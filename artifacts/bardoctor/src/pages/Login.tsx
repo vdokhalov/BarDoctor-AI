@@ -1,75 +1,178 @@
-import React from 'react';
-import { Link } from 'wouter';
-import { Eye, ChevronLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { Link, useLocation } from 'wouter';
+import { Eye, EyeOff, Mail, Lock, ChevronLeft } from 'lucide-react';
+import { motion } from 'framer-motion';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
+import Button from '@/components/ds/Button';
+import Input from '@/components/ds/Input';
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.07, duration: 0.4, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  }),
+};
 
 export default function Login() {
+  const [, navigate] = useLocation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <AppShell>
-      <SafeArea className="flex flex-col min-h-[100dvh] pt-4">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-12">
-          <Link href="/" className="w-10 h-10 -ml-2 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors">
-            <ChevronLeft className="w-6 h-6 text-[#1A1A2E]" />
-          </Link>
-          <button className="text-[15px] font-medium text-[#8E8E9A]">
-            Пропустить
+      {/* Subtle radial glow behind logo */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 38% at 50% 0%, hsl(240 78% 64% / 0.10) 0%, transparent 70%)',
+        }}
+      />
+
+      <SafeArea className="relative z-10 flex flex-col min-h-[100dvh] px-6">
+
+        {/* ── Back button ── */}
+        <motion.div
+          custom={0}
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="flex items-center pt-2 pb-2"
+        >
+          <button
+            onClick={() => navigate('/')}
+            className="w-10 h-10 -ml-2 rounded-full flex items-center justify-center hover:bg-foreground/5 active:bg-foreground/10 transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-foreground" strokeWidth={2.2} />
           </button>
-        </div>
+        </motion.div>
 
-        {/* Logo & Title */}
-        <div className="flex flex-col items-center text-center mb-10">
-          <div className="w-14 h-14 bg-[#4F46E5] rounded-full flex items-center justify-center mb-6 shadow-lg shadow-indigo-500/20">
-            <span className="text-white text-xl font-bold tracking-tighter">BD</span>
+        {/* ── Logo block ── */}
+        <motion.div
+          custom={1}
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="flex flex-col items-center text-center mt-6 mb-10"
+        >
+          {/* Mark */}
+          <div
+            className="w-[68px] h-[68px] rounded-[20px] bg-primary flex items-center justify-center mb-5 select-none"
+            style={{ boxShadow: '0 8px 32px hsl(240 78% 64% / 0.30), 0 2px 8px hsl(240 78% 64% / 0.14)' }}
+          >
+            <span className="text-primary-foreground text-[24px] font-bold tracking-tighter">
+              BD
+            </span>
           </div>
-          <h1 className="text-[28px] font-bold text-[#1A1A2E] tracking-tight mb-2">Добро пожаловать</h1>
-          <p className="text-[16px] text-[#8E8E9A]">Войдите в свой аккаунт</p>
-        </div>
 
-        {/* Form */}
-        <div className="flex flex-col gap-4 mb-8">
-          <div>
-            <input 
-              type="email" 
-              placeholder="Эл. почта" 
-              className="w-full h-14 bg-[#F2F2F7] rounded-xl px-4 text-[16px] outline-none border border-transparent focus:border-[#4F46E5] transition-colors"
+          {/* Wordmark */}
+          <h1 className="text-[34px] font-bold text-foreground tracking-tight leading-none mb-2.5">
+            BarDoctor
+          </h1>
+
+          {/* Subtitle */}
+          <p className="text-[15px] text-muted-foreground leading-snug max-w-[230px]">
+            AI‑платформа для управления заведением
+          </p>
+        </motion.div>
+
+        {/* ── Form ── */}
+        <div className="flex flex-col gap-4 w-full">
+          <motion.div custom={2} variants={fadeUp} initial="hidden" animate="visible">
+            <Input
+              label="Email"
+              type="email"
+              placeholder="example@mail.ru"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              leftIcon={<Mail className="w-[18px] h-[18px]" />}
             />
-          </div>
-          <div className="relative">
-            <input 
-              type="password" 
-              placeholder="Пароль" 
-              className="w-full h-14 bg-[#F2F2F7] rounded-xl px-4 pr-12 text-[16px] outline-none border border-transparent focus:border-[#4F46E5] transition-colors"
+          </motion.div>
+
+          <motion.div custom={3} variants={fadeUp} initial="hidden" animate="visible">
+            <Input
+              label="Пароль"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              leftIcon={<Lock className="w-[18px] h-[18px]" />}
+              rightElement={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                >
+                  {showPassword
+                    ? <EyeOff className="w-[18px] h-[18px]" />
+                    : <Eye className="w-[18px] h-[18px]" />}
+                </button>
+              }
             />
-            <button className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8E8E9A] hover:text-[#1A1A2E]">
-              <Eye className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="flex justify-end">
-            <button className="text-[14px] font-medium text-[#4F46E5]">Забыли пароль?</button>
-          </div>
+
+            {/* Forgot password */}
+            <div className="flex justify-end mt-3">
+              <Link href="/forgot-password">
+                <span className="text-[14px] font-medium text-primary hover:opacity-80 transition-opacity">
+                  Забыли пароль?
+                </span>
+              </Link>
+            </div>
+          </motion.div>
         </div>
 
-        <Link href="/home" className="w-full">
-          <button className="w-full h-14 bg-[#1A1A2E] text-white rounded-xl text-[16px] font-semibold active:scale-[0.98] transition-transform">
+        {/* ── CTA buttons ── */}
+        <motion.div
+          custom={4}
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="flex flex-col gap-3 mt-8"
+        >
+          <Button
+            variant="primary"
+            fullWidth
+            onClick={() => navigate('/home')}
+          >
             Войти
-          </button>
-        </Link>
+          </Button>
 
-        {/* Divider */}
-        <div className="flex items-center gap-4 my-8">
-          <div className="h-[1px] flex-1 bg-[#E8E8EC]"></div>
-          <span className="text-[13px] font-medium text-[#8E8E9A] uppercase tracking-wider">Или</span>
-          <div className="h-[1px] flex-1 bg-[#E8E8EC]"></div>
-        </div>
+          <Button
+            variant="secondary"
+            fullWidth
+            onClick={() => navigate('/register')}
+          >
+            Создать аккаунт
+          </Button>
+        </motion.div>
 
-        {/* Register Link */}
-        <div className="mt-auto pb-8 flex justify-center">
-          <Link href="/register" className="text-[15px] text-[#8E8E9A] font-medium">
-            Нет аккаунта? <span className="text-[#1A1A2E] font-semibold">Зарегистрироваться</span>
-          </Link>
-        </div>
+        {/* ── Spacer + legal ── */}
+        <div className="flex-1 min-h-[32px]" />
+
+        <motion.div
+          custom={5}
+          variants={fadeUp}
+          initial="hidden"
+          animate="visible"
+          className="pb-10 text-center"
+        >
+          <p className="text-[12px] text-muted-foreground leading-relaxed">
+            Входя в систему, вы принимаете{' '}
+            <span className="text-foreground/60 underline underline-offset-2 decoration-foreground/30">
+              Условия использования
+            </span>{' '}
+            и{' '}
+            <span className="text-foreground/60 underline underline-offset-2 decoration-foreground/30">
+              Политику конфиденциальности
+            </span>
+          </p>
+        </motion.div>
+
       </SafeArea>
     </AppShell>
   );
