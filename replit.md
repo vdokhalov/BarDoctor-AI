@@ -1,6 +1,6 @@
-# [Project name]
+# BarDoctor
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+AI-платформа для владельцев и управляющих ресторанов — мобильное premium SaaS-приложение на React + TypeScript + Tailwind CSS.
 
 ## Run & Operate
 
@@ -22,23 +22,39 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Frontend app: `artifacts/bardoctor/src/`
+- Pages: `artifacts/bardoctor/src/pages/` (10 pages)
+- Layout components: `artifacts/bardoctor/src/components/layout/` (AppShell, BottomNav, PageHeader, SafeArea)
+- Shared UI: `artifacts/bardoctor/src/components/shared/` (MetricCard, ListRow, StatusBadge, SectionTitle, EmptyState)
+- Design tokens (CSS vars): `artifacts/bardoctor/src/index.css`
+- Router: `artifacts/bardoctor/src/App.tsx` (wouter)
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Mobile-first: max-width 430px container, fixed bottom nav 80px, content padded above nav
+- No backend wired yet — pure frontend architecture/shell, no API calls
+- Routing via wouter; all 10 pages scaffolded as empty shells with realistic Russian placeholder content
+- Bottom nav: 5 tabs (Главная, Анализ, FAB Add, Задачи, Профиль); Equipment accessible from Profile
+- Design system: indigo accent (#4F46E5), near-black primary (#1A1A2E), SF Pro Display font stack, CSS variables in index.css
+- Splash auto-redirects to /home after 2s via framer-motion fade + setTimeout
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+BarDoctor — premium command center for restaurant owners. Screens: Splash, Login, Register, Create Restaurant (onboarding), Home (dashboard), Analysis, Add (action menu), Tasks, Equipment, Profile.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Language: Russian throughout the UI
+- Style: Apple / Linear / Notion — Premium SaaS
+- Rounded cards (rounded-2xl), soft shadows, large spacing, minimalistic
+- No business logic, no charts — architecture/shell only
+- No emojis in UI text
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Do not add charts until user explicitly requests them
+- All new pages must use AppShell + PageHeader layout wrappers
+- Bottom nav only shows on authenticated pages (/home, /analysis, /add, /tasks, /profile)
 
 ## Pointers
 

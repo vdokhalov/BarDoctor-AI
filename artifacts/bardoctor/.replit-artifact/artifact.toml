@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "BarDoctor"
+version = "1.0.0"
+id = "artifacts/bardoctor"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22117
+
+[services.development]
+run = "pnpm --filter @workspace/bardoctor run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bardoctor", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bardoctor/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22117"
+BASE_PATH = "/"
