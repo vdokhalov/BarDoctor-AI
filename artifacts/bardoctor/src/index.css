@@ -41,6 +41,7 @@
 
   --color-success: hsl(var(--success));
   --color-warning: hsl(var(--warning));
+  --color-info: hsl(var(--info));
 
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
@@ -58,65 +59,108 @@
 }
 
 :root {
-  /* Background: #F9F9FB */
-  --background: 240 20% 98%;
-  
-  /* Text: Primary #1A1A2E */
-  --foreground: 240 28% 14%;
-  
-  /* Border: #E8E8EC */
-  --border: 240 10% 92%;
-  
-  /* Card: #FFFFFF */
-  --card: 0 0% 100%;
-  --card-foreground: 240 28% 14%;
-  --card-border: 240 10% 92%;
+  /* === CORE BRAND === */
+  --primary: 240 78% 64%;           /* #5B5CEB */
+  --primary-foreground: 0 0% 100%;
+
+  --background: 228 33% 97%;        /* #F8F9FC */
+  --foreground: 230 25% 12%;        /* #161B2E */
+
+  --card: 0 0% 100%;                /* White */
+  --card-foreground: 230 25% 12%;
+  --card-border: 228 20% 92%;       /* #E5E7EF */
+
+  --border: 228 20% 92%;
+  --input: 228 30% 95%;             /* #EFF0F6 */
+  --ring: 240 78% 64%;              /* #5B5CEB */
+
+  --muted: 228 30% 95%;
+  --muted-foreground: 228 12% 55%;  /* #878EA8 */
+
+  --secondary: 228 30% 95%;
+  --secondary-foreground: 230 25% 12%;
+
+  --accent: 240 78% 64%;
+  --accent-foreground: 0 0% 100%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 240 28% 14%;
-  --popover-border: 240 10% 92%;
-  
-  /* Primary: #1A1A2E */
-  --primary: 240 28% 14%;
-  --primary-foreground: 0 0% 100%;
-  
-  /* Muted / Secondary: #8E8E9A */
-  --secondary: 240 8% 58%;
-  --secondary-foreground: 0 0% 100%;
-  
-  /* Muted background: #F2F2F7 */
-  --muted: 240 20% 96%;
-  --muted-foreground: 240 8% 58%;
-  
-  /* Accent: #4F46E5 */
-  --accent: 243 75% 59%;
-  --accent-foreground: 0 0% 100%;
-  
-  /* Danger: #EF4444 */
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  
-  /* Additional statuses */
-  --success: 142 71% 45%;
-  --warning: 38 92% 50%;
+  --popover-foreground: 230 25% 12%;
+  --popover-border: 228 20% 92%;
 
-  --input: 240 20% 96%;
-  --ring: 243 75% 59%;
-  
-  --chart-1: 243 75% 59%;
+  --destructive: 0 84% 60%;         /* #EF4444 */
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 142 71% 45%;           /* #22C55E */
+  --warning: 38 92% 50%;            /* #F59E0B */
+  --info: 213 94% 55%;              /* #3B82F6 */
+
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 230 25% 12%;
+  --sidebar-border: 228 20% 92%;
+  --sidebar-primary: 240 78% 64%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 228 30% 95%;
+  --sidebar-accent-foreground: 230 25% 12%;
+  --sidebar-ring: 240 78% 64%;
+
+  --chart-1: 240 78% 64%;
   --chart-2: 142 71% 45%;
   --chart-3: 38 92% 50%;
   --chart-4: 0 84% 60%;
-  --chart-5: 240 8% 58%;
+  --chart-5: 213 94% 55%;
 
+  /* === TYPOGRAPHY === */
   --app-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
-  --radius: 0.5rem; /* 8px base */
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'SF Mono', ui-monospace, monospace;
 
-  --shadow-card: 0 2px 16px rgba(0, 0, 0, 0.06);
+  /* === RADIUS (all based on 20px) === */
+  --radius: 1.25rem;                /* 20px — main card radius */
+
+  /* === SPACING === */
+  --spacing-outer: 1.5rem;          /* 24px — outer page padding */
+  --spacing-inner: 1.25rem;         /* 20px — inner card padding */
+  --spacing-gap: 0.75rem;           /* 12px — between items */
+
+  /* === SHADOWS === */
+  --shadow-card: 0 1px 3px rgba(22,27,46,0.06), 0 4px 16px rgba(22,27,46,0.04);
+  --shadow-elevated: 0 4px 24px rgba(22,27,46,0.10), 0 1px 4px rgba(22,27,46,0.06);
+  --shadow-fab: 0 8px 32px rgba(91,92,235,0.32), 0 2px 8px rgba(91,92,235,0.16);
+  --shadow-dialog: 0 20px 60px rgba(22,27,46,0.18), 0 4px 16px rgba(22,27,46,0.08);
+
+  /* BUTTON HEIGHT */
+  --button-h: 3.5rem;               /* 56px */
 }
 
 .dark {
-  /* Enforce light mode only as per requirements */
+  --background: 230 25% 10%;
+  --foreground: 0 0% 96%;
+  --card: 230 20% 14%;
+  --card-foreground: 0 0% 96%;
+  --card-border: 230 20% 20%;
+  --border: 230 20% 20%;
+  --input: 230 20% 18%;
+  --muted: 230 20% 18%;
+  --muted-foreground: 228 12% 60%;
+  --secondary: 230 20% 18%;
+  --secondary-foreground: 0 0% 96%;
+  --popover: 230 20% 14%;
+  --popover-foreground: 0 0% 96%;
+  --popover-border: 230 20% 20%;
+  --primary: 240 78% 64%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 240 78% 64%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: 230 20% 14%;
+  --sidebar-foreground: 0 0% 96%;
+  --sidebar-border: 230 20% 20%;
+  --sidebar-primary: 240 78% 64%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 230 20% 18%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-ring: 240 78% 64%;
 }
 
 @layer base {
@@ -136,5 +180,36 @@
 @layer utilities {
   .shadow-card {
     box-shadow: var(--shadow-card);
+  }
+  
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  
+  .bd-card {
+    @apply bg-card border border-card-border rounded-[20px];
+    box-shadow: var(--shadow-card);
+  }
+  
+  .bd-page-padding {
+    @apply px-6; /* 24px */
+  }
+  
+  .bd-inner-padding {
+    @apply p-5; /* 20px */
+  }
+  
+  .bd-input-base {
+    @apply w-full bg-input border border-transparent rounded-[14px] px-4 text-[16px] text-foreground
+           placeholder:text-muted-foreground outline-none
+           transition-all duration-150
+           focus:border-primary focus:bg-background focus:ring-0;
+    height: var(--button-h); /* 56px */
+  }
+  
+  .bd-button-base {
+    @apply inline-flex items-center justify-center font-semibold text-[16px] 
+           rounded-[14px] transition-all duration-150 active:scale-[0.97] 
+           select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none;
+    height: var(--button-h); /* 56px */
   }
 }

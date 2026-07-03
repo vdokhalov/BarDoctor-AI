@@ -36,7 +36,7 @@ export default function ListRow({
         {icon && (
           <div className={cn(
             "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-            destructive ? "bg-red-50 text-red-500" : "bg-[#F2F2F7] text-[#1A1A2E]"
+            destructive ? "bg-destructive/10 text-destructive" : "bg-muted text-foreground"
           )}>
             {icon}
           </div>
@@ -44,19 +44,19 @@ export default function ListRow({
         <div className="flex flex-col">
           <span className={cn(
             "text-[16px] font-medium",
-            destructive ? "text-[#EF4444]" : "text-[#1A1A2E]"
+            destructive ? "text-destructive" : "text-foreground"
           )}>
             {title}
           </span>
           {subtitle && (
-            <span className="text-[13px] text-[#8E8E9A] mt-0.5">{subtitle}</span>
+            <span className="text-[13px] text-muted-foreground mt-0.5">{subtitle}</span>
           )}
         </div>
       </div>
       
       <div className="flex items-center gap-3">
-        {meta && <div className="text-[14px] text-[#8E8E9A] font-medium">{meta}</div>}
-        {showChevron && <ChevronRight className="w-5 h-5 text-[#C7C7CC]" />}
+        {meta && <div className="text-[14px] text-muted-foreground font-medium">{meta}</div>}
+        {showChevron && <ChevronRight className="w-5 h-5 text-muted-foreground" />}
       </div>
     </div>
   );

@@ -11,11 +11,11 @@ interface StatusBadgeProps {
 
 export default function StatusBadge({ label, variant = 'neutral', className }: StatusBadgeProps) {
   const variants: Record<StatusVariant, string> = {
-    success: 'bg-[#22C55E]/10 text-[#22C55E]',
-    warning: 'bg-[#F59E0B]/10 text-[#D97706]',
-    danger: 'bg-[#EF4444]/10 text-[#EF4444]',
-    neutral: 'bg-[#F2F2F7] text-[#8E8E9A]',
-    primary: 'bg-[#4F46E5]/10 text-[#4F46E5]',
+    success: 'bg-success/10 text-success',
+    warning: 'bg-warning/10 text-warning',
+    danger: 'bg-destructive/10 text-destructive',
+    neutral: 'bg-muted text-muted-foreground',
+    primary: 'bg-primary/10 text-primary',
   };
 
   return (
