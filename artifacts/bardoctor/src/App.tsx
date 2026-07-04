@@ -5,6 +5,7 @@ import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { ToastProvider, ToastContainer } from '@/components/ds/Toast';
 import { RestaurantProvider, useRestaurant } from '@/contexts/RestaurantContext';
 import { EventsProvider } from '@/contexts/EventsContext';
+import { EmployeesProvider } from '@/contexts/EmployeesContext';
 
 import NotFound     from '@/pages/not-found';
 import Splash       from '@/pages/Splash';
@@ -17,6 +18,7 @@ import Add          from '@/pages/Add';
 import Events       from '@/pages/Events';
 import Tasks        from '@/pages/Tasks';
 import Equipment    from '@/pages/Equipment';
+import Employees    from '@/pages/Employees';
 import Profile      from '@/pages/Profile';
 import More         from '@/pages/More';
 import ComingSoon   from '@/pages/ComingSoon';
@@ -52,7 +54,7 @@ function Router() {
       <Route path="/equipment"     component={() => <RequireProfile component={Equipment} />} />
       <Route path="/profile"       component={() => <RequireProfile component={Profile} />} />
       <Route path="/more"          component={() => <RequireProfile component={More} />} />
-      <Route path="/employees"     component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/employees"     component={() => <RequireProfile component={Employees} />} />
       <Route path="/suppliers"     component={() => <RequireProfile component={ComingSoon} />} />
       <Route path="/warehouse"     component={() => <RequireProfile component={ComingSoon} />} />
       <Route path="/reports"       component={() => <RequireProfile component={ComingSoon} />} />
@@ -75,6 +77,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <RestaurantProvider>
         <EventsProvider>
+          <EmployeesProvider>
           <TooltipProvider>
             <ToastProvider>
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
@@ -84,6 +87,7 @@ function App() {
             </ToastProvider>
             <Toaster />
           </TooltipProvider>
+          </EmployeesProvider>
         </EventsProvider>
       </RestaurantProvider>
     </QueryClientProvider>
