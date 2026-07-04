@@ -80,21 +80,21 @@ const SEED: Task[] = [
     title: 'Очистить кофемашину',
     category: 'Оборудование',
     deadline: 'Сегодня, 12:00',
-    responsible: 'Алексей П.',
+    responsible: 'Бариста',
   },
   {
     id: uid(), tab: 'today', priority: 'high',
     title: 'Провести инвентаризацию бара',
     category: 'Склад',
     deadline: 'Сегодня, 18:00',
-    responsible: 'Иван С.',
+    responsible: 'Администратор',
   },
   {
     id: uid(), tab: 'today', priority: 'medium',
-    title: 'Заказать сиропы Monin',
+    title: 'Заказать сиропы',
     category: 'Закупки',
     deadline: 'Сегодня, 15:00',
-    responsible: 'Мария К.',
+    responsible: 'Менеджер',
   },
   {
     id: uid(), tab: 'today', priority: 'low',
@@ -123,7 +123,7 @@ const SEED: Task[] = [
     title: 'Составить меню на декабрь',
     category: 'Меню',
     deadline: 'Чт, 30 ноя',
-    responsible: 'Мария К.',
+    responsible: 'Шеф',
   },
   // overdue
   {
@@ -131,14 +131,14 @@ const SEED: Task[] = [
     title: 'Проверить пожарную сигнализацию',
     category: 'Безопасность',
     deadline: 'Вчера, 10:00',
-    responsible: 'Алексей П.',
+    responsible: 'Управляющий',
   },
   {
     id: uid(), tab: 'overdue', priority: 'high',
     title: 'Обновить ХАССП-документы',
     category: 'Документы',
     deadline: '2 дня назад',
-    responsible: 'Мария К.',
+    responsible: 'Менеджер',
   },
   // done
   {
@@ -153,14 +153,14 @@ const SEED: Task[] = [
     title: 'Поставка чайной посуды',
     category: 'Закупки',
     deadline: 'Выполнено 24 ноя',
-    responsible: 'Иван С.',
+    responsible: 'Администратор',
   },
   {
     id: uid(), tab: 'done', priority: 'low',
     title: 'Инструктаж персонала по безопасности',
     category: 'Персонал',
     deadline: 'Выполнено 23 ноя',
-    responsible: 'Алексей П.',
+    responsible: 'Управляющий',
   },
 ];
 

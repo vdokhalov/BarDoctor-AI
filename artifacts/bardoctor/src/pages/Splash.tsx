@@ -1,26 +1,26 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { motion } from 'framer-motion';
+import { loadProfile } from '@/store/restaurant';
 
 export default function Splash() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLocation('/home');
-    }, 2000);
-
+      const profile = loadProfile();
+      setLocation(profile ? '/home' : '/setup');
+    }, 1800);
     return () => clearTimeout(timer);
   }, [setLocation]);
 
   return (
     <div className="min-h-[100dvh] w-full bg-[#F9F9FB] flex flex-col items-center justify-center relative overflow-hidden">
-      {/* Decorative background blur */}
       <div className="absolute inset-0 flex items-center justify-center opacity-30">
-        <motion.div 
+        <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1.2, opacity: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
+          transition={{ duration: 1.5, ease: 'easeOut' }}
           className="w-64 h-64 bg-[#4F46E5] rounded-full blur-[80px]"
         />
       </div>

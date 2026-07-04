@@ -76,7 +76,7 @@ const EQUIPMENT_DATA: Equipment[] = [
     serialNumber: 'LM-PB-2024-0341', purchaseDate: '18 янв 2023', warranty: 'до 18 янв 2026',
     repairs: [
       { id: nid(), date: '12 сен 2024', type: 'Плановое ТО', cost: '4 800 ₽', technician: 'Сервис-центр CoffeePro' },
-      { id: nid(), date: '3 мар 2024',  type: 'Замена уплотнителей', cost: '1 200 ₽', technician: 'Иван Техник' },
+      { id: nid(), date: '3 мар 2024',  type: 'Замена уплотнителей', cost: '1 200 ₽', technician: 'Сервис-центр CoffeePro' },
     ],
   },
   {

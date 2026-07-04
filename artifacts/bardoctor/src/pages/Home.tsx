@@ -5,6 +5,7 @@ import {
   ShoppingCart, Star, MessageSquare, Wrench, ArrowRight,
 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { useRestaurant } from '@/contexts/RestaurantContext';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import { cn } from '@/lib/utils';
@@ -38,7 +39,7 @@ const CRITICAL = [
     id: 2,
     icon: Users,
     title: 'Два сотрудника не вышли',
-    insight: 'Иванов и Петрова не подтвердили явку на смену в 14:00. Если не решить до 12:00 — смена будет под угрозой.',
+    insight: 'Два сотрудника не подтвердили явку на смену в 14:00. Если не решить до 12:00 — смена будет под угрозой.',
     tag: 'Персонал',
     time: 'До 12:00',
     action: 'Связаться',
@@ -383,6 +384,9 @@ const fadeUp = {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
+  const { profile } = useRestaurant();
+  const restaurantName = profile?.name ?? 'Моё заведение';
+
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? 'Доброе утро' : hour < 17 ? 'Добрый день' : 'Добрый вечер';
@@ -399,11 +403,11 @@ export default function Home() {
           >
             <div>
               <h1 className="text-[22px] font-bold text-foreground tracking-tight leading-tight">
-                {greeting}, Алексей 👋
+                {greeting} 👋
               </h1>
               <button className="flex items-center gap-1.5 mt-2 pl-2.5 pr-3 py-1.5 bg-muted rounded-full hover:bg-border/60 transition-colors active:scale-[0.97]">
                 <Store size={13} className="text-muted-foreground" />
-                <span className="text-[13px] font-semibold text-foreground">Гранд Кафе</span>
+                <span className="text-[13px] font-semibold text-foreground">{restaurantName}</span>
                 <ChevronDown size={13} className="text-muted-foreground" />
               </button>
             </div>

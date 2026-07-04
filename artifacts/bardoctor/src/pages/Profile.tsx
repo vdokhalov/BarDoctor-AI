@@ -1,43 +1,96 @@
-import React from 'react';
 import { useLocation } from 'wouter';
-import { Bell, Shield, Globe, Wrench, HelpCircle, Info, LogOut, Palette } from 'lucide-react';
+import { Shield, Globe, LogOut, RotateCcw, Lock, Smartphone } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import PageHeader from '@/components/layout/PageHeader';
 import ListRow from '@/components/shared/ListRow';
+import { useRestaurant } from '@/contexts/RestaurantContext';
+import { initials, clearProfile } from '@/store/restaurant';
 
 export default function Profile() {
   const [, setLocation] = useLocation();
+  const { profile } = useRestaurant();
+
+  const name  = profile?.name ?? 'Моё заведение';
+  const role  = profile ? `${profile.businessType} · ${profile.city}` : 'Настройте профиль';
+  const abbr  = initials(name);
+
+  function handleReset() {
+    clearProfile();
+    setLocation('/setup');
+  }
 
   return (
     <AppShell showBottomNav>
       <PageHeader title="Профиль" />
       <SafeArea>
-        {/* Profile Info */}
+
+        {/* ── Avatar & name ── */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4 shadow-sm border border-border">
-            <span className="text-[28px] font-bold text-primary tracking-tight">АК</span>
+            <span className="text-[24px] font-bold text-primary tracking-tight">{abbr}</span>
           </div>
-          <h2 className="text-[22px] font-bold text-foreground tracking-tight mb-1">Алексей Кузнецов</h2>
-          <p className="text-[15px] text-muted-foreground font-medium">Владелец · Гранд Кафе</p>
+          <h2 className="text-[22px] font-bold text-foreground tracking-tight mb-1">{name}</h2>
+          <p className="text-[15px] text-muted-foreground font-medium">{role}</p>
+
+          {profile && (
+            <div className="flex flex-wrap justify-center gap-2 mt-3">
+              {profile.seats > 0 && (
+                <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                  {profile.seats} мест
+                </span>
+              )}
+              {profile.employees > 0 && (
+                <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                  {profile.employees} сотрудников
+                </span>
+              )}
+              {profile.avgCheck > 0 && (
+                <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                  ₽{profile.avgCheck.toLocaleString('ru')} средний чек
+                </span>
+              )}
+              {profile.hasBar && (
+                <span className="text-[12px] font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
+                  Бар
+                </span>
+              )}
+              {profile.hasDelivery && (
+                <span className="text-[12px] font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
+                  Доставка
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col gap-6 mb-8">
-          {/* Section 1 */}
+
+          {/* ── Account security ── */}
           <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
-            <ListRow 
-              icon={<Bell className="w-5 h-5" />}
-              title="Уведомления"
+            <ListRow
+              icon={<Lock className="w-5 h-5" />}
+              title="Пароль"
               showChevron
               className="px-4 border-b border-border"
             />
-            <ListRow 
+            <ListRow
               icon={<Shield className="w-5 h-5" />}
-              title="Безопасность"
+              title="Двухфакторная защита"
               showChevron
               className="px-4 border-b border-border"
             />
-            <ListRow 
+            <ListRow
+              icon={<Smartphone className="w-5 h-5" />}
+              title="Устройства"
+              showChevron
+              className="px-4"
+            />
+          </div>
+
+          {/* ── Preferences ── */}
+          <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
+            <ListRow
               icon={<Globe className="w-5 h-5" />}
               title="Язык"
               meta="Русский"
@@ -46,40 +99,20 @@ export default function Profile() {
             />
           </div>
 
-          {/* Section 2 */}
+          {/* ── Restaurant data ── */}
           <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
-            <ListRow 
-              icon={<Wrench className="w-5 h-5" />}
-              title="Оборудование"
+            <ListRow
+              icon={<RotateCcw className="w-5 h-5" />}
+              title="Изменить данные заведения"
               showChevron
-              onClick={() => setLocation('/equipment')}
-              className="px-4 border-b border-border"
-            />
-            <ListRow 
-              icon={<HelpCircle className="w-5 h-5" />}
-              title="Помощь"
-              showChevron
-              className="px-4 border-b border-border"
-            />
-            <ListRow 
-              icon={<Info className="w-5 h-5" />}
-              title="О приложении"
-              meta="Версия 1.0.0"
-              showChevron
-              className="px-4 border-b border-border"
-            />
-            <ListRow 
-              icon={<Palette className="w-5 h-5" />}
-              title="Design System"
-              showChevron
-              onClick={() => setLocation('/design-system')}
+              onClick={handleReset}
               className="px-4"
             />
           </div>
 
-          {/* Danger Section */}
-          <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden mt-2">
-            <ListRow 
+          {/* ── Sign out ── */}
+          <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
+            <ListRow
               icon={<LogOut className="w-5 h-5" />}
               title="Выйти из аккаунта"
               destructive
@@ -87,6 +120,7 @@ export default function Profile() {
               className="px-4"
             />
           </div>
+
         </div>
       </SafeArea>
     </AppShell>
