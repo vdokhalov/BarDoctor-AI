@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   Plus, Clock, User, Check, Trash2, ChevronDown,
-  AlertCircle, Calendar, X,
+  AlertCircle, Calendar, X, CheckSquare,
 } from 'lucide-react';
 import {
   motion, AnimatePresence, useMotionValue,
@@ -73,96 +73,8 @@ const TABS: { key: Tab; label: string }[] = [
 let _id = 0;
 const uid = () => String(++_id);
 
-const SEED: Task[] = [
-  // today
-  {
-    id: uid(), tab: 'today', priority: 'critical',
-    title: 'Очистить кофемашину',
-    category: 'Оборудование',
-    deadline: 'Сегодня, 12:00',
-    responsible: 'Бариста',
-  },
-  {
-    id: uid(), tab: 'today', priority: 'high',
-    title: 'Провести инвентаризацию бара',
-    category: 'Склад',
-    deadline: 'Сегодня, 18:00',
-    responsible: 'Администратор',
-  },
-  {
-    id: uid(), tab: 'today', priority: 'medium',
-    title: 'Заказать сиропы',
-    category: 'Закупки',
-    deadline: 'Сегодня, 15:00',
-    responsible: 'Менеджер',
-  },
-  {
-    id: uid(), tab: 'today', priority: 'low',
-    title: 'Созвать собрание персонала',
-    category: 'Управление',
-    deadline: 'Сегодня, 20:00',
-    responsible: 'Вы',
-  },
-  // week
-  {
-    id: uid(), tab: 'week', priority: 'critical',
-    title: 'Квартальный отчёт',
-    category: 'Управление',
-    deadline: 'Пт, 1 дек',
-    responsible: 'Вы',
-  },
-  {
-    id: uid(), tab: 'week', priority: 'high',
-    title: 'Обслуживание холодильника',
-    category: 'Оборудование',
-    deadline: 'Пт, 1 дек',
-    responsible: 'Техник',
-  },
-  {
-    id: uid(), tab: 'week', priority: 'medium',
-    title: 'Составить меню на декабрь',
-    category: 'Меню',
-    deadline: 'Чт, 30 ноя',
-    responsible: 'Шеф',
-  },
-  // overdue
-  {
-    id: uid(), tab: 'overdue', priority: 'critical',
-    title: 'Проверить пожарную сигнализацию',
-    category: 'Безопасность',
-    deadline: 'Вчера, 10:00',
-    responsible: 'Управляющий',
-  },
-  {
-    id: uid(), tab: 'overdue', priority: 'high',
-    title: 'Обновить ХАССП-документы',
-    category: 'Документы',
-    deadline: '2 дня назад',
-    responsible: 'Менеджер',
-  },
-  // done
-  {
-    id: uid(), tab: 'done', priority: 'medium',
-    title: 'Составить график на ноябрь',
-    category: 'Управление',
-    deadline: 'Выполнено 25 ноя',
-    responsible: 'Вы',
-  },
-  {
-    id: uid(), tab: 'done', priority: 'high',
-    title: 'Поставка чайной посуды',
-    category: 'Закупки',
-    deadline: 'Выполнено 24 ноя',
-    responsible: 'Администратор',
-  },
-  {
-    id: uid(), tab: 'done', priority: 'low',
-    title: 'Инструктаж персонала по безопасности',
-    category: 'Персонал',
-    deadline: 'Выполнено 23 ноя',
-    responsible: 'Управляющий',
-  },
-];
+// No seed data — tasks are entered by the user only.
+const SEED: Task[] = [];
 
 // ─── Priority pill ─────────────────────────────────────────────────────────────
 
@@ -299,19 +211,40 @@ function SwipeableTask({ task, isDone = false, onComplete, onDelete }: Swipeable
 
 // ─── Empty state ───────────────────────────────────────────────────────────────
 
-function EmptyState({ tab }: { tab: Tab }) {
-  const MSGS: Record<Tab, { emoji: string; text: string }> = {
-    today: { emoji: '✅', text: 'Задач на сегодня нет' },
-    week: { emoji: '📅', text: 'Задач на этой неделе нет' },
-    overdue: { emoji: '🎉', text: 'Просроченных задач нет' },
-    done: { emoji: '📋', text: 'Выполненных задач пока нет' },
+function EmptyState({ tab, onAdd }: { tab: Tab; onAdd?: () => void }) {
+  const MSGS: Record<Tab, { title: string; body: string; cta?: string }> = {
+    today:   { title: 'Задач на сегодня нет',       body: 'Добавьте первую задачу — она сразу появится здесь.',        cta: 'Добавить задачу' },
+    week:    { title: 'На этой неделе всё спокойно', body: 'Нет задач на ближайшие дни. Самое время спланировать.',     cta: 'Добавить задачу' },
+    overdue: { title: 'Просроченных задач нет',      body: 'Отличный результат — всё выполняется вовремя.',             cta: undefined },
+    done:    { title: 'Выполненных задач пока нет',  body: 'Здесь будут отмечены завершённые задачи.',                  cta: undefined },
   };
-  const { emoji, text } = MSGS[tab];
+  const { title, body, cta } = MSGS[tab];
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <span className="text-4xl mb-3">{emoji}</span>
-      <p className="text-[15px] text-muted-foreground font-medium">{text}</p>
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="flex flex-col items-center justify-center py-16 text-center px-8"
+    >
+      <div className="w-14 h-14 rounded-[18px] bg-muted flex items-center justify-center mb-4">
+        {tab === 'overdue'
+          ? <span className="text-2xl">🎉</span>
+          : tab === 'done'
+          ? <span className="text-2xl">📋</span>
+          : <CheckSquare size={26} className="text-muted-foreground/60" />}
+      </div>
+      <p className="text-[16px] font-bold text-foreground mb-1.5">{title}</p>
+      <p className="text-[13px] text-muted-foreground leading-relaxed mb-5">{body}</p>
+      {cta && onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          className="px-5 py-2.5 bg-primary text-white rounded-2xl text-[14px] font-semibold hover:opacity-90 active:scale-[0.97] transition-all shadow-[0_4px_14px_rgba(91,92,235,0.22)]"
+        >
+          {cta}
+        </button>
+      )}
+    </motion.div>
   );
 }
 
@@ -534,7 +467,7 @@ export default function Tasks() {
           <AnimatePresence mode="wait">
             <motion.div key={activeTab} {...fadeUp}>
               {tabTasks.length === 0 ? (
-                <EmptyState tab={activeTab} />
+                <EmptyState tab={activeTab} onAdd={() => setShowAdd(true)} />
               ) : (
                 tabTasks.map((task) => (
                   <SwipeableTask

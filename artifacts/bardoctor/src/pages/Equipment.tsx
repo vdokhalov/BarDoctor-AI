@@ -62,75 +62,9 @@ const RISK_CFG: Record<Risk, { label: string; color: string; bar: string; width:
   critical: { label: 'Критический', color: 'text-destructive', bar: 'bg-destructive', width: 'w-full', bg: 'bg-destructive/10' },
 };
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
-
+// No seed data — equipment is added by the user only.
 let _n = 0;
 const nid = () => String(++_n);
-
-const EQUIPMENT_DATA: Equipment[] = [
-  {
-    id: nid(), emoji: '☕', gradientFrom: '#FEF3C7', gradientTo: '#FDE68A',
-    name: 'La Marzocco Linea PB', model: 'Linea PB 2G',
-    category: 'Кофемашина', location: 'Барная стойка',
-    status: 'working', risk: 'medium',
-    lastMaintenance: '12 сен 2024', nextMaintenance: '12 дек 2024',
-    serialNumber: 'LM-PB-2024-0341', purchaseDate: '18 янв 2023', warranty: 'до 18 янв 2026',
-    repairs: [
-      { id: nid(), date: '12 сен 2024', type: 'Плановое ТО', cost: '4 800 ₽', technician: 'Сервис-центр CoffeePro' },
-      { id: nid(), date: '3 мар 2024',  type: 'Замена уплотнителей', cost: '1 200 ₽', technician: 'Сервис-центр CoffeePro' },
-    ],
-  },
-  {
-    id: nid(), emoji: '❄️', gradientFrom: '#DBEAFE', gradientTo: '#BFDBFE',
-    name: 'Льдогенератор Brema', model: 'CB 184A HC',
-    category: 'Холодильное', location: 'Подсобка',
-    status: 'maintenance', risk: 'high',
-    lastMaintenance: '1 окт 2024', nextMaintenance: '1 нояб 2024', nextOverdue: true,
-    serialNumber: 'BR-CB-2022-1174', purchaseDate: '5 авг 2022', warranty: 'истекла',
-    repairs: [
-      { id: nid(), date: '1 окт 2024',  type: 'Очистка испарителя', cost: '2 200 ₽', technician: 'ХолодТех' },
-      { id: nid(), date: '10 июл 2024', type: 'Замена помпы',        cost: '8 500 ₽', technician: 'ХолодТех' },
-      { id: nid(), date: '2 янв 2024',  type: 'Плановое ТО',         cost: '3 000 ₽', technician: 'ХолодТех' },
-      { id: nid(), date: '4 мар 2023',  type: 'Устранение утечки',   cost: '5 400 ₽', technician: 'ХолодТех' },
-    ],
-  },
-  {
-    id: nid(), emoji: '🍷', gradientFrom: '#FCE7F3', gradientTo: '#FBCFE8',
-    name: 'Винный шкаф Liebherr', model: 'WTr 1841',
-    category: 'Холодильное', location: 'Зал',
-    status: 'working', risk: 'low',
-    lastMaintenance: '5 окт 2024', nextMaintenance: '5 янв 2025',
-    serialNumber: 'LB-WT-2023-0892', purchaseDate: '12 мар 2023', warranty: 'до 12 мар 2026',
-    repairs: [],
-  },
-  {
-    id: nid(), emoji: '🫧', gradientFrom: '#DCFCE7', gradientTo: '#BBF7D0',
-    name: 'Посудомоечная Hobart', model: 'AM-15',
-    category: 'Кухня', location: 'Мойка',
-    status: 'broken', risk: 'critical',
-    lastMaintenance: '3 авг 2024', nextMaintenance: '3 нояб 2024', nextOverdue: true,
-    serialNumber: 'HB-AM-2021-5531', purchaseDate: '20 дек 2021', warranty: 'истекла',
-    repairs: [
-      { id: nid(), date: '3 авг 2024',  type: 'Замена нагревателя', cost: '12 000 ₽', technician: 'ПромСервис' },
-      { id: nid(), date: '9 май 2024',  type: 'Ремонт насоса',      cost: '7 800 ₽',  technician: 'ПромСервис' },
-      { id: nid(), date: '11 янв 2024', type: 'Плановое ТО',        cost: '4 500 ₽',  technician: 'ПромСервис' },
-      { id: nid(), date: '2 сен 2023',  type: 'Ремонт дозатора',    cost: '3 200 ₽',  technician: 'ПромСервис' },
-      { id: nid(), date: '15 май 2023', type: 'Замена уплотнений',  cost: '2 100 ₽',  technician: 'ПромСервис' },
-      { id: nid(), date: '10 янв 2023', type: 'Плановое ТО',        cost: '4 500 ₽',  technician: 'ПромСервис' },
-    ],
-  },
-  {
-    id: nid(), emoji: '💻', gradientFrom: '#EDE9FE', gradientTo: '#DDD6FE',
-    name: 'POS-система iiko', model: 'iiko v8.7',
-    category: 'Автоматизация', location: 'Стойка администратора',
-    status: 'working', risk: 'low',
-    lastMaintenance: '20 окт 2024', nextMaintenance: '20 янв 2025',
-    serialNumber: 'IIKO-2023-0078', purchaseDate: '3 фев 2023', warranty: 'до 3 фев 2026',
-    repairs: [
-      { id: nid(), date: '20 окт 2024', type: 'Обновление ПО + ТО', cost: '6 000 ₽', technician: 'iiko Support' },
-    ],
-  },
-];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -435,12 +369,35 @@ function DetailSheet({ eq, onClose }: { eq: Equipment; onClose: () => void }) {
 
 // ─── Add Equipment sheet ──────────────────────────────────────────────────────
 
-function AddSheet({ onClose }: { onClose: () => void }) {
-  const [name, setName]     = useState('');
+function AddSheet({ onClose, onSave }: { onClose: () => void; onSave: (eq: Equipment) => void }) {
+  const [name, setName]         = useState('');
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState('');
-  const [serial, setSerial] = useState('');
+  const [serial, setSerial]     = useState('');
   const [purchase, setPurchase] = useState('');
+
+  function handleSave() {
+    const eq: Equipment = {
+      id: nid(),
+      emoji: '🔧',
+      gradientFrom: '#F3F4F6',
+      gradientTo: '#E5E7EB',
+      name: name.trim(),
+      model: '',
+      category: category.trim() || 'Прочее',
+      location: location.trim() || '—',
+      status: 'working',
+      risk: 'low',
+      lastMaintenance: '—',
+      nextMaintenance: '—',
+      serialNumber: serial.trim() || '—',
+      purchaseDate: purchase || '—',
+      warranty: '—',
+      repairs: [],
+    };
+    onSave(eq);
+    onClose();
+  }
 
   return (
     <motion.div
@@ -479,7 +436,7 @@ function AddSheet({ onClose }: { onClose: () => void }) {
           <Input label="Расположение" placeholder="Где находится" value={location} onChange={(e) => setLocation(e.target.value)} />
           <Input label="Серийный номер" placeholder="SN-XXXXXXXX" value={serial} onChange={(e) => setSerial(e.target.value)} />
           <Input label="Дата покупки" type="date" value={purchase} onChange={(e) => setPurchase(e.target.value)} />
-          <Button fullWidth disabled={!name.trim()} onClick={onClose} className="mt-1">
+          <Button fullWidth disabled={!name.trim()} onClick={handleSave} className="mt-1">
             Добавить
           </Button>
         </div>
@@ -500,16 +457,19 @@ const FILTERS: { key: Status | 'all'; label: string }[] = [
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function Equipment() {
-  const [search, setSearch]         = useState('');
-  const [filter, setFilter]         = useState<Status | 'all'>('all');
-  const [selected, setSelected]     = useState<Equipment | null>(null);
-  const [showAdd, setShowAdd]       = useState(false);
+  const [equipmentList, setEquipmentList] = useState<Equipment[]>([]);
+  const [search, setSearch]               = useState('');
+  const [filter, setFilter]               = useState<Status | 'all'>('all');
+  const [selected, setSelected]           = useState<Equipment | null>(null);
+  const [showAdd, setShowAdd]             = useState(false);
 
-  const filtered = EQUIPMENT_DATA.filter((eq) =>
+  const filtered = equipmentList.filter((eq) =>
     (filter === 'all' || eq.status === filter) &&
     (eq.name.toLowerCase().includes(search.toLowerCase()) ||
      eq.category.toLowerCase().includes(search.toLowerCase())),
   );
+
+  const hasAny = equipmentList.length > 0;
 
   return (
     <>
@@ -569,15 +529,43 @@ export default function Equipment() {
         {/* Equipment list */}
         <div className="px-6 pt-4 flex flex-col gap-4">
           <AnimatePresence mode="popLayout">
-            {filtered.length === 0 ? (
+            {!hasAny ? (
+              /* ── True empty state: no equipment added yet ── */
               <motion.div
-                key="empty"
+                key="empty-list"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col items-center py-16 text-center px-8"
+              >
+                <div className="w-14 h-14 rounded-[18px] bg-muted flex items-center justify-center mb-4">
+                  <Wrench size={26} className="text-muted-foreground/60" />
+                </div>
+                <p className="text-[16px] font-bold text-foreground mb-1.5">Оборудование не добавлено</p>
+                <p className="text-[13px] text-muted-foreground leading-relaxed mb-5">
+                  Добавьте кофемашины, холодильники, POS-системы и другое — BarDoctor поможет отслеживать состояние и обслуживание.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAdd(true)}
+                  className="px-5 py-2.5 bg-primary text-white rounded-2xl text-[14px] font-semibold hover:opacity-90 active:scale-[0.97] transition-all shadow-[0_4px_14px_rgba(91,92,235,0.22)]"
+                >
+                  Добавить первое
+                </button>
+              </motion.div>
+            ) : filtered.length === 0 ? (
+              /* ── Filter/search returned no results ── */
+              <motion.div
+                key="empty-filter"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex flex-col items-center py-16 text-center"
+                className="flex flex-col items-center py-16 text-center px-8"
               >
-                <span className="text-4xl mb-3">🔍</span>
-                <p className="text-[15px] font-medium text-muted-foreground">Ничего не найдено</p>
+                <div className="w-14 h-14 rounded-[18px] bg-muted flex items-center justify-center mb-4">
+                  <Search size={24} className="text-muted-foreground/60" />
+                </div>
+                <p className="text-[16px] font-bold text-foreground mb-1.5">Ничего не найдено</p>
+                <p className="text-[13px] text-muted-foreground">Попробуйте изменить фильтр или поисковый запрос</p>
               </motion.div>
             ) : (
               filtered.map((eq) => (
@@ -614,7 +602,11 @@ export default function Equipment() {
       {/* Add sheet */}
       <AnimatePresence>
         {showAdd && (
-          <AddSheet key="add-sheet" onClose={() => setShowAdd(false)} />
+          <AddSheet
+            key="add-sheet"
+            onClose={() => setShowAdd(false)}
+            onSave={(eq) => setEquipmentList((prev) => [eq, ...prev])}
+          />
         )}
       </AnimatePresence>
     </>

@@ -30,67 +30,16 @@ type ChatMessage = UserMessage | AIMessage;
 
 // ─── Mock AI logic ────────────────────────────────────────────────────────────
 
-function generateResponse(query: string): AIMessage {
-  const q = query.toLowerCase();
-
-  if (q.includes('выручка') || q.includes('прибыл') || q.includes('доход') || q.includes('упал')) {
-    return {
-      type: 'ai', id: uid(),
-      problem: 'Выручка в пятницу и субботу ниже среднего на 18%',
-      reason: 'Пиковая загрузка совпадает с нехваткой персонала — 2 бармена вместо 3 на вечерней смене снижают скорость обслуживания и количество отданных заказов',
-      confidence: 87,
-      recommendation: 'Перенести один выход на пятницу-субботу. Добавить позицию «экспресс-кофе» для снижения времени ожидания в час пик',
-      nextStep: 'Согласовать расписание со старшим менеджером до четверга и обновить смены в приложении',
-    };
-  }
-  if (q.includes('food cost') || q.includes('себестоим') || q.includes('закупк')) {
-    return {
-      type: 'ai', id: uid(),
-      problem: 'Food cost превышает плановый показатель на 6,3% (факт: 34,1%, план: 27,8%)',
-      reason: 'Завышенные порции молочных напитков и списание по кофемашине — нарушена технологическая карта на латте и капучино',
-      confidence: 91,
-      recommendation: 'Провести контрольное взвешивание порций. Обновить инструкцию бариста и разместить карточку у кофемашины',
-      nextStep: 'Инвентаризация сегодня до 18:00, сравнение с теоретическим расходом',
-    };
-  }
-  if (q.includes('меню') || q.includes('позици') || q.includes('прибыльн')) {
-    return {
-      type: 'ai', id: uid(),
-      problem: 'Топ-3 позиции по обороту дают лишь 38% маржи, хотя занимают 61% площади меню',
-      reason: 'Капучино и американо продаются чаще всего, но сырьевая стоимость делает их наименее маржинальными — разница с альтернативами до 22%',
-      confidence: 83,
-      recommendation: 'Выделить матча-латте и фильтр-кофе как «рекомендации бариста» — они дают маржу на 19% выше при схожей цене продажи',
-      nextStep: 'Обновить стенд рекомендаций до пятницы и провести brief для персонала',
-    };
-  }
-  if (q.includes('гост') || q.includes('возвращ') || q.includes('лояльн')) {
-    return {
-      type: 'ai', id: uid(),
-      problem: 'Повторные визиты гостей снизились на 23% за последние 6 недель',
-      reason: 'Корреляция с уходом популярного бариста и отсутствием программы лояльности — гости не чувствуют персонализированного сервиса',
-      confidence: 79,
-      recommendation: 'Запустить карту постоянного гостя — «6-й кофе в подарок». Ответить на 3 свежих негативных отзыва на Яндекс.Картах до конца дня',
-      nextStep: 'Найти замену барист через внутренний резерв и предложить выход на 2 смены в неделю',
-    };
-  }
-  if (q.includes('инвентар') || q.includes('запас') || q.includes('склад')) {
-    return {
-      type: 'ai', id: uid(),
-      problem: 'Молоко и сиропы достигнут нулевого остатка через 2–3 дня при текущем темпе потребления',
-      reason: 'Заказ на прошлой неделе был сокращён на 30% из-за ошибки в прогнозе, а объём продаж напитков на молоке вырос на 14%',
-      confidence: 94,
-      recommendation: 'Разместить экстренный заказ сегодня до 15:00. Рассмотреть переход на еженедельный автозаказ с поправкой ±15% по трафику',
-      nextStep: 'Связаться с поставщиком и подтвердить доставку на завтра до 10:00',
-    };
-  }
-
+// Returns an honest "no data connected" response — never invents restaurant data.
+function generateResponse(_query: string): AIMessage {
   return {
-    type: 'ai', id: uid(),
-    problem: 'Обнаружены отклонения по нескольким операционным показателям',
-    reason: 'Анализ данных за последние 30 дней показывает расхождение с плановыми показателями — требуется детальная проверка выбранного направления',
-    confidence: 72,
-    recommendation: 'Сфокусируйтесь на одном конкретном показателе: выручка, food cost, персонал или загрузка. Уточните временной период для точного анализа',
-    nextStep: 'Задайте уточняющий вопрос или выберите один из предложенных вариантов ниже',
+    type: 'ai',
+    id: uid(),
+    problem: 'Нет подключённых данных для анализа',
+    reason: 'BarDoctor AI анализирует реальные операционные данные вашего заведения — задачи, оборудование, инциденты и историю работы. На данный момент данные ещё не добавлены.',
+    confidence: -1, // special: means "no data", not a real confidence value
+    recommendation: 'Добавьте оборудование, создайте первые задачи и зафиксируйте инциденты. Чем больше реальных данных в системе — тем точнее анализ.',
+    nextStep: 'Перейдите в раздел «Оборудование» или «Задачи», чтобы начать наполнение.',
   };
 }
 
@@ -108,10 +57,7 @@ const SUGGESTED = [
   'Когда проводить инвентаризацию?',
 ];
 
-const RECENT_INITIAL = [
-  'Почему выросли расходы на закупки?',
-  'Как увеличить средний чек?',
-];
+const RECENT_INITIAL: string[] = [];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -146,7 +92,8 @@ function UserBubble({ text }: { text: string }) {
 }
 
 function AICard({ msg }: { msg: AIMessage }) {
-  const pct = msg.confidence;
+  const hasData = msg.confidence >= 0;
+  const pct = hasData ? msg.confidence : 0;
   const confColor =
     pct >= 80 ? '#16A34A' : pct >= 60 ? '#B45309' : '#DC2626';
   const confBg =
@@ -221,31 +168,33 @@ function AICard({ msg }: { msg: AIMessage }) {
           );
         })}
 
-        {/* Confidence bar */}
-        <div className="px-4 py-3.5 border-t border-border bg-muted/30">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
-                <Activity size={11} className="text-muted-foreground" />
+        {/* Confidence bar — only shown when real data is present */}
+        {hasData && (
+          <div className="px-4 py-3.5 border-t border-border bg-muted/30">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                  <Activity size={11} className="text-muted-foreground" />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Уверенность
+                </span>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-                Уверенность
+              <span className="text-[13px] font-bold" style={{ color: confColor }}>
+                {confLabel} · {pct}%
               </span>
             </div>
-            <span className="text-[13px] font-bold" style={{ color: confColor }}>
-              {confLabel} · {pct}%
-            </span>
+            <div className="h-1.5 bg-border rounded-full overflow-hidden ml-7">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: confBg }}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.7, delay: 0.2, ease: 'easeOut' }}
+              />
+            </div>
           </div>
-          <div className="h-1.5 bg-border rounded-full overflow-hidden ml-7">
-            <motion.div
-              className="h-full rounded-full"
-              style={{ backgroundColor: confBg }}
-              initial={{ width: 0 }}
-              animate={{ width: `${pct}%` }}
-              transition={{ duration: 0.7, delay: 0.2, ease: 'easeOut' }}
-            />
-          </div>
-        </div>
+        )}
       </motion.div>
     </div>
   );

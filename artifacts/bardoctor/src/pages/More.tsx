@@ -21,7 +21,7 @@ const MANAGE_ITEMS = [
 ];
 
 const APP_ITEMS = [
-  { icon: Bell,     label: 'Уведомления',  href: '/notifications', badge: '3' },
+  { icon: Bell,     label: 'Уведомления',  href: '/notifications', badge: null },
   { icon: Settings, label: 'Настройки',    href: '/settings',      badge: null },
   { icon: Info,     label: 'О приложении', href: '/about',         badge: null },
 ];
