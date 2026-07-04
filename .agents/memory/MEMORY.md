@@ -1,0 +1,2 @@
+- [Cases module architecture](cases-module.md) — compound mutations must use functional setCases(prev=>) not ref+patch to avoid clobber on rapid updates.
+- [Home phantom-gap pattern](home-layout.md) — conditional sections in flex gap must guard the motion.div wrapper, not just the inner component's return null.
