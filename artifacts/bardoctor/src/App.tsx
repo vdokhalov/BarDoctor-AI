@@ -24,6 +24,7 @@ import Employees    from '@/pages/Employees';
 import Cases        from '@/pages/Cases';
 import AddCase      from '@/pages/AddCase';
 import CaseDetail   from '@/pages/CaseDetail';
+import EventDetail  from '@/pages/EventDetail';
 import Profile      from '@/pages/Profile';
 import More         from '@/pages/More';
 import ComingSoon   from '@/pages/ComingSoon';
@@ -58,6 +59,7 @@ function Router() {
       <Route path="/analysis"      component={() => <RequireProfile component={Analysis} />} />
       <Route path="/smart"         component={() => <RequireProfile component={SmartInput} />} />
       <Route path="/add"           component={() => <RequireProfile component={Add} />} />
+      <Route path="/events/:id"    component={() => <RequireProfile component={EventDetail} />} />
       <Route path="/events"        component={() => <RequireProfile component={Events} />} />
       <Route path="/tasks"         component={() => <RequireProfile component={Tasks} />} />
       <Route path="/decisions"     component={() => <RequireProfile component={Decisions} />} />

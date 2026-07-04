@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronLeft, Plus, Camera, MessageSquare, Clock, CheckCircle2,
   RefreshCw, AlertTriangle, Paperclip, X, Trash2, Edit3,
-  User, CalendarDays, Flag, Tag, Send,
+  User, CalendarDays, Flag, Tag, Send, Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCases } from '@/contexts/CasesContext';
@@ -13,12 +13,14 @@ import {
   Case, CaseStatus, CasePriority, TimelineType,
   caseNid, isOverdue, formatDue,
 } from '@/store/cases';
+import type { Priority, AIAssessment } from '@/store/events';
 import {
   CASE_TYPE_CONFIG, CASE_PRIORITY_CONFIG, CASE_STATUS_CONFIG,
   CASE_STATUSES, CASE_PRIORITIES,
 } from '@/config/caseCategories';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
+import PriorityModal from '@/components/ai/PriorityModal';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -200,9 +202,10 @@ export default function CaseDetail() {
   const caseId   = params?.id ?? '';
   const caseData = useMemo(() => cases.find((c) => c.id === caseId), [cases, caseId]);
 
-  const [commentText, setCommentText] = useState('');
-  const [deleteStep,  setDeleteStep]  = useState(0);
-  const [editOpen,    setEditOpen]    = useState(false);
+  const [commentText,    setCommentText]    = useState('');
+  const [deleteStep,     setDeleteStep]     = useState(0);
+  const [editOpen,       setEditOpen]       = useState(false);
+  const [showReanalyze,  setShowReanalyze]  = useState(false);
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset delete confirm after 3s
@@ -261,6 +264,12 @@ export default function CaseDetail() {
     updateCase(c.id, patch);
     setEditOpen(false);
     toast({ variant: 'success', title: 'Изменения сохранены' });
+  }
+
+  function handleReanalyzed(priority: Priority, assessment: AIAssessment) {
+    updateCase(c.id, { priority: priority as CasePriority, aiAssessment: assessment });
+    setShowReanalyze(false);
+    toast({ variant: 'success', title: 'Приоритет обновлён', description: `Новый приоритет: ${CASE_PRIORITY_CONFIG[priority as CasePriority].label}` });
   }
 
   return (
@@ -386,6 +395,37 @@ export default function CaseDetail() {
                 </div>
               )}
 
+              {/* AI re-analyze button */}
+              <button
+                type="button"
+                onClick={() => setShowReanalyze(true)}
+                className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border border-primary/30 bg-primary/6 text-primary text-[14px] font-semibold transition-all hover:bg-primary/10 active:scale-[0.98]"
+              >
+                <Brain size={15} />
+                {c.aiAssessment ? 'Переоценить приоритет AI' : 'Оценить приоритет AI'}
+              </button>
+
+              {/* AI assessment summary */}
+              {c.aiAssessment && (
+                <div className="bd-card px-5 py-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Brain size={12} className="text-primary" />
+                    </div>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-primary">AI-оценка</p>
+                    <span className="ml-auto text-[10px] text-muted-foreground/60">
+                      {new Date(c.aiAssessment.analyzedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                    </span>
+                  </div>
+                  <p className="text-[14px] text-foreground leading-relaxed mb-3">{c.aiAssessment.explanation}</p>
+                  {c.aiAssessment.recommendedDeadline && (
+                    <p className="text-[12px] text-muted-foreground font-medium">
+                      Срок: {c.aiAssessment.recommendedDeadline}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Photos */}
               <div className="bd-card px-5 py-4">
                 <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-3.5">
@@ -497,6 +537,22 @@ export default function CaseDetail() {
       <AnimatePresence>
         {editOpen && (
           <EditSheet key="edit" c={c} onClose={() => setEditOpen(false)} onSave={handleSaveEdit} />
+        )}
+      </AnimatePresence>
+
+      {/* AI re-analyze modal */}
+      <AnimatePresence>
+        {showReanalyze && (
+          <div key="reanalyze" className="fixed inset-0 z-50 bg-background">
+            <PriorityModal
+              itemType="case"
+              category={c.type}
+              title={c.title}
+              description={c.description}
+              onConfirm={handleReanalyzed}
+              onSkip={() => setShowReanalyze(false)}
+            />
+          </div>
         )}
       </AnimatePresence>
     </AppShell>

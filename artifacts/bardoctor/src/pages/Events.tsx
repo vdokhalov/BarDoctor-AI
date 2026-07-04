@@ -51,7 +51,7 @@ function StatusBadge({ status }: { status: EventStatus }) {
 
 // ─── Event card ───────────────────────────────────────────────────────────────
 
-function EventCard({ event }: { event: RestaurantEvent }) {
+function EventCard({ event, onClick }: { event: RestaurantEvent; onClick: () => void }) {
   const cfg  = CATEGORY_CONFIG[event.category];
   const Icon = cfg.icon;
 
@@ -60,7 +60,8 @@ function EventCard({ event }: { event: RestaurantEvent }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="bg-card rounded-2xl border border-card-border shadow-[var(--shadow-card)] overflow-hidden"
+      onClick={onClick}
+      className="bg-card rounded-2xl border border-card-border shadow-[var(--shadow-card)] overflow-hidden cursor-pointer active:scale-[0.98] transition-transform"
     >
       {/* Top color accent line */}
       <div className="h-[3px] w-full" style={{ backgroundColor: cfg.color }} />
@@ -279,7 +280,7 @@ export default function Events() {
                   <DateHeader label={group.label} />
                   <div className="flex flex-col gap-3 mt-2">
                     {group.items.map((ev) => (
-                      <EventCard key={ev.id} event={ev} />
+                      <EventCard key={ev.id} event={ev} onClick={() => setLocation(`/events/${ev.id}`)} />
                     ))}
                   </div>
                 </div>
