@@ -18,6 +18,7 @@ import Tasks from '@/pages/Tasks';
 import Equipment from '@/pages/Equipment';
 import Profile from '@/pages/Profile';
 import More from '@/pages/More';
+import ComingSoon from '@/pages/ComingSoon';
 import DesignSystem from '@/pages/DesignSystem';
 
 const queryClient = new QueryClient();
@@ -37,6 +38,13 @@ function Router() {
       <Route path="/equipment" component={Equipment} />
       <Route path="/profile" component={Profile} />
       <Route path="/more" component={More} />
+      <Route path="/employees" component={ComingSoon} />
+      <Route path="/suppliers" component={ComingSoon} />
+      <Route path="/warehouse" component={ComingSoon} />
+      <Route path="/reports" component={ComingSoon} />
+      <Route path="/notifications" component={ComingSoon} />
+      <Route path="/settings" component={ComingSoon} />
+      <Route path="/about" component={ComingSoon} />
       <Route path="/design-system" component={DesignSystem} />
       <Route component={NotFound} />
     </Switch>

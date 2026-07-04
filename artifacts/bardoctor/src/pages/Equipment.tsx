@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useToast } from '@/components/ds/Toast';
 import {
   Search, Plus, Wrench, Calendar, Shield,
   AlertTriangle, ChevronRight, X, Clock,
@@ -266,6 +267,7 @@ function EquipmentCard({ eq, onTap }: { eq: Equipment; onTap: () => void }) {
 function DetailSheet({ eq, onClose }: { eq: Equipment; onClose: () => void }) {
   const statusCfg = STATUS_CFG[eq.status];
   const riskCfg   = RISK_CFG[eq.risk];
+  const { toast } = useToast();
 
   return (
     <motion.div
@@ -417,7 +419,10 @@ function DetailSheet({ eq, onClose }: { eq: Equipment; onClose: () => void }) {
               <Button variant="secondary" className="flex-1" onClick={onClose}>
                 Закрыть
               </Button>
-              <Button className="flex-1">
+              <Button
+                className="flex-1"
+                onClick={() => toast({ variant: 'info', title: 'Скоро', description: 'Планирование ТО будет доступно в ближайшем обновлении.' })}
+              >
                 Запланировать ТО
               </Button>
             </div>

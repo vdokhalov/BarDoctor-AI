@@ -6,14 +6,20 @@ import PageHeader from '@/components/layout/PageHeader';
 import ListRow from '@/components/shared/ListRow';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 import { initials, clearProfile } from '@/store/restaurant';
+import { useToast } from '@/components/ds/Toast';
 
 export default function Profile() {
   const [, setLocation] = useLocation();
   const { profile } = useRestaurant();
+  const { toast } = useToast();
 
-  const name  = profile?.name ?? 'Моё заведение';
-  const role  = profile ? `${profile.businessType} · ${profile.city}` : 'Настройте профиль';
-  const abbr  = initials(name);
+  const name = profile?.name ?? 'Моё заведение';
+  const role = profile ? `${profile.businessType} · ${profile.city}` : 'Настройте профиль';
+  const abbr = initials(name);
+
+  function soon() {
+    toast({ variant: 'info', title: 'Скоро', description: 'Эта функция скоро будет доступна.' });
+  }
 
   function handleReset() {
     clearProfile();
@@ -72,18 +78,21 @@ export default function Profile() {
               icon={<Lock className="w-5 h-5" />}
               title="Пароль"
               showChevron
+              onClick={soon}
               className="px-4 border-b border-border"
             />
             <ListRow
               icon={<Shield className="w-5 h-5" />}
               title="Двухфакторная защита"
               showChevron
+              onClick={soon}
               className="px-4 border-b border-border"
             />
             <ListRow
               icon={<Smartphone className="w-5 h-5" />}
               title="Устройства"
               showChevron
+              onClick={soon}
               className="px-4"
             />
           </div>
@@ -95,6 +104,7 @@ export default function Profile() {
               title="Язык"
               meta="Русский"
               showChevron
+              onClick={soon}
               className="px-4"
             />
           </div>
