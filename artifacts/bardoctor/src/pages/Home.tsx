@@ -1,152 +1,318 @@
 import { useLocation } from 'wouter';
 import {
-  Bell, ChevronDown, Store, Sparkles,
-  Wrench, MessageCircle, Users, Lightbulb,
-  CalendarClock, Package, Truck,
+  Bell, Sparkles, Plus, CheckSquare, Wrench,
+  Clock, ChevronRight,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 
-// ─── Animation ────────────────────────────────────────────────────────────────
+// ─── Stagger animation preset ─────────────────────────────────────────────────
 
-const fadeUp = {
-  hidden:   { opacity: 0, y: 14 },
-  visible: (i: number) => ({
+const rise = {
+  hidden:  { opacity: 0, y: 16 },
+  show: (i: number) => ({
     opacity: 1, y: 0,
-    transition: { delay: i * 0.07, duration: 0.38, ease: [0.22, 1, 0.36, 1] as [number,number,number,number] },
+    transition: { delay: i * 0.08, duration: 0.42, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
-// ─── Event example chips ──────────────────────────────────────────────────────
+// ─── 1. Health Score card ─────────────────────────────────────────────────────
+//   Dark premium hero card. SVG gauge arc in calibrating state.
 
-const EXAMPLES = [
-  { label: 'Поломка оборудования', icon: Wrench },
-  { label: 'Жалоба гостя',         icon: MessageCircle },
-  { label: 'Конфликт',             icon: Users },
-  { label: 'Идея',                 icon: Lightbulb },
-  { label: 'Обслуживание',         icon: CalendarClock },
-  { label: 'Инвентарь',           icon: Package },
-  { label: 'Вопрос поставщика',    icon: Truck },
-];
+const ARC_R   = 52;
+const ARC_CX  = 72;
+const ARC_CY  = 72;
+const CIRC    = 2 * Math.PI * ARC_R;           // full circumference
+const ARC_270 = (270 / 360) * CIRC;            // 270° track length
 
-// ─── Teaching card ────────────────────────────────────────────────────────────
-
-function TeachingCard({ onAdd }: { onAdd: () => void }) {
+// Points at 135° and 405° (= 45°) define the 270° arc.
+// SVG arc rotated so the gap is at the bottom.
+function GaugeArc() {
   return (
-    <div className="bd-card overflow-hidden relative">
+    <svg
+      width="144" height="144"
+      viewBox="0 0 144 144"
+      fill="none"
+      aria-hidden
+    >
+      {/* Track (grey) */}
+      <circle
+        cx={ARC_CX}
+        cy={ARC_CY}
+        r={ARC_R}
+        stroke="rgba(255,255,255,0.10)"
+        strokeWidth="8"
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray={`${ARC_270} ${CIRC}`}
+        strokeDashoffset={0}
+        transform={`rotate(135 ${ARC_CX} ${ARC_CY})`}
+      />
 
-      {/* Purple glow layer */}
+      {/* Animated shimmer fill (calibrating) */}
+      <motion.circle
+        cx={ARC_CX}
+        cy={ARC_CY}
+        r={ARC_R}
+        stroke="rgba(91,92,235,0.55)"
+        strokeWidth="8"
+        strokeLinecap="round"
+        fill="none"
+        strokeDasharray={`${ARC_270} ${CIRC}`}
+        strokeDashoffset={0}
+        transform={`rotate(135 ${ARC_CX} ${ARC_CY})`}
+        animate={{ opacity: [0.4, 0.85, 0.4] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Center label */}
+      <text
+        x={ARC_CX}
+        y={ARC_CY - 6}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="28"
+        fontWeight="800"
+        fill="rgba(255,255,255,0.9)"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+      >
+        —
+      </text>
+      <text
+        x={ARC_CX}
+        y={ARC_CY + 18}
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontSize="10"
+        fontWeight="600"
+        fill="rgba(255,255,255,0.40)"
+        letterSpacing="0.04em"
+        fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif"
+      >
+        СБОР ДАННЫХ
+      </text>
+    </svg>
+  );
+}
+
+function HealthCard() {
+  return (
+    <div
+      className="rounded-[24px] overflow-hidden relative"
+      style={{
+        background: 'linear-gradient(160deg, #1A1F38 0%, #161B2E 55%, #1D1440 100%)',
+        boxShadow: '0 8px 32px rgba(22,27,46,0.28), 0 2px 8px rgba(22,27,46,0.14)',
+      }}
+    >
+      {/* Atmospheric glow */}
       <div
         aria-hidden
-        className="absolute inset-x-0 top-0 h-48 pointer-events-none"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 80% 100% at 50% -10%, rgba(91,92,235,0.11) 0%, transparent 72%)',
+          background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,92,235,0.18) 0%, transparent 70%)',
         }}
       />
 
-      {/* Top section */}
-      <div className="relative z-10 flex flex-col items-center text-center px-6 pt-8 pb-6">
+      <div className="relative z-10 px-6 pt-6 pb-5">
+        {/* Row: label + badge */}
+        <div className="flex items-center justify-between mb-5">
+          <p className="text-[12px] font-bold uppercase tracking-widest text-white/40">
+            Здоровье заведения
+          </p>
+          <span className="text-[11px] font-semibold bg-white/8 text-white/50 px-2.5 py-1 rounded-full border border-white/10">
+            Калибровка
+          </span>
+        </div>
 
-        {/* Icon cluster */}
-        <motion.div
-          initial={{ scale: 0.82, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.52, ease: [0.22, 1, 0.36, 1] }}
-          className="relative mb-6"
-        >
-          {/* Outer glow ring */}
-          <div className="absolute inset-0 rounded-full"
-            style={{ boxShadow: '0 0 0 12px rgba(91,92,235,0.06), 0 0 0 24px rgba(91,92,235,0.03)' }} />
+        {/* Gauge centered */}
+        <div className="flex flex-col items-center">
+          <GaugeArc />
 
-          {/* Core icon */}
-          <div
-            className="w-[68px] h-[68px] rounded-[22px] flex items-center justify-center relative"
-            style={{
-              background: 'linear-gradient(145deg, #161B2E 0%, #252D4A 100%)',
-              boxShadow: '0 8px 28px rgba(22,27,46,0.22), 0 2px 6px rgba(22,27,46,0.12)',
-            }}
-          >
-            {/* BarDoctor mark */}
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-              <rect x="14" y="5" width="4" height="22" rx="2" fill="white" fillOpacity="0.9" />
-              <rect x="5" y="14" width="22" height="4" rx="2" fill="white" fillOpacity="0.9" />
-              <circle cx="16" cy="16" r="4" fill="#5B5CEB" />
-              {/* Pulse dot top-right */}
-              <circle cx="25" cy="7" r="3" fill="#22C55E" />
-            </svg>
-          </div>
-        </motion.div>
-
-        {/* Headline */}
-        <motion.h2
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          className="text-[22px] font-black text-foreground tracking-tight leading-tight mb-3"
-        >
-          Начните обучать BarDoctor
-        </motion.h2>
-
-        {/* Body text */}
-        <motion.p
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="text-[14px] text-muted-foreground leading-relaxed max-w-[270px] mb-7"
-        >
-          Каждое событие помогает AI глубже понять ваш ресторан — и давать точные, своевременные советы.
-        </motion.p>
-
-        {/* Primary CTA */}
-        <motion.button
-          type="button"
-          onClick={onAdd}
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.28, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          whileTap={{ scale: 0.97 }}
-          className="w-full h-14 rounded-2xl flex items-center justify-center gap-2.5 text-[16px] font-bold text-white tracking-tight"
-          style={{
-            background: 'linear-gradient(135deg, #5B5CEB 0%, #7B7CF0 100%)',
-            boxShadow: '0 6px 24px rgba(91,92,235,0.36), 0 2px 6px rgba(91,92,235,0.18)',
-          }}
-        >
-          <div className="w-6 h-6 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
-            <span className="text-[14px]">+</span>
-          </div>
-          Добавить первое событие
-        </motion.button>
-      </div>
-
-      {/* Divider */}
-      <div className="h-px bg-border mx-6" />
-
-      {/* Event examples */}
-      <div className="px-5 pt-4 pb-5">
-        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3 px-1">
-          Что можно добавить
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {EXAMPLES.map(({ label, icon: Icon }, i) => (
-            <motion.button
-              key={label}
-              type="button"
-              onClick={onAdd}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.04, duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              whileTap={{ scale: 0.96 }}
-              className="flex items-center gap-1.5 pl-2.5 pr-3.5 py-2 bg-muted hover:bg-border/70 active:bg-border rounded-full transition-colors"
-            >
-              <Icon size={13} className="text-muted-foreground flex-shrink-0" />
-              <span className="text-[13px] font-medium text-foreground">{label}</span>
-            </motion.button>
-          ))}
+          <p className="text-[13px] text-white/45 font-medium text-center mt-3 max-w-[220px] leading-snug">
+            Добавьте первые события, чтобы BarDoctor рассчитал балл здоровья
+          </p>
         </div>
       </div>
+    </div>
+  );
+}
 
+// ─── 2. Today's Focus card ────────────────────────────────────────────────────
+
+function getTodayFocus(hour: number): { headline: string; body: string } {
+  if (hour >= 5 && hour < 12) return {
+    headline: 'Проверьте оборудование при открытии.',
+    body: 'Утренний осмотр помогает предотвратить инциденты. Зафиксируйте любые отклонения сейчас.',
+  };
+  if (hour >= 12 && hour < 16) return {
+    headline: 'Зафиксируйте события первой половины дня.',
+    body: 'Обеденная смена — источник данных для AI. Каждое событие делает анализ точнее.',
+  };
+  if (hour >= 16 && hour < 20) return {
+    headline: 'Оцените состояние команды перед вечерней сменой.',
+    body: 'Конфликты и замечания, зафиксированные сейчас, помогут AI выявить паттерны.',
+  };
+  return {
+    headline: 'Подведите итоги дня перед закрытием.',
+    body: 'Вечерние записи — самые ценные. Пока детали свежи, добавьте ключевые события дня.',
+  };
+}
+
+function FocusCard({ hour, onAdd }: { hour: number; onAdd: () => void }) {
+  const { headline, body } = getTodayFocus(hour);
+
+  return (
+    <div className="bd-card overflow-hidden relative">
+      {/* Left accent bar */}
+      <div className="absolute left-0 top-4 bottom-4 w-[3px] rounded-full bg-primary" aria-hidden />
+
+      <div className="px-5 py-4 pl-6">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+          Сегодняшний приоритет
+        </p>
+
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-bold text-foreground leading-snug mb-1.5">
+              {headline}
+            </p>
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
+              {body}
+            </p>
+          </div>
+
+          {/* Sparkles icon */}
+          <div className="w-9 h-9 rounded-[12px] bg-primary/8 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Sparkles size={16} className="text-primary" />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="mt-3.5 flex items-center gap-1 text-[13px] font-semibold text-primary hover:opacity-75 active:opacity-60 transition-opacity"
+        >
+          Добавить событие
+          <ChevronRight size={14} className="mt-px" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── 3. Quick Actions ─────────────────────────────────────────────────────────
+
+interface Action {
+  label: string;
+  sublabel: string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  href: string;
+}
+
+const ACTIONS: Action[] = [
+  {
+    label: 'Событие',
+    sublabel: 'Записать инцидент',
+    icon: Plus,
+    iconBg: 'bg-primary',
+    iconColor: 'text-white',
+    href: '/add',
+  },
+  {
+    label: 'Задача',
+    sublabel: 'Создать задачу',
+    icon: CheckSquare,
+    iconBg: 'bg-foreground',
+    iconColor: 'text-white',
+    href: '/tasks',
+  },
+  {
+    label: 'Спросить AI',
+    sublabel: 'BarDoctor AI',
+    icon: Sparkles,
+    iconBg: 'bg-[#5B5CEB]',
+    iconColor: 'text-white',
+    href: '/analysis',
+  },
+  {
+    label: 'Оборудование',
+    sublabel: 'Добавить единицу',
+    icon: Wrench,
+    iconBg: 'bg-[#22C55E]/15',
+    iconColor: 'text-[#16A34A]',
+    href: '/equipment',
+  },
+];
+
+function QuickActions({ onNavigate }: { onNavigate: (href: string) => void }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground px-1">
+        Быстрые действия
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {ACTIONS.map((a, i) => (
+          <motion.button
+            key={a.label}
+            type="button"
+            onClick={() => onNavigate(a.href)}
+            custom={i}
+            variants={rise}
+            initial="hidden"
+            animate="show"
+            whileTap={{ scale: 0.97 }}
+            className="bd-card p-4 flex flex-col items-start gap-3 text-left hover:shadow-[var(--shadow-elevated)] transition-shadow"
+          >
+            <div className={`w-9 h-9 rounded-[11px] flex items-center justify-center flex-shrink-0 ${a.iconBg}`}>
+              <a.icon size={16} className={a.iconColor} />
+            </div>
+            <div>
+              <p className="text-[14px] font-bold text-foreground leading-tight">{a.label}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{a.sublabel}</p>
+            </div>
+          </motion.button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── 4. Activity Timeline ─────────────────────────────────────────────────────
+
+function ActivitySection({ onAdd }: { onAdd: () => void }) {
+  // No events yet — always empty state for now (no backend)
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground px-1">
+        Последние события
+      </p>
+
+      <div className="bd-card px-5 py-8 flex flex-col items-center text-center">
+        {/* Icon */}
+        <div className="w-11 h-11 rounded-[14px] bg-muted flex items-center justify-center mb-4">
+          <Clock size={20} className="text-muted-foreground/50" />
+        </div>
+
+        <p className="text-[15px] font-bold text-foreground mb-1.5">
+          Событий пока нет
+        </p>
+        <p className="text-[13px] text-muted-foreground leading-relaxed max-w-[220px] mb-5">
+          Начните с записи первого события в вашем ресторане — это займёт меньше минуты.
+        </p>
+
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex items-center gap-1.5 px-4 py-2.5 bg-primary/8 text-primary rounded-2xl text-[13px] font-semibold hover:bg-primary/14 active:scale-[0.97] transition-all"
+        >
+          <Plus size={14} />
+          Добавить событие
+        </button>
+      </div>
     </div>
   );
 }
@@ -158,68 +324,68 @@ export default function Home() {
   const [, setLocation] = useLocation();
 
   const restaurantName = profile?.name ?? '';
-  const hour    = new Date().getHours();
-  const greeting = hour < 12 ? 'Доброе утро' : hour < 17 ? 'Добрый день' : 'Добрый вечер';
+  const hour = new Date().getHours();
+  const greeting =
+    hour >= 5  && hour < 12 ? 'Доброе утро'  :
+    hour >= 12 && hour < 17 ? 'Добрый день'  :
+    hour >= 17 && hour < 22 ? 'Добрый вечер' : 'Доброй ночи';
 
   return (
     <AppShell showBottomNav>
       <SafeArea className="pt-5 pb-36">
-        <div className="px-6 flex flex-col gap-0">
+        <div className="px-6 flex flex-col gap-6">
 
           {/* ── Header ── */}
           <motion.div
-            custom={0} variants={fadeUp} initial="hidden" animate="visible"
-            className="flex items-start justify-between mb-6"
+            custom={0} variants={rise} initial="hidden" animate="show"
+            className="flex items-start justify-between"
           >
             <div>
-              <h1 className="text-[22px] font-bold text-foreground tracking-tight leading-tight">
-                {greeting} 👋
+              <h1 className="text-[24px] font-black text-foreground tracking-tight leading-tight">
+                {greeting}.
               </h1>
-              <button
-                type="button"
-                onClick={() => setLocation('/more')}
-                className="flex items-center gap-1.5 mt-2 pl-2.5 pr-3 py-1.5 bg-muted rounded-full hover:bg-border/60 transition-colors active:scale-[0.97]"
-              >
-                <Store size={13} className="text-muted-foreground" />
-                <span className="text-[13px] font-semibold text-foreground">
-                  {restaurantName || 'Моё заведение'}
-                </span>
-                <ChevronDown size={13} className="text-muted-foreground" />
-              </button>
+              {restaurantName ? (
+                <button
+                  type="button"
+                  onClick={() => setLocation('/more')}
+                  className="mt-1.5 text-[14px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {restaurantName}
+                </button>
+              ) : null}
             </div>
+
             <button
               type="button"
               onClick={() => setLocation('/notifications')}
-              className="relative w-10 h-10 bg-card border border-border rounded-full flex items-center justify-center shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] active:scale-[0.94] transition-all"
+              className="w-10 h-10 bg-card border border-border rounded-full flex items-center justify-center shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-elevated)] active:scale-[0.94] transition-all mt-0.5"
             >
-              <Bell size={18} className="text-foreground" />
+              <Bell size={17} className="text-foreground" />
             </button>
           </motion.div>
 
-          {/* ── Teaching card ── */}
-          <motion.div custom={1} variants={fadeUp} initial="hidden" animate="visible">
-            <TeachingCard onAdd={() => setLocation('/add')} />
+          {/* ── Health Score ── */}
+          <motion.div custom={1} variants={rise} initial="hidden" animate="show">
+            <HealthCard />
+          </motion.div>
+
+          {/* ── Today's Focus ── */}
+          <motion.div custom={2} variants={rise} initial="hidden" animate="show">
+            <FocusCard hour={hour} onAdd={() => setLocation('/add')} />
+          </motion.div>
+
+          {/* ── Quick Actions ── */}
+          <motion.div custom={3} variants={rise} initial="hidden" animate="show">
+            <QuickActions onNavigate={setLocation} />
+          </motion.div>
+
+          {/* ── Activity Timeline ── */}
+          <motion.div custom={4} variants={rise} initial="hidden" animate="show">
+            <ActivitySection onAdd={() => setLocation('/add')} />
           </motion.div>
 
         </div>
       </SafeArea>
-
-      {/* ── Floating AI pill ── */}
-      <div className="fixed bottom-[92px] left-0 right-0 flex justify-center z-40 pointer-events-none">
-        <motion.button
-          type="button"
-          onClick={() => setLocation('/analysis')}
-          initial={{ opacity: 0, y: 12, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.45, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="pointer-events-auto flex items-center gap-2.5 pl-4 pr-5 py-3 bg-foreground text-white rounded-full shadow-[0_8px_32px_rgba(22,27,46,0.28),0_2px_8px_rgba(22,27,46,0.14)] hover:opacity-90 active:scale-[0.97] transition-all"
-        >
-          <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-            <Sparkles size={13} className="text-white" />
-          </div>
-          <span className="text-[14px] font-semibold tracking-tight">Спросить BarDoctor</span>
-        </motion.button>
-      </div>
     </AppShell>
   );
 }
