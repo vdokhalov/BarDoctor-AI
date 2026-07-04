@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { ToastProvider, ToastContainer } from '@/components/ds/Toast';
 import { RestaurantProvider, useRestaurant } from '@/contexts/RestaurantContext';
+import { EventsProvider } from '@/contexts/EventsContext';
 
 import NotFound     from '@/pages/not-found';
 import Splash       from '@/pages/Splash';
@@ -13,6 +14,7 @@ import Onboarding   from '@/pages/Onboarding';
 import Home         from '@/pages/Home';
 import Analysis     from '@/pages/Analysis';
 import Add          from '@/pages/Add';
+import Events       from '@/pages/Events';
 import Tasks        from '@/pages/Tasks';
 import Equipment    from '@/pages/Equipment';
 import Profile      from '@/pages/Profile';
@@ -23,8 +25,6 @@ import DesignSystem from '@/pages/DesignSystem';
 const queryClient = new QueryClient();
 
 // ─── Route guard ──────────────────────────────────────────────────────────────
-// Wraps any component that requires a completed onboarding profile.
-// If no profile exists, sends the user to /setup immediately.
 
 function RequireProfile({ component: Component }: { component: React.ComponentType }) {
   const { profile } = useRestaurant();
@@ -37,16 +37,17 @@ function RequireProfile({ component: Component }: { component: React.ComponentTy
 function Router() {
   return (
     <Switch>
-      {/* Public / pre-onboarding */}
-      <Route path="/"          component={Splash} />
-      <Route path="/setup"     component={Onboarding} />
-      <Route path="/login"     component={Login} />
-      <Route path="/register"  component={Register} />
+      {/* Public */}
+      <Route path="/"         component={Splash} />
+      <Route path="/setup"    component={Onboarding} />
+      <Route path="/login"    component={Login} />
+      <Route path="/register" component={Register} />
 
       {/* Protected — require completed onboarding */}
       <Route path="/home"          component={() => <RequireProfile component={Home} />} />
       <Route path="/analysis"      component={() => <RequireProfile component={Analysis} />} />
       <Route path="/add"           component={() => <RequireProfile component={Add} />} />
+      <Route path="/events"        component={() => <RequireProfile component={Events} />} />
       <Route path="/tasks"         component={() => <RequireProfile component={Tasks} />} />
       <Route path="/equipment"     component={() => <RequireProfile component={Equipment} />} />
       <Route path="/profile"       component={() => <RequireProfile component={Profile} />} />
@@ -59,7 +60,7 @@ function Router() {
       <Route path="/settings"      component={() => <RequireProfile component={ComingSoon} />} />
       <Route path="/about"         component={() => <RequireProfile component={ComingSoon} />} />
 
-      {/* Dev only */}
+      {/* Dev */}
       <Route path="/design-system" component={DesignSystem} />
 
       <Route component={NotFound} />
@@ -73,15 +74,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <RestaurantProvider>
-        <TooltipProvider>
-          <ToastProvider>
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
-              <Router />
-            </WouterRouter>
-            <ToastContainer />
-          </ToastProvider>
-          <Toaster />
-        </TooltipProvider>
+        <EventsProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+                <Router />
+              </WouterRouter>
+              <ToastContainer />
+            </ToastProvider>
+            <Toaster />
+          </TooltipProvider>
+        </EventsProvider>
       </RestaurantProvider>
     </QueryClientProvider>
   );
