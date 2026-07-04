@@ -11,7 +11,7 @@ export default function NavBar() {
   const tabs = [
     { name: 'Главная',  href: '/home',     icon: House },
     { name: 'Анализ',   href: '/analysis', icon: BarChart2 },
-    { name: 'Добавить', href: '/add',       icon: Plus, isFab: true },
+    { name: 'Сообщить', href: '/smart',     icon: Plus, isFab: true },
     { name: 'Решения',  href: '/decisions', icon: LayoutList },
     { name: 'Ещё',      href: '/more',     icon: LayoutGrid },
   ];

@@ -29,6 +29,7 @@ import More         from '@/pages/More';
 import ComingSoon   from '@/pages/ComingSoon';
 import Health      from '@/pages/Health';
 import Decisions   from '@/pages/Decisions';
+import SmartInput  from '@/pages/SmartInput';
 import DesignSystem from '@/pages/DesignSystem';
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ function Router() {
       {/* Protected — require completed onboarding */}
       <Route path="/home"          component={() => <RequireProfile component={Home} />} />
       <Route path="/analysis"      component={() => <RequireProfile component={Analysis} />} />
+      <Route path="/smart"         component={() => <RequireProfile component={SmartInput} />} />
       <Route path="/add"           component={() => <RequireProfile component={Add} />} />
       <Route path="/events"        component={() => <RequireProfile component={Events} />} />
       <Route path="/tasks"         component={() => <RequireProfile component={Tasks} />} />
