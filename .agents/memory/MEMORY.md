@@ -1,3 +1,4 @@
 - [Cases module architecture](cases-module.md) — compound mutations must use functional setCases(prev=>) not ref+patch to avoid clobber on rapid updates.
 - [Home phantom-gap pattern](home-layout.md) — conditional sections in flex gap must guard the motion.div wrapper, not just the inner component's return null.
 - [AI Doctor / Anthropic integration](ai-doctor.md) — api-server at /api, Anthropic via @workspace/integrations-anthropic-ai, rate limit + payload guard on the diagnosis route.
+- [Restaurant Health Engine](health-engine.md) — deterministic scoring in healthEngine.ts; supplier→operations, idea events excluded from calibration count; always returns HealthReport (overall=null when insufficient).

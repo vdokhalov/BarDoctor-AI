@@ -10,10 +10,16 @@ import SafeArea from '@/components/layout/SafeArea';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 import { useEvents } from '@/contexts/EventsContext';
 import { useCases } from '@/contexts/CasesContext';
+import { useEmployees } from '@/contexts/EmployeesContext';
 import { formatRelative } from '@/store/events';
 import { activeCases, isOverdue, formatDue } from '@/store/cases';
 import { CATEGORY_CONFIG, PRIORITY_CONFIG } from '@/config/eventCategories';
 import { CASE_TYPE_CONFIG, CASE_PRIORITY_CONFIG, CASE_STATUS_CONFIG } from '@/config/caseCategories';
+import {
+  computeHealth, scoreVisual,
+  CATEGORY_ORDER, CATEGORY_META,
+  type HealthReport,
+} from '@/store/healthEngine';
 
 // ─── Animation ────────────────────────────────────────────────────────────────
 
@@ -27,78 +33,125 @@ const rise = {
 
 // ─── 1. Health Score card ─────────────────────────────────────────────────────
 
-const ARC_R  = 52;
-const ARC_CX = 72;
-const ARC_CY = 72;
-const CIRC   = 2 * Math.PI * ARC_R;
-const ARC270 = (270 / 360) * CIRC;
+const H_R    = 52;
+const H_CX   = 72;
+const H_CY   = 72;
+const H_CIRC = 2 * Math.PI * H_R;
+const H_ARC  = H_CIRC * 0.75;
 
-function GaugeArc({ eventCount }: { eventCount: number }) {
-  const fillFraction = Math.min(eventCount / 20, 1) * 0.4;
-  const fillLength   = ARC270 * fillFraction;
+function HomeGauge({ score }: { score: number | null }) {
+  const vis  = score !== null ? scoreVisual(score) : null;
+  const fill = score !== null ? H_ARC * (score / 100) : 0;
 
   return (
     <svg width="144" height="144" viewBox="0 0 144 144" fill="none" aria-hidden>
-      <circle cx={ARC_CX} cy={ARC_CY} r={ARC_R}
+      {/* Track */}
+      <circle cx={H_CX} cy={H_CY} r={H_R}
         stroke="rgba(255,255,255,0.10)" strokeWidth="8" strokeLinecap="round" fill="none"
-        strokeDasharray={`${ARC270} ${CIRC}`}
-        transform={`rotate(135 ${ARC_CX} ${ARC_CY})`}
+        strokeDasharray={`${H_ARC} ${H_CIRC}`}
+        transform={`rotate(135 ${H_CX} ${H_CY})`}
       />
-      {fillLength > 0 && (
-        <motion.circle cx={ARC_CX} cy={ARC_CY} r={ARC_R}
-          stroke="rgba(91,92,235,0.8)" strokeWidth="8" strokeLinecap="round" fill="none"
-          strokeDasharray={`${fillLength} ${CIRC}`} strokeDashoffset={0}
-          transform={`rotate(135 ${ARC_CX} ${ARC_CY})`}
-          initial={{ strokeDasharray: `0 ${CIRC}` }}
-          animate={{ strokeDasharray: `${fillLength} ${CIRC}` }}
+      {/* Fill */}
+      {score !== null ? (
+        <motion.circle cx={H_CX} cy={H_CY} r={H_R}
+          stroke={vis!.stroke}
+          strokeWidth="8" strokeLinecap="round" fill="none"
+          transform={`rotate(135 ${H_CX} ${H_CY})`}
+          initial={{ strokeDasharray: `0 ${H_CIRC}` }}
+          animate={{ strokeDasharray: `${fill} ${H_CIRC}` }}
           transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
         />
-      )}
-      {fillLength === 0 && (
-        <motion.circle cx={ARC_CX} cy={ARC_CY} r={ARC_R}
+      ) : (
+        <motion.circle cx={H_CX} cy={H_CY} r={H_R}
           stroke="rgba(91,92,235,0.45)" strokeWidth="8" strokeLinecap="round" fill="none"
-          strokeDasharray={`${ARC270} ${CIRC}`}
-          transform={`rotate(135 ${ARC_CX} ${ARC_CY})`}
+          strokeDasharray={`${H_ARC} ${H_CIRC}`}
+          transform={`rotate(135 ${H_CX} ${H_CY})`}
           animate={{ opacity: [0.35, 0.75, 0.35] }}
           transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
         />
       )}
-      <text x={ARC_CX} y={ARC_CY - 6} textAnchor="middle" dominantBaseline="middle"
+      {/* Label inside arc */}
+      <text x={H_CX} y={H_CY - 6} textAnchor="middle" dominantBaseline="middle"
         fontSize="28" fontWeight="800" fill="rgba(255,255,255,0.9)"
         fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif">
-        {eventCount > 0 ? eventCount : '—'}
+        {score !== null ? score : '—'}
       </text>
-      <text x={ARC_CX} y={ARC_CY + 18} textAnchor="middle" dominantBaseline="middle"
+      <text x={H_CX} y={H_CY + 18} textAnchor="middle" dominantBaseline="middle"
         fontSize="10" fontWeight="600" fill="rgba(255,255,255,0.40)" letterSpacing="0.04em"
         fontFamily="-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif">
-        {eventCount > 0 ? 'СОБЫТИЙ' : 'СБОР ДАННЫХ'}
+        {score !== null ? 'БАЛЛ' : 'КАЛИБРОВКА'}
       </text>
     </svg>
   );
 }
 
-function HealthCard({ eventCount }: { eventCount: number }) {
-  const label = eventCount === 0 ? 'Калибровка' : `${eventCount} ${eventCount === 1 ? 'событие' : eventCount < 5 ? 'события' : 'событий'}`;
+function HealthCard({ report, onDetail }: { report: HealthReport; onDetail: () => void }) {
+  const vis          = report.overall !== null ? scoreVisual(report.overall) : null;
+  const orderedCats  = CATEGORY_ORDER.map((id) => report.categories[id]);
+
   return (
-    <div className="rounded-[24px] overflow-hidden relative"
-      style={{ background: 'linear-gradient(160deg, #1A1F38 0%, #161B2E 55%, #1D1440 100%)', boxShadow: '0 8px 32px rgba(22,27,46,0.28), 0 2px 8px rgba(22,27,46,0.14)' }}>
+    <button
+      type="button" onClick={onDetail}
+      className="w-full text-left rounded-[24px] overflow-hidden relative active:scale-[0.985] transition-transform"
+      style={{ background: 'linear-gradient(160deg, #1A1F38 0%, #161B2E 55%, #1D1440 100%)', boxShadow: '0 8px 32px rgba(22,27,46,0.28)' }}
+    >
       <div aria-hidden className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(91,92,235,0.18) 0%, transparent 70%)' }} />
       <div className="relative z-10 px-6 pt-6 pb-5">
-        <div className="flex items-center justify-between mb-5">
-          <p className="text-[12px] font-bold uppercase tracking-widest text-white/40">Здоровье заведения</p>
-          <span className="text-[11px] font-semibold bg-white/8 text-white/50 px-2.5 py-1 rounded-full border border-white/10">{label}</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <GaugeArc eventCount={eventCount} />
-          <p className="text-[13px] text-white/45 font-medium text-center mt-3 max-w-[220px] leading-snug">
-            {eventCount === 0
-              ? 'Добавьте первые события, чтобы BarDoctor рассчитал балл здоровья'
-              : 'Продолжайте добавлять события для точного анализа'}
+        {/* Title row */}
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[12px] font-bold uppercase tracking-widest text-white/40">
+            Здоровье заведения
           </p>
+          {vis ? (
+            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full"
+              style={{ color: vis.color, background: vis.bg }}>
+              {vis.label}
+            </span>
+          ) : (
+            <span className="text-[11px] font-semibold bg-white/8 text-white/40 px-2.5 py-1 rounded-full border border-white/10">
+              Калибровка
+            </span>
+          )}
+        </div>
+
+        {/* Gauge */}
+        <div className="flex flex-col items-center">
+          <HomeGauge score={report.overall} />
+          {!report.hasEnoughData && (
+            <p className="text-[13px] text-white/40 font-medium text-center mt-2 max-w-[220px] leading-snug">
+              {report.totalRecords === 0
+                ? 'Добавьте первые события — балл появится автоматически'
+                : 'Продолжайте добавлять данные для точного анализа'}
+            </p>
+          )}
+        </div>
+
+        {/* Category dots — only when there's enough data */}
+        {report.hasEnoughData && (
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/8">
+            {orderedCats.map((cat) => {
+              const catVis = cat.score !== null ? scoreVisual(cat.score) : null;
+              return (
+                <div key={cat.id} className="flex flex-col items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full"
+                    style={{ background: catVis ? catVis.stroke : 'rgba(255,255,255,0.15)' }} />
+                  <span className="text-[8px] font-bold text-white/25 uppercase tracking-wide leading-none">
+                    {CATEGORY_META[cat.id].labelShort.slice(0, 4).replace('.', '')}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* "Подробнее" affordance */}
+        <div className="flex items-center justify-center gap-1 mt-3">
+          <span className="text-[12px] font-semibold text-white/30">Подробнее</span>
+          <ArrowRight size={11} className="text-white/30" />
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -322,11 +375,16 @@ export default function Home() {
   const { profile }     = useRestaurant();
   const { events }      = useEvents();
   const { cases }       = useCases();
+  const { employees }   = useEmployees();
   const [, setLocation] = useLocation();
 
   const restaurantName  = profile?.name ?? '';
   const hour            = new Date().getHours();
   const hasActiveCases  = useMemo(() => activeCases(cases).length > 0, [cases]);
+  const healthReport    = useMemo(
+    () => computeHealth(events, cases, employees),
+    [events, cases, employees],
+  );
   const greeting =
     hour >= 5  && hour < 12 ? 'Доброе утро'  :
     hour >= 12 && hour < 17 ? 'Добрый день'  :
@@ -357,7 +415,7 @@ export default function Home() {
 
           {/* Health Score */}
           <motion.div custom={1} variants={rise} initial="hidden" animate="show">
-            <HealthCard eventCount={events.length} />
+            <HealthCard report={healthReport} onDetail={() => setLocation('/health')} />
           </motion.div>
 
           {/* Active Cases — wrapper removed entirely when no active cases to prevent flex gap */}

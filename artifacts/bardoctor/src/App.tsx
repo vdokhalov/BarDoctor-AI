@@ -26,6 +26,7 @@ import CaseDetail   from '@/pages/CaseDetail';
 import Profile      from '@/pages/Profile';
 import More         from '@/pages/More';
 import ComingSoon   from '@/pages/ComingSoon';
+import Health      from '@/pages/Health';
 import DesignSystem from '@/pages/DesignSystem';
 
 const queryClient = new QueryClient();
@@ -60,6 +61,8 @@ function Router() {
       <Route path="/more"          component={() => <RequireProfile component={More} />} />
       <Route path="/employees"     component={() => <RequireProfile component={Employees} />} />
       {/* Cases — specific paths before dynamic :id */}
+      <Route path="/health"         component={() => <RequireProfile component={Health} />} />
+
       <Route path="/cases/add"     component={() => <RequireProfile component={AddCase} />} />
       <Route path="/cases/:id"     component={() => <RequireProfile component={CaseDetail} />} />
       <Route path="/cases"         component={() => <RequireProfile component={Cases} />} />
