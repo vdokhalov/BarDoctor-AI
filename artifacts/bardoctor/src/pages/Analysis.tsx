@@ -1,106 +1,525 @@
-import React, { useState } from 'react';
-import { Banknote, TrendingUp, Users, ShoppingBag } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  Sparkles, Mic, Send, Clock, ChevronRight,
+  AlertCircle, Info, Activity, Lightbulb, ArrowRight,
+  MicOff, X,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import AppShell from '@/components/layout/AppShell';
-import SafeArea from '@/components/layout/SafeArea';
-import PageHeader from '@/components/layout/PageHeader';
-import SectionTitle from '@/components/shared/SectionTitle';
-import ListRow from '@/components/shared/ListRow';
 import { cn } from '@/lib/utils';
 
-export default function Analysis() {
-  const [activeRange, setActiveRange] = useState('Неделя');
-  const ranges = ['День', 'Неделя', 'Месяц'];
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface UserMessage {
+  type: 'user';
+  id: string;
+  text: string;
+}
+
+interface AIMessage {
+  type: 'ai';
+  id: string;
+  problem: string;
+  reason: string;
+  confidence: number; // 0-100
+  recommendation: string;
+  nextStep: string;
+}
+
+type ChatMessage = UserMessage | AIMessage;
+
+// ─── Mock AI logic ────────────────────────────────────────────────────────────
+
+function generateResponse(query: string): AIMessage {
+  const q = query.toLowerCase();
+
+  if (q.includes('выручка') || q.includes('прибыл') || q.includes('доход') || q.includes('упал')) {
+    return {
+      type: 'ai', id: uid(),
+      problem: 'Выручка в пятницу и субботу ниже среднего на 18%',
+      reason: 'Пиковая загрузка совпадает с нехваткой персонала — 2 бармена вместо 3 на вечерней смене снижают скорость обслуживания и количество отданных заказов',
+      confidence: 87,
+      recommendation: 'Перенести один выход на пятницу-субботу. Добавить позицию «экспресс-кофе» для снижения времени ожидания в час пик',
+      nextStep: 'Согласовать расписание с Иваном С. до четверга и обновить смены в приложении',
+    };
+  }
+  if (q.includes('food cost') || q.includes('себестоим') || q.includes('закупк')) {
+    return {
+      type: 'ai', id: uid(),
+      problem: 'Food cost превышает плановый показатель на 6,3% (факт: 34,1%, план: 27,8%)',
+      reason: 'Завышенные порции молочных напитков и списание по кофемашине — нарушена технологическая карта на латте и капучино',
+      confidence: 91,
+      recommendation: 'Провести контрольное взвешивание порций. Обновить инструкцию бариста и разместить карточку у кофемашины',
+      nextStep: 'Инвентаризация сегодня до 18:00, сравнение с теоретическим расходом',
+    };
+  }
+  if (q.includes('меню') || q.includes('позици') || q.includes('прибыльн')) {
+    return {
+      type: 'ai', id: uid(),
+      problem: 'Топ-3 позиции по обороту дают лишь 38% маржи, хотя занимают 61% площади меню',
+      reason: 'Капучино и американо продаются чаще всего, но сырьевая стоимость делает их наименее маржинальными — разница с альтернативами до 22%',
+      confidence: 83,
+      recommendation: 'Выделить матча-латте и фильтр-кофе как «рекомендации бариста» — они дают маржу на 19% выше при схожей цене продажи',
+      nextStep: 'Обновить стенд рекомендаций до пятницы и провести brief для персонала',
+    };
+  }
+  if (q.includes('гост') || q.includes('возвращ') || q.includes('лояльн')) {
+    return {
+      type: 'ai', id: uid(),
+      problem: 'Повторные визиты гостей снизились на 23% за последние 6 недель',
+      reason: 'Корреляция с уходом популярного бариста и отсутствием программы лояльности — гости не чувствуют персонализированного сервиса',
+      confidence: 79,
+      recommendation: 'Запустить карту постоянного гостя — «6-й кофе в подарок». Ответить на 3 свежих негативных отзыва на Яндекс.Картах до конца дня',
+      nextStep: 'Связаться с Марией К. (ex-бариста) и предложить выход на 2 смены в неделю',
+    };
+  }
+  if (q.includes('инвентар') || q.includes('запас') || q.includes('склад')) {
+    return {
+      type: 'ai', id: uid(),
+      problem: 'Молоко и сиропы достигнут нулевого остатка через 2–3 дня при текущем темпе потребления',
+      reason: 'Заказ на прошлой неделе был сокращён на 30% из-за ошибки в прогнозе, а объём продаж напитков на молоке вырос на 14%',
+      confidence: 94,
+      recommendation: 'Разместить экстренный заказ сегодня до 15:00. Рассмотреть переход на еженедельный автозаказ с поправкой ±15% по трафику',
+      nextStep: 'Связаться с поставщиком и подтвердить доставку на завтра до 10:00',
+    };
+  }
+
+  return {
+    type: 'ai', id: uid(),
+    problem: 'Обнаружены отклонения по нескольким операционным показателям',
+    reason: 'Анализ данных за последние 30 дней показывает расхождение с плановыми показателями — требуется детальная проверка выбранного направления',
+    confidence: 72,
+    recommendation: 'Сфокусируйтесь на одном конкретном показателе: выручка, food cost, персонал или загрузка. Уточните временной период для точного анализа',
+    nextStep: 'Задайте уточняющий вопрос или выберите один из предложенных вариантов ниже',
+  };
+}
+
+function uid() {
+  return Math.random().toString(36).slice(2);
+}
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+
+const SUGGESTED = [
+  'Почему упала выручка в пятницу?',
+  'Как снизить food cost?',
+  'Какие позиции меню самые прибыльные?',
+  'Почему гости не возвращаются?',
+  'Когда проводить инвентаризацию?',
+];
+
+const RECENT_INITIAL = [
+  'Почему выросли расходы на закупки?',
+  'Как увеличить средний чек?',
+];
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-end gap-3 px-6">
+      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <Sparkles size={14} className="text-primary" />
+      </div>
+      <div className="bd-card px-4 py-3 flex items-center gap-1.5">
+        {[0, 0.18, 0.36].map((delay, i) => (
+          <motion.span
+            key={i}
+            className="w-2 h-2 rounded-full bg-muted-foreground/50"
+            animate={{ y: [0, -5, 0] }}
+            transition={{ repeat: Infinity, duration: 0.7, delay, ease: 'easeInOut' }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UserBubble({ text }: { text: string }) {
+  return (
+    <div className="flex justify-end px-6">
+      <div className="max-w-[78%] bg-primary text-primary-foreground px-4 py-3 rounded-[18px] rounded-tr-[6px] text-[15px] leading-snug font-medium shadow-[var(--shadow-card)]">
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function AICard({ msg }: { msg: AIMessage }) {
+  const pct = msg.confidence;
+  const confColor =
+    pct >= 80 ? '#16A34A' : pct >= 60 ? '#B45309' : '#DC2626';
+  const confBg =
+    pct >= 80 ? '#22C55E' : pct >= 60 ? '#F59E0B' : '#EF4444';
+  const confLabel =
+    pct >= 80 ? 'Высокая' : pct >= 60 ? 'Средняя' : 'Низкая';
+
+  const sections = [
+    {
+      icon: AlertCircle,
+      iconColor: 'text-destructive',
+      iconBg: 'bg-destructive/10',
+      label: 'Проблема',
+      text: msg.problem,
+    },
+    {
+      icon: Info,
+      iconColor: 'text-[#1D4ED8]',
+      iconBg: 'bg-[#3B82F6]/10',
+      label: 'Причина',
+      text: msg.reason,
+    },
+    {
+      icon: Lightbulb,
+      iconColor: 'text-primary',
+      iconBg: 'bg-primary/10',
+      label: 'Рекомендация',
+      text: msg.recommendation,
+    },
+    {
+      icon: ArrowRight,
+      iconColor: 'text-foreground',
+      iconBg: 'bg-muted',
+      label: 'Следующий шаг',
+      text: msg.nextStep,
+    },
+  ];
 
   return (
-    <AppShell showBottomNav>
-      <PageHeader title="Аналитика" />
-      <SafeArea>
-        {/* Date Range Selector */}
-        <div className="flex p-1 bg-[#F2F2F7] rounded-xl mb-6">
-          {ranges.map((range) => (
-            <button
-              key={range}
-              onClick={() => setActiveRange(range)}
-              className={cn(
-                "flex-1 py-2 text-[14px] font-medium rounded-lg transition-all",
-                activeRange === range 
-                  ? "bg-white text-[#1A1A2E] shadow-sm" 
-                  : "text-[#8E8E9A]"
-              )}
+    <div className="px-6">
+      <div className="flex items-center gap-2 mb-2 pl-1">
+        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+          <Sparkles size={13} className="text-primary" />
+        </div>
+        <span className="text-[13px] font-semibold text-muted-foreground">BarDoctor</span>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="bd-card overflow-hidden"
+      >
+        {/* Sections */}
+        {sections.map((sec, idx) => {
+          const Icon = sec.icon;
+          return (
+            <div
+              key={sec.label}
+              className={cn('px-4 py-3.5', idx < sections.length - 1 && 'border-b border-border')}
             >
-              {range}
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={cn('w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0', sec.iconBg)}>
+                  <Icon size={11} className={sec.iconColor} />
+                </div>
+                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                  {sec.label}
+                </span>
+              </div>
+              <p className="text-[14px] text-foreground leading-snug pl-7">{sec.text}</p>
+            </div>
+          );
+        })}
+
+        {/* Confidence bar */}
+        <div className="px-4 py-3.5 border-t border-border bg-muted/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center">
+                <Activity size={11} className="text-muted-foreground" />
+              </div>
+              <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                Уверенность
+              </span>
+            </div>
+            <span className="text-[13px] font-bold" style={{ color: confColor }}>
+              {confLabel} · {pct}%
+            </span>
+          </div>
+          <div className="h-1.5 bg-border rounded-full overflow-hidden ml-7">
+            <motion.div
+              className="h-full rounded-full"
+              style={{ backgroundColor: confBg }}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.7, delay: 0.2, ease: 'easeOut' }}
+            />
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({
+  recent,
+  onSelect,
+}: {
+  recent: string[];
+  onSelect: (q: string) => void;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="flex flex-col px-6 pt-4 pb-4"
+    >
+      {/* Hero */}
+      <div className="flex flex-col items-center text-center py-8">
+        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 shadow-[0_0_0_8px_rgba(91,92,235,0.06)]">
+          <Sparkles size={28} className="text-primary" />
+        </div>
+        <h2 className="text-[20px] font-bold text-foreground tracking-tight mb-1.5">
+          BarDoctor AI
+        </h2>
+        <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[260px]">
+          Задайте любой вопрос о вашем ресторане — получите структурированный анализ
+        </p>
+      </div>
+
+      {/* Suggested */}
+      <div className="mb-6">
+        <p className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Предложения
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {SUGGESTED.map((q) => (
+            <button
+              key={q}
+              onClick={() => onSelect(q)}
+              className="px-3.5 py-2 bg-card border border-border rounded-full text-[13px] font-medium text-foreground hover:border-primary hover:text-primary transition-colors active:scale-[0.97]"
+            >
+              {q}
             </button>
           ))}
         </div>
+      </div>
 
-        {/* Metrics */}
-        <div className="flex flex-col gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-5 border border-[#E8E8EC] shadow-card flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
-                <Banknote className="w-6 h-6 text-[#4F46E5]" />
-              </div>
-              <div>
-                <p className="text-[14px] text-[#8E8E9A] font-medium mb-1">Выручка</p>
-                <p className="text-[24px] font-bold text-[#1A1A2E] leading-none">—</p>
-              </div>
-            </div>
-            <div className="text-[#22C55E] flex items-center gap-1 text-[14px] font-medium bg-green-50 px-2 py-1 rounded-md">
-              <TrendingUp className="w-4 h-4" />
-              —%
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 border border-[#E8E8EC] shadow-card flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6 text-[#4F46E5]" />
-              </div>
-              <div>
-                <p className="text-[14px] text-[#8E8E9A] font-medium mb-1">Средний чек</p>
-                <p className="text-[24px] font-bold text-[#1A1A2E] leading-none">—</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 border border-[#E8E8EC] shadow-card flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
-                <Users className="w-6 h-6 text-[#4F46E5]" />
-              </div>
-              <div>
-                <p className="text-[14px] text-[#8E8E9A] font-medium mb-1">Гости</p>
-                <p className="text-[24px] font-bold text-[#1A1A2E] leading-none">—</p>
-              </div>
-            </div>
+      {/* Recent */}
+      {recent.length > 0 && (
+        <div>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+            Недавние вопросы
+          </p>
+          <div className="bd-card overflow-hidden">
+            {recent.map((q, idx) => (
+              <button
+                key={q}
+                onClick={() => onSelect(q)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-muted/50 transition-colors active:bg-muted',
+                  idx < recent.length - 1 && 'border-b border-border',
+                )}
+              >
+                <Clock size={14} className="text-muted-foreground flex-shrink-0" />
+                <span className="flex-1 text-[14px] text-foreground truncate">{q}</span>
+                <ChevronRight size={14} className="text-muted-foreground flex-shrink-0" />
+              </button>
+            ))}
           </div>
         </div>
+      )}
+    </motion.div>
+  );
+}
 
-        {/* Top Items */}
-        <SectionTitle title="Популярные позиции" />
-        <div className="bg-white rounded-2xl border border-[#E8E8EC] shadow-sm overflow-hidden mb-6">
-          <ListRow 
-            title="Капучино"
-            meta="— шт"
-            className="px-4 border-b border-[#E8E8EC]"
-          />
-          <ListRow 
-            title="Круассан классический"
-            meta="— шт"
-            className="px-4 border-b border-[#E8E8EC]"
-          />
-          <ListRow 
-            title="Эспрессо"
-            meta="— шт"
-            className="px-4 border-b border-[#E8E8EC]"
-          />
-          <ListRow 
-            title="Матча латте"
-            meta="— шт"
-            className="px-4"
-          />
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export default function Analysis() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recent, setRecent] = useState<string[]>(RECENT_INITIAL);
+  const endRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom when new message arrives
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }, [query]);
+
+  const submit = useCallback(
+    (text: string) => {
+      const q = text.trim();
+      if (!q || loading) return;
+
+      // Add user message
+      const userMsg: UserMessage = { type: 'user', id: uid(), text: q };
+      setMessages((prev) => [...prev, userMsg]);
+      setQuery('');
+      setLoading(true);
+
+      // Add to recent
+      setRecent((prev) => [q, ...prev.filter((r) => r !== q)].slice(0, 5));
+
+      // Simulate AI response after delay
+      setTimeout(() => {
+        const aiMsg = generateResponse(q);
+        setMessages((prev) => [...prev, aiMsg]);
+        setLoading(false);
+      }, 1600 + Math.random() * 600);
+    },
+    [loading],
+  );
+
+  const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      submit(query);
+    }
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+    setQuery('');
+    setLoading(false);
+  };
+
+  const isEmpty = messages.length === 0 && !loading;
+
+  return (
+    <AppShell showBottomNav className="pb-[168px]">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-30 bg-background/90 backdrop-blur-md border-b border-border px-6 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+            <Sparkles size={13} className="text-primary" />
+          </div>
+          <span className="text-[16px] font-bold text-foreground tracking-tight">BarDoctor AI</span>
         </div>
-      </SafeArea>
+        {!isEmpty && (
+          <button
+            onClick={clearChat}
+            className="flex items-center gap-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X size={14} />
+            Очистить
+          </button>
+        )}
+      </div>
+
+      {/* Content */}
+      <AnimatePresence mode="wait">
+        {isEmpty ? (
+          <EmptyState key="empty" recent={recent} onSelect={submit} />
+        ) : (
+          <motion.div
+            key="chat"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col gap-5 py-5"
+          >
+            {messages.map((msg) =>
+              msg.type === 'user' ? (
+                <motion.div
+                  key={msg.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <UserBubble text={msg.text} />
+                </motion.div>
+              ) : (
+                <AICard key={msg.id} msg={msg} />
+              ),
+            )}
+            {loading && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.28 }}
+              >
+                <TypingIndicator />
+              </motion.div>
+            )}
+            <div ref={endRef} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Fixed input bar ── */}
+      <div className="fixed bottom-[80px] left-0 right-0 z-40 flex justify-center pointer-events-none">
+        <div
+          className="pointer-events-auto w-full max-w-[430px] px-4 pb-3 pt-2 bg-background/95 backdrop-blur-md border-t border-border"
+        >
+          <div className="bd-card p-0 overflow-hidden flex items-end gap-0">
+            {/* Textarea */}
+            <textarea
+              ref={textareaRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Спросите что угодно о ресторане…"
+              rows={1}
+              className="flex-1 resize-none bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground outline-none px-4 py-3.5 leading-snug max-h-[120px] overflow-y-auto"
+              style={{ minHeight: 52 }}
+            />
+
+            {/* Voice button */}
+            <button
+              type="button"
+              onClick={() => setRecording((r) => !r)}
+              className={cn(
+                'flex-shrink-0 w-10 h-10 m-1.5 rounded-[12px] flex items-center justify-center transition-all',
+                recording
+                  ? 'bg-destructive text-white shadow-[0_0_0_4px_rgba(239,68,68,0.2)]'
+                  : 'bg-muted text-muted-foreground hover:bg-border',
+              )}
+            >
+              {recording ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+
+            {/* Send button */}
+            <button
+              type="button"
+              onClick={() => submit(query)}
+              disabled={!query.trim() || loading}
+              className={cn(
+                'flex-shrink-0 w-10 h-10 m-1.5 rounded-[12px] flex items-center justify-center transition-all',
+                query.trim() && !loading
+                  ? 'bg-primary text-primary-foreground shadow-[var(--shadow-fab)] hover:opacity-90 active:scale-95'
+                  : 'bg-muted text-muted-foreground opacity-40',
+              )}
+            >
+              <Send size={16} />
+            </button>
+          </div>
+
+          {/* Mic recording indicator */}
+          <AnimatePresence>
+            {recording && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-center gap-2 pt-2 pl-1 overflow-hidden"
+              >
+                <motion.span
+                  className="w-2 h-2 rounded-full bg-destructive"
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ repeat: Infinity, duration: 1 }}
+                />
+                <span className="text-[12px] text-muted-foreground font-medium">
+                  Запись голоса… нажмите ещё раз чтобы остановить
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </AppShell>
   );
 }
