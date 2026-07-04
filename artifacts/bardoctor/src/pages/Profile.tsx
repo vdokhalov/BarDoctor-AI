@@ -8,13 +8,20 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 import { initials, clearProfile } from '@/store/restaurant';
 import { useToast } from '@/components/ds/Toast';
 
+const AREA_EMOJI: Record<string, string> = {
+  'Бар': '🍸', 'Кухня': '🍳', 'Кофе': '☕',
+  'Доставка': '🛵', 'Кальяны': '💨', 'Терраса': '🌿', 'Банкет': '🎪',
+};
+
 export default function Profile() {
   const [, setLocation] = useLocation();
   const { profile } = useRestaurant();
   const { toast } = useToast();
 
   const name = profile?.name ?? 'Моё заведение';
-  const role = profile ? `${profile.businessType} · ${profile.city}` : 'Настройте профиль';
+  const role = profile
+    ? [profile.businessType, profile.city].filter(Boolean).join(' · ')
+    : 'Настройте профиль';
   const abbr = initials(name);
 
   function soon() {
@@ -39,6 +46,7 @@ export default function Profile() {
           <h2 className="text-[22px] font-bold text-foreground tracking-tight mb-1">{name}</h2>
           <p className="text-[15px] text-muted-foreground font-medium">{role}</p>
 
+          {/* Info badges */}
           {profile && (
             <div className="flex flex-wrap justify-center gap-2 mt-3">
               {profile.seats > 0 && (
@@ -48,31 +56,40 @@ export default function Profile() {
               )}
               {profile.employees > 0 && (
                 <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
-                  {profile.employees} сотрудников
+                  {profile.employees} сотр.
                 </span>
               )}
               {profile.avgCheck > 0 && (
                 <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
-                  ₽{profile.avgCheck.toLocaleString('ru')} средний чек
+                  ₽{profile.avgCheck.toLocaleString('ru')} чек
                 </span>
               )}
-              {profile.hasBar && (
-                <span className="text-[12px] font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
-                  Бар
+              {profile.openTime && profile.closeTime && (
+                <span className="text-[12px] font-semibold bg-muted text-muted-foreground px-3 py-1 rounded-full">
+                  {profile.openTime}–{profile.closeTime}
                 </span>
               )}
-              {profile.hasDelivery && (
-                <span className="text-[12px] font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full">
-                  Доставка
+            </div>
+          )}
+
+          {/* Area chips */}
+          {profile && profile.areas && profile.areas.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-2 mt-2">
+              {profile.areas.map((area) => (
+                <span
+                  key={area}
+                  className="text-[12px] font-semibold bg-primary/8 text-primary px-3 py-1 rounded-full"
+                >
+                  {AREA_EMOJI[area] ?? ''} {area}
                 </span>
-              )}
+              ))}
             </div>
           )}
         </div>
 
         <div className="flex flex-col gap-6 mb-8">
 
-          {/* ── Account security ── */}
+          {/* ── Security ── */}
           <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
             <ListRow
               icon={<Lock className="w-5 h-5" />}
@@ -109,7 +126,7 @@ export default function Profile() {
             />
           </div>
 
-          {/* ── Restaurant data ── */}
+          {/* ── Restaurant ── */}
           <div className="bg-card rounded-2xl border border-card-border shadow-sm overflow-hidden">
             <ListRow
               icon={<RotateCcw className="w-5 h-5" />}

@@ -1,55 +1,73 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { Route, Switch, Router as WouterRouter, Redirect } from 'wouter';
 import { ToastProvider, ToastContainer } from '@/components/ds/Toast';
-import { RestaurantProvider } from '@/contexts/RestaurantContext';
+import { RestaurantProvider, useRestaurant } from '@/contexts/RestaurantContext';
 
-import NotFound from '@/pages/not-found';
-import Splash from '@/pages/Splash';
-import Login from '@/pages/Login';
-import Register from '@/pages/Register';
-import Onboarding from '@/pages/Onboarding';
-import CreateRestaurant from '@/pages/CreateRestaurant';
-import Home from '@/pages/Home';
-import Analysis from '@/pages/Analysis';
-import Add from '@/pages/Add';
-import Tasks from '@/pages/Tasks';
-import Equipment from '@/pages/Equipment';
-import Profile from '@/pages/Profile';
-import More from '@/pages/More';
-import ComingSoon from '@/pages/ComingSoon';
+import NotFound     from '@/pages/not-found';
+import Splash       from '@/pages/Splash';
+import Login        from '@/pages/Login';
+import Register     from '@/pages/Register';
+import Onboarding   from '@/pages/Onboarding';
+import Home         from '@/pages/Home';
+import Analysis     from '@/pages/Analysis';
+import Add          from '@/pages/Add';
+import Tasks        from '@/pages/Tasks';
+import Equipment    from '@/pages/Equipment';
+import Profile      from '@/pages/Profile';
+import More         from '@/pages/More';
+import ComingSoon   from '@/pages/ComingSoon';
 import DesignSystem from '@/pages/DesignSystem';
 
 const queryClient = new QueryClient();
 
+// ─── Route guard ──────────────────────────────────────────────────────────────
+// Wraps any component that requires a completed onboarding profile.
+// If no profile exists, sends the user to /setup immediately.
+
+function RequireProfile({ component: Component }: { component: React.ComponentType }) {
+  const { profile } = useRestaurant();
+  if (!profile) return <Redirect to="/setup" />;
+  return <Component />;
+}
+
+// ─── Router ───────────────────────────────────────────────────────────────────
+
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Splash} />
-      <Route path="/setup" component={Onboarding} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/onboarding" component={CreateRestaurant} />
-      <Route path="/home" component={Home} />
-      <Route path="/analysis" component={Analysis} />
-      <Route path="/add" component={Add} />
-      <Route path="/tasks" component={Tasks} />
-      <Route path="/equipment" component={Equipment} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/more" component={More} />
-      <Route path="/employees" component={ComingSoon} />
-      <Route path="/suppliers" component={ComingSoon} />
-      <Route path="/warehouse" component={ComingSoon} />
-      <Route path="/reports" component={ComingSoon} />
-      <Route path="/notifications" component={ComingSoon} />
-      <Route path="/settings" component={ComingSoon} />
-      <Route path="/about" component={ComingSoon} />
+      {/* Public / pre-onboarding */}
+      <Route path="/"          component={Splash} />
+      <Route path="/setup"     component={Onboarding} />
+      <Route path="/login"     component={Login} />
+      <Route path="/register"  component={Register} />
+
+      {/* Protected — require completed onboarding */}
+      <Route path="/home"          component={() => <RequireProfile component={Home} />} />
+      <Route path="/analysis"      component={() => <RequireProfile component={Analysis} />} />
+      <Route path="/add"           component={() => <RequireProfile component={Add} />} />
+      <Route path="/tasks"         component={() => <RequireProfile component={Tasks} />} />
+      <Route path="/equipment"     component={() => <RequireProfile component={Equipment} />} />
+      <Route path="/profile"       component={() => <RequireProfile component={Profile} />} />
+      <Route path="/more"          component={() => <RequireProfile component={More} />} />
+      <Route path="/employees"     component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/suppliers"     component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/warehouse"     component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/reports"       component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/notifications" component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/settings"      component={() => <RequireProfile component={ComingSoon} />} />
+      <Route path="/about"         component={() => <RequireProfile component={ComingSoon} />} />
+
+      {/* Dev only */}
       <Route path="/design-system" component={DesignSystem} />
+
       <Route component={NotFound} />
     </Switch>
   );
 }
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 function App() {
   return (

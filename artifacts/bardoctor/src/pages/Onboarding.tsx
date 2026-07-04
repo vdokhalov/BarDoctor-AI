@@ -1,25 +1,31 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ArrowRight, Check } from 'lucide-react';
+import { ChevronLeft, Check } from 'lucide-react';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 import { RestaurantProfile } from '@/store/restaurant';
 import { cn } from '@/lib/utils';
 
-// ─── Step definitions ─────────────────────────────────────────────────────────
+// ─── Static data ──────────────────────────────────────────────────────────────
 
-const BUSINESS_TYPES = ['Ресторан', 'Кафе', 'Бар', 'Пекарня', 'Фастфуд', 'Другое'];
+const BUSINESS_TYPES = ['Ресторан', 'Кафе', 'Бар', 'Пекарня', 'Кофейня', 'Другое'];
 
-const CUISINES = [
-  'Европейская', 'Итальянская', 'Японская', 'Русская',
-  'Кофейня', 'Паназиатская', 'Американская', 'Другая',
+const HOURS: string[] = [];
+for (let h = 0; h < 24; h++) {
+  HOURS.push(`${String(h).padStart(2, '0')}:00`);
+}
+
+const AREAS = [
+  { label: 'Бар',      emoji: '🍸', desc: 'Коктейли, вино, крепкие напитки' },
+  { label: 'Кухня',    emoji: '🍳', desc: 'Горячее, холодное, выпечка' },
+  { label: 'Кофе',     emoji: '☕', desc: 'Эспрессо-бар, кофейная станция' },
+  { label: 'Доставка', emoji: '🛵', desc: 'Курьеры или самовывоз' },
+  { label: 'Кальяны',  emoji: '💨', desc: 'Кальянная зона' },
+  { label: 'Терраса',  emoji: '🌿', desc: 'Открытая или летняя площадка' },
+  { label: 'Банкет',   emoji: '🎪', desc: 'Банкетный зал, закрытые события' },
 ];
 
-const HOURS = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
-  '20:00', '21:00', '22:00', '23:00', '00:00', '01:00', '02:00', '03:00',
-];
+// ─── Draft ────────────────────────────────────────────────────────────────────
 
 interface Draft {
   name: string;
@@ -29,100 +35,64 @@ interface Draft {
   seats: string;
   avgCheck: string;
   employees: string;
-  cuisine: string;
-  hasBar: boolean;
-  hasDelivery: boolean;
   openTime: string;
   closeTime: string;
+  areas: string[];
 }
 
 const EMPTY: Draft = {
   name: '', businessType: '', country: '', city: '',
-  seats: '', avgCheck: '', employees: '', cuisine: '',
-  hasBar: false, hasDelivery: false, openTime: '10:00', closeTime: '23:00',
+  seats: '', avgCheck: '', employees: '',
+  openTime: '10:00', closeTime: '23:00',
+  areas: [],
 };
 
-// ─── Small atoms ──────────────────────────────────────────────────────────────
-
-function Chip({
-  label, selected, onClick,
-}: { label: string; selected: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'px-4 py-2.5 rounded-[14px] text-[14px] font-semibold border transition-all active:scale-[0.97]',
-        selected
-          ? 'bg-primary text-white border-primary shadow-[0_2px_12px_rgba(91,92,235,0.30)]'
-          : 'bg-card text-foreground border-border hover:border-primary/50',
-      )}
-    >
-      {label}
-    </button>
-  );
+// ─── Validation ───────────────────────────────────────────────────────────────
+// step 1 = basics, step 2 = operations, step 3 = areas
+function canAdvance(step: number, d: Draft): boolean {
+  if (step === 1) return d.name.trim().length > 0 && d.businessType !== '' && d.city.trim().length > 0;
+  if (step === 2) return true; // all optional
+  if (step === 3) return true; // can select 0 areas
+  return false;
 }
 
-function Toggle({
-  label, sub, value, onChange,
-}: { label: string; sub: string; value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={cn(
-        'w-full flex items-center justify-between p-4 rounded-2xl border transition-all active:scale-[0.99]',
-        value
-          ? 'bg-primary/6 border-primary/30'
-          : 'bg-card border-border',
-      )}
-    >
-      <div className="text-left">
-        <p className={cn('text-[15px] font-semibold', value ? 'text-primary' : 'text-foreground')}>
-          {label}
-        </p>
-        <p className="text-[12px] text-muted-foreground mt-0.5">{sub}</p>
-      </div>
-      <div className={cn(
-        'w-12 h-6.5 rounded-full relative transition-colors flex-shrink-0',
-        value ? 'bg-primary' : 'bg-muted',
-      )} style={{ height: 26, width: 48 }}>
-        <motion.div
-          className="absolute top-[3px] w-5 h-5 rounded-full bg-white shadow-sm"
-          animate={{ left: value ? 24 : 3 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-        />
-      </div>
-    </button>
-  );
-}
+// ─── Animation ────────────────────────────────────────────────────────────────
 
-function FieldBlock({
-  label, children,
-}: { label: string; children: React.ReactNode }) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const slide: Record<string, any> = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 48 : -48, opacity: 0,
+  }),
+  center: {
+    x: 0, opacity: 1,
+    transition: { duration: 0.36, ease: [0.22, 1, 0.36, 1] },
+  },
+  exit: (dir: number) => ({
+    x: dir > 0 ? -48 : 48, opacity: 0,
+    transition: { duration: 0.22, ease: 'easeIn' },
+  }),
+};
+
+// ─── Shared field atoms ───────────────────────────────────────────────────────
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-[13px] font-semibold text-muted-foreground uppercase tracking-wide px-1">
-        {label}
-      </span>
+    <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
       {children}
-    </div>
+    </p>
   );
 }
 
 function TextInput({
-  placeholder, value, onChange, type = 'text', prefix,
+  placeholder, value, onChange, type = 'text', prefix, autoFocus,
 }: {
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  prefix?: string;
+  placeholder: string; value: string; onChange: (v: string) => void;
+  type?: string; prefix?: string; autoFocus?: boolean;
 }) {
   return (
     <div className="relative flex items-center">
       {prefix && (
-        <span className="absolute left-4 text-[16px] font-semibold text-muted-foreground select-none">
+        <span className="absolute left-4 text-[15px] font-semibold text-muted-foreground select-none pointer-events-none">
           {prefix}
         </span>
       )}
@@ -131,11 +101,12 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        autoFocus={autoFocus}
         inputMode={type === 'number' ? 'numeric' : undefined}
         className={cn(
-          'w-full h-14 bg-card border border-border rounded-2xl text-[16px] font-semibold text-foreground',
-          'placeholder:text-muted-foreground/50 placeholder:font-normal',
-          'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all',
+          'w-full h-[54px] bg-card border border-border rounded-2xl text-[16px] font-medium text-foreground',
+          'placeholder:text-muted-foreground/40 placeholder:font-normal',
+          'focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all',
           prefix ? 'pl-9 pr-4' : 'px-4',
         )}
       />
@@ -143,7 +114,7 @@ function TextInput({
   );
 }
 
-function SelectRow({
+function SelectInput({
   label, value, onChange, options,
 }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
   return (
@@ -152,270 +123,500 @@ function SelectRow({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'w-full h-14 bg-card border border-border rounded-2xl text-[16px] font-semibold text-foreground',
-          'px-4 appearance-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all',
-          !value && 'text-muted-foreground/50',
+          'w-full h-[54px] bg-card border border-border rounded-2xl text-[16px] font-medium text-foreground',
+          'px-4 pr-10 appearance-none focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all',
+          !value && 'text-muted-foreground/40',
         )}
       >
         <option value="" disabled>{label}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
-      <ChevronLeft
-        size={16}
-        className="absolute right-4 top-1/2 -translate-y-1/2 -rotate-90 text-muted-foreground pointer-events-none"
-      />
+      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none text-[10px]">▼</span>
     </div>
   );
 }
 
-// ─── Step content ─────────────────────────────────────────────────────────────
+// ─── Step 1 — Restaurant basics ───────────────────────────────────────────────
 
-function Step1({ d, upd }: { d: Draft; upd: (k: keyof Draft, v: Draft[keyof Draft]) => void }) {
+function StepBasics({ d, upd }: {
+  d: Draft;
+  upd: (k: keyof Draft, v: Draft[keyof Draft]) => void;
+}) {
   return (
-    <div className="flex flex-col gap-6">
-      <FieldBlock label="Название заведения">
+    <div className="flex flex-col gap-5">
+      {/* Name */}
+      <div>
+        <FieldLabel>Название заведения</FieldLabel>
         <TextInput
           placeholder="Например: Кафе «Берёза»"
           value={d.name}
           onChange={(v) => upd('name', v)}
+          autoFocus
         />
-      </FieldBlock>
-      <FieldBlock label="Тип бизнеса">
+      </div>
+
+      {/* Business type */}
+      <div>
+        <FieldLabel>Тип бизнеса</FieldLabel>
         <div className="flex flex-wrap gap-2">
           {BUSINESS_TYPES.map((t) => (
-            <Chip
+            <button
               key={t}
-              label={t}
-              selected={d.businessType === t}
+              type="button"
               onClick={() => upd('businessType', t)}
-            />
+              className={cn(
+                'px-4 py-2.5 rounded-[14px] text-[14px] font-semibold border transition-all active:scale-[0.96]',
+                d.businessType === t
+                  ? 'bg-primary text-white border-primary shadow-[0_2px_14px_rgba(91,92,235,0.28)]'
+                  : 'bg-card text-foreground border-border hover:border-primary/40',
+              )}
+            >
+              {t}
+            </button>
           ))}
         </div>
-      </FieldBlock>
+      </div>
+
+      {/* Country + City */}
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <FieldLabel>Страна</FieldLabel>
+          <TextInput placeholder="Россия" value={d.country} onChange={(v) => upd('country', v)} />
+        </div>
+        <div className="flex-1">
+          <FieldLabel>Город</FieldLabel>
+          <TextInput placeholder="Москва" value={d.city} onChange={(v) => upd('city', v)} />
+        </div>
+      </div>
     </div>
   );
 }
 
-function Step2({ d, upd }: { d: Draft; upd: (k: keyof Draft, v: Draft[keyof Draft]) => void }) {
+// ─── Step 2 — Operations ──────────────────────────────────────────────────────
+
+function StepOperations({ d, upd }: {
+  d: Draft;
+  upd: (k: keyof Draft, v: Draft[keyof Draft]) => void;
+}) {
   return (
     <div className="flex flex-col gap-5">
-      <FieldBlock label="Страна">
-        <TextInput placeholder="Россия" value={d.country} onChange={(v) => upd('country', v)} />
-      </FieldBlock>
-      <FieldBlock label="Город">
-        <TextInput placeholder="Москва" value={d.city} onChange={(v) => upd('city', v)} />
-      </FieldBlock>
-    </div>
-  );
-}
+      {/* Seats + Employees */}
+      <div className="flex gap-3">
+        <div className="flex-1">
+          <FieldLabel>Мест в зале</FieldLabel>
+          <TextInput placeholder="80" type="number" value={d.seats} onChange={(v) => upd('seats', v)} />
+        </div>
+        <div className="flex-1">
+          <FieldLabel>Сотрудников</FieldLabel>
+          <TextInput placeholder="15" type="number" value={d.employees} onChange={(v) => upd('employees', v)} />
+        </div>
+      </div>
 
-function Step3({ d, upd }: { d: Draft; upd: (k: keyof Draft, v: Draft[keyof Draft]) => void }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <FieldBlock label="Количество мест">
-        <TextInput placeholder="80" type="number" value={d.seats} onChange={(v) => upd('seats', v)} />
-      </FieldBlock>
-      <FieldBlock label="Средний чек">
-        <TextInput placeholder="1 200" type="number" prefix="₽" value={d.avgCheck} onChange={(v) => upd('avgCheck', v)} />
-      </FieldBlock>
-      <FieldBlock label="Сотрудников">
-        <TextInput placeholder="15" type="number" value={d.employees} onChange={(v) => upd('employees', v)} />
-      </FieldBlock>
-    </div>
-  );
-}
+      {/* Avg check */}
+      <div>
+        <FieldLabel>Средний чек</FieldLabel>
+        <TextInput
+          placeholder="1 200"
+          type="number"
+          prefix="₽"
+          value={d.avgCheck}
+          onChange={(v) => upd('avgCheck', v)}
+        />
+      </div>
 
-function Step4({ d, upd }: { d: Draft; upd: (k: keyof Draft, v: Draft[keyof Draft]) => void }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <FieldBlock label="Кухня">
-        <div className="flex flex-wrap gap-2">
-          {CUISINES.map((c) => (
-            <Chip
-              key={c}
-              label={c}
-              selected={d.cuisine === c}
-              onClick={() => upd('cuisine', c)}
+      {/* Hours */}
+      <div>
+        <FieldLabel>Часы работы</FieldLabel>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            <SelectInput
+              label="Открытие"
+              value={d.openTime}
+              onChange={(v) => upd('openTime', v)}
+              options={HOURS}
             />
-          ))}
+          </div>
+          <span className="text-muted-foreground font-medium text-[14px] flex-shrink-0">—</span>
+          <div className="flex-1">
+            <SelectInput
+              label="Закрытие"
+              value={d.closeTime}
+              onChange={(v) => upd('closeTime', v)}
+              options={HOURS}
+            />
+          </div>
         </div>
-      </FieldBlock>
-      <FieldBlock label="Особенности">
-        <div className="flex flex-col gap-2.5">
-          <Toggle
-            label="Есть бар"
-            sub="Коктейли, вино, крепкие напитки"
-            value={d.hasBar}
-            onChange={(v) => upd('hasBar', v)}
-          />
-          <Toggle
-            label="Есть доставка"
-            sub="Курьерская или самовывоз"
-            value={d.hasDelivery}
-            onChange={(v) => upd('hasDelivery', v)}
-          />
-        </div>
-      </FieldBlock>
+      </div>
+
+      <p className="text-[12px] text-muted-foreground px-1 -mt-1">
+        Все поля необязательны — вы сможете добавить позже.
+      </p>
     </div>
   );
 }
 
-function Step5({ d, upd }: { d: Draft; upd: (k: keyof Draft, v: Draft[keyof Draft]) => void }) {
+// ─── Step 3 — Areas ───────────────────────────────────────────────────────────
+
+function StepAreas({ d, upd }: {
+  d: Draft;
+  upd: (k: keyof Draft, v: Draft[keyof Draft]) => void;
+}) {
+  function toggle(label: string) {
+    const current = d.areas;
+    const next = current.includes(label)
+      ? current.filter((a) => a !== label)
+      : [...current, label];
+    upd('areas', next);
+  }
+
   return (
-    <div className="flex flex-col gap-5">
-      <FieldBlock label="Открытие">
-        <SelectRow
-          label="Выберите время"
-          value={d.openTime}
-          onChange={(v) => upd('openTime', v)}
-          options={HOURS}
-        />
-      </FieldBlock>
-      <FieldBlock label="Закрытие">
-        <SelectRow
-          label="Выберите время"
-          value={d.closeTime}
-          onChange={(v) => upd('closeTime', v)}
-          options={HOURS}
-        />
-      </FieldBlock>
+    <div className="flex flex-col gap-3">
+      {AREAS.map((area) => {
+        const selected = d.areas.includes(area.label);
+        return (
+          <motion.button
+            key={area.label}
+            type="button"
+            onClick={() => toggle(area.label)}
+            whileTap={{ scale: 0.98 }}
+            className={cn(
+              'w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl border text-left transition-all',
+              selected
+                ? 'bg-primary/6 border-primary/35 shadow-[0_0_0_1px_rgba(91,92,235,0.18)]'
+                : 'bg-card border-border hover:border-primary/30',
+            )}
+          >
+            {/* Emoji */}
+            <span className={cn(
+              'w-10 h-10 rounded-[13px] flex items-center justify-center text-[20px] flex-shrink-0 transition-colors',
+              selected ? 'bg-primary/12' : 'bg-muted',
+            )}>
+              {area.emoji}
+            </span>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <p className={cn(
+                'text-[15px] font-semibold leading-tight',
+                selected ? 'text-primary' : 'text-foreground',
+              )}>
+                {area.label}
+              </p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{area.desc}</p>
+            </div>
+
+            {/* Check */}
+            <motion.div
+              animate={selected ? { scale: 1, opacity: 1 } : { scale: 0.7, opacity: 0 }}
+              transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0"
+            >
+              <Check size={13} strokeWidth={3} className="text-white" />
+            </motion.div>
+          </motion.button>
+        );
+      })}
+
+      {d.areas.length === 0 && (
+        <p className="text-[12px] text-muted-foreground text-center pt-1">
+          Можно не выбирать — добавите позже.
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Welcome screen ───────────────────────────────────────────────────────────
+
+function WelcomeScreen({ onStart }: { onStart: () => void }) {
+  return (
+    <div className="min-h-[100dvh] w-full bg-white flex flex-col overflow-hidden relative">
+
+      {/* Atmospheric glow */}
+      <div
+        aria-hidden
+        className="absolute pointer-events-none"
+        style={{
+          width: 500,
+          height: 500,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(91,92,235,0.10) 0%, rgba(91,92,235,0.03) 55%, transparent 75%)',
+          top: '30%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
+
+      {/* Content */}
+      <div className="flex-1 flex flex-col items-center justify-center px-8 relative z-10">
+
+        {/* Logo */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.88 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          className="mb-8"
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 20,
+            background: '#161B2E',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 24px rgba(22,27,46,0.18), 0 1px 4px rgba(22,27,46,0.10)',
+          }}
+        >
+          <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+            <rect x="15.5" y="5" width="3" height="24" rx="1.5" fill="white" />
+            <rect x="5" y="15.5" width="24" height="3" rx="1.5" fill="white" />
+            <circle cx="17" cy="17" r="3.5" fill="#5B5CEB" />
+          </svg>
+        </motion.div>
+
+        {/* Headline */}
+        <motion.h1
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.52, delay: 0.14, ease: [0.22, 1, 0.36, 1] }}
+          className="text-[30px] font-black text-[#161B2E] tracking-tight text-center leading-tight mb-4"
+        >
+          Добро пожаловать<br />в BarDoctor
+        </motion.h1>
+
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.48, delay: 0.26, ease: [0.22, 1, 0.36, 1] }}
+          className="text-[15px] text-[#6B7280] font-medium leading-relaxed text-center max-w-[280px] mb-2"
+        >
+          BarDoctor умнеет по мере того, как узнаёт ваш бизнес.
+        </motion.p>
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, delay: 0.34, ease: [0.22, 1, 0.36, 1] }}
+          className="text-[13px] text-[#9CA3AF] text-center max-w-[260px] leading-relaxed"
+        >
+          Расскажите о заведении — это займёт меньше минуты.
+        </motion.p>
+
+        {/* Feature list */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.44, delay: 0.44, ease: [0.22, 1, 0.36, 1] }}
+          className="mt-8 flex flex-col gap-3 w-full max-w-[300px]"
+        >
+          {[
+            { emoji: '🎯', text: 'Точные рекомендации на основе данных' },
+            { emoji: '⚡', text: 'Мгновенные предупреждения об инцидентах' },
+            { emoji: '📈', text: 'Аналитика и возможности для роста' },
+          ].map(({ emoji, text }) => (
+            <div key={text} className="flex items-center gap-3">
+              <span className="w-9 h-9 rounded-[12px] bg-primary/8 flex items-center justify-center text-[17px] flex-shrink-0">
+                {emoji}
+              </span>
+              <p className="text-[13px] text-[#4B5563] font-medium leading-snug">{text}</p>
+            </div>
+          ))}
+        </motion.div>
+      </div>
+
+      {/* CTA */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="relative z-10 px-6 pb-12 pt-4 flex-shrink-0"
+      >
+        <button
+          type="button"
+          onClick={onStart}
+          className="w-full h-14 rounded-2xl bg-[#161B2E] text-white text-[16px] font-bold tracking-tight flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_6px_24px_rgba(22,27,46,0.22)]"
+        >
+          Начать
+        </button>
+        <p className="text-center text-[12px] text-[#9CA3AF] mt-3">
+          Настройка займёт около 1 минуты
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─── Success screen ───────────────────────────────────────────────────────────
+
+function SuccessScreen({ name }: { name: string }) {
+  return (
+    <div className="min-h-[100dvh] w-full bg-white flex flex-col items-center justify-center px-8 gap-0">
+
+      {/* Check circle */}
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 20 }}
+        className="w-24 h-24 rounded-full bg-[#22C55E] flex items-center justify-center mb-6 shadow-[0_12px_40px_rgba(34,197,94,0.30)]"
+      >
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: 'spring', stiffness: 340, damping: 24 }}
+        >
+          <Check size={44} strokeWidth={3} className="text-white" />
+        </motion.div>
+      </motion.div>
+
+      {/* Text */}
+      <motion.div
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.28, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+        className="text-center"
+      >
+        <h2 className="text-[13px] font-bold uppercase tracking-widest text-[#22C55E] mb-2">
+          Поздравляем!
+        </h2>
+        <h1 className="text-[26px] font-black text-[#161B2E] tracking-tight leading-tight mb-2">
+          {name || 'Заведение создано'}
+        </h1>
+        <p className="text-[15px] text-[#6B7280] font-medium">
+          Заведение успешно создано.<br />Открываем BarDoctor…
+        </p>
+      </motion.div>
+
+      {/* Loading dots */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7, duration: 0.4 }}
+        className="flex gap-1.5 mt-10"
+      >
+        {[0, 1, 2].map((i) => (
+          <motion.div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-[#161B2E]/20"
+            animate={{ opacity: [0.2, 1, 0.2] }}
+            transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2 }}
+          />
+        ))}
+      </motion.div>
     </div>
   );
 }
 
 // ─── Step meta ────────────────────────────────────────────────────────────────
 
-const STEPS = [
-  { emoji: '🏠', title: 'Как называется\nваше заведение?', sub: 'Это имя будет использоваться по всему приложению' },
-  { emoji: '📍', title: 'Где вы\nнаходитесь?', sub: 'Укажите страну и город для точной аналитики' },
-  { emoji: '📊', title: 'Расскажите\nо масштабе', sub: 'Помогает BarDoctor давать точные рекомендации' },
-  { emoji: '🍽️', title: 'Концепция\nзаведения', sub: 'Кухня и ключевые особенности' },
-  { emoji: '🕐', title: 'Часы\nработы', sub: 'Ежедневное расписание вашего заведения' },
+const FORM_STEPS = [
+  {
+    step: 1,
+    title: 'Ваше заведение',
+    sub: 'Основные данные для настройки BarDoctor',
+  },
+  {
+    step: 2,
+    title: 'Операционные\nданные',
+    sub: 'Помогает давать более точные рекомендации',
+  },
+  {
+    step: 3,
+    title: 'Зоны\nзаведения',
+    sub: 'Выберите зоны, которые есть у вас',
+  },
 ];
 
-// ─── Validation ───────────────────────────────────────────────────────────────
+const TOTAL_FORM_STEPS = FORM_STEPS.length; // 3
 
-function canAdvance(step: number, d: Draft): boolean {
-  if (step === 0) return d.name.trim().length > 0 && d.businessType !== '';
-  if (step === 1) return d.country.trim().length > 0 && d.city.trim().length > 0;
-  if (step === 2) return d.seats !== '' && d.avgCheck !== '' && d.employees !== '';
-  if (step === 3) return d.cuisine !== '';
-  if (step === 4) return d.openTime !== '' && d.closeTime !== '';
-  return false;
-}
-
-// ─── Slide animation ──────────────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const slideVariants: Record<string, any> = {
-  enter: (dir: number) => ({ x: dir > 0 ? 40 : -40, opacity: 0 }),
-  center: { x: 0, opacity: 1, transition: { duration: 0.34, ease: [0.22, 1, 0.36, 1] } },
-  exit:  (dir: number) => ({ x: dir > 0 ? -40 : 40, opacity: 0, transition: { duration: 0.22, ease: 'easeIn' } }),
-};
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const { save } = useRestaurant();
 
+  // step 0 = welcome; step 1-3 = form; done = true = success
   const [step, setStep] = useState(0);
-  const [dir, setDir] = useState(1);
+  const [dir, setDir]   = useState(1);
   const [draft, setDraft] = useState<Draft>(EMPTY);
-  const [done, setDone] = useState(false);
+  const [done, setDone]   = useState(false);
 
   function upd(k: keyof Draft, v: Draft[keyof Draft]) {
     setDraft((prev) => ({ ...prev, [k]: v }));
   }
 
-  function next() {
-    if (step < STEPS.length - 1) {
+  function goForward() {
+    if (step === 0) {
+      // Welcome → first form step
+      setDir(1);
+      setStep(1);
+      return;
+    }
+    if (step < TOTAL_FORM_STEPS) {
       setDir(1);
       setStep((s) => s + 1);
-    } else {
-      // Save and finish
-      const profile: RestaurantProfile = {
-        name: draft.name.trim(),
-        businessType: draft.businessType,
-        country: draft.country.trim(),
-        city: draft.city.trim(),
-        seats: Number(draft.seats) || 0,
-        avgCheck: Number(draft.avgCheck) || 0,
-        employees: Number(draft.employees) || 0,
-        cuisine: draft.cuisine,
-        hasBar: draft.hasBar,
-        hasDelivery: draft.hasDelivery,
-        openTime: draft.openTime,
-        closeTime: draft.closeTime,
-      };
-      save(profile);
-      setDone(true);
-      setTimeout(() => setLocation('/home'), 1600);
+      return;
     }
+    // Last form step → save & show success
+    const profile: RestaurantProfile = {
+      name:         draft.name.trim(),
+      businessType: draft.businessType,
+      country:      draft.country.trim() || 'Россия',
+      city:         draft.city.trim(),
+      seats:        Number(draft.seats)    || 0,
+      avgCheck:     Number(draft.avgCheck) || 0,
+      employees:    Number(draft.employees)|| 0,
+      openTime:     draft.openTime,
+      closeTime:    draft.closeTime,
+      areas:        draft.areas,
+    };
+    save(profile);
+    setDone(true);
+    setTimeout(() => setLocation('/home'), 2000);
   }
 
-  function back() {
-    if (step > 0) {
-      setDir(-1);
-      setStep((s) => s - 1);
-    }
+  function goBack() {
+    if (step <= 1) return; // can't go back from first form step or welcome
+    setDir(-1);
+    setStep((s) => s - 1);
   }
 
-  const meta = STEPS[step];
-  const ok = canAdvance(step, draft);
-  const isLast = step === STEPS.length - 1;
+  // ── Screens ──
 
-  // ── Success screen ──
+  if (step === 0) {
+    return <WelcomeScreen onStart={() => { setDir(1); setStep(1); }} />;
+  }
+
   if (done) {
-    return (
-      <div className="min-h-[100dvh] w-full bg-[#F8F9FC] flex flex-col items-center justify-center gap-6 px-8">
-        <motion.div
-          initial={{ scale: 0.5, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-          className="w-24 h-24 rounded-full bg-[#22C55E] flex items-center justify-center shadow-[0_12px_40px_rgba(34,197,94,0.35)]"
-        >
-          <Check size={44} strokeWidth={3} className="text-white" />
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.4 }}
-          className="text-center"
-        >
-          <h2 className="text-[26px] font-black text-foreground tracking-tight mb-2">
-            {draft.name}
-          </h2>
-          <p className="text-[15px] text-muted-foreground font-medium">
-            Всё готово. Открываем BarDoctor…
-          </p>
-        </motion.div>
-      </div>
-    );
+    return <SuccessScreen name={draft.name.trim()} />;
   }
+
+  const meta     = FORM_STEPS[step - 1];
+  const ok       = canAdvance(step, draft);
+  const isLast   = step === TOTAL_FORM_STEPS;
+  const progress = step / TOTAL_FORM_STEPS; // 0.33 … 1.0
 
   return (
     <div className="min-h-[100dvh] w-full bg-[#F8F9FC] flex flex-col overflow-hidden">
 
-      {/* ── Progress bar ── */}
-      <div className="h-1 bg-border w-full flex-shrink-0">
+      {/* ── Slim progress bar ── */}
+      <div className="h-[3px] bg-border/60 w-full flex-shrink-0">
         <motion.div
           className="h-full bg-primary rounded-r-full"
-          animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          animate={{ width: `${progress * 100}%` }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
 
-      {/* ── Top bar ── */}
+      {/* ── Top chrome ── */}
       <div className="flex items-center justify-between px-6 pt-5 pb-2 flex-shrink-0">
+
+        {/* Back button */}
         <button
           type="button"
-          onClick={back}
+          onClick={goBack}
           className={cn(
             'w-10 h-10 rounded-full flex items-center justify-center transition-all',
-            step === 0
+            step <= 1
               ? 'opacity-0 pointer-events-none'
               : 'bg-card border border-border hover:bg-muted active:scale-[0.94]',
           )}
@@ -424,42 +625,39 @@ export default function Onboarding() {
         </button>
 
         {/* Step dots */}
-        <div className="flex items-center gap-1.5">
-          {STEPS.map((_, i) => (
+        <div className="flex items-center gap-2">
+          {[1, 2, 3].map((s) => (
             <motion.div
-              key={i}
-              animate={{ width: i === step ? 20 : 6, opacity: i <= step ? 1 : 0.3 }}
-              transition={{ duration: 0.3 }}
-              className={cn(
-                'h-1.5 rounded-full',
-                i <= step ? 'bg-primary' : 'bg-border',
-              )}
+              key={s}
+              animate={{
+                width: s === step ? 22 : 7,
+                opacity: s <= step ? 1 : 0.28,
+              }}
+              transition={{ duration: 0.28 }}
+              className={cn('h-[6px] rounded-full', s <= step ? 'bg-primary' : 'bg-border')}
             />
           ))}
         </div>
 
-        <div className="w-10 flex items-center justify-end">
-          <span className="text-[13px] font-semibold text-muted-foreground">
-            {step + 1}/{STEPS.length}
-          </span>
-        </div>
+        {/* Counter */}
+        <span className="text-[13px] font-semibold text-muted-foreground w-10 text-right">
+          {step}/{TOTAL_FORM_STEPS}
+        </span>
       </div>
 
       {/* ── Scrollable content ── */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pt-6 pb-8">
-
-        {/* Step header */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pt-6 pb-6">
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div
-            key={`header-${step}`}
+            key={`step-${step}`}
             custom={dir}
-            variants={slideVariants}
+            variants={slide}
             initial="enter"
             animate="center"
             exit="exit"
           >
-            <div className="mb-8">
-              <span className="text-[44px] leading-none mb-3 block">{meta.emoji}</span>
+            {/* Step header */}
+            <div className="mb-7">
               <h1
                 className="text-[26px] font-black text-foreground tracking-tight leading-tight mb-2"
                 style={{ whiteSpace: 'pre-line' }}
@@ -472,38 +670,39 @@ export default function Onboarding() {
             </div>
 
             {/* Step body */}
-            {step === 0 && <Step1 d={draft} upd={upd} />}
-            {step === 1 && <Step2 d={draft} upd={upd} />}
-            {step === 2 && <Step3 d={draft} upd={upd} />}
-            {step === 3 && <Step4 d={draft} upd={upd} />}
-            {step === 4 && <Step5 d={draft} upd={upd} />}
+            {step === 1 && <StepBasics      d={draft} upd={upd} />}
+            {step === 2 && <StepOperations  d={draft} upd={upd} />}
+            {step === 3 && <StepAreas       d={draft} upd={upd} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* ── Bottom button ── */}
-      <div className="flex-shrink-0 px-6 pb-10 pt-4">
+      {/* ── CTA ── */}
+      <div className="flex-shrink-0 px-6 pb-10 pt-3 bg-[#F8F9FC]">
         <button
           type="button"
-          onClick={next}
+          onClick={goForward}
           disabled={!ok}
           className={cn(
-            'w-full h-14 rounded-2xl flex items-center justify-center gap-2.5 text-[16px] font-bold tracking-tight transition-all',
+            'w-full h-14 rounded-2xl text-[16px] font-bold tracking-tight transition-all flex items-center justify-center',
             ok
-              ? 'bg-primary text-white shadow-[0_4px_20px_rgba(91,92,235,0.35)] active:scale-[0.98] hover:opacity-90'
+              ? 'bg-primary text-white shadow-[0_4px_20px_rgba(91,92,235,0.30)] active:scale-[0.98] hover:opacity-90'
               : 'bg-muted text-muted-foreground cursor-not-allowed',
           )}
         >
-          {isLast ? 'Начать работу' : 'Продолжить'}
-          {ok && (
-            <div className={cn(
-              'w-6 h-6 rounded-full flex items-center justify-center',
-              isLast ? 'bg-white/20' : 'bg-white/20',
-            )}>
-              <ArrowRight size={14} className="text-white" />
-            </div>
-          )}
+          {isLast ? 'Создать заведение' : 'Продолжить'}
         </button>
+
+        {/* Skip hint for optional steps */}
+        {(step === 2 || step === 3) && (
+          <button
+            type="button"
+            onClick={goForward}
+            className="w-full mt-3 text-center text-[13px] text-muted-foreground font-medium hover:text-foreground transition-colors active:opacity-70"
+          >
+            Пропустить
+          </button>
+        )}
       </div>
     </div>
   );

@@ -2,17 +2,15 @@
 
 export interface RestaurantProfile {
   name: string;
-  businessType: string; // 'Ресторан' | 'Кафе' | 'Бар' | 'Пекарня' | 'Фастфуд' | 'Другое'
+  businessType: string;
   country: string;
   city: string;
   seats: number;
   avgCheck: number;
   employees: number;
-  cuisine: string;
-  hasBar: boolean;
-  hasDelivery: boolean;
   openTime: string;
   closeTime: string;
+  areas: string[]; // e.g. ['Бар', 'Кухня', 'Кофе', 'Доставка']
 }
 
 const KEY = 'bd_restaurant_profile';
