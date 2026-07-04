@@ -1,10 +1,12 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
-import aiRouter from "./ai";
+import healthRouter   from "./health";
+import aiRouter       from "./ai";
+import priorityRouter from "./priority";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
-router.use("/ai", aiRouter);
+router.use("/ai",       aiRouter);
+router.use("/priority", priorityRouter);
 
 export default router;

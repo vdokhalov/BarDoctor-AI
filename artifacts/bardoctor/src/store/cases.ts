@@ -1,3 +1,6 @@
+import type { AIAssessment } from '@/store/events';
+export type { AIAssessment };
+
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
 export type CaseType =
@@ -50,6 +53,7 @@ export interface Case {
   relatedEquipment: string[];    // equipment IDs (future)
   createdAt:        string;
   updatedAt:        string;
+  aiAssessment?:    AIAssessment;  // AI Priority Engine result (set after creation)
 }
 
 // ─── Persistence ──────────────────────────────────────────────────────────────

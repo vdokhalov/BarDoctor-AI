@@ -5,12 +5,13 @@ import { ChevronLeft, X, Check, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCases } from '@/contexts/CasesContext';
 import { useToast } from '@/components/ds/Toast';
-import { Case, CasePriority, caseNid, makeTimeline } from '@/store/cases';
+import { Case, CasePriority, caseNid, makeTimeline, AIAssessment } from '@/store/cases';
 import {
   CASE_TYPES, CASE_TYPE_CONFIG,
-  CASE_PRIORITIES, CASE_PRIORITY_CONFIG,
 } from '@/config/caseCategories';
 import type { CaseType } from '@/store/cases';
+import { type Priority } from '@/store/events';
+import PriorityModal from '@/components/ai/PriorityModal';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 
@@ -125,7 +126,7 @@ function CaseForm({
   type, onSaved, onBack,
 }: {
   type: CaseType;
-  onSaved: (id: string) => void;
+  onSaved: (c: Case) => void;
   onBack: () => void;
 }) {
   const { addCase } = useCases();
@@ -135,13 +136,12 @@ function CaseForm({
 
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
-  const [priority,    setPriority]    = useState<CasePriority | ''>('');
   const [responsible, setResponsible] = useState('');
   const [dueDate,     setDueDate]     = useState('');
   const [photos,      setPhotos]      = useState<string[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const canSave = title.trim().length > 0 && priority !== '';
+  const canSave = title.trim().length > 0;
 
   async function handlePhotos(files: FileList | null) {
     if (!files) return;
@@ -159,7 +159,7 @@ function CaseForm({
       id, type,
       title:            title.trim(),
       description:      description.trim(),
-      priority:         priority as CasePriority,
+      priority:         'low',   // AI Priority Engine sets real priority
       status:           'open',
       responsible:      responsible.trim(),
       dueDate,
@@ -174,10 +174,8 @@ function CaseForm({
     };
     const ok = addCase(newCase);
     if (!ok) toast({ variant: 'warning', title: 'Мало памяти', description: 'Дело добавлено в сессию, но не сохранено постоянно.' });
-    onSaved(id);
+    onSaved(newCase);
   }
-
-  const priLabels = Object.fromEntries(CASE_PRIORITIES.map((p) => [p, CASE_PRIORITY_CONFIG[p].label])) as Record<string, string>;
 
   return (
     <motion.div key="form" {...slideRight} className="flex flex-col min-h-[100dvh]">
@@ -211,24 +209,6 @@ function CaseForm({
           <div>
             <FLabel>Описание</FLabel>
             <FTextarea placeholder="Подробности — что произошло, когда, при каких обстоятельствах…" value={description} onChange={setDescription} />
-          </div>
-
-          <div>
-            <FLabel required>Приоритет</FLabel>
-            <div className="flex flex-wrap gap-2">
-              {CASE_PRIORITIES.map((p) => (
-                <button key={p} type="button" onClick={() => setPriority(p)}
-                  className={cn(
-                    'px-3.5 py-2 rounded-full text-[13px] font-medium border transition-all active:scale-[0.97]',
-                    priority === p
-                      ? 'bg-primary text-white border-primary shadow-[0_2px_8px_rgba(91,92,235,0.28)]'
-                      : 'bg-card border-border text-foreground hover:border-primary/40',
-                  )}
-                >
-                  {priLabels[p]}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div>
@@ -318,21 +298,27 @@ function SuccessScreen({ typeLabel }: { typeLabel: string }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-type Screen = 'pick' | 'form' | 'success';
+type Screen = 'pick' | 'form' | 'assess' | 'success';
 
 export default function AddCase() {
-  const [, setLocation]   = useLocation();
+  const [, setLocation]         = useLocation();
+  const { updateCase }          = useCases();
   const [screen, setScreen]     = useState<Screen>('pick');
   const [type,   setType]       = useState<CaseType | null>(null);
+  const [savedCase, setSavedCase] = useState<Case | null>(null);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => { if (navTimerRef.current) clearTimeout(navTimerRef.current); }, []);
 
   function handlePick(t: CaseType) { setType(t); setScreen('form'); }
 
-  function handleSaved(id: string) {
-    setScreen('success');
-    navTimerRef.current = setTimeout(() => setLocation(`/cases/${id}`), 1600);
+  function handleSaved(c: Case) {
+    setSavedCase(c);
+    setScreen('assess');
+  }
+
+  function navigateToCase(id: string) {
+    navTimerRef.current = setTimeout(() => setLocation(`/cases/${id}`), 400);
   }
 
   return (
@@ -344,6 +330,23 @@ export default function AddCase() {
         {screen === 'form' && type && (
           <CaseForm key={`form-${type}`} type={type} onSaved={handleSaved}
             onBack={() => { setScreen('pick'); setType(null); }} />
+        )}
+        {screen === 'assess' && savedCase && (
+          <PriorityModal
+            key="assess"
+            itemType="case"
+            category={savedCase.type}
+            title={savedCase.title}
+            description={savedCase.description}
+            onConfirm={(priority: Priority, assessment: AIAssessment) => {
+              updateCase(savedCase.id, { priority: priority as CasePriority, aiAssessment: assessment });
+              navigateToCase(savedCase.id);
+            }}
+            onSkip={() => {
+              updateCase(savedCase.id, { priority: 'medium' as CasePriority });
+              navigateToCase(savedCase.id);
+            }}
+          />
         )}
         {screen === 'success' && type && (
           <SuccessScreen key="success" typeLabel={CASE_TYPE_CONFIG[type].label} />

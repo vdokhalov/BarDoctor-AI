@@ -2,3 +2,4 @@
 - [Home phantom-gap pattern](home-layout.md) — conditional sections in flex gap must guard the motion.div wrapper, not just the inner component's return null.
 - [AI Doctor / Anthropic integration](ai-doctor.md) — api-server at /api, Anthropic via @workspace/integrations-anthropic-ai, rate limit + payload guard on the diagnosis route.
 - [Restaurant Health Engine](health-engine.md) — deterministic scoring in healthEngine.ts; supplier→operations, idea events excluded from calibration count; always returns HealthReport (overall=null when insufficient).
+- [AI Priority Engine](ai-priority-engine.md) — saves item first with priority:'low', then PriorityModal assigns real priority via Claude; both server+client harden against partial JSON; AIAssessment type lives in events.ts.

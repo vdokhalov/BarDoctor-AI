@@ -14,6 +14,16 @@ export type EventCategory =
 export type Priority    = 'critical' | 'high' | 'medium' | 'low';
 export type EventStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
 
+/** Structured result from the AI Priority Engine. Stored with the event/case. */
+export interface AIAssessment {
+  priority:            Priority;
+  explanation:         string;
+  businessImpact:      string;
+  recommendedAction:   string[];
+  recommendedDeadline: string;
+  analyzedAt:          string;  // ISO timestamp
+}
+
 export interface RestaurantEvent {
   id: string;
   category: EventCategory;
@@ -22,12 +32,13 @@ export interface RestaurantEvent {
   priority: Priority;
   status: EventStatus;
   responsible: string;
-  eventDate: string;        // ISO datetime (when the event occurred)
-  photos: string[];         // base64 data URLs, max 3
-  voiceNote: string | null; // base64 audio/webm or null
-  extraField: string;       // category-specific free-text
-  createdAt: string;        // ISO timestamp (when logged)
+  eventDate: string;           // ISO datetime (when the event occurred)
+  photos: string[];            // base64 data URLs, max 3
+  voiceNote: string | null;    // base64 audio/webm or null
+  extraField: string;          // category-specific free-text
+  createdAt: string;           // ISO timestamp (when logged)
   updatedAt: string;
+  aiAssessment?: AIAssessment; // AI Priority Engine result (set after creation)
 }
 
 // ─── localStorage persistence ─────────────────────────────────────────────────

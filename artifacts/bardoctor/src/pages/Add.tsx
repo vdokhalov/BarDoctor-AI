@@ -5,12 +5,12 @@ import { ChevronLeft, X, Check, Camera, Mic, MicOff, Play, Square, Trash2 } from
 import { cn } from '@/lib/utils';
 import { useEvents } from '@/contexts/EventsContext';
 import { useToast } from '@/components/ds/Toast';
-import { RestaurantEvent, EventCategory, Priority, EventStatus } from '@/store/events';
+import { RestaurantEvent, EventCategory, Priority, EventStatus, AIAssessment } from '@/store/events';
 import {
   CATEGORIES, CATEGORY_CONFIG,
-  PRIORITIES, PRIORITY_CONFIG,
   STATUSES, STATUS_CONFIG,
 } from '@/config/eventCategories';
+import PriorityModal from '@/components/ai/PriorityModal';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 
@@ -360,7 +360,7 @@ function EventForm({
   onBack,
 }: {
   category: EventCategory;
-  onSaved: () => void;
+  onSaved: (ev: RestaurantEvent) => void;
   onBack: () => void;
 }) {
   const { addEvent } = useEvents();
@@ -372,14 +372,13 @@ function EventForm({
   const [title,       setTitle]       = useState('');
   const [extraField,  setExtraField]  = useState('');
   const [description, setDescription] = useState('');
-  const [priority,    setPriority]    = useState<Priority | ''>('');
   const [status,      setStatus]      = useState<EventStatus>('open');
   const [eventDate,   setEventDate]   = useState(localNow);
   const [responsible, setResponsible] = useState('');
   const [photos,      setPhotos]      = useState<string[]>([]);
   const [voiceNote,   setVoiceNote]   = useState<string | null>(null);
 
-  const canSave = title.trim().length > 0 && priority !== '';
+  const canSave = title.trim().length > 0;
 
   async function handlePhotoAdd(files: FileList) {
     const remaining = 3 - photos.length;
@@ -396,7 +395,7 @@ function EventForm({
       category,
       title:       title.trim(),
       description: description.trim(),
-      priority:    priority as Priority,
+      priority:    'low',   // AI Priority Engine will set the real priority
       status,
       responsible: responsible.trim(),
       eventDate:   new Date(eventDate).toISOString(),
@@ -408,19 +407,14 @@ function EventForm({
     };
     const persisted = addEvent(ev);
     if (!persisted) {
-      // Event is live in session state but storage quota was exceeded
       toast({
         variant: 'warning',
         title: 'Мало памяти браузера',
         description: 'Событие добавлено в текущую сессию, но не сохранено постоянно. Очистите старые данные.',
       });
     }
-    onSaved();
+    onSaved(ev);
   }
-
-  const priorityLabels = Object.fromEntries(
-    PRIORITIES.map((p) => [p, PRIORITY_CONFIG[p].label]),
-  ) as Record<Priority, string>;
 
   const statusLabels = Object.fromEntries(
     STATUSES.map((s) => [s, STATUS_CONFIG[s].label]),
@@ -482,17 +476,6 @@ function EventForm({
               value={description}
               onChange={setDescription}
               rows={3}
-            />
-          </div>
-
-          {/* Priority */}
-          <div>
-            <FieldLabel>Приоритет *</FieldLabel>
-            <ChipRow
-              options={PRIORITIES}
-              labels={priorityLabels}
-              value={priority}
-              onChange={setPriority}
             />
           </div>
 
@@ -631,12 +614,14 @@ function SuccessScreen({ categoryLabel, onAddAnother }: { categoryLabel: string;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-type Screen = 'pick' | 'form' | 'success';
+type Screen = 'pick' | 'form' | 'assess' | 'success';
 
 export default function Add() {
-  const [, setLocation]  = useLocation();
-  const [screen, setScreen]     = useState<Screen>('pick');
-  const [category, setCategory] = useState<EventCategory | null>(null);
+  const [, setLocation]       = useLocation();
+  const { updateEvent }       = useEvents();
+  const [screen, setScreen]         = useState<Screen>('pick');
+  const [category, setCategory]     = useState<EventCategory | null>(null);
+  const [savedEvent, setSavedEvent] = useState<RestaurantEvent | null>(null);
   const navTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Clear pending navigation on unmount
@@ -651,7 +636,12 @@ export default function Add() {
     setScreen('form');
   }
 
-  function handleSaved() {
+  function handleSaved(ev: RestaurantEvent) {
+    setSavedEvent(ev);
+    setScreen('assess');
+  }
+
+  function handleAssessed() {
     setScreen('success');
     navTimerRef.current = setTimeout(() => setLocation('/events'), 1800);
   }
@@ -659,6 +649,7 @@ export default function Add() {
   function handleAddAnother() {
     // Cancel pending auto-navigation before going back to picker
     if (navTimerRef.current) { clearTimeout(navTimerRef.current); navTimerRef.current = null; }
+    setSavedEvent(null);
     setCategory(null);
     setScreen('pick');
   }
@@ -732,8 +723,28 @@ export default function Add() {
           />
         )}
 
+        {/* ── AI Assessment ── */}
+        {screen === 'assess' && savedEvent && (
+          <PriorityModal
+            key="assess"
+            itemType="event"
+            category={savedEvent.category}
+            title={savedEvent.title}
+            description={savedEvent.description}
+            extraField={savedEvent.extraField}
+            onConfirm={(priority: Priority, assessment: AIAssessment) => {
+              updateEvent(savedEvent.id, { priority, aiAssessment: assessment });
+              handleAssessed();
+            }}
+            onSkip={() => {
+              updateEvent(savedEvent.id, { priority: 'medium' });
+              handleAssessed();
+            }}
+          />
+        )}
+
         {/* ── Success ── */}
-        {screen === 'success' && category && (
+        {screen === 'success' && category && savedEvent && (
           <SuccessScreen
             key="success"
             categoryLabel={CATEGORY_CONFIG[category].label}
