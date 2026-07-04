@@ -83,6 +83,7 @@ interface DiagnosisResult {
   why?: string;
   actionPlan?: string[];
   expectedResult?: string;
+  estimatedEffort?: "low" | "medium" | "high";
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -175,7 +176,8 @@ ${caseLines || "Активных дел нет"}
     "Конкретный шаг 3",
     "Конкретный шаг 4"
   ],
-  "expectedResult": "1-2 предложения о том, что улучшится после решения этой проблемы"
+  "expectedResult": "1-2 предложения о том, что улучшится после решения этой проблемы",
+  "estimatedEffort": "одно из: low | medium | high (low = до 2 ч работы, medium = 2–8 ч, high = свыше 8 ч или требует нескольких людей)"
 }
 
 Если данных недостаточно:
@@ -240,6 +242,10 @@ router.post("/diagnosis", async (req, res) => {
     const VALID_URGENCY = new Set(["critical", "high", "medium"]);
     if (result.priorityIssue && !VALID_URGENCY.has(result.priorityIssue.urgency)) {
       result.priorityIssue.urgency = "medium";
+    }
+    const VALID_EFFORT = new Set(["low", "medium", "high"]);
+    if (result.estimatedEffort && !VALID_EFFORT.has(result.estimatedEffort)) {
+      result.estimatedEffort = "medium";
     }
 
     res.json({ success: true, data: result, generatedAt: new Date().toISOString() });

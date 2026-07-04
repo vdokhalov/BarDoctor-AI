@@ -14,6 +14,9 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 import { useEvents } from '@/contexts/EventsContext';
 import { useCases } from '@/contexts/CasesContext';
 import { useEmployees } from '@/contexts/EmployeesContext';
+import { useDecisions } from '@/contexts/DecisionsContext';
+import { hasTodayDecision } from '@/store/decisions';
+import { useToast } from '@/components/ds/Toast';
 import { useLocation } from 'wouter';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +35,7 @@ interface DiagnosisData {
   why?: string;
   actionPlan?: string[];
   expectedResult?: string;
+  estimatedEffort?: 'low' | 'medium' | 'high';
 }
 
 interface DiagnosisResponse {
@@ -438,6 +442,8 @@ export default function Analysis() {
   const { events }     = useEvents();
   const { cases }      = useCases();
   const { employees }  = useEmployees();
+  const { decisions, addDecision } = useDecisions();
+  const { toast }      = useToast();
   const [, setLocation] = useLocation();
 
   const cached = useMemo(() => loadCache(), []);
@@ -520,12 +526,41 @@ export default function Analysis() {
         setScreen('insufficient');
       } else {
         setScreen('ready');
+        // Auto-publish to Decision Feed — one card per day per diagnosis run
+        if (result.priorityIssue && !hasTodayDecision(decisions)) {
+          const urgency = result.priorityIssue.urgency;
+          const saved = addDecision({
+            recommendation: result.priorityIssue.title,
+            reason:         result.why          ?? '',
+            expectedImpact: result.expectedResult ?? '',
+            estimatedEffort: result.estimatedEffort ?? 'medium',
+            priority:       urgency === 'critical' ? 'critical'
+                          : urgency === 'high'     ? 'high'
+                          : urgency === 'medium'   ? 'medium'
+                          : 'low',
+            category: result.priorityIssue.category ?? 'operations',
+            source:   'ai_doctor',
+          });
+          if (saved) {
+            toast({
+              variant:     'success',
+              title:       'Рекомендация добавлена',
+              description: 'Открыть в ленте решений →',
+            });
+          } else {
+            toast({
+              variant:     'error',
+              title:       'Ошибка хранилища',
+              description: 'Не удалось сохранить рекомендацию',
+            });
+          }
+        }
       }
     } catch (err) {
       console.error('[AI Doctor]', err);
       setScreen('error');
     }
-  }, [buildPayload]);
+  }, [buildPayload, decisions, addDecision, toast]);
 
   return (
     <AppShell showBottomNav>

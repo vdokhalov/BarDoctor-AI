@@ -1,5 +1,5 @@
 import { useLocation, Link } from 'wouter';
-import { House, BarChart2, Plus, CheckSquare, LayoutGrid } from 'lucide-react';
+import { House, BarChart2, Plus, LayoutList, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Routes that belong to the "More" umbrella — keeps the tab highlighted
@@ -12,7 +12,7 @@ export default function NavBar() {
     { name: 'Главная',  href: '/home',     icon: House },
     { name: 'Анализ',   href: '/analysis', icon: BarChart2 },
     { name: 'Добавить', href: '/add',       icon: Plus, isFab: true },
-    { name: 'Задачи',   href: '/tasks',    icon: CheckSquare },
+    { name: 'Решения',  href: '/decisions', icon: LayoutList },
     { name: 'Ещё',      href: '/more',     icon: LayoutGrid },
   ];
 

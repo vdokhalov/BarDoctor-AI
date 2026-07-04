@@ -7,6 +7,7 @@ import { RestaurantProvider, useRestaurant } from '@/contexts/RestaurantContext'
 import { EventsProvider } from '@/contexts/EventsContext';
 import { EmployeesProvider } from '@/contexts/EmployeesContext';
 import { CasesProvider } from '@/contexts/CasesContext';
+import { DecisionsProvider } from '@/contexts/DecisionsContext';
 
 import NotFound     from '@/pages/not-found';
 import Splash       from '@/pages/Splash';
@@ -27,6 +28,7 @@ import Profile      from '@/pages/Profile';
 import More         from '@/pages/More';
 import ComingSoon   from '@/pages/ComingSoon';
 import Health      from '@/pages/Health';
+import Decisions   from '@/pages/Decisions';
 import DesignSystem from '@/pages/DesignSystem';
 
 const queryClient = new QueryClient();
@@ -56,6 +58,7 @@ function Router() {
       <Route path="/add"           component={() => <RequireProfile component={Add} />} />
       <Route path="/events"        component={() => <RequireProfile component={Events} />} />
       <Route path="/tasks"         component={() => <RequireProfile component={Tasks} />} />
+      <Route path="/decisions"     component={() => <RequireProfile component={Decisions} />} />
       <Route path="/equipment"     component={() => <RequireProfile component={Equipment} />} />
       <Route path="/profile"       component={() => <RequireProfile component={Profile} />} />
       <Route path="/more"          component={() => <RequireProfile component={More} />} />
@@ -90,6 +93,7 @@ function App() {
         <EventsProvider>
           <EmployeesProvider>
           <CasesProvider>
+          <DecisionsProvider>
           <TooltipProvider>
             <ToastProvider>
               <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
@@ -99,6 +103,7 @@ function App() {
             </ToastProvider>
             <Toaster />
           </TooltipProvider>
+          </DecisionsProvider>
           </CasesProvider>
           </EmployeesProvider>
         </EventsProvider>
