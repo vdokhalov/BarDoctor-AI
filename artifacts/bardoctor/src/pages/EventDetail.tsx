@@ -18,6 +18,7 @@ import {
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import PriorityModal from '@/components/ai/PriorityModal';
+import AIAssessmentCard from '@/components/ai/AIAssessmentCard';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -27,12 +28,6 @@ function fmtDate(iso: string): string {
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
 }
-function fmtDateTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) + ' · ' +
-    d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-}
-
 // ─── Photo grid ───────────────────────────────────────────────────────────────
 
 function PhotoGrid({ photos }: { photos: string[] }) {
@@ -345,25 +340,9 @@ export default function EventDetail() {
                 {ev.aiAssessment ? 'Переоценить приоритет AI' : 'Оценить приоритет AI'}
               </button>
 
-              {/* AI assessment card */}
+              {/* AI assessment card — full reasoning */}
               {ev.aiAssessment && (
-                <div className="bd-card px-5 py-4 border-primary/20">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Brain size={12} className="text-primary" />
-                    </div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-primary">AI-оценка</p>
-                    <span className="ml-auto text-[10px] text-muted-foreground/60">
-                      {fmtDateTime(ev.aiAssessment.analyzedAt)}
-                    </span>
-                  </div>
-                  <p className="text-[14px] text-foreground leading-relaxed mb-3">{ev.aiAssessment.explanation}</p>
-                  {ev.aiAssessment.recommendedDeadline && (
-                    <p className="text-[12px] text-muted-foreground font-medium">
-                      Срок: {ev.aiAssessment.recommendedDeadline}
-                    </p>
-                  )}
-                </div>
+                <AIAssessmentCard assessment={ev.aiAssessment} />
               )}
 
               {/* Photos */}

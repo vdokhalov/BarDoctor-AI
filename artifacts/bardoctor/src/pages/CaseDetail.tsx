@@ -21,6 +21,7 @@ import {
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import PriorityModal from '@/components/ai/PriorityModal';
+import AIAssessmentCard from '@/components/ai/AIAssessmentCard';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -405,25 +406,9 @@ export default function CaseDetail() {
                 {c.aiAssessment ? 'Переоценить приоритет AI' : 'Оценить приоритет AI'}
               </button>
 
-              {/* AI assessment summary */}
+              {/* AI assessment card — full reasoning */}
               {c.aiAssessment && (
-                <div className="bd-card px-5 py-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Brain size={12} className="text-primary" />
-                    </div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-primary">AI-оценка</p>
-                    <span className="ml-auto text-[10px] text-muted-foreground/60">
-                      {new Date(c.aiAssessment.analyzedAt).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-                    </span>
-                  </div>
-                  <p className="text-[14px] text-foreground leading-relaxed mb-3">{c.aiAssessment.explanation}</p>
-                  {c.aiAssessment.recommendedDeadline && (
-                    <p className="text-[12px] text-muted-foreground font-medium">
-                      Срок: {c.aiAssessment.recommendedDeadline}
-                    </p>
-                  )}
-                </div>
+                <AIAssessmentCard assessment={c.aiAssessment} />
               )}
 
               {/* Photos */}
