@@ -173,7 +173,7 @@
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight text-primary;
+    @apply font-bold tracking-tight text-foreground;
   }
 }
 
@@ -211,5 +211,26 @@
            rounded-[14px] transition-all duration-150 active:scale-[0.97] 
            select-none cursor-pointer disabled:opacity-40 disabled:pointer-events-none;
     height: var(--button-h); /* 56px */
+  }
+}
+
+/* ─── Skeleton shimmer ───────────────────────────────────────────────────────── */
+
+@keyframes bd-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+@layer utilities {
+  .bd-skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--border)) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: bd-shimmer 1.5s ease-in-out infinite;
+    border-radius: 8px;
   }
 }

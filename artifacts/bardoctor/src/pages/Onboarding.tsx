@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Check } from 'lucide-react';
+import { ChevronLeft, Check, Target, Zap, TrendingUp } from 'lucide-react';
 import { useRestaurant } from '@/contexts/RestaurantContext';
 import { RestaurantProfile } from '@/store/restaurant';
 import { cn } from '@/lib/utils';
@@ -286,12 +286,12 @@ function StepAreas({ d, upd }: {
                 : 'bg-card border-border hover:border-primary/30',
             )}
           >
-            {/* Emoji */}
+            {/* Abbreviation */}
             <span className={cn(
-              'w-10 h-10 rounded-[13px] flex items-center justify-center text-[20px] flex-shrink-0 transition-colors',
-              selected ? 'bg-primary/12' : 'bg-muted',
+              'w-10 h-10 rounded-[13px] flex items-center justify-center text-[13px] font-bold flex-shrink-0 transition-colors',
+              selected ? 'bg-primary/12 text-primary' : 'bg-muted text-muted-foreground',
             )}>
-              {area.emoji}
+              {area.label.slice(0, 2)}
             </span>
 
             {/* Text */}
@@ -409,14 +409,14 @@ function WelcomeScreen({ onStart }: { onStart: () => void }) {
           transition={{ duration: 0.44, delay: 0.44, ease: [0.22, 1, 0.36, 1] }}
           className="mt-8 flex flex-col gap-3 w-full max-w-[300px]"
         >
-          {[
-            { emoji: '🎯', text: 'Точные рекомендации на основе данных' },
-            { emoji: '⚡', text: 'Мгновенные предупреждения об инцидентах' },
-            { emoji: '📈', text: 'Аналитика и возможности для роста' },
-          ].map(({ emoji, text }) => (
+          {([
+            { Icon: Target,      text: 'Точные рекомендации на основе данных' },
+            { Icon: Zap,         text: 'Мгновенные предупреждения об инцидентах' },
+            { Icon: TrendingUp,  text: 'Аналитика и возможности для роста' },
+          ] as const).map(({ Icon, text }) => (
             <div key={text} className="flex items-center gap-3">
-              <span className="w-9 h-9 rounded-[12px] bg-primary/8 flex items-center justify-center text-[17px] flex-shrink-0">
-                {emoji}
+              <span className="w-9 h-9 rounded-[12px] bg-primary/8 flex items-center justify-center flex-shrink-0">
+                <Icon size={17} className="text-primary" />
               </span>
               <p className="text-[13px] text-[#4B5563] font-medium leading-snug">{text}</p>
             </div>

@@ -118,8 +118,11 @@ export default function More() {
             transition={{ delay: 0.04, duration: 0.36, ease: [0.22, 1, 0.36, 1] }}
             className="w-full bg-card border border-card-border rounded-2xl shadow-[var(--shadow-card)] p-4 flex items-center gap-3.5 hover:bg-muted/30 active:bg-muted/50 transition-colors text-left"
           >
-            <div className="w-12 h-12 rounded-full bg-indigo-50 border border-border flex items-center justify-center flex-shrink-0">
-              <span className="text-[16px] font-bold text-primary">{abbr}</span>
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #5B5CEB 0%, #4A4BC9 100%)', boxShadow: '0 2px 10px rgba(91,92,235,0.24)' }}
+            >
+              <span className="text-[15px] font-bold text-white">{abbr}</span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-bold text-foreground leading-snug truncate">{name}</p>

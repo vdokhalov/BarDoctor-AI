@@ -8,10 +8,6 @@ import { useRestaurant } from '@/contexts/RestaurantContext';
 import { initials, clearProfile } from '@/store/restaurant';
 import { useToast } from '@/components/ds/Toast';
 
-const AREA_EMOJI: Record<string, string> = {
-  'Бар': '🍸', 'Кухня': '🍳', 'Кофе': '☕',
-  'Доставка': '🛵', 'Кальяны': '💨', 'Терраса': '🌿', 'Банкет': '🎪',
-};
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -40,8 +36,11 @@ export default function Profile() {
 
         {/* ── Avatar & name ── */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-20 h-20 rounded-full bg-indigo-50 flex items-center justify-center mb-4 shadow-sm border border-border">
-            <span className="text-[24px] font-bold text-primary tracking-tight">{abbr}</span>
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
+            style={{ background: 'linear-gradient(135deg, #5B5CEB 0%, #4A4BC9 100%)', boxShadow: '0 4px 20px rgba(91,92,235,0.28)' }}
+          >
+            <span className="text-[24px] font-bold text-white tracking-tight">{abbr}</span>
           </div>
           <h2 className="text-[22px] font-bold text-foreground tracking-tight mb-1">{name}</h2>
           <p className="text-[15px] text-muted-foreground font-medium">{role}</p>
@@ -80,7 +79,7 @@ export default function Profile() {
                   key={area}
                   className="text-[12px] font-semibold bg-primary/8 text-primary px-3 py-1 rounded-full"
                 >
-                  {AREA_EMOJI[area] ?? ''} {area}
+                  {area}
                 </span>
               ))}
             </div>

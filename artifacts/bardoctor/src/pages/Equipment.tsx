@@ -116,7 +116,9 @@ function EquipmentCard({ eq, onTap }: { eq: Equipment; onTap: () => void }) {
         className="relative w-full h-[120px] flex items-center justify-center"
         style={{ background: `linear-gradient(135deg, ${eq.gradientFrom}, ${eq.gradientTo})` }}
       >
-        <span className="text-[52px] select-none">{eq.emoji}</span>
+        <span className="text-[36px] font-black tracking-tight select-none" style={{ color: 'rgba(22,27,46,0.18)' }}>
+          {eq.name.slice(0, 2).toUpperCase()}
+        </span>
         {/* Status top-right */}
         <div className="absolute top-3 right-3">
           <StatusPill status={eq.status} />
@@ -231,7 +233,9 @@ function DetailSheet({ eq, onClose }: { eq: Equipment; onClose: () => void }) {
             className="relative w-full h-[160px] flex items-center justify-center flex-shrink-0"
             style={{ background: `linear-gradient(135deg, ${eq.gradientFrom}, ${eq.gradientTo})` }}
           >
-            <span className="text-[64px]">{eq.emoji}</span>
+            <span className="text-[48px] font-black tracking-tight select-none" style={{ color: 'rgba(22,27,46,0.18)' }}>
+              {eq.name.slice(0, 2).toUpperCase()}
+            </span>
             <button
               onClick={onClose}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/70 backdrop-blur-sm flex items-center justify-center shadow-sm"
@@ -323,7 +327,9 @@ function DetailSheet({ eq, onClose }: { eq: Equipment; onClose: () => void }) {
 
               {eq.repairs.length === 0 ? (
                 <div className="bd-card p-6 flex flex-col items-center text-center">
-                  <span className="text-3xl mb-2">✅</span>
+                  <div className="w-12 h-12 rounded-[16px] bg-[#22C55E]/10 flex items-center justify-center mb-3">
+                    <CheckCircle2 size={24} className="text-[#22C55E]" />
+                  </div>
                   <p className="text-[14px] font-medium text-foreground mb-0.5">Ремонтов не было</p>
                   <p className="text-[12px] text-muted-foreground">Оборудование работает без нареканий</p>
                 </div>
@@ -379,7 +385,7 @@ function AddSheet({ onClose, onSave }: { onClose: () => void; onSave: (eq: Equip
   function handleSave() {
     const eq: Equipment = {
       id: nid(),
-      emoji: '🔧',
+      emoji: '',
       gradientFrom: '#F3F4F6',
       gradientTo: '#E5E7EB',
       name: name.trim(),

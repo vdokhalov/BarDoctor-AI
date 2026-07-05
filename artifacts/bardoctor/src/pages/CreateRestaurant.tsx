@@ -187,7 +187,6 @@ const slideVariants = {
 function StepHeader({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
   return (
     <div className="text-center mb-8 px-2">
-      <div className="text-5xl mb-5 leading-none select-none">{emoji}</div>
       <h2 className="text-[28px] font-bold text-foreground tracking-tight leading-tight mb-2 whitespace-pre-line">
         {title}
       </h2>
@@ -252,7 +251,6 @@ function ChipsGridStep({
                   : 'bg-card border-border/60 text-foreground hover:border-border',
               )}
             >
-              {opt.emoji && <span className="text-[22px] leading-none">{opt.emoji}</span>}
               <span className="leading-tight text-center">{opt.label}</span>
             </button>
           );
@@ -320,7 +318,6 @@ function GoalStep({
                   : 'bg-card border-border/60 hover:border-border',
               )}
             >
-              <span className="text-[28px] leading-none flex-shrink-0 select-none">{opt.emoji}</span>
               <div>
                 <p className={cn('text-[15px] font-semibold leading-tight', active ? 'text-primary' : 'text-foreground')}>
                   {opt.label}

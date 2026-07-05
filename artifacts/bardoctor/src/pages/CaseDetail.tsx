@@ -367,10 +367,10 @@ export default function CaseDetail() {
                     <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Дедлайн</p>
                   </div>
                   {c.dueDate ? (
-                    <p className={cn('text-[13px] font-bold', overdue ? 'text-destructive' : 'text-foreground')}>
-                      {overdue && '⚠ '}
-                      {new Date(c.dueDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}
-                    </p>
+                    <div className={cn('flex items-center gap-1.5 text-[13px] font-bold', overdue ? 'text-destructive' : 'text-foreground')}>
+                      {overdue && <AlertTriangle size={12} className="flex-shrink-0" />}
+                      <span>{new Date(c.dueDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}</span>
+                    </div>
                   ) : (
                     <p className="text-[13px] text-muted-foreground/50 font-medium">Не задан</p>
                   )}

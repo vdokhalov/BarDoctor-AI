@@ -1,8 +1,9 @@
 import React, { useState, useRef, useCallback } from 'react';
 import {
   Plus, Clock, User, Check, Trash2, ChevronDown,
-  AlertCircle, Calendar, X, CheckSquare,
+  AlertCircle, Calendar, X, CheckSquare, CheckCircle2,
 } from 'lucide-react';
+import { useToast } from '@/components/ds/Toast';
 import {
   motion, AnimatePresence, useMotionValue,
   animate as fmAnimate,
@@ -228,9 +229,9 @@ function EmptyState({ tab, onAdd }: { tab: Tab; onAdd?: () => void }) {
     >
       <div className="w-14 h-14 rounded-[18px] bg-muted flex items-center justify-center mb-4">
         {tab === 'overdue'
-          ? <span className="text-2xl">🎉</span>
+          ? <CheckCircle2 size={26} className="text-[#22C55E]/70" />
           : tab === 'done'
-          ? <span className="text-2xl">📋</span>
+          ? <CheckSquare size={26} className="text-primary/40" />
           : <CheckSquare size={26} className="text-muted-foreground/60" />}
       </div>
       <p className="text-[16px] font-bold text-foreground mb-1.5">{title}</p>
@@ -369,6 +370,7 @@ export default function Tasks() {
   const [activeTab, setActiveTab] = useState<Tab>('today');
   const [tasks, setTasks] = useState<Task[]>(SEED);
   const [showAdd, setShowAdd] = useState(false);
+  const { toast } = useToast();
 
   const tabTasks = tasks.filter((t) => t.tab === activeTab);
 
@@ -379,16 +381,22 @@ export default function Tasks() {
     done: tasks.filter((t) => t.tab === 'done').length,
   };
 
-  const handleComplete = (id: string) =>
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, tab: 'done' } : t)),
-    );
+  const handleComplete = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, tab: 'done' } : t)));
+    if (task) toast({ variant: 'success', title: 'Задача выполнена', description: task.title });
+  };
 
-  const handleDelete = (id: string) =>
+  const handleDelete = (id: string) => {
+    const task = tasks.find((t) => t.id === id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    toast({ variant: 'default', title: 'Задача удалена', description: task?.title });
+  };
 
-  const handleAdd = (t: Omit<Task, 'id'>) =>
+  const handleAdd = (t: Omit<Task, 'id'>) => {
     setTasks((prev) => [{ ...t, id: uid() }, ...prev]);
+    toast({ variant: 'success', title: 'Задача добавлена', description: t.title });
+  };
 
   return (
     <>

@@ -1,7 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, X, FolderOpen, ArrowUpDown, ChevronRight, AlertCircle } from 'lucide-react';
+import {
+  Plus, Search, X, FolderOpen, ArrowUpDown, ChevronRight,
+  AlertCircle, Camera, Paperclip, MessageSquare,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCases } from '@/contexts/CasesContext';
 import { Case, CaseStatus, sortCases, sortByDate, sortByDeadline, isOverdue, formatDue } from '@/store/cases';
@@ -122,13 +125,19 @@ function CaseCard({ c, onTap }: { c: Case; onTap: () => void }) {
         {(c.photos.length > 0 || c.files.length > 0 || c.comments.length > 0) && (
           <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-border">
             {c.photos.length > 0 && (
-              <span className="text-[11px] text-muted-foreground">📷 {c.photos.length}</span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Camera size={11} className="opacity-60" /> {c.photos.length}
+              </span>
             )}
             {c.files.length > 0 && (
-              <span className="text-[11px] text-muted-foreground">📎 {c.files.length}</span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <Paperclip size={11} className="opacity-60" /> {c.files.length}
+              </span>
             )}
             {c.comments.length > 0 && (
-              <span className="text-[11px] text-muted-foreground">💬 {c.comments.length}</span>
+              <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <MessageSquare size={11} className="opacity-60" /> {c.comments.length}
+              </span>
             )}
           </div>
         )}
@@ -224,102 +233,113 @@ export default function Cases() {
 
   return (
     <AppShell showBottomNav>
-      <SafeArea className="pt-5 pb-32">
+      <SafeArea className="pt-0 pb-28">
 
-        {/* Header */}
-        <div className="px-6 flex items-center justify-between mb-5">
-          <div>
-            <h1 className="text-[24px] font-black text-foreground tracking-tight">Дела</h1>
+        {/* ── Sticky header ── */}
+        <div className="sticky top-0 z-20 bg-[#F8F9FC]/95 backdrop-blur-md border-b border-border/60">
+          <div className="px-6 pt-5 pb-3">
+
+            {/* Title row */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-[24px] font-black text-foreground tracking-tight">Дела</h1>
+                {hasAny && (
+                  <p className="text-[13px] text-muted-foreground mt-0.5">
+                    {cases.length} {cases.length === 1 ? 'дело' : cases.length < 5 ? 'дела' : 'дел'}
+                  </p>
+                )}
+              </div>
+              {hasAny && (
+                <motion.button
+                  whileTap={{ scale: 0.90 }}
+                  type="button"
+                  onClick={() => setLocation('/cases/add')}
+                  className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-[var(--shadow-fab)]"
+                >
+                  <Plus size={18} className="text-white" />
+                </motion.button>
+              )}
+            </div>
+
+            {/* Search + Sort + Filter — shown only when there are cases */}
             {hasAny && (
-              <p className="text-[13px] text-muted-foreground mt-0.5">
-                {cases.length} {cases.length === 1 ? 'дело' : cases.length < 5 ? 'дела' : 'дел'}
-              </p>
+              <>
+                <div className="flex gap-2 mb-3">
+                  <div className="relative flex-1">
+                    <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="Поиск по делам…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full h-10 bg-card border border-border rounded-2xl pl-9 pr-9 text-[14px] font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all"
+                    />
+                    {search && (
+                      <button type="button" onClick={() => setSearch('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSortIdx((i) => (i + 1) % SORTS.length)}
+                    className="h-10 px-3 bg-card border border-border rounded-2xl flex items-center gap-1.5 text-[12px] font-semibold text-foreground whitespace-nowrap hover:border-primary/40 transition-colors"
+                  >
+                    <ArrowUpDown size={12} className="text-muted-foreground" />
+                    {SORTS[sortIdx].label}
+                  </button>
+                </div>
+
+                {/* Filter tabs */}
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  {FILTER_TABS.map((f) => {
+                    const count = counts[f.key] ?? 0;
+                    return (
+                      <button key={f.key} type="button" onClick={() => setFilter(f.key)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all flex-shrink-0',
+                          filter === f.key
+                            ? 'bg-primary text-white shadow-[0_2px_10px_rgba(91,92,235,0.28)]'
+                            : 'bg-card border border-border text-foreground hover:border-primary/40',
+                        )}
+                      >
+                        {f.label}
+                        {count > 0 && (
+                          <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded-full',
+                            filter === f.key ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground')}>
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
-          {hasAny && (
-            <button type="button" onClick={() => setLocation('/cases/add')}
-              className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-[var(--shadow-fab)] active:scale-95 transition-transform">
-              <Plus size={18} className="text-white" />
-            </button>
-          )}
         </div>
 
+        {/* ── Content ── */}
         {!hasAny ? (
           <EmptyAll onAdd={() => setLocation('/cases/add')} />
         ) : (
-          <>
-            {/* Search + Sort row */}
-            <div className="px-6 mb-4 flex gap-2">
-              <div className="relative flex-1">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="Поиск по делам…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full h-11 bg-card border border-border rounded-2xl pl-10 pr-9 text-[14px] font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all"
-                />
-                {search && (
-                  <button type="button" onClick={() => setSearch('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    <X size={15} />
-                  </button>
-                )}
-              </div>
-
-              {/* Sort cycle button */}
-              <button
-                type="button"
-                onClick={() => setSortIdx((i) => (i + 1) % SORTS.length)}
-                className="h-11 px-3 bg-card border border-border rounded-2xl flex items-center gap-1.5 text-[12px] font-semibold text-foreground hover:border-primary/40 transition-colors whitespace-nowrap"
-              >
-                <ArrowUpDown size={13} className="text-muted-foreground" />
-                {SORTS[sortIdx].label}
-              </button>
-            </div>
-
-            {/* Filter tabs */}
-            <div className="px-6 mb-5 flex gap-2 overflow-x-auto scrollbar-none">
-              {FILTER_TABS.map((f) => {
-                const count = counts[f.key] ?? 0;
-                return (
-                  <button key={f.key} type="button" onClick={() => setFilter(f.key)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all flex-shrink-0',
-                      filter === f.key
-                        ? 'bg-primary text-white shadow-[0_2px_10px_rgba(91,92,235,0.28)]'
-                        : 'bg-card border border-border text-foreground hover:border-primary/40',
-                    )}
-                  >
-                    {f.label}
-                    {count > 0 && (
-                      <span className={cn('text-[11px] font-bold px-1.5 py-0.5 rounded-full',
-                        filter === f.key ? 'bg-white/20 text-white' : 'bg-muted text-muted-foreground')}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Case list */}
-            <div className="px-6 flex flex-col gap-3">
-              <AnimatePresence mode="popLayout">
-                {filtered.length > 0
-                  ? filtered.map((c) => (
-                      <CaseCard
-                        key={c.id}
-                        c={c}
-                        onTap={() => setLocation(`/cases/${c.id}`)}
-                      />
-                    ))
-                  : <EmptyFiltered key="empty" onClear={() => { setFilter('all'); setSearch(''); }} />
-                }
-              </AnimatePresence>
-            </div>
-          </>
+          <div className="px-6 pt-4 pb-4 flex flex-col gap-3">
+            <AnimatePresence mode="popLayout">
+              {filtered.length > 0
+                ? filtered.map((c) => (
+                    <CaseCard
+                      key={c.id}
+                      c={c}
+                      onTap={() => setLocation(`/cases/${c.id}`)}
+                    />
+                  ))
+                : <EmptyFiltered key="empty" onClear={() => { setFilter('all'); setSearch(''); }} />
+              }
+            </AnimatePresence>
+          </div>
         )}
+
       </SafeArea>
     </AppShell>
   );

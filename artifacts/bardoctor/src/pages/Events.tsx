@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, Clock, X } from 'lucide-react';
+import { Plus, Search, Clock, X, Mic } from 'lucide-react';
 import AppShell from '@/components/layout/AppShell';
 import SafeArea from '@/components/layout/SafeArea';
 import { useEvents } from '@/contexts/EventsContext';
@@ -126,8 +126,9 @@ function EventCard({ event, onClick }: { event: RestaurantEvent; onClick: () => 
               </div>
             )}
             {event.voiceNote && (
-              <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                🎙 Голосовая заметка
+              <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                <Mic size={11} className="opacity-70" />
+                Голосовая заметка
               </span>
             )}
           </div>
@@ -203,74 +204,80 @@ export default function Events() {
   }, [events, filter, search]);
 
   const groups = useMemo(() => groupByDate(filtered), [filtered]);
+  const hasAny = events.length > 0;
 
   return (
     <AppShell showBottomNav>
-      <SafeArea className="pt-5 pb-32">
+      <SafeArea className="pt-0 pb-28">
 
-        {/* ── Header ── */}
-        <div className="px-6 flex items-center justify-between mb-5">
-          <div>
-            <h1 className="text-[24px] font-black text-foreground tracking-tight">События</h1>
-            {events.length > 0 && (
-              <p className="text-[13px] text-muted-foreground mt-0.5">
-                {events.length} {events.length === 1 ? 'запись' : events.length < 5 ? 'записи' : 'записей'}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setLocation('/add')}
-            className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-[var(--shadow-fab)] active:scale-95 transition-transform"
-          >
-            <Plus size={18} className="text-white" />
-          </button>
-        </div>
+        {/* ── Sticky header ── */}
+        <div className="sticky top-0 z-20 bg-[#F8F9FC]/95 backdrop-blur-md border-b border-border/60">
+          <div className="px-6 pt-5 pb-3">
 
-        {/* ── Search ── */}
-        <div className="px-6 mb-4">
-          <div className="relative">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Поиск по событиям…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 bg-card border border-border rounded-2xl pl-10 pr-10 text-[14px] font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all"
-            />
-            {search && (
-              <button
+            {/* Title row */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-[24px] font-black text-foreground tracking-tight">События</h1>
+                {hasAny && (
+                  <p className="text-[13px] text-muted-foreground mt-0.5">
+                    {events.length} {events.length === 1 ? 'запись' : events.length < 5 ? 'записи' : 'записей'}
+                  </p>
+                )}
+              </div>
+              <motion.button
+                whileTap={{ scale: 0.90 }}
                 type="button"
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setLocation('/add')}
+                className="w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-[var(--shadow-fab)]"
               >
-                <X size={15} />
-              </button>
-            )}
-          </div>
-        </div>
+                <Plus size={18} className="text-white" />
+              </motion.button>
+            </div>
 
-        {/* ── Filter tabs ── */}
-        <div className="px-6 mb-5 flex gap-2 overflow-x-auto scrollbar-none -mx-0">
-          {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              type="button"
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                'px-4 py-2 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all flex-shrink-0',
-                filter === f.key
-                  ? 'bg-primary text-white shadow-[0_2px_10px_rgba(91,92,235,0.28)]'
-                  : 'bg-card border border-border text-foreground hover:border-primary/40',
+            {/* Search */}
+            <div className="relative mb-3">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Поиск по событиям…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full h-10 bg-card border border-border rounded-2xl pl-9 pr-10 text-[14px] font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/12 transition-all"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X size={14} />
+                </button>
               )}
-            >
-              {f.label}
-            </button>
-          ))}
+            </div>
+
+            {/* Filter tabs */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    'px-4 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition-all flex-shrink-0',
+                    filter === f.key
+                      ? 'bg-primary text-white shadow-[0_2px_10px_rgba(91,92,235,0.28)]'
+                      : 'bg-card border border-border text-foreground hover:border-primary/40',
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── Timeline ── */}
-        <div className="px-6">
+        <div className="px-6 pt-4">
           <AnimatePresence mode="popLayout">
             {groups.length === 0 ? (
               <EmptyState key="empty" filter={filter} onAdd={() => setLocation('/add')} />
