@@ -288,19 +288,23 @@ function VoiceInput({
   const [isRecording,  setIsRecording]  = useState(false);
   const [isSupported,  setIsSupported]  = useState(true);
   const [textFallback, setTextFallback] = useState(false);
-  const recRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recRef = useRef<any | null>(null);
 
   useEffect(() => {
-    const SR = (window as unknown as { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
-      || (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
-    if (!SR) { setIsSupported(false); return; }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SRClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SRClass) { setIsSupported(false); return; }
 
-    const r = new SR();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r: any = new SRClass();
     r.lang = 'ru-RU';
     r.continuous = true;
     r.interimResults = true;
-    r.onresult = (e: SpeechRecognitionEvent) => {
-      const t = Array.from(e.results).map((res) => res[0].transcript).join(' ');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    r.onresult = (e: any) => {
+      const t = Array.from(e.results as ArrayLike<ArrayLike<{ transcript: string }>>)
+        .map((res) => res[0].transcript).join(' ');
       setTranscript(t);
     };
     r.onerror = () => { setIsRecording(false); };
