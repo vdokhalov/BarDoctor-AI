@@ -72,9 +72,13 @@
     Array.from(select.options).forEach(function (option) {
       var legacy = optionLegacyLabel(option);
       if (!legacy) return;
+      var stableValue = option.value;
       option.dataset.bdPurchaseArticleLegacyLabel = legacy;
       var next = ARTICLE_LABELS[legacy];
-      if (next && option.textContent !== next) option.textContent = next;
+      if (next && option.textContent !== next) {
+        option.textContent = next;
+        option.value = stableValue;
+      }
     });
 
     var label = findFieldLabel(select);
