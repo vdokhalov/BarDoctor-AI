@@ -1,19 +1,58 @@
 {
-  "name": "workspace",
-  "version": "0.0.0",
-  "license": "MIT",
-  "scripts": {
-    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
-    "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck"
-  },
+  "name": "bardoctor-preview",
+  "version": "0.1.0",
   "private": true,
-  "devDependencies": {
-    "prettier": "^3.8.4",
-    "typescript": "~5.9.3"
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "audit:buttons": "node scripts/audit-button-interactions.mjs",
+    "audit:modern": "node scripts/audit-modern-ux.mjs",
+    "audit:navigation": "node scripts/audit-navigation-consistency.mjs",
+    "audit:headers": "node scripts/audit-header-system-v185.mjs",
+    "install:ci": "bash scripts/install-ci.sh",
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
+    "build": "bash scripts/build-verified.sh",
+    "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "test": "npm run audit:buttons && npm run audit:navigation && npm run audit:headers && npm run audit:modern && npm run build && npm run test:artifact && npm run test:unit",
+    "test:data-control-runtime": "node scripts/verify-data-control-runtime.mjs",
+    "test:venue-runtime": "node scripts/verify-venue-switch-runtime.mjs",
+    "test:admin-runtime": "node scripts/verify-internal-admin-runtime.mjs",
+    "test:notifications-runtime": "node scripts/verify-notifications-runtime.mjs",
+    "test:procurement-browser": "bash scripts/run-procurement-browser-qa-v190.sh",
+    "test:artifact": "node --test tests/rendered-html.test.mjs tests/navigation-consistency.test.mjs tests/app-shell-v185.test.mjs tests/modern-ux.test.mjs tests/health-score-experience.test.mjs tests/shifts-experience.test.mjs tests/sync-experience.test.mjs tests/brand-identity.test.mjs tests/finance-dashboard-v160.test.mjs tests/team-management-v163.test.mjs tests/payroll-dashboard-v164.test.mjs tests/monthly-report-v165.test.mjs tests/more-hub-v166.test.mjs tests/equipment-command-v167.test.mjs tests/procurement-command-v168.test.mjs tests/assortment-command-v170.test.mjs tests/integrations-experience-v178.test.mjs tests/reviews-experience-v179.test.mjs tests/settings-experience-v182.test.mjs",
+    "test:unit": "node --import tsx --test tests/*.test.ts",
+    "validate:artifact": "bash scripts/validate-artifact.sh",
+    "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/assets --ignore-pattern public/runtime-assets",
+    "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
   },
   "dependencies": {
-    "@replit/connectors-sdk": "^0.4.1"
-  }
+    "drizzle-orm": "0.45.2",
+    "next": "16.2.6",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "acorn": "8.16.0",
+    "@cloudflare/vite-plugin": "1.37.1",
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-rsc": "0.5.26",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "react-server-dom-webpack": "19.2.6",
+    "tailwindcss": "4.2.1",
+    "typescript": "5.9.3",
+    "vinext": "0.0.50",
+    "vite": "8.0.13",
+    "wrangler": "4.92.0"
+  },
+  "type": "module",
+  "displayName": "BarDoctor Preview"
 }

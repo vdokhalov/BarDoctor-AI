@@ -1,0 +1,49 @@
+.select-control {
+  position: relative;
+  display: block;
+}
+
+.select-control select {
+  appearance: none;
+  padding-right: 44px;
+  cursor: pointer;
+}
+
+.select-control > span {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  color: #737b91;
+  font-size: 19px;
+  line-height: 1;
+  pointer-events: none;
+  transform: translateY(-55%);
+}
+
+.select-control select:invalid,
+.select-control select:disabled {
+  color: #9ca2b1;
+  font-weight: 550;
+}
+
+.select-control select:disabled {
+  cursor: not-allowed;
+  background: #f2f3f6;
+  opacity: 1;
+}
+
+.field-help {
+  color: #9399a9;
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+}
+
+@media (max-width: 620px) {
+  .select-control select {
+    min-height: 54px;
+    font-size: 16px;
+  }
+}

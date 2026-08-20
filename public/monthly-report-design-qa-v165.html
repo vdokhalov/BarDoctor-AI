@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BarDoctor monthly report design QA</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: #dfe3eb; color: #171a2f; font-family: Inter, system-ui, sans-serif; }
+      body { padding: 24px; }
+      h1 { margin: 0 0 18px; font-size: 20px; }
+      h2 { margin: 22px 0 10px; font-size: 14px; }
+      .row { display: flex; align-items: flex-start; gap: 24px; }
+      .panel > strong { display: block; margin-bottom: 8px; font-size: 12px; }
+      .desktop-shell { width: 590px; height: 450px; overflow: hidden; background: #fff; box-shadow: 0 12px 32px rgba(23, 30, 54, .18); }
+      .desktop-shell iframe { width: 1180px; height: 900px; border: 0; transform: scale(.5); transform-origin: 0 0; }
+      .mobile-shell { width: 390px; height: 844px; overflow: hidden; background: #fff; box-shadow: 0 12px 32px rgba(23, 30, 54, .18); }
+      .mobile-shell iframe { width: 390px; height: 844px; border: 0; }
+    </style>
+  </head>
+  <body>
+    <h1>BarDoctor monthly report · visual comparison</h1>
+    <h2>Desktop · 1180 × 900 CSS px, scaled 1:2</h2>
+    <div class="row">
+      <div class="panel">
+        <strong>Source visual language · Finance</strong>
+        <div class="desktop-shell"><iframe title="Desktop source" src="/finance?qaReport=closed&amp;month=2026-07"></iframe></div>
+      </div>
+      <div class="panel">
+        <strong>Implementation · Monthly report</strong>
+        <div class="desktop-shell"><iframe title="Desktop implementation" src="/reports?qaReport=closed&amp;month=2026-07"></iframe></div>
+      </div>
+    </div>
+    <h2>Mobile · 390 × 844 CSS px</h2>
+    <div class="row">
+      <div class="panel">
+        <strong>Source visual language · Finance</strong>
+        <div class="mobile-shell"><iframe title="Mobile source" src="/finance?qaReport=closed&amp;month=2026-07"></iframe></div>
+      </div>
+      <div class="panel">
+        <strong>Implementation · Monthly report</strong>
+        <div class="mobile-shell"><iframe title="Mobile implementation" src="/reports?qaReport=closed&amp;month=2026-07"></iframe></div>
+      </div>
+    </div>
+  </body>
+</html>

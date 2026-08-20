@@ -1,0 +1,1 @@
+ALTER TABLE `integration_ingress_deliveries` ADD `attempt_count` integer DEFAULT 1 NOT NULL;

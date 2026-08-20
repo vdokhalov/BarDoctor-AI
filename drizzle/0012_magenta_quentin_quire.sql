@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `integration_connections_source_uq` ON `integration_connections` (`venue_id`,`data_account_id`,`adapter_key`,`provider`,`channel`);

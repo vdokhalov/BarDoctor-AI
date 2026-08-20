@@ -1,0 +1,426 @@
+/* BarDoctor modern UX and visual polish — RC v87 */
+:root {
+  --bd-focus-ring: rgba(79, 70, 229, 0.42);
+  --bd-focus-color: #4f46e5;
+  --bd-polish-surface: #f8f9fc;
+  --bd-scroll-top-offset: 96px;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+}
+
+:where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) {
+  touch-action: manipulation;
+}
+
+:where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+  outline: 3px solid var(--bd-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+:where(input, select, textarea)[aria-invalid="true"] {
+  border-color: #dc4456 !important;
+  box-shadow: 0 0 0 3px rgba(220, 68, 86, 0.12) !important;
+}
+
+:where(button, [role="button"]):disabled,
+:where(button, [role="button"])[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+:where(td, th, [data-bd-nowrap-money], [data-bd-money], [class*="amount"], [class*="total"]) {
+  font-variant-numeric: tabular-nums;
+}
+
+::placeholder {
+  color: #7f879a;
+  opacity: 1;
+}
+
+/* Keep icon-only actions comfortably tappable without changing their visual weight. */
+:where(button[aria-label], a[aria-label]) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.bd-catalog-back,
+.bd-catalog-plus,
+.bd-catalog-close,
+.bd-procurement-back,
+.bd-procurement-icon-button,
+.bd-procurement-close,
+.bd-warehouse-product-head > button,
+.bd-venue-sheet-panel > header button,
+.bd-team-add-button,
+.bd-team-filters button,
+.audit-action,
+.month-item button,
+.deduction-actions button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
+.bd-catalog-tab,
+.bd-procurement-tabs button,
+.bd-warehouse-tabs button,
+.bd-procurement-search {
+  min-height: 44px !important;
+}
+
+/* A single, collision-aware control for every long production route. */
+.bd-scroll-top {
+  position: fixed;
+  z-index: 860;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(var(--bd-scroll-top-offset), calc(16px + env(safe-area-inset-bottom)));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 1px solid rgba(67, 71, 102, 0.18);
+  border-radius: 999px;
+  color: #ffffff;
+  background: #24283b;
+  box-shadow: 0 10px 28px rgba(22, 27, 46, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease;
+}
+
+.bd-scroll-top-icon {
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.bd-scroll-top[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.bd-scroll-top:hover {
+  background: #161a2d;
+}
+
+.bd-scroll-top:active {
+  transform: scale(0.97);
+}
+
+/* Existing filters and period selectors stay available only on genuinely long pages. */
+.bd-sticky-context {
+  position: sticky !important;
+  z-index: 36 !important;
+  top: var(--bd-sticky-top, 0px) !important;
+  background: rgba(248, 249, 252, 0.97) !important;
+  border-bottom: 1px solid rgba(215, 219, 230, 0.88) !important;
+  box-shadow: 0 8px 20px rgba(30, 36, 65, 0.045) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.bd-catalog-tabs.bd-sticky-context,
+.bd-procurement-tabs.bd-sticky-context,
+.bd-warehouse-tabs.bd-sticky-context,
+.bd-team-controls.bd-sticky-context {
+  margin-top: 0 !important;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+
+/* Long edit/create sheets keep their primary decision within reach. */
+.bd-catalog-sheet-actions,
+.bd-procurement-sheet-actions,
+.bd-warehouse-product-actions {
+  position: sticky;
+  z-index: 4;
+  bottom: -1px;
+  margin-top: 8px !important;
+  padding: 11px 4px calc(4px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e2e5ed;
+  background: #f8f9fc;
+}
+
+.bd-dirty-state {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  margin: 0 0 8px;
+  padding: 5px 9px;
+  border: 1px solid #ead6a6;
+  border-radius: 999px;
+  color: #805a16;
+  background: #fff8e8;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+/* Tables remain dense on desktop while their headers and numeric columns scan cleanly. */
+.table-scroll {
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.table-scroll thead th {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  background: #f7f8fc !important;
+  box-shadow: inset 0 -1px #e1e5ee;
+}
+
+.table-scroll tbody tr:hover {
+  background: #fafaff;
+}
+
+.table-scroll:focus-visible {
+  border-radius: 12px;
+}
+
+/* Mobile navigation: stronger state, safe-area padding and readable labels. */
+@media (max-width: 1023px) {
+  [data-bd-bottom-nav="responsive-v54"],
+  .market-bottom-nav,
+  .opportunity-bottom-nav,
+  .trust-bottom-nav,
+  .push-bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  [data-bd-primary-navigation="responsive-v54"] > a,
+  [data-bd-primary-navigation="responsive-v54"] > button,
+  .market-bottom-nav a,
+  .market-bottom-nav button,
+  .opportunity-bottom-nav a,
+  .opportunity-bottom-nav button,
+  .trust-bottom-nav a,
+  .push-bottom-nav a {
+    min-height: 52px !important;
+    color: #687086 !important;
+  }
+
+  [data-bd-primary-navigation="responsive-v54"] > a > span:last-child > span:last-child,
+  [data-bd-primary-navigation="responsive-v54"] > button > span:last-child > span:last-child,
+  .market-bottom-nav a,
+  .market-bottom-nav button,
+  .opportunity-bottom-nav a,
+  .opportunity-bottom-nav button,
+  .trust-bottom-nav a,
+  .push-bottom-nav a {
+    font-size: 10px !important;
+    line-height: 1.15 !important;
+    font-weight: 760 !important;
+  }
+
+  [data-bd-primary-navigation="responsive-v54"] > a:has(> span[style*="position: absolute"]),
+  .market-bottom-nav a.active,
+  .opportunity-bottom-nav a.active,
+  .trust-bottom-nav a.active,
+  .push-bottom-nav a.active {
+    color: #4f46e5 !important;
+    font-weight: 850 !important;
+  }
+
+  :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px !important;
+  }
+}
+
+/* Finance uses desktop width for comparison, not as a stretched phone feed. */
+@media (min-width: 1024px) {
+  body[data-bd-route="/finance"] [data-bd-finance-results="unified-v16"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    align-items: stretch;
+    gap: 14px !important;
+  }
+
+  body[data-bd-route="/finance"] [data-bd-finance-result-card] {
+    height: 100%;
+  }
+
+  .bd-catalog-sheet-backdrop,
+  .bd-procurement-sheet-backdrop {
+    align-items: center !important;
+    padding: 32px;
+  }
+
+  .bd-catalog-sheet,
+  .bd-procurement-sheet {
+    width: min(680px, 100%) !important;
+    max-width: 680px !important;
+    max-height: calc(100dvh - 64px) !important;
+    border-radius: 26px !important;
+  }
+
+  .bd-scroll-top {
+    right: max(28px, env(safe-area-inset-right));
+    bottom: max(28px, env(safe-area-inset-bottom));
+  }
+}
+
+/* AI output stays UI-only: problem → reason → money → action/check. */
+[data-bd-ai-result="scan-order-v86"] > [data-bd-ai-section="problem"] {
+  scroll-margin-top: 96px;
+}
+
+[data-bd-ai-result="scan-order-v86"] details > summary {
+  min-height: 44px;
+}
+
+/* Status, empty and error copy should never collapse or become visually ambiguous. */
+:where([role="status"], [role="alert"], .notice, .empty-state, .bd-venue-message) {
+  overflow-wrap: anywhere;
+}
+
+.notice.success,
+.bd-venue-message:not(.error) {
+  border-color: #a7dfc2 !important;
+}
+
+.notice.error,
+.bd-venue-message.error,
+[role="alert"] {
+  border-color: #efbcc3;
+}
+
+/* One global sync pattern: quiet while working, transient on success, actionable on failure. */
+.bd-sync-indicator {
+  position: fixed;
+  z-index: 910;
+  top: max(12px, calc(env(safe-area-inset-top) + 8px));
+  right: max(12px, env(safe-area-inset-right));
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
+.bd-sync-status-shell {
+  pointer-events: none;
+}
+
+.bd-sync-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 8px 11px;
+  border: 1px solid #dfe3ec;
+  border-radius: 999px;
+  color: #4f586d;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 7px 22px rgba(24, 31, 55, 0.1);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  font-size: 10.5px;
+  font-weight: 780;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.bd-sync-status-shell.syncing .bd-sync-status {
+  border-color: #dad9fb;
+  color: #514cd7;
+  background: rgba(247, 246, 255, 0.97);
+}
+
+.bd-sync-status-shell.offline .bd-sync-status {
+  color: #687086;
+  background: rgba(246, 247, 250, 0.97);
+}
+
+.bd-sync-status-shell.error .bd-sync-status {
+  border-color: #edc391;
+  color: #8b5209;
+  background: rgba(255, 248, 235, 0.98);
+}
+
+.bd-sync-status-shell.conflict .bd-sync-status {
+  border-color: #efbcc3;
+  color: #b63245;
+  background: rgba(255, 244, 246, 0.98);
+}
+
+button.bd-sync-status {
+  min-height: 48px;
+  border-width: 1px;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+button.bd-sync-status:active {
+  transform: scale(0.98);
+}
+
+.bd-sync-status-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.bd-sync-status-icon.is-spinning {
+  animation: bd-sync-spin 0.85s linear infinite;
+}
+
+.bd-sync-status-action {
+  margin-left: 2px;
+  padding-left: 8px;
+  border-left: 1px solid currentColor;
+  font-weight: 900;
+}
+
+@keyframes bd-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Public auth polish: legal copy and placeholders remain secondary, but readable. */
+.bd-auth-legal,
+.bd-auth-switch,
+.bd-auth-consent {
+  color: #697287 !important;
+}
+
+.bd-auth-input::placeholder {
+  color: #747d91 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .bd-scroll-top {
+    transform: none;
+  }
+
+  .bd-sync-status-icon.is-spinning {
+    animation: none;
+  }
+}

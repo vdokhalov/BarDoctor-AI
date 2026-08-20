@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">BarDoctor</title>
+  <desc id="desc">Фирменный знак: ресторанный клош и линия пульса</desc>
+  <defs>
+    <radialGradient id="bd-bg" cx="50%" cy="34%" r="76%">
+      <stop offset="0" stop-color="#141C4D"/>
+      <stop offset="0.58" stop-color="#091131"/>
+      <stop offset="1" stop-color="#050A20"/>
+    </radialGradient>
+    <linearGradient id="bd-mark" x1="92" y1="190" x2="420" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D14CFF"/>
+      <stop offset="0.42" stop-color="#916CFF"/>
+      <stop offset="0.7" stop-color="#4F78FF"/>
+      <stop offset="1" stop-color="#18C9FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bd-bg)"/>
+  <g fill="none" stroke="url(#bd-mark)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M224 160v-22c0-17.7 14.3-32 32-32s32 14.3 32 32v22" stroke-width="30"/>
+    <path d="M116 336c0-97.2 62.7-176 140-176s140 78.8 140 176" stroke-width="30"/>
+    <path d="M92 336h113l39-88 50 154 40-110 25 44h61" stroke-width="32"/>
+  </g>
+</svg>

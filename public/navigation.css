@@ -1,0 +1,33 @@
+/* bd-navigation-consistency-v85 */
+[data-bd-primary-navigation="responsive-v54"] {
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+
+[data-bd-desktop-brand="responsive-v54"] {
+  display: none;
+}
+
+button[aria-label="Назад"],
+a[aria-label="Назад"],
+a[aria-label^="Вернуться"] {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 370px) {
+  [data-bd-primary-navigation="responsive-v54"] > a,
+  [data-bd-primary-navigation="responsive-v54"] > button {
+    min-width: 0;
+  }
+
+  [data-bd-primary-navigation="responsive-v54"] > a > span:last-child > span:last-child,
+  [data-bd-primary-navigation="responsive-v54"] > button > span:last-child > span:last-child {
+    font-size: 7.5px !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  [data-bd-desktop-brand="responsive-v54"] {
+    display: flex !important;
+  }
+}

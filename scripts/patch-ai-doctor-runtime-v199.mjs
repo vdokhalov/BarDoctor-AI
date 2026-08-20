@@ -1,0 +1,41 @@
+import { readFileSync, writeFileSync } from "node:fs";
+
+const bundlePath = "public/assets/index-BQGspy0I.js";
+let bundle = readFileSync(bundlePath, "utf8");
+
+function replaceOnce(search, replacement, label) {
+  const first = bundle.indexOf(search);
+  if (first < 0) throw new Error(`Missing ${label}`);
+  if (bundle.indexOf(search, first + search.length) >= 0) throw new Error(`Ambiguous ${label}`);
+  bundle = bundle.slice(0, first) + replacement + bundle.slice(first + search.length);
+}
+
+function replaceBetween(start, end, replacement, label) {
+  const first = bundle.indexOf(start);
+  if (first < 0) throw new Error(`Missing start for ${label}`);
+  const last = bundle.indexOf(end, first + start.length);
+  if (last < 0) throw new Error(`Missing end for ${label}`);
+  bundle = bundle.slice(0, first) + replacement + bundle.slice(last);
+}
+
+if (!bundle.includes('bdAIDoctorRuntimeVersion="attention-v199"')) {
+  replaceOnce(
+    'bdAIDoctorUniversalVersion="attention-v198",IC="bd_ai_diagnosis_v9";',
+    'bdAIDoctorUniversalVersion="attention-v198",bdAIDoctorRuntimeVersion="attention-v199",IC="bd_ai_diagnosis_v9";',
+    "AI Doctor runtime version marker",
+  );
+
+  const result = String.raw`function bdAIDoctorSearchV199(e){try{return JSON.stringify(e??{}).toLocaleLowerCase("ru")}catch{return String(e?.title??e?.action??"").toLocaleLowerCase("ru")}}
+function bdAIDoctorIssueV199(e){const t=bdAIDoctorSearchV199(e);if(/незакрыт.{0,14}смен|смен.{0,14}(без отч[её]та|не заполн)|перв.{0,12}сменн.{0,12}отч[её]т/.test(t))return"unclosed-shifts";if(/добавить сотрудник|не добавлен.{0,16}сотрудник|сотрудник.{0,22}(не добав|отсутств)|нет сотрудник/.test(t))return"employees";if(/перв.{0,14}инвентаризац|нет подтвержд.{0,18}закуп|подтвердить закупк/.test(t))return"first-inventory";if(/праздник|празднич|событи|календар|calendar|event|план.{0,16}смен.{0,20}запас|смен.{0,20}запас.{0,20}дат/.test(t))return"local-demand-event";return String(e?.issueKey??e?.recommendationId??e?.title??"signal")}
+function bdAIDoctorMaterialRiskV199(e){return/касс.{0,18}(расхожд|не сход)|налог|штраф|нарушен.{0,16}(уч[её]т|отч[её]тност)|блокир.{0,20}(расч[её]т|выплат|закрыт)|невозможно.{0,24}(рассчит|выплат)|потер[яи].{0,10}данн/.test(bdAIDoctorSearchV199(e))}
+function bdAIDoctorDataGapV199(e){if(bdAIDoctorMaterialRiskV199(e))return!1;const t=bdAIDoctorIssueV199(e),n=bdAIDoctorSearchV199(e);return e?.signalClass==="data_quality"||["unclosed-shifts","employees","first-inventory"].includes(t)||/нет данных|качество данных|неполнот|coverage|нет техкарт|без техкарт|не сопостав|нет закупочн.{0,10}цен|отсутств.{0,16}(отч[её]т|интеграц|меню|отзыв)|меню.{0,18}(не загруж|отсутств)|нет отзыв/.test(n)}
+function bdAIDoctorQualityItemV199(e,t){const n=bdAIDoctorIssueV199(e),r={...e,signalClass:"data_quality",criticalOverride:!1};return n==="unclosed-shifts"&&!t?{...r,title:"Заполнить первые сменные отчёты",fact:"История фактических смен ещё не сформирована.",consequence:"После первых закрытых смен AI сможет сформировать исходную точку для сравнения.",action:"Закрыть первую фактическую смену с отчётом.",responsibleRole:"администратор",deadline:"После первой фактической смены",successCriterion:"Первая фактическая смена закрыта с заполненным отчётом."}:r}
+function bdAIDoctorNormalizeV199(e){const t=e?.attention??{},n=Array.isArray(e?.contextCoverage)&&e.contextCoverage.some(v=>v?.id==="performanceHistory"&&v?.available===!0),r=Array.isArray(t.priorities)?t.priorities:Array.isArray(e?.actions)?e.actions.slice(0,3):[],a=Array.isArray(t.opportunities)?t.opportunities:[],s=Array.isArray(t.dataQuality?.items)?t.dataQuality.items:[],l=[],u=new Set,d=v=>{const b=bdAIDoctorIssueV199(v);u.has(b)||(u.add(b),l.push(v))};s.forEach(d);const f=v=>{const b=[];for(const N of v)bdAIDoctorDataGapV199(N)?d(bdAIDoctorQualityItemV199(N,n)):b.push(N);return b},m=f(r),h=f(a),g=new Set(m.map(bdAIDoctorIssueV199)),y=h.filter(v=>!g.has(bdAIDoctorIssueV199(v))),j=m.filter(v=>v?.criticalOverride===!0||v?.priority==="critical").length,C=m.length-j,p=t.counts??{},b=m[0],N=y[0],E=b?"Главный приоритет сейчас — "+String(b.title??"проверить рабочий сигнал").toLocaleLowerCase("ru")+". "+String(b.consequence??b.whyImportant??"Проверьте факты и назначьте следующее действие."):N?"Срочных проблем нет. Главная возможность — "+String(N.title??"улучшить результат").toLocaleLowerCase("ru")+".":l.length?"Срочных проблем нет. Для более точного диагноза заполните недостающие данные ниже.":"Срочных проблем нет. Ключевые показатели стабильны.";return{...t,priorities:m,opportunities:y,dataQuality:{...(t.dataQuality??{}),items:l},counts:{...p,requiresAttention:m.length,critical:j,important:C,moreSignals:0},diagnosticSentence:E}}
+function Fce({data:e,generatedAt:t,onRefresh:n}){const r=bdAIDoctorNormalizeV199(e),a=r.priorities,s=Array.isArray(r.inProgress)?r.inProgress:[],l=r.opportunities,u=r.dataQuality.items,d=Array.isArray(r.history)?r.history:[],f=r.counts,m=new Date(r.updatedAt??t),h=Number.isNaN(m.getTime())?"Время обновления неизвестно":"Обновлено "+m.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})+" в "+m.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"}),g=Number(f.requiresAttention??a.length),y=a.length===1?"1 приоритет":a.length>1?a.length+" приоритета":"Приоритеты";return i.jsxs("div",{"data-bd-ai-result":"attention-v199","data-bd-ai-attention":"runtime-v199",className:"bd-ai-doctor-v196",children:[i.jsxs("section",{className:"bd-ai-overview",children:[i.jsxs("div",{className:"bd-ai-overview-head",children:[i.jsxs("div",{children:[i.jsx("p",{children:"Сводка по заведению"}),i.jsx("h2",{children:g?"Требуют внимания: "+g:"Срочных проблем нет"})]}),i.jsx("span",{className:"bd-ai-overview-mark","aria-hidden":!0,children:"AI"})]}),i.jsxs("div",{className:"bd-ai-status-row",children:[i.jsxs("span",{className:"critical",children:[f.critical??0," критично"]}),i.jsxs("span",{className:"important",children:[f.important??0," важно"]}),i.jsxs("span",{className:"stable",children:[f.stable??0," стабильно"]})]}),i.jsx("p",{className:"bd-ai-diagnostic",children:r.diagnosticSentence}),i.jsx("small",{children:h})]}),i.jsxs("section",{className:"bd-ai-section bd-ai-now",children:[i.jsxs("div",{className:"bd-ai-section-head",children:[i.jsx("h2",{children:"Что делать сейчас"}),i.jsx("span",{children:y})]}),a.length?i.jsx("div",{className:"bd-ai-priority-grid bd-ai-priority-count-"+Math.min(a.length,3),children:a.slice(0,3).map((v,b)=>i.jsx(bdAIDoctorPriorityCardV196,{item:v,runAt:t},v.recommendationId??b))}):i.jsx("div",{className:"bd-ai-empty",children:"Подтверждённых бизнес-проблем сейчас нет. Пробелы исходных данных вынесены в отдельный блок ниже."}),Number(f.moreSignals)>0&&i.jsxs("p",{className:"bd-ai-more",children:["Ещё ",f.moreSignals," сигналов — они учтены в приоритизации"]})]}),i.jsx(bdAIDoctorSectionV198,{title:"В работе",count:s.length,items:s,kind:"Уже принято",mode:"in_progress",runAt:t}),i.jsx(bdAIDoctorSectionV198,{title:"Возможности",count:l.length,items:l,kind:"Потенциал",mode:"opportunity",runAt:t}),i.jsx(bdAIDoctorDataQualityV198,{items:u,reliability:r.dataQuality?.reliabilityPercent??e.confidence?.percent,runAt:t}),e.financialAssessment&&i.jsxs("details",{className:"bd-ai-finance-details",children:[i.jsxs("summary",{children:["Финансовый контекст",i.jsx("small",{children:"Подробнее"})]}),i.jsx(bdDiagnosisFinancialCardV48,{value:e.financialAssessment})]}),d.length>0&&i.jsxs("details",{className:"bd-ai-history",children:[i.jsxs("summary",{children:["История AI Doctor",i.jsxs("small",{children:[d.length," решений"]})]}),i.jsx("div",{className:"bd-ai-history-list",children:d.map((v,b)=>i.jsxs("article",{children:[i.jsxs("div",{children:[i.jsx("strong",{children:v.title}),i.jsx("span",{children:bdAIDoctorLifecycleLabelsV196[v.lifecycle]??v.lifecycle})]}),i.jsxs("small",{children:[v.decidedAt,v.responsible?" · "+v.responsible:""]}),v.outcomeSummary&&i.jsx("p",{children:v.outcomeSummary})]},v.recommendationId??b))})]}),i.jsx("div",{className:"bd-ai-footer-actions",children:i.jsx("button",{type:"button",onClick:n,className:"bd-ai-refresh",children:"Обновить анализ"})})]})}
+`;
+
+  replaceBetween("function Fce(", "function Uce(", result, "AI Doctor runtime normalisation");
+}
+
+writeFileSync(bundlePath, bundle);
+console.log("Installed AI Doctor runtime normalisation v199");

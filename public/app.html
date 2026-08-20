@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <script>
+      (function () {
+        var path = window.location.pathname;
+        if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
+        if (path === "/" || path === "/home") {
+          document.documentElement.setAttribute("data-bd-startup-pending", "v201");
+        }
+      })();
+    </script>
+    <style>
+      .bd-static-startup-v201 { display: none; }
+      html[data-bd-startup-pending="v201"] {
+        background: #070911;
+        color-scheme: dark;
+      }
+      html[data-bd-startup-pending="v201"] body {
+        min-height: 100%;
+        margin: 0;
+        overflow: hidden !important;
+        background: #070911 !important;
+      }
+      html[data-bd-startup-pending="v201"] #root { min-height: 100dvh; }
+      html[data-bd-startup-pending="v201"] .bd-static-startup-v201 {
+        position: fixed;
+        z-index: 2147483000;
+        inset: 0;
+        box-sizing: border-box;
+        display: flex;
+        min-height: 100dvh;
+        padding: 0;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        color: #fff;
+        background: radial-gradient(circle at 50% 42%, #171b3d 0%, #0d1022 42%, #070911 100%);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+      html[data-bd-startup-pending="v201"] .bd-static-startup-v201::before {
+        position: absolute;
+        top: 22%;
+        left: 50%;
+        width: 360px;
+        height: 360px;
+        border-radius: 50%;
+        background: rgba(91, 92, 235, 0.18);
+        filter: blur(90px);
+        content: "";
+        margin-left: -180px;
+        animation: bd-static-startup-purple-halo-v202 3.2s ease-in-out infinite;
+        pointer-events: none;
+      }
+      html[data-bd-startup-pending="v201"] .bd-static-startup-v201::after {
+        position: absolute;
+        right: -18%;
+        bottom: 8%;
+        width: 260px;
+        height: 260px;
+        border-radius: 50%;
+        background: rgba(46, 211, 183, 0.08);
+        filter: blur(80px);
+        content: "";
+        animation: bd-static-startup-green-halo-v202 4s ease-in-out infinite;
+        pointer-events: none;
+      }
+      .bd-static-startup-content-v202 {
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        display: flex;
+        width: 100%;
+        max-width: 390px;
+        padding: 32px 28px;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .bd-static-startup-mark-v201 {
+        position: relative;
+        display: grid;
+        width: 164px;
+        height: 164px;
+        margin-bottom: 30px;
+        place-items: center;
+      }
+      .bd-static-startup-mark-v201::before,
+      .bd-static-startup-mark-v201::after {
+        position: absolute;
+        border-radius: 50%;
+        content: "";
+      }
+      .bd-static-startup-mark-v201::before {
+        inset: 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-top-color: #8b7bff;
+        border-right-color: rgba(91, 92, 235, 0.65);
+        box-shadow: 0 0 34px rgba(91, 92, 235, 0.16);
+        animation: bd-static-startup-spin-v201 2.4s linear infinite;
+      }
+      .bd-static-startup-mark-v201::after {
+        inset: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 60px rgba(0, 0, 0, 0.34);
+        animation: bd-static-startup-core-v202 2.2s ease-in-out infinite;
+      }
+      html[data-bd-startup-pending="v201"] .bd-static-startup-mark-v201 img {
+        position: relative;
+        z-index: 1;
+        display: block;
+        width: 112px;
+        height: 112px;
+        border-radius: 28px;
+        object-fit: cover;
+        box-shadow: 0 16px 44px rgba(0, 0, 0, 0.34);
+      }
+      .bd-static-startup-brand-v201 {
+        position: relative;
+        margin: 0;
+        color: #fff;
+        font-size: 38px;
+        font-weight: 850;
+        letter-spacing: -0.045em;
+        line-height: 1;
+      }
+      .bd-static-startup-brand-v201 span {
+        color: transparent;
+        background: linear-gradient(100deg, #9b8cff 0%, #6f78ff 48%, #69e6d1 120%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .bd-static-startup-tagline-v201 {
+        position: relative;
+        margin: 13px 0 0;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 16px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .bd-static-startup-status-v201 {
+        position: relative;
+        display: flex;
+        margin: 34px 0 0;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255, 255, 255, 0.42);
+        font-size: 12px;
+        font-weight: 650;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .bd-static-startup-dots-v202 { display: flex; gap: 4px; }
+      .bd-static-startup-dots-v202 span {
+        display: block;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #8b7bff;
+        animation: bd-static-startup-dot-v202 1s ease-in-out infinite;
+      }
+      .bd-static-startup-dots-v202 span:nth-child(2) { animation-delay: 0.16s; }
+      .bd-static-startup-dots-v202 span:nth-child(3) { animation-delay: 0.32s; }
+      @keyframes bd-static-startup-spin-v201 { to { transform: rotate(360deg); } }
+      @keyframes bd-static-startup-purple-halo-v202 {
+        0%, 100% { opacity: 0.35; transform: scale(0.9); }
+        50% { opacity: 0.65; transform: scale(1.08); }
+      }
+      @keyframes bd-static-startup-green-halo-v202 {
+        0%, 100% { opacity: 0.2; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(1.15); }
+      }
+      @keyframes bd-static-startup-core-v202 {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.025); }
+      }
+      @keyframes bd-static-startup-dot-v202 {
+        0%, 100% { opacity: 0.2; transform: translateY(0); }
+        50% { opacity: 1; transform: translateY(-2px); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .bd-static-startup-mark-v201::before,
+        .bd-static-startup-mark-v201::after,
+        .bd-static-startup-v201::before,
+        .bd-static-startup-v201::after,
+        .bd-static-startup-dots-v202 span { animation: none; }
+      }
+    </style>
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#070b24" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BarDoctor" />
+    <meta name="bd-app-version" content="202" />
+    <meta name="bd-build-id" content="employee-edit-page-v206" />
+    <title>BarDoctor</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon-v159.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/bardoctor-v159-favicon-32.png" />
+    <link rel="shortcut icon" href="/favicon.ico?v=20260812-brand-v159" />
+    <link rel="manifest" href="/manifest.json?v=20260812-brand-v159" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/bardoctor-v159-apple-180.png" />
+    <link rel="preload" href="/icons/bardoctor-mark-v159.svg" as="image" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/index-D0AhgpbR.css?v=20260809-rc-v78" />
+    <link rel="stylesheet" href="/access-entry.css?v=20260726-access-v1" />
+    <link rel="stylesheet" href="/market-entry.css?v=20260722-competitors-v28" />
+    <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
+    <link rel="stylesheet" href="/suppliers.css?v=20260809-rc-v76" />
+    <link rel="stylesheet" href="/warehouse.css?v=20260809-warehouse-v76" />
+    <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
+    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44" />
+    <link rel="stylesheet" href="/employee-detail.css?v=20260817-employee-edit-page-v206" />
+    <link rel="stylesheet" href="/employee-list.css?v=20260817-employee-edit-page-v206" />
+    <link rel="stylesheet" href="/team-dashboard-v163.css?v=20260812-team-v163" />
+    <link rel="stylesheet" href="/payroll-dashboard-v164.css?v=20260812-payroll-v164" />
+    <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
+    <link rel="stylesheet" href="/modern-polish.css?v=20260812-modern-v158" />
+    <link rel="stylesheet" href="/home-visual-v151.css?v=20260811-home-v151" />
+    <link rel="stylesheet" href="/health-score-experience-v152.css?v=20260815-home-health-v200" />
+    <link rel="stylesheet" href="/shifts-visual-v156.css?v=20260812-shifts-v158" />
+    <link rel="stylesheet" href="/finance-dashboard-v160.css?v=20260812-finance-v161" />
+    <link rel="stylesheet" href="/monthly-report-v165.css?v=20260812-monthly-v165" />
+    <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
+    <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" />
+    <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" />
+    <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" />
+    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171" />
+    <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" />
+    <link rel="stylesheet" href="/ai-doctor-attention-v196.css?v=20260817-ai-doctor-mobile-v203" />
+    <link rel="stylesheet" href="/app-shell-v185.css?v=20260815-startup-v201" />
+    <script src="/monthly-report-qa-v165.js?v=20260812-monthly-v165"></script>
+    <script src="/more-hub-qa-v166.js?v=20260812-more-v166"></script>
+    <script src="/equipment-qa-v167.js?v=20260812-equipment-v167"></script>
+    <script src="/procurement-qa-v168.js?v=20260814-finance-purchase-delete-v195"></script>
+    <script src="/assortment-qa-v170.js?v=20260813-assortment-v171"></script>
+    <script src="/health-score-experience.js?v=20260811-health-v155"></script>
+    <script src="/bardoctor-preview.js?v=20260815-seamless-startup-v202"></script>
+    <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
+    <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
+    <script src="/app-shell-v185.js?v=20260815-startup-v201" defer></script>
+  </head>
+  <body>
+    <div id="root">
+      <div class="bd-static-startup-v201" data-bd-static-startup="v201" role="status" aria-label="BarDoctor загружается">
+        <div class="bd-static-startup-content-v202">
+          <div class="bd-static-startup-mark-v201" aria-hidden="true">
+            <img src="/icons/bardoctor-mark-v159.svg" alt="" width="112" height="112" />
+          </div>
+          <h1 class="bd-static-startup-brand-v201">Bar<span>Doctor</span></h1>
+          <p class="bd-static-startup-tagline-v201">Заведение под контролем</p>
+          <p class="bd-static-startup-status-v201">
+            <span>Готовим данные</span>
+            <span class="bd-static-startup-dots-v202" aria-hidden="true"><span></span><span></span><span></span></span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

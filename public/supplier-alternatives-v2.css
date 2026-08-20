@@ -1,0 +1,47 @@
+.match { display: block; margin-bottom: 6px; color: #625df1; font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: .05em; }
+.saving { padding: 7px 9px; border-radius: 10px; background: #eafaf3; font-size: 12px; }
+.price-row { display: grid; grid-template-columns: 1.2fr 1fr; gap: 9px; margin-top: 15px; }
+.price-row > div { padding: 14px; border-radius: 15px; background: #f7f8fb; }
+.price-row > div:first-child { background: #effdf7; border: 1px solid #ccefe0; }
+.price-row small, .price-row span { display: block; color: #8991a4; font-size: 9px; font-weight: 750; }
+.price-row strong { display: block; margin: 5px 0 3px; font-size: 20px; }
+.price-row .candidate { color: #168758; }
+.empty b, .empty span { display: block; }
+.empty b { margin-bottom: 8px; color: #2b3044; font-size: 16px; }
+@media (max-width: 600px) { .price-row { grid-template-columns: 1fr; } }
+.overview { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 18px 0 6px; padding: 13px 16px; border-radius: 15px; background: #fff; border: 1px solid #e0e4ed; }
+.overview b { font-size: 14px; }
+.overview span { color: #625df1; font-size: 12px; font-weight: 800; }
+.card.is-checking { border-color: #625df1; box-shadow: 0 12px 34px rgba(98, 93, 241, .14); }
+.card.is-checking .saving { color: #fff; background: #625df1; }
+.contacts { margin-top: 10px; padding: 13px; border: 1px solid #dce1eb; border-radius: 15px; background: #fbfcff; }
+.contacts > small { display: block; margin-bottom: 9px; color: #747d92; font-size: 10px; font-weight: 850; text-transform: uppercase; letter-spacing: .04em; }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.contact-link { min-height: 38px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 11px; color: #29304a; background: #fff; border: 1px solid #dce1eb; text-decoration: none; font-size: 11px; font-weight: 800; }
+.contact-link.phone { color: #087a4f; border-color: #bde8d6; background: #effbf6; }
+.contact-link.email { color: #3941a3; border-color: #d6d8fa; background: #f3f4ff; }
+.contact-link.order { color: #fff; border-color: #625df1; background: #625df1; }
+.contacts p { margin: 9px 0 0; color: #7b8397; font-size: 10px; line-height: 1.4; }
+@media (max-width: 600px) { .overview { align-items: flex-start; flex-direction: column; } .contact-link { width: 100%; justify-content: center; } }
+.hero > small { display: block; margin-top: 10px; color: rgba(255,255,255,.58); font-size: 10px; }
+.coverage { margin-top: 18px; padding: 18px; border-radius: 20px; color: #fff; background: linear-gradient(145deg, #151a3b, #272e6b); box-shadow: 0 14px 36px rgba(26,32,72,.14); }
+.coverage-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.coverage-head small { color: #79e2c4; font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.coverage-head h2 { margin: 5px 0 0; font-size: 18px; }
+.coverage-pct { color: #79e2c4; font-size: 25px; }
+.progress { height: 7px; margin: 15px 0; overflow: hidden; border-radius: 9px; background: rgba(255,255,255,.14); }
+.progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#69dfbd,#68a8ff); }
+.metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+.metrics div { padding: 10px; border-radius: 12px; background: rgba(255,255,255,.08); }
+.metrics b,.metrics span { display: block; }
+.metrics b { font-size: 16px; }
+.metrics span { margin-top: 3px; color: rgba(255,255,255,.62); font-size: 9px; }
+.missing { margin: 11px 0; padding: 13px 15px; border: 1px solid #f0d7a8; border-radius: 15px; background: #fff8e9; color: #795821; font-size: 11px; }
+.missing summary { cursor: pointer; font-weight: 800; }
+.missing summary b { float: right; }
+.missing p { margin: 10px 0 0; line-height: 1.55; }
+.toolbar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.toolbar input { min-width: 0; flex: 1; height: 44px; padding: 0 14px; border: 1px solid #dce1eb; border-radius: 13px; background: #fff; color: #20263c; outline: none; }
+.toolbar input:focus { border-color: #625df1; box-shadow: 0 0 0 3px rgba(98,93,241,.1); }
+.toolbar span { color: #747d92; font-size: 11px; white-space: nowrap; }
+@media (max-width: 600px) { .metrics { grid-template-columns: repeat(2,1fr); } .coverage-head { align-items: flex-end; } .toolbar { align-items: stretch; flex-direction: column; } .toolbar span { padding-left: 3px; } }

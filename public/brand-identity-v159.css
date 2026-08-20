@@ -1,0 +1,40 @@
+/* BarDoctor cloche + pulse brand identity v159 */
+img.brand-mark,
+.brand > img,
+.bd-auth-brand-mark,
+[data-bd-desktop-brand="responsive-v54"] > img {
+  display: block !important;
+  flex: 0 0 auto !important;
+  object-fit: cover !important;
+  background: #070b24 !important;
+}
+
+img.brand-mark,
+.brand > img {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 13px !important;
+  box-shadow: 0 10px 24px rgba(79, 70, 229, 0.24) !important;
+}
+
+.bd-auth-brand-mark {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  box-shadow: 0 10px 24px rgba(91, 87, 242, 0.23) !important;
+}
+
+[data-bd-desktop-brand="responsive-v54"] > img {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 11px !important;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22) !important;
+}
+
+@media (max-width: 520px) {
+  .bd-auth-brand-mark {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 10px !important;
+  }
+}
