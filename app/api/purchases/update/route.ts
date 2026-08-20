@@ -17,6 +17,7 @@ import {
 import {
   applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
+  consolidateInventoryDuplicates,
   inventoryProductKey,
   revisePurchaseInInventory,
   STOCK_MOVEMENT_STORE_KEY,
@@ -179,8 +180,8 @@ export async function POST(request: Request): Promise<Response> {
   let documents = array(stores.get(PURCHASE_STORE_KEY));
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
-  const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
+  let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const ledgerMigration = migratePurchaseLedger({
     documents,
     expenses,
@@ -189,6 +190,9 @@ export async function POST(request: Request): Promise<Response> {
   });
   documents = ledgerMigration.documents;
   expenses = ledgerMigration.expenses;
+  const inventoryRepair = consolidateInventoryDuplicates({ assortment, stockMovements, now });
+  assortment = inventoryRepair.assortment;
+  stockMovements = inventoryRepair.stockMovements;
   const documentIndex = documents.findIndex((value) => record(value)?.id === document.id);
   const previousDocument = documentIndex >= 0 ? record(documents[documentIndex]) : null;
   if (!previousDocument || !["confirmed", "cancelled"].includes(String(previousDocument.status))) {

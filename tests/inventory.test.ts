@@ -4,7 +4,9 @@ import {
   applyInventoryCount,
   applyPurchaseToInventory,
   applySalesToInventory,
+  consolidateInventoryDuplicates,
   inventoryPackageAmount,
+  inventoryProductKey,
   purchaseLineBaseAmount,
   repairInventoryBalanceMetadata,
   removePurchaseFromInventory,
@@ -84,6 +86,134 @@ test("package parsing handles cases and base units", () => {
   });
 });
 
+test("inventory identity is stable across package sizes but keeps incompatible base units separate", () => {
+  assert.equal(inventoryProductKey({ name: "Апельсины", packageSize: "1 кг", unit: "шт." }), "stock:апельсины|g");
+  assert.equal(inventoryProductKey({ name: "Апельсины", packageSize: "500 г", unit: "уп." }), "stock:апельсины|g");
+  assert.equal(inventoryProductKey({ name: "Апельсины", packageSize: "1 шт.", unit: "шт." }), "stock:апельсины|pcs");
+  assert.equal(
+    inventoryProductKey({ name: "Апельсины", packageSize: "1 кг", purchaseProductKey: "апельсины|1 кг" }),
+    "stock:апельсины|g",
+  );
+  assert.equal(
+    inventoryProductKey({ name: "Апельсины", packageSize: "1 кг", purchaseProductKey: "1c-product-42" }),
+    "1c-product-42",
+  );
+});
+
+test("duplicate package-specific cards merge without losing stock, value, movements or recipe links", () => {
+  const result = consolidateInventoryDuplicates({
+    assortment: {
+      stockBalances: [
+        {
+          key: "апельсины|1 кг",
+          productKey: "апельсины|1 кг",
+          name: "Апельсины",
+          unit: "g",
+          packageSize: "1 кг",
+          packageAmount: 1_000,
+          current: 1_078,
+          inventoryValue: 64.68,
+          averageUnitCost: 0.06,
+          currency: "MDL",
+          updatedAt: "2026-08-19T10:00:00.000Z",
+        },
+        {
+          key: "апельсины|500 г",
+          productKey: "апельсины|500 г",
+          name: "Апельсины",
+          unit: "g",
+          packageSize: "500 г",
+          packageAmount: 500,
+          current: 2_054,
+          inventoryValue: 143.78,
+          averageUnitCost: 0.07,
+          currency: "MDL",
+          updatedAt: "2026-08-20T10:00:00.000Z",
+        },
+      ],
+      nomenclature: [
+        { key: "апельсины|1 кг", productKey: "апельсины|1 кг", name: "Апельсины", unit: "g", packageSize: "1 кг", kind: "stock" },
+        { key: "апельсины|500 г", productKey: "апельсины|500 г", name: "Апельсины", unit: "g", packageSize: "500 г", kind: "stock" },
+      ],
+      recipes: [{
+        id: "fruit-salad",
+        ingredients: [{ id: "orange", name: "Апельсины", quantity: 100, unit: "г", purchaseProductKey: "апельсины|500 г" }],
+      }],
+    },
+    stockMovements: [
+      { id: "m1", productKey: "апельсины|1 кг", productName: "Апельсины", unit: "g", amount: 1_078 },
+      { id: "m2", productKey: "апельсины|500 г", productName: "Апельсины", unit: "g", amount: 2_054 },
+    ],
+    now: "2026-08-20T20:00:00.000Z",
+  });
+
+  const balances = result.assortment.stockBalances as Array<Record<string, unknown>>;
+  const nomenclature = result.assortment.nomenclature as Array<Record<string, unknown>>;
+  const recipes = result.assortment.recipes as Array<Record<string, unknown>>;
+  assert.equal(balances.length, 1);
+  assert.equal(nomenclature.length, 1);
+  assert.equal(balances[0].productKey, "stock:апельсины|g");
+  assert.equal(balances[0].current, 3_132);
+  assert.equal(balances[0].inventoryValue, 208.46);
+  assert.equal(balances[0].averageUnitCost, 0.066558);
+  assert.equal(balances[0].packageSize, "Несколько фасовок");
+  assert.equal(balances[0].packageAmount, 0);
+  assert.deepEqual(balances[0].packageOptions, ["1 кг", "500 г"]);
+  assert.equal(result.stockMovements.every((movement) => movement.productKey === "stock:апельсины|g"), true);
+  assert.equal(
+    ((recipes[0].ingredients as Array<Record<string, unknown>>)[0]).purchaseProductKey,
+    "stock:апельсины|g",
+  );
+  assert.deepEqual(result.summary, {
+    mergedBalances: 1,
+    mergedNomenclature: 1,
+    remappedMovements: 2,
+    remappedRecipes: 1,
+    skippedCurrencyConflicts: 0,
+    changed: true,
+  });
+});
+
+test("different currencies are not silently merged", () => {
+  const result = consolidateInventoryDuplicates({
+    assortment: {
+      stockBalances: [
+        { key: "персики|1 кг", name: "Персики", unit: "g", packageSize: "1 кг", current: 1_000, inventoryValue: 100, currency: "MDL" },
+        { key: "персики|500 г", name: "Персики", unit: "g", packageSize: "500 г", current: 500, inventoryValue: 50, currency: "RUB" },
+      ],
+    },
+  });
+  assert.equal((result.assortment.stockBalances as unknown[]).length, 2);
+  assert.equal(result.summary.skippedCurrencyConflicts, 1);
+  assert.equal(result.summary.mergedBalances, 0);
+});
+
+test("two purchases of the same product in different packages use one balance", () => {
+  const first = applyPurchaseToInventory({
+    assortment: { stockBalances: [], nomenclature: [] },
+    document: {
+      id: "orange-1",
+      currency: "MDL",
+      items: [{ id: "a", name: "Апельсины", category: "food", quantity: 1, packageSize: "1 кг", lineTotal: 60 }],
+    },
+  });
+  const second = applyPurchaseToInventory({
+    assortment: first.assortment,
+    document: {
+      id: "orange-2",
+      currency: "MDL",
+      items: [{ id: "b", name: "Апельсины", category: "food", quantity: 2, packageSize: "500 г", lineTotal: 70 }],
+    },
+  });
+  const balances = second.assortment.stockBalances as Array<Record<string, unknown>>;
+  assert.equal(balances.length, 1);
+  assert.equal(balances[0].productKey, "stock:апельсины|g");
+  assert.equal(balances[0].current, 2_000);
+  assert.equal(balances[0].packageSize, "Несколько фасовок");
+  assert.equal(balances[0].packageAmount, 0);
+  assert.deepEqual(balances[0].packageOptions, ["1 кг", "500 г"]);
+});
+
 test("confirmed purchase increases stock, recalculates cost and links exact recipe ingredient", () => {
   const result = applyPurchaseToInventory({
     assortment: {
@@ -128,7 +258,7 @@ test("confirmed purchase increases stock, recalculates cost and links exact reci
   assert.equal(result.summary.linkedIngredients, 1);
   const recipe = (result.assortment.recipes as Array<Record<string, unknown>>)[0];
   const ingredient = (recipe.ingredients as Array<Record<string, unknown>>)[0];
-  assert.equal(ingredient.purchaseProductKey, "coca cola|1 л");
+  assert.equal(ingredient.purchaseProductKey, "stock:coca cola|ml");
 });
 
 test("mixed purchase adds every line to nomenclature but posts only goods to stock", () => {

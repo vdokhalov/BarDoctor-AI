@@ -4,6 +4,7 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import {
   ASSORTMENT_STORE_KEY,
   BaseInventoryUnit,
+  consolidateInventoryDuplicates,
   inventoryPackageAmount,
   inventoryProductKey,
   repairInventoryBalanceMetadata,
@@ -138,8 +139,9 @@ export async function POST(request: Request): Promise<Response> {
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
 
   if (action === "classify") {
-    const result = ensureNomenclatureHierarchy(assortment, now);
-    await database.batch([
+    const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
+    const result = ensureNomenclatureHierarchy(consolidated.assortment, now);
+    const statements = [
       upsertStore(database, account.id, result.assortment, now),
       auditUpdate(database, {
         accountId: account.id,
@@ -156,20 +158,36 @@ export async function POST(request: Request): Promise<Response> {
           classified: result.classified,
           suggested: result.suggested,
           unassigned: result.unassigned,
+          duplicateRepair: consolidated.summary,
         },
         actorName,
         actorRole: account.role,
         reason: "Автоматическое распределение номенклатуры по разделам",
         createdAt: now,
       }),
-    ]);
-    return Response.json({ ok: true, ...result });
+    ];
+    if (consolidated.summary.changed) {
+      statements.push(upsertStore(
+        database,
+        account.id,
+        STOCK_MOVEMENT_STORE_KEY,
+        consolidated.stockMovements,
+        now,
+      ));
+    }
+    await database.batch(statements);
+    return Response.json({ ok: true, ...result, duplicateRepair: consolidated.summary });
   }
 
   if (action === "repair") {
-    const repaired = repairInventoryBalanceMetadata({ assortment, stockMovements, now });
-    if (repaired.summary.repaired || repaired.summary.removed) {
-      await database.batch([
+    const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
+    const repaired = repairInventoryBalanceMetadata({
+      assortment: consolidated.assortment,
+      stockMovements: consolidated.stockMovements,
+      now,
+    });
+    if (repaired.summary.repaired || repaired.summary.removed || consolidated.summary.changed) {
+      const statements = [
         upsertStore(database, account.id, repaired.assortment, now),
         auditUpdate(database, {
           accountId: account.id,
@@ -179,16 +197,29 @@ export async function POST(request: Request): Promise<Response> {
           after: repaired.assortment,
           actorName,
           actorRole: account.role,
-          reason: "Восстановление названий складских позиций из техкарт",
+          reason: consolidated.summary.changed
+            ? "Объединение дублей склада и восстановление карточек без потери движений"
+            : "Восстановление названий складских позиций из техкарт",
           createdAt: now,
         }),
-      ]);
+      ];
+      if (consolidated.summary.changed) {
+        statements.push(upsertStore(
+          database,
+          account.id,
+          STOCK_MOVEMENT_STORE_KEY,
+          consolidated.stockMovements,
+          now,
+        ));
+      }
+      await database.batch(statements);
     }
     return Response.json({
       ok: true,
       assortment: repaired.assortment,
       repaired: repaired.summary.repaired,
       removed: repaired.summary.removed,
+      duplicateRepair: consolidated.summary,
     });
   }
 
@@ -215,7 +246,7 @@ export async function POST(request: Request): Promise<Response> {
     const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
     const productKey = inventoryProductKey({ name, unit, packageSize });
     const duplicate = [...balances, ...nomenclature].find((value) =>
-      text(value.productKey ?? value.key, "", 300) === productKey
+      inventoryProductKey(value) === productKey
     );
     if (duplicate) {
       return Response.json(

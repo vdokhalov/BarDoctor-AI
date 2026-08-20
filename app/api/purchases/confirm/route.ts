@@ -16,6 +16,7 @@ import {
 import {
   applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
+  consolidateInventoryDuplicates,
   inventoryProductKey,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
@@ -200,8 +201,8 @@ export async function POST(request: Request): Promise<Response> {
   let documents = array(stores.get(PURCHASE_STORE_KEY));
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
-  const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
+  let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const ledgerMigration = migratePurchaseLedger({
     documents,
     expenses,
@@ -210,6 +211,9 @@ export async function POST(request: Request): Promise<Response> {
   });
   documents = ledgerMigration.documents;
   expenses = ledgerMigration.expenses;
+  const inventoryRepair = consolidateInventoryDuplicates({ assortment, stockMovements, now });
+  assortment = inventoryRepair.assortment;
+  stockMovements = inventoryRepair.stockMovements;
 
   const duplicateById = documents.find((item) => {
     const value = record(item);
@@ -490,7 +494,7 @@ export async function POST(request: Request): Promise<Response> {
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, nextAssortment, now),
     );
   }
-  if (inventory && inventory.summary.postedLines > 0) {
+  if (inventory && (inventory.summary.postedLines > 0 || inventoryRepair.summary.changed)) {
     statements.push(
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextStockMovements, now),
       audit(database, {

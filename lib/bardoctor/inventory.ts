@@ -66,6 +66,15 @@ export type InventoryMetadataRepairSummary = {
   removed: number;
 };
 
+export type InventoryDuplicateConsolidationSummary = {
+  mergedBalances: number;
+  mergedNomenclature: number;
+  remappedMovements: number;
+  remappedRecipes: number;
+  skippedCurrencyConflicts: number;
+  changed: boolean;
+};
+
 export type InventoryProductUpdate = {
   productKey: string;
   name: string;
@@ -137,11 +146,52 @@ export function normalizeInventoryText(value: unknown): string {
     .trim();
 }
 
+function inventoryIdentityName(value: unknown): string {
+  const item = record(value);
+  return normalizeInventoryText(item.name ?? item.productName);
+}
+
+function generatedInventoryProductKey(value: unknown): string {
+  const item = record(value);
+  const name = inventoryIdentityName(item);
+  if (!name) return "";
+  const unitText = normalizeInventoryText(item.unit);
+  const packageText = normalizeInventoryText(item.packageSize);
+  const service = text(item.kind, "", 20) === "service"
+    || /(^| )усл(уга|уги|уг)?($| )/.test(unitText)
+    || /(^| )усл(уга|уги|уг)?($| )/.test(packageText);
+  if (service) return `service:${name}`;
+  const packageDetails = inventoryPackageAmount(item.packageSize, item.unit);
+  const unit = packageDetails.unit !== "unknown" ? packageDetails.unit : baseUnit(item.unit);
+  return unit === "unknown" ? "" : `stock:${name}|${unit}`;
+}
+
+function legacyGeneratedInventoryProductKey(value: unknown): string {
+  const item = record(value);
+  return `${inventoryIdentityName(item)}|${normalizeInventoryText(item.packageSize ?? item.unit)}`;
+}
+
 export function inventoryProductKey(value: unknown): string {
   const item = record(value);
   const requested = text(item.purchaseProductKey ?? item.productKey, "", 300);
-  if (requested) return requested;
-  return `${normalizeInventoryText(item.name)}|${normalizeInventoryText(item.packageSize ?? item.unit)}`;
+  const generated = generatedInventoryProductKey(item);
+  if (requested) {
+    const name = inventoryIdentityName(item);
+    const normalizedRequested = normalizeInventoryText(requested);
+    const legacyGenerated = Boolean(
+      name
+      && requested.includes("|")
+      && normalizedRequested.startsWith(`${name} `),
+    );
+    if (generated && (
+      requested.startsWith("stock:")
+      || requested.startsWith("service:")
+      || legacyGenerated
+    )) return generated;
+    return requested;
+  }
+  if (generated) return generated;
+  return legacyGeneratedInventoryProductKey(item);
 }
 
 export function toInventoryBaseAmount(quantity: unknown, unit: unknown): {
@@ -193,6 +243,248 @@ export function purchaseLineBaseAmount(value: unknown): {
   return {
     amount: rounded(quantity * packageAmount.amount),
     unit: packageAmount.unit,
+  };
+}
+
+function packageOptionLabels(value: unknown): string[] {
+  const item = record(value);
+  const candidates = [
+    ...(Array.isArray(item.packageOptions) ? item.packageOptions : []),
+    item.packageSize,
+  ];
+  const byFingerprint = new Map<string, string>();
+  for (const candidate of candidates) {
+    const label = typeof candidate === "string"
+      ? text(candidate, "", 120)
+      : text(record(candidate).label ?? record(candidate).packageSize, "", 120);
+    if (!label || normalizeInventoryText(label) === "несколько фасовок") continue;
+    const parsed = inventoryPackageAmount(label, item.unit);
+    const fingerprint = parsed.amount > 0 && parsed.unit !== "unknown"
+      ? `${parsed.unit}:${rounded(parsed.amount)}`
+      : normalizeInventoryText(label);
+    if (fingerprint && !byFingerprint.has(fingerprint)) byFingerprint.set(fingerprint, label);
+  }
+  return [...byFingerprint.values()];
+}
+
+function latestRecord(values: JsonRecord[]): JsonRecord {
+  return [...values].sort((left, right) =>
+    text(right.updatedAt ?? right.checkedAt ?? right.lastPurchaseAt, "", 40)
+      .localeCompare(text(left.updatedAt ?? left.checkedAt ?? left.lastPurchaseAt, "", 40))
+  )[0] ?? {};
+}
+
+function classificationRecord(values: JsonRecord[]): JsonRecord | undefined {
+  return values.find((value) => text(value.classificationStatus, "", 20) === "confirmed")
+    ?? values.find((value) => text(value.classificationStatus, "", 20) === "auto");
+}
+
+function valueOfBalance(value: JsonRecord): number {
+  if (value.inventoryValue != null && Number.isFinite(number(value.inventoryValue, Number.NaN))) {
+    return number(value.inventoryValue);
+  }
+  return number(value.current) * Math.max(0, number(value.averageUnitCost));
+}
+
+function remappedProductKey(value: unknown, aliases: Map<string, string>): string {
+  const item = record(value);
+  const requested = text(item.purchaseProductKey ?? item.productKey ?? item.key, "", 300);
+  return aliases.get(requested) ?? inventoryProductKey(item) ?? requested;
+}
+
+/**
+ * Collapses legacy package-specific identities into one stock item per exact
+ * normalized name and base unit. Quantities and values are added, average cost
+ * is recalculated, and every movement/recipe reference is remapped together.
+ * External connector identities and incompatible base units remain untouched.
+ */
+export function consolidateInventoryDuplicates(input: {
+  assortment: unknown;
+  stockMovements?: unknown[];
+  now?: string;
+}): {
+  assortment: JsonRecord;
+  stockMovements: JsonRecord[];
+  aliases: Record<string, string>;
+  summary: InventoryDuplicateConsolidationSummary;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const parts = assortmentParts(input.assortment);
+  const aliases = new Map<string, string>();
+  const blockedCanonicalKeys = new Set<string>();
+  const balanceGroups = new Map<string, JsonRecord[]>();
+  for (const balance of parts.balances) {
+    const originalKey = text(balance.productKey ?? balance.key, "", 300);
+    const canonicalKey = inventoryProductKey(balance) || originalKey;
+    const groupKey = canonicalKey || originalKey;
+    const values = balanceGroups.get(groupKey) ?? [];
+    values.push(balance);
+    balanceGroups.set(groupKey, values);
+  }
+
+  let mergedBalances = 0;
+  let skippedCurrencyConflicts = 0;
+  const balances: JsonRecord[] = [];
+  for (const [canonicalKey, values] of balanceGroups) {
+    const currencies = new Set(values.map((value) => text(value.currency, "", 12).toUpperCase()).filter(Boolean));
+    if (values.length > 1 && currencies.size > 1) {
+      skippedCurrencyConflicts += values.length - 1;
+      blockedCanonicalKeys.add(canonicalKey);
+      for (const value of values) {
+        const originalKey = text(value.productKey ?? value.key, "", 300);
+        if (originalKey) aliases.delete(originalKey);
+        balances.push(value);
+      }
+      continue;
+    }
+    for (const value of values) {
+      const originalKey = text(value.productKey ?? value.key, "", 300);
+      if (originalKey && canonicalKey && originalKey !== canonicalKey) aliases.set(originalKey, canonicalKey);
+    }
+    const latest = latestRecord(values);
+    const classification = classificationRecord(values);
+    const packageOptions = packageOptionLabels({
+      ...latest,
+      packageOptions: values.flatMap(packageOptionLabels),
+    });
+    const current = rounded(values.reduce((sum, value) => sum + number(value.current), 0));
+    const inventoryValue = rounded(values.reduce((sum, value) => sum + valueOfBalance(value), 0), 2);
+    const unit = baseUnit(latest.unit) !== "unknown"
+      ? baseUnit(latest.unit)
+      : inventoryPackageAmount(latest.packageSize, latest.unit).unit;
+    const singlePackage = packageOptions.length === 1
+      ? inventoryPackageAmount(packageOptions[0], unit)
+      : { amount: 0, unit };
+    const merged: JsonRecord = {
+      ...latest,
+      ...(classification ?? {}),
+      id: canonicalKey,
+      key: canonicalKey,
+      productKey: canonicalKey,
+      unit,
+      current,
+      onOrder: rounded(values.reduce((sum, value) => sum + Math.max(0, number(value.onOrder)), 0)),
+      safety: Math.max(0, ...values.map((value) => number(value.safety))),
+      inventoryValue,
+      averageUnitCost: current > 0 ? rounded(inventoryValue / current, 6) : 0,
+      packageOptions,
+      packageSize: packageOptions.length > 1 ? "Несколько фасовок" : packageOptions[0] ?? text(latest.packageSize),
+      packageAmount: packageOptions.length > 1 ? 0 : singlePackage.amount,
+      multiplePackageSizes: packageOptions.length > 1 || undefined,
+      mergedFromProductKeys: [...new Set(values.flatMap((value) => [
+        ...array(value.mergedFromProductKeys).map((key) => text(key, "", 300)),
+        text(value.productKey ?? value.key, "", 300),
+      ]).filter(Boolean))],
+      updatedAt: values.length > 1 ? now : text(latest.updatedAt, now, 40),
+    };
+    balances.push(merged);
+    if (values.length > 1) mergedBalances += values.length - 1;
+  }
+
+  const balanceByKey = new Map(balances.map((balance) => [text(balance.productKey ?? balance.key, "", 300), balance]));
+  const nomenclatureGroups = new Map<string, JsonRecord[]>();
+  for (const raw of array(parts.root.nomenclature)) {
+    const item = cloneRecord(raw);
+    const originalKey = text(item.productKey ?? item.key, "", 300);
+    const candidateKey = remappedProductKey(item, aliases) || originalKey;
+    const canonicalKey = blockedCanonicalKeys.has(candidateKey) && !aliases.has(originalKey)
+      ? originalKey
+      : candidateKey;
+    if (originalKey && canonicalKey && originalKey !== canonicalKey) aliases.set(originalKey, canonicalKey);
+    const values = nomenclatureGroups.get(canonicalKey) ?? [];
+    values.push(item);
+    nomenclatureGroups.set(canonicalKey, values);
+  }
+  for (const [key, balance] of balanceByKey) {
+    if (!nomenclatureGroups.has(key)) nomenclatureGroups.set(key, [{ ...balance, kind: "stock" }]);
+  }
+
+  let mergedNomenclature = 0;
+  const nomenclature: JsonRecord[] = [];
+  for (const [canonicalKey, values] of nomenclatureGroups) {
+    const latest = latestRecord(values);
+    const classification = classificationRecord(values);
+    const balance = balanceByKey.get(canonicalKey);
+    const packageOptions = packageOptionLabels({
+      ...latest,
+      packageOptions: values.flatMap(packageOptionLabels),
+    });
+    nomenclature.push({
+      ...latest,
+      ...(classification ?? {}),
+      ...(balance ?? {}),
+      id: canonicalKey,
+      key: canonicalKey,
+      productKey: canonicalKey,
+      packageOptions: balance?.packageOptions ?? packageOptions,
+      updatedAt: values.length > 1 ? now : text(latest.updatedAt, now, 40),
+    });
+    if (values.length > 1) mergedNomenclature += values.length - 1;
+  }
+
+  let remappedRecipes = 0;
+  for (const recipe of parts.recipes) {
+    recipe.ingredients = array(recipe.ingredients).map((value) => {
+      const ingredient = cloneRecord(value);
+      const previous = text(ingredient.purchaseProductKey, "", 300);
+      if (!previous) return ingredient;
+      const candidate = remappedProductKey(ingredient, aliases);
+      const next = blockedCanonicalKeys.has(candidate) && !aliases.has(previous)
+        ? previous
+        : candidate;
+      if (next && next !== previous) {
+        ingredient.purchaseProductKey = next;
+        ingredient.updatedAt = now;
+        remappedRecipes += 1;
+      }
+      return ingredient;
+    });
+  }
+
+  let remappedMovements = 0;
+  const stockMovements = array(input.stockMovements).map((value) => {
+    const movement = cloneRecord(value);
+    const previous = text(movement.productKey, "", 300);
+    const candidate = remappedProductKey({ ...movement, name: movement.productName }, aliases);
+    const next = blockedCanonicalKeys.has(candidate) && !aliases.has(previous)
+      ? previous
+      : candidate;
+    if (previous && next && previous !== next) {
+      movement.productKey = next;
+      movement.updatedAt = now;
+      remappedMovements += 1;
+    }
+    return movement;
+  });
+
+  const existingAliases = array(parts.root.inventoryProductAliases).map(cloneRecord);
+  const aliasRecords = [...aliases.entries()]
+    .filter(([from, to]) => from && to && from !== to)
+    .map(([from, to]) => ({ from, to, reason: "package-identity-v214", updatedAt: now }));
+  const aliasesByFrom = new Map(existingAliases.map((value) => [text(value.from, "", 300), value]));
+  for (const value of aliasRecords) aliasesByFrom.set(String(value.from), value);
+  parts.root.stockBalances = balances;
+  parts.root.nomenclature = nomenclature;
+  parts.root.recipes = parts.recipes;
+  parts.root.inventoryProductAliases = [...aliasesByFrom.values()].slice(0, 5_000);
+  const changed = mergedBalances > 0
+    || mergedNomenclature > 0
+    || remappedMovements > 0
+    || remappedRecipes > 0
+    || aliasRecords.length > 0;
+  if (changed) parts.root.updatedAt = now;
+  return {
+    assortment: parts.root,
+    stockMovements,
+    aliases: Object.fromEntries(aliases),
+    summary: {
+      mergedBalances,
+      mergedNomenclature,
+      remappedMovements,
+      remappedRecipes,
+      skippedCurrencyConflicts,
+      changed,
+    },
   };
 }
 
@@ -511,6 +803,22 @@ export function applyPurchaseToInventory(input: {
     const productKey = inventoryProductKey(item);
     const category = text(item.category, "products", 80);
     const previousNomenclature = nomenclatureByKey.get(productKey);
+    const previousBalance = indexedBalances.get(productKey)
+      ?? indexedBalances.get(legacyGeneratedInventoryProductKey(item));
+    const previous = previousBalance ?? {};
+    const incomingPackageSize = text(item.packageSize ?? item.unit, "", 120);
+    const packageOptions = packageOptionLabels({
+      unit: received.unit,
+      packageOptions: [
+        ...packageOptionLabels(previousNomenclature),
+        ...packageOptionLabels(previous),
+        incomingPackageSize,
+      ],
+    });
+    const hasMultiplePackageSizes = packageOptions.length > 1;
+    const displayedPackageSize = hasMultiplePackageSizes
+      ? "Несколько фасовок"
+      : packageOptions[0] ?? incomingPackageSize;
     const automaticClassification = previousNomenclature?.sectionId
       ? {}
       : classifyNomenclatureItemWithRules(
@@ -527,7 +835,9 @@ export function applyPurchaseToInventory(input: {
       category,
       kind: PURCHASE_STOCK_CATEGORIES.has(category) ? "stock" : "service",
       unit: received.unit,
-      packageSize: text(item.packageSize ?? item.unit, "", 120),
+      packageSize: displayedPackageSize,
+      packageOptions,
+      multiplePackageSizes: hasMultiplePackageSizes || undefined,
       active: true,
       source: "purchase",
       lastPurchaseAt: date,
@@ -552,7 +862,6 @@ export function applyPurchaseToInventory(input: {
       return;
     }
 
-    const previous = indexedBalances.get(productKey) ?? {};
     const previousCurrent = number(previous.current);
     const previousAverageCost = Math.max(0, number(previous.averageUnitCost));
     const previousCurrency = text(previous.currency, currency, 12).toUpperCase();
@@ -579,11 +888,13 @@ export function applyPurchaseToInventory(input: {
       productKey,
       name,
       category: text(item.category, text(previous.category, "other", 80), 80),
-      packageSize: text(item.packageSize ?? item.unit, "", 120),
+      packageSize: displayedPackageSize,
+      packageOptions,
+      multiplePackageSizes: hasMultiplePackageSizes || undefined,
       unit: received.unit,
       current: nextCurrent,
       onOrder: Math.max(0, rounded(number(previous.onOrder) - received.amount)),
-      packageAmount: packageDetails.amount,
+      packageAmount: hasMultiplePackageSizes ? 0 : packageDetails.amount,
       averageUnitCost: nextAverageCost,
       inventoryValue: rounded(Math.max(0, nextCurrent) * nextAverageCost, 2),
       currency: previousCurrency || currency,
@@ -595,8 +906,8 @@ export function applyPurchaseToInventory(input: {
       updatedAt: now,
       costNeedsReview: currencyConflict || undefined,
     };
-    if (!indexedBalances.has(productKey)) parts.balances.push(next);
-    else Object.assign(previous, next);
+    if (!previousBalance) parts.balances.push(next);
+    else Object.assign(previousBalance, next);
     indexedBalances.set(productKey, next);
 
     const alias = normalizeInventoryText(name);
@@ -661,7 +972,12 @@ function movementRecord(value: unknown): StockMovement | null {
   }
   const id = text(item.id, "", 100);
   const sourceDocumentId = text(item.sourceDocumentId, "", 100);
-  const productKey = text(item.productKey, "", 300);
+  const requestedProductKey = text(item.productKey, "", 300);
+  const productKey = inventoryProductKey({
+    ...item,
+    productKey: requestedProductKey,
+    name: item.productName,
+  }) || requestedProductKey;
   if (!id || !sourceDocumentId || !productKey) return null;
   const requestedType = text(item.type, "receipt", 40);
   const type: StockMovement["type"] = [
