@@ -1,3 +1,6 @@
+import { classifyNomenclatureItemWithRules, defaultNomenclatureStructure } from "./nomenclature";
+import { PURCHASE_STOCK_CATEGORIES } from "./purchases";
+
 export const ASSORTMENT_STORE_KEY = "bd_assortment_v1";
 export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
 export const SALES_DOCUMENT_STORE_KEY = "bd_sales_documents";
@@ -423,8 +426,33 @@ export function updateInventoryProductDefinition(input: {
     2,
   );
   balance.updatedAt = now;
+  const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
+  const nomenclatureItem = nomenclature.find((value) =>
+    text(value.key ?? value.productKey, "", 300) === productKey
+  );
+  if (nomenclatureItem) {
+    Object.assign(nomenclatureItem, {
+      name,
+      unit: requestedUnit,
+      packageSize,
+      packageAmount: rounded(parsedPackage.amount),
+      updatedAt: now,
+    });
+  } else {
+    nomenclature.unshift({
+      ...cloneRecord(balance),
+      id: productKey,
+      key: productKey,
+      productKey,
+      kind: "stock",
+      source: "manual",
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
   parts.root.stockBalances = parts.balances;
   parts.root.recipes = parts.recipes;
+  parts.root.nomenclature = nomenclature;
   parts.root.updatedAt = now;
   return {
     ok: true,
@@ -462,11 +490,18 @@ export function applyPurchaseToInventory(input: {
   const date = text(document.date, now.slice(0, 10), 10);
   const currency = text(document.currency, "", 12).toUpperCase();
   const parts = assortmentParts(input.assortment);
+  if (!record(parts.root.nomenclatureStructure).version) {
+    parts.root.nomenclatureStructure = defaultNomenclatureStructure();
+  }
   const indexedBalances = balanceIndex(parts.balances);
   const movements: StockMovement[] = [];
   const unresolvedLines: InventoryUpdateSummary["unresolvedLines"] = [];
   const candidates = new Map<string, Set<string>>();
   let currencyConflicts = 0;
+  const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
+  const nomenclatureByKey = new Map(
+    nomenclature.map((item) => [text(item.key ?? item.productKey, "", 300), item]),
+  );
 
   array(document.items).forEach((value, index) => {
     const item = record(value);
@@ -474,6 +509,40 @@ export function applyPurchaseToInventory(input: {
     const name = text(item.name, `Позиция ${index + 1}`);
     const received = purchaseLineBaseAmount(item);
     const productKey = inventoryProductKey(item);
+    const category = text(item.category, "products", 80);
+    const previousNomenclature = nomenclatureByKey.get(productKey);
+    const automaticClassification = previousNomenclature?.sectionId
+      ? {}
+      : classifyNomenclatureItemWithRules(
+        { name, category, kind: PURCHASE_STOCK_CATEGORIES.has(category) ? "stock" : "service" },
+        parts.root.nomenclatureRules,
+      );
+    const nomenclatureItem: JsonRecord = {
+      ...(previousNomenclature ?? {}),
+      ...automaticClassification,
+      id: text(previousNomenclature?.id, productKey, 300),
+      key: productKey,
+      productKey,
+      name,
+      category,
+      kind: PURCHASE_STOCK_CATEGORIES.has(category) ? "stock" : "service",
+      unit: received.unit,
+      packageSize: text(item.packageSize ?? item.unit, "", 120),
+      active: true,
+      source: "purchase",
+      lastPurchaseAt: date,
+      updatedAt: now,
+      classifiedAt: previousNomenclature?.classifiedAt ?? now,
+      createdAt: text(previousNomenclature?.createdAt, now, 40),
+    };
+    if (nomenclatureByKey.has(productKey)) {
+      Object.assign(nomenclatureByKey.get(productKey)!, nomenclatureItem);
+    } else {
+      nomenclature.unshift(nomenclatureItem);
+      nomenclatureByKey.set(productKey, nomenclatureItem);
+    }
+
+    if (!PURCHASE_STOCK_CATEGORIES.has(category)) return;
     if (!productKey || received.amount <= 0 || received.unit === "unknown") {
       unresolvedLines.push({
         id: itemId,
@@ -570,6 +639,7 @@ export function applyPurchaseToInventory(input: {
 
   parts.root.stockBalances = parts.balances;
   parts.root.recipes = parts.recipes;
+  parts.root.nomenclature = nomenclature;
   parts.root.updatedAt = now;
   return {
     assortment: parts.root,
@@ -763,7 +833,9 @@ function purchaseMaterialFromDocument(value: unknown): Array<{
   unit: BaseInventoryUnit;
   costAmount: number;
 }> {
-  return array(record(value).items).map((line) => {
+  return array(record(value).items).filter((line) =>
+    PURCHASE_STOCK_CATEGORIES.has(text(record(line).category, "products", 80))
+  ).map((line) => {
     const item = record(line);
     const base = purchaseLineBaseAmount(item);
     return {

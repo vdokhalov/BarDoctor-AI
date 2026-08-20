@@ -31,7 +31,7 @@ test("payroll v164 is one shared data-driven module with two entry contexts", as
     assert.match(document, /payroll-dashboard-v164\.css\?v=20260812-payroll-v164/);
     assert.match(document, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
   }
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
   assert.match(css, /\.bd-payroll-summary-grid-v164/);
   assert.match(css, /grid-template-columns:\s*repeat\(4,/);
   assert.match(css, /\.bd-payroll-employee-row-v164/);

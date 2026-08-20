@@ -4,10 +4,19 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import {
   ASSORTMENT_STORE_KEY,
   BaseInventoryUnit,
+  inventoryPackageAmount,
+  inventoryProductKey,
   repairInventoryBalanceMetadata,
   STOCK_MOVEMENT_STORE_KEY,
   updateInventoryProductDefinition,
 } from "../../../../lib/bardoctor/inventory";
+import {
+  classifyNomenclatureItem,
+  defaultNomenclatureStructure,
+  ensureNomenclatureHierarchy,
+  manualClassification,
+  rememberNomenclatureCorrection,
+} from "../../../../lib/bardoctor/nomenclature";
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -112,7 +121,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Некорректные данные товара" }, { status: 400 });
   }
   const action = text(body.action, "repair", 20);
-  if (!new Set(["repair", "update"]).has(action)) {
+  if (!new Set(["repair", "classify", "create", "update"]).has(action)) {
     return Response.json({ ok: false, error: "Неизвестное действие" }, { status: 400 });
   }
 
@@ -127,6 +136,35 @@ export async function POST(request: Request): Promise<Response> {
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
+
+  if (action === "classify") {
+    const result = ensureNomenclatureHierarchy(assortment, now);
+    await database.batch([
+      upsertStore(database, account.id, result.assortment, now),
+      auditUpdate(database, {
+        accountId: account.id,
+        entityId: "nomenclature-hierarchy-v209",
+        entityLabel: "Структура номенклатуры",
+        before: {
+          structureVersion: text(record(record(assortment).nomenclatureStructure).version, "legacy", 20),
+          itemCount: Array.isArray(record(assortment).nomenclature)
+            ? (record(assortment).nomenclature as unknown[]).length
+            : 0,
+        },
+        after: {
+          structureVersion: "v209",
+          classified: result.classified,
+          suggested: result.suggested,
+          unassigned: result.unassigned,
+        },
+        actorName,
+        actorRole: account.role,
+        reason: "Автоматическое распределение номенклатуры по разделам",
+        createdAt: now,
+      }),
+    ]);
+    return Response.json({ ok: true, ...result });
+  }
 
   if (action === "repair") {
     const repaired = repairInventoryBalanceMetadata({ assortment, stockMovements, now });
@@ -154,18 +192,158 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
+  if (action === "create") {
+    const name = text(body.name, "", 240);
+    const kind = text(body.kind, "stock", 20) === "service" ? "service" : "stock";
+    const unit = text(body.unit, kind === "service" ? "service" : "pcs", 20) as BaseInventoryUnit;
+    const packageSize = text(
+      body.packageSize,
+      kind === "service" ? "1 усл." : unit === "ml" ? "1 л" : unit === "g" ? "1 кг" : "1 шт.",
+      120,
+    );
+    if (!name || (kind === "stock" && !["ml", "g", "pcs"].includes(unit))) {
+      return Response.json(
+        { ok: false, error: "Укажите название и единицу учёта" },
+        { status: 422 },
+      );
+    }
+    const root = record(assortment);
+    if (!record(root.nomenclatureStructure).version) {
+      root.nomenclatureStructure = defaultNomenclatureStructure();
+    }
+    const balances = Array.isArray(root.stockBalances) ? root.stockBalances.map(record) : [];
+    const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
+    const productKey = inventoryProductKey({ name, unit, packageSize });
+    const duplicate = [...balances, ...nomenclature].find((value) =>
+      text(value.productKey ?? value.key, "", 300) === productKey
+    );
+    if (duplicate) {
+      return Response.json(
+        { ok: false, code: "PRODUCT_EXISTS", error: "Такая позиция уже есть в номенклатуре" },
+        { status: 409 },
+      );
+    }
+    const packageDetails = kind === "stock"
+      ? inventoryPackageAmount(packageSize, unit)
+      : { amount: 1, unit: "unknown" as BaseInventoryUnit };
+    if (kind === "stock" && (packageDetails.amount <= 0 || packageDetails.unit !== unit)) {
+      return Response.json(
+        { ok: false, error: "Укажите корректную фасовку для выбранной единицы" },
+        { status: 422 },
+      );
+    }
+    const manual = manualClassification(body);
+    const classification = Object.keys(manual).length
+      ? manual
+      : classifyNomenclatureItem({ name, category: body.category, kind });
+    const product: JsonRecord = {
+      id: productKey,
+      key: productKey,
+      productKey,
+      name,
+      category: text(body.category, kind === "service" ? "other" : "products", 80),
+      kind,
+      unit,
+      packageSize,
+      packageAmount: packageDetails.amount,
+      current: 0,
+      onOrder: 0,
+      averageUnitCost: 0,
+      inventoryValue: 0,
+      active: true,
+      metadataSource: "manual",
+      ...classification,
+      classifiedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    root.stockBalances = kind === "stock" ? [product, ...balances] : balances;
+    root.nomenclature = [{ ...product, source: "manual" }, ...nomenclature];
+    if (Object.keys(manual).length) {
+      root.nomenclatureRules = rememberNomenclatureCorrection(root.nomenclatureRules, product, manual, now);
+    }
+    root.updatedAt = now;
+    await database.batch([
+      upsertStore(database, account.id, root, now),
+      auditUpdate(database, {
+        accountId: account.id,
+        entityId: productKey,
+        entityLabel: name,
+        before: null,
+        after: product,
+        actorName,
+        actorRole: account.role,
+        reason: "Ручное добавление позиции в номенклатуру",
+        createdAt: now,
+      }),
+    ]);
+    return Response.json({ ok: true, assortment: root, product, created: true });
+  }
+
   const productKey = text(body.productKey, "", 300);
   const previousRoot = record(assortment);
-  const previousProduct = (Array.isArray(previousRoot.stockBalances) ? previousRoot.stockBalances : [])
+  const previousNomenclature = (Array.isArray(previousRoot.nomenclature) ? previousRoot.nomenclature : [])
     .map(record)
     .find((value) => text(value.productKey ?? value.key, "", 300) === productKey) ?? null;
+  const previousProduct = previousNomenclature ?? (Array.isArray(previousRoot.stockBalances) ? previousRoot.stockBalances : [])
+    .map(record)
+    .find((value) => text(value.productKey ?? value.key, "", 300) === productKey) ?? null;
+  const requestedName = text(body.name, "", 240);
+  const requestedCategory = text(body.category, text(previousProduct?.category, "products", 80), 80);
+  const requestedClassification = manualClassification(body);
+  const requestedActive = body.active !== false;
+  const previousKind = text(previousProduct?.kind, "stock", 20) === "service" ? "service" : "stock";
+  if (previousKind === "service") {
+    if (!previousProduct || !requestedName) {
+      return Response.json({ ok: false, error: "Укажите название услуги" }, { status: 422 });
+    }
+    const root = record(assortment);
+    const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
+    const item = nomenclature.find((value) => text(value.productKey ?? value.key, "", 300) === productKey);
+    if (!item) {
+      return Response.json({ ok: false, code: "PRODUCT_NOT_FOUND", error: "Позиция номенклатуры не найдена" }, { status: 404 });
+    }
+    Object.assign(item, {
+      name: requestedName,
+      category: requestedCategory,
+      active: requestedActive,
+      packageSize: text(body.packageSize, text(item.packageSize, "1 усл.", 120), 120),
+      updatedAt: now,
+      ...requestedClassification,
+    });
+    root.nomenclature = nomenclature;
+    if (Object.keys(requestedClassification).length) {
+      root.nomenclatureRules = rememberNomenclatureCorrection(
+        root.nomenclatureRules,
+        { name: requestedName },
+        requestedClassification,
+        now,
+      );
+    }
+    root.updatedAt = now;
+    await database.batch([
+      upsertStore(database, account.id, root, now),
+      auditUpdate(database, {
+        accountId: account.id,
+        entityId: productKey,
+        entityLabel: requestedName,
+        before: previousProduct,
+        after: item,
+        actorName,
+        actorRole: account.role,
+        reason: "Изменение услуги в номенклатуре",
+        createdAt: now,
+      }),
+    ]);
+    return Response.json({ ok: true, assortment: root, product: item, linkedRecipes: 0 });
+  }
   const requestedUnit = text(body.unit, "", 20) as BaseInventoryUnit;
   const updated = updateInventoryProductDefinition({
     assortment,
     stockMovements,
     update: {
       productKey,
-      name: text(body.name, "", 240),
+      name: requestedName,
       unit: requestedUnit,
       packageSize: text(body.packageSize, "", 120),
     },
@@ -179,14 +357,39 @@ export async function POST(request: Request): Promise<Response> {
         : 422;
     return Response.json(updated, { status });
   }
+  const updatedRoot = record(updated.assortment);
+  const updatedNomenclature = Array.isArray(updatedRoot.nomenclature)
+    ? updatedRoot.nomenclature.map(record)
+    : [];
+  const updatedItem = updatedNomenclature.find((value) =>
+    text(value.productKey ?? value.key, "", 300) === productKey
+  );
+  if (updatedItem) Object.assign(updatedItem, { category: requestedCategory, active: requestedActive, ...requestedClassification });
+  const updatedBalances = Array.isArray(updatedRoot.stockBalances)
+    ? updatedRoot.stockBalances.map(record)
+    : [];
+  const updatedBalance = updatedBalances.find((value) =>
+    text(value.productKey ?? value.key, "", 300) === productKey
+  );
+  if (updatedBalance) Object.assign(updatedBalance, { category: requestedCategory, active: requestedActive, ...requestedClassification });
+  updatedRoot.nomenclature = updatedNomenclature;
+  updatedRoot.stockBalances = updatedBalances;
+  if (Object.keys(requestedClassification).length) {
+    updatedRoot.nomenclatureRules = rememberNomenclatureCorrection(
+      updatedRoot.nomenclatureRules,
+      { name: requestedName },
+      requestedClassification,
+      now,
+    );
+  }
   await database.batch([
-    upsertStore(database, account.id, updated.assortment, now),
+    upsertStore(database, account.id, updatedRoot, now),
     auditUpdate(database, {
       accountId: account.id,
       entityId: productKey,
       entityLabel: text(updated.product.name, "Складская позиция", 240),
       before: previousProduct,
-      after: updated.product,
+      after: updatedItem ?? updated.product,
       actorName,
       actorRole: account.role,
       reason: "Изменение карточки складского товара",
@@ -195,8 +398,8 @@ export async function POST(request: Request): Promise<Response> {
   ]);
   return Response.json({
     ok: true,
-    assortment: updated.assortment,
-    product: updated.product,
+    assortment: updatedRoot,
+    product: updatedItem ?? updated.product,
     linkedRecipes: updated.linkedRecipes,
   });
 }

@@ -801,7 +801,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /navigation\.css\?v=20260811-navigation-v85/);
   assert.match(worker, /employee-detail\.css\?v=20260817-employee-edit-page-v206/);
   assert.match(worker, /employee-list\.css\?v=20260817-employee-edit-page-v206/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
   assert.match(bootstrap, /function installProtectedOriginalLinks\(\)/);
   assert.match(bootstrap, /window\.open\("about:blank", "_blank"\)/);
   assert.match(bootstrap, /fetch\(targetUrl\.pathname \+ targetUrl\.search/);
@@ -1044,7 +1044,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(marketCss, /\.competitor-delete-button/);
   assert.match(marketCss, /repeat\(6,minmax\(0,1fr\)\)/);
   assert.match(worker, /Закрыть смену/);
-  assert.match(worker, /Добавить расход/);
+  assert.match(worker, /Добавить покупку/);
   assert.match(worker, /Сообщить о происшествии/);
   assert.match(worker, /Создать поручение/);
   assert.match(marketCss, /@media\(max-width:390px\)/);
@@ -1387,7 +1387,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.doesNotMatch(mainBundle, /"aria-label":"Назад к диагностике"/);
   assert.match(worker, /frame-ancestors 'self'/);
   assert.match(worker, /X-Frame-Options[\s\S]*SAMEORIGIN/);
-  assert.match(mainBundle, /description:"Записать накопительный расход",href:"\/finance\?addExpense=1"/);
+  assert.match(mainBundle, /name:"Добавить покупку",description:"Товары, услуги или другие затраты",href:"\/suppliers\?create=1"/);
   assert.match(mainBundle, /description:"Внести выручку и состав команды",href:"\/shifts\?closeShift=1"/);
   assert.match(mainBundle, /data-bd-shifts-page":"v158/);
   assert.match(mainBundle, /path:"\/shifts"/);
@@ -1532,7 +1532,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /Расходы за период/);
   assert.match(mainBundle, /function bdPeriodExpenseBreakdown/);
   assert.match(mainBundle, /function bdExpenseArea/);
-  assert.match(mainBundle, /e\.category==="hookah"\?"Кальяны"/);
+  assert.match(mainBundle, /function bdExpenseArea\(e\).*repairs:"Ремонт"/);
   assert.match(mainBundle, /rent:"Аренда",repairs:"Ремонт",equipment:"Оборудование"/);
   assert.match(mainBundle, /household:"Хоз\.товары"/);
   assert.match(mainBundle, /hookah:"Кальяны"/);
@@ -2309,7 +2309,7 @@ test("monthly report uses monetary inventory totals without double-counting writ
       ["Кальяны", 1_000],
       ["Ремонт", 1_000],
       ["Хоз.товары", 500],
-      ["Не распределено", 250],
+      ["Продукты", 250],
     ],
   );
   assert.equal(report.writeoffs, 500);

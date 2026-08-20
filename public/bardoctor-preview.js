@@ -1339,7 +1339,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260815-seamless-startup-v202";
+    script.src = "/assets/index-BQGspy0I.js?v=20260820-nomenclature-v211";
     document.head.appendChild(script);
   }
 

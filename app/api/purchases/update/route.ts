@@ -4,6 +4,7 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import {
   EXPENSE_STORE_KEY,
+  hasMeaningfulPurchaseItems,
   isPurchasePayment,
   migratePurchaseLedger,
   normalizePurchaseDocument,
@@ -14,6 +15,7 @@ import {
   withPurchasePaymentSummary,
 } from "../../../../lib/bardoctor/purchases";
 import {
+  applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
   inventoryProductKey,
   revisePurchaseInInventory,
@@ -138,6 +140,12 @@ export async function POST(request: Request): Promise<Response> {
   const document = normalizePurchaseDocument(body.document, "");
   if (!document.id) {
     return Response.json({ ok: false, error: "Не найден идентификатор накладной" }, { status: 422 });
+  }
+  if (document.documentType !== "price_list" && !hasMeaningfulPurchaseItems(body.document)) {
+    return Response.json(
+      { ok: false, error: "Заполните название, количество и стоимость каждой позиции" },
+      { status: 422 },
+    );
   }
   if (!document.items.length && document.documentType !== "price_list") {
     return Response.json({ ok: false, error: "Добавьте хотя бы одну позицию" }, { status: 422 });
@@ -297,18 +305,19 @@ export async function POST(request: Request): Promise<Response> {
       },
     }
     : !previousAffectsInventory && !nextAffectsInventory
-    ? {
-      ok: true as const,
-      assortment,
-      movements: stockMovements,
-      summary: {
-        postedLines: 0,
-        movementCount: 0,
-        linkedIngredients: 0,
-        unresolvedLines: [],
-        currencyConflicts: 0,
-      },
-    }
+    ? (() => {
+      const nomenclatureOnly = applyPurchaseToInventory({
+        assortment,
+        document: updatedDocument,
+        now,
+      });
+      return {
+        ok: true as const,
+        assortment: nomenclatureOnly.assortment,
+        movements: stockMovements,
+        summary: nomenclatureOnly.summary,
+      };
+    })()
     : revisePurchaseInInventory({
       assortment,
       previousDocument: previousAffectsInventory

@@ -51,7 +51,7 @@ test("Finance dashboard exposes the three existing financial levels as one resul
 });
 
 test("Finance dashboard is compact, actionable, and keeps detailed records behind summaries", async () => {
-  const { finance, page, css } = await loadFinanceArtifacts();
+  const { bundle, finance, page, css } = await loadFinanceArtifacts();
 
   for (const label of [
     "Выручка",
@@ -87,6 +87,8 @@ test("Finance dashboard is compact, actionable, and keeps detailed records behin
   assert.match(css, /\.bd-finance-record-v160\.expense \.bd-finance-record-main\s*\{[^}]*min-height:\s*58px/s);
   assert.match(finance, /bd-finance-record-copy/);
   assert.match(finance, /\.filter\(Boolean\)\.join\(" · "\)/);
+  assert.match(bundle, /function bdExpenseArea\(e\).*repairs:"Ремонт"/);
+  assert.match(finance, /bdProcPluralV168\(bdLinkedDocument\.items\?\.length\|\|0,"позиция","позиции","позиций"\)/);
 });
 
 test("Finance Quick Add, venue switcher, sync status, and scroll control share a stable header", async () => {
@@ -97,7 +99,8 @@ test("Finance Quick Add, venue switcher, sync status, and scroll control share a
   assert.match(page, /"data-bd-sync-host":"finance-v161"/);
   assert.match(finance, /Быстрые финансовые действия/);
   assert.match(finance, /Закрыть смену \/ внести выручку/);
-  assert.match(finance, /Добавить расход/);
+  assert.match(finance, /Добавить покупку/);
+  assert.match(page, /navigate\("\/suppliers\?create=1&returnTo=finance"\)/);
   assert.match(page, /children:"Оплатить поставщику"/);
   assert.match(page, /navigate\("\/suppliers\?tab=purchases&payment=1&returnTo=finance"\)/);
   assert.doesNotMatch(bootstrap, /data-bd-purchase-payment-entry[^\n]*v186/);
@@ -121,7 +124,7 @@ test("Finance Quick Add, venue switcher, sync status, and scroll control share a
     assert.match(html, /finance-dashboard-v160\.css\?v=20260812-finance-v161/);
     assert.match(html, /venue-switcher\.js\?v=20260813-venue-v174/);
   }
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
 });
 
 test("Finance purchase deletion applies server state in Finance scope and hides reversed payments from active records", async () => {

@@ -75,5 +75,5 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
   assert.match(bundle, /new CustomEvent\("bd:startup-complete"/);
   assert.match(bundle, /initial:!1,animate:\{opacity:1,y:0,scale:1\},transition:\{duration:\.65/);
   assert.doesNotMatch(bundle, /initial:\{opacity:0,y:12,scale:\.97\},animate:\{opacity:1,y:0,scale:1\}/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
 });

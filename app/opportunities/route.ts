@@ -144,7 +144,7 @@ const OPPORTUNITIES_HTML = `<!doctype html>
       <div class="quick-heading"><div><h2 id="opportunity-quick-title">Добавить</h2><p>Выберите действие</p></div><button id="opportunity-quick-close" type="button" aria-label="Закрыть">×</button></div>
       <div class="quick-list">
         <button type="button" data-route="/shifts?closeShift=1"><span>▥</span><b>Закрыть смену<small>Внести выручку и состав команды</small></b><i>›</i></button>
-        <button type="button" data-route="/finance?addExpense=1"><span>₽</span><b>Добавить расход<small>Записать накопительный расход</small></b><i>›</i></button>
+        <button type="button" data-route="/suppliers?create=1&returnTo=opportunities"><span>₽</span><b>Добавить покупку<small>Чек, файл или ручной ввод</small></b><i>›</i></button>
         <button type="button" data-route="/add"><span>!</span><b>Сообщить о происшествии<small>Зафиксировать проблему или жалобу</small></b><i>›</i></button>
         <button type="button" data-route="/tasks?new=1"><span>✓</span><b>Создать поручение<small>Назначить задачу сотруднику</small></b><i>›</i></button>
       </div>

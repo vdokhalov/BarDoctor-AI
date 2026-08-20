@@ -214,6 +214,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
     <link rel="stylesheet" href="/suppliers.css?v=20260809-rc-v76" />
     <link rel="stylesheet" href="/warehouse.css?v=20260809-warehouse-v76" />
+    <link rel="stylesheet" href="/nomenclature-v208.css?v=20260820-nomenclature-v211" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44" />
     <link rel="stylesheet" href="/ai-action-plan.css?v=20260803-action-plan-v2" />

@@ -131,6 +131,48 @@ test("confirmed purchase increases stock, recalculates cost and links exact reci
   assert.equal(ingredient.purchaseProductKey, "coca cola|1 л");
 });
 
+test("mixed purchase adds every line to nomenclature but posts only goods to stock", () => {
+  const result = applyPurchaseToInventory({
+    assortment: { stockBalances: [], nomenclature: [], recipes: [], menuItems: [] },
+    document: {
+      id: "purchase-mixed-1",
+      date: "2026-08-20",
+      currency: "MDL",
+      items: [
+        {
+          id: "coffee",
+          name: "Кофе",
+          category: "food",
+          quantity: 2,
+          unit: "шт.",
+          packageSize: "1 кг",
+          unitPrice: 200,
+          lineTotal: 400,
+        },
+        {
+          id: "setup",
+          name: "Настройка кассы",
+          category: "repairs",
+          quantity: 1,
+          unit: "усл.",
+          packageSize: "1 усл.",
+          unitPrice: 500,
+          lineTotal: 500,
+        },
+      ],
+    },
+    now: "2026-08-20T12:00:00.000Z",
+  });
+
+  const nomenclature = result.assortment.nomenclature as Array<Record<string, unknown>>;
+  assert.equal(nomenclature.length, 2);
+  assert.equal(nomenclature.find((item) => item.name === "Кофе")?.kind, "stock");
+  assert.equal(nomenclature.find((item) => item.name === "Настройка кассы")?.kind, "service");
+  assert.equal((result.assortment.stockBalances as unknown[]).length, 1);
+  assert.equal(result.movements.length, 1);
+  assert.equal(result.summary.postedLines, 1);
+});
+
 test("sales report consumes confirmed recipe without fabricating unmatched rows", () => {
   const assortment = {
     menuItems: [

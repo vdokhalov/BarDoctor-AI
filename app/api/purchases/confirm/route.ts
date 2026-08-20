@@ -5,10 +5,10 @@ import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import {
   EXPENSE_STORE_KEY,
   findPurchaseExpense,
+  hasMeaningfulPurchaseItems,
   migratePurchaseLedger,
   normalizePurchaseDocument,
   purchaseIdempotencyKey,
-  purchaseAffectsInventory,
   PURCHASE_STORE_KEY,
   SUPPLIER_STORE_KEY,
   withPurchasePaymentSummary,
@@ -157,6 +157,12 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   const document = normalizePurchaseDocument(body.document, crypto.randomUUID());
+  if (document.documentType !== "price_list" && !hasMeaningfulPurchaseItems(requestedDocument)) {
+    return Response.json(
+      { ok: false, error: "Заполните название, количество и стоимость каждой позиции" },
+      { status: 422 },
+    );
+  }
   if (!document.items.length && document.documentType !== "price_list") {
     return Response.json(
       { ok: false, error: "Добавьте хотя бы одну позицию перед сохранением" },
@@ -339,6 +345,46 @@ export async function POST(request: Request): Promise<Response> {
     supplier.updatedAt = now;
   }
 
+  const shouldRecordPayment = body.recordPayment === true
+    && document.documentType !== "price_list"
+    && document.paymentMethod !== "unknown";
+  if (shouldRecordPayment && !hasPermission(account, "expenses.create")) {
+    return Response.json(
+      { ok: false, code: "ACCESS_DENIED", error: "Нет права отражать оплату покупки в расходах" },
+      { status: 403 },
+    );
+  }
+  const payment = shouldRecordPayment ? {
+    id: `purchase-payment:${document.id}`,
+    venueId: account.venueId,
+    date: document.date,
+    accountingMonth: document.date.slice(0, 7),
+    category: document.expenseCategory,
+    amount: document.total,
+    currency: document.currency,
+    description: `Оплата поставщику · ${String(supplier.name)}`,
+    supplierId: String(supplier.id),
+    supplierName: String(supplier.name),
+    purchaseId: document.id,
+    sourceDocumentId: document.id,
+    source: "purchase_payment",
+    paymentKind: "supplier_payment",
+    paymentMethod: document.paymentMethod,
+    moneySourceName: document.paymentMethod === "cash"
+      ? "Наличные · касса"
+      : document.paymentMethod === "card"
+        ? "Корпоративная карта"
+        : "Банковский счёт · перевод",
+    status: "posted",
+    idempotencyKey: `purchase-payment:${idempotencyKey}`,
+    ledgerVersion: 2,
+    createdAt: now,
+    updatedAt: now,
+    createdByAccountId: account.actorAccountId,
+    updatedByAccountId: account.actorAccountId,
+  } : null;
+  if (payment) expenses.unshift(payment);
+
   const confirmedDocument = withPurchasePaymentSummary({
     ...document,
     internalId: document.id,
@@ -358,7 +404,7 @@ export async function POST(request: Request): Promise<Response> {
     createdByAccountId: document.createdByAccountId ?? account.actorAccountId,
     updatedByAccountId: account.actorAccountId,
   }, expenses);
-  const inventory = purchaseAffectsInventory(confirmedDocument)
+  const inventory = confirmedDocument.documentType !== "price_list"
     ? applyPurchaseToInventory({ assortment, document: confirmedDocument, now })
     : null;
   if (inventory?.summary.unresolvedLines.length) {
@@ -402,9 +448,29 @@ export async function POST(request: Request): Promise<Response> {
       createdAt: now,
     }),
   ];
-  if (ledgerMigration.changed) {
+  if (ledgerMigration.changed || payment) {
     statements.push(
       upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
+    );
+  }
+  if (payment) {
+    statements.push(
+      audit(database, {
+        accountId: account.id,
+        storeKey: EXPENSE_STORE_KEY,
+        entityId: String(payment.id),
+        entityLabel: String(payment.description),
+        monthKey: document.date.slice(0, 7),
+        after: payment,
+        actorName,
+        actorRole: account.role,
+        reason: "Оплата покупки отражена в расходах",
+        createdAt: now,
+      }),
+    );
+  }
+  if (ledgerMigration.changed) {
+    statements.push(
       audit(database, {
         accountId: account.id,
         storeKey: EXPENSE_STORE_KEY,
@@ -422,6 +488,10 @@ export async function POST(request: Request): Promise<Response> {
   if (inventory) {
     statements.push(
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, nextAssortment, now),
+    );
+  }
+  if (inventory && inventory.summary.postedLines > 0) {
+    statements.push(
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextStockMovements, now),
       audit(database, {
         accountId: account.id,
@@ -447,7 +517,7 @@ export async function POST(request: Request): Promise<Response> {
     ok: true,
     document: confirmedDocument,
     supplier,
-    payment: null,
+    payment,
     documents,
     suppliers,
     expenses,

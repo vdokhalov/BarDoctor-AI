@@ -7,8 +7,8 @@ import { runNavigationAudit } from "../scripts/audit-navigation-consistency.mjs"
 
 test("production navigation graph satisfies the RC consistency contract", async () => {
   const result = await runNavigationAudit();
-  assert.deepEqual(result.routes, { current: 56, compatibility: 2, total: 58, spa: 53 });
-  assert.equal(result.modules, 35);
+  assert.deepEqual(result.routes, { current: 57, compatibility: 2, total: 59, spa: 54 });
+  assert.equal(result.modules, 36);
   assert.deepEqual(result.defects, {
     found: 54,
     fixed: 54,

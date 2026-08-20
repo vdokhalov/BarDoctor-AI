@@ -39,6 +39,7 @@
     "/cases": ["Дела", "/home"],
     "/catalog": ["Ассортимент и техкарты", "/more"],
     "/suppliers": ["Поставщики и закупки", "/more"],
+    "/nomenclature": ["Номенклатура", "/more"],
     "/warehouse": ["Склад", "/finance"],
     "/reports": ["Месячный отчёт", "/finance"],
     "/finance/settings": ["Настройки финансов", "/finance"],

@@ -24,6 +24,43 @@ export const PURCHASE_STOCK_CATEGORIES = new Set([
   "household",
 ]);
 
+export const PURCHASE_PACKAGE_PRESETS = [
+  "1 шт.", "10 шт.", "12 шт.", "20 шт.", "24 шт.",
+  "1 уп.", "1 пачка", "1 коробка", "1 усл.",
+  "50 мл", "100 мл", "200 мл", "250 мл", "330 мл", "500 мл", "700 мл", "750 мл",
+  "0,25 л", "0,33 л", "0,5 л", "0,7 л", "0,75 л", "0,9 л", "1 л", "1,5 л", "2 л", "5 л", "10 л", "20 л",
+  "50 г", "100 г", "200 г", "250 г", "400 г", "500 г", "1 кг", "2 кг", "5 кг", "10 кг", "25 кг",
+] as const;
+
+function canonicalPackageSize(value: unknown): string {
+  const current = text(value, "", 80);
+  return /^(?:1\s*)?шт\.?$/i.test(current) ? "1 шт." : current;
+}
+
+export function inferPurchasePackageSize(
+  nameValue: unknown,
+  packageSizeValue?: unknown,
+  unitValue?: unknown,
+): string {
+  const current = canonicalPackageSize(packageSizeValue || unitValue);
+  if (current && current !== "1 шт.") return current;
+  const name = text(nameValue, "", 240).toLocaleLowerCase("ru").replace(/ё/g, "е");
+  if (/реклам|smm|продвиж|таргет|маркетинг|ремонт|монтаж|установк|настройк|обслуживан|диагност|аренд|коммунал|доставк|перевоз|обучен|консультац|подписк|лицензи|услуг/.test(name)) return "1 усл.";
+  if (/молок|кефир|ряженк|айран|питьев.*йогурт/.test(name)) return "1 л";
+  if (/мука|сахар|рис|гречк|крупа|соль\b/.test(name)) return "1 кг";
+  return current || "1 шт.";
+}
+
+export function purchaseUnitForPackage(packageSizeValue: unknown): string {
+  const value = text(packageSizeValue, "1 шт.", 80).toLocaleLowerCase("ru");
+  if (/мл/.test(value)) return "мл";
+  if (/(?:^|\s)л(?:\s|\.|$)|литр/.test(value)) return "л";
+  if (/кг/.test(value)) return "кг";
+  if (/(?:^|\s)г(?:\s|\.|$)|грамм/.test(value)) return "г";
+  if (/усл/.test(value)) return "усл.";
+  return "шт.";
+}
+
 export type PurchaseDocumentType = "receipt" | "invoice" | "price_list";
 
 export type PurchaseItem = {
@@ -455,6 +492,9 @@ function documentType(value: unknown): PurchaseDocumentType {
 export function inferPurchaseCategory(name: string): string {
   const value = name.toLocaleLowerCase("ru");
   if (/реклам|instagram|инстаграм|smm|продвиж|таргет|маркетинг/.test(value)) return "marketing";
+  if (/ремонт|монтаж|установк|настройк|обслуживан|диагност|мастер|креп[её]ж|работ[аы]/.test(value)) return "repairs";
+  if (/оборудован|холодиль|кофемаш|принтер|ноутбук|телефон|мебел|касс[аы]|терминал/.test(value)) return "equipment";
+  if (/аренд|коммунал|доставк|перевоз|обучен|консультац|подписк|лицензи|услуг/.test(value)) return "other";
   if (/водк|виски|ром|джин|текил|коньяк|вино|пиво|лик[её]р|алког/.test(value)) return "alcohol";
   if (/табак|угол|кальян|чаша|мундштук/.test(value)) return "hookah";
   if (/моющ|салфет|бумаг|перчат|пакет|губк|бытов|хоз/.test(value)) return "household";
@@ -466,13 +506,24 @@ export function inferPurchaseCategory(name: string): string {
 export function purchaseAffectsInventory(value: unknown): boolean {
   const input = record(value);
   if (documentType(input.documentType ?? input.type) === "price_list") return false;
-  const requestedCategory = text(input.expenseCategory, "", 32);
-  const category = PURCHASE_EXPENSE_CATEGORIES.has(requestedCategory)
-    ? requestedCategory
-    : Array.isArray(input.items) && input.items.length
-      ? normalizePurchaseItem(input.items[0], 0).category
-      : "other";
-  return PURCHASE_STOCK_CATEGORIES.has(category);
+  const items = Array.isArray(input.items) ? input.items : [];
+  return items.some((item, index) =>
+    PURCHASE_STOCK_CATEGORIES.has(normalizePurchaseItem(item, index).category)
+  );
+}
+
+export function hasMeaningfulPurchaseItems(value: unknown): boolean {
+  const input = record(value);
+  const items = Array.isArray(input.items) ? input.items : [];
+  if (!items.length) return false;
+  return items.every((value) => {
+    const item = record(value);
+    const name = text(item.name ?? item.productName, "", 240);
+    const quantity = number(item.quantity, 0);
+    const unitPrice = number(item.unitPrice ?? item.price, 0);
+    const lineTotal = number(item.lineTotal ?? item.total, 0);
+    return Boolean(name) && quantity > 0 && (unitPrice > 0 || lineTotal > 0);
+  });
 }
 
 export function normalizePurchaseItem(
@@ -488,18 +539,19 @@ export function normalizePurchaseItem(
   if (!unitPrice && lineTotal) unitPrice = lineTotal / quantity;
   const requestedCategory = text(input.category, "", 32);
   const inferredCategory = inferPurchaseCategory(name);
+  const packageSize = inferPurchasePackageSize(name, input.packageSize, input.unit);
   return {
     id: text(input.id, crypto.randomUUID(), 80),
     purchaseProductKey: text(input.purchaseProductKey ?? input.productKey, "", 300) || undefined,
     name,
     brand: text(input.brand, "", 120) || undefined,
     quantity: Math.round(quantity * 1_000) / 1_000,
-    unit: text(input.unit, "шт.", 32),
-    packageSize: text(input.packageSize, "", 80) || undefined,
+    unit: purchaseUnitForPackage(packageSize),
+    packageSize,
     unitPrice: Math.round(unitPrice * 100) / 100,
     lineTotal: Math.round(lineTotal * 100) / 100,
-    category: inferredCategory === "marketing"
-      ? "marketing"
+    category: !PURCHASE_STOCK_CATEGORIES.has(inferredCategory) && inferredCategory !== "equipment"
+      ? inferredCategory
       : PURCHASE_EXPENSE_CATEGORIES.has(requestedCategory)
       ? requestedCategory
       : inferredCategory,
@@ -598,8 +650,10 @@ export function normalizePurchaseDocument(
     paymentMethod: payment === "cash" || payment === "card" || payment === "transfer"
       ? payment
       : "unknown",
-    expenseCategory: items.length > 0 && items.every((item) => item.category === "marketing")
-      ? "marketing"
+    expenseCategory: items.length > 0
+      && !PURCHASE_STOCK_CATEGORIES.has(items[0].category)
+      && items.every((item) => item.category === items[0].category)
+      ? items[0].category
       : PURCHASE_EXPENSE_CATEGORIES.has(requestedCategory)
       ? requestedCategory
       : items[0]?.category ?? "products",

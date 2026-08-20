@@ -70,7 +70,7 @@ test("team v163 keeps the directory and adds a data-driven management overview",
     assert.match(document, /team-dashboard-v163\.css\?v=20260812-team-v163/);
     assert.match(document, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
   }
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
 });
 
 test("salary quick actions reuse the existing payroll entry sheet", async () => {

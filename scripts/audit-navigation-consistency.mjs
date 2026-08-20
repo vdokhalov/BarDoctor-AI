@@ -10,7 +10,7 @@ export const spaRoutes = [
   "/equipment", "/equipment/:id", "/equipment/:id/history/new", "/equipment/analytics",
   "/equipment/catalog", "/events", "/events/:id", "/finance", "/finance/settings",
   "/finance/shift/:id/payroll", "/health", "/home", "/integrations", "/login",
-  "/market", "/month-closing", "/more", "/notifications", "/opportunities", "/payroll",
+  "/market", "/month-closing", "/more", "/nomenclature", "/notifications", "/opportunities", "/payroll",
   "/privacy", "/profile", "/register", "/reports", "/reset", "/reviews", "/salaries",
   "/salaries/:id", "/settings", "/setup", "/shifts", "/smart", "/suppliers", "/tasks",
   "/sales-import", "/supplier-alternatives", "/terms", "/venues/new", "/warehouse",
@@ -25,7 +25,7 @@ export const additionalProductionRoutes = [
 export const legacyCompatibilityRoutes = ["/app.html", "/decisions"];
 
 export const auditedModules = [
-  "Главная", "Смены", "Финансы", "Команда", "Ещё", "Товары", "Склад", "Закупки",
+  "Главная", "Смены", "Финансы", "Команда", "Ещё", "Товары", "Номенклатура", "Склад", "Закупки",
   "Накладные", "Продажи", "Техкарты", "Инвентаризации", "Списания", "Расходы",
   "Сотрудники", "Зарплаты", "Отчёты", "Поставщики", "Конкуренты", "Календарь",
   "Интеграции", "Настройки", "Профиль", "Управление заведениями", "Multi-venue",
@@ -97,9 +97,9 @@ export async function runNavigationAudit() {
 
   const actualSpaRoutes = [...new Set([...bundle.matchAll(/path:\"([^\"]+)\"/g)].map((match) => match[1]))].sort();
   assert.deepEqual(actualSpaRoutes, spaRoutes, "The audited SPA route inventory is stale");
-  assert.equal(spaRoutes.length, 53);
-  assert.equal(spaRoutes.length + additionalProductionRoutes.length, 56);
-  assert.equal(spaRoutes.length + additionalProductionRoutes.length + legacyCompatibilityRoutes.length, 58);
+  assert.equal(spaRoutes.length, 54);
+  assert.equal(spaRoutes.length + additionalProductionRoutes.length, 57);
+  assert.equal(spaRoutes.length + additionalProductionRoutes.length + legacyCompatibilityRoutes.length, 59);
 
   requireText(bootstrap, 'window.location.pathname === "/join"', "invite route");
   requireText(bootstrap, 'window.location.pathname === "/decisions"', "legacy decisions route");
@@ -225,9 +225,9 @@ export async function runNavigationAudit() {
 
   return {
     routes: {
-      current: 56,
+      current: 57,
       compatibility: 2,
-      total: 58,
+      total: 59,
       spa: spaRoutes.length,
     },
     modules: auditedModules.length,

@@ -7,7 +7,7 @@ import { runModernUxAudit } from "../scripts/audit-modern-ux.mjs";
 test("all production routes satisfy the Modern UX RC contract", async () => {
   const result = await runModernUxAudit();
   assert.deepEqual(result, {
-    routes: 58,
+    routes: 59,
     surfaceTemplates: 11,
     resolvedContracts: 30,
     byCategory: {

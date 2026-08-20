@@ -2,14 +2,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   findPurchaseExpense,
+  hasMeaningfulPurchaseItems,
+  inferPurchasePackageSize,
   inferPurchaseCategory,
   migratePurchaseLedger,
   normalizePurchaseDocument,
   purchaseAffectsInventory,
+  purchaseUnitForPackage,
   purchasePaymentSummary,
   supplierDebtSummary,
   withPurchasePaymentSummary,
 } from "../lib/bardoctor/purchases";
+
+test("manual purchase packaging offers useful defaults without overwriting an explicit package", () => {
+  assert.equal(inferPurchasePackageSize("Молоко", "", "шт."), "1 л");
+  assert.equal(inferPurchasePackageSize("Мука", "", "шт."), "1 кг");
+  assert.equal(inferPurchasePackageSize("Молоко", "0,9 л", "шт."), "0,9 л");
+  assert.equal(inferPurchasePackageSize("Салфетки", "", "шт."), "1 шт.");
+  assert.equal(inferPurchasePackageSize("Ремонт кофемашины", "", "шт."), "1 усл.");
+  assert.equal(purchaseUnitForPackage("500 мл"), "мл");
+  assert.equal(purchaseUnitForPackage("1 кг"), "кг");
+});
 
 test("purchase expense lookup preserves idempotency on a repeated confirmation", () => {
   const linked = findPurchaseExpense([
@@ -66,6 +79,15 @@ test("receipt normalization keeps line prices and derives a safe total", () => {
   assert.equal(document.pageCount, 2);
 });
 
+test("milk without an explicit package is normalized as a liquid purchase", () => {
+  const document = normalizePurchaseDocument({
+    source: "manual",
+    items: [{ name: "Молоко", quantity: 2, unit: "шт.", unitPrice: 30 }],
+  });
+  assert.equal(document.items[0].packageSize, "1 л");
+  assert.equal(document.items[0].unit, "л");
+});
+
 test("price list may be saved without a document total", () => {
   const document = normalizePurchaseDocument({
     documentType: "price_list",
@@ -85,9 +107,44 @@ test("purchase category inference separates common procurement groups", () => {
   assert.equal(inferPurchaseCategory("Вино красное"), "alcohol");
   assert.equal(inferPurchaseCategory("Сливки 10%"), "food");
   assert.equal(inferPurchaseCategory("Реклама в Instagram"), "marketing");
+  assert.equal(inferPurchaseCategory("Настройка кассового терминала"), "repairs");
+  assert.equal(inferPurchaseCategory("Подписка на сервис"), "other");
+});
+
+test("purchase requires complete item lines and classifies mixed content per item", () => {
+  assert.equal(hasMeaningfulPurchaseItems({ items: [] }), false);
+  assert.equal(hasMeaningfulPurchaseItems({
+    items: [{ name: "", quantity: 1, lineTotal: 100 }],
+  }), false);
+  assert.equal(hasMeaningfulPurchaseItems({
+    items: [{ name: "Кофе", quantity: 1, unitPrice: 0 }],
+  }), false);
+  assert.equal(hasMeaningfulPurchaseItems({
+    items: [{ name: "Кофе", quantity: 2, unitPrice: 50 }],
+  }), true);
+  assert.equal(purchaseAffectsInventory({
+    documentType: "invoice",
+    items: [
+      { name: "Настройка кассы", quantity: 1, lineTotal: 500, category: "repairs" },
+      { name: "Кофе", quantity: 2, lineTotal: 300, category: "food" },
+    ],
+  }), true);
 });
 
 test("service documents become expenses without creating warehouse stock", () => {
+  const repairDocument = normalizePurchaseDocument({
+    documentType: "invoice",
+    supplierName: "Сервисный центр",
+    expenseCategory: "products",
+    total: 900,
+    items: [{ name: "Ремонт кофемашины", quantity: 1, unit: "шт.", lineTotal: 900, category: "products" }],
+  });
+  assert.equal(repairDocument.expenseCategory, "repairs");
+  assert.equal(repairDocument.items[0].category, "repairs");
+  assert.equal(repairDocument.items[0].packageSize, "1 усл.");
+  assert.equal(repairDocument.items[0].unit, "усл.");
+  assert.equal(purchaseAffectsInventory(repairDocument), false);
+
   const marketingDocument = normalizePurchaseDocument({
     documentType: "invoice",
     supplierName: "Инстаграм",

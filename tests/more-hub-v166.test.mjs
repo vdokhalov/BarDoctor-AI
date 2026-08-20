@@ -25,6 +25,7 @@ test("More v166 is a compact permission-aware hub without upsell", async () => {
   assert.match(hub, /Быстрые действия/);
   assert.match(hub, /icon:kX,title:"Ассортимент и техкарты"/);
   assert.match(hub, /icon:Pf,title:"Поставщики"/);
+  assert.match(hub, /key:"nomenclature",icon:kX,title:"Номенклатура"/);
   assert.match(hub, /key:"warehouse",icon:kX,title:"Склад"/);
   assert.match(hub, /onClick:\(\)=>e\("\/warehouse"\)/);
   assert.match(hub, /bdMoreHasPermissionV166\("inventory\.view"\)/);

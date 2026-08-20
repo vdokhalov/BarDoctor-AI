@@ -563,6 +563,16 @@
   box-shadow: 0 0 0 3px rgba(91, 85, 245, .10);
 }
 
+.bd-procurement-package-editor-v209 {
+  display: grid;
+  gap: 6px;
+}
+
+.bd-procurement-package-editor-v209 input {
+  min-height: 39px;
+  font-size: 12px;
+}
+
 .bd-procurement-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

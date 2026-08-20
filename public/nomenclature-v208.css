@@ -1,0 +1,1065 @@
+.bd-nomenclature-main-v208 {
+  width: min(1120px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 120px;
+  color: #161b2e;
+}
+
+.bd-nomenclature-summary-v208 article.warning {
+  border-color: rgba(217, 119, 6, 0.28);
+  background: #fffbeb;
+}
+
+.bd-nomenclature-catalog-head-v210 {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bd-nomenclature-catalog-head-v210 h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+.bd-nomenclature-catalog-head-v210 p {
+  margin: 5px 0 0;
+  color: #7c8498;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.bd-nomenclature-catalog-head-v210 > span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: #f1f0ff;
+  color: #514be0;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-catalog-head-v210 > span.error {
+  background: #fff7ed;
+  color: #b45309;
+}
+
+.bd-nomenclature-search-v210 {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  margin-top: 16px;
+  padding: 0 16px;
+  border: 1px solid #e5e7ef;
+  border-radius: 15px;
+  outline: 0;
+  background: #f8f9fc;
+  color: #161b2e;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.bd-nomenclature-tabs-v210 {
+  margin-top: 12px;
+}
+
+.bd-nomenclature-tabs-v210 button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-tabs-v210 button b {
+  display: grid;
+  min-width: 24px;
+  height: 20px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  place-items: center;
+  background: #fff;
+  color: #514be0;
+  font-size: 10px;
+}
+
+.bd-taxonomy-tree-v210 {
+  display: grid;
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.bd-taxonomy-section-v210 {
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 20px;
+  background: #fff;
+}
+
+.bd-taxonomy-section-v210 > summary {
+  display: flex;
+  min-height: 70px;
+  padding: 0 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bd-taxonomy-section-v210 > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bd-taxonomy-section-title-v210 {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.bd-taxonomy-section-title-v210 > b {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  place-items: center;
+  background: #efefff;
+  color: #514be0;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.bd-taxonomy-section-title-v210 > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.bd-taxonomy-section-title-v210 strong {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.bd-taxonomy-section-title-v210 small {
+  margin-top: 2px;
+  color: #8a91a4;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bd-taxonomy-section-count-v210 {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  color: #747c91;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bd-taxonomy-section-count-v210 b {
+  color: #514be0;
+  font-size: 18px;
+  transition: transform 0.16s ease;
+}
+
+.bd-taxonomy-section-v210[open] .bd-taxonomy-section-count-v210 b {
+  transform: rotate(180deg);
+}
+
+.bd-taxonomy-categories-v210 {
+  display: grid;
+  padding: 0 12px 12px;
+  gap: 10px;
+}
+
+.bd-taxonomy-category-v210 {
+  padding: 14px;
+  border-radius: 16px;
+  background: #f8f9fc;
+}
+
+.bd-taxonomy-category-v210 > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bd-taxonomy-category-v210 > header strong {
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.bd-taxonomy-category-v210 > header span {
+  color: #7c8498;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.bd-taxonomy-subcategories-v210 {
+  display: flex;
+  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bd-taxonomy-subcategories-v210 > span {
+  display: inline-flex;
+  min-height: 29px;
+  padding: 0 9px;
+  border: 1px solid #e3e6ef;
+  border-radius: 999px;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: #6f778b;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.bd-taxonomy-subcategories-v210 > span.has-items {
+  border-color: #d8d6ff;
+  color: #514be0;
+}
+
+.bd-taxonomy-subcategories-v210 > span b {
+  font-size: 10px;
+}
+
+.bd-taxonomy-category-v210 > .bd-nomenclature-list-v208 {
+  margin-top: 12px;
+}
+
+.bd-nomenclature-card-v208.needs-attention-v210 {
+  border-color: #f1cf8b;
+  background: #fffdf8;
+}
+
+.bd-nomenclature-attention-banner-v210 {
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  margin-top: 12px;
+  padding: 12px 15px;
+  border: 1px solid #f1cf8b;
+  border-radius: 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffaf0;
+  color: #161b2e;
+  text-align: left;
+}
+
+.bd-nomenclature-attention-banner-v210 > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.bd-nomenclature-attention-banner-v210 strong {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.bd-nomenclature-attention-banner-v210 small {
+  margin-top: 3px;
+  color: #8a6b32;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.bd-nomenclature-attention-banner-v210 > b {
+  flex: 0 0 auto;
+  color: #a66200;
+  font-size: 11px;
+}
+
+.bd-nomenclature-groups-v209,
+.bd-warehouse-groups-v209 {
+  display: grid;
+  margin-top: 18px;
+  gap: 12px;
+}
+
+.bd-nomenclature-groups-v209 details,
+.bd-warehouse-groups-v209 details {
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 20px;
+  background: #f8f9fc;
+}
+
+.bd-nomenclature-groups-v209 summary,
+.bd-warehouse-groups-v209 summary {
+  display: flex;
+  min-height: 58px;
+  padding: 0 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.bd-nomenclature-groups-v209 summary::-webkit-details-marker,
+.bd-warehouse-groups-v209 summary::-webkit-details-marker {
+  display: none;
+}
+
+.bd-nomenclature-groups-v209 summary strong,
+.bd-warehouse-groups-v209 summary strong {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.bd-nomenclature-groups-v209 summary span,
+.bd-warehouse-groups-v209 summary span {
+  color: #7c8498;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.bd-nomenclature-groups-v209 details > .bd-nomenclature-list-v208,
+.bd-warehouse-groups-v209 details > .bd-warehouse-stock-grid {
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.bd-nomenclature-path-editor-v209 {
+  display: grid;
+  padding: 14px;
+  border: 1px solid #e6e8f0;
+  border-radius: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  background: #f8f9fc;
+}
+
+.bd-warehouse-nomenclature-tools-v207 .bd-warehouse-group-select-v209 {
+  min-height: 42px;
+  padding: 0 34px 0 12px;
+  border: 1px solid #e2e5ee;
+  border-radius: 13px;
+  background: #fff;
+  color: #343a4f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bd-nomenclature-hero-v208 {
+  position: relative;
+  overflow: hidden;
+  padding: 28px;
+  border: 1px solid rgba(91, 85, 245, 0.13);
+  border-radius: 28px;
+  background: linear-gradient(135deg, #171b36 0%, #242359 58%, #3a357f 100%);
+  box-shadow: 0 18px 45px rgba(22, 27, 46, 0.14);
+  color: #fff;
+}
+
+.bd-nomenclature-hero-v208::after {
+  position: absolute;
+  top: -110px;
+  right: -80px;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: rgba(123, 118, 255, 0.24);
+  content: "";
+  pointer-events: none;
+}
+
+.bd-nomenclature-hero-v208 > p,
+.bd-nomenclature-hero-v208 > h2,
+.bd-nomenclature-hero-v208 > span,
+.bd-nomenclature-hero-actions-v208 {
+  position: relative;
+  z-index: 1;
+}
+
+.bd-nomenclature-hero-v208 > p {
+  margin: 0 0 8px;
+  color: #a9a8ff;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.bd-nomenclature-hero-v208 > h2 {
+  max-width: 620px;
+  margin: 0;
+  font-size: clamp(25px, 4vw, 36px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: #fff !important;
+}
+
+.bd-nomenclature-hero-v208 > span {
+  display: block;
+  max-width: 680px;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.55;
+}
+
+.bd-nomenclature-hero-actions-v208 {
+  display: flex;
+  margin-top: 22px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bd-nomenclature-hero-actions-v208 button,
+.bd-nomenclature-empty-v208 button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.bd-nomenclature-hero-actions-v208 button.primary {
+  border-color: #fff;
+  background: #fff;
+  color: #272356;
+}
+
+.bd-nomenclature-summary-v208 {
+  display: grid;
+  margin-top: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bd-nomenclature-summary-v208 article {
+  display: flex;
+  min-height: 92px;
+  padding: 18px;
+  border: 1px solid rgba(22, 27, 46, 0.08);
+  border-radius: 20px;
+  flex-direction: column;
+  justify-content: center;
+  background: #fff;
+  box-shadow: 0 7px 24px rgba(22, 27, 46, 0.05);
+}
+
+.bd-nomenclature-summary-v208 strong {
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.bd-nomenclature-summary-v208 span {
+  margin-top: 4px;
+  color: #7c8498;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bd-nomenclature-catalog-v208 {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid rgba(22, 27, 46, 0.08);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 10px 32px rgba(22, 27, 46, 0.055);
+}
+
+.bd-nomenclature-toolbar-v208 {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.bd-nomenclature-toolbar-v208 > input {
+  width: 100%;
+  height: 46px;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid #e5e7ef;
+  border-radius: 15px;
+  outline: 0;
+  background: #f8f9fc;
+  color: #161b2e;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.bd-nomenclature-toolbar-v208 > input:focus {
+  border-color: rgba(91, 85, 245, 0.55);
+  box-shadow: 0 0 0 3px rgba(91, 85, 245, 0.1);
+}
+
+.bd-nomenclature-filters-v208 {
+  display: flex;
+  overflow-x: auto;
+  gap: 7px;
+  scrollbar-width: none;
+}
+
+.bd-nomenclature-filters-v208::-webkit-scrollbar {
+  display: none;
+}
+
+.bd-nomenclature-filters-v208 button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid #e5e7ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #656d82;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-filters-v208 button.active {
+  border-color: #5b55f5;
+  background: #5b55f5;
+  color: #fff;
+}
+
+.bd-nomenclature-list-v208 {
+  display: grid;
+  margin-top: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bd-nomenclature-card-v208 {
+  display: grid;
+  min-width: 0;
+  min-height: 108px;
+  padding: 14px;
+  border: 1px solid #e8eaf1;
+  border-radius: 18px;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  color: #161b2e;
+  text-align: left;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+
+.bd-nomenclature-card-v208:hover {
+  border-color: rgba(91, 85, 245, 0.3);
+  box-shadow: 0 10px 24px rgba(22, 27, 46, 0.07);
+  transform: translateY(-1px);
+}
+
+.bd-nomenclature-card-v208.archived {
+  opacity: 0.66;
+}
+
+.bd-nomenclature-type-v208 {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.bd-nomenclature-type-v208.stock {
+  background: rgba(91, 85, 245, 0.11);
+  color: #514be0;
+}
+
+.bd-nomenclature-type-v208.service {
+  background: rgba(12, 164, 131, 0.11);
+  color: #087c65;
+}
+
+.bd-nomenclature-copy-v208,
+.bd-nomenclature-state-v208 {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.bd-nomenclature-copy-v208 strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-copy-v208 small,
+.bd-nomenclature-state-v208 small {
+  overflow: hidden;
+  margin-top: 4px;
+  color: #7c8498;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-copy-v208 em {
+  margin-top: 7px;
+  color: #9aa0af;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bd-nomenclature-state-v208 {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.bd-nomenclature-state-v208 strong {
+  max-width: 160px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-state-v208 b {
+  margin-top: 7px;
+  color: #5b55f5;
+  font-size: 15px;
+}
+
+.bd-nomenclature-empty-v208 {
+  display: flex;
+  min-height: 220px;
+  padding: 28px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.bd-nomenclature-empty-v208 strong {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.bd-nomenclature-empty-v208 p {
+  max-width: 480px;
+  margin: 8px 0 0;
+  color: #7c8498;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bd-nomenclature-empty-v208 button {
+  margin-top: 18px;
+  border-color: #5b55f5;
+  background: #5b55f5;
+}
+
+.bd-nomenclature-note-v208 {
+  display: block;
+  margin-top: 14px;
+  padding: 17px 19px;
+  border: 1px solid rgba(91, 85, 245, 0.13);
+  border-radius: 18px;
+  background: rgba(91, 85, 245, 0.055);
+}
+
+.bd-nomenclature-note-v208 strong {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.bd-nomenclature-note-v208 p {
+  margin: 5px 0 0;
+  color: #646c80;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bd-nomenclature-form-grid-v208 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bd-nomenclature-sheet-v208 {
+  max-height: min(88dvh, 760px);
+  overflow-y: auto;
+}
+
+.bd-nomenclature-sheet-backdrop-v212 {
+  appearance: none;
+  width: 100%;
+  border: 0;
+  padding: 0;
+}
+
+.bd-nomenclature-sheet-v212 {
+  transform: none !important;
+  visibility: visible !important;
+}
+
+.bd-taxonomy-tree-v213 {
+  display: grid;
+  gap: 10px;
+}
+
+.bd-taxonomy-section-v213,
+.bd-taxonomy-category-v213,
+.bd-taxonomy-subcategory-v213 {
+  overflow: hidden;
+  border: 1px solid #e2e5ef;
+  border-radius: 20px;
+  background: #fff;
+}
+
+.bd-taxonomy-section-v213.open {
+  border-color: #cbc8ff;
+  box-shadow: 0 10px 28px rgba(47, 43, 111, .07);
+}
+
+.bd-taxonomy-section-toggle-v213,
+.bd-taxonomy-category-toggle-v213,
+.bd-taxonomy-subcategory-v213 > button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #171a34;
+  cursor: pointer;
+  text-align: left;
+}
+
+.bd-taxonomy-section-toggle-v213 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 86px;
+  padding: 14px 18px;
+}
+
+.bd-taxonomy-categories-v213 {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.bd-taxonomy-category-v213 {
+  border-radius: 16px;
+  background: #f8f8fc;
+}
+
+.bd-taxonomy-category-toggle-v213,
+.bd-taxonomy-subcategory-v213 > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 54px;
+  padding: 12px 14px;
+}
+
+.bd-taxonomy-category-toggle-v213 strong {
+  font-size: 14px;
+}
+
+.bd-taxonomy-category-toggle-v213 span,
+.bd-taxonomy-subcategory-v213 > button span {
+  color: #727a90;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.bd-taxonomy-subcategories-v213 {
+  display: grid;
+  gap: 7px;
+  padding: 0 8px 8px;
+}
+
+.bd-taxonomy-subcategory-v213 {
+  border-radius: 14px;
+}
+
+.bd-taxonomy-subcategory-v213 > button strong {
+  font-size: 12px;
+}
+
+.bd-taxonomy-items-v213 {
+  padding: 0 8px 8px;
+}
+
+.bd-taxonomy-empty-v213 {
+  margin: 0;
+  padding: 11px 13px;
+  color: #7b8295;
+  font-size: 11px;
+}
+
+.bd-nomenclature-panel-v213 {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 620px);
+  margin: 0 auto;
+  background: #f5f6fa;
+  color: #171a34;
+}
+
+.bd-nomenclature-panel-head-v213 {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  border-bottom: 1px solid #e1e4ec;
+  background: rgba(255,255,255,.98);
+}
+
+.bd-nomenclature-panel-head-v213 > button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #dfe3ec;
+  border-radius: 15px;
+  background: #fff;
+  color: #202641;
+  font-size: 30px;
+}
+
+.bd-nomenclature-panel-head-v213 small {
+  display: block;
+  color: #5b55f5;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.bd-nomenclature-panel-head-v213 h2 {
+  overflow: hidden;
+  margin: 3px 0 0;
+  font-size: 18px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bd-nomenclature-panel-body-v213 {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+  padding: 18px 18px calc(24px + env(safe-area-inset-bottom));
+}
+
+.bd-nomenclature-panel-actions-v213 {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 9px;
+  margin: 4px -4px -4px;
+  padding: 12px 4px 4px;
+  background: linear-gradient(180deg, rgba(245,246,250,0), #f5f6fa 24%);
+}
+
+.bd-nomenclature-panel-actions-v213 button,
+.bd-nomenclature-panel-error-v213 button {
+  min-height: 48px;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.bd-nomenclature-panel-actions-v213 .secondary {
+  border: 1px solid #dfe2eb;
+  background: #fff;
+  color: #30364c;
+}
+
+.bd-nomenclature-panel-actions-v213 .primary,
+.bd-nomenclature-panel-error-v213 button {
+  border: 0;
+  background: #5b55f5;
+  color: #fff;
+}
+
+.bd-nomenclature-panel-error-v213 {
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  text-align: center;
+}
+
+.bd-nomenclature-panel-error-v213 p {
+  max-width: 360px;
+  color: #6e7589;
+  line-height: 1.5;
+}
+
+.bd-nomenclature-panel-error-v213 button {
+  margin-top: 12px;
+  padding: 0 20px;
+}
+
+@media (max-width: 720px) {
+  .bd-nomenclature-main-v208 {
+    width: min(100% - 24px, 620px);
+    padding-top: 14px;
+  }
+
+  .bd-nomenclature-hero-v208 {
+    padding: 22px 20px;
+    border-radius: 24px;
+  }
+
+  .bd-nomenclature-hero-actions-v208 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bd-nomenclature-hero-actions-v208 button.primary {
+    grid-column: 1 / -1;
+  }
+
+  .bd-nomenclature-summary-v208 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bd-nomenclature-summary-v208 article {
+    min-height: 78px;
+    padding: 14px;
+  }
+
+  .bd-nomenclature-catalog-v208 {
+    padding: 14px;
+    border-radius: 22px;
+  }
+
+  .bd-nomenclature-toolbar-v208 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-nomenclature-list-v208 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-nomenclature-card-v208 {
+    min-height: 100px;
+    padding: 12px;
+  }
+
+  .bd-nomenclature-state-v208 strong {
+    max-width: 112px;
+  }
+
+  .bd-nomenclature-form-grid-v208 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-nomenclature-path-editor-v209 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-nomenclature-tabs-v210 {
+    display: grid;
+    overflow: visible;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .bd-nomenclature-tabs-v210 button {
+    position: relative;
+    min-width: 0;
+    min-height: 46px;
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  .bd-nomenclature-tabs-v210 button.attention {
+    padding-right: 34px;
+  }
+
+  .bd-nomenclature-tabs-v210 button.attention b {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+  }
+
+  .bd-nomenclature-catalog-head-v210 {
+    align-items: center;
+  }
+
+  .bd-nomenclature-catalog-head-v210 h3 {
+    font-size: 17px;
+  }
+
+  .bd-nomenclature-catalog-head-v210 p {
+    font-size: 11px;
+  }
+
+  .bd-warehouse-nomenclature-tools-v207 {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 390px) {
+  .bd-nomenclature-main-v208 {
+    width: calc(100% - 20px);
+  }
+
+  .bd-nomenclature-hero-actions-v208 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-nomenclature-hero-actions-v208 button.primary {
+    grid-column: auto;
+  }
+
+  .bd-nomenclature-card-v208 {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .bd-nomenclature-type-v208 {
+    width: 38px;
+    height: 38px;
+  }
+
+  .bd-nomenclature-state-v208 {
+    grid-column: 2;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .bd-nomenclature-state-v208 small {
+    display: none;
+  }
+
+  .bd-nomenclature-state-v208 b {
+    display: none;
+  }
+}

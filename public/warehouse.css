@@ -1064,6 +1064,24 @@
   font-size: 13px;
 }
 
+.bd-warehouse-nomenclature-tools-v207 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bd-warehouse-nomenclature-tools-v207 > button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #5b5ceb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .bd-warehouse-main {
     padding: 16px 16px 56px;
@@ -1092,6 +1110,15 @@
 
   .bd-warehouse-search {
     width: 100%;
+  }
+
+  .bd-warehouse-nomenclature-tools-v207 {
+    width: 100%;
+  }
+
+  .bd-warehouse-nomenclature-tools-v207 .bd-warehouse-search {
+    flex: 1;
+    min-width: 0;
   }
 }
 
