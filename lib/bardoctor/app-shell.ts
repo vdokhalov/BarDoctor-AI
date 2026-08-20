@@ -1,5 +1,5 @@
 export const APP_SHELL_VERSION = "20260815-startup-v201";
-export const CATALOG_ACCOUNTING_VERSION = "20260820-catalog-v207";
+export const CATALOG_ACCOUNTING_VERSION = "20260820-catalog-v208";
 
 /**
  * One asset contract for every authenticated BarDoctor user surface.
