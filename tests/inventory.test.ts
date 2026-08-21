@@ -910,6 +910,44 @@ test("a posted receipt never overwrites a valued opening balance without financi
   assert.equal(repaired.summary.reconciledBalances, 0);
 });
 
+test("a unique financially matching receipt key is relinked before repairing the stale balance", () => {
+  const repaired = repairInventoryPurchaseAmounts({
+    assortment: { stockBalances: [{
+      key: "stock:коньяк нистру|ml",
+      productKey: "stock:коньяк нистру|ml",
+      name: "Коньяк Нистру",
+      unit: "ml",
+      current: 100_000,
+      inventoryValue: 2_377,
+      averageUnitCost: 0.02377,
+      source: "legacy-stock",
+      currency: "RUB",
+    }] },
+    purchaseDocuments: [],
+    stockMovements: [{
+      id: "receipt-nistru-legacy-key",
+      type: "receipt",
+      status: "active",
+      sourceDocumentId: "invoice-vprok",
+      sourceLineId: "nistru-conus-line",
+      productKey: "legacy:nistru-conus",
+      productName: "Коньяк Нистру",
+      amount: 10_000,
+      unit: "ml",
+      costAmount: 2_377,
+      currency: "RUB",
+    }],
+  });
+
+  const balance = (repaired.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(balance.current, 10_000);
+  assert.equal(repaired.stockMovements[0].productKey, "stock:коньяк нистру|ml");
+  assert.equal(repaired.summary.reconciledBalances, 1);
+  assert.equal(repaired.summary.repairedMovements, 1);
+  assert.equal(repaired.summary.diagnostics[0].movementMatch, "unique-name");
+  assert.equal(repaired.summary.diagnostics[0].receiptValueExplainsBalance, true);
+});
+
 test("confirmed purchase with a missing receipt is restored instead of showing zero stock", () => {
   const repaired = repairInventoryPurchaseAmounts({
     assortment: { stockBalances: [{

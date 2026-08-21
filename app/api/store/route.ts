@@ -14,7 +14,7 @@ import {
   PURCHASE_STORE_KEY,
 } from "../../../lib/bardoctor/purchases";
 
-const INVENTORY_QUANTITY_REPAIR_VERSION = "v233";
+const INVENTORY_QUANTITY_REPAIR_VERSION = "v234";
 
 type StoreRow = {
   store_key: string;

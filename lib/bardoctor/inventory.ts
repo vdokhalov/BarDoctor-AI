@@ -76,6 +76,7 @@ export type InventoryPurchaseAmountRepairSummary = {
   evidenceDocuments: number;
   evidenceMatches: number;
   linkedShadowBalances: number;
+  diagnostics: Array<Record<string, unknown>>;
   changed: boolean;
 };
 
@@ -1222,6 +1223,7 @@ export function repairInventoryPurchaseAmounts(input: {
   let correctedAmount = 0;
   let evidenceMatches = 0;
   let linkedShadowBalances = 0;
+  const diagnostics: Array<Record<string, unknown>> = [];
   const claimedDocumentLines = new Set<string>();
 
   const purchaseLineValue = (item: JsonRecord): number => rounded(Math.max(
@@ -1746,7 +1748,38 @@ export function repairInventoryPurchaseAmounts(input: {
   for (const [productKey, balance] of balances) {
     if (balance.archived === true || balance.active === false) continue;
     if (text(balance.lastInventoryDocumentId, "", 100)) continue;
-    const movements = movementsByProduct.get(productKey) ?? [];
+    const exactMovements = movementsByProduct.get(productKey) ?? [];
+    const movementGroupScores = [...movementsByProduct.entries()]
+        .map(([candidateKey, candidateMovements]) => {
+          const representative = candidateMovements[0] ?? {};
+          const score = inventoryAutomaticIdentityScore(
+            balance,
+            {
+              ...representative,
+              name: representative.productName,
+              productName: representative.productName,
+              unit: representative.unit,
+            },
+          );
+          return { candidateKey, candidateMovements, score };
+        });
+    const semanticMovementGroups = exactMovements.length
+      ? []
+      : movementGroupScores
+        .filter(({ candidateMovements, score }) =>
+          score >= 0.9
+          && candidateMovements.length > 0
+          && candidateMovements.every((movement) =>
+            text(movement.type, "", 30) === "receipt"
+            && baseUnit(movement.unit) === baseUnit(balance.unit)
+          )
+        );
+    const semanticMatch = semanticMovementGroups.length === 1
+      ? semanticMovementGroups[0]
+      : undefined;
+    const movements = exactMovements.length
+      ? exactMovements
+      : semanticMatch?.candidateMovements ?? [];
     if (!movements.length || movements.some((movement) => text(movement.type, "", 30) !== "receipt")) {
       continue;
     }
@@ -1811,11 +1844,72 @@ export function repairInventoryPurchaseAmounts(input: {
     const lastDocumentId = text(balance.lastDocumentId, "", 100);
     const lastDocumentIsReceipt = Boolean(lastDocumentId)
       && movements.some((movement) => text(movement.sourceDocumentId, "", 100) === lastDocumentId);
+    const diagnosticCandidate = (
+      balanceUnit === "ml" && current >= 50_000
+    ) || (
+      current >= 5_000
+      && ledgerAmount > 0
+      && current > ledgerAmount
+      && ratio >= 5
+    );
+    if (diagnosticCandidate && diagnostics.length < 20) {
+      diagnostics.push({
+        productKey,
+        name: text(balance.name ?? balance.productName, "", 240),
+        unit: balanceUnit,
+        current,
+        inventoryValue,
+        source: text(balance.source, "", 40),
+        lastDocumentId,
+        lastInventoryDocumentId: text(balance.lastInventoryDocumentId, "", 100),
+        movementMatch: exactMovements.length ? "exact-key" : semanticMatch ? "unique-name" : "none",
+        movementProductKey: semanticMatch?.candidateKey ?? productKey,
+        movementCount: movements.length,
+        movementTypes: [...new Set(movements.map((movement) => text(movement.type, "", 30)))],
+        movementUnits: [...new Set(movements.map((movement) => text(movement.unit, "", 20)))],
+        movementAmounts: movements.map((movement) => number(movement.amount)),
+        movementValues: movements.map((movement) => number(movement.costAmount)),
+        ledgerAmount,
+        receiptValue,
+        ratio,
+        legacyMultiplier,
+        receiptValueExplainsBalance,
+        purchaseOrigin,
+        lastDocumentIsReceipt,
+        nearestMovementGroups: movementGroupScores
+          .sort((left, right) => right.score - left.score)
+          .slice(0, 5)
+          .map(({ candidateKey, candidateMovements, score }) => ({
+            productKey: candidateKey,
+            score: rounded(score, 4),
+            names: [...new Set(candidateMovements.map((movement) =>
+              text(movement.productName, "", 240)
+            ))],
+            types: [...new Set(candidateMovements.map((movement) =>
+              text(movement.type, "", 30)
+            ))],
+            units: [...new Set(candidateMovements.map((movement) =>
+              text(movement.unit, "", 20)
+            ))],
+            amounts: candidateMovements.map((movement) => number(movement.amount)),
+            values: candidateMovements.map((movement) => number(movement.costAmount)),
+          })),
+      });
+    }
     if (
       !legacyMultiplier
       || (!lastDocumentIsReceipt && !receiptValueExplainsBalance)
       || (!purchaseOrigin && !receiptValueExplainsBalance)
     ) continue;
+    if (semanticMatch) {
+      for (const movement of movements) {
+        if (text(movement.productKey, "", 300) === productKey) continue;
+        movement.productKey = productKey;
+        movement.repairedAt = now;
+        movement.repairReason = "Приход привязан к единственной совпадающей складской карточке";
+        repairedMovements += 1;
+      }
+    }
     for (const value of confirmedReceipts) {
       if (Math.abs(number(value.movement.amount) - value.expected.amount) < 0.0001) continue;
       value.movement.amount = value.expected.amount;
@@ -1852,6 +1946,7 @@ export function repairInventoryPurchaseAmounts(input: {
       evidenceDocuments: evidenceDocuments.size,
       evidenceMatches,
       linkedShadowBalances,
+      diagnostics,
       changed: repairedMovements > 0 || restoredMovements > 0 || reconciledBalances > 0,
     },
   };
