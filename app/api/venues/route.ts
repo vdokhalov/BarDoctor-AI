@@ -9,6 +9,7 @@ import { permissionsFor } from "../../../lib/bardoctor/access-control";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { createVenueForOwner } from "../../../lib/bardoctor/venue-service";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
+import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
 
 function venueName(value: string | null): string {
   if (!value) return "Новое заведение";
@@ -19,6 +20,16 @@ function venueName(value: string | null): string {
       : "Новое заведение";
   } catch {
     return "Новое заведение";
+  }
+}
+
+function venueCurrency(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    const profile = JSON.parse(value) as { currency?: unknown };
+    return normalizeAccountingCurrency(profile.currency);
+  } catch {
+    return null;
   }
 }
 
@@ -37,6 +48,7 @@ export async function GET(request: Request): Promise<Response> {
       id: item.venue.id,
       workspaceId: item.venue.workspaceId,
       name: venueName(item.dataAccount.restaurantJson),
+      currency: venueCurrency(item.dataAccount.restaurantJson),
       role: item.role,
       permissions: item.permissions,
       status: item.venue.status,

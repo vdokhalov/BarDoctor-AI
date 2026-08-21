@@ -44,9 +44,9 @@ test("warehouse v241 keeps controls compact, complete and fully actionable", asy
   assert.match(css, /\.bd-warehouse-nomenclature-tools-v207 \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 148px/);
   assert.match(css, /\.bd-warehouse-search::placeholder \{[\s\S]*?font-size: 10\.5px/);
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 128px/);
-  assert.match(html, /warehouse-base-currency-v242/);
-  assert.match(response, /warehouse-base-currency-v242/);
-  assert.match(preview, /warehouse-v242/);
+  assert.match(html, /accounting-currency-v243/);
+  assert.match(response, /accounting-currency-v243/);
+  assert.match(preview, /accounting-currency-v243/);
 
   for (const label of [
     "Провести инвентаризацию",

@@ -92,7 +92,7 @@ test("two venues in one workspace keep identical products, stock, finances and i
       chatgpt_email, app_email, first_name, account_kind, owns_venue, restaurant_json, migration_status
     ) VALUES ('venue-b@internal.test', 'venue-b@internal.test', 'Venue', 'venue_data', 0, ?, 'venue_data')
     RETURNING id
-  `).get(JSON.stringify({ name: "Venue B" })) as { id: number };
+  `).get(JSON.stringify({ name: "Venue B", currency: "MDL" })) as { id: number };
   const venueB = database.prepare(`
     INSERT INTO venues (workspace_id, data_account_id, created_by_account_id)
     VALUES (?, ?, ?) RETURNING id
@@ -166,6 +166,12 @@ test("two venues in one workspace keep identical products, stock, finances and i
   assert.deepEqual(JSON.parse(employeeRows.find((row) => row.accountId === venueDataB.id)!.dataJson), [{ id: "employee-b", name: "Борис" }]);
   assert.notEqual(venueA.id, venueB.id);
   assert.notEqual(owner.id, venueDataB.id);
+  database.prepare("UPDATE accounts SET restaurant_json = ? WHERE id = ?")
+    .run(JSON.stringify({ name: "Venue A", currency: "RUB" }), owner.id);
+  const venueCurrencies = database.prepare(`
+    SELECT id, restaurant_json AS restaurantJson FROM accounts WHERE id IN (?, ?) ORDER BY id
+  `).all(owner.id, venueDataB.id) as Array<{ id: number; restaurantJson: string }>;
+  assert.deepEqual(venueCurrencies.map((row) => JSON.parse(row.restaurantJson).currency), ["RUB", "MDL"]);
   assert.throws(
     () => database.prepare("INSERT INTO venues (workspace_id, data_account_id, created_by_account_id) VALUES (?, ?, ?)").run(workspace.id, owner.id, owner.id),
     /UNIQUE/,

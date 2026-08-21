@@ -1,3 +1,5 @@
+import { normalizeAccountingCurrency } from "./currency";
+
 export type VenueProfile = {
   name: string;
   businessType: string;
@@ -37,7 +39,7 @@ export function venueProfileFromInput(body: Record<string, unknown>): VenueProfi
     city: text(body.city, 100),
     address: text(body.address, 180),
     district: text(body.district, 100),
-    currency: text(body.currency, 8),
+    currency: normalizeAccountingCurrency(body.currency) ?? "",
     venueFormat: text(body.venueFormat, 160),
     seats: positiveNumber(body.seats),
     employees: positiveNumber(body.employees),

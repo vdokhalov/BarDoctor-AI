@@ -6,6 +6,7 @@ import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { compareStoreData } from "../../../lib/bardoctor/data-trust";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
+import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
 
 export async function POST(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
@@ -25,10 +26,22 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Укажите название заведения" }, { status: 400 });
   }
 
-  const restaurant = venueProfileFromInput(body);
-
   const db = getDb();
   const before = account.restaurantJson ? JSON.parse(account.restaurantJson) : null;
+  const previousCurrency = normalizeAccountingCurrency(before?.currency);
+  const requestedCurrency = body.currency === undefined
+    ? previousCurrency
+    : normalizeAccountingCurrency(body.currency);
+  if (body.currency !== undefined && !requestedCurrency) {
+    return Response.json(
+      { ok: false, code: "INVALID_ACCOUNTING_CURRENCY", error: "Выберите поддерживаемую валюту учёта" },
+      { status: 400 },
+    );
+  }
+  const restaurant = venueProfileFromInput({
+    ...body,
+    currency: requestedCurrency ?? "",
+  });
   const mutations = compareStoreData(before, restaurant);
   const updatedAt = new Date().toISOString();
   await db
@@ -56,5 +69,5 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, restaurant });
 }

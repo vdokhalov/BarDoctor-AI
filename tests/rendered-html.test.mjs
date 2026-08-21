@@ -1821,6 +1821,9 @@ async function healthIndexReport(scores, context = {}) {
     gce() {
       return category("tasks");
     },
+    bdAccountingMoneyV243(value) {
+      return `${Math.round(Number(value) || 0).toLocaleString("ru-RU")} RUB`;
+    },
   };
 
   const {

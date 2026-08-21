@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { domainData, type Account } from "../../db/schema";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
+import { accountingCurrencyFromProfile } from "./currency";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -32,6 +33,7 @@ export type VenueAIContext = {
   version: "venue-ai-context-v1";
   purpose: VenueAIContextPurpose;
   generatedAt: string;
+  accountingCurrency: string | null;
   blocks: VenueAIContextBlock[];
   promptData: Record<string, JsonRecord>;
 };
@@ -766,6 +768,7 @@ export function buildVenueAIContextFromSources(
   const request = sources.request ?? {};
   const requestProfile = record(request.profile);
   const profile = { ...sources.accountProfile, ...requestProfile };
+  const accountingCurrency = accountingCurrencyFromProfile(profile);
   const menu = summariseMenu(sources, now);
   const revenue = summariseRevenue(request, sources, now);
   const purchases = summarisePurchasesAndInventory(sources, now);
@@ -823,6 +826,7 @@ export function buildVenueAIContextFromSources(
         concept: text(profile.concept) || null,
         seats: number(profile.seats),
         areas: array(profile.areas).slice(0, 12),
+        accountingCurrency,
       },
       now,
       freshDays: 90,
@@ -1008,6 +1012,7 @@ export function buildVenueAIContextFromSources(
     version: "venue-ai-context-v1",
     purpose,
     generatedAt,
+    accountingCurrency,
     blocks: selected,
     promptData: Object.fromEntries(selected.map((item) => [item.id, item.data])),
   };
@@ -1052,6 +1057,7 @@ export function venueAIContextForPrompt(context: VenueAIContext): JsonRecord {
     version: context.version,
     generatedAt: context.generatedAt,
     purpose: context.purpose,
+    accountingCurrency: context.accountingCurrency,
     coverage: context.blocks.map((item) => ({
       id: item.id,
       label: item.label,

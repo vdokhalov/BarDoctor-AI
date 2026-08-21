@@ -112,7 +112,7 @@
       region: String(data.get("region") || "").trim(),
       district: String(data.get("district") || "").trim(),
       address: String(data.get("address") || "").trim(),
-      currency: String(data.get("currency") || "MDL"),
+      currency: String(data.get("currency") || "").trim().toUpperCase(),
       venueFormat: String(data.get("venueFormat") || "").trim(),
       seats: Number(data.get("seats")) || 0,
       employees: Number(data.get("employees")) || 0,

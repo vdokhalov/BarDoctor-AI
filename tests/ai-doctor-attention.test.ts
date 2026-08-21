@@ -13,6 +13,7 @@ function context(): VenueAIContext {
     version: "venue-ai-context-v1",
     purpose: "diagnosis",
     generatedAt: "2026-08-15T08:24:00.000Z",
+    accountingCurrency: "RUB",
     blocks: [
       { id: "performanceHistory", label: "История показателей", available: true, freshness: "fresh", updatedAt: "2026-08-15T07:00:00.000Z", detail: "4 смены без отчёта", missingAction: null, data: {} },
       { id: "menuAndRecipes", label: "Меню и техкарты", available: true, freshness: "fresh", updatedAt: "2026-08-14T07:00:00.000Z", detail: "100 позиций", missingAction: null, data: {} },

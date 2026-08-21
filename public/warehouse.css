@@ -2037,6 +2037,52 @@ main[data-bd-warehouse-version="compact-tree-v240"] {
   padding-top: 9px;
 }
 
+/* Accounting currency v243 — one venue-level source of truth */
+.bd-warehouse-currency-link-v243 {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  margin: -2px 0 10px;
+  padding: 9px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(91, 92, 235, 0.18);
+  border-radius: 14px;
+  background: rgba(91, 92, 235, 0.055);
+  color: #25264a;
+  text-align: left;
+}
+
+.bd-warehouse-currency-link-v243 span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bd-warehouse-currency-link-v243 strong {
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.bd-warehouse-currency-link-v243 small {
+  color: #6f7189;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.bd-warehouse-currency-link-v243 svg {
+  flex: 0 0 auto;
+  color: #5b5ceb;
+}
+
+.bd-warehouse-currency-link-v243:active {
+  transform: scale(0.99);
+}
+
 main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid {
   margin-top: 6px;
 }

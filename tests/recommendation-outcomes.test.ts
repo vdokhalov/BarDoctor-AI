@@ -9,6 +9,7 @@ function context(monthKey: string, finalProfit: number): VenueAIContext {
     version: "venue-ai-context-v1",
     purpose: "diagnosis",
     generatedAt: `${monthKey}-28T12:00:00.000Z`,
+    accountingCurrency: "RUB",
     blocks: [{
       id: "performanceHistory",
       label: "История показателей",

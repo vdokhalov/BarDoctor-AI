@@ -110,7 +110,7 @@ try {
     businessType: "Бар",
     country: "MD",
     city: "Бендеры",
-    currency: "MDL",
+    currency: "RUB",
   });
   assert.equal(profileA.response.status, 200, JSON.stringify(profileA.body));
   const created = await json(owner, venueA, "/api/venues", "POST", {
@@ -131,13 +131,27 @@ try {
   });
   assert.equal(profileB.response.status, 200, JSON.stringify(profileB.body));
 
+  const invalidCurrency = await json(owner, venueB, "/api/restaurants", "POST", {
+    name: "Venue Runtime B",
+    businessType: "Бар",
+    country: "MD",
+    city: "Бендеры",
+    currency: "BTC",
+  });
+  assert.equal(invalidCurrency.response.status, 400, JSON.stringify(invalidCurrency.body));
+  assert.equal(invalidCurrency.body.code, "INVALID_ACCOUNTING_CURRENCY");
+
+  const loadedProfileA = await json(owner, venueA, "/api/restaurants/me");
+  const loadedProfileB = await json(owner, venueB, "/api/restaurants/me");
+  assert.equal(loadedProfileA.body.restaurant.currency, "RUB");
+  assert.equal(loadedProfileB.body.restaurant.currency, "MDL");
+
   const moduleStores = {
     health: "bd_finance_revenue",
     finance: "bd_finance_expenses",
     warehouse: "bd_inventory_snapshots",
     employees: "bd_employees",
     purchases: "bd_purchase_documents",
-    assortment: "bd_assortment_v1",
     equipment: "bd_equipment",
     audit: "bd_tasks",
     ai: "bd_ai_diagnosis_v9",
@@ -160,6 +174,18 @@ try {
     assert.equal(JSON.stringify(b.body).includes(`B:${module}`), true, module);
     assert.equal(JSON.stringify(b.body).includes(`A:${module}`), false, module);
   }
+
+  const assortmentKey = "bd_assortment_v1";
+  const assortmentA = { stockBalances: [{ id: "same-stock-id", name: "Venue A stock", quantity: 50 }] };
+  const assortmentB = { stockBalances: [{ id: "same-stock-id", name: "Venue B stock", quantity: 10 }] };
+  assert.equal((await putStore(owner, venueA, assortmentKey, assortmentA)).response.status, 200);
+  assert.equal((await putStore(owner, venueB, assortmentKey, assortmentB)).response.status, 200);
+  const loadedAssortmentA = await json(owner, venueA, `/api/store/${assortmentKey}`);
+  const loadedAssortmentB = await json(owner, venueB, `/api/store/${assortmentKey}`);
+  assert.match(JSON.stringify(loadedAssortmentA.body), /Venue A stock/);
+  assert.doesNotMatch(JSON.stringify(loadedAssortmentA.body), /Venue B stock/);
+  assert.match(JSON.stringify(loadedAssortmentB.body), /Venue B stock/);
+  assert.doesNotMatch(JSON.stringify(loadedAssortmentB.body), /Venue A stock/);
 
   const activeB = await json(owner, venueA, "/api/access/active-venue", "POST", { venueId: venueB });
   assert.equal(activeB.response.status, 200, JSON.stringify(activeB.body));

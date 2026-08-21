@@ -65,9 +65,9 @@ test("warehouse v242 reads base currency from the current venue and exposes a sa
   assert.doesNotMatch(warehouse, /Несколько валют/);
   assert.match(css, /Warehouse v242 — base-currency KPI and final production density/);
   assert.match(css, /article\.incomplete strong/);
-  assert.match(html, /warehouse-base-currency-v242/);
-  assert.match(response, /warehouse-base-currency-v242/);
-  assert.match(preview, /warehouse-v242/);
+  assert.match(html, /accounting-currency-v243/);
+  assert.match(response, /accounting-currency-v243/);
+  assert.match(preview, /accounting-currency-v243/);
 });
 
 test("warehouse v242 retains every action, tab and compact hierarchy workflow", async () => {

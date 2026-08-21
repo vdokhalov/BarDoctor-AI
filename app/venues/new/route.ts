@@ -80,14 +80,17 @@ const VENUE_CREATE_HTML = `<!doctype html>
             <label class="field">Район <input name="district" maxlength="100" autocomplete="address-level3" placeholder="Центр" /></label>
           </div>
           <label class="field">Адрес <input name="address" maxlength="180" autocomplete="street-address" placeholder="Улица и номер дома" /></label>
-          <label class="field">Валюта *
+          <label class="field">Валюта учёта *
             <select name="currency" required>
+              <option value="">Выберите валюту</option>
               <option value="MDL">MDL — молдавский лей</option>
+              <option value="RUB">RUB — российский рубль</option>
               <option value="EUR">EUR — евро</option>
               <option value="USD">USD — доллар</option>
-              <option value="RUB">RUB — российский рубль</option>
               <option value="UAH">UAH — гривна</option>
+              <option value="RON">RON — румынский лей</option>
             </select>
+            <small class="field-help">Используется для стоимости склада, финансов, отчётов и других денежных показателей заведения.</small>
           </label>
         </section>
 
