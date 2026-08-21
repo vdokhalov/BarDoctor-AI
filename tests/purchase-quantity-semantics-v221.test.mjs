@@ -9,7 +9,8 @@ test("purchase review separates quantity unit from package and previews warehous
   assert.match(bundle, /Единица количества/);
   assert.match(bundle, /На склад поступит/);
   assert.match(bundle, /bdProcStockPreviewV221/);
-  assert.match(bundle, /function bdProcPackageUpdateV209\(e\)\{return\{packageSize:e\}\}/);
+  assert.match(bundle, /function bdProcPackageUpdateV209\(e\)\{return e&&typeof e==="object"\?e:\{packageSize:e\}\}/);
+  assert.match(bundle, /function bdProcNomenclaturePreferenceV237/);
   assert.match(css, /bd-procurement-stock-preview-v221/);
 });
 

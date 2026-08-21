@@ -55,6 +55,25 @@ test("nomenclature exposes one explicit hierarchy, a consistent attention queue 
   assert.match(bundle, /Раздел → категория → подкатегория → позиция/);
 });
 
+test("nomenclature offers separate purchase, storage and display units without an overlapping footer", async () => {
+  const [bundle, css, route] = await Promise.all([
+    read("public/assets/index-BQGspy0I.js"),
+    read("public/nomenclature-v208.css"),
+    read("app/api/inventory/products/route.ts"),
+  ]);
+
+  assert.match(bundle, /data-bd-nomenclature-editor":"purchase-units-v237/);
+  assert.match(bundle, /children:"Приходовать в"/);
+  assert.match(bundle, /children:"В бутылках \/ штуках"/);
+  assert.match(bundle, /Одна бутылка равна/);
+  assert.match(bundle, /children:"Фасовки из документов"/);
+  assert.match(bundle, /purchasePackageSize/);
+  assert.match(route, /usesPackageAsPurchaseUnit/);
+  assert.match(css, /\.bd-nomenclature-unit-card-v237/);
+  assert.match(css, /\.bd-nomenclature-panel-actions-v213 \{[\s\S]*position: relative/);
+  assert.doesNotMatch(css, /\.bd-nomenclature-panel-actions-v213 \{[\s\S]{0,120}position: sticky/);
+});
+
 test("warehouse reads canonical names from nomenclature and remains operational", async () => {
   const [bundle, bootstrap] = await Promise.all([
     read("public/assets/index-BQGspy0I.js"),

@@ -2050,6 +2050,55 @@ test("warehouse product editor requires a package conversion when liquid is disp
   assert.match(result.error, /показывать остаток в штуках/);
 });
 
+test("nomenclature stores how wine is received without changing its canonical liquid balance", () => {
+  const result = updateInventoryProductDefinition({
+    assortment: {
+      recipes: [],
+      stockBalances: [{
+        key: "stock:вино|ml",
+        productKey: "stock:вино|ml",
+        name: "Вино",
+        current: 9_000,
+        unit: "ml",
+        packageSize: "Несколько фасовок",
+        packageAmount: 0,
+        packageOptions: ["0,75 л", "1,5 л"],
+        multiplePackageSizes: true,
+      }],
+      nomenclature: [{
+        key: "stock:вино|ml",
+        productKey: "stock:вино|ml",
+        name: "Вино",
+        unit: "ml",
+        packageSize: "Несколько фасовок",
+        packageAmount: 0,
+        packageOptions: ["0,75 л", "1,5 л"],
+        multiplePackageSizes: true,
+      }],
+    },
+    update: {
+      productKey: "stock:вино|ml",
+      name: "Вино",
+      unit: "ml",
+      packageSize: "Несколько фасовок",
+      displayUnit: "pcs",
+      displayPackageSize: "0,75 л",
+      purchaseMode: "package",
+      purchasePackageSize: "0,75 л",
+    },
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.product.current, 9_000);
+  assert.equal(result.product.unit, "ml");
+  assert.equal(result.product.purchaseMode, "package");
+  assert.equal(result.product.purchasePackageSize, "0,75 л");
+  assert.equal(result.product.purchasePackageAmount, 750);
+  assert.equal(result.product.displayPackageAmount, 750);
+  assert.deepEqual(result.product.packageOptions, ["0,75 л", "1,5 л"]);
+});
+
 test("warehouse product editor changes display units without collapsing multiple purchase packages", () => {
   const result = updateInventoryProductDefinition({
     assortment: {

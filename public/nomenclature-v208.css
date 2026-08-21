@@ -916,18 +916,117 @@
   flex-direction: column;
   gap: 14px;
   overflow-y: auto;
-  padding: 18px 18px calc(24px + env(safe-area-inset-bottom));
+  padding: 18px;
 }
 
 .bd-nomenclature-panel-actions-v213 {
-  position: sticky;
-  bottom: 0;
+  position: relative;
+  flex: none;
   display: grid;
   grid-template-columns: 1fr 1.35fr;
   gap: 9px;
-  margin: 4px -4px -4px;
-  padding: 12px 4px 4px;
-  background: linear-gradient(180deg, rgba(245,246,250,0), #f5f6fa 24%);
+  margin: 0;
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e1e4ec;
+  background: rgba(255,255,255,.98);
+}
+
+.bd-nomenclature-unit-card-v237 {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid #dedff0;
+  border-radius: 22px;
+  background: #fff;
+}
+
+.bd-nomenclature-unit-card-v237 > header strong,
+.bd-nomenclature-unit-card-v237 > header small {
+  display: block;
+}
+
+.bd-nomenclature-unit-card-v237 > header strong {
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.bd-nomenclature-unit-card-v237 > header small {
+  margin-top: 4px;
+  color: #70778c;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bd-nomenclature-package-editor-v237 {
+  display: grid;
+  gap: 8px;
+}
+
+.bd-nomenclature-package-editor-v237 > span,
+.bd-nomenclature-package-options-v237 > span {
+  color: #838aa0;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.bd-nomenclature-package-editor-v237 select,
+.bd-nomenclature-package-editor-v237 input {
+  width: 100%;
+}
+
+.bd-nomenclature-package-options-v237 {
+  display: grid;
+  gap: 8px;
+}
+
+.bd-nomenclature-package-options-v237 > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bd-nomenclature-package-options-v237 button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #dfe2ec;
+  border-radius: 12px;
+  background: #f7f8fb;
+  color: #30364c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.bd-nomenclature-package-options-v237 button.active {
+  border-color: #5b55f5;
+  background: #eeedff;
+  color: #4b45df;
+}
+
+.bd-nomenclature-package-options-v237 em {
+  color: #7b8295;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.bd-nomenclature-conversion-preview-v237,
+.bd-nomenclature-lock-note-v237 {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 14px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bd-nomenclature-conversion-preview-v237 {
+  background: #f0efff;
+  color: #403ba8;
+}
+
+.bd-nomenclature-lock-note-v237 {
+  background: #fff6df;
+  color: #7b5712;
 }
 
 .bd-nomenclature-panel-actions-v213 button,

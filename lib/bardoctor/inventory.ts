@@ -96,6 +96,8 @@ export type InventoryProductUpdate = {
   packageSize: string;
   displayUnit?: InventoryDisplayUnit;
   displayPackageSize?: string;
+  purchaseMode?: "document" | "measure" | "package";
+  purchasePackageSize?: string;
 };
 
 export type InventoryProductUpdateResult =
@@ -2112,6 +2114,34 @@ export function updateInventoryProductDefinition(input: {
       error: "Чтобы показывать остаток в штуках, выберите объём или вес одной бутылки, банки или упаковки.",
     };
   }
+  const purchaseMode = ["document", "measure", "package"].includes(input.update.purchaseMode ?? "")
+    ? input.update.purchaseMode as "document" | "measure" | "package"
+    : "document";
+  const usesPackageAsPurchaseUnit = purchaseMode === "package" && requestedUnit !== "pcs";
+  const purchasePackageSize = usesPackageAsPurchaseUnit
+    ? text(
+      input.update.purchasePackageSize,
+      text(
+        balance.purchasePackageSize,
+        displayPackageSize || (keepsMultiplePackages ? "" : packageSize),
+        120,
+      ),
+      120,
+    )
+    : "";
+  const parsedPurchasePackage = usesPackageAsPurchaseUnit
+    ? inventoryPackageAmount(purchasePackageSize, baseUnitInputLabel(requestedUnit))
+    : { amount: 0, unit: requestedUnit };
+  if (
+    usesPackageAsPurchaseUnit
+    && (!purchasePackageSize || parsedPurchasePackage.amount <= 0 || parsedPurchasePackage.unit !== requestedUnit)
+  ) {
+    return {
+      ok: false,
+      code: "INVALID_PRODUCT",
+      error: "Чтобы приходовать товар в бутылках или упаковках, укажите объём или вес одной единицы.",
+    };
+  }
   const previousUnit = baseUnit(balance.unit);
   const hasMovement = array(input.stockMovements).some((value) =>
     text(record(value).productKey, "", 300) === productKey
@@ -2160,6 +2190,14 @@ export function updateInventoryProductDefinition(input: {
     delete balance.displayPackageSize;
     delete balance.displayPackageAmount;
   }
+  balance.purchaseMode = purchaseMode;
+  if (usesPackageAsPurchaseUnit) {
+    balance.purchasePackageSize = purchasePackageSize;
+    balance.purchasePackageAmount = rounded(parsedPurchasePackage.amount);
+  } else {
+    delete balance.purchasePackageSize;
+    delete balance.purchasePackageAmount;
+  }
   balance.packageSize = packageSize;
   balance.packageAmount = rounded(parsedPackage.amount);
   balance.multiplePackageSizes = keepsMultiplePackages || undefined;
@@ -2189,6 +2227,13 @@ export function updateInventoryProductDefinition(input: {
           displayPackageAmount: rounded(parsedDisplayPackage.amount),
         }
         : {}),
+      purchaseMode,
+      ...(usesPackageAsPurchaseUnit
+        ? {
+          purchasePackageSize,
+          purchasePackageAmount: rounded(parsedPurchasePackage.amount),
+        }
+        : {}),
       packageSize,
       packageAmount: rounded(parsedPackage.amount),
       multiplePackageSizes: keepsMultiplePackages || undefined,
@@ -2198,6 +2243,10 @@ export function updateInventoryProductDefinition(input: {
     if (!usesPackageAsDisplayUnit) {
       delete nomenclatureItem.displayPackageSize;
       delete nomenclatureItem.displayPackageAmount;
+    }
+    if (!usesPackageAsPurchaseUnit) {
+      delete nomenclatureItem.purchasePackageSize;
+      delete nomenclatureItem.purchasePackageAmount;
     }
   } else {
     nomenclature.unshift({

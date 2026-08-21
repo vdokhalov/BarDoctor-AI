@@ -338,6 +338,27 @@ export async function POST(request: Request): Promise<Response> {
         { status: 422 },
       );
     }
+    const purchaseMode = ["document", "measure", "package"].includes(text(body.purchaseMode, "document", 20))
+      ? text(body.purchaseMode, "document", 20) as "document" | "measure" | "package"
+      : "document";
+    const usesPackageAsPurchaseUnit = kind === "stock"
+      && purchaseMode === "package"
+      && unit !== "pcs";
+    const purchasePackageSize = usesPackageAsPurchaseUnit
+      ? text(body.purchasePackageSize, displayPackageSize || packageSize, 120)
+      : "";
+    const purchasePackageDetails = usesPackageAsPurchaseUnit
+      ? inventoryPackageAmount(purchasePackageSize, unit)
+      : { amount: 0, unit };
+    if (
+      usesPackageAsPurchaseUnit
+      && (purchasePackageDetails.amount <= 0 || purchasePackageDetails.unit !== unit)
+    ) {
+      return Response.json(
+        { ok: false, error: "Чтобы приходовать товар в бутылках или упаковках, укажите объём или вес одной единицы" },
+        { status: 422 },
+      );
+    }
     const manual = manualClassification(body);
     const classification = Object.keys(manual).length
       ? manual
@@ -358,6 +379,13 @@ export async function POST(request: Request): Promise<Response> {
         ? {
           displayPackageSize,
           displayPackageAmount: displayPackageDetails.amount,
+        }
+        : {}),
+      ...(kind === "stock" ? { purchaseMode } : {}),
+      ...(usesPackageAsPurchaseUnit
+        ? {
+          purchasePackageSize,
+          purchasePackageAmount: purchasePackageDetails.amount,
         }
         : {}),
       packageSize,
@@ -473,6 +501,16 @@ export async function POST(request: Request): Promise<Response> {
       displayPackageSize: text(
         body.displayPackageSize,
         text(previousProduct?.displayPackageSize, "", 120),
+        120,
+      ),
+      purchaseMode: text(
+        body.purchaseMode,
+        text(previousProduct?.purchaseMode, "document", 20),
+        20,
+      ) as "document" | "measure" | "package",
+      purchasePackageSize: text(
+        body.purchasePackageSize,
+        text(previousProduct?.purchasePackageSize, "", 120),
         120,
       ),
     },
