@@ -66,6 +66,60 @@ final result: passed
 
 ---
 
+# Warehouse v241 — Final refinement QA
+
+## Evidence
+
+- Source visual truth: `/workspace/scratch/2bdf7974f7c0/upload/F7350725-A671-4794-8C4D-8EC036BC5B48.jpeg`.
+- Browser-rendered mobile evidence: live `/warehouse-qa-frame-v241.html` canvas containing 375, 390 and 430 px frames.
+- Browser-rendered desktop evidence: live `/warehouse?qaNomenclature=1&venue=501` at 1363 × 936 CSS px.
+- Full-view comparison: the source image and final three-width browser capture were emitted together in one comparison input. The final implementation retains the accepted compact hierarchy and focuses only on control clarity, information density and workflow separation.
+
+## Viewport, state and responsive coverage
+
+- Initial state: all venue sections are collapsed; categories, subcategories and products are absent until their parent is explicitly opened.
+- Expanded state: `Бар → Алкоголь → Пиво`; the user opens each level independently and only then sees seven compact product rows.
+- Mobile: 375, 390 and 430 px frames. Document width equals viewport width in every frame (360/360, 375/375 and 415/415 inner CSS px), so no horizontal overflow is present.
+- Desktop: the existing bounded stock workspace remains centered inside the canonical application shell.
+
+## Findings and iteration history
+
+1. First pass — P2: the structure select was clipped on narrow mobile layouts and could render as a partial label.
+   - Fix: changed the compact label to `Структура`, reserved a stable 128–132 px control column and prevented mobile text inflation/wrapping.
+   - Result: the complete label and chevron remain visible at 375, 390 and 430 px without conflicting with search.
+2. First pass — P2: `Номенклатура` read as a full-width primary warehouse CTA.
+   - Fix: moved it into the stock-heading row as a compact secondary link with a chevron; the route and workflow are unchanged.
+3. First pass — P2: `Требуют распределения` was visually mixed into the section hierarchy.
+   - Fix: derived its count from current-venue attention data, rendered it as a separate compact status row above the real tree, hid it at zero and deep-linked to the existing `На проверке` queue.
+4. Second pass — no actionable P0/P1/P2 mismatch. The upper dashboard is 10–15% denser while preserving practical tap targets, all four actions, all four current tabs and the canonical navigation.
+
+## Required fidelity surfaces
+
+- Typography: the existing BarDoctor font stack and hierarchy are preserved. Search placeholder weight/contrast is quieter; long hierarchy and product names wrap by words with a two-line clamp and no aggressive hyphenation.
+- Spacing and layout: KPI, action, tab and control gaps are tightened without reintroducing nested cards. Tree rows, count slots, chevrons and indentation continue to match Nomenclature.
+- Colors and tokens: existing neutral surfaces, subtle borders and restrained violet/indigo accents remain. The distribution row uses a compact semantic warning treatment rather than becoming a fake section.
+- Assets: existing icon components and brand assets are reused; no emoji, placeholder imagery, custom SVG or decorative CSS illustration was introduced.
+- Data fidelity: counts, stock, units, currencies, status, packaging, cost and receipt data remain venue-scoped. No conversion, stock update or other data mutation was added.
+
+## Interaction and regression coverage
+
+- Verified whole-row disclosure at section, category and subcategory levels and product-card opening from the whole product row.
+- Verified `Пиво Kozel тёмный` (`60 шт.`) and zero-stock `Сироп тестовый` (`0 мл`, package `1 л`, `0 MDL`) without `NaN`/`undefined`.
+- Verified the distribution row at `N > 0`, its direct review-queue transition, its removal from the main tree and its hidden state at zero.
+- Verified `Кёльн → Причал → Кёльн`: KPI, counts, units, warning count and collapsed disclosure state stayed isolated per venue.
+- Verified grouping modes `Структура`, `Категории`, `Подразделы` and `Список`; returned structure state remained collapsed.
+- Verified all current tabs: `Остатки`, `Движения`, `Инвентаризации`, `Списания`.
+- Verified all four actions: inventory sheet, single-file scan chooser, sales-import route and add-purchase sheet.
+- Verified long-name search, scroll-to-top placement, desktop max width and unchanged six-item bottom navigation.
+
+## Console check
+
+No application-origin console errors were observed. Two metadata errors came from the cloud-browser extension URL and are outside the BarDoctor runtime.
+
+final result: passed
+
+---
+
 # Warehouse v240 — Compact tree redesign QA
 
 ## Evidence
