@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import {
   EXPENSE_STORE_KEY,
   hasMeaningfulPurchaseItems,
@@ -313,6 +314,7 @@ export async function POST(request: Request): Promise<Response> {
       const nomenclatureOnly = applyPurchaseToInventory({
         assortment,
         document: updatedDocument,
+        accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
         now,
       });
       return {
@@ -331,6 +333,7 @@ export async function POST(request: Request): Promise<Response> {
         ? updatedDocument
         : { ...updatedDocument, items: [] },
       stockMovements,
+      accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
       now,
     });
   if (!inventory.ok) {

@@ -65,6 +65,31 @@ test("inventory count replaces calculated balance and records only the differenc
   });
 });
 
+test("inventory adjustment preserves a stored value basis when legacy average cost is absent", () => {
+  const result = applyInventoryCount({
+    assortment: {
+      stockBalances: [{
+        key: "valued-opening",
+        name: "Valued opening",
+        current: 10,
+        unit: "pcs",
+        inventoryValue: 1_000,
+        currency: "RUB",
+      }],
+    },
+    snapshot: {
+      id: "inventory-adjustment-valued",
+      date: "2026-08-22",
+      items: [{ id: "line-1", productKey: "valued-opening", actual: 8 }],
+    },
+    now: "2026-08-22T12:00:00.000Z",
+  });
+  const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(balance.current, 8);
+  assert.equal(balance.inventoryValue, 800);
+  assert.equal(result.movements[0]?.costAmount, -200);
+});
+
 test("inventory count does not invent unknown warehouse products", () => {
   const result = applyInventoryCount({
     assortment: { stockBalances: [] },
@@ -1532,6 +1557,100 @@ test("mixed purchase adds every line to nomenclature but posts only goods to sto
   assert.equal(result.summary.postedLines, 1);
 });
 
+test("purchase posting normalizes cost into venue currency without changing document currency", () => {
+  const document = {
+    id: "purchase-fx-1",
+    date: "2026-08-21",
+    currency: "EUR",
+    exchangeRateToAccounting: 100,
+    items: [{
+      id: "line-fx-1",
+      name: "Вино",
+      category: "alcohol",
+      quantity: 2,
+      unit: "шт.",
+      packageSize: "0.75 л",
+      unitPrice: 5,
+      lineTotal: 10,
+    }],
+  };
+  const posted = applyPurchaseToInventory({
+    assortment: { stockBalances: [] },
+    document,
+    accountingCurrency: "RUB",
+  });
+  const balance = (posted.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(document.currency, "EUR");
+  assert.equal(balance.current, 1_500);
+  assert.equal(balance.inventoryValue, 1_000);
+  assert.equal(balance.averageUnitCost, 0.666667);
+  assert.equal(balance.currency, "RUB");
+  assert.equal(balance.costNeedsReview, undefined);
+  assert.equal(posted.movements[0].costAmount, 1_000);
+  assert.equal(posted.movements[0].currency, "RUB");
+  assert.equal(posted.movements[0].transactionCostAmount, 10);
+  assert.equal(posted.movements[0].transactionCurrency, "EUR");
+});
+
+test("purchase without historical FX posts quantity but leaves an explicit unvalued reason", () => {
+  const posted = applyPurchaseToInventory({
+    assortment: { stockBalances: [] },
+    accountingCurrency: "RUB",
+    document: {
+      id: "purchase-fx-missing",
+      date: "2026-08-21",
+      currency: "EUR",
+      items: [{
+        id: "line-fx-missing",
+        name: "Вино",
+        category: "alcohol",
+        quantity: 2,
+        unit: "шт.",
+        packageSize: "0.75 л",
+        unitPrice: 5,
+        lineTotal: 10,
+      }],
+    },
+  });
+  const balance = (posted.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(balance.current, 1_500);
+  assert.equal(balance.inventoryValue, 0);
+  assert.equal(balance.costNeedsReview, true);
+  assert.equal(balance.costReviewReason, "missing_fx");
+  assert.equal(posted.summary.valuationIssues?.[0].reason, "missing_fx");
+  assert.equal(posted.movements[0].costAmount, undefined);
+  assert.equal(posted.movements[0].transactionCostAmount, 10);
+});
+
+test("a valued purchase does not invent cost for an existing positive balance without basis", () => {
+  const result = applyPurchaseToInventory({
+    accountingCurrency: "RUB",
+    assortment: {
+      stockBalances: [{
+        key: "product:legacy",
+        name: "Legacy stock",
+        current: 5,
+        unit: "pcs",
+        averageUnitCost: 0,
+        inventoryValue: 0,
+        currency: "RUB",
+      }],
+    },
+    document: {
+      id: "purchase-known-after-legacy",
+      status: "confirmed",
+      currency: "RUB",
+      items: [{ id: "line-1", name: "Legacy stock", quantity: 5, unit: "pcs", unitPrice: 100, lineTotal: 500 }],
+    },
+    now: "2026-08-22T12:00:00.000Z",
+  });
+  const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(balance.current, 10);
+  assert.equal(balance.inventoryValue, 0);
+  assert.equal(balance.costNeedsReview, true);
+  assert.equal(balance.costReviewReason, "missing_cost_basis");
+});
+
 test("sales report consumes confirmed recipe without fabricating unmatched rows", () => {
   const assortment = {
     menuItems: [
@@ -1572,6 +1691,37 @@ test("sales report consumes confirmed recipe without fabricating unmatched rows"
   assert.equal(result.summary.soldPortions, 4);
   assert.equal(result.summary.unresolvedLines.length, 1);
   assert.equal(result.movements.length, 2);
+});
+
+test("sale keeps a stored value basis instead of making the remaining stock unvalued", () => {
+  const result = applySalesToInventory({
+    assortment: {
+      menuItems: [{ id: "bottled-water", name: "Вода", active: true }],
+      recipes: [{
+        id: "recipe-water",
+        menuItemId: "bottled-water",
+        status: "confirmed",
+        ingredients: [{ id: "water", name: "Вода", quantity: 1, unit: "шт", purchaseProductKey: "water" }],
+      }],
+      stockBalances: [{
+        key: "water",
+        current: 10,
+        unit: "pcs",
+        inventoryValue: 500,
+        currency: "RUB",
+      }],
+    },
+    salesDocument: {
+      id: "sale-valued-opening",
+      date: "2026-08-22",
+      items: [{ id: "sale-water", name: "Вода", quantity: 2 }],
+    },
+    now: "2026-08-22T20:00:00.000Z",
+  });
+  const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
+  assert.equal(balance.current, 8);
+  assert.equal(balance.inventoryValue, 400);
+  assert.equal(result.movements[0]?.costAmount, 100);
 });
 
 test("a partially linked recipe never creates a partial stock deduction", () => {

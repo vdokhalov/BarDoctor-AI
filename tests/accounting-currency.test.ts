@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ACCOUNTING_CURRENCIES,
   accountingCurrencyFromProfile,
+  accountingCurrencyFromRestaurantJson,
   normalizeAccountingCurrency,
 } from "../lib/bardoctor/currency";
 import { venueProfileFromInput } from "../lib/bardoctor/venue-profile";
@@ -20,6 +21,8 @@ test("accounting currency uses the existing venue profile field as its canonical
   assert.equal(normalizeAccountingCurrency("btc"), null);
   assert.equal(accountingCurrencyFromProfile({ currency: "mdl" }), "MDL");
   assert.equal(accountingCurrencyFromProfile({ accountingCurrency: "USD" }), null);
+  assert.equal(accountingCurrencyFromRestaurantJson('{"currency":"rub"}'), "RUB");
+  assert.equal(accountingCurrencyFromRestaurantJson("invalid"), null);
 
   const profile = venueProfileFromInput({
     name: "Venue A",

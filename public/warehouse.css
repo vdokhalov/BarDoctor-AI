@@ -2165,3 +2165,29 @@ body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top::before
     min-height: 52px;
   }
 }
+
+
+/* Warehouse valuation v244 — partial value and focused issue drilldown */
+.bd-warehouse-valuation-link-v244 {
+  width: 100%;
+  min-height: 52px;
+  margin-top: -2px;
+  padding: 10px 13px;
+  border: 1px solid #f1c98a;
+  border-radius: 15px;
+  background: #fff9ed;
+  color: #8a4b08;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.bd-warehouse-valuation-link-v244 span { min-width: 0; display: grid; gap: 2px; }
+.bd-warehouse-valuation-link-v244 strong { font-size: 12.5px; line-height: 1.25; font-weight: 900; overflow-wrap: anywhere; }
+.bd-warehouse-valuation-link-v244 small { font-size: 10.5px; line-height: 1.3; color: #a36b2c; }
+.bd-warehouse-valuation-link-v244.active { border-color: #c7c8ff; background: #f3f3ff; color: #4546aa; }
+.bd-warehouse-valuation-link-v244.active small { color: #6c6db5; }
+@media (min-width: 768px) {
+  .bd-warehouse-valuation-link-v244 { max-width: 430px; }
+}

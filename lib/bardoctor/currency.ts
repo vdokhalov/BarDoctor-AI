@@ -25,3 +25,12 @@ export function accountingCurrencyFromProfile(value: unknown): AccountingCurrenc
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   return normalizeAccountingCurrency((value as Record<string, unknown>).currency);
 }
+
+export function accountingCurrencyFromRestaurantJson(value: unknown): AccountingCurrency | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    return accountingCurrencyFromProfile(JSON.parse(value) as unknown);
+  } catch {
+    return null;
+  }
+}

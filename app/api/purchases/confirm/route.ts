@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import {
   EXPENSE_STORE_KEY,
   findPurchaseExpense,
@@ -409,7 +410,12 @@ export async function POST(request: Request): Promise<Response> {
     updatedByAccountId: account.actorAccountId,
   }, expenses);
   const inventory = confirmedDocument.documentType !== "price_list"
-    ? applyPurchaseToInventory({ assortment, document: confirmedDocument, now })
+    ? applyPurchaseToInventory({
+      assortment,
+      document: confirmedDocument,
+      accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+      now,
+    })
     : null;
   if (inventory?.summary.unresolvedLines.length) {
     const details = inventory.summary.unresolvedLines

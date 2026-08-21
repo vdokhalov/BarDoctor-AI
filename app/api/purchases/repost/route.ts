@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import {
   applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
@@ -194,7 +195,12 @@ export async function POST(request: Request): Promise<Response> {
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const inventory = purchaseAffectsInventory(previous)
-    ? applyPurchaseToInventory({ assortment, document: previous, now })
+    ? applyPurchaseToInventory({
+      assortment,
+      document: previous,
+      accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+      now,
+    })
     : null;
   if (inventory?.summary.unresolvedLines.length) {
     return Response.json(
