@@ -408,6 +408,12 @@
       entries.forEach(function (entry) { entry.remove(); });
       return;
     }
+    if (document.querySelector('[data-bd-warehouse-version="compact-tree-v240"]')) {
+      entries.forEach(function (entry) {
+        if (entry.getAttribute("data-bd-warehouse-sales-entry") === "legacy") entry.remove();
+      });
+      return;
+    }
     var nativeEntry = document.querySelector('[data-bd-warehouse-sales-entry="native-v79"]');
     if (nativeEntry) {
       entries.forEach(function (entry) { if (entry !== nativeEntry) entry.remove(); });
@@ -427,9 +433,10 @@
       '<span>Загрузите отчёт кассы: BarDoctor сопоставит позиции меню и спишет ингредиенты.</span></span>',
       '<a href="/sales-import">Открыть <b aria-hidden="true">→</b></a>',
     ].join("");
-    var heading = main.querySelector("header");
-    if (heading && heading.nextSibling) main.insertBefore(entry, heading.nextSibling);
-    else main.insertBefore(entry, main.firstChild);
+    var heading = main.querySelector(":scope > header");
+    var reference = heading ? heading.nextSibling : main.firstChild;
+    if (reference && reference.parentNode === main) main.insertBefore(entry, reference);
+    else main.appendChild(entry);
   }
 
   function enhancePurchaseLanguage() {
@@ -1366,7 +1373,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237";
+    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-warehouse-v240";
     document.head.appendChild(script);
   }
 

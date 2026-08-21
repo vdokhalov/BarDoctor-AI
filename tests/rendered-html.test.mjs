@@ -1178,7 +1178,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
     /textShadow:"0 0 22px rgba\(255,255,255,0\.16\)"},children:"Bar"/,
   );
   assert.match(mainBundle, /\/warehouse\?add=inventory/);
-  assert.match(mainBundle, /data-bd-warehouse-version":"product-cards-v78/);
+  assert.match(mainBundle, /data-bd-warehouse-version":"compact-tree-v240/);
   assert.match(mainBundle, /function bdWarehouseProductSheet/);
   assert.match(mainBundle, /\/api\/inventory\/products/);
   assert.match(mainBundle, /Открыть карточку/);

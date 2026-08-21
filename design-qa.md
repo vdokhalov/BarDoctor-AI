@@ -66,6 +66,162 @@ final result: passed
 
 ---
 
+# Warehouse v240 — Compact tree redesign QA
+
+## Evidence
+
+- Source visual truth: `/workspace/scratch/2bdf7974f7c0/upload/F7350725-A671-4794-8C4D-8EC036BC5B48.jpeg`.
+- Browser-rendered mobile evidence: `/warehouse-qa-frame-v240.html`, containing live 375, 390 and 430 px frames.
+- Browser-rendered desktop evidence: `/warehouse?qaNomenclature=1&venue=501` at 1363 × 936 CSS px.
+- The source mock and the final three-width mobile canvas were emitted together in one comparison input. The implementation preserves the mock's header, compact action area, tabs, filters, hierarchical stock list, compact product rows and canonical navigation.
+
+## State and responsive coverage
+
+- Initial state: every section, category and subcategory is collapsed. A child level is not rendered until the user explicitly opens its parent.
+- Expanded state: `Бар → Алкоголь → Пиво`, with seven venue-scoped beer positions rendered as 76 px rows.
+- Mobile: 375, 390 and 430 px frames with no horizontal overflow; the fixed bottom navigation and compact scroll-to-top control remain unobstructed.
+- Desktop: the stock workspace is bounded and centered inside the canonical finance layout instead of stretching across the full page.
+
+## Findings
+
+- No actionable P0/P1/P2 visual findings remain.
+- Four stock tabs remain because the existing module also includes `Списания`; removing it to copy the three-tab mock would violate feature parity.
+- The compact summary strip remains above the actions because its venue-scoped value, item count, negative count and last-inventory data already support the warehouse workflow.
+- Mobile action tiles use a 2 × 2 layout so the full Russian labels remain readable and tappable; desktop uses four equal columns.
+
+## Required fidelity surfaces
+
+- Typography: existing BarDoctor font stack and weights are retained. Hierarchy labels, product names, amounts and secondary metadata have distinct optical weight; long names clamp to two lines without hyphenation.
+- Spacing and hierarchy: nested product cards were replaced by a single divided tree surface. Indentation, one subtle active-branch guide, compact counts and chevrons match the updated Nomenclature pattern.
+- Colors and tokens: light neutral page, white surfaces, restrained violet/indigo accents, compact green/amber/error status text and subtle borders use the established BarDoctor tokens.
+- Icons and assets: existing application icon components and logo assets are reused; no emoji, custom SVG, CSS illustration or placeholder imagery was introduced.
+- Responsiveness and accessibility: hierarchy rows are semantic buttons with `aria-expanded` and `aria-controls`; the whole product row opens the existing card. Counts and units are non-wrapping, product rows have practical tap height, and 375/390/430/1363 px views have no horizontal overflow.
+
+## Interaction and regression coverage
+
+- Fresh open showed only top-level sections; opening `Бар` revealed collapsed categories, opening `Алкоголь` revealed collapsed subcategories, and opening `Пиво` revealed products only at the fourth user action.
+- Closing/reopening and `Кёльн → Причал → Кёльн` reset disclosure state. Köln showed 19 positions and zero counter 3; Причал showed 3 positions and zero counter 0, with no carried counts or open IDs.
+- Opened `Пиво Kozel тёмный`; verified `60 шт.`, packaging, accounting/display unit, cost, last receipt and current status without `NaN` or `undefined`.
+- Searched and opened zero-stock `Сироп тестовый`; verified `0 мл`, `Нет остатка`, `1 л` packaging, `0 MDL`, last-receipt state and an operable card.
+- Verified the inventory sheet opens, scan action produces the existing single-file chooser, sales import navigates to `/sales-import`, and purchase opens the existing suppliers/purchases flow.
+- Verified `Остатки`, `Движения`, `Инвентаризации` and preserved `Списания` content. The canonical six-item navigation remained intact and Finance stayed active.
+- A legacy warehouse-sales DOM injector initially logged an `insertBefore` error against the redesigned hierarchy. It now detects v240, removes only its obsolete legacy entry and exits; a fresh browser tab showed zero application errors.
+
+## Console check
+
+No `terminal.local` application errors were present after the legacy injector guard. Browser-extension metadata errors were excluded as non-application noise.
+
+final result: passed
+
+---
+
+# Nomenclature v238 — Compact tree redesign QA
+
+## Evidence
+
+- Source visual truth: `/workspace/scratch/c68329c14995/upload/5B52A5B1-4134-4261-93A1-185BBA67BF1E.png`
+- Browser-rendered implementation screenshot: `/tmp/nomenclature-v238-qa-all.png` (cloud-browser session artifact containing 375, 390 and 430 px frames).
+- Local implementation route: `/nomenclature?qaNomenclature=1&venue=501`.
+- Full-view comparison: the source mock and the final three-width browser capture were emitted together in one comparison input. The implementation preserves the same header → structure title → search/tabs → four-level tree → canonical bottom navigation hierarchy.
+- Focused comparison: the 390 px frame was inspected at readable scale for the header, segmented tabs, section/category/subcategory rows, stock amount, location line, chevrons and bottom navigation. A separate crop was not required because those controls remained legible in the combined comparison.
+
+## Viewport and normalization
+
+- Source pixels: 941 × 1672. The source includes an iPhone status area and is a directional high-density mock rather than a 1:1 browser capture.
+- Implementation comparison frame: 390 × 844 CSS px at device pixel ratio 1, with additional browser-rendered checks at 375 × 844 and 430 × 844.
+- Desktop implementation: 1365 × 936 CSS px.
+- Density normalization: compared at the shared 390 px content width and ignored source-only status-bar/device-density differences. Layout hierarchy, control proportions, wrapping and information density were judged in CSS-space rather than raw source pixels.
+- State: light theme, authenticated synthetic owner, venue `Кёльн`, `Бар → Алкоголь → Пиво` expanded, seven beer positions visible in the rendered tree data.
+
+## Findings
+
+- No actionable P0/P1/P2 visual findings remain.
+- The compact action shortcuts `Позиция`, `Покупка`, `Остатки` remain above search. They are an intentional feature-parity deviation from the directional mock, not decorative UI.
+- The optional review warning remains as one compact amber row near the tabs. The primary entry point is still the `На проверке` tab, as required.
+- Test counts differ from the illustrative mock because the implementation uses venue data as the source of truth.
+
+## Required fidelity surfaces
+
+- Fonts and typography: existing BarDoctor font stack and weights are retained. Heading, hierarchy labels, product names, storage locations and amounts have distinct optical weights; 375/390 px tab and action labels no longer wrap awkwardly.
+- Spacing and layout rhythm: one bounded workspace and one tree surface replace nested cards. Section, category, subcategory and item rows use dense, consistent heights with restrained indentation, guide lines and dividers.
+- Colors and visual tokens: light neutral page, white surfaces, soft borders, muted secondary text and restrained violet/indigo accents match the mock and existing tokens.
+- Image quality and asset fidelity: no raster imagery is required for this data-management screen. Existing BarDoctor/logo assets and the installed icon set are reused; no emoji, handcrafted SVG or decorative CSS illustration substitutes were added.
+- Copy and content: the requested structure title, path explanation, search label, tabs, review status, product names, locations and user-configured units are present. Full taxonomy paths are not repeated inside product rows.
+- Responsiveness and accessibility: 375, 390, 430 and 1365 px layouts were rendered without horizontal overflow. Accordion rows are semantic buttons with `aria-expanded`/`aria-controls`, the whole row is tappable, item rows open the editor, focus behavior is preserved and the scroll-to-top control respects bottom navigation.
+
+## Comparison history
+
+1. First browser pass — P2: at 375/390 px the `Позиция` action and `На проверке` tab wrapped, while the search placeholder was overly cramped.
+   - Fix: tightened mobile-only font/padding values, hid the redundant Plus icon at the narrowest width and made the review tab a non-wrapping compact control.
+   - Post-fix evidence: the final combined comparison shows single-line action/tab labels and stable 375/390/430 layouts with no clipping or horizontal scroll.
+2. Second browser pass — no actionable P0/P1/P2 mismatch. Remaining differences are deliberate feature-parity constraints described above.
+
+## Primary interactions tested in the cloud browser
+
+- Expanded `Бар → Алкоголь → Пиво`; verified all seven Köln beer rows and per-position `шт.` amounts.
+- Opened `Пиво Kozel тёмный`, verified the existing editor and returned to the tree.
+- Changed synthetic `Сироп тестовый` from `мл` to `шт.`, saved, and verified the tree changed from `0 мл` to `0 шт.` without touching real data.
+- Expanded `Вино и игристое`; verified `Вино Крикова Изабелла` displays `12 шт.` from its configured 0.75 L package.
+- Expanded `Кухня → Продукты → Мясо и птица`; verified a long product name, storage location and `5,2 кг` amount.
+- Opened `Все позиции` and `На проверке`; verified their existing content and attention item.
+- Searched for `Kozel тёмный`; verified the matching product remains and unrelated beer rows are filtered out.
+- Used the existing venue switcher to select `Причал`, then verified its `/nomenclature` data separately: `Пиво Kozel тёмный — 24 шт.` and `Вино домашнее — 6 л`.
+- Scrolled the 390 px Köln list past the threshold, verified the scroll-to-top control became keyboard reachable, clicked it and confirmed scroll position returned to zero.
+- Desktop layout rendered in the canonical bounded workspace with the existing left navigation and venue switcher.
+
+## Console check
+
+No errors from `terminal.local` application code were observed in the final cloud-browser session.
+
+final result: passed
+
+---
+
+# Nomenclature v239 — Collapsed tree refinement QA
+
+## Evidence
+
+- Source visual truth: `/workspace/scratch/c68329c14995/upload/5B52A5B1-4134-4261-93A1-185BBA67BF1E.png`.
+- Browser-rendered mobile evidence: the local QA canvas at `/nomenclature-qa-frame-v238.html`, containing live 375, 390 and 430 px frames.
+- Browser-rendered desktop evidence: `/nomenclature?qaNomenclature=1&venue=501&visual=1` at 1365 × 936 CSS px.
+- The source mock and the final manually expanded implementation were emitted together in one comparison input. The implementation retains the selected compact-tree direction while reducing hierarchy markers, guide lines and row height.
+
+## State and responsive coverage
+
+- Initial state: every top-level section is collapsed; no category, subcategory or product row is mounted until its parent is explicitly opened.
+- Expanded comparison state: `Бар → Алкоголь → Пиво`, with the seven synthetic Köln beer rows and their venue-scoped `шт.` amounts visible.
+- Mobile: 375 × 844, 390 × 844 and 430 × 844 CSS px, with fixed canonical bottom navigation.
+- Desktop: 1365 × 936 CSS px, bounded workspace and canonical left navigation.
+
+## Findings
+
+- No actionable P0/P1/P2 visual findings remain.
+- Top-level sections are distinct through the compact letter badge, stronger typography and a very light neutral tint; categories rely on indentation and typography; only subcategories retain the selective violet dot; products have no dot.
+- One subtle active-branch guide remains. The second product-level guide was removed, avoiding the previous spreadsheet-like stack of parallel lines.
+- Product rows are 54 px on mobile and 56 px on desktop. Storage text is smaller, lighter and closer to the product name, while the stock amount remains high-contrast and data-driven.
+- Long hierarchy labels use a two-line clamp with a reserved, non-shrinking count/chevron slot.
+
+## Interaction and regression coverage
+
+- Fresh open/reopen: all five synthetic Köln top-level sections reported `aria-expanded=false`; categories were absent.
+- Opened only `Бар`: its three categories appeared and remained collapsed; all sibling sections stayed collapsed.
+- Opened `Алкоголь`: all subcategories appeared collapsed; no product row was rendered.
+- Opened `Пиво`: only then did the seven beer rows render.
+- Closed/reopened the route and confirmed the tree returned to fully collapsed state.
+- Search for `Kozel тёмный` temporarily revealed the matching path. A search-only accordion change did not alter the normal tree; clearing via user keyboard input restored the previous normal disclosure state.
+- Switched `Кёльн → Причал`, reopened Nomenclature and confirmed the new venue started fully collapsed with its own counts and units. No Köln disclosure state or IDs were reused.
+- Opened `Пиво Kozel тёмный` and verified the existing editor, section/category/subcategory controls, storage location, stock unit, purchase unit, display unit and packaging controls.
+- Opened `Все позиции`, `На проверке` and returned to `Структура`; headings and existing routes remained functional.
+- No `terminal.local` application errors were present. Repeated metadata messages from the cloud-browser extension were excluded as non-application noise.
+
+## Visual comparison result
+
+The implementation preserves the source hierarchy, light surfaces, restrained indigo accent, compact information density, prominent amounts and canonical navigation. The deliberate differences are required by the final brief: the default state is fully collapsed, category/product dots are reduced, parallel guides are removed, product rows are denser and existing BarDoctor quick actions/review status remain for feature parity.
+
+final result: passed
+
+---
+
 # Notifications v183 — Design QA
 
 **Source visual truth path**
