@@ -195,6 +195,31 @@ test("mapping suggests one saved target across Latin and Cyrillic Coca-Cola vari
   assert.equal(latin.status, "confirmed");
 });
 
+test("mapping treats a different package as the same unique stock master", () => {
+  const decision = decideMapping(
+    { id: "1c-volk-half", name: "Водка VOLK", unit: "л", packageSize: "0.5 л" },
+    [{ id: "stock:водка volk|ml", name: "Водка Volk", unit: "ml", packageSize: "10 л" }],
+  );
+  assert.equal(decision.status, "confirmed");
+  assert.equal(decision.candidate?.id, "stock:водка volk|ml");
+  assert.equal(decision.confidence, 95);
+});
+
+test("mapping keeps an explicit size in the product name but merges water descriptors", () => {
+  const cola = decideMapping(
+    { id: "1c-cola-half", name: "Кола 0,5 л", packageSize: "0,5 л" },
+    [{ id: "stock:кола|ml", name: "Кола", unit: "ml", packageSize: "1 л" }],
+  );
+  assert.notEqual(cola.status, "confirmed");
+
+  const borjomi = decideMapping(
+    { id: "1c-borjomi-half", name: "Вода минеральная Боржоми", packageSize: "0,5 л" },
+    [{ id: "stock:боржоми|ml", name: "Вода Боржоми", unit: "ml", packageSize: "1 л" }],
+  );
+  assert.equal(borjomi.status, "confirmed");
+  assert.equal(borjomi.candidate?.id, "stock:боржоми|ml");
+});
+
 test("validation rejects one bad record without inventing accounting values", async () => {
   const adapter = new UniversalFileAdapter();
   const result = await adapter.normalize({

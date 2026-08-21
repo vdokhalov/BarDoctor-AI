@@ -6,6 +6,7 @@ export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
 export const SALES_DOCUMENT_STORE_KEY = "bd_sales_documents";
 
 export type BaseInventoryUnit = "ml" | "g" | "pcs" | "unknown";
+export type InventoryDisplayUnit = "auto" | "ml" | "l" | "g" | "kg" | "pcs";
 
 export type StockMovement = {
   id: string;
@@ -66,6 +67,18 @@ export type InventoryMetadataRepairSummary = {
   removed: number;
 };
 
+export type InventoryPurchaseAmountRepairSummary = {
+  repairedMovements: number;
+  restoredMovements: number;
+  reconciledBalances: number;
+  correctedProducts: number;
+  correctedAmount: number;
+  evidenceDocuments: number;
+  evidenceMatches: number;
+  linkedShadowBalances: number;
+  changed: boolean;
+};
+
 export type InventoryDuplicateConsolidationSummary = {
   mergedBalances: number;
   mergedNomenclature: number;
@@ -80,6 +93,7 @@ export type InventoryProductUpdate = {
   name: string;
   unit: BaseInventoryUnit;
   packageSize: string;
+  displayUnit?: InventoryDisplayUnit;
 };
 
 export type InventoryProductUpdateResult =
@@ -151,9 +165,26 @@ function inventoryIdentityName(value: unknown): string {
   return normalizeInventoryText(item.name ?? item.productName);
 }
 
+export function inventoryProductIdentityName(value: unknown): string {
+  const item = record(value);
+  const rawName = text(item.name ?? item.productName, "", 240);
+  if (!rawName) return "";
+  const normalized = normalizeInventoryText(rawName);
+  const tokens = normalized.split(" ").filter(Boolean);
+  const waterDescriptors = new Set([
+    "вода", "воды", "минеральная", "минеральный", "питьевая", "питьевой",
+    "столовая", "столовый", "газированная", "газированный", "негазированная",
+    "негазированный", "water", "mineral", "still", "sparkling",
+  ]);
+  const hasWaterDescriptor = tokens.some((token) => waterDescriptors.has(token));
+  if (!hasWaterDescriptor) return normalized;
+  const distinctive = tokens.filter((token) => !waterDescriptors.has(token));
+  return distinctive.length ? distinctive.join(" ") : normalized;
+}
+
 function generatedInventoryProductKey(value: unknown): string {
   const item = record(value);
-  const name = inventoryIdentityName(item);
+  const name = inventoryProductIdentityName(item);
   if (!name) return "";
   const unitText = normalizeInventoryText(item.unit);
   const packageText = normalizeInventoryText(item.packageSize);
@@ -164,6 +195,31 @@ function generatedInventoryProductKey(value: unknown): string {
   const packageDetails = inventoryPackageAmount(item.packageSize, item.unit);
   const unit = packageDetails.unit !== "unknown" ? packageDetails.unit : baseUnit(item.unit);
   return unit === "unknown" ? "" : `stock:${name}|${unit}`;
+}
+
+export function resolveInventoryProductKey(assortment: unknown, requestedValue: unknown): string {
+  const root = record(assortment);
+  const requested = text(requestedValue, "", 300);
+  if (!requested) return "";
+  const aliases = new Map(
+    array(root.inventoryProductAliases)
+      .map((value) => record(value))
+      .map((value) => [text(value.from, "", 300), text(value.to, "", 300)] as const)
+      .filter(([from, to]) => from && to),
+  );
+  let resolved = requested;
+  const visited = new Set<string>();
+  while (aliases.has(resolved) && !visited.has(resolved) && visited.size < 20) {
+    visited.add(resolved);
+    resolved = aliases.get(resolved) ?? resolved;
+  }
+  const balances = array(root.stockBalances).map(record);
+  const direct = balances.find((value) => text(value.productKey ?? value.key, "", 300) === resolved);
+  if (direct) return text(direct.productKey ?? direct.key, resolved, 300);
+  const external = balances.find((value) =>
+    array(value.externalProductKeys).some((key) => text(key, "", 300) === requested)
+  );
+  return external ? text(external.productKey ?? external.key, resolved, 300) : resolved;
 }
 
 function legacyGeneratedInventoryProductKey(value: unknown): string {
@@ -239,7 +295,40 @@ export function purchaseLineBaseAmount(value: unknown): {
 } {
   const item = record(value);
   const quantity = Math.max(0, number(item.quantity));
+  const quantityAmount = toInventoryBaseAmount(quantity, item.unit);
+  const quantityMode = text(item.quantityMode, "", 20);
+  // A dimensional quantity is already the total measured amount. Packaging is
+  // metadata in this case and must never multiply liters/kilograms a second
+  // time, even if an old imported line incorrectly says quantityMode=count.
+  if (
+    quantityMode === "measure"
+    || quantityAmount.unit === "ml"
+    || quantityAmount.unit === "g"
+  ) {
+    return {
+      amount: rounded(quantityAmount.amount),
+      unit: quantityAmount.unit,
+    };
+  }
   const packageAmount = inventoryPackageAmount(item.packageSize, item.unit);
+  // Older manual-purchase forms could save the *total* amount both as the
+  // quantity and as a synthetic package label (for example 10 + "10 л"),
+  // while also marking the row as a count. Multiplying those fields produced
+  // 100 l. A package above 5 l is not a credible retail bottle for distilled
+  // spirits, and equality with the entered total is the legacy signature.
+  // Beer kegs and other genuinely large containers are intentionally excluded.
+  const itemName = normalizeInventoryText(item.name ?? item.productName);
+  const isDistilledSpirit = /(?:^| )(?:коньяк|бренди|водка|виски|ром|джин|текила|ликер|ликёр|cognac|brandy|vodka|whisky|whiskey|rum|gin|tequila|liqueur)(?: |$)/i
+    .test(itemName);
+  const packageAsLiters = packageAmount.unit === "ml" ? packageAmount.amount / 1_000 : 0;
+  if (
+    isDistilledSpirit
+    && quantity >= 5
+    && packageAsLiters > 5
+    && Math.abs(packageAsLiters - quantity) < 0.0001
+  ) {
+    return { amount: rounded(packageAmount.amount), unit: packageAmount.unit };
+  }
   return {
     amount: rounded(quantity * packageAmount.amount),
     unit: packageAmount.unit,
@@ -292,11 +381,396 @@ function remappedProductKey(value: unknown, aliases: Map<string, string>): strin
   return aliases.get(requested) ?? inventoryProductKey(item) ?? requested;
 }
 
+const INVENTORY_PRODUCT_TYPES = new Set([
+  "вода", "водка", "коньяк", "бренди", "виски", "ром", "джин", "текила",
+  "ликер", "ликёр", "вино", "шампанское", "пиво", "сидр", "сок", "сироп",
+  "кола", "cola", "лимонад", "тоник", "кофе", "чай", "молоко", "сливки",
+]);
+
+const INVENTORY_VARIANT_MARKERS = new Set([
+  "vs", "vsop", "xo", "xxo", "reserve", "reserva", "gold", "black", "red",
+  "white", "rose", "brut", "dry", "citron", "lemon", "orange", "cherry",
+  "vanilla", "honey", "apple", "pear", "peach", "coconut", "mint",
+  "лимон", "апельсин", "вишня", "ваниль", "мед", "яблоко", "груша",
+  "персик", "кокос", "мята", "сухое", "полусухое", "сладкое", "брют",
+  "светлый", "светлое", "светлая", "светлые", "light",
+  "темный", "тёмный", "темное", "тёмное", "темная", "тёмная", "dark",
+]);
+
+const INVENTORY_VARIANT_ALIASES = new Map<string, string>([
+  ["светлый", "light"], ["светлое", "light"], ["светлая", "light"],
+  ["светлые", "light"], ["light", "light"],
+  ["темный", "dark"], ["тёмный", "dark"], ["темное", "dark"],
+  ["тёмное", "dark"], ["темная", "dark"], ["тёмная", "dark"], ["dark", "dark"],
+]);
+
+const INVENTORY_IDENTITY_DESCRIPTORS = new Set([
+  "вода", "воды", "минеральная", "минеральный", "питьевая", "питьевой",
+  "столовая", "столовый", "газированная", "газированный", "негазированная",
+  "негазированный", "water", "mineral", "still", "sparkling",
+  "коньяк", "бренди", "cognac", "brandy", "напиток", "напитки", "drink",
+  "бутылка", "бутылки", "бут", "банка", "банки", "упаковка", "уп", "пэт",
+  "pet", "стекло", "glass",
+]);
+
+const INVENTORY_TRANSLITERATION: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh",
+  з: "z", и: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o",
+  п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "c",
+  ч: "ch", ш: "sh", щ: "shch", ъ: "", ы: "i", ь: "", э: "e", ю: "yu",
+  я: "ya",
+};
+
+function inventoryPhoneticToken(value: string): string {
+  return [...value.toLocaleLowerCase("ru")]
+    .map((letter) => INVENTORY_TRANSLITERATION[letter] ?? letter)
+    .join("")
+    .replace(/c(?=[aou])/g, "k")
+    .replace(/shch/g, "sch")
+    .replace(/(?:iy|yy|yi)$/g, "i")
+    .replace(/yo/g, "e")
+    .replace(/yu/g, "u")
+    .replace(/ya/g, "a")
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function inventoryTokenDistance(left: string, right: string): number {
+  if (left === right) return 0;
+  if (!left.length) return right.length;
+  if (!right.length) return left.length;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + (left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1),
+      );
+    }
+    previous = current;
+  }
+  return previous[right.length];
+}
+
+function inventoryTokenSimilarity(left: string, right: string): number {
+  if (!left || !right) return 0;
+  return 1 - inventoryTokenDistance(left, right) / Math.max(left.length, right.length);
+}
+
+function inventoryNameTokens(value: unknown): string[] {
+  const item = record(value);
+  return normalizeInventoryText(item.name ?? item.productName)
+    .split(" ")
+    .filter((token) => token.length > 1 || /\d/.test(token));
+}
+
+function inventoryTypeToken(value: unknown): string {
+  return inventoryNameTokens(value).find((token) => INVENTORY_PRODUCT_TYPES.has(token)) ?? "";
+}
+
+function hasExplicitInventoryVariant(value: unknown): boolean {
+  const item = record(value);
+  const rawName = text(item.name ?? item.productName, "", 240);
+  const tokens = inventoryNameTokens(item);
+  return /\d/.test(rawName)
+    || /\b(?:мл|ml|л|l|литр|г|гр|g|кг|kg|шт|pcs)\b/i.test(rawName)
+    || tokens.some((token) => INVENTORY_VARIANT_MARKERS.has(token));
+}
+
+function inventoryBalanceUnit(value: unknown): BaseInventoryUnit {
+  const item = record(value);
+  const packageUnit = inventoryPackageAmount(item.packageSize, item.unit).unit;
+  return packageUnit !== "unknown" ? packageUnit : baseUnit(item.unit);
+}
+
+function inventoryExplicitNameAmount(value: unknown): { amount: number; unit: BaseInventoryUnit } | null {
+  const item = record(value);
+  const rawName = text(item.name ?? item.productName, "", 240);
+  const match = rawName.toLocaleLowerCase("ru").replace(/,/g, ".").match(
+    /(?:^|\s)(\d+(?:\.\d+)?)\s*(мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg)(?:\s|$)/i,
+  );
+  if (!match) return null;
+  const parsed = toInventoryBaseAmount(match[1], match[2]);
+  return parsed.unit === "unknown" ? null : parsed;
+}
+
+function inventoryIdentityTokens(value: unknown): string[] {
+  const tokens = inventoryNameTokens(value)
+    .filter((token) => !INVENTORY_IDENTITY_DESCRIPTORS.has(token))
+    .filter((token) => !INVENTORY_PRODUCT_TYPES.has(token))
+    .filter((token) => !/^\d+(?:[.,]\d+)?$/.test(token))
+    .filter((token) => !/^(?:мл|ml|л|l|литр|литра|литров|г|гр|g|кг|kg|шт|pcs)$/.test(token))
+    .map((token) => INVENTORY_VARIANT_ALIASES.get(token) ?? token)
+    .map(inventoryPhoneticToken)
+    .filter((token) => token.length >= 2);
+  return [...new Set(tokens)].sort();
+}
+
+function inventoryIdentityType(value: unknown): string {
+  const item = record(value);
+  const direct = inventoryTypeToken(item);
+  if (direct) return direct === "бренди" ? "коньяк" : direct;
+  const classification = normalizeInventoryText([
+    item.category,
+    item.categoryName,
+    item.subcategory,
+    item.subCategory,
+    item.subcategoryName,
+    item.subCategoryName,
+    item.path,
+  ].filter(Boolean).join(" "));
+  const token = classification.split(" ").find((candidate) => INVENTORY_PRODUCT_TYPES.has(candidate)) ?? "";
+  return token === "бренди" ? "коньяк" : token;
+}
+
+function inventoryAutomaticIdentityScore(left: JsonRecord, right: JsonRecord): number {
+  const leftIsEmpty = Math.abs(number(left.current)) < 0.0001 && Math.abs(valueOfBalance(left)) < 0.01;
+  const rightIsEmpty = Math.abs(number(right.current)) < 0.0001 && Math.abs(valueOfBalance(right)) < 0.01;
+  if (inventoryBalanceUnit(left) !== inventoryBalanceUnit(right) && !leftIsEmpty && !rightIsEmpty) return 0;
+  const leftCurrency = text(left.currency, "", 12).toUpperCase();
+  const rightCurrency = text(right.currency, "", 12).toUpperCase();
+  if (leftCurrency && rightCurrency && leftCurrency !== rightCurrency) return 0;
+
+  const leftType = inventoryIdentityType(left);
+  const rightType = inventoryIdentityType(right);
+  if (leftType && rightType && leftType !== rightType) return 0;
+
+  const leftAmount = inventoryExplicitNameAmount(left);
+  const rightAmount = inventoryExplicitNameAmount(right);
+  const commonType = leftType || rightType;
+  const genericWaterName = commonType === "вода" && [left, right].some((item) =>
+    inventoryNameTokens(item).some((token) => INVENTORY_WATER_DESCRIPTORS.has(token))
+  );
+  if (leftAmount && rightAmount && (
+    leftAmount.unit !== rightAmount.unit || Math.abs(leftAmount.amount - rightAmount.amount) > 0.001
+  )) return 0;
+  if (Boolean(leftAmount) !== Boolean(rightAmount)) {
+    if (!genericWaterName) return 0;
+  }
+  const leftNumbers = normalizeInventoryText(record(left).name ?? record(left).productName)
+    .match(/\d+(?:[.,]\d+)?/g) ?? [];
+  const rightNumbers = normalizeInventoryText(record(right).name ?? record(right).productName)
+    .match(/\d+(?:[.,]\d+)?/g) ?? [];
+  if (leftNumbers.join(" ") !== rightNumbers.join(" ") && !genericWaterName) return 0;
+
+  const leftVariants = inventoryNameTokens(left)
+    .filter((token) => INVENTORY_VARIANT_MARKERS.has(token))
+    .map((token) => INVENTORY_VARIANT_ALIASES.get(token) ?? token);
+  const rightVariants = inventoryNameTokens(right)
+    .filter((token) => INVENTORY_VARIANT_MARKERS.has(token))
+    .map((token) => INVENTORY_VARIANT_ALIASES.get(token) ?? token);
+  if (leftVariants.length || rightVariants.length) {
+    if (leftVariants.join(" ") !== rightVariants.join(" ")) return 0;
+  }
+
+  const leftTokens = inventoryIdentityTokens(left);
+  const rightTokens = inventoryIdentityTokens(right);
+  if (!leftTokens.length || !rightTokens.length) return 0;
+  if (leftTokens.join(" ") === rightTokens.join(" ")) return 1;
+
+  const smaller = leftTokens.length <= rightTokens.length ? leftTokens : rightTokens;
+  const larger = smaller === leftTokens ? rightTokens : leftTokens;
+  const matched = smaller.map((token) => Math.max(...larger.map((candidate) =>
+    inventoryTokenSimilarity(token, candidate)
+  )));
+  const coverage = matched.reduce((sum, score) => sum + score, 0) / smaller.length;
+  const unmatched = larger.filter((token) =>
+    !smaller.some((candidate) => inventoryTokenSimilarity(token, candidate) >= 0.72)
+  );
+  const extraPenalty = unmatched.length / larger.length;
+  if ((leftIsEmpty || rightIsEmpty) && smaller.length >= 2 && coverage >= 0.98 && unmatched.length <= 1) {
+    return 0.93;
+  }
+  return coverage - extraPenalty * 0.35;
+}
+
+function inventoryAutomaticAnchor(value: JsonRecord, balances: JsonRecord[]): JsonRecord | undefined {
+  const matches = balances
+    .filter((candidate) => candidate !== value)
+    .map((candidate) => ({ candidate, score: inventoryAutomaticIdentityScore(value, candidate) }))
+    .filter(({ score }) => score >= 0.9);
+  if (!matches.length) return undefined;
+  return [value, ...matches.map(({ candidate }) => candidate)]
+    .sort((left, right) => {
+      const leftPreferred = Boolean(text(left.preferredDisplayName, "", 240));
+      const rightPreferred = Boolean(text(right.preferredDisplayName, "", 240));
+      if (leftPreferred !== rightPreferred) return leftPreferred ? -1 : 1;
+      const leftGenericMaster = inventoryExplicitNameAmount(left) ? 1 : 0;
+      const rightGenericMaster = inventoryExplicitNameAmount(right) ? 1 : 0;
+      if (leftGenericMaster !== rightGenericMaster) return leftGenericMaster - rightGenericMaster;
+      const leftCyrillic = /[а-яё]/i.test(text(left.name ?? left.productName, "", 240));
+      const rightCyrillic = /[а-яё]/i.test(text(right.name ?? right.productName, "", 240));
+      if (leftCyrillic !== rightCyrillic) return leftCyrillic ? -1 : 1;
+      return Number(number(right.current) > 0) - Number(number(left.current) > 0)
+        || inventoryIdentityTokens(left).length - inventoryIdentityTokens(right).length
+        || text(left.name).length - text(right.name).length
+        || text(left.name).localeCompare(text(right.name), "ru");
+    })[0];
+}
+
+// Compatibility for already imported legacy connector labels. New products are
+// matched by the generic identity engine above and do not require this table.
+const INVENTORY_LEGACY_IMPORT_ALIAS_TOKENS = new Map<string, string | null>([
+  ["nistru", "нистру"],
+  ["conus", null],
+  ["soprizmivyi", "сюрпризный"],
+  ["sopriznivyi", "сюрпризный"],
+  ["surpriznyi", "сюрпризный"],
+  ["siurpriznyi", "сюрпризный"],
+  ["coca", null],
+  ["cola", "кола"],
+]);
+
+function inventoryImportedAliasTokens(value: unknown): string[] {
+  const tokens = inventoryNameTokens(value);
+  const mapsToSurprise = tokens.some((token) => INVENTORY_LEGACY_IMPORT_ALIAS_TOKENS.get(token) === "сюрпризный");
+  return tokens.flatMap((token) => {
+    if (mapsToSurprise && (token === "nistru" || token === "нистру")) return [];
+    if (!INVENTORY_LEGACY_IMPORT_ALIAS_TOKENS.has(token)) return [token];
+    const replacement = INVENTORY_LEGACY_IMPORT_ALIAS_TOKENS.get(token);
+    return replacement ? [replacement] : [];
+  });
+}
+
+function inventoryImportedDisplayName(value: unknown): string {
+  const tokens = inventoryNameTokens(value);
+  if (tokens.includes("coca") && tokens.includes("cola")) return "Кола";
+  if (tokens.some((token) => INVENTORY_LEGACY_IMPORT_ALIAS_TOKENS.get(token) === "сюрпризный")) {
+    return "Коньяк Сюрпризный";
+  }
+  if (tokens.includes("nistru")) return "Коньяк Нистру";
+  return "";
+}
+
+function inventoryAliasProductKey(value: JsonRecord): string {
+  if (hasExplicitInventoryVariant(value)) return "";
+  const tokens = inventoryNameTokens(value);
+  const aliasTokens = inventoryImportedAliasTokens(value);
+  if (aliasTokens.join(" ") === tokens.join(" ") || aliasTokens.length < 1) return "";
+  const type = inventoryTypeToken(value)
+    || aliasTokens.find((token) => INVENTORY_PRODUCT_TYPES.has(token))
+    || "";
+  const unit = inventoryBalanceUnit(value);
+  if (!type || unit === "unknown") return "";
+  return `stock:${aliasTokens.join(" ")}|${unit}`;
+}
+
+function inventoryAliasAnchor(value: JsonRecord, balances: JsonRecord[]): JsonRecord | undefined {
+  if (hasExplicitInventoryVariant(value)) return undefined;
+  const tokens = inventoryNameTokens(value);
+  const aliasTokens = inventoryImportedAliasTokens(value);
+  const type = inventoryTypeToken(value);
+  const unit = inventoryBalanceUnit(value);
+  const hasKnownImportAlias = aliasTokens.join(" ") !== tokens.join(" ");
+  if (!type || unit === "unknown" || !hasKnownImportAlias || aliasTokens.length < 2) return undefined;
+  const currency = text(value.currency, "", 12).toUpperCase();
+  return balances
+    .filter((candidate) => candidate !== value)
+    .filter((candidate) => {
+      if (hasExplicitInventoryVariant(candidate)) return false;
+      if (inventoryBalanceUnit(candidate) !== unit || inventoryTypeToken(candidate) !== type) return false;
+      const candidateCurrency = text(candidate.currency, "", 12).toUpperCase();
+      if (currency && candidateCurrency && currency !== candidateCurrency) return false;
+      const candidateTokens = inventoryNameTokens(candidate);
+      if (candidateTokens.length !== aliasTokens.length) return false;
+      if (!candidateTokens.every((token, index) => token === aliasTokens[index])) return false;
+      const hasDistinctiveBrand = candidateTokens.some((token) =>
+        token !== type && token.length >= 4 && !INVENTORY_VARIANT_MARKERS.has(token)
+      );
+      if (!hasDistinctiveBrand) return false;
+      return number(candidate.current) > 0 || number(value.current) === 0;
+    })
+    .sort((left, right) => {
+      const stockLead = Number(number(right.current) > 0) - Number(number(left.current) > 0);
+      return stockLead
+        || inventoryNameTokens(left).length - inventoryNameTokens(right).length
+        || text(left.name).length - text(right.name).length;
+    })[0];
+}
+
+const INVENTORY_WATER_DESCRIPTORS = new Set([
+  "вода", "воды", "минеральная", "минеральный", "питьевая", "питьевой",
+  "столовая", "столовый", "газированная", "газированный", "негазированная",
+  "негазированный", "water", "mineral", "still", "sparkling",
+]);
+
+function inventoryNameWithoutWaterPackage(value: unknown): string[] {
+  return inventoryNameTokens(value).filter((token) =>
+    !INVENTORY_WATER_DESCRIPTORS.has(token)
+    && !/^\d+(?:[.,]\d+)?$/.test(token)
+    && !/^(?:мл|ml|л|l|литр|литра|литров)$/.test(token)
+  );
+}
+
+function inventoryWaterPackageAnchor(value: JsonRecord, balances: JsonRecord[]): JsonRecord | undefined {
+  const rawName = text(value.name ?? value.productName, "", 240);
+  if (!/\d/.test(rawName) || !/(?:^|\s)(?:мл|ml|л|l|литр)(?:\s|$)/i.test(rawName)) return undefined;
+  const distinctive = inventoryNameWithoutWaterPackage(value);
+  if (!distinctive.length) return undefined;
+  const unit = inventoryBalanceUnit(value);
+  const currency = text(value.currency, "", 12).toUpperCase();
+  return balances.find((candidate) => {
+    if (candidate === value || inventoryBalanceUnit(candidate) !== unit) return false;
+    const candidateName = text(candidate.name ?? candidate.productName, "", 240);
+    const candidateTokens = inventoryNameTokens(candidate);
+    if (!candidateTokens.some((token) => INVENTORY_WATER_DESCRIPTORS.has(token))) return false;
+    const candidateCurrency = text(candidate.currency, "", 12).toUpperCase();
+    if (currency && candidateCurrency && currency !== candidateCurrency) return false;
+    return inventoryNameWithoutWaterPackage(candidate).join(" ") === distinctive.join(" ");
+  });
+}
+
+function inventoryMovementNameAnchor(
+  value: JsonRecord,
+  balances: JsonRecord[],
+  movements: JsonRecord[],
+): JsonRecord | undefined {
+  if (Math.abs(number(value.current)) >= 0.0001 || Math.abs(valueOfBalance(value)) >= 0.01) {
+    return undefined;
+  }
+  const requestedName = normalizeInventoryText(value.name ?? value.productName);
+  if (!requestedName) return undefined;
+  const targetKeys = new Set(movements
+    .filter((movement) =>
+      text(movement.status, "active", 20) !== "cancelled"
+      && !text(movement.reversedAt, "", 40)
+      && normalizeInventoryText(movement.productName) === requestedName
+    )
+    .map((movement) => text(movement.productKey, "", 300))
+    .filter(Boolean));
+  if (targetKeys.size !== 1) return undefined;
+  const targetKey = [...targetKeys][0];
+  return balances.find((candidate) =>
+    text(candidate.productKey ?? candidate.key, "", 300) === targetKey
+    && (Math.abs(number(candidate.current)) >= 0.0001 || Math.abs(valueOfBalance(candidate)) >= 0.01)
+  );
+}
+
+function inventoryReceiptShadowAnchor(
+  value: JsonRecord,
+  balances: JsonRecord[],
+): JsonRecord | undefined {
+  const requestedKey = text(value.receiptShadowOfProductKey, "", 300);
+  if (!requestedKey) return undefined;
+  return balances.find((candidate) =>
+    text(candidate.productKey ?? candidate.key, "", 300) === requestedKey
+    && (Math.abs(number(candidate.current)) >= 0.0001 || Math.abs(valueOfBalance(candidate)) >= 0.01)
+  );
+}
+
 /**
- * Collapses legacy package-specific identities into one stock item per exact
- * normalized name and base unit. Quantities and values are added, average cost
- * is recalculated, and every movement/recipe reference is remapped together.
- * External connector identities and incompatible base units remain untouched.
+ * Collapses connector identities into one stock master per normalized product
+ * name and base unit. Package metadata does not split an exact product name,
+ * while an explicit net content in the product name remains part of identity.
+ * Generic water descriptors are ignored so brand-equivalent labels consolidate.
+ * The generic identity engine compares word order, Cyrillic/Latin spelling,
+ * harmless descriptors, classification, units and meaningful variants. A
+ * small compatibility table only migrates labels produced by old connectors.
+ * A name confirmed in a manual or scanned purchase remains the visible label;
+ * connector spellings are retained only as aliases. Volume, age, quality
+ * grade and flavour remain real variants.
+ * External IDs remain aliases for subsequent connector updates.
  */
 export function consolidateInventoryDuplicates(input: {
   assortment: unknown;
@@ -310,12 +784,21 @@ export function consolidateInventoryDuplicates(input: {
 } {
   const now = input.now ?? new Date().toISOString();
   const parts = assortmentParts(input.assortment);
+  const sourceMovements = array(input.stockMovements).map(cloneRecord);
   const aliases = new Map<string, string>();
   const blockedCanonicalKeys = new Set<string>();
   const balanceGroups = new Map<string, JsonRecord[]>();
   for (const balance of parts.balances) {
     const originalKey = text(balance.productKey ?? balance.key, "", 300);
-    const canonicalKey = inventoryProductKey(balance) || originalKey;
+    const anchor = inventoryReceiptShadowAnchor(balance, parts.balances)
+      ?? inventoryAutomaticAnchor(balance, parts.balances)
+      ?? inventoryAliasAnchor(balance, parts.balances)
+      ?? inventoryMovementNameAnchor(balance, parts.balances, sourceMovements)
+      ?? inventoryWaterPackageAnchor(balance, parts.balances);
+    const canonicalKey = inventoryAliasProductKey(balance)
+      || generatedInventoryProductKey(anchor ?? balance)
+      || inventoryProductKey(balance)
+      || originalKey;
     const groupKey = canonicalKey || originalKey;
     const values = balanceGroups.get(groupKey) ?? [];
     values.push(balance);
@@ -342,16 +825,55 @@ export function consolidateInventoryDuplicates(input: {
       if (originalKey && canonicalKey && originalKey !== canonicalKey) aliases.set(originalKey, canonicalKey);
     }
     const latest = latestRecord(values);
+    const valuedRecords = values.filter((value) =>
+      Math.abs(number(value.current)) >= 0.0001 || Math.abs(valueOfBalance(value)) >= 0.01
+    );
+    const measurementSource = valuedRecords.length ? latestRecord(valuedRecords) : latest;
+    const unit = baseUnit(measurementSource.unit) !== "unknown"
+      ? baseUnit(measurementSource.unit)
+      : inventoryPackageAmount(measurementSource.packageSize, measurementSource.unit).unit;
+    const displayCandidate = values
+      .map((value) => ({
+        value,
+        label: text(value.preferredDisplayName ?? value.name ?? value.productName, "", 240),
+        preferred: Boolean(text(value.preferredDisplayName, "", 240)),
+        preferredAt: text(value.preferredDisplayNameUpdatedAt, "", 40),
+      }))
+      .filter((candidate) => candidate.label)
+      .sort((left, right) => {
+        if (left.preferred !== right.preferred) return left.preferred ? -1 : 1;
+        if (left.preferred && right.preferred) {
+          const recentPreference = right.preferredAt.localeCompare(left.preferredAt);
+          if (recentPreference) return recentPreference;
+        }
+        const leftCanonicalScript = inventoryImportedAliasTokens(left.value).join(" ")
+          === inventoryNameTokens(left.value).join(" ");
+        const rightCanonicalScript = inventoryImportedAliasTokens(right.value).join(" ")
+          === inventoryNameTokens(right.value).join(" ");
+        if (leftCanonicalScript !== rightCanonicalScript) return leftCanonicalScript ? -1 : 1;
+        const leftMaster = generatedInventoryProductKey(left.value) === canonicalKey ? 0 : 1;
+        const rightMaster = generatedInventoryProductKey(right.value) === canonicalKey ? 0 : 1;
+        return leftMaster - rightMaster
+          || inventoryNameTokens(left.value).length - inventoryNameTokens(right.value).length
+          || left.label.length - right.label.length
+          || left.label.localeCompare(right.label, "ru");
+      })[0];
+    const importedDisplayName = displayCandidate
+      ? inventoryImportedDisplayName(displayCandidate.value)
+      : "";
+    const displayName = importedDisplayName
+      || displayCandidate?.label
+      || text(latest.name ?? latest.productName, "Товар", 240);
     const classification = classificationRecord(values);
+    const compatiblePackageValues = values.filter((value) =>
+      inventoryBalanceUnit(value) === unit || inventoryBalanceUnit(value) === "unknown"
+    );
     const packageOptions = packageOptionLabels({
-      ...latest,
-      packageOptions: values.flatMap(packageOptionLabels),
+      ...measurementSource,
+      packageOptions: compatiblePackageValues.flatMap(packageOptionLabels),
     });
     const current = rounded(values.reduce((sum, value) => sum + number(value.current), 0));
     const inventoryValue = rounded(values.reduce((sum, value) => sum + valueOfBalance(value), 0), 2);
-    const unit = baseUnit(latest.unit) !== "unknown"
-      ? baseUnit(latest.unit)
-      : inventoryPackageAmount(latest.packageSize, latest.unit).unit;
     const singlePackage = packageOptions.length === 1
       ? inventoryPackageAmount(packageOptions[0], unit)
       : { amount: 0, unit };
@@ -361,6 +883,14 @@ export function consolidateInventoryDuplicates(input: {
       id: canonicalKey,
       key: canonicalKey,
       productKey: canonicalKey,
+      name: displayName,
+      preferredDisplayName: displayCandidate?.preferred ? displayName : undefined,
+      preferredDisplayNameSource: displayCandidate?.preferred
+        ? text(displayCandidate.value.preferredDisplayNameSource, "confirmed_purchase", 40)
+        : undefined,
+      preferredDisplayNameUpdatedAt: displayCandidate?.preferred
+        ? displayCandidate.preferredAt || now
+        : undefined,
       unit,
       current,
       onOrder: rounded(values.reduce((sum, value) => sum + Math.max(0, number(value.onOrder)), 0)),
@@ -368,9 +898,13 @@ export function consolidateInventoryDuplicates(input: {
       inventoryValue,
       averageUnitCost: current > 0 ? rounded(inventoryValue / current, 6) : 0,
       packageOptions,
-      packageSize: packageOptions.length > 1 ? "Несколько фасовок" : packageOptions[0] ?? text(latest.packageSize),
+      packageSize: packageOptions.length > 1 ? "Несколько фасовок" : packageOptions[0] ?? text(measurementSource.packageSize),
       packageAmount: packageOptions.length > 1 ? 0 : singlePackage.amount,
       multiplePackageSizes: packageOptions.length > 1 || undefined,
+      externalProductKeys: [...new Set(values.flatMap((value) => [
+        ...array(value.externalProductKeys).map((key) => text(key, "", 300)),
+        text(value.productKey ?? value.key, "", 300),
+      ]).filter((key) => key && key !== canonicalKey))],
       mergedFromProductKeys: [...new Set(values.flatMap((value) => [
         ...array(value.mergedFromProductKeys).map((key) => text(key, "", 300)),
         text(value.productKey ?? value.key, "", 300),
@@ -386,7 +920,9 @@ export function consolidateInventoryDuplicates(input: {
   for (const raw of array(parts.root.nomenclature)) {
     const item = cloneRecord(raw);
     const originalKey = text(item.productKey ?? item.key, "", 300);
-    const candidateKey = remappedProductKey(item, aliases) || originalKey;
+    const candidateKey = inventoryAliasProductKey(item)
+      || remappedProductKey(item, aliases)
+      || originalKey;
     const canonicalKey = blockedCanonicalKeys.has(candidateKey) && !aliases.has(originalKey)
       ? originalKey
       : candidateKey;
@@ -442,7 +978,7 @@ export function consolidateInventoryDuplicates(input: {
   }
 
   let remappedMovements = 0;
-  const stockMovements = array(input.stockMovements).map((value) => {
+  const stockMovements = sourceMovements.map((value) => {
     const movement = cloneRecord(value);
     const previous = text(movement.productKey, "", 300);
     const candidate = remappedProductKey({ ...movement, name: movement.productName }, aliases);
@@ -460,7 +996,7 @@ export function consolidateInventoryDuplicates(input: {
   const existingAliases = array(parts.root.inventoryProductAliases).map(cloneRecord);
   const aliasRecords = [...aliases.entries()]
     .filter(([from, to]) => from && to && from !== to)
-    .map(([from, to]) => ({ from, to, reason: "package-identity-v214", updatedAt: now }));
+    .map(([from, to]) => ({ from, to, reason: "stock-master-identity-v214", updatedAt: now }));
   const aliasesByFrom = new Map(existingAliases.map((value) => [text(value.from, "", 300), value]));
   for (const value of aliasRecords) aliasesByFrom.set(String(value.from), value);
   parts.root.stockBalances = balances;
@@ -518,6 +1054,18 @@ function baseUnitInputLabel(value: BaseInventoryUnit): string {
   if (value === "g") return "г";
   if (value === "pcs") return "шт.";
   return "";
+}
+
+export function normalizeInventoryDisplayUnit(
+  value: unknown,
+  base: BaseInventoryUnit,
+): InventoryDisplayUnit | null {
+  const requested = text(value, "auto", 20) as InventoryDisplayUnit;
+  if (requested === "auto") return requested;
+  if (base === "ml" && (requested === "ml" || requested === "l")) return requested;
+  if (base === "g" && (requested === "g" || requested === "kg")) return requested;
+  if (base === "pcs" && requested === "pcs") return requested;
+  return null;
 }
 
 function recipeIngredientProductKey(value: unknown): string {
@@ -630,6 +1178,753 @@ export function repairInventoryBalanceMetadata(input: {
   return { assortment: parts.root, summary: { repaired, removed } };
 }
 
+export function repairInventoryPurchaseAmounts(input: {
+  assortment: unknown;
+  purchaseDocuments: unknown[];
+  stockMovements: unknown[];
+  now?: string;
+}): {
+  assortment: JsonRecord;
+  stockMovements: JsonRecord[];
+  summary: InventoryPurchaseAmountRepairSummary;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const parts = assortmentParts(input.assortment);
+  const referencedDocumentIds = new Set(parts.balances
+    .map((balance) => text(balance.lastDocumentId, "", 100))
+    .filter(Boolean));
+  const documents = new Map<string, JsonRecord>();
+  const evidenceDocuments = new Map<string, JsonRecord>();
+  for (const value of input.purchaseDocuments) {
+    const document = record(value);
+    const id = text(document.id, "", 100);
+    const status = text(document.status, "", 20);
+    if (!id || status === "cancelled") continue;
+    const confirmed = status === "confirmed" || Boolean(text(document.confirmedAt, "", 40));
+    if (confirmed) documents.set(id, document);
+    // Legacy ledger migrations could demote an old confirmed document to
+    // draft after losing its status field. It is still valid reconciliation
+    // evidence when an existing posted balance points to this exact document.
+    // This evidence-only map never restores missing receipts from drafts.
+    if (confirmed || referencedDocumentIds.has(id)) evidenceDocuments.set(id, document);
+  }
+  const balances = new Map(parts.balances.map((balance) => [
+    text(balance.productKey ?? balance.key, "", 300),
+    balance,
+  ]));
+  const archivedProductKeys = new Set(array(parts.root.archivedInventoryProductKeys)
+    .map((value) => text(value, "", 300))
+    .filter(Boolean));
+  const correctedProducts = new Set<string>();
+  let repairedMovements = 0;
+  let restoredMovements = 0;
+  let reconciledBalances = 0;
+  let correctedAmount = 0;
+  let evidenceMatches = 0;
+  let linkedShadowBalances = 0;
+  const claimedDocumentLines = new Set<string>();
+
+  const purchaseLineValue = (item: JsonRecord): number => rounded(Math.max(
+    0,
+    number(item.lineTotal) || number(item.unitPrice) * Math.max(0, number(item.quantity)),
+  ), 2);
+
+  const packageEvidenceAmount = (
+    item: JsonRecord,
+    balance: JsonRecord,
+    unit: BaseInventoryUnit,
+  ): number => {
+    const candidates = [
+      item.packageSize,
+      item.purchaseProductKey,
+      item.productKey,
+      ...array(item.packageOptions),
+      balance.packageSize,
+      ...array(balance.packageOptions),
+      ...array(balance.externalProductKeys),
+      ...array(balance.mergedFromProductKeys),
+    ];
+    const amounts = candidates
+      .map((candidate) => text(candidate, "", 300)
+        .replace(/(\d)\s+(\d+)\s*(мл|ml|л|l|г|g|кг|kg)/gi, "$1.$2 $3"))
+      .filter((candidate) => /\d/.test(candidate))
+      .map((candidate) => inventoryPackageAmount(candidate, unit))
+      .filter((candidate) => candidate.unit === unit && candidate.amount > 0)
+      // A purchase price for bottled/bar stock is a price per retail package.
+      // Larger values are totals or synthetic legacy labels, not bottle sizes.
+      .filter((candidate) => unit === "pcs" || candidate.amount <= 5_000)
+      .map((candidate) => candidate.amount);
+    return amounts.length ? Math.min(...amounts) : 0;
+  };
+
+  const reconciliationLineBaseAmount = (
+    item: JsonRecord,
+    balance: JsonRecord,
+  ): { amount: number; unit: BaseInventoryUnit } => {
+    const parsed = purchaseLineBaseAmount(item);
+    const balanceUnit = baseUnit(balance.unit);
+    const lineTotal = purchaseLineValue(item);
+    const unitPrice = Math.max(0, number(item.unitPrice));
+    if (!lineTotal || !unitPrice || balanceUnit === "unknown") return parsed;
+    const pricedPackages = lineTotal / unitPrice;
+    if (
+      pricedPackages <= 0
+      || Math.abs(pricedPackages - Math.round(pricedPackages)) > 0.01
+    ) return parsed;
+    // The broken legacy import stored the invoice line as pieces, while the
+    // stock master retained the real bottle size (for example 0.5 l) in its
+    // external product key. Derive the physical unit from the balance instead
+    // of trusting that corrupted line unit. Financial equality proves the
+    // number of purchased packages before any quantity is rewritten.
+    const packageAmount = packageEvidenceAmount(item, balance, balanceUnit);
+    if (!packageAmount) return parsed;
+    const inferred = rounded(Math.round(pricedPackages) * packageAmount);
+    if (inferred <= 0) return parsed;
+    if (parsed.unit !== balanceUnit) return { amount: inferred, unit: balanceUnit };
+    if (parsed.amount <= inferred) return parsed;
+    const multiplier = parsed.amount / inferred;
+    return multiplier >= 5
+        && multiplier <= 1_000
+        && Math.abs(multiplier - Math.round(multiplier)) < 0.0001
+      ? { amount: inferred, unit: balanceUnit }
+      : parsed;
+  };
+
+  const movementIdentityScore = (movement: JsonRecord, item: JsonRecord): number => {
+    const expected = purchaseLineBaseAmount(item);
+    if (expected.unit === "unknown" || text(movement.unit, expected.unit, 20) !== expected.unit) return 0;
+    const productKey = resolveInventoryProductKey(parts.root, text(movement.productKey, "", 300));
+    const requestedKey = resolveInventoryProductKey(parts.root, inventoryProductKey(item));
+    if (productKey && requestedKey && productKey === requestedKey) return 1;
+    return inventoryAutomaticIdentityScore(
+      { ...item, unit: expected.unit },
+      {
+        ...movement,
+        name: movement.productName,
+        productName: movement.productName,
+        unit: expected.unit,
+      },
+    );
+  };
+
+  const bestDocumentLine = (
+    movement: JsonRecord,
+    document: JsonRecord,
+  ): { item: JsonRecord; key: string } | undefined => {
+    const documentId = text(document.id, "", 100);
+    const candidates = array(document.items)
+      .map((value, index) => {
+        const item = record(value);
+        const lineId = sourceLineId(item, index);
+        const key = `${documentId}:${lineId}`;
+        return { item, key, score: movementIdentityScore(movement, item) };
+      })
+      .filter((candidate) => !claimedDocumentLines.has(candidate.key) && candidate.score >= 0.9)
+      .sort((left, right) => right.score - left.score);
+    if (!candidates.length) return undefined;
+    if (candidates.length > 1 && Math.abs(candidates[0].score - candidates[1].score) < 0.01) return undefined;
+    return candidates[0];
+  };
+
+  const reconcileReceiptAmount = (movement: JsonRecord, item: JsonRecord): void => {
+    const previousAmount = number(movement.amount);
+    const productKey = resolveInventoryProductKey(parts.root, text(movement.productKey, "", 300));
+    if (!productKey || archivedProductKeys.has(productKey)) return;
+    const balance = balances.get(productKey);
+    if (!balance || balance.archived === true || balance.active === false) return;
+    const expected = reconciliationLineBaseAmount(item, balance);
+    if (
+      expected.amount <= 0
+      || expected.unit === "unknown"
+      || (text(movement.unit, expected.unit, 20) !== expected.unit && previousAmount > 0)
+      || Math.abs(previousAmount - expected.amount) < 0.0001
+    ) return;
+    const delta = rounded(expected.amount - previousAmount);
+    movement.amount = expected.amount;
+    movement.unit = expected.unit;
+    movement.repairedAt = now;
+    movement.repairReason = "Остаток пересчитан по подтверждённой строке накладной";
+    balance.current = rounded(number(balance.current) + delta);
+    const inventoryValue = valueOfBalance(balance);
+    balance.inventoryValue = rounded(inventoryValue, 2);
+    balance.averageUnitCost = number(balance.current) > 0
+      ? rounded(inventoryValue / number(balance.current), 6)
+      : 0;
+    balance.updatedAt = now;
+    balance.quantityRepairAt = now;
+    repairedMovements += 1;
+    correctedAmount += Math.abs(delta);
+    correctedProducts.add(productKey);
+  };
+
+  const stockMovements = input.stockMovements.map((value) => {
+    const movement = cloneRecord(value);
+    if (
+      text(movement.type, "", 30) !== "receipt"
+      || text(movement.status, "active", 20) === "cancelled"
+      || text(movement.reversedAt, "", 40)
+    ) return movement;
+    const document = evidenceDocuments.get(text(movement.sourceDocumentId, "", 100));
+    if (document) {
+      const items = array(document.items).map(record);
+      const itemIndex = items.findIndex((line, index) =>
+        sourceLineId(line, index) === text(movement.sourceLineId, "", 100)
+      );
+      if (itemIndex >= 0) {
+        const item = items[itemIndex];
+        claimedDocumentLines.add(`${text(document.id, "", 100)}:${sourceLineId(item, itemIndex)}`);
+        reconcileReceiptAmount(movement, item);
+        return movement;
+      }
+      const semantic = bestDocumentLine(movement, document);
+      if (semantic) {
+        movement.sourceLineId = semantic.key.slice(text(document.id, "", 100).length + 1);
+        movement.repairedAt = now;
+        movement.repairReason = "Восстановлена связь прихода с позицией накладной по товару";
+        claimedDocumentLines.add(semantic.key);
+        const repairCountBefore = repairedMovements;
+        reconcileReceiptAmount(movement, semantic.item);
+        if (repairedMovements === repairCountBefore) repairedMovements += 1;
+        return movement;
+      }
+    }
+
+    // Some old imports lost the document id entirely. Link only a unique
+    // same-day, same-product confirmed line; ambiguity is left untouched.
+    const sameDayMatches = [...documents.values()]
+      .filter((candidateDocument) =>
+        text(candidateDocument.date, "", 10) === text(movement.date, "", 10)
+      )
+      .map((candidateDocument) => ({
+        document: candidateDocument,
+        match: bestDocumentLine(movement, candidateDocument),
+      }))
+      .filter((candidate): candidate is { document: JsonRecord; match: { item: JsonRecord; key: string } } =>
+        Boolean(candidate.match)
+      );
+    if (sameDayMatches.length === 1) {
+      const matched = sameDayMatches[0];
+      const documentId = text(matched.document.id, "", 100);
+      movement.sourceDocumentId = documentId;
+      movement.sourceLineId = matched.match.key.slice(documentId.length + 1);
+      movement.repairedAt = now;
+      movement.repairReason = "Восстановлена связь прихода с подтверждённой накладной";
+      claimedDocumentLines.add(matched.match.key);
+      const repairCountBefore = repairedMovements;
+      reconcileReceiptAmount(movement, matched.match.item);
+      if (repairedMovements === repairCountBefore) repairedMovements += 1;
+    }
+    return movement;
+  });
+
+  // Old stock masters were sometimes created before movement keys were
+  // normalized. In that shape the confirmed purchase line, the visible
+  // balance and the receipt all describe the same product, but the receipt
+  // points to a different generated key. Reconcile the balance directly from
+  // the exact last confirmed document and its retained external product key.
+  // Financial equality is required as an additional guard, so a similarly
+  // named product or a real opening balance cannot be rewritten accidentally.
+  const balanceEvidenceKeys = (balance: JsonRecord): Set<string> => new Set([
+    text(balance.productKey ?? balance.key, "", 300),
+    ...array(balance.externalProductKeys).map((value) => text(value, "", 300)),
+    ...array(balance.mergedFromProductKeys).map((value) => text(value, "", 300)),
+  ].filter(Boolean));
+  const itemEvidenceKeys = (item: JsonRecord): Set<string> => new Set([
+    text(item.purchaseProductKey ?? item.productKey, "", 300),
+    inventoryProductKey(item),
+  ].filter(Boolean));
+  const sharesEvidenceKey = (balance: JsonRecord, item: JsonRecord): boolean => {
+    const balanceKeys = balanceEvidenceKeys(balance);
+    return [...itemEvidenceKeys(item)].some((key) => balanceKeys.has(key));
+  };
+  const lineFinanciallyExplainsBalance = (balance: JsonRecord, item: JsonRecord): boolean => {
+    const lineValue = purchaseLineValue(item);
+    const inventoryValue = rounded(Math.max(0, valueOfBalance(balance)), 2);
+    const valueTolerance = Math.max(0.01, inventoryValue * 0.005);
+    if (lineValue <= 0 || Math.abs(inventoryValue - lineValue) > valueTolerance) return false;
+    const lastPurchasePrice = Math.max(0, number(balance.lastPurchasePrice));
+    const unitPrice = Math.max(0, number(item.unitPrice));
+    const priceTolerance = Math.max(0.01, lastPurchasePrice * 0.005);
+    return !lastPurchasePrice || !unitPrice || Math.abs(lastPurchasePrice - unitPrice) <= priceTolerance;
+  };
+  const lineNameExplainsBalance = (balance: JsonRecord, item: JsonRecord): boolean =>
+    inventoryAutomaticIdentityScore(
+      balance,
+      { ...item, unit: purchaseLineBaseAmount(item).unit },
+    ) >= 0.65;
+  for (const balance of parts.balances) {
+    if (balance.archived === true || balance.active === false) continue;
+    const productKey = text(balance.productKey ?? balance.key, "", 300);
+    const document = evidenceDocuments.get(text(balance.lastDocumentId, "", 100));
+    if (!productKey || !document) continue;
+    const documentItems = array(document.items)
+      .map((value, index) => ({ item: record(value), lineId: sourceLineId(record(value), index) }))
+      .filter(({ item }) => PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80)))
+      .filter(({ item }) => {
+        const expected = reconciliationLineBaseAmount(item, balance);
+        return expected.amount > 0
+          && expected.unit === baseUnit(balance.unit)
+          && lineFinanciallyExplainsBalance(balance, item)
+          && (sharesEvidenceKey(balance, item) || lineNameExplainsBalance(balance, item));
+      });
+    if (documentItems.length !== 1) continue;
+    const matched = documentItems[0];
+    evidenceMatches += 1;
+    const expected = reconciliationLineBaseAmount(matched.item, balance);
+    const current = rounded(number(balance.current));
+    const ratio = expected.amount > 0 ? current / expected.amount : 0;
+    const legacyMultiplier = ratio >= 5
+      && ratio <= 1_000
+      && Math.abs(ratio - Math.round(ratio)) < 0.0001;
+    if (!legacyMultiplier || text(balance.lastInventoryDocumentId, "", 100)) continue;
+    balance.current = expected.amount;
+    const inventoryValue = rounded(Math.max(0, valueOfBalance(balance)), 2);
+    balance.inventoryValue = inventoryValue;
+    balance.averageUnitCost = expected.amount > 0
+      ? rounded(inventoryValue / expected.amount, 6)
+      : 0;
+    balance.updatedAt = now;
+    balance.quantityRepairAt = now;
+    balance.quantityRepairReason = "Баланс восстановлен по точной строке последней подтверждённой накладной";
+    for (const movement of stockMovements) {
+      if (
+        text(movement.type, "", 30) !== "receipt"
+        || text(movement.status, "active", 20) === "cancelled"
+        || text(movement.reversedAt, "", 40)
+        || text(movement.sourceDocumentId, "", 100) !== text(document.id, "", 100)
+      ) continue;
+      const exactLine = text(movement.sourceLineId, "", 100) === matched.lineId;
+      const sameProduct = resolveInventoryProductKey(parts.root, movement.productKey) === productKey;
+      if (!exactLine && !sameProduct) continue;
+      if (Math.abs(number(movement.amount) - expected.amount) < 0.0001 && movement.unit === expected.unit) continue;
+      movement.amount = expected.amount;
+      movement.unit = expected.unit;
+      movement.sourceLineId = matched.lineId;
+      movement.repairedAt = now;
+      movement.repairReason = "Приход восстановлен по точной строке подтверждённой накладной";
+      repairedMovements += 1;
+    }
+    reconciledBalances += 1;
+    correctedAmount += Math.abs(current - expected.amount);
+    correctedProducts.add(productKey);
+  }
+
+  // Some legacy cards lost or later replaced `lastDocumentId`, even though
+  // the original confirmed invoice still uniquely explains their quantity
+  // and value. The document-specific pass above cannot see that shape and a
+  // previously repaired receipt is not enough to fix the stale materialized
+  // balance. Search all confirmed evidence only when one line is an exact
+  // financial and product match. This deliberately requires a unique result
+  // so similarly named variants (for example two Nistru cognacs) are never
+  // collapsed by name alone.
+  for (const balance of parts.balances) {
+    if (balance.archived === true || balance.active === false) continue;
+    if (text(balance.lastInventoryDocumentId, "", 100)) continue;
+    const productKey = text(balance.productKey ?? balance.key, "", 300);
+    const balanceUnit = baseUnit(balance.unit);
+    const current = rounded(number(balance.current));
+    if (!productKey || balanceUnit === "unknown" || current <= 0) continue;
+    const balanceCurrency = text(balance.currency, "", 12).toUpperCase();
+    const candidates = [...evidenceDocuments.values()].flatMap((document) => {
+      const documentCurrency = text(document.currency, "", 12).toUpperCase();
+      if (balanceCurrency && documentCurrency && balanceCurrency !== documentCurrency) return [];
+      const documentId = text(document.id, "", 100);
+      return array(document.items).flatMap((value, index) => {
+        const item = record(value);
+        if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return [];
+        const expected = reconciliationLineBaseAmount(item, balance);
+        if (
+          expected.amount <= 0
+          || expected.unit !== balanceUnit
+          || current <= expected.amount
+          || !lineFinanciallyExplainsBalance(balance, item)
+          || (!sharesEvidenceKey(balance, item) && !lineNameExplainsBalance(balance, item))
+        ) return [];
+        const ratio = current / expected.amount;
+        const legacyMultiplier = ratio >= 5
+          && ratio <= 1_000
+          && Math.abs(ratio - Math.round(ratio)) < 0.0001;
+        return legacyMultiplier
+          ? [{ document, documentId, item, lineId: sourceLineId(item, index), expected }]
+          : [];
+      });
+    });
+    if (candidates.length !== 1) continue;
+    const matched = candidates[0];
+    balance.current = matched.expected.amount;
+    const inventoryValue = rounded(Math.max(0, valueOfBalance(balance)), 2);
+    balance.inventoryValue = inventoryValue;
+    balance.averageUnitCost = matched.expected.amount > 0
+      ? rounded(inventoryValue / matched.expected.amount, 6)
+      : 0;
+    balance.updatedAt = now;
+    balance.quantityRepairAt = now;
+    balance.quantityRepairReason = "Баланс восстановлен по уникальной финансовой строке подтверждённой накладной";
+    balance.quantityRepairEvidenceDocumentId = matched.documentId;
+    balance.quantityRepairEvidenceLineId = matched.lineId;
+    for (const movement of stockMovements) {
+      if (
+        text(movement.type, "", 30) !== "receipt"
+        || text(movement.status, "active", 20) === "cancelled"
+        || text(movement.reversedAt, "", 40)
+        || text(movement.sourceDocumentId, "", 100) !== matched.documentId
+      ) continue;
+      const exactLine = text(movement.sourceLineId, "", 100) === matched.lineId;
+      const sameProduct = resolveInventoryProductKey(parts.root, movement.productKey) === productKey;
+      if (!exactLine && (!sameProduct || movementIdentityScore(movement, matched.item) < 0.85)) continue;
+      movement.sourceLineId = matched.lineId;
+      if (
+        Math.abs(number(movement.amount) - matched.expected.amount) < 0.0001
+        && baseUnit(movement.unit) === matched.expected.unit
+      ) continue;
+      movement.amount = matched.expected.amount;
+      movement.unit = matched.expected.unit;
+      movement.repairedAt = now;
+      movement.repairReason = "Приход восстановлен по уникальной финансовой строке подтверждённой накладной";
+      repairedMovements += 1;
+    }
+    reconciledBalances += 1;
+    evidenceMatches += 1;
+    correctedAmount += Math.abs(current - matched.expected.amount);
+    correctedProducts.add(productKey);
+  }
+
+  // A zero card can survive next to a stocked card when an old importer used
+  // the package unit for one identity and pieces for another. Link the empty
+  // shadow only when one confirmed line uniquely explains the stocked card by
+  // document, quantity, value and price; the following duplicate pass then
+  // collapses both identities without losing stock.
+  for (const document of evidenceDocuments.values()) {
+    const documentId = text(document.id, "", 100);
+    array(document.items).forEach((value, itemIndex) => {
+      const item = record(value);
+      if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return;
+      const expected = purchaseLineBaseAmount(item);
+      const counted = toInventoryBaseAmount(item.quantity, item.unit);
+      const movementTargets = new Set(stockMovements
+        .filter((movement) =>
+          text(movement.type, "", 30) === "receipt"
+          && text(movement.status, "active", 20) !== "cancelled"
+          && !text(movement.reversedAt, "", 40)
+          && text(movement.sourceDocumentId, "", 100) === documentId
+          && (
+            text(movement.sourceLineId, "", 100) === sourceLineId(item, itemIndex)
+            || movementIdentityScore(movement, item) >= 0.85
+          )
+        )
+        .map((movement) => resolveInventoryProductKey(parts.root, movement.productKey))
+        .filter(Boolean));
+      const stocked = parts.balances.filter((balance) =>
+        balance.archived !== true
+        && balance.active !== false
+        && (
+          text(balance.lastDocumentId, "", 100) === documentId
+          || movementTargets.has(text(balance.productKey ?? balance.key, "", 300))
+        )
+        && (
+          (baseUnit(balance.unit) === expected.unit
+            && Math.abs(number(balance.current) - expected.amount) < 0.0001)
+          || (counted.unit === "pcs"
+            && baseUnit(balance.unit) === counted.unit
+            && Math.abs(number(balance.current) - counted.amount) < 0.0001)
+        )
+        && lineFinanciallyExplainsBalance(balance, item)
+      );
+      const empty = parts.balances.filter((balance) =>
+        balance.archived !== true
+        && balance.active !== false
+        && Math.abs(number(balance.current)) < 0.0001
+        && Math.abs(valueOfBalance(balance)) < 0.01
+        && (
+          sharesEvidenceKey(balance, item)
+          || inventoryAutomaticIdentityScore(
+            balance,
+            { ...item, unit: baseUnit(balance.unit) },
+          ) >= 0.8
+        )
+      );
+      if (stocked.length !== 1 || empty.length !== 1 || stocked[0] === empty[0]) return;
+      const targetKey = text(stocked[0].productKey ?? stocked[0].key, "", 300);
+      if (!targetKey || text(empty[0].receiptShadowOfProductKey, "", 300) === targetKey) return;
+      empty[0].receiptShadowOfProductKey = targetKey;
+      empty[0].updatedAt = now;
+      reconciledBalances += 1;
+      linkedShadowBalances += 1;
+      correctedProducts.add(targetKey);
+    });
+  }
+
+  parts.root.stockBalances = parts.balances;
+  let assortment = parts.root;
+  const activeReceiptKeys = new Set(stockMovements
+    .filter((movement) =>
+      text(movement.type, "", 30) === "receipt"
+      && text(movement.status, "active", 20) !== "cancelled"
+      && !text(movement.reversedAt, "", 40)
+    )
+    .map((movement) => `${text(movement.sourceDocumentId, "", 100)}:${text(movement.sourceLineId, "", 100)}`));
+
+  for (const document of documents.values()) {
+    const documentId = text(document.id, "", 100);
+    const documentItems = array(document.items).map((value, index) => {
+      const item = record(value);
+      return { ...item, id: sourceLineId(item, index) };
+    });
+    const claimedFallbackMovements = new Set<string>();
+    for (const item of documentItems) {
+      const lineId = text(item.id, "", 100);
+      const exactKey = `${documentId}:${lineId}`;
+      if (activeReceiptKeys.has(exactKey)) continue;
+      const requestedProductKey = resolveInventoryProductKey(assortment, inventoryProductKey(item));
+      if (archivedProductKeys.has(requestedProductKey) || archivedProductKeys.has(inventoryProductKey(item))) continue;
+      const fallback = stockMovements.find((movement) => {
+        const movementId = text(movement.id, "", 100);
+        if (claimedFallbackMovements.has(movementId)) return false;
+        if (
+          text(movement.type, "", 30) !== "receipt"
+          || text(movement.status, "active", 20) === "cancelled"
+          || text(movement.reversedAt, "", 40)
+          || text(movement.sourceDocumentId, "", 100) !== documentId
+        ) return false;
+        return resolveInventoryProductKey(assortment, movement.productKey) === requestedProductKey;
+      });
+      if (!fallback) continue;
+      fallback.sourceLineId = lineId;
+      fallback.repairedAt = now;
+      fallback.repairReason = "Восстановлена связь строки накладной с приходом";
+      const repairCountBefore = repairedMovements;
+      reconcileReceiptAmount(fallback, item);
+      claimedFallbackMovements.add(text(fallback.id, "", 100));
+      activeReceiptKeys.add(exactKey);
+      if (repairedMovements === repairCountBefore) repairedMovements += 1;
+      if (requestedProductKey) correctedProducts.add(requestedProductKey);
+    }
+    const missingItems = documentItems.filter((item) => {
+      if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return false;
+      const requestedProductKey = resolveInventoryProductKey(assortment, inventoryProductKey(item));
+      if (archivedProductKeys.has(requestedProductKey) || archivedProductKeys.has(inventoryProductKey(item))) return false;
+      return !activeReceiptKeys.has(`${documentId}:${text(item.id, "", 100)}`);
+    });
+    if (!missingItems.length) continue;
+    const restored = applyPurchaseToInventory({
+      assortment,
+      document: { ...document, items: missingItems },
+      now,
+    });
+    if (!restored.movements.length) continue;
+    assortment = restored.assortment;
+    for (const movement of restored.movements) {
+      stockMovements.push(movement);
+      activeReceiptKeys.add(`${movement.sourceDocumentId}:${movement.sourceLineId}`);
+      restoredMovements += 1;
+      correctedAmount += Math.abs(movement.amount);
+      correctedProducts.add(movement.productKey);
+    }
+  }
+
+  // A previous repair could already have corrected the receipt movement while
+  // leaving the materialized balance untouched. In that state rerunning the
+  // receipt repair is a no-op, so the inflated balance survives forever.
+  // Reconcile only receipt-only products whose entire inventory value is
+  // explained by those receipts. This proves that there is no valued opening
+  // balance to preserve and avoids rewriting legitimate imported stock.
+  const movementsByProduct = new Map<string, JsonRecord[]>();
+  for (const movement of stockMovements) {
+    if (
+      text(movement.status, "active", 20) === "cancelled"
+      || text(movement.reversedAt, "", 40)
+    ) continue;
+    const productKey = resolveInventoryProductKey(
+      assortment,
+      text(movement.productKey, "", 300),
+    );
+    if (!productKey) continue;
+    const values = movementsByProduct.get(productKey) ?? [];
+    values.push(movement);
+    movementsByProduct.set(productKey, values);
+  }
+  for (const [productKey, balance] of balances) {
+    if (balance.archived === true || balance.active === false) continue;
+    if (text(balance.lastInventoryDocumentId, "", 100)) continue;
+    const movements = movementsByProduct.get(productKey) ?? [];
+    if (!movements.length || movements.some((movement) => text(movement.type, "", 30) !== "receipt")) {
+      continue;
+    }
+    const balanceUnit = baseUnit(balance.unit);
+    if (
+      balanceUnit === "unknown"
+      || movements.some((movement) => baseUnit(movement.unit) !== balanceUnit)
+    ) continue;
+    const linkedReceipts = movements.map((movement) => {
+      const document = evidenceDocuments.get(text(movement.sourceDocumentId, "", 100));
+      if (!document) return undefined;
+      const items = array(document.items).map(record);
+      const item = items.find((line, index) =>
+        sourceLineId(line, index) === text(movement.sourceLineId, "", 100)
+      );
+      if (!item) return undefined;
+      const expected = reconciliationLineBaseAmount(item, balance);
+      if (expected.amount <= 0 || expected.unit !== balanceUnit) return undefined;
+      const lineValue = Math.max(0, number(item.lineTotal)
+        || number(item.unitPrice) * Math.max(0, number(item.quantity)));
+      return { movement, expected, lineValue };
+    });
+    if (linkedReceipts.some((value) => !value)) continue;
+    const confirmedReceipts = linkedReceipts.filter((value): value is NonNullable<typeof value> => Boolean(value));
+    const ledgerAmount = rounded(confirmedReceipts.reduce((sum, value) => sum + value.expected.amount, 0));
+    const current = rounded(number(balance.current));
+    if (ledgerAmount <= 0 || current <= ledgerAmount) continue;
+    const receiptValue = rounded(
+      confirmedReceipts.reduce((sum, value) => sum + value.lineValue, 0),
+      2,
+    );
+    const inventoryValue = rounded(Math.max(0, valueOfBalance(balance)), 2);
+    const valueTolerance = Math.max(0.01, inventoryValue * 0.005);
+    const receiptValueExplainsBalance = receiptValue > 0
+      && Math.abs(inventoryValue - receiptValue) <= valueTolerance;
+    const purchaseOrigin = text(balance.source, "", 40) === "purchase";
+    const ratio = current / ledgerAmount;
+    const legacyMultiplier = ratio >= 5
+      && ratio <= 1_000
+      && Math.abs(ratio - Math.round(ratio)) < 0.0001;
+    const lastDocumentId = text(balance.lastDocumentId, "", 100);
+    const lastDocumentIsReceipt = Boolean(lastDocumentId)
+      && movements.some((movement) => text(movement.sourceDocumentId, "", 100) === lastDocumentId);
+    if (
+      !legacyMultiplier
+      || !lastDocumentIsReceipt
+      || (!purchaseOrigin && !receiptValueExplainsBalance)
+    ) continue;
+    for (const value of confirmedReceipts) {
+      if (Math.abs(number(value.movement.amount) - value.expected.amount) < 0.0001) continue;
+      value.movement.amount = value.expected.amount;
+      value.movement.unit = value.expected.unit;
+      value.movement.repairedAt = now;
+      value.movement.repairReason = "Приход сверен с подтверждённой строкой накладной";
+      repairedMovements += 1;
+    }
+    balance.current = ledgerAmount;
+    balance.inventoryValue = inventoryValue;
+    balance.averageUnitCost = ledgerAmount > 0
+      ? rounded(inventoryValue / ledgerAmount, 6)
+      : 0;
+    balance.updatedAt = now;
+    balance.quantityRepairAt = now;
+    balance.quantityRepairReason = "Баланс сверен с журналом подтверждённых приходов";
+    reconciledBalances += 1;
+    correctedAmount += Math.abs(current - ledgerAmount);
+    correctedProducts.add(productKey);
+  }
+
+  if (repairedMovements || restoredMovements || reconciledBalances) record(assortment).updatedAt = now;
+  return {
+    assortment: record(assortment),
+    stockMovements,
+    summary: {
+      repairedMovements,
+      restoredMovements,
+      reconciledBalances,
+      correctedProducts: correctedProducts.size,
+      correctedAmount: rounded(correctedAmount),
+      evidenceDocuments: evidenceDocuments.size,
+      evidenceMatches,
+      linkedShadowBalances,
+      changed: repairedMovements > 0 || restoredMovements > 0 || reconciledBalances > 0,
+    },
+  };
+}
+
+export function archiveInventoryProduct(input: {
+  assortment: unknown;
+  productKey: string;
+  now?: string;
+}): {
+  ok: boolean;
+  code?: "PRODUCT_NOT_FOUND" | "PRODUCT_HAS_STOCK" | "PRODUCT_IN_USE";
+  error?: string;
+  assortment: JsonRecord;
+  product?: JsonRecord;
+  linkedRecipes: number;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const parts = assortmentParts(input.assortment);
+  const requestedKey = text(input.productKey, "", 300);
+  const resolvedKey = resolveInventoryProductKey(parts.root, requestedKey);
+  const balance = parts.balances.find((value) =>
+    text(value.productKey ?? value.key, "", 300) === resolvedKey
+  );
+  const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
+  const item = nomenclature.find((value) =>
+    text(value.productKey ?? value.key, "", 300) === resolvedKey
+  );
+  const product = balance ?? item;
+  if (!product) {
+    return {
+      ok: false,
+      code: "PRODUCT_NOT_FOUND",
+      error: "Позиция не найдена",
+      assortment: parts.root,
+      linkedRecipes: 0,
+    };
+  }
+  if (Math.abs(number(balance?.current)) >= 0.0001 || Math.abs(valueOfBalance(balance ?? {})) >= 0.01) {
+    return {
+      ok: false,
+      code: "PRODUCT_HAS_STOCK",
+      error: "Сначала обнулите остаток инвентаризацией",
+      assortment: parts.root,
+      product: cloneRecord(product),
+      linkedRecipes: 0,
+    };
+  }
+  const linkedRecipes = parts.recipes.filter((recipe) =>
+    array(recipe.ingredients).some((value) => {
+      const ingredient = record(value);
+      const ingredientKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
+      return ingredientKey && resolveInventoryProductKey(parts.root, ingredientKey) === resolvedKey;
+    })
+  ).length;
+  if (linkedRecipes > 0) {
+    return {
+      ok: false,
+      code: "PRODUCT_IN_USE",
+      error: "Позиция используется в техкарте. Сначала замените ингредиент",
+      assortment: parts.root,
+      product: cloneRecord(product),
+      linkedRecipes,
+    };
+  }
+  const archived = {
+    archived: true,
+    active: false,
+    archivedAt: now,
+    updatedAt: now,
+  };
+  if (balance) Object.assign(balance, archived);
+  if (item) Object.assign(item, archived);
+  const tombstoneKeys = [
+    requestedKey,
+    resolvedKey,
+    text(product.key, "", 300),
+    text(product.productKey, "", 300),
+    ...array(product.externalProductKeys).map((value) => text(value, "", 300)),
+    ...array(product.mergedFromProductKeys).map((value) => text(value, "", 300)),
+  ].filter(Boolean);
+  parts.root.stockBalances = parts.balances;
+  parts.root.nomenclature = nomenclature;
+  parts.root.archivedInventoryProductKeys = [...new Set([
+    ...array(parts.root.archivedInventoryProductKeys).map((value) => text(value, "", 300)),
+    ...tombstoneKeys,
+  ].filter(Boolean))].slice(-5_000);
+  parts.root.updatedAt = now;
+  return {
+    ok: true,
+    assortment: parts.root,
+    product: cloneRecord(balance ?? item),
+    linkedRecipes: 0,
+  };
+}
+
 export function updateInventoryProductDefinition(input: {
   assortment: unknown;
   stockMovements?: unknown;
@@ -646,8 +1941,9 @@ export function updateInventoryProductDefinition(input: {
   const productKey = text(input.update.productKey, "", 300);
   const name = text(input.update.name, "", 240);
   const requestedUnit = baseUnit(input.update.unit);
+  const displayUnit = normalizeInventoryDisplayUnit(input.update.displayUnit, requestedUnit);
   const packageSize = text(input.update.packageSize, "", 120);
-  if (!productKey || !name || requestedUnit === "unknown" || !packageSize) {
+  if (!productKey || !name || requestedUnit === "unknown" || !packageSize || !displayUnit) {
     return {
       ok: false,
       code: "INVALID_PRODUCT",
@@ -660,8 +1956,12 @@ export function updateInventoryProductDefinition(input: {
   if (!balance) {
     return { ok: false, code: "PRODUCT_NOT_FOUND", error: "Складская позиция не найдена." };
   }
-  const parsedPackage = inventoryPackageAmount(packageSize, baseUnitInputLabel(requestedUnit));
-  if (parsedPackage.amount <= 0 || parsedPackage.unit !== requestedUnit) {
+  const keepsMultiplePackages = balance.multiplePackageSizes === true
+    && packageSize === "Несколько фасовок";
+  const parsedPackage = keepsMultiplePackages
+    ? { amount: 0, unit: requestedUnit }
+    : inventoryPackageAmount(packageSize, baseUnitInputLabel(requestedUnit));
+  if (!keepsMultiplePackages && (parsedPackage.amount <= 0 || parsedPackage.unit !== requestedUnit)) {
     return {
       ok: false,
       code: "INVALID_PRODUCT",
@@ -708,9 +2008,15 @@ export function updateInventoryProductDefinition(input: {
   balance.key = productKey;
   balance.productKey = productKey;
   balance.name = name;
+  balance.preferredDisplayName = name;
+  balance.preferredDisplayNameSource = "manual_edit";
+  balance.preferredDisplayNameUpdatedAt = now;
   balance.unit = requestedUnit;
+  balance.displayUnit = displayUnit;
   balance.packageSize = packageSize;
   balance.packageAmount = rounded(parsedPackage.amount);
+  balance.multiplePackageSizes = keepsMultiplePackages || undefined;
+  if (!keepsMultiplePackages) balance.packageOptions = [packageSize];
   balance.linkedRecipeCount = linkedRecipes;
   balance.metadataSource = linkedRecipes ? "recipe" : text(balance.metadataSource, "manual", 40);
   balance.inventoryValue = rounded(
@@ -725,9 +2031,15 @@ export function updateInventoryProductDefinition(input: {
   if (nomenclatureItem) {
     Object.assign(nomenclatureItem, {
       name,
+      preferredDisplayName: name,
+      preferredDisplayNameSource: "manual_edit",
+      preferredDisplayNameUpdatedAt: now,
       unit: requestedUnit,
+      displayUnit,
       packageSize,
       packageAmount: rounded(parsedPackage.amount),
+      multiplePackageSizes: keepsMultiplePackages || undefined,
+      ...(!keepsMultiplePackages ? { packageOptions: [packageSize] } : {}),
       updatedAt: now,
     });
   } else {
@@ -763,6 +2075,38 @@ function balanceIndex(balances: JsonRecord[]): Map<string, JsonRecord> {
   return result;
 }
 
+function incomingInventoryProductKey(
+  assortment: JsonRecord,
+  balances: JsonRecord[],
+  item: JsonRecord,
+): { key: string; requestedKey: string } {
+  const requestedKey = inventoryProductKey(item);
+  const resolvedKey = resolveInventoryProductKey(assortment, requestedKey);
+  const direct = balances.find((balance) =>
+    text(balance.productKey ?? balance.key, "", 300) === resolvedKey
+  );
+  if (direct) return { key: resolvedKey, requestedKey };
+  const incoming = {
+    ...item,
+    unit: purchaseLineBaseAmount(item).unit,
+    currency: text(item.currency, "", 12),
+  };
+  const match = balances
+    .map((balance) => ({ balance, score: inventoryAutomaticIdentityScore(incoming, balance) }))
+    .filter(({ score }) => score >= 0.9)
+    .sort((left, right) =>
+      right.score - left.score
+      || Number(Boolean(text(right.balance.preferredDisplayName, "", 240)))
+        - Number(Boolean(text(left.balance.preferredDisplayName, "", 240)))
+      || Number(number(right.balance.current) > 0) - Number(number(left.balance.current) > 0)
+      || text(left.balance.name).length - text(right.balance.name).length
+    )[0]?.balance;
+  return {
+    key: match ? text(match.productKey ?? match.key, requestedKey, 300) : requestedKey,
+    requestedKey,
+  };
+}
+
 function sourceLineId(item: JsonRecord, index: number): string {
   return text(item.id, `line-${index + 1}`, 100);
 }
@@ -781,6 +2125,8 @@ export function applyPurchaseToInventory(input: {
   const documentId = text(document.id, crypto.randomUUID(), 100);
   const date = text(document.date, now.slice(0, 10), 10);
   const currency = text(document.currency, "", 12).toUpperCase();
+  const sourceType = text(document.sourceType, "manual", 30);
+  const userConfirmedNames = sourceType === "manual" || sourceType === "scan";
   const parts = assortmentParts(input.assortment);
   if (!record(parts.root.nomenclatureStructure).version) {
     parts.root.nomenclatureStructure = defaultNomenclatureStructure();
@@ -794,13 +2140,28 @@ export function applyPurchaseToInventory(input: {
   const nomenclatureByKey = new Map(
     nomenclature.map((item) => [text(item.key ?? item.productKey, "", 300), item]),
   );
+  const identityAliases = new Map(
+    array(parts.root.inventoryProductAliases)
+      .map((value) => cloneRecord(value))
+      .map((value) => [text(value.from, "", 300), value] as const)
+      .filter(([from]) => Boolean(from)),
+  );
 
   array(document.items).forEach((value, index) => {
     const item = record(value);
     const itemId = sourceLineId(item, index);
     const name = text(item.name, `Позиция ${index + 1}`);
     const received = purchaseLineBaseAmount(item);
-    const productKey = inventoryProductKey(item);
+    const identity = incomingInventoryProductKey(parts.root, parts.balances, { ...item, currency });
+    const productKey = identity.key;
+    if (identity.requestedKey && identity.requestedKey !== productKey) {
+      identityAliases.set(identity.requestedKey, {
+        from: identity.requestedKey,
+        to: productKey,
+        reason: "automatic-stock-identity",
+        updatedAt: now,
+      });
+    }
     const category = text(item.category, "products", 80);
     const previousNomenclature = nomenclatureByKey.get(productKey);
     const previousBalance = indexedBalances.get(productKey)
@@ -840,6 +2201,9 @@ export function applyPurchaseToInventory(input: {
       multiplePackageSizes: hasMultiplePackageSizes || undefined,
       active: true,
       source: "purchase",
+      preferredDisplayName: userConfirmedNames ? name : previousNomenclature?.preferredDisplayName,
+      preferredDisplayNameSource: userConfirmedNames ? "confirmed_purchase" : previousNomenclature?.preferredDisplayNameSource,
+      preferredDisplayNameUpdatedAt: userConfirmedNames ? now : previousNomenclature?.preferredDisplayNameUpdatedAt,
       lastPurchaseAt: date,
       updatedAt: now,
       classifiedAt: previousNomenclature?.classifiedAt ?? now,
@@ -887,6 +2251,10 @@ export function applyPurchaseToInventory(input: {
       key: productKey,
       productKey,
       name,
+      source: "purchase",
+      preferredDisplayName: userConfirmedNames ? name : previous.preferredDisplayName,
+      preferredDisplayNameSource: userConfirmedNames ? "confirmed_purchase" : previous.preferredDisplayNameSource,
+      preferredDisplayNameUpdatedAt: userConfirmedNames ? now : previous.preferredDisplayNameUpdatedAt,
       category: text(item.category, text(previous.category, "other", 80), 80),
       packageSize: displayedPackageSize,
       packageOptions,
@@ -951,6 +2319,7 @@ export function applyPurchaseToInventory(input: {
   parts.root.stockBalances = parts.balances;
   parts.root.recipes = parts.recipes;
   parts.root.nomenclature = nomenclature;
+  parts.root.inventoryProductAliases = [...identityAliases.values()].slice(0, 5_000);
   parts.root.updatedAt = now;
   return {
     assortment: parts.root,

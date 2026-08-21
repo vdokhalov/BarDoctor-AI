@@ -5,6 +5,7 @@ import {
   applyInventoryCount,
   ASSORTMENT_STORE_KEY,
   inventoryPackageAmount,
+  resolveInventoryProductKey,
   STOCK_MOVEMENT_STORE_KEY,
   toInventoryBaseAmount,
   type BaseInventoryUnit,
@@ -187,7 +188,8 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
   const assortment = record(parse(loaded.get(ASSORTMENT_STORE_KEY), {}));
   const balances = array(assortment.stockBalances);
   const value = record(input.data);
-  const productKey = input.internalId;
+  const requestedProductKey = input.internalId;
+  const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
   const index = balances.findIndex((item) => text(item.productKey ?? item.key) === productKey);
   const before = index >= 0 ? { ...balances[index] } : undefined;
   const previous = index >= 0 ? balances[index] : {};
@@ -206,6 +208,10 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
       ...(Array.isArray(previous.aliases) ? previous.aliases.map(String) : []),
       text(value.name),
     ].filter(Boolean))].slice(0, 30),
+    externalProductKeys: [...new Set([
+      ...(Array.isArray(previous.externalProductKeys) ? previous.externalProductKeys.map(String) : []),
+      requestedProductKey,
+    ].filter((key) => key && key !== productKey))].slice(0, 100),
     unit: packageDetails.unit === "unknown" ? text(previous.unit, "unknown") : packageDetails.unit,
     packageSize: text(value.packageSize, text(previous.packageSize)),
     packageAmount: packageDetails.amount || number(previous.packageAmount),
@@ -258,7 +264,8 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   const date = text(value.measuredAt, now.slice(0, 10), 10);
   const locked = closedMonthFailure(loaded, date);
   if (locked) return locked;
-  const productKey = text(value.productKey);
+  const requestedProductKey = text(value.productKey);
+  const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
   const warehouseExternalId = text(value.warehouseExternalId, "__venue__", 180);
   const balances = array(assortment.stockBalances);
   let balance = balances.find((item) => text(item.productKey ?? item.key) === productKey);
@@ -381,7 +388,8 @@ async function writeInventoryDocument(input: WriterInput & { kind: "write_off" |
   const byKey = new Map(balances.map((balance) => [text(balance.productKey ?? balance.key), balance]));
   const prepared: Array<{ item: JsonRecord; balance: JsonRecord; amount: number; unit: BaseInventoryUnit; cost: number }> = [];
   for (const original of array(value.items)) {
-    const productKey = text(original.productKey);
+    const requestedProductKey = text(original.productKey);
+    const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
     const balance = byKey.get(productKey);
     if (!balance) return { ok: false, code: "MAPPING_TARGET_NOT_FOUND", error: `Складская позиция «${text(original.name, "Товар") }» не найдена` };
     const base = toInventoryBaseAmount(original.quantity, original.unit);
@@ -504,6 +512,13 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
   if (before && before.source !== "integration" && text(before.externalId) !== input.envelope.externalId) {
     return { ok: false, code: "MANUAL_RECIPE_PROTECTED", error: "У позиции уже есть ручная техкарта. Она не перезаписана; сравните версии вручную." };
   }
+  const resolvedIngredients = array(value.ingredients).map((ingredient) => {
+    const requested = text(ingredient.purchaseProductKey);
+    const resolved = resolveInventoryProductKey(assortment, requested) || requested;
+    return requested && resolved !== requested
+      ? { ...ingredient, purchaseProductKey: resolved }
+      : ingredient;
+  });
   const recipe = {
     ...before,
     ...value,
@@ -512,13 +527,14 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
     status: "confirmed",
     confidence: 1,
     warnings: [],
+    ingredients: resolvedIngredients,
     ...sourceMetadata(input.envelope),
     createdAt: text(before?.createdAt, now, 40),
     updatedAt: now,
   };
   if (existingIndex >= 0) recipes[existingIndex] = recipe;
   else recipes.unshift(recipe);
-  for (const ingredient of array(value.ingredients)) {
+  for (const ingredient of resolvedIngredients) {
     const productKey = text(ingredient.purchaseProductKey);
     if (!productKey || balances.some((item) => text(item.productKey ?? item.key) === productKey)) continue;
     const base = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);

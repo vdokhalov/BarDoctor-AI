@@ -70,6 +70,7 @@ export type PurchaseItem = {
   brand?: string;
   quantity: number;
   unit: string;
+  quantityMode?: "count" | "measure";
   packageSize?: string;
   unitPrice: number;
   lineTotal: number;
@@ -540,13 +541,21 @@ export function normalizePurchaseItem(
   const requestedCategory = text(input.category, "", 32);
   const inferredCategory = inferPurchaseCategory(name);
   const packageSize = inferPurchasePackageSize(name, input.packageSize, input.unit);
+  const explicitUnit = text(input.unit, "", 32);
+  const requestedUnit = /усл/i.test(packageSize)
+    ? "усл."
+    : explicitUnit || purchaseUnitForPackage(packageSize);
+  const quantityMode = /^(?:л|l|литр|мл|ml|миллилитр|кг|kg|килограмм|г|гр|g|грамм)/i.test(requestedUnit)
+    ? "measure"
+    : "count";
   return {
     id: text(input.id, crypto.randomUUID(), 80),
     purchaseProductKey: text(input.purchaseProductKey ?? input.productKey, "", 300) || undefined,
     name,
     brand: text(input.brand, "", 120) || undefined,
     quantity: Math.round(quantity * 1_000) / 1_000,
-    unit: purchaseUnitForPackage(packageSize),
+    unit: requestedUnit,
+    quantityMode,
     packageSize,
     unitPrice: Math.round(unitPrice * 100) / 100,
     lineTotal: Math.round(lineTotal * 100) / 100,

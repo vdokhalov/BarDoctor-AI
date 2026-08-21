@@ -573,6 +573,28 @@
   font-size: 12px;
 }
 
+.bd-procurement-stock-preview-v221 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -2px;
+  padding: 12px 14px;
+  border: 1px solid #d9dcff;
+  border-radius: 14px;
+  background: #f5f5ff;
+  color: #626a83;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.bd-procurement-stock-preview-v221 strong {
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .bd-procurement-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

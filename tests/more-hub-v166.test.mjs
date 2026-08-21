@@ -79,7 +79,7 @@ test("More v166 is linked in both app documents and has responsive overflow-safe
   for (const source of [appHtml, response]) {
     assert.match(source, /more-hub-v166\.css\?v=20260812-more-v166/);
     assert.match(source, /more-hub-qa-v166\.js\?v=20260812-more-v166/);
-    assert.match(source, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
+    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
   }
   assert.match(css, /\.bd-more-header-v166/);
   assert.match(css, /position: sticky/);

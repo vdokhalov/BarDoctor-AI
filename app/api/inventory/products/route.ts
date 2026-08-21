@@ -3,14 +3,19 @@ import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import {
   ASSORTMENT_STORE_KEY,
+  archiveInventoryProduct,
   BaseInventoryUnit,
   consolidateInventoryDuplicates,
   inventoryPackageAmount,
   inventoryProductKey,
+  type InventoryDisplayUnit,
+  normalizeInventoryDisplayUnit,
   repairInventoryBalanceMetadata,
+  repairInventoryPurchaseAmounts,
   STOCK_MOVEMENT_STORE_KEY,
   updateInventoryProductDefinition,
 } from "../../../../lib/bardoctor/inventory";
+import { PURCHASE_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 import {
   classifyNomenclatureItem,
   defaultNomenclatureStructure,
@@ -51,6 +56,7 @@ function text(value: unknown, fallback = "", max = 300): string {
 function upsertStore(
   database: D1Database,
   accountId: number,
+  storeKey: string,
   value: unknown,
   updatedAt: string,
 ): D1PreparedStatement {
@@ -59,7 +65,7 @@ function upsertStore(
     VALUES (?, ?, ?, ?)
     ON CONFLICT(account_id, store_key)
     DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
-  `).bind(accountId, ASSORTMENT_STORE_KEY, JSON.stringify(value), updatedAt);
+  `).bind(accountId, storeKey, JSON.stringify(value), updatedAt);
 }
 
 function auditUpdate(
@@ -122,7 +128,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Некорректные данные товара" }, { status: 400 });
   }
   const action = text(body.action, "repair", 20);
-  if (!new Set(["repair", "classify", "create", "update"]).has(action)) {
+  if (!new Set(["repair", "classify", "create", "update", "archive"]).has(action)) {
     return Response.json({ ok: false, error: "Неизвестное действие" }, { status: 400 });
   }
 
@@ -130,19 +136,46 @@ export async function POST(request: Request): Promise<Response> {
   const storesResult = await database.prepare(`
     SELECT store_key, data_json
     FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?)
-  `).bind(account.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY).all<StoreRow>();
+    WHERE account_id = ? AND store_key IN (?, ?, ?)
+  `).bind(account.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY).all<StoreRow>();
   const stores = new Map((storesResult.results ?? []).map((row) => [row.store_key, row.data_json]));
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const purchaseDocuments = array(stores.get(PURCHASE_STORE_KEY));
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
+
+  if (action === "archive") {
+    const productKey = text(body.productKey, "", 300);
+    const archived = archiveInventoryProduct({ assortment, productKey, now });
+    if (!archived.ok) {
+      const status = archived.code === "PRODUCT_NOT_FOUND" ? 404 : 409;
+      return Response.json(archived, { status });
+    }
+    await database.batch([
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, archived.assortment, now),
+      auditUpdate(database, {
+        accountId: account.id,
+        entityId: productKey,
+        entityLabel: text(archived.product?.name, "Складская позиция", 240),
+        before: (Array.isArray(record(assortment).stockBalances) ? record(assortment).stockBalances as unknown[] : [])
+          .map(record)
+          .find((value) => text(value.productKey ?? value.key, "", 300) === productKey) ?? null,
+        after: archived.product,
+        actorName,
+        actorRole: account.role,
+        reason: "Удаление ошибочной нулевой позиции из активной номенклатуры",
+        createdAt: now,
+      }),
+    ]);
+    return Response.json({ ok: true, assortment: archived.assortment, product: archived.product, archived: true });
+  }
 
   if (action === "classify") {
     const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
     const result = ensureNomenclatureHierarchy(consolidated.assortment, now);
     const statements = [
-      upsertStore(database, account.id, result.assortment, now),
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
       auditUpdate(database, {
         accountId: account.id,
         entityId: "nomenclature-hierarchy-v209",
@@ -181,14 +214,31 @@ export async function POST(request: Request): Promise<Response> {
 
   if (action === "repair") {
     const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
-    const repaired = repairInventoryBalanceMetadata({
+    const amountRepair = repairInventoryPurchaseAmounts({
       assortment: consolidated.assortment,
+      purchaseDocuments,
       stockMovements: consolidated.stockMovements,
       now,
     });
-    if (repaired.summary.repaired || repaired.summary.removed || consolidated.summary.changed) {
+    const reconciled = consolidateInventoryDuplicates({
+      assortment: amountRepair.assortment,
+      stockMovements: amountRepair.stockMovements,
+      now,
+    });
+    const repaired = repairInventoryBalanceMetadata({
+      assortment: reconciled.assortment,
+      stockMovements: reconciled.stockMovements,
+      now,
+    });
+    if (
+      repaired.summary.repaired
+      || repaired.summary.removed
+      || consolidated.summary.changed
+      || reconciled.summary.changed
+      || amountRepair.summary.changed
+    ) {
       const statements = [
-        upsertStore(database, account.id, repaired.assortment, now),
+        upsertStore(database, account.id, ASSORTMENT_STORE_KEY, repaired.assortment, now),
         auditUpdate(database, {
           accountId: account.id,
           entityId: "inventory-metadata",
@@ -197,18 +247,20 @@ export async function POST(request: Request): Promise<Response> {
           after: repaired.assortment,
           actorName,
           actorRole: account.role,
-          reason: consolidated.summary.changed
+          reason: amountRepair.summary.changed
+            ? "Исправление двойного умножения количества и фасовки в приходах"
+            : consolidated.summary.changed
             ? "Объединение дублей склада и восстановление карточек без потери движений"
             : "Восстановление названий складских позиций из техкарт",
           createdAt: now,
         }),
       ];
-      if (consolidated.summary.changed) {
+      if (consolidated.summary.changed || reconciled.summary.changed || amountRepair.summary.changed) {
         statements.push(upsertStore(
           database,
           account.id,
           STOCK_MOVEMENT_STORE_KEY,
-          consolidated.stockMovements,
+          reconciled.stockMovements,
           now,
         ));
       }
@@ -220,6 +272,8 @@ export async function POST(request: Request): Promise<Response> {
       repaired: repaired.summary.repaired,
       removed: repaired.summary.removed,
       duplicateRepair: consolidated.summary,
+      reconciliationDuplicateRepair: reconciled.summary,
+      amountRepair: amountRepair.summary,
     });
   }
 
@@ -232,7 +286,10 @@ export async function POST(request: Request): Promise<Response> {
       kind === "service" ? "1 усл." : unit === "ml" ? "1 л" : unit === "g" ? "1 кг" : "1 шт.",
       120,
     );
-    if (!name || (kind === "stock" && !["ml", "g", "pcs"].includes(unit))) {
+    const displayUnit = kind === "stock"
+      ? normalizeInventoryDisplayUnit(body.displayUnit, unit)
+      : null;
+    if (!name || (kind === "stock" && (!["ml", "g", "pcs"].includes(unit) || !displayUnit))) {
       return Response.json(
         { ok: false, error: "Укажите название и единицу учёта" },
         { status: 422 },
@@ -272,9 +329,13 @@ export async function POST(request: Request): Promise<Response> {
       key: productKey,
       productKey,
       name,
+      preferredDisplayName: name,
+      preferredDisplayNameSource: "manual_create",
+      preferredDisplayNameUpdatedAt: now,
       category: text(body.category, kind === "service" ? "other" : "products", 80),
       kind,
       unit,
+      ...(displayUnit ? { displayUnit } : {}),
       packageSize,
       packageAmount: packageDetails.amount,
       current: 0,
@@ -295,7 +356,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     root.updatedAt = now;
     await database.batch([
-      upsertStore(database, account.id, root, now),
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
       auditUpdate(database, {
         accountId: account.id,
         entityId: productKey,
@@ -336,6 +397,9 @@ export async function POST(request: Request): Promise<Response> {
     }
     Object.assign(item, {
       name: requestedName,
+      preferredDisplayName: requestedName,
+      preferredDisplayNameSource: "manual_edit",
+      preferredDisplayNameUpdatedAt: now,
       category: requestedCategory,
       active: requestedActive,
       packageSize: text(body.packageSize, text(item.packageSize, "1 усл.", 120), 120),
@@ -353,7 +417,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     root.updatedAt = now;
     await database.batch([
-      upsertStore(database, account.id, root, now),
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
       auditUpdate(database, {
         accountId: account.id,
         entityId: productKey,
@@ -377,6 +441,11 @@ export async function POST(request: Request): Promise<Response> {
       name: requestedName,
       unit: requestedUnit,
       packageSize: text(body.packageSize, "", 120),
+      displayUnit: text(
+        body.displayUnit,
+        text(previousProduct?.displayUnit, "auto", 20),
+        20,
+      ) as InventoryDisplayUnit,
     },
     now,
   });
@@ -414,7 +483,7 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   await database.batch([
-    upsertStore(database, account.id, updatedRoot, now),
+    upsertStore(database, account.id, ASSORTMENT_STORE_KEY, updatedRoot, now),
     auditUpdate(database, {
       accountId: account.id,
       entityId: productKey,

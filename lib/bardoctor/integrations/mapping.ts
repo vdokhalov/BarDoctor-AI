@@ -1,4 +1,4 @@
-import { normalizeInventoryText } from "../inventory";
+import { inventoryProductIdentityName, normalizeInventoryText } from "../inventory";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -91,20 +91,35 @@ function candidateScore(external: MappingCandidate, candidate: MappingCandidate)
   if (external.barcode && candidate.barcode && external.barcode === candidate.barcode) return 100;
   const externalVolume = volume(`${external.packageSize ?? ""} ${external.unit ?? ""} ${external.name}`);
   const internalVolume = volume(`${candidate.packageSize ?? ""} ${candidate.unit ?? ""} ${candidate.name}`);
-  const withoutPackage = (value: string, hasPackage: boolean) => {
-    const normalized = matchingText(
-      value.replace(/\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт|pcs)(?![a-zа-яё])/gi, " "),
+  const nameIdentity = (value: string, packageSize: string | undefined) => {
+    const packageVolume = volume(packageSize ?? "");
+    let marked = value.replace(
+      /(\d+(?:[.,]\d+)?)\s*(мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт|pcs)(?![a-zа-яё])/gi,
+      (match) => {
+        const parsed = volume(match);
+        return parsed ? ` pack${parsed.amount}${parsed.unit} ` : match;
+      },
     );
-    return hasPackage ? normalized.replace(/\b\d+(?:\s+\d+)?\b/g, " ").replace(/\s+/g, " ").trim() : normalized;
+    if (packageVolume) {
+      marked = marked.replace(/(\d+(?:[.,]\d+)?)\s*$/i, (match, amountText: string) => {
+        const amount = Number(amountText.replace(",", "."));
+        const sameAmount = Math.abs(amount - packageVolume.amount) < 0.001
+          || (packageVolume.unit !== "pcs" && Math.abs(amount * 1_000 - packageVolume.amount) < 0.001);
+        return sameAmount ? ` pack${packageVolume.amount}${packageVolume.unit}` : match;
+      });
+    }
+    return matchingText(inventoryProductIdentityName({ name: marked }));
   };
-  const left = withoutPackage(external.name, Boolean(externalVolume));
-  const right = withoutPackage(candidate.name, Boolean(internalVolume));
+  const left = nameIdentity(external.name, external.packageSize);
+  const right = nameIdentity(candidate.name, candidate.packageSize);
   if (!left || !right) return 0;
   let score = left === right ? 96 : Math.round(dice(left, right) * 88);
   if (externalVolume && internalVolume) {
     if (externalVolume.unit !== internalVolume.unit) score -= 25;
     else if (Math.abs(externalVolume.amount - internalVolume.amount) < 0.001) score += 4;
-    else score -= 12;
+    // Different net contents are package variants of the same stock master.
+    // Keep the match confirmable when the normalized name and base unit agree.
+    else score -= 1;
   }
   return Math.max(0, Math.min(100, score));
 }
@@ -178,13 +193,14 @@ export function decideMapping(
       reason: "Подходящей позиции BarDoctor не найдено",
     };
   }
-  if (best.score >= 94 && (!second || best.score - second.score >= 8)) {
+  const requiredLead = best.score === 100 ? 4 : 8;
+  if (best.score >= 94 && (!second || best.score - second.score >= requiredLead)) {
     return {
       status: "confirmed",
       confidence: best.score,
       candidate: best.candidate,
       alternatives,
-      reason: best.score === 100 ? "Точное совпадение" : "Однозначное совпадение названия и фасовки",
+      reason: best.score === 100 ? "Точное совпадение" : "Однозначное совпадение складского товара",
     };
   }
   return {

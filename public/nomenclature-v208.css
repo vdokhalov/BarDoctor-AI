@@ -333,6 +333,52 @@
   padding: 0 12px 12px;
 }
 
+.bd-warehouse-groups-v209 .bd-warehouse-section-v214 {
+  border-color: #dfe3ee;
+  background: #f5f7fb;
+}
+
+.bd-warehouse-category-list-v214,
+.bd-warehouse-subcategory-list-v214 {
+  display: grid;
+  padding: 0 10px 10px;
+  gap: 8px;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-category-v214 {
+  border-radius: 15px;
+  background: #fff;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-subcategory-v214 {
+  border-color: #eceef4;
+  border-radius: 13px;
+  background: #fafbfe;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-category-v214 > summary {
+  min-height: 50px;
+  padding: 0 14px;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-subcategory-v214 > summary {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-category-v214 > summary strong {
+  font-size: 14px;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-subcategory-v214 > summary strong {
+  font-size: 13px;
+  color: #4d5570;
+}
+
+.bd-warehouse-groups-v209 .bd-warehouse-subcategory-v214 > .bd-warehouse-stock-grid {
+  padding: 0 8px 8px;
+}
+
 .bd-nomenclature-path-editor-v209 {
   display: grid;
   padding: 14px;

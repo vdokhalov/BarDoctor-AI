@@ -79,13 +79,21 @@ test("receipt normalization keeps line prices and derives a safe total", () => {
   assert.equal(document.pageCount, 2);
 });
 
-test("milk without an explicit package is normalized as a liquid purchase", () => {
+test("purchase normalization keeps quantity unit separate from package size", () => {
   const document = normalizePurchaseDocument({
     source: "manual",
     items: [{ name: "Молоко", quantity: 2, unit: "шт.", unitPrice: 30 }],
   });
   assert.equal(document.items[0].packageSize, "1 л");
-  assert.equal(document.items[0].unit, "л");
+  assert.equal(document.items[0].unit, "шт.");
+  assert.equal(document.items[0].quantityMode, "count");
+
+  const measured = normalizePurchaseDocument({
+    source: "manual",
+    items: [{ name: "Коньяк Нистру", quantity: 10, unit: "л", packageSize: "10 л", unitPrice: 237.7 }],
+  });
+  assert.equal(measured.items[0].unit, "л");
+  assert.equal(measured.items[0].quantityMode, "measure");
 });
 
 test("price list may be saved without a document total", () => {

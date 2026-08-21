@@ -19,7 +19,7 @@ test("nomenclature is a first-class visible module under More", async () => {
   assert.match(bundle, /path:"\/nomenclature",component:\(\)=>i\.jsx\(pt,\{component:bdNomenclaturePage\}\)/);
   assert.match(bundle, /key:"nomenclature",icon:kX,title:"Номенклатура",description:"Товары, расходники и услуги"/);
   assert.match(shell, /"\/nomenclature": \["Номенклатура", "\/more"\]/);
-  assert.match(bootstrap, /nomenclature-v208\.css\?v=20260820-nomenclature-v211/);
+  assert.match(bootstrap, /nomenclature-v208\.css\?v=20260821-warehouse-v214/);
   assert.match(css, /\.bd-nomenclature-main-v208/);
   assert.match(css, /@media \(max-width: 390px\)/);
 });
@@ -56,7 +56,10 @@ test("nomenclature exposes one explicit hierarchy, a consistent attention queue 
 });
 
 test("warehouse reads canonical names from nomenclature and remains operational", async () => {
-  const bundle = await read("public/assets/index-BQGspy0I.js");
+  const [bundle, bootstrap] = await Promise.all([
+    read("public/assets/index-BQGspy0I.js"),
+    read("public/bardoctor-preview.js"),
+  ]);
 
   assert.match(bundle, /function bdWarehouseCanonicalBalances/);
   assert.match(bundle, /\[N,E\]=S\.useState\(\(\)=>bdWarehouseCanonicalBalances\(xr\("bd_assortment_v1"\)\)\)/);
@@ -64,11 +67,19 @@ test("warehouse reads canonical names from nomenclature and remains operational"
   assert.match(bundle, /children:"Товары на складе"/);
   assert.match(bundle, /onClick:\(\)=>e\("\/nomenclature"\),children:"Номенклатура"/);
   assert.match(bundle, /function bdWarehouseGroupedStock/);
-  assert.match(bundle, /value:"sections",children:"По разделам"/);
+  assert.match(bundle, /value:"sections",children:"Разделы и подразделы"/);
   assert.match(bundle, /value:"categories",children:"По категориям"/);
+  assert.match(bundle, /value:"subcategories",children:"По подразделам"/);
+  assert.match(bundle, /bd-warehouse-section-v214/);
+  assert.match(bundle, /bd-warehouse-category-v214/);
+  assert.match(bundle, /bd-warehouse-subcategory-v214/);
   assert.match(bundle, /bdInventoryCountSheet/);
   assert.match(bundle, /bdWriteoffSheet/);
   assert.match(bundle, /data-bd-warehouse-sales-entry/);
+  assert.match(bundle, /async function bdWarehouseRepairProducts\(\)\{try\{const [A-Za-z]+=await fetch\("\/api\/inventory\/products",\{method:"POST",credentials:"include",headers:\{"Content-Type":"application\/json",\.\.\.ca\(Ot\(\)\)\},body:JSON\.stringify\(\{action:"repair"\}\)\}\)/);
+  assert.match(bundle, /title:"Очистка дублей не выполнена"/);
+  assert.match(bundle, /title:"Дубли объединены"/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
 });
 
 test("API keeps services out of balances and propagates stock metadata", async () => {
@@ -81,4 +92,7 @@ test("API keeps services out of balances and propagates stock metadata", async (
   assert.match(route, /assortment: updatedRoot/);
   assert.match(route, /action === "classify"/);
   assert.match(route, /ensureNomenclatureHierarchy/);
+  assert.match(route, /function upsertStore\([\s\S]*storeKey: string,[\s\S]*\.bind\(accountId, storeKey, JSON\.stringify\(value\), updatedAt\)/);
+  assert.match(route, /upsertStore\(database, account\.id, ASSORTMENT_STORE_KEY, repaired\.assortment, now\)/);
+  assert.match(route, /STOCK_MOVEMENT_STORE_KEY,[\s\S]*consolidated\.stockMovements,[\s\S]*now/);
 });

@@ -83,8 +83,8 @@ test("manifest and HTML metadata use cache-busted v159 brand assets", async () =
     assert.match(html, /favicon-v159\.svg/);
   }
   assert.match(response, /rel="preload" href="\/icons\/bardoctor-mark-v159\.svg"/);
-  assert.match(response, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
-  assert.match(appHtml, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(response, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+  assert.match(appHtml, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
 });
 
 test("splash and interface brand marks use the same symbol without BD letters", async () => {

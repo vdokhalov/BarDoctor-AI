@@ -25,7 +25,7 @@ test("Settings v182 replaces the placeholder on the independent canonical route"
   assert.match(settings, /showBottomNav:!0/);
   assert.match(settings, /window\.bdNavigateBack\("\/more"\)/);
   assert.match(settings, /data-bd-venue-host":"settings-v182/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
   assert.doesNotMatch(settings, /bdIntegrationsPage|Integration Layer|OneSignal|Local Connector/);
 });
 

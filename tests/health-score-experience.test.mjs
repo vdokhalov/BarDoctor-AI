@@ -307,6 +307,6 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.match(css, /touch-action:\s*manipulation/);
   assert.match(response, /health-score-experience-v152\.css\?v=20260815-home-health-v200/);
   assert.match(response, /health-score-experience\.js\?v=20260811-health-v155/);
-  assert.match(response, /bardoctor-preview\.js\?v=20260815-seamless-startup-v202/);
+  assert.match(response, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
   assert.match(manifest, /start_url:\s*"\/home\?source=pwa"/);
 });

@@ -625,6 +625,12 @@
   background: #fff;
 }
 
+.bd-warehouse-product-actions .danger {
+  border: 1px solid #f2b6aa;
+  color: #a63b2b;
+  background: #fff7f5;
+}
+
 .bd-warehouse-product-actions button:disabled {
   opacity: 0.5;
   cursor: default;

@@ -195,5 +195,5 @@ test("shifts v158 keeps cards data-driven and opens the dedicated shift view", a
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(html, /shifts-visual-v156\.css\?v=20260812-shifts-v158/);
   assert.match(routeSource, /shifts-visual-v156\.css\?v=20260812-shifts-v158/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260820-nomenclature-v211/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
 });
