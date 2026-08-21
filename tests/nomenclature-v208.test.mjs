@@ -74,6 +74,56 @@ test("nomenclature offers separate purchase, storage and display units without a
   assert.doesNotMatch(css, /\.bd-nomenclature-panel-actions-v213 \{[\s\S]{0,120}position: sticky/);
 });
 
+test("nomenclature v239 starts collapsed and preserves the compact accessible hierarchy", async () => {
+  const [bundle, css, inventory] = await Promise.all([
+    read("public/assets/index-BQGspy0I.js"),
+    read("public/nomenclature-v208.css"),
+    read("docs/nomenclature-feature-inventory-v238.md"),
+  ]);
+
+  const start = bundle.indexOf("function bdNomenclatureRowV238");
+  const end = bundle.indexOf("function bdInventoryCountSheet", start);
+  assert.ok(start >= 0 && end > start);
+  const implementation = bundle.slice(start, end);
+
+  assert.match(implementation, /data-bd-nomenclature-version":"v239/);
+  assert.match(implementation, /bdNomenclaturePage=bdNomenclaturePageV238/);
+  assert.match(implementation, /data-bd-canonical-venue-host":"nomenclature-v238/);
+  assert.match(implementation, /bd-taxonomy-section-toggle-v238/);
+  assert.match(implementation, /bd-taxonomy-category-toggle-v238/);
+  assert.match(implementation, /bd-taxonomy-subcategory-toggle-v238/);
+  assert.match(implementation, /"aria-expanded"/);
+  assert.match(implementation, /"aria-controls"/);
+  assert.match(implementation, /function bdNomenclatureDisclosureSeedV238\(\)\{return\{sections:\{\},categories:\{\},subcategories:\{\}\}\}/);
+  assert.match(implementation, /searchActive:!!a,searchKey:a,venueKey:localStorage\.getItem\("bd_active_venue_id"\)\|\|"default"/);
+  assert.match(implementation, /S\.useEffect\(\(\)=>\{setSectionState\(\{\}\),setCategoryState\(\{\}\),setSubcategoryState\(\{\}\),setSearchSectionState\(\{\}\),setSearchCategoryState\(\{\}\),setSearchSubcategoryState\(\{\}\)\},\[l\]\)/);
+  assert.match(implementation, /searchSectionState\[[A-Za-z]+\.id\]\?\?!0/);
+  assert.match(implementation, /searchCategoryState\[[A-Za-z]+\.id\]\?\?!0/);
+  assert.match(implementation, /searchSubcategoryState\[[A-Za-z]+\.id\]\?\?!0/);
+  assert.match(implementation, /bd-nomenclature-row-amount-v238/);
+  assert.match(implementation, /bdWarehouseDisplayAmount/);
+  assert.match(implementation, /bdTaxonomyName\(t,"locations"/);
+  assert.match(implementation, /\/suppliers\?create=1&returnTo=nomenclature/);
+  assert.match(implementation, /e\("\/warehouse"\)/);
+  assert.match(implementation, /bdNomenclatureSheet/);
+  assert.doesNotMatch(implementation, /bd-nomenclature-hero-v208/);
+  assert.doesNotMatch(implementation, /bd-nomenclature-summary-v208/);
+  assert.doesNotMatch(implementation, /bd-nomenclature-card-v208/);
+
+  assert.match(css, /\.bd-taxonomy-tree-v238/);
+  assert.match(css, /\.bd-nomenclature-row-v238 \{[\s\S]*?min-height: 54px/);
+  assert.match(css, /\.bd-taxonomy-category-toggle-v238 \.bd-taxonomy-node-title-v238 > i \{[\s\S]*?display: none/);
+  assert.match(css, /\.bd-taxonomy-items-v238 \{[\s\S]*?border-left: 0/);
+  assert.match(css, /\.bd-nomenclature-row-copy-v238 small \{[\s\S]*?font-size: 9\.75px/);
+  assert.match(css, /@media \(max-width: 720px\)/);
+  assert.match(css, /@media \(max-width: 390px\)/);
+  assert.match(css, /@media \(min-width: 960px\)/);
+  assert.match(css, /body:has\(\.bd-nomenclature-main-v238\) \.bd-scroll-top/);
+  assert.match(inventory, /Search matches item names and the full section\/category\/subcategory path/);
+  assert.match(inventory, /Change receipt mode, display unit, package size/);
+  assert.match(inventory, /No database schema, API contract, integration, stock posting/);
+});
+
 test("warehouse reads canonical names from nomenclature and remains operational", async () => {
   const [bundle, bootstrap] = await Promise.all([
     read("public/assets/index-BQGspy0I.js"),
