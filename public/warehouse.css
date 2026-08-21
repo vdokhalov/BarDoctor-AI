@@ -2031,3 +2031,91 @@ main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-distribution-r
     display: none;
   }
 }
+
+/* Warehouse v242 — base-currency KPI and final production density */
+main[data-bd-warehouse-version="compact-tree-v240"] {
+  padding-top: 9px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid {
+  margin-top: 6px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid article {
+  min-height: 50px;
+  padding: 7px 10px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid article.incomplete strong {
+  color: #595f70;
+  font-size: 12.25px;
+  line-height: 1.15;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid article.incomplete span {
+  font-size: 8.25px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-actions {
+  gap: 6px;
+  margin-top: 7px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-actions button {
+  min-height: 60px;
+  padding: 7px 9px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-actions small {
+  margin-top: 3px;
+  font-size: 8.5px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-tabs {
+  margin-top: 8px;
+}
+
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-section {
+  margin-top: 9px;
+}
+
+.bd-warehouse-distribution-row-v241 {
+  min-height: 42px;
+  margin-top: 6px;
+  padding-block: 5px;
+}
+
+body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+}
+
+body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top::before {
+  position: absolute;
+  inset: -5px;
+  content: "";
+}
+
+@media (max-width: 720px) {
+  main[data-bd-warehouse-version="compact-tree-v240"] {
+    padding-top: 7px;
+  }
+
+  main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-summary-grid article {
+    min-height: 44px;
+    padding: 6px 8px;
+  }
+
+  main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-actions button {
+    min-height: 54px;
+    padding: 6px 8px;
+  }
+}
+
+@media (max-width: 430px) {
+  main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-actions button {
+    min-height: 52px;
+  }
+}

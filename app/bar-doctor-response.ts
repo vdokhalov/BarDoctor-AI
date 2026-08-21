@@ -213,7 +213,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/market-entry.css?v=20260722-competitors-v28" />
     <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
     <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224" />
-    <link rel="stylesheet" href="/warehouse.css?v=20260821-warehouse-final-refinement-v241" />
+    <link rel="stylesheet" href="/warehouse.css?v=20260821-warehouse-base-currency-v242" />
     <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44" />
@@ -242,9 +242,9 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/equipment-qa-v167.js?v=20260812-equipment-v167"></script>
     <script src="/procurement-qa-v168.js?v=20260814-finance-purchase-delete-v195"></script>
     <script src="/assortment-qa-v170.js?v=20260813-assortment-v171"></script>
-    <script src="/nomenclature-qa-v238.js?v=20260821-collapsed-tree-v239"></script>
+    <script src="/nomenclature-qa-v238.js?v=20260821-warehouse-base-currency-v242"></script>
     <script src="/health-score-experience.js?v=20260811-health-v155"></script>
-    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-warehouse-v241"></script>
+    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-warehouse-v242"></script>
     <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>

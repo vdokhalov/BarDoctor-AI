@@ -116,6 +116,18 @@
       item('service', 'Обслуживание кассы', 0, 'pcs', 'office-services', { kind: 'service', unit: 'service', packageSize: '1 усл.' }),
       item('review', 'Новая позиция из накладной', 0, 'pcs', 'unassigned-subcategory', { sectionId: 'unassigned', taxonomyCategoryId: 'unassigned-category', classificationStatus: 'review', storageLocationId: '' }),
     ];
+    var baseCurrency = activeVenueId === 502 ? 'MDL' : 'RUB';
+    rows = rows.map(function (row, index) {
+      var unitCost = index + 1;
+      return Object.assign({}, row, {
+        averageUnitCost: unitCost,
+        inventoryValue: Math.max(0, Number(row.current) || 0) * unitCost,
+        currency: baseCurrency,
+      });
+    });
+    if (params.get('qaCurrency') === 'incomplete' && activeVenueId === 501 && rows[0]) {
+      rows[0] = Object.assign({}, rows[0], { currency: 'MDL' });
+    }
     return {
       nomenclatureStructure: structure,
       nomenclature: rows.map(function (row) { return Object.assign({}, row); }),
@@ -126,7 +138,7 @@
   }
 
   var assortment = assortmentFor(venueId);
-  var profile = { id: 'primary', name: venueId === 502 ? 'Причал' : 'Кёльн', businessType: 'Бар', city: 'Бендеры', areas: ['Бар', 'Кухня'] };
+  var profile = { id: 'primary', name: venueId === 502 ? 'Причал' : 'Кёльн', businessType: 'Бар', city: 'Бендеры', currency: venueId === 502 ? 'MDL' : 'RUB', areas: ['Бар', 'Кухня'] };
 
   function persist() {
     localStorage.setItem('bd_assortment_v1_cache' + scope, JSON.stringify(assortment));
