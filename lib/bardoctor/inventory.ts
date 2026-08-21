@@ -1756,18 +1756,39 @@ export function repairInventoryPurchaseAmounts(input: {
       || movements.some((movement) => baseUnit(movement.unit) !== balanceUnit)
     ) continue;
     const linkedReceipts = movements.map((movement) => {
+      const movementAmount = Math.max(0, number(movement.amount));
+      const movementValue = rounded(Math.max(0, number(movement.costAmount)), 2);
+      const movementEvidence = movementAmount > 0
+        && movementValue > 0
+        && Boolean(text(movement.sourceDocumentId, "", 100))
+        && Boolean(text(movement.sourceLineId, "", 100));
       const document = evidenceDocuments.get(text(movement.sourceDocumentId, "", 100));
-      if (!document) return undefined;
-      const items = array(document.items).map(record);
-      const item = items.find((line, index) =>
-        sourceLineId(line, index) === text(movement.sourceLineId, "", 100)
-      );
-      if (!item) return undefined;
-      const expected = reconciliationLineBaseAmount(item, balance);
-      if (expected.amount <= 0 || expected.unit !== balanceUnit) return undefined;
-      const lineValue = Math.max(0, number(item.lineTotal)
-        || number(item.unitPrice) * Math.max(0, number(item.quantity)));
-      return { movement, expected, lineValue };
+      if (document) {
+        const items = array(document.items).map(record);
+        const item = items.find((line, index) =>
+          sourceLineId(line, index) === text(movement.sourceLineId, "", 100)
+        );
+        if (item) {
+          const expected = reconciliationLineBaseAmount(item, balance);
+          if (expected.amount > 0 && expected.unit === balanceUnit) {
+            const lineValue = Math.max(0, number(item.lineTotal)
+              || number(item.unitPrice) * Math.max(0, number(item.quantity)));
+            return { movement, expected, lineValue, evidence: "document" as const };
+          }
+        }
+      }
+      // A previous repair may have fixed and financially verified the receipt
+      // before a legacy merge removed the invoice from the current evidence
+      // set. The receipt still carries the immutable document/line ids, its
+      // physical amount and the posted invoice value. Keep that evidence
+      // usable instead of leaving the materialized balance inflated forever.
+      if (!movementEvidence || baseUnit(movement.unit) !== balanceUnit) return undefined;
+      return {
+        movement,
+        expected: { amount: movementAmount, unit: balanceUnit },
+        lineValue: movementValue,
+        evidence: "posted-receipt" as const,
+      };
     });
     if (linkedReceipts.some((value) => !value)) continue;
     const confirmedReceipts = linkedReceipts.filter((value): value is NonNullable<typeof value> => Boolean(value));
@@ -1792,7 +1813,7 @@ export function repairInventoryPurchaseAmounts(input: {
       && movements.some((movement) => text(movement.sourceDocumentId, "", 100) === lastDocumentId);
     if (
       !legacyMultiplier
-      || !lastDocumentIsReceipt
+      || (!lastDocumentIsReceipt && !receiptValueExplainsBalance)
       || (!purchaseOrigin && !receiptValueExplainsBalance)
     ) continue;
     for (const value of confirmedReceipts) {
@@ -1810,7 +1831,9 @@ export function repairInventoryPurchaseAmounts(input: {
       : 0;
     balance.updatedAt = now;
     balance.quantityRepairAt = now;
-    balance.quantityRepairReason = "Баланс сверен с журналом подтверждённых приходов";
+    balance.quantityRepairReason = lastDocumentIsReceipt
+      ? "Баланс сверен с журналом подтверждённых приходов"
+      : "Баланс восстановлен по финансово подтверждённому журналу приходов";
     reconciledBalances += 1;
     correctedAmount += Math.abs(current - ledgerAmount);
     correctedProducts.add(productKey);
