@@ -320,6 +320,24 @@ export async function POST(request: Request): Promise<Response> {
         { status: 422 },
       );
     }
+    const usesPackageAsDisplayUnit = kind === "stock"
+      && displayUnit === "pcs"
+      && unit !== "pcs";
+    const displayPackageSize = usesPackageAsDisplayUnit
+      ? text(body.displayPackageSize, packageSize, 120)
+      : "";
+    const displayPackageDetails = usesPackageAsDisplayUnit
+      ? inventoryPackageAmount(displayPackageSize, unit)
+      : { amount: 0, unit };
+    if (
+      usesPackageAsDisplayUnit
+      && (displayPackageDetails.amount <= 0 || displayPackageDetails.unit !== unit)
+    ) {
+      return Response.json(
+        { ok: false, error: "Чтобы показывать остаток в штуках, укажите объём или вес одной единицы" },
+        { status: 422 },
+      );
+    }
     const manual = manualClassification(body);
     const classification = Object.keys(manual).length
       ? manual
@@ -336,6 +354,12 @@ export async function POST(request: Request): Promise<Response> {
       kind,
       unit,
       ...(displayUnit ? { displayUnit } : {}),
+      ...(usesPackageAsDisplayUnit
+        ? {
+          displayPackageSize,
+          displayPackageAmount: displayPackageDetails.amount,
+        }
+        : {}),
       packageSize,
       packageAmount: packageDetails.amount,
       current: 0,
@@ -446,6 +470,11 @@ export async function POST(request: Request): Promise<Response> {
         text(previousProduct?.displayUnit, "auto", 20),
         20,
       ) as InventoryDisplayUnit,
+      displayPackageSize: text(
+        body.displayPackageSize,
+        text(previousProduct?.displayPackageSize, "", 120),
+        120,
+      ),
     },
     now,
   });

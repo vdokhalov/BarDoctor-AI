@@ -1977,6 +1977,79 @@ test("warehouse product editor rejects a display unit from another measurement t
   assert.equal(result.code, "INVALID_PRODUCT");
 });
 
+test("warehouse product editor displays liquid beer as pieces by bottle size without changing base precision", () => {
+  const result = updateInventoryProductDefinition({
+    assortment: {
+      recipes: [],
+      stockBalances: [{
+        key: "stock:пиво|ml",
+        productKey: "stock:пиво|ml",
+        name: "Пиво",
+        current: 10_000,
+        unit: "ml",
+        packageSize: "0,5 л",
+        packageAmount: 500,
+      }],
+      nomenclature: [{
+        key: "stock:пиво|ml",
+        productKey: "stock:пиво|ml",
+        name: "Пиво",
+        unit: "ml",
+        packageSize: "0,5 л",
+        packageAmount: 500,
+      }],
+    },
+    update: {
+      productKey: "stock:пиво|ml",
+      name: "Пиво",
+      unit: "ml",
+      packageSize: "0,5 л",
+      displayUnit: "pcs",
+      displayPackageSize: "0,5 л",
+    },
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.product.current, 10_000);
+  assert.equal(result.product.unit, "ml");
+  assert.equal(result.product.displayUnit, "pcs");
+  assert.equal(result.product.displayPackageSize, "0,5 л");
+  assert.equal(result.product.displayPackageAmount, 500);
+  const nomenclature = result.assortment.nomenclature as Array<Record<string, unknown>>;
+  assert.equal(nomenclature[0].displayPackageAmount, 500);
+});
+
+test("warehouse product editor requires a package conversion when liquid is displayed as pieces", () => {
+  const result = updateInventoryProductDefinition({
+    assortment: {
+      recipes: [],
+      stockBalances: [{
+        key: "stock:пиво|ml",
+        productKey: "stock:пиво|ml",
+        name: "Пиво",
+        current: 10_000,
+        unit: "ml",
+        packageSize: "Несколько фасовок",
+        packageAmount: 0,
+        multiplePackageSizes: true,
+      }],
+    },
+    update: {
+      productKey: "stock:пиво|ml",
+      name: "Пиво",
+      unit: "ml",
+      packageSize: "Несколько фасовок",
+      displayUnit: "pcs",
+    },
+  });
+
+  assert.equal(result.ok, false);
+  if (result.ok) return;
+  assert.equal(result.code, "INVALID_PRODUCT");
+  assert.match(result.error, /показывать остаток в штуках/);
+});
+
 test("warehouse product editor changes display units without collapsing multiple purchase packages", () => {
   const result = updateInventoryProductDefinition({
     assortment: {

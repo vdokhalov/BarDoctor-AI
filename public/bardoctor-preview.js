@@ -1366,7 +1366,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224";
+    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236";
     document.head.appendChild(script);
   }
 

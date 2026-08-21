@@ -16,6 +16,9 @@ test("warehouse and nomenclature display stock in user-selected units without pa
   assert.match(bundle, /function bdWarehouseEffectiveDisplayUnit/);
   assert.match(bundle, /Показывать остаток/);
   assert.match(bundle, /В литрах/);
+  assert.match(bundle, /В штуках по фасовке/);
+  assert.match(bundle, /displayPackageAmount/);
+  assert.match(bundle, /Одна штука равна/);
   assert.match(bundle, /Остаток хранится точно/);
   assert.doesNotMatch(bundle, /bdWarehouseDecimal\(r\/n,2\)\+" уп\. · "/);
   assert.match(bundle, /multiplePackageSizes&&/);

@@ -95,6 +95,7 @@ export type InventoryProductUpdate = {
   unit: BaseInventoryUnit;
   packageSize: string;
   displayUnit?: InventoryDisplayUnit;
+  displayPackageSize?: string;
 };
 
 export type InventoryProductUpdateResult =
@@ -1063,8 +1064,8 @@ export function normalizeInventoryDisplayUnit(
 ): InventoryDisplayUnit | null {
   const requested = text(value, "auto", 20) as InventoryDisplayUnit;
   if (requested === "auto") return requested;
-  if (base === "ml" && (requested === "ml" || requested === "l")) return requested;
-  if (base === "g" && (requested === "g" || requested === "kg")) return requested;
+  if (base === "ml" && (requested === "ml" || requested === "l" || requested === "pcs")) return requested;
+  if (base === "g" && (requested === "g" || requested === "kg" || requested === "pcs")) return requested;
   if (base === "pcs" && requested === "pcs") return requested;
   return null;
 }
@@ -2090,6 +2091,27 @@ export function updateInventoryProductDefinition(input: {
           : "Для штучных товаров укажите фасовку в штуках, например 1 шт.",
     };
   }
+  const usesPackageAsDisplayUnit = displayUnit === "pcs" && requestedUnit !== "pcs";
+  const displayPackageSize = usesPackageAsDisplayUnit
+    ? text(
+      input.update.displayPackageSize,
+      text(balance.displayPackageSize, keepsMultiplePackages ? "" : packageSize, 120),
+      120,
+    )
+    : "";
+  const parsedDisplayPackage = usesPackageAsDisplayUnit
+    ? inventoryPackageAmount(displayPackageSize, baseUnitInputLabel(requestedUnit))
+    : { amount: 0, unit: requestedUnit };
+  if (
+    usesPackageAsDisplayUnit
+    && (!displayPackageSize || parsedDisplayPackage.amount <= 0 || parsedDisplayPackage.unit !== requestedUnit)
+  ) {
+    return {
+      ok: false,
+      code: "INVALID_PRODUCT",
+      error: "Чтобы показывать остаток в штуках, выберите объём или вес одной бутылки, банки или упаковки.",
+    };
+  }
   const previousUnit = baseUnit(balance.unit);
   const hasMovement = array(input.stockMovements).some((value) =>
     text(record(value).productKey, "", 300) === productKey
@@ -2131,6 +2153,13 @@ export function updateInventoryProductDefinition(input: {
   balance.preferredDisplayNameUpdatedAt = now;
   balance.unit = requestedUnit;
   balance.displayUnit = displayUnit;
+  if (usesPackageAsDisplayUnit) {
+    balance.displayPackageSize = displayPackageSize;
+    balance.displayPackageAmount = rounded(parsedDisplayPackage.amount);
+  } else {
+    delete balance.displayPackageSize;
+    delete balance.displayPackageAmount;
+  }
   balance.packageSize = packageSize;
   balance.packageAmount = rounded(parsedPackage.amount);
   balance.multiplePackageSizes = keepsMultiplePackages || undefined;
@@ -2154,12 +2183,22 @@ export function updateInventoryProductDefinition(input: {
       preferredDisplayNameUpdatedAt: now,
       unit: requestedUnit,
       displayUnit,
+      ...(usesPackageAsDisplayUnit
+        ? {
+          displayPackageSize,
+          displayPackageAmount: rounded(parsedDisplayPackage.amount),
+        }
+        : {}),
       packageSize,
       packageAmount: rounded(parsedPackage.amount),
       multiplePackageSizes: keepsMultiplePackages || undefined,
       ...(!keepsMultiplePackages ? { packageOptions: [packageSize] } : {}),
       updatedAt: now,
     });
+    if (!usesPackageAsDisplayUnit) {
+      delete nomenclatureItem.displayPackageSize;
+      delete nomenclatureItem.displayPackageAmount;
+    }
   } else {
     nomenclature.unshift({
       ...cloneRecord(balance),
