@@ -27,6 +27,33 @@
     try { localStorage.setItem(serverStoreCacheKey(storeKey), JSON.stringify(value)); } catch { /* no-op */ }
   }
 
+  async function refreshServerInventoryCacheV235() {
+    var email = localStorage.getItem("bd_session");
+    var token = localStorage.getItem("bd_session_token");
+    if (!email || !token) return;
+    try {
+      var response = await fetch("/api/store/bd_assortment_v1", {
+        method: "GET",
+        headers: {
+          "X-Session-Email": email,
+          "X-Session-Token": token
+        },
+        cache: "no-store"
+      });
+      if (!response.ok) return;
+      var result = await response.json();
+      var assortment = result && result.ok && result.data;
+      if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) return;
+      if (!assortment.inventoryQuantityRepairedAt) return;
+      cacheServerStore("bd_assortment_v1", assortment);
+      window.dispatchEvent(new CustomEvent("bd:store-updated", {
+        detail: { storeKey: "bd_assortment_v1", source: "server-repair-v235" }
+      }));
+    } catch {
+      // Cloud sync will retry through its normal path.
+    }
+  }
+
   function observePurchaseConfirmation() {
     if (window.fetch.__bdPurchaseInventoryObserver) return;
     var originalFetch = window.fetch.bind(window);
@@ -1678,6 +1705,7 @@
         window.location.replace("/home");
         return;
       }
+      await refreshServerInventoryCacheV235();
     } else if (result.needsLogin) {
       localStorage.removeItem("bd_session");
       localStorage.removeItem("bd_session_token");

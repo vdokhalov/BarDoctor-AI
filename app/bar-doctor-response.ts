@@ -243,7 +243,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/procurement-qa-v168.js?v=20260814-finance-purchase-delete-v195"></script>
     <script src="/assortment-qa-v170.js?v=20260813-assortment-v171"></script>
     <script src="/health-score-experience.js?v=20260811-health-v155"></script>
-    <script src="/bardoctor-preview.js?v=20260821-inventory-reconciliation-v224"></script>
+    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235"></script>
     <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>

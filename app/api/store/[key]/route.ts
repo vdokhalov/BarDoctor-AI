@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { auditLog, domainData } from "../../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -12,6 +12,13 @@ import {
   MONTH_LOCKED_STORE_KEYS,
 } from "../../../../lib/bardoctor/data-trust";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
+import {
+  ASSORTMENT_STORE_KEY,
+  consolidateInventoryDuplicates,
+  repairInventoryBalanceMetadata,
+  repairInventoryPurchaseAmounts,
+  STOCK_MOVEMENT_STORE_KEY,
+} from "../../../../lib/bardoctor/inventory";
 import {
   EXPENSE_STORE_KEY,
   isPurchasePayment,
@@ -94,7 +101,54 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   const merge = Object.prototype.hasOwnProperty.call(body, "baseData")
     ? mergeConcurrentStoreData(body.baseData ?? null, body.data ?? null, before)
     : { data: body.data ?? null, conflicts: 0 };
-  const after = merge.data;
+  let after = merge.data;
+  let repairedStockMovements: unknown[] | null = null;
+  if (key === ASSORTMENT_STORE_KEY) {
+    const related = await db
+      .select()
+      .from(domainData)
+      .where(and(
+        eq(domainData.accountId, account.id),
+        inArray(domainData.storeKey, [STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY]),
+      ));
+    const relatedStores = new Map(related.map((row) => [row.storeKey, row.dataJson]));
+    const stockMovements = JSON.parse(
+      relatedStores.get(STOCK_MOVEMENT_STORE_KEY) ?? "[]",
+    ) as unknown;
+    const purchaseDocuments = JSON.parse(
+      relatedStores.get(PURCHASE_STORE_KEY) ?? "[]",
+    ) as unknown;
+    const now = new Date().toISOString();
+    const consolidated = consolidateInventoryDuplicates({
+      assortment: after,
+      stockMovements,
+      now,
+    });
+    const amountRepair = repairInventoryPurchaseAmounts({
+      assortment: consolidated.assortment,
+      purchaseDocuments,
+      stockMovements: consolidated.stockMovements,
+      now,
+    });
+    const reconciled = consolidateInventoryDuplicates({
+      assortment: amountRepair.assortment,
+      stockMovements: amountRepair.stockMovements,
+      now,
+    });
+    const metadataRepair = repairInventoryBalanceMetadata({
+      assortment: reconciled.assortment,
+      stockMovements: reconciled.stockMovements,
+      now,
+    });
+    after = metadataRepair.assortment;
+    if (
+      consolidated.summary.changed
+      || amountRepair.summary.changed
+      || reconciled.summary.changed
+    ) {
+      repairedStockMovements = reconciled.stockMovements;
+    }
+  }
   const auditBefore = before == null && Array.isArray(after) ? [] : before;
   const auditAfter = after == null && Array.isArray(before) ? [] : after;
   const mutations = compareStoreData(auditBefore, auditAfter);
@@ -219,6 +273,21 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       target: [domainData.accountId, domainData.storeKey],
       set: { dataJson: JSON.stringify(after), updatedAt },
     });
+
+  if (repairedStockMovements) {
+    await db
+      .insert(domainData)
+      .values({
+        accountId: account.id,
+        storeKey: STOCK_MOVEMENT_STORE_KEY,
+        dataJson: JSON.stringify(repairedStockMovements),
+        updatedAt,
+      })
+      .onConflictDoUpdate({
+        target: [domainData.accountId, domainData.storeKey],
+        set: { dataJson: JSON.stringify(repairedStockMovements), updatedAt },
+      });
+  }
 
   if (mutations.length > 0) {
     const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;

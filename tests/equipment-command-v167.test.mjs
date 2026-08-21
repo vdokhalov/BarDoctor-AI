@@ -110,7 +110,7 @@ test("Equipment v167 is linked in both app documents and fixes mobile title over
   for (const source of [appHtml, response]) {
     assert.match(source, /equipment-command-v167\.css\?v=20260812-equipment-v167/);
     assert.match(source, /equipment-qa-v167\.js\?v=20260812-equipment-v167/);
-    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   }
   assert.match(css, /position: sticky/);
   assert.match(css, /white-space: nowrap/);

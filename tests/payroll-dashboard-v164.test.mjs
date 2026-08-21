@@ -29,7 +29,7 @@ test("payroll v164 is one shared data-driven module with two entry contexts", as
 
   for (const document of [html, response]) {
     assert.match(document, /payroll-dashboard-v164\.css\?v=20260812-payroll-v164/);
-    assert.match(document, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+    assert.match(document, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   }
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
   assert.match(css, /\.bd-payroll-summary-grid-v164/);

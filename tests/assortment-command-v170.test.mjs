@@ -175,7 +175,7 @@ test("Assortment v170 is linked, responsive and has isolated QA states", async (
   for (const source of [appHtml, response]) {
     assert.match(source, /assortment-command-v170\.css\?v=20260813-assortment-v171/);
     assert.match(source, /assortment-qa-v170\.js\?v=20260813-assortment-v171/);
-    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   }
   assert.match(css, /position: sticky/);
   assert.match(css, /overflow-x: clip/);

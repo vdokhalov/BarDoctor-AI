@@ -792,7 +792,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   ]);
 
   assert.match(worker, /<div id="root">[\s\S]*data-bd-static-startup="v201"/);
-  assert.match(worker, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+  assert.match(worker, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   assert.match(worker, /health-score-experience-v152\.css\?v=20260815-home-health-v200/);
   assert.match(worker, /health-score-experience\.js\?v=20260811-health-v155/);
   assert.match(worker, /venue-switcher\.css\?v=20260813-venue-v174/);

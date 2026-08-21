@@ -240,7 +240,7 @@ test("Procurement v168 is linked, responsive and has explicit QA states", async 
   for (const source of [appHtml, response]) {
     assert.match(source, /procurement-command-v168\.css\?v=20260814-finance-purchase-delete-v195/);
     assert.match(source, /procurement-qa-v168\.js\?v=20260814-finance-purchase-delete-v195/);
-    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-reconciliation-v224/);
+    assert.match(source, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   }
   assert.match(css, /position: sticky/);
   assert.match(css, /overflow-x: clip/);
