@@ -135,7 +135,7 @@ async function createRuntime(
     Object,
   });
 
-  return { window: window as VenueRuntime["window"], localStorage, events, replacements, messages };
+  return { window: window as unknown as VenueRuntime["window"], localStorage, events, replacements, messages };
 }
 
 function switchResponse(venueId: number) {
@@ -195,7 +195,7 @@ test("tapping the current venue is a no-op and rapid taps cannot start competing
   assert.equal(await runtime.window.bdVenueSwitcher.switchVenue({ id: 303, role: "manager" }), false);
   assert.equal(calls, 1);
   assert.ok(resolveSwitch);
-  resolveSwitch(switchResponse(202));
+  (resolveSwitch as ((response: Response) => void) | null)?.(switchResponse(202));
   assert.equal(await first, true, runtime.messages.join(" | "));
   assert.deepEqual(runtime.replacements, ["/equipment?venue=202"]);
 });
@@ -217,7 +217,9 @@ test("a response started in A is rejected once an A to B switch begins", async (
     runtime.messages.join(" | "),
   );
   assert.ok(resolveOld);
-  resolveOld(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+  (resolveOld as ((response: Response) => void) | null)?.(
+    new Response(JSON.stringify({ ok: true }), { status: 200 }),
+  );
   await assert.rejects(oldResponse, (error: unknown) =>
     error instanceof DOMException && error.name === "AbortError"
   );

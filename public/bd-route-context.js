@@ -1,14 +1,16 @@
 (function () {
   "use strict";
 
-  window.bdStandaloneNavigationAsset = "bd-route-context-v185";
-  document.documentElement.dataset.bdRouteContext = "v185";
+  window.bdStandaloneNavigationAsset = "bd-route-context-v247";
+  document.documentElement.dataset.bdRouteContext = "v247";
   if (window.top !== window.self || new URLSearchParams(window.location.search).get("embedded") === "1") return;
 
   var parentRoute = document.body && document.body.dataset.bdParentRoute;
   if (!parentRoute) return;
+  var contract = window.bdNavigationContract;
+  if (contract && (!contract.isRegistered(parentRoute) || !contract.isSafeInternal(parentRoute))) parentRoute = "/home";
 
-  var navigationVersion = "standalone-navigation-v185";
+  var navigationVersion = "standalone-navigation-v247";
   var venueId = localStorage.getItem("bd_active_venue_id") || "";
   var currentUrl = window.location.pathname + window.location.search + window.location.hash;
   var state = window.history.state && typeof window.history.state === "object"
@@ -118,7 +120,8 @@
       event.preventDefault();
       var currentState = window.history.state || {};
       var sameVenue = !currentState.bdVenueId || !venueId || String(currentState.bdVenueId) === String(venueId);
-      if (currentState.bdPreviousEntryId && currentState.bdPreviousUrl && sameVenue) window.history.back();
+      var safePrevious = !contract || contract.isSafeInternal(currentState.bdPreviousUrl);
+      if (currentState.bdPreviousEntryId && currentState.bdPreviousUrl && sameVenue && safePrevious) window.history.back();
       else window.location.replace(parentRoute);
     }
   }, true);

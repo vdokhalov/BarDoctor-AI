@@ -196,5 +196,5 @@ test("Assortment v170 is linked, responsive and has isolated QA states", async (
   assert.match(fixture, /state === "error"/);
   assert.match(fixture, /state === "readonly"/);
   assert.match(fixture, /bd_assortment_v1_cache/);
-  assert.match(bootstrap, /path === "\/catalog" && url\.searchParams\.has\("itemId"\)/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.resolve/);
 });

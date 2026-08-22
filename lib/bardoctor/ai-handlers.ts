@@ -1,6 +1,9 @@
 import { authenticateRequest, unauthorized } from "./auth";
-import type { Account } from "../../db/schema";
-import { hasPermission, type PermissionKey } from "./access-control";
+import {
+  hasPermission,
+  type AuthenticatedAccount,
+  type PermissionKey,
+} from "./access-control";
 import {
   AIServiceError,
   aiErrorResponse,
@@ -1430,7 +1433,7 @@ export async function handleSmart(request: Request): Promise<Response> {
   }
 }
 
-async function reviewAnalyze(account: Account, body: JsonRecord): Promise<Response> {
+async function reviewAnalyze(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
   const reviews = Array.isArray(body.reviews) ? body.reviews : [];
   if (reviews.length === 0 || reviews.length > 25) {
     throw new AIServiceError("Передайте от 1 до 25 отзывов.", 400);
@@ -1469,7 +1472,7 @@ async function reviewAnalyze(account: Account, body: JsonRecord): Promise<Respon
   return Response.json({ success: true, data: { results } });
 }
 
-async function reviewDoctorSummary(account: Account, body: JsonRecord): Promise<Response> {
+async function reviewDoctorSummary(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
   const insights = asRecord(body.insights);
   if (!insights) throw new AIServiceError("Сводка отзывов обязательна.", 400);
   const venueContext = await loadVenueAIContext(account, "reviews", body);
@@ -1545,7 +1548,7 @@ async function reviewDoctorSummary(account: Account, body: JsonRecord): Promise<
   });
 }
 
-async function reviewReply(account: Account, body: JsonRecord): Promise<Response> {
+async function reviewReply(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
   const review = asRecord(body.review);
   if (!review || !text(review.text)) throw new AIServiceError("Текст отзыва обязателен.", 400);
   const venueContext = await loadVenueAIContext(account, "reviews", body);
@@ -1570,7 +1573,7 @@ async function reviewReply(account: Account, body: JsonRecord): Promise<Response
   return Response.json({ success: true, data: { draft } });
 }
 
-async function reviewCorrelate(account: Account, body: JsonRecord): Promise<Response> {
+async function reviewCorrelate(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
   if (!asRecord(body.insights)) throw new AIServiceError("Сводка отзывов обязательна.", 400);
   const venueContext = await loadVenueAIContext(account, "reviews", body);
   const evidenceCatalog = buildReviewEvidenceCatalog(body, venueContext);

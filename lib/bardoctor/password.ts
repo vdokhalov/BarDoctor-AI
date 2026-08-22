@@ -38,7 +38,7 @@ async function derivePassword(
     {
       name: "PBKDF2",
       hash: "SHA-256",
-      salt,
+      salt: salt as BufferSource,
       iterations,
     },
     material,

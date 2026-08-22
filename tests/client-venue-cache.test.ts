@@ -146,7 +146,7 @@ test("late API responses from a previous venue are rejected before UI state or c
   const pending = window.fetch("/api/store/bd_employees", {});
   localStorage.setItem("bd_active_venue_id", "202");
   assert.ok(resolveResponse);
-  resolveResponse(new Response(null, { status: 200 }));
+  (resolveResponse as ((response: Response) => void) | null)?.(new Response(null, { status: 200 }));
   await assert.rejects(pending, (error: unknown) =>
     error instanceof DOMException && error.name === "AbortError"
   );

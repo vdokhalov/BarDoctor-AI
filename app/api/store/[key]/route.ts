@@ -112,12 +112,14 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
         inArray(domainData.storeKey, [STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY]),
       ));
     const relatedStores = new Map(related.map((row) => [row.storeKey, row.dataJson]));
-    const stockMovements = JSON.parse(
+    const parsedStockMovements = JSON.parse(
       relatedStores.get(STOCK_MOVEMENT_STORE_KEY) ?? "[]",
     ) as unknown;
-    const purchaseDocuments = JSON.parse(
+    const parsedPurchaseDocuments = JSON.parse(
       relatedStores.get(PURCHASE_STORE_KEY) ?? "[]",
     ) as unknown;
+    const stockMovements = Array.isArray(parsedStockMovements) ? parsedStockMovements : [];
+    const purchaseDocuments = Array.isArray(parsedPurchaseDocuments) ? parsedPurchaseDocuments : [];
     const now = new Date().toISOString();
     const consolidated = consolidateInventoryDuplicates({
       assortment: after,

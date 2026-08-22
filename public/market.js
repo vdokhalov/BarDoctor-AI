@@ -460,7 +460,9 @@
   document.querySelectorAll("#market-quick-sheet [data-route]").forEach(function (button) {
     button.addEventListener("click", function () {
       setQuickMenu(false);
-      window.location.assign(button.getAttribute("data-route"));
+      var route = button.getAttribute("data-route");
+      if (typeof window.bdNavigate === "function") window.bdNavigate(route);
+      else window.location.assign(route);
     });
   });
   load();

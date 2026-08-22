@@ -844,7 +844,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /route:\/api\/inventory\/counts/);
   assert.match(worker, /route:\/api\/inventory\/scan/);
   assert.match(worker, /route:\/sales-import/);
-  assert.match(mainBundle, /window\.location\.assign\("\/sales-import"\)/);
+  assert.match(mainBundle, /window\.bdNavigate\("\/sales-import"\)/);
   assert.doesNotMatch(mainBundle, /\/sales-import\.html/);
   assert.match(salesImportClient, /\/api\/sales\/scan/);
   assert.match(salesImportClient, /\/api\/sales\/confirm/);

@@ -1,69 +1,8 @@
 (function () {
   "use strict";
 
-  var SHELL_VERSION = "v185";
-  var HEADER_MARK = "canonical-v185";
-  var CATEGORY_TITLES = {
-    critical: "Критические события",
-    incident: "Критические события",
-    shifts: "Смены",
-    shift: "Смены",
-    tasks: "Поручения",
-    task: "Поручения",
-    finance: "Финансы",
-    equipment: "Оборудование",
-    calendar: "Календарь возможностей"
-  };
-  var ROOT_ROUTES = {
-    "/home": "Главная",
-    "/shifts": "Смены",
-    "/finance": "Финансы",
-    "/employees": "Команда",
-    "/more": "Ещё"
-  };
-  var MODULE_ROUTES = {
-    "/analysis": ["AI Доктор", "/home"],
-    "/events": ["Журнал происшествий", "/home"],
-    "/tasks": ["Поручения", "/employees"],
-    "/equipment": ["Оборудование", "/more"],
-    "/market": ["Локальный рынок", "/home"],
-    "/opportunities": ["Календарь возможностей", "/home"],
-    "/data-control": ["Контроль данных", "/more"],
-    "/team-access": ["Роли и доступ", "/employees"],
-    "/integrations": ["Интеграции", "/more"],
-    "/profile": ["Профиль", "/more"],
-    "/salaries": ["Зарплаты", "/finance"],
-    "/payroll": ["Правила оплаты", "/salaries"],
-    "/health": ["Диагностика заведения", "/home"],
-    "/reviews": ["Отзывы гостей", "/more"],
-    "/cases": ["Дела", "/home"],
-    "/catalog": ["Ассортимент и техкарты", "/more"],
-    "/suppliers": ["Поставщики и закупки", "/more"],
-    "/nomenclature": ["Номенклатура", "/more"],
-    "/warehouse": ["Склад", "/finance"],
-    "/reports": ["Месячный отчёт", "/finance"],
-    "/finance/settings": ["Настройки финансов", "/finance"],
-    "/notifications": ["Уведомления", "/more"],
-    "/settings": ["Настройки", "/more"],
-    "/about": ["О BarDoctor", "/more"]
-  };
-  var DETAIL_ROUTES = [
-    [/^\/events\/[^/]+$/, "Происшествие", "/events"],
-    [/^\/cases\/add$/, "Новое дело", "/cases"],
-    [/^\/cases\/[^/]+$/, "Дело", "/cases"],
-    [/^\/equipment\/catalog$/, "Каталог оборудования", "/equipment"],
-    [/^\/equipment\/analytics$/, "Аналитика оборудования", "/equipment"],
-    [/^\/equipment\/[^/]+\/history\/new$/, "Запись обслуживания", null],
-    [/^\/equipment\/[^/]+$/, "Оборудование", "/equipment"],
-    [/^\/finance\/shift\/[^/]+\/payroll$/, "Расчёт смены", "/finance"],
-    [/^\/employees\/[^/]+$/, "Сотрудник", "/employees"],
-    [/^\/salaries\/[^/]+$/, "Зарплата сотрудника", "/salaries"],
-    [/^\/smart$/, "Сообщить BarDoctor", "/home"],
-    [/^\/add$/, "Добавить", "/home"],
-    [/^\/sales-import$/, "Продажи и склад", "/warehouse"],
-    [/^\/supplier-alternatives$/, "Новые поставщики", "/suppliers"],
-    [/^\/venues\/new$/, "Новое заведение", "/more"]
-  ];
+  var SHELL_VERSION = "v247";
+  var HEADER_MARK = "canonical-v247";
   var TAB_SELECTORS = [
     ".bd-team-tabs-v163",
     ".bd-eq-tabs-v167",
@@ -107,69 +46,20 @@
     );
   }
 
-  function urlWithout(keys) {
-    var url = new URL(window.location.href);
-    keys.forEach(function (key) { url.searchParams.delete(key); });
-    return url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
-  }
-
-  function detailFromQuery(path) {
-    var query = new URLSearchParams(window.location.search);
-    if (path === "/notifications" && query.get("view") && query.get("view") !== "overview") {
-      var view = query.get("view");
-      var title = view === "category" ? (CATEGORY_TITLES[query.get("category")] || "Категория уведомлений")
-        : view === "quiet" ? "Тихие часы"
-          : view === "history" ? "История уведомлений"
-            : view === "device" ? "Настройки устройства" : "Уведомления";
-      return { variant: "detail", title: title, parent: urlWithout(["view", "category"]) };
-    }
-    if (path === "/data-control" && query.get("event")) {
-      return { variant: "detail", title: "Событие журнала", parent: urlWithout(["event"]) };
-    }
-    if (path === "/integrations" && ((query.get("view") && query.get("view") !== "overview") || (query.get("flow") && query.get("flow") !== "overview"))) {
-      var integrationFlow = query.get("flow") || query.get("view");
-      var integrationTitle = integrationFlow === "catalog" ? "Подключить систему"
-        : integrationFlow === "onec" ? "1С:Предприятие"
-          : integrationFlow === "api" ? "Подключение API"
-            : integrationFlow === "file" ? "Импорт из файла" : "Подключение";
-      return { variant: "detail", title: integrationTitle, parent: urlWithout(["view", "connectionId", "sourceId", "flow", "connection"]) };
-    }
-    if (path === "/catalog" && query.get("itemId")) {
-      return { variant: "detail", title: "Позиция меню", parent: urlWithout(["itemId"]) };
-    }
-    if (path === "/suppliers" && query.get("documentId")) {
-      return { variant: "detail", title: "Закупочный документ", parent: urlWithout(["documentId", "edit", "returnTo"]) };
-    }
-    if (path === "/suppliers" && query.get("supplierId")) {
-      return { variant: "detail", title: "Поставщик", parent: urlWithout(["supplierId", "edit"]) };
-    }
-    if (path === "/suppliers" && query.get("compareKey")) {
-      return { variant: "detail", title: "Сравнение предложений", parent: urlWithout(["compareKey"]) };
-    }
-    if (path === "/finance" && ["closeShift", "addExpense", "repairEquipmentId"].some(function (key) { return query.has(key); })) {
-      return { variant: "detail", title: query.has("addExpense") ? "Новый расход" : query.has("repairEquipmentId") ? "Расход на оборудование" : "Закрытие смены", parent: urlWithout(["closeShift", "addExpense", "repairEquipmentId"]) };
-    }
-    if (path === "/shifts" && query.has("closeShift")) return { variant: "detail", title: "Закрытие смены", parent: urlWithout(["closeShift"]) };
-    if (path === "/warehouse" && query.has("add")) return { variant: "detail", title: "Операция склада", parent: urlWithout(["add"]) };
-    if (path === "/tasks" && query.get("new") === "1") return { variant: "detail", title: "Новое поручение", parent: urlWithout(["new", "title", "responsible"]) };
-    if (path === "/reports" && query.has("closeMonth")) return { variant: "detail", title: "Закрытие периода", parent: urlWithout(["closeMonth"]) };
-    return null;
-  }
-
   function resolveRoute() {
-    var path = window.location.pathname;
-    var queryDetail = detailFromQuery(path);
-    if (queryDetail) return queryDetail;
-    if (ROOT_ROUTES[path]) return { variant: "root", title: ROOT_ROUTES[path], parent: null };
-    if (MODULE_ROUTES[path]) return { variant: "module", title: MODULE_ROUTES[path][0], parent: MODULE_ROUTES[path][1] };
-    for (var index = 0; index < DETAIL_ROUTES.length; index += 1) {
-      var rule = DETAIL_ROUTES[index];
-      if (!rule[0].test(path)) continue;
-      var parent = rule[2];
-      if (!parent && /\/history\/new$/.test(path)) parent = path.replace(/\/history\/new$/, "");
-      return { variant: "detail", title: rule[1], parent: parent };
-    }
-    return null;
+    var contract = window.bdNavigationContract;
+    var screen = contract && contract.resolve(window.location.href);
+    if (screen && screen.headerMode === "underlay" && screen.parent) screen = contract.resolve(screen.parent);
+    if (!screen || ["public", "admin", "compatibility", "redirect"].includes(screen.type)) return null;
+    return {
+      variant: screen.type === "root" ? "root" : ["module", "list", "report", "settings"].includes(screen.type) ? "module" : "detail",
+      title: screen.title,
+      parent: screen.parent,
+      shell: screen.shell,
+      bottomNav: screen.bottomNav,
+      headerMode: screen.headerMode,
+      screenType: screen.type
+    };
   }
 
   function isPublicOrEmbedded() {
@@ -396,7 +286,7 @@
         var venue = document.createElement("div");
         venue.className = "bd-app-canonical-venue-host";
         venue.setAttribute("data-bd-canonical-venue-host", "");
-        venue.setAttribute("data-bd-venue-host", "canonical-v185");
+        venue.setAttribute("data-bd-venue-host", "canonical-v247");
         trailing.appendChild(venue);
       }
       row.appendChild(trailing);
@@ -430,6 +320,12 @@
       if (!config) { if (existing) existing.remove(); return; }
       document.documentElement.setAttribute("data-bd-user-shell", SHELL_VERSION);
       document.documentElement.setAttribute("data-bd-header-variant", config.variant);
+      document.documentElement.setAttribute("data-bd-shell-mode", config.shell || "standard");
+      if (config.headerMode === "owned") {
+        if (existing) existing.remove();
+        markLegacyHeaders();
+        return;
+      }
       var header = existing || document.createElement("bd-app-header");
       if (!existing) document.body.insertBefore(header, document.body.firstChild);
       header.hidden = false;
@@ -460,11 +356,7 @@
     refresh: scheduleRender,
     variants: ["root", "module", "detail"]
   };
-  window.bdUserRouteInventoryV185 = {
-    root: Object.keys(ROOT_ROUTES),
-    module: Object.keys(MODULE_ROUTES),
-    detailPatterns: DETAIL_ROUTES.map(function (rule) { return String(rule[0]); })
-  };
+  window.bdUserRouteInventoryV247 = window.bdNavigationContract;
   document.addEventListener("DOMContentLoaded", scheduleRender, { once: true });
   window.addEventListener("popstate", renderForNavigation);
   window.addEventListener("bd:navigation-change", renderForNavigation);

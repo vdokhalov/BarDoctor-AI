@@ -392,7 +392,6 @@ export function buildAssortmentAnalytics(input: {
       id: text(ingredient.id, crypto.randomUUID(), 120),
       name: text(ingredient.name, "Ингредиент", 180),
       quantity: nonNegative(ingredient.quantity),
-      unit: text(ingredient.unit, "", 40),
       ...ingredientCost(ingredient, currentPrices, balances),
     }));
     const isService = text(item.type) === "service";

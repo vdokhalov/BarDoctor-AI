@@ -74,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   const idempotencyKey = typeof entry.idempotencyKey === "string" && entry.idempotencyKey.trim()
     ? entry.idempotencyKey.trim().slice(0, 240)
     : request.headers.get("idempotency-key")?.trim().slice(0, 240) || null;
-  const nextEntry = {
+  const nextEntry: Record<string, unknown> & { date: string; category: string; id: string } = {
     ...entry,
     venueId: account.venueId,
     date: entry.date,

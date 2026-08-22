@@ -285,7 +285,7 @@ export async function integrationStatus(
   const stored = new Set(rows.map((row) => row.key));
   const platformStatus = new Map<PlatformIntegrationKey, IntegrationStatus>(
     await Promise.all(
-      PLATFORM_INTEGRATION_KEYS.map(async (key) => [
+      PLATFORM_INTEGRATION_KEYS.map(async (key): Promise<[PlatformIntegrationKey, IntegrationStatus]> => [
         key,
         runtimeEnv(key)
           ? "environment" as const

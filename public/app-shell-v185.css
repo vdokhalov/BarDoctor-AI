@@ -9,6 +9,15 @@
   --bd-header-total: calc(var(--bd-header-row-height) + var(--bd-safe-top));
   --bd-shell-inline: clamp(14px, 3vw, 28px);
   --bd-shell-content: 1100px;
+  --bd-layer-page: 0;
+  --bd-layer-sticky: 100;
+  --bd-layer-navigation: 200;
+  --bd-layer-floating: 300;
+  --bd-layer-backdrop: 800;
+  --bd-layer-overlay: 900;
+  --bd-layer-overlay-header: 910;
+  --bd-layer-toast: 1200;
+  --bd-layer-critical: 1300;
 }
 
 html[data-bd-user-shell="v185"] {
@@ -17,7 +26,7 @@ html[data-bd-user-shell="v185"] {
 
 bd-app-header {
   position: sticky;
-  z-index: 75;
+  z-index: var(--bd-layer-sticky);
   top: 0;
   display: block;
   width: 100%;
@@ -211,7 +220,7 @@ html[data-bd-header-variant="detail"] body > .bd-venue-trigger { display: none !
   backdrop-filter: none !important;
 }
 
-[data-bd-tabs="canonical-v185"] {
+[data-bd-tabs="canonical-v247"] {
   display: flex !important;
   width: min(calc(100% - 2 * var(--bd-shell-inline)), var(--bd-shell-content)) !important;
   min-height: 48px !important;
@@ -229,9 +238,9 @@ html[data-bd-header-variant="detail"] body > .bd-venue-trigger { display: none !
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
 }
-[data-bd-tabs="canonical-v185"]::-webkit-scrollbar { display: none; }
-[data-bd-tabs="canonical-v185"] > button,
-[data-bd-tabs="canonical-v185"] > a {
+[data-bd-tabs="canonical-v247"]::-webkit-scrollbar { display: none; }
+[data-bd-tabs="canonical-v247"] > button,
+[data-bd-tabs="canonical-v247"] > a {
   position: relative !important;
   display: grid !important;
   flex: 1 0 auto !important;
@@ -251,8 +260,8 @@ html[data-bd-header-variant="detail"] body > .bd-venue-trigger { display: none !
   cursor: pointer !important;
   touch-action: manipulation;
 }
-[data-bd-tabs="canonical-v185"] > button::after,
-[data-bd-tabs="canonical-v185"] > a::after {
+[data-bd-tabs="canonical-v247"] > button::after,
+[data-bd-tabs="canonical-v247"] > a::after {
   position: absolute;
   right: 10px;
   bottom: 0;
@@ -262,14 +271,22 @@ html[data-bd-header-variant="detail"] body > .bd-venue-trigger { display: none !
   background: transparent;
   content: "";
 }
-[data-bd-tabs="canonical-v185"] > button.active,
-[data-bd-tabs="canonical-v185"] > button[aria-selected="true"],
-[data-bd-tabs="canonical-v185"] > a.active,
-[data-bd-tabs="canonical-v185"] > a[aria-current="page"] { color: #5b5ceb !important; }
-[data-bd-tabs="canonical-v185"] > button.active::after,
-[data-bd-tabs="canonical-v185"] > button[aria-selected="true"]::after,
-[data-bd-tabs="canonical-v185"] > a.active::after,
-[data-bd-tabs="canonical-v185"] > a[aria-current="page"]::after { background: #5b5ceb; }
+[data-bd-tabs="canonical-v247"] > button.active,
+[data-bd-tabs="canonical-v247"] > button[aria-selected="true"],
+[data-bd-tabs="canonical-v247"] > a.active,
+[data-bd-tabs="canonical-v247"] > a[aria-current="page"] { color: #5b5ceb !important; }
+[data-bd-tabs="canonical-v247"] > button.active::after,
+[data-bd-tabs="canonical-v247"] > button[aria-selected="true"]::after,
+[data-bd-tabs="canonical-v247"] > a.active::after,
+[data-bd-tabs="canonical-v247"] > a[aria-current="page"]::after { background: #5b5ceb; }
+
+html[data-bd-shell-mode="fullscreen-owned"] body > bd-app-header,
+html[data-bd-shell-mode="fullscreen-owned"] body > .bd-venue-trigger,
+html[data-bd-shell-mode="fullscreen-owned"] #bd-canonical-bottom-nav,
+html[data-bd-shell-mode="fullscreen-owned"] nav[data-bd-bottom-nav] {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 
 html[data-bd-embedded="true"] bd-app-header,
 html[data-bd-embedded="true"] .market-topbar,
@@ -322,7 +339,7 @@ main[data-bd-app-main] > iframe {
   bd-app-header .bd-venue-trigger.bd-venue-trigger-inline { max-width: 126px; padding-inline: 8px; }
   bd-app-header .bd-venue-trigger-copy small { display: none; }
   bd-app-header .bd-venue-trigger-copy strong { max-width: 74px; font-size: 10px; }
-  [data-bd-tabs="canonical-v185"] { width: 100% !important; }
+  [data-bd-tabs="canonical-v247"] { width: 100% !important; }
 }
 
 @media (max-width: 390px) {

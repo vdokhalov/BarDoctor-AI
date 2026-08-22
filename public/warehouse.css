@@ -2558,9 +2558,17 @@ body.bd-inventory-overlay-open-v246 .bd-scroll-top {
   opacity: 0;
 }
 
+body.bd-inventory-overlay-open-v246 > bd-app-header,
+body.bd-inventory-overlay-open-v246 > .bd-venue-trigger,
+body.bd-inventory-overlay-open-v246 > nav[data-bd-bottom-nav],
+body.bd-inventory-overlay-open-v246 > #bd-canonical-bottom-nav {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 .bd-inventory-layer-v246 {
   position: fixed;
-  z-index: 80;
+  z-index: var(--bd-layer-overlay, 900);
   inset: 0;
   isolation: isolate;
   display: flex;
@@ -2599,7 +2607,7 @@ body.bd-inventory-overlay-open-v246 .bd-scroll-top {
 
 .bd-inventory-sheet-v246 .bd-inventory-head-v245 {
   position: relative;
-  z-index: 2;
+  z-index: var(--bd-layer-overlay-header, 910);
   background: #fff;
 }
 
@@ -2622,7 +2630,7 @@ body.bd-inventory-overlay-open-v246 .bd-scroll-top {
 
 .bd-inventory-footer-v246 {
   position: relative;
-  z-index: 2;
+  z-index: var(--bd-layer-overlay-header, 910);
   padding: 9px 18px calc(9px + env(safe-area-inset-bottom));
   border-top: 1px solid #e7e8ee;
   background: rgba(255, 255, 255, .98);

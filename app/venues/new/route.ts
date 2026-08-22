@@ -14,7 +14,7 @@ const VENUE_CREATE_HTML = `<!doctype html>
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
-    <script src="/bd-route-context.js?v=20260814-navigation-v185" defer></script>
+    <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-location-data.js?v=20260811-location-selects-v2" defer></script>
     <script src="/venue-create.js?v=20260811-location-selects-v2" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>

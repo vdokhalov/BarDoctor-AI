@@ -7,6 +7,9 @@
   var identity = document.getElementById("admin-identity");
   var detail = document.getElementById("admin-detail");
   var backdrop = document.getElementById("admin-backdrop");
+  var detailTrigger = null;
+  var detailHistoryClosing = false;
+  var detailBodyOverflow = "";
   var labels = {
     dashboard: "Обзор", users: "Пользователи", venues: "Заведения", integrations: "Интеграции", reviews: "Отзывы гостей",
     ai: "AI-наблюдаемость", push: "Push-инфраструктура", system: "Состояние системы", audit: "Журнал администраторов"
@@ -434,8 +437,14 @@
   }
 
   async function openDetail(kind, id) {
+    detailTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     detail.hidden = false;
     detail.setAttribute("aria-hidden", "false");
+    detailBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    if (!(history.state && history.state.bdAdminDetail)) {
+      history.pushState(Object.assign({}, history.state || {}, { bdAdminDetail: true }), "", location.href);
+    }
     detail.innerHTML = '<section class="admin-detail-panel"><div class="admin-loading"><span></span><p>Загружаю read-only детали…</p></div></section>';
     try {
       var section = kind === "user" ? "users" : kind === "venue" ? "venues" : kind === "integration" ? "integrations" : "audit";
@@ -445,6 +454,7 @@
           : kind === "integration" ? integrationDetail(payload.data) : auditDetail(payload.data);
       detail.querySelector("[data-detail-close]").addEventListener("click", closeDetail);
       bindNavigation(detail);
+      detail.querySelector("[data-detail-close]").focus({ preventScroll: true });
     } catch (error) {
       detail.innerHTML = '<section class="admin-detail-panel"><div class="admin-error"><h3>Детали не загрузились</h3><p>' + esc(error.message) + '</p><button data-detail-close>Закрыть</button></div></section>';
       detail.querySelector("[data-detail-close]").addEventListener("click", closeDetail);
@@ -452,9 +462,17 @@
   }
 
   function closeDetail() {
+    if (!detailHistoryClosing && history.state && history.state.bdAdminDetail) {
+      history.back();
+      return;
+    }
     detail.hidden = true;
     detail.setAttribute("aria-hidden", "true");
     detail.innerHTML = "";
+    document.body.style.overflow = detailBodyOverflow;
+    if (detailTrigger && detailTrigger.isConnected) detailTrigger.focus({ preventScroll: true });
+    detailTrigger = null;
+    detailHistoryClosing = false;
   }
 
   function detailLine(label, value, action) {
@@ -598,6 +616,11 @@
     if (event.key === "Escape") { closeDetail(); closeMenu(); }
   });
   window.addEventListener("popstate", function () {
+    if (!detail.hidden && !(history.state && history.state.bdAdminDetail)) {
+      detailHistoryClosing = true;
+      closeDetail();
+      return;
+    }
     var section = location.hash.slice(1);
     if (labels[section]) navigate(section);
   });

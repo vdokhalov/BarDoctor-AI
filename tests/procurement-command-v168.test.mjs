@@ -266,8 +266,8 @@ test("Procurement v168 is linked, responsive and has explicit QA states", async 
   assert.match(fixture, /\/api\/purchases\/cancel/);
   assert.match(fixture, /\/api\/purchases\/delete/);
   assert.match(fixture, /rebuildWarehouse/);
-  assert.match(bootstrap, /\["documentId", "supplierId", "compareKey"\]/);
-  assert.match(bootstrap, /if \(path === "\/profile" \|\| path === "\/catalog" \|\| path === "\/suppliers"/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.resolve/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.parent/);
 });
 
 test("Procurement browser regression uses only visible user actions for settlement and lifecycle", async () => {

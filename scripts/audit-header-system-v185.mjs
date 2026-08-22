@@ -56,13 +56,15 @@ export async function runHeaderSystemAudit() {
   assert.match(shell, /class BdAppHeader extends HTMLElement/);
   assert.match(shell, /customElements\.define\("bd-app-header", BdAppHeader\)/);
   assert.match(shell, /variants: \["root", "module", "detail"\]/);
-  assert.match(shell, /window\.bdUserRouteInventoryV185/);
+  assert.match(shell, /window\.bdUserRouteInventoryV247/);
   assert.match(css, /--bd-safe-top: env\(safe-area-inset-top, 0px\)/);
   assert.match(css, /--bd-safe-bottom: env\(safe-area-inset-bottom, 0px\)/);
   assert.match(css, /min-width: 44px/);
   assert.match(css, /min-height: 44px/);
   assert.match(css, /\[data-bd-legacy-header="true"\] \{ display: none !important; \}/);
-  assert.match(css, /\[data-bd-tabs="canonical-v185"\]/);
+  assert.match(css, /\[data-bd-tabs="canonical-v247"\]/);
+  assert.match(css, /--bd-layer-overlay: 900/);
+  assert.match(css, /data-bd-shell-mode="fullscreen-owned"/);
   assert.match(response, /canonicalUserShellAssets\(\)/);
   assert.match(preview, /window\.bdNavigateBack = function/);
   assert.match(preview, /window\.bdNavigate = function/);

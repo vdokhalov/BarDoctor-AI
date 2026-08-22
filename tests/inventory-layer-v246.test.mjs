@@ -7,6 +7,8 @@ const css = fs.readFileSync(new URL("../public/warehouse.css", import.meta.url),
 const html = fs.readFileSync(new URL("../public/app.html", import.meta.url), "utf8");
 const response = fs.readFileSync(new URL("../app/bar-doctor-response.ts", import.meta.url), "utf8");
 const bootstrap = fs.readFileSync(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
+const print = fs.readFileSync(new URL("../lib/bardoctor/inventory-counts.ts", import.meta.url), "utf8");
+const route = fs.readFileSync(new URL("../app/api/inventory/counts/route.ts", import.meta.url), "utf8");
 
 test("inventory is portalled into one viewport-owned layer", () => {
   assert.match(bundle, /ug\.createPortal\(i\.jsxs\("div",\{className:"bd-inventory-layer-v246"/);
@@ -35,8 +37,13 @@ test("print and close actions remain in the active inventory header", () => {
   assert.match(bundle, /"aria-label":"Закрыть"/);
   assert.match(bundle, /children:"×"/);
   assert.match(bundle, /window\.open\("\/api\/inventory\/counts\?id="/);
+  assert.doesNotMatch(bundle, /noopener,noreferrer/);
+  assert.match(print, /Назад к инвентаризации/);
+  assert.match(print, /window\.opener/);
+  assert.match(route, /inventoryPrintUnavailable/);
 });
 
-test("v246 cache markers are wired through every app shell", () => {
-  for (const source of [html, response, bootstrap]) assert.match(source, /inventory-layer-v246/);
+test("v247 navigation cache markers are wired through every app shell", () => {
+  for (const source of [html, response]) assert.match(source, /20260822-navigation-v247/);
+  assert.match(bootstrap, /canonical-navigation-v247/);
 });

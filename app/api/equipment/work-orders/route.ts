@@ -339,7 +339,7 @@ export async function POST(request: Request): Promise<Response> {
     expenseChanged = !beforeExpense || materiallyChanged;
   }
 
-  const nextEquipment = { ...equipmentItem, updatedAt: now };
+  const nextEquipment: JsonRecord = { ...equipmentItem, updatedAt: now };
   if (requestedStatus === "detected" && kind !== "maintenance") nextEquipment.status = problemStatus;
   if (requestedStatus === "in_progress") {
     nextEquipment.status = kind === "maintenance" ? "needs_maintenance" : "under_repair";

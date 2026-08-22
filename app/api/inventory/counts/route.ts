@@ -153,10 +153,26 @@ function venueName(restaurantJson: string | null): string {
   return text(profile.name ?? profile.venueName ?? profile.restaurantName, "Заведение", 180);
 }
 
+function inventoryPrintUnavailable(title: string, message: string, status = 404, destination = "/warehouse?tab=counts"): Response {
+  const escape = (value: string) => value.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[character] ?? character);
+  const safeDestination = destination.startsWith("/") && !destination.startsWith("//") ? destination : "/home";
+  return new Response(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>${escape(title)} · BarDoctor</title><style>:root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#171925;background:#f6f7fb}*{box-sizing:border-box}body{margin:0;min-height:100dvh}.bar{position:sticky;z-index:10;top:0;display:flex;min-height:60px;padding:calc(8px + env(safe-area-inset-top,0px)) 16px 8px;align-items:center;gap:12px;border-bottom:1px solid #e5e7ef;background:rgba(255,255,255,.96);backdrop-filter:blur(14px)}a{display:inline-flex;min-width:44px;min-height:44px;padding:0 14px;align-items:center;justify-content:center;border-radius:12px;color:#3936c9;font-weight:750;text-decoration:none}.card{width:min(560px,calc(100% - 32px));margin:clamp(44px,12vh,120px) auto;padding:28px;border:1px solid #e5e7ef;border-radius:22px;background:#fff;box-shadow:0 16px 50px rgba(20,24,45,.08)}h1{margin:0 0 10px;font-size:24px}p{margin:0 0 22px;color:#666b7c;line-height:1.5}</style></head><body><header class="bar"><a href="${escape(safeDestination)}">← Назад</a><strong>${escape(title)}</strong></header><main class="card"><h1>${escape(title)}</h1><p>${escape(message)}</p><a href="${escape(safeDestination)}">Перейти к инвентаризациям</a></main></body></html>`, {
+    status,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow" },
+  });
+}
+
 export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const printView = url.searchParams.get("format") === "print";
   const account = await authenticateRequest(request);
-  if (!account) return unauthorized();
+  if (!account) return printView
+    ? inventoryPrintUnavailable("Сессия завершена", "Войдите снова, чтобы открыть печатную ведомость.", 401, "/login")
+    : unauthorized();
   if (!hasPermission(account, "inventory.view")) {
+    if (printView) return inventoryPrintUnavailable("Нет доступа", "У вас нет права просматривать эту инвентаризацию.", 403, "/warehouse?tab=counts");
     return Response.json(
       { ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать инвентаризации" },
       { status: 403 },
@@ -166,20 +182,21 @@ export async function GET(request: Request): Promise<Response> {
   const documents = stores.snapshots.filter(isDocument).filter((document) =>
     !document.venueId || Number(document.venueId) === account.venueId
   );
-  const url = new URL(request.url);
   const id = text(url.searchParams.get("id"), "", 100);
   if (id) {
     const document = documents.find((value) => value.id === id);
     if (!document) {
+      if (printView) return inventoryPrintUnavailable("Инвентаризация не найдена", "Документ удалён, недоступен или относится к другому заведению.");
       return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация не найдена" }, { status: 404 });
     }
-    if (url.searchParams.get("format") === "print") {
+    if (printView) {
       if (document.status === "cancelled") {
-        return Response.json({ ok: false, error: "Отменённую инвентаризацию нельзя печатать" }, { status: 409 });
+        return inventoryPrintUnavailable("Печать недоступна", "Отменённую инвентаризацию нельзя печатать.", 409, `/warehouse?tab=counts&inventory=${encodeURIComponent(document.id)}`);
       }
       return new Response(renderInventoryCountPrintSheet({
         document,
         venueName: venueName(account.restaurantJson),
+        returnUrl: `/warehouse?tab=counts&inventory=${encodeURIComponent(document.id)}`,
       }), {
         headers: {
           "Content-Type": "text/html; charset=utf-8",

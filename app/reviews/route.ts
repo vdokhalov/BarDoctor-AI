@@ -17,7 +17,7 @@ return `<!doctype html>
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
-    <script src="/bd-route-context.js?v=20260814-navigation-v185" defer></script>
+    <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
     <script src="/reviews.js?v=20260813-reviews-v179" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>

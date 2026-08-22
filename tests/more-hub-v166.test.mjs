@@ -63,8 +63,8 @@ test("More v166 links the native venue switcher and suppresses legacy rows", asy
   assert.match(hub, /data-bd-data-control-native/);
   assert.match(bootstrap, /data-bd-more-hub=\"v166\"/);
   assert.match(venueSwitcher, /data-bd-more-hub=\"v166\"/);
-  assert.match(bootstrap, /if \(path === "\/equipment"\) return "\/more"/);
-  assert.match(bootstrap, /if \(path === "\/warehouse"\) return "\/more"/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.parent/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.resolve/);
   assert.match(bundle, /bdAccountingHeader,\{title:"Склад",back:"\/more"/);
 });
 

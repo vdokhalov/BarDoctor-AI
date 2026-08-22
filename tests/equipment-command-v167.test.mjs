@@ -124,8 +124,8 @@ test("Equipment v167 is linked in both app documents and fixes mobile title over
   assert.match(fixture, /state === "venue-b"/);
   assert.match(fixture, /state === "long"/);
   assert.match(fixture, /state === "unconfigured"/);
-  assert.match(bootstrap, /if \(path === "\/equipment"\) return "\/more"/);
-  assert.match(bootstrap, /\/\^\\\/equipment\\\/\[\^\/\]\+\$\/\.test\(path\)\) return "\/equipment"/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.parent/);
+  assert.match(bootstrap, /window\.bdNavigationContract\.resolve/);
 });
 
 test("existing Home and Health signals consume Equipment state without a second alert system", async () => {

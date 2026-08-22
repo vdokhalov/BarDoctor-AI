@@ -18,7 +18,7 @@ test("nomenclature is a first-class visible module under More", async () => {
 
   assert.match(bundle, /path:"\/nomenclature",component:\(\)=>i\.jsx\(pt,\{component:bdNomenclaturePage\}\)/);
   assert.match(bundle, /key:"nomenclature",icon:kX,title:"Номенклатура",description:"Товары, расходники и услуги"/);
-  assert.match(shell, /"\/nomenclature": \["Номенклатура", "\/more"\]/);
+  assert.match(shell, /window\.bdNavigationContract/);
   assert.match(bootstrap, /nomenclature-v208\.css\?v=20260821-warehouse-v214/);
   assert.match(css, /\.bd-nomenclature-main-v208/);
   assert.match(css, /@media \(max-width: 390px\)/);

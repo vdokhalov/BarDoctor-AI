@@ -7,19 +7,10 @@ import { runNavigationAudit } from "../scripts/audit-navigation-consistency.mjs"
 
 test("production navigation graph satisfies the RC consistency contract", async () => {
   const result = await runNavigationAudit();
-  assert.deepEqual(result.routes, { current: 57, compatibility: 2, total: 59, spa: 54 });
-  assert.equal(result.modules, 36);
-  assert.deepEqual(result.defects, {
-    found: 54,
-    fixed: 54,
-    byCategory: {
-      backAndHeader: 30,
-      architecture: 5,
-      contextPreservation: 13,
-      safetyAndAccessibility: 2,
-      duplicateControls: 4,
-    },
-  });
+  assert.deepEqual(result.routes, { current: 57, compatibility: 2, admin: 1, total: 60, spa: 54 });
+  assert.equal(result.registeredStaticMetadata, 50);
+  assert.equal(result.queryScreens, 10);
+  assert.deepEqual(result.traps, { detected: 0, unresolved: 0 });
 });
 
 test("navigation runtime sources and patched production bundle parse successfully", async () => {
@@ -27,6 +18,8 @@ test("navigation runtime sources and patched production bundle parse successfull
     new URL("../public/bardoctor-preview.js", import.meta.url),
     new URL("../public/bd-route-context.js", import.meta.url),
     new URL("../public/app-shell-v185.js", import.meta.url),
+    new URL("../public/navigation-contract-v247.js", import.meta.url),
+    new URL("../public/navigation-transient-v247.js", import.meta.url),
     new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
   ];
   for (const file of files) {
@@ -44,51 +37,50 @@ test("navigation runtime sources and patched production bundle parse successfull
 });
 
 test("deep-link query flows resolve to a stable logical parent without losing list context", async () => {
-  const runtime = await readFile(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
-  const start = runtime.indexOf("function bdNavigationPathname(value)");
-  const end = runtime.indexOf("function bdCanReturnToPreviousContext(state)", start);
-  assert.ok(start >= 0 && end > start);
+  const runtime = await readFile(new URL("../public/navigation-contract-v247.js", import.meta.url), "utf8");
   const context = {
     URL,
-    window: { location: { href: "https://bardoctor.example/suppliers" } },
+    URLSearchParams,
+    Set,
+    window: { location: { href: "https://bardoctor.example/suppliers", origin: "https://bardoctor.example" } },
+    document: { documentElement: { setAttribute() {} } },
   };
-  vm.runInNewContext(`${runtime.slice(start, end)}
-globalThis.queryParent = bdQueryParentUrl;
-globalThis.logicalParent = bdLogicalParentUrl;`, context);
+  vm.runInNewContext(runtime, context);
+  const parent = (url) => context.window.bdNavigationContract.resolve(`https://bardoctor.example${url}`).parent;
 
   assert.equal(
-    context.queryParent("/suppliers?tab=compare&q=gin&documentId=doc-1&edit=1"),
+    parent("/suppliers?tab=compare&q=gin&documentId=doc-1&edit=1"),
     "/suppliers?tab=compare&q=gin",
   );
   assert.equal(
-    context.queryParent("/suppliers?documentId=doc-1&edit=1&returnTo=finance"),
+    parent("/suppliers?documentId=doc-1&edit=1&returnTo=finance"),
     "/finance",
   );
   assert.equal(
-    context.queryParent("/suppliers?tab=suppliers&q=bar&supplierId=supplier-1"),
+    parent("/suppliers?tab=suppliers&q=bar&supplierId=supplier-1"),
     "/suppliers?tab=suppliers&q=bar",
   );
   assert.equal(
-    context.queryParent("/suppliers?tab=compare&compareKey=product%3Agin%7CRUB%7Cml"),
+    parent("/suppliers?tab=compare&compareKey=product%3Agin%7CRUB%7Cml"),
     "/suppliers?tab=compare",
   );
   assert.equal(
-    context.queryParent("/finance?view=expenses&month=2026-08&addExpense=1"),
+    parent("/finance?view=expenses&month=2026-08&addExpense=1"),
     "/finance?view=expenses&month=2026-08",
   );
-  assert.equal(context.queryParent("/tasks?tab=week&new=1&title=Check"), "/tasks?tab=week");
+  assert.equal(parent("/tasks?tab=week&new=1&title=Check"), "/tasks?tab=week");
   assert.equal(
-    context.queryParent("/notifications?view=category&category=finance&venue=2"),
+    parent("/notifications?view=category&category=finance&venue=2"),
     "/notifications?venue=2",
   );
   assert.equal(
-    context.queryParent("/data-control?tab=journal&event=audit-1&venue=2"),
+    parent("/data-control?tab=journal&event=audit-1&venue=2"),
     "/data-control?tab=journal&venue=2",
   );
   assert.equal(
-    context.queryParent("/integrations?venue=2&flow=onec&connection=source-1"),
+    parent("/integrations?venue=2&flow=onec&connection=source-1"),
     "/integrations?venue=2",
   );
-  assert.equal(context.queryParent("/finance?month=2026-08"), null);
-  assert.equal(context.logicalParent("/equipment/item-1"), "/equipment");
+  assert.equal(parent("/finance?month=2026-08"), null);
+  assert.equal(parent("/equipment/item-1"), "/equipment");
 });

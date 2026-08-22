@@ -965,7 +965,10 @@
   document.getElementById("integration-back").addEventListener("click", function (event) {
     if (state.view === "overview") return;
     event.preventDefault();
-    if (window.history.length > 1) window.history.back();
+    var overviewUrl = new URL(window.location.href);
+    ["view", "connectionId", "sourceId", "flow", "connection"].forEach(function (key) { overviewUrl.searchParams.delete(key); });
+    var fallback = overviewUrl.pathname + (overviewUrl.searchParams.toString() ? "?" + overviewUrl.searchParams.toString() : "");
+    if (typeof window.bdNavigateBack === "function") window.bdNavigateBack(fallback);
     else showView("overview", "", true);
   });
   window.addEventListener("popstate", function () { var requested = parseView(); showView(requested.view, requested.connectionId, false); });

@@ -939,8 +939,10 @@
   var nativePushState = window.history.pushState.bind(window.history);
   var nativeReplaceState = window.history.replaceState.bind(window.history);
 
-  var bdNavigationVersion = "canonical-navigation-v185";
-  var bdTopLevelRoutes = ["/home", "/shifts", "/finance", "/employees", "/more"];
+  var bdNavigationVersion = "canonical-navigation-v247";
+  var bdTopLevelRoutes = window.bdNavigationContract
+    ? window.bdNavigationContract.roots.slice()
+    : ["/home", "/shifts", "/finance", "/employees", "/more"];
   var bdPendingScrollRestore = "";
   var bdInitialHadNavigationEntry = Boolean(window.history.state && window.history.state.bdEntryId);
 
@@ -1044,65 +1046,19 @@
 
   function bdLogicalParentRoute(pathname) {
     var path = pathname || window.location.pathname;
-    if (/^\/equipment\/[^/]+\/history\/new$/.test(path)) {
-      return path.replace(/\/history\/new$/, "");
-    }
-    if (/^\/equipment\/[^/]+$/.test(path)) return "/equipment";
-    if (path === "/equipment/catalog" || path === "/equipment/analytics") return "/equipment";
-    if (path === "/equipment") return "/more";
-    if (/^\/employees\/[^/]+$/.test(path)) return "/employees";
-    if (/^\/salaries\/[^/]+$/.test(path)) return "/salaries";
-    if (/^\/events\/[^/]+$/.test(path)) return "/events";
-    if (/^\/cases\/[^/]+$/.test(path) || path === "/cases/add") return "/cases";
-    if (/^\/finance\/shift\/[^/]+\/payroll$/.test(path)) return "/finance";
-    if (path === "/warehouse") return "/more";
-    if (path === "/reports" || path === "/salaries" || path === "/finance/settings") return "/finance";
-    if (path === "/payroll") return "/salaries";
-    if (path === "/tasks") return "/employees";
-    if (path === "/analysis" || path === "/health" || path === "/events" || path === "/cases" || path === "/smart" || path === "/add") return "/home";
-    if (path === "/team-access") return "/employees";
-    if (path === "/sales-import") return "/warehouse";
-    if (path === "/supplier-alternatives") return "/suppliers";
-    if (path === "/venues/new") return "/more";
-    if (path === "/market" || path === "/opportunities") return "/home";
-    if (path === "/profile" || path === "/catalog" || path === "/suppliers" || path === "/reviews" || path === "/about" || path === "/integrations" || path === "/settings" || path === "/data-control" || path === "/notifications") return "/more";
-    return "/home";
+    return window.bdNavigationContract
+      ? window.bdNavigationContract.parent(path)
+      : "/home";
   }
 
   function bdQueryParentUrl(value) {
-    var url;
-    try {
-      url = new URL(String(value == null ? window.location.href : value), window.location.href);
-    } catch {
-      return null;
-    }
-    var path = url.pathname;
-    var keys = [];
-    if (path === "/catalog" && url.searchParams.has("itemId")) {
-      keys = ["itemId"];
-    } else if (path === "/notifications" && url.searchParams.has("view") && url.searchParams.get("view") !== "overview") {
-      keys = ["view", "category"];
-    } else if (path === "/data-control" && url.searchParams.has("event")) {
-      keys = ["event"];
-    } else if (path === "/integrations" && ((url.searchParams.has("view") && url.searchParams.get("view") !== "overview") || (url.searchParams.has("flow") && url.searchParams.get("flow") !== "overview"))) {
-      keys = ["view", "connectionId", "sourceId", "flow", "connection"];
-    } else if (path === "/suppliers" && ["documentId", "supplierId", "compareKey"].some(function (key) { return url.searchParams.has(key); })) {
-      if (url.searchParams.has("documentId") && url.searchParams.get("returnTo") === "finance") return "/finance";
-      keys = ["documentId", "supplierId", "compareKey", "edit", "returnTo"];
-    } else if (path === "/finance" && ["closeShift", "addExpense", "repairEquipmentId"].some(function (key) { return url.searchParams.has(key); })) {
-      keys = ["closeShift", "addExpense", "repairEquipmentId"];
-    } else if (path === "/shifts" && url.searchParams.has("closeShift")) {
-      keys = ["closeShift"];
-    } else if (path === "/warehouse" && url.searchParams.has("add")) {
-      keys = ["add"];
-    } else if (path === "/tasks" && url.searchParams.get("new") === "1") {
-      keys = ["new", "title", "responsible"];
-    } else if (path === "/reports" && url.searchParams.has("closeMonth")) {
-      keys = ["closeMonth"];
-    }
-    if (!keys.length) return null;
-    keys.forEach(function (key) { url.searchParams.delete(key); });
-    return url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
+    var url = bdNavigationUrl(value == null ? window.location.href : value);
+    if (!url || !window.bdNavigationContract) return null;
+    var screen = window.bdNavigationContract.resolve(url);
+    if (!screen || !screen.parent || screen.parent === url) return null;
+    return bdNavigationPathname(screen.parent) === bdNavigationPathname(url)
+      ? screen.parent
+      : null;
   }
 
   function bdLogicalParentUrl(value) {
@@ -1112,6 +1068,7 @@
   function bdCanReturnToPreviousContext(state) {
     if (!state || !state.bdPreviousUrl || !state.bdPreviousEntryId) return false;
     if (!bdNavigationUrl(state.bdPreviousUrl)) return false;
+    if (window.bdNavigationContract && !window.bdNavigationContract.isSafeInternal(state.bdPreviousUrl)) return false;
     if (state.bdVenueId && bdActiveVenueId() && String(state.bdVenueId) !== String(bdActiveVenueId())) return false;
     return true;
   }
@@ -1168,9 +1125,8 @@
     var path = window.location.pathname;
     var currentUrl = bdCurrentNavigationUrl();
     var queryParentUrl = bdQueryParentUrl(currentUrl);
-    var publicOrTopLevel = ["/", "/login", "/register", "/terms", "/privacy", "/setup", "/reset", "/design-system"]
-      .concat(bdTopLevelRoutes)
-      .includes(path);
+    var routeScreen = window.bdNavigationContract && window.bdNavigationContract.resolve(currentUrl);
+    var publicOrTopLevel = Boolean(routeScreen && ["public", "root", "redirect", "compatibility"].includes(routeScreen.type));
     if (bdInitialHadNavigationEntry || (publicOrTopLevel && !queryParentUrl)) {
       bdEnsureCurrentEntry();
       return;
@@ -1256,6 +1212,14 @@
     var restoreTarget = bdPendingScrollRestore || bdCurrentNavigationUrl();
     bdPendingScrollRestore = "";
     window.setTimeout(function () { bdRestoreScroll(restoreTarget); }, 0);
+  });
+  window.addEventListener("bd:venue-changed", function () {
+    var state = bdHistoryState(window.history.state);
+    state.bdVenueId = bdActiveVenueId();
+    state.bdPreviousEntryId = "";
+    state.bdPreviousUrl = "";
+    nativeReplaceState(state, "", bdCurrentNavigationUrl());
+    bdDispatchNavigationChange();
   });
 
   var nativeFetch = window.fetch.bind(window);
