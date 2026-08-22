@@ -2545,3 +2545,110 @@ body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top::before
   .bd-inventory-line-note-v245 { grid-column: auto; }
   .bd-inventory-head-v245 h2 { font-size: 19px; }
 }
+
+/* Inventory layer v246 — one viewport, one header, one scroll owner */
+body.bd-inventory-overlay-open-v246 {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.bd-inventory-overlay-open-v246 .bd-scroll-top {
+  visibility: hidden;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.bd-inventory-layer-v246 {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.bd-inventory-backdrop-v246 {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: rgba(23, 26, 46, .4);
+  backdrop-filter: blur(2px);
+}
+
+.bd-inventory-sheet-v246 {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 0 1 780px;
+  flex-direction: column;
+  width: min(100%, 780px);
+  height: calc(100dvh - max(12px, env(safe-area-inset-top)));
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.bd-inventory-sheet-v246 .bd-inventory-handle-v245,
+.bd-inventory-sheet-v246 .bd-inventory-head-v245,
+.bd-inventory-footer-v246 {
+  flex: 0 0 auto;
+}
+
+.bd-inventory-sheet-v246 .bd-inventory-head-v245 {
+  position: relative;
+  z-index: 2;
+  background: #fff;
+}
+
+.bd-inventory-sheet-v246 .bd-inventory-head-v245 > div:first-child {
+  min-width: 0;
+}
+
+.bd-inventory-sheet-v246 .bd-inventory-head-v245 > div:last-child {
+  flex: 0 0 auto;
+}
+
+.bd-inventory-sheet-v246 .bd-inventory-body-v245 {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bd-inventory-footer-v246 {
+  position: relative;
+  z-index: 2;
+  padding: 9px 18px calc(9px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e7e8ee;
+  background: rgba(255, 255, 255, .98);
+}
+
+.bd-inventory-footer-v246 .bd-inventory-actions-v245 {
+  position: static;
+  gap: 7px;
+  padding: 0;
+  background: none;
+}
+
+@media (min-width: 768px) {
+  .bd-inventory-layer-v246 {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .bd-inventory-sheet-v246 {
+    height: min(900px, calc(100dvh - 48px));
+    border-radius: 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  .bd-inventory-footer-v246 {
+    padding-inline: 13px;
+  }
+}
