@@ -1,15 +1,28 @@
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import {
+  createInventoryCountDocument,
+  INVENTORY_COUNT_STORE_KEY,
+  type InventoryCountDocument,
+  type InventoryCountScope,
+  inventoryCountConflicts,
+  inventoryCountLineDifference,
+  inventoryCountScopes,
+  inventoryCountSummary,
+  renderInventoryCountPrintSheet,
+  updateInventoryCountDocument,
+} from "../../../../lib/bardoctor/inventory-counts";
 import {
   applyInventoryCount,
   ASSORTMENT_STORE_KEY,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
 
-const INVENTORY_SNAPSHOT_STORE_KEY = "bd_inventory_snapshots";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
+const MAX_BODY_BYTES = 1_200_000;
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -40,11 +53,13 @@ function text(value: unknown, fallback = "", max = 240): string {
     : fallback;
 }
 
-function number(value: unknown, fallback = 0): number {
-  const parsed = typeof value === "string"
-    ? Number(value.replace(/\s/g, "").replace(",", "."))
-    : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+function isDocument(value: unknown): value is InventoryCountDocument {
+  const item = record(value);
+  return Boolean(text(item.id, "", 100) && Array.isArray(item.items));
+}
+
+function isCompleted(document: InventoryCountDocument): boolean {
+  return document.status === "completed" || String(document.status) === "confirmed";
 }
 
 function upsertStore(
@@ -62,6 +77,132 @@ function upsertStore(
   `).bind(accountId, key, JSON.stringify(value), updatedAt);
 }
 
+function actorName(account: { firstName: string; lastName: string | null; appEmail: string }): string {
+  return [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
+}
+
+function auditStatement(input: {
+  database: D1Database;
+  accountId: number;
+  action: string;
+  document: InventoryCountDocument;
+  before?: unknown;
+  actorName: string;
+  actorRole: string;
+  reason: string;
+  now: string;
+}): D1PreparedStatement {
+  return input.database.prepare(`
+    INSERT INTO audit_log (
+      account_id, store_key, action, entity_id, entity_label, month_key,
+      before_json, after_json, changed_fields_json, actor_name, actor_role,
+      reason, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    input.accountId,
+    INVENTORY_COUNT_STORE_KEY,
+    input.action,
+    input.document.id,
+    `Инвентаризация № ${input.document.number}`,
+    input.document.date.slice(0, 7),
+    input.before == null ? null : JSON.stringify(input.before),
+    JSON.stringify(input.document),
+    JSON.stringify(["status", "scope", "items", "summary", "adjustmentMovementIds"]),
+    input.actorName,
+    input.actorRole,
+    input.reason,
+    input.now,
+  );
+}
+
+async function readStores(database: D1Database, accountId: number) {
+  const result = await database.prepare(`
+    SELECT store_key, data_json
+    FROM domain_data
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?)
+  `).bind(
+    accountId,
+    INVENTORY_COUNT_STORE_KEY,
+    ASSORTMENT_STORE_KEY,
+    STOCK_MOVEMENT_STORE_KEY,
+    MONTH_CLOSING_STORE_KEY,
+  ).all<StoreRow>();
+  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  return {
+    snapshots: array(stores.get(INVENTORY_COUNT_STORE_KEY)),
+    assortment: json(stores.get(ASSORTMENT_STORE_KEY), {}),
+    movements: array(stores.get(STOCK_MOVEMENT_STORE_KEY)),
+    closedMonths: closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY), null)),
+  };
+}
+
+function presentDocument(document: InventoryCountDocument) {
+  return {
+    ...document,
+    summary: document.summary ?? inventoryCountSummary(document),
+    items: document.items.map((line) => ({ ...line, ...inventoryCountLineDifference(line) })),
+  };
+}
+
+function presentSnapshots(snapshots: unknown[]) {
+  return snapshots.map((value) => isDocument(value) ? presentDocument(value) : value);
+}
+
+function venueName(restaurantJson: string | null): string {
+  const profile = record(json(restaurantJson ?? undefined, {}));
+  return text(profile.name ?? profile.venueName ?? profile.restaurantName, "Заведение", 180);
+}
+
+export async function GET(request: Request): Promise<Response> {
+  const account = await authenticateRequest(request);
+  if (!account) return unauthorized();
+  if (!hasPermission(account, "inventory.view")) {
+    return Response.json(
+      { ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать инвентаризации" },
+      { status: 403 },
+    );
+  }
+  const stores = await readStores(getD1(), account.id);
+  const documents = stores.snapshots.filter(isDocument).filter((document) =>
+    !document.venueId || Number(document.venueId) === account.venueId
+  );
+  const url = new URL(request.url);
+  const id = text(url.searchParams.get("id"), "", 100);
+  if (id) {
+    const document = documents.find((value) => value.id === id);
+    if (!document) {
+      return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация не найдена" }, { status: 404 });
+    }
+    if (url.searchParams.get("format") === "print") {
+      if (document.status === "cancelled") {
+        return Response.json({ ok: false, error: "Отменённую инвентаризацию нельзя печатать" }, { status: 409 });
+      }
+      return new Response(renderInventoryCountPrintSheet({
+        document,
+        venueName: venueName(account.restaurantJson),
+      }), {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "Content-Disposition": `inline; filename="inventory-${document.number}.html"`,
+          "X-Robots-Tag": "noindex, nofollow",
+        },
+      });
+    }
+    return Response.json(
+      { ok: true, venueId: account.venueId, inventory: presentDocument(document) },
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+  return Response.json({
+    ok: true,
+    venueId: account.venueId,
+    accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+    scopes: inventoryCountScopes(stores.assortment),
+    inventories: documents.map(presentDocument),
+  }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
 export async function POST(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
@@ -71,9 +212,8 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     );
   }
-
   const raw = await request.text();
-  if (new TextEncoder().encode(raw).byteLength > 1_200_000) {
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
     return Response.json({ ok: false, error: "В инвентаризации слишком много данных" }, { status: 413 });
   }
   let body: JsonRecord;
@@ -82,44 +222,188 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return Response.json({ ok: false, error: "Некорректная инвентаризация" }, { status: 400 });
   }
-  const requested = record(body.snapshot);
-  const requestedItems = Array.isArray(requested.items) ? requested.items : [];
-  if (!requestedItems.length) {
-    return Response.json(
-      { ok: false, error: "Укажите фактическое количество хотя бы одной складской позиции" },
-      { status: 422 },
-    );
-  }
-  if (requestedItems.length > 2_000) {
-    return Response.json({ ok: false, error: "За один раз можно пересчитать до 2000 позиций" }, { status: 413 });
-  }
-
-  const now = new Date().toISOString();
-  const id = text(requested.id, crypto.randomUUID(), 100);
-  const date = text(requested.date, now.slice(0, 10), 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return Response.json({ ok: false, error: "Укажите дату инвентаризации" }, { status: 422 });
-  }
 
   const database = getD1();
-  const result = await database.prepare(`
-    SELECT store_key, data_json
-    FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?)
-  `).bind(
-    account.id,
-    INVENTORY_SNAPSHOT_STORE_KEY,
-    ASSORTMENT_STORE_KEY,
-    STOCK_MOVEMENT_STORE_KEY,
-    MONTH_CLOSING_STORE_KEY,
-  ).all<StoreRow>();
-  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
-  const snapshots = array(stores.get(INVENTORY_SNAPSHOT_STORE_KEY));
-  let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  let movements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
-  const closedMonths = closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY), null));
-  const monthKey = date.slice(0, 7);
-  if (closedMonths.has(monthKey)) {
+  const stores = await readStores(database, account.id);
+  const snapshots = [...stores.snapshots];
+  const requestedSnapshot = record(body.snapshot);
+  let action = text(body.action, "", 30);
+  const legacyFinalize = !action && Array.isArray(requestedSnapshot.items);
+  if (!action) action = legacyFinalize ? "legacy_finalize" : "create";
+  const now = new Date().toISOString();
+  const name = actorName(account);
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson) ?? undefined;
+
+  if (action === "create" || action === "legacy_finalize") {
+    const requestedScope = record(body.scope);
+    const scope = legacyFinalize
+      ? { type: "all", label: "Весь активный склад" }
+      : {
+        type: text(requestedScope.type, "all", 30),
+        id: text(requestedScope.id, "", 100) || undefined,
+        label: text(requestedScope.label, "", 120),
+      };
+    const allowedScope = inventoryCountScopes(stores.assortment).find((value) =>
+      value.type === scope.type && String(value.id ?? "") === String(scope.id ?? "")
+    );
+    if (!allowedScope) {
+      return Response.json({ ok: false, code: "INVALID_SCOPE", error: "Выбранный охват недоступен для текущего заведения" }, { status: 422 });
+    }
+    let document = createInventoryCountDocument({
+      assortment: stores.assortment,
+      venueId: account.venueId,
+      sequenceNumber: snapshots.filter(isDocument).reduce((max, value) => Math.max(max, Number(value.number) || 0), 0) + 1,
+      scope: allowedScope as InventoryCountScope,
+      accountingCurrency,
+      creator: { accountId: account.actorAccountId, name, role: account.role },
+      source: ["scan", "import"].includes(text(body.source ?? requestedSnapshot.source, "", 20))
+        ? text(body.source ?? requestedSnapshot.source, "manual", 20) as "scan" | "import"
+        : "manual",
+      id: text(requestedSnapshot.id, "", 100) || undefined,
+      date: text(body.date ?? requestedSnapshot.date, "", 10) || undefined,
+      now,
+    });
+    const prefill = body.items ?? requestedSnapshot.items;
+    if (Array.isArray(prefill)) {
+      try {
+        document = updateInventoryCountDocument({
+          document,
+          items: prefill,
+          note: body.note ?? requestedSnapshot.note,
+          now,
+        });
+      } catch (error) {
+        return Response.json({ ok: false, error: error instanceof Error ? error.message : "Некорректный факт" }, { status: 422 });
+      }
+    }
+    document = { ...document, summary: inventoryCountSummary(document) };
+    if (!document.items.length) {
+      return Response.json({ ok: false, code: "EMPTY_SCOPE", error: "В выбранном охвате нет активных складских позиций" }, { status: 422 });
+    }
+    if (document.items.length > 2_000) {
+      return Response.json({ ok: false, error: "За один раз можно пересчитать до 2000 позиций" }, { status: 413 });
+    }
+    snapshots.unshift(document);
+    await database.batch([
+      upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
+      auditStatement({
+        database,
+        accountId: account.id,
+        action: "create",
+        document,
+        actorName: name,
+        actorRole: account.role,
+        reason: `Создан snapshot инвентаризации; охват: ${document.scope.label}; склад не изменён`,
+        now,
+      }),
+    ]);
+    if (!legacyFinalize) {
+      return Response.json({
+        ok: true,
+        venueId: account.venueId,
+        inventory: presentDocument(document),
+        snapshots: presentSnapshots(snapshots),
+        stockChanged: false,
+      }, { status: 201 });
+    }
+    body = { ...body, action: "finalize", id: document.id };
+    action = "finalize";
+  }
+
+  const id = text(body.id ?? requestedSnapshot.id, "", 100);
+  const index = snapshots.findIndex((value) => text(record(value).id, "", 100) === id);
+  const existing = index >= 0 && isDocument(snapshots[index]) ? snapshots[index] : null;
+  if (!existing || (existing.venueId && existing.venueId !== account.venueId)) {
+    return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация текущего заведения не найдена" }, { status: 404 });
+  }
+  if (isCompleted(existing) && action === "finalize") {
+    return Response.json({
+      ok: true,
+      idempotent: true,
+      venueId: account.venueId,
+      inventory: presentDocument(existing),
+      snapshots: presentSnapshots(snapshots),
+      assortment: stores.assortment,
+      stockMovements: stores.movements,
+      stockChanged: false,
+    });
+  }
+  if (isCompleted(existing) || existing.status === "cancelled") {
+    return Response.json({ ok: false, code: "INVENTORY_READ_ONLY", error: "Завершённую или отменённую инвентаризацию нельзя изменять" }, { status: 409 });
+  }
+
+  if (["save", "review"].includes(action)) {
+    let document: InventoryCountDocument;
+    try {
+      document = updateInventoryCountDocument({
+        document: existing,
+        items: body.items ?? requestedSnapshot.items,
+        note: body.note ?? requestedSnapshot.note,
+        status: action === "review" ? "review" : "counting",
+        now,
+      });
+    } catch (error) {
+      return Response.json({ ok: false, error: error instanceof Error ? error.message : "Некорректный факт" }, { status: 422 });
+    }
+    document = { ...document, summary: inventoryCountSummary(document) };
+    snapshots[index] = document;
+    await database.batch([
+      upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
+      auditStatement({
+        database,
+        accountId: account.id,
+        action: "update",
+        document,
+        before: existing,
+        actorName: name,
+        actorRole: account.role,
+        reason: action === "review" ? "Инвентаризация переведена на проверку; склад не изменён" : "Черновик подсчёта сохранён; склад не изменён",
+        now,
+      }),
+    ]);
+    return Response.json({
+      ok: true,
+      venueId: account.venueId,
+      inventory: presentDocument(document),
+      snapshots: presentSnapshots(snapshots),
+      stockChanged: false,
+    });
+  }
+
+  if (action === "cancel") {
+    const document: InventoryCountDocument = { ...existing, status: "cancelled", cancelledAt: now, updatedAt: now };
+    snapshots[index] = document;
+    await database.batch([
+      upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
+      auditStatement({
+        database,
+        accountId: account.id,
+        action: "cancel",
+        document,
+        before: existing,
+        actorName: name,
+        actorRole: account.role,
+        reason: "Инвентаризация отменена без изменения складских остатков",
+        now,
+      }),
+    ]);
+    return Response.json({ ok: true, inventory: presentDocument(document), snapshots: presentSnapshots(snapshots), stockChanged: false });
+  }
+
+  if (action !== "finalize") {
+    return Response.json({ ok: false, error: "Неизвестное действие инвентаризации" }, { status: 400 });
+  }
+  const summary = inventoryCountSummary(existing);
+  if (summary.uncountedLines > 0) {
+    return Response.json({
+      ok: false,
+      code: "INVENTORY_INCOMPLETE",
+      error: `Не посчитано: ${summary.uncountedLines} поз. Пустые значения не являются нулём.`,
+      summary,
+    }, { status: 422 });
+  }
+  const monthKey = existing.date.slice(0, 7);
+  if (stores.closedMonths.has(monthKey)) {
     return Response.json({
       ok: false,
       code: "MONTH_LOCKED",
@@ -127,154 +411,95 @@ export async function POST(request: Request): Promise<Response> {
       error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.`,
     }, { status: 423 });
   }
-
-  const existingIndex = snapshots.findIndex((value) => text(record(value).id, "", 100) === id);
-  const existing = existingIndex >= 0 ? record(snapshots[existingIndex]) : null;
-  const existingMonthKey = existing ? text(existing.date, "", 10).slice(0, 7) : "";
-  if (existingMonthKey && closedMonths.has(existingMonthKey)) {
+  const conflicts = inventoryCountConflicts({ document: existing, assortment: stores.assortment });
+  if (conflicts.length) {
     return Response.json({
       ok: false,
-      code: "MONTH_LOCKED",
-      monthKey: existingMonthKey,
-      error: `Месяц ${existingMonthKey} закрыт. Сначала откройте его в мастере закрытия месяца.`,
-    }, { status: 423 });
-  }
-  if (existing && !Array.isArray(existing.items)) {
-    return Response.json({
-      ok: false,
-      code: "LEGACY_SNAPSHOT",
-      error: "Старая запись содержит только денежные итоги. Создайте новую предметную инвентаризацию.",
+      code: "INVENTORY_STOCK_CHANGED",
+      error: "После начала подсчёта склад изменился. Завершение заблокировано, чтобы не потерять покупки, продажи или списания.",
+      conflicts: conflicts.slice(0, 100),
     }, { status: 409 });
   }
 
-  if (existing) {
-    const existingUpdatedAt = text(existing.updatedAt ?? existing.createdAt, "", 40);
-    const affectedKeys = new Set(
-      (Array.isArray(existing.items) ? existing.items : [])
-        .map((value) => text(record(value).productKey, "", 300))
-        .filter(Boolean),
-    );
-    const laterMovement = movements.map(record).find((movement) =>
-      text(movement.sourceDocumentId, "", 100) !== id
-      && affectedKeys.has(text(movement.productKey, "", 300))
-      && (
-        Boolean(existingUpdatedAt && text(movement.createdAt, "", 40) > existingUpdatedAt)
-        || Boolean(!text(movement.createdAt, "", 40) && text(movement.date, "", 10) >= text(existing.date, "", 10))
-      )
-    );
-    if (laterMovement) {
-      return Response.json({
-        ok: false,
-        code: "INVENTORY_HAS_LATER_MOVEMENTS",
-        error: "После этой инвентаризации уже были движения товара. Создайте корректирующую инвентаризацию текущей датой.",
-      }, { status: 409 });
-    }
-
-    const root = record(assortment);
-    const balances = (Array.isArray(root.stockBalances) ? root.stockBalances : []).map(record);
-    const byKey = new Map(balances.map((balance) => [text(balance.productKey ?? balance.key, "", 300), balance]));
-    for (const movement of movements.map(record).filter((movement) =>
-      text(movement.type, "", 40) === "inventory_adjustment"
-      && text(movement.sourceDocumentId, "", 100) === id
-    )) {
-      const balance = byKey.get(text(movement.productKey, "", 300));
-      if (!balance) continue;
-      const restored = number(balance.current) - number(movement.amount);
-      const averageCost = Math.max(0, number(balance.averageUnitCost));
-      balance.current = Math.round(restored * 1000) / 1000;
-      balance.inventoryValue = Math.round(Math.max(0, restored) * averageCost * 100) / 100;
-      balance.updatedAt = now;
-    }
-    root.stockBalances = balances;
-    root.updatedAt = now;
-    assortment = root;
-    movements = movements.filter((value) => {
-      const movement = record(value);
-      return !(
-        text(movement.type, "", 40) === "inventory_adjustment"
-        && text(movement.sourceDocumentId, "", 100) === id
-      );
-    });
-  }
-
-  const source = ["manual", "scan", "import"].includes(text(requested.source, "manual", 20))
-    ? text(requested.source, "manual", 20)
-    : "manual";
-  const inventory = applyInventoryCount({
-    assortment,
-    snapshot: { id, date, items: requestedItems },
+  const result = applyInventoryCount({
+    assortment: stores.assortment,
+    snapshot: {
+      id: existing.id,
+      date: existing.date,
+      items: existing.items.map((item) => ({
+        id: item.id,
+        productKey: item.productKey,
+        productName: item.productName,
+        actual: item.actual,
+        section: item.sectionName,
+      })),
+    },
     now,
   });
-  if (inventory.summary.unresolvedLines.length) {
+  if (result.summary.unresolvedLines.length) {
     return Response.json({
       ok: false,
       code: "INVENTORY_REVIEW_REQUIRED",
-      error: "Проверьте позиции и фактические количества перед сохранением.",
-      unresolvedLines: inventory.summary.unresolvedLines,
+      error: "Проверьте позиции и единицы перед завершением.",
+      unresolvedLines: result.summary.unresolvedLines,
     }, { status: 422 });
   }
-
-  const snapshot = {
-    ...(existing ?? {}),
-    id,
-    internalId: id,
-    venueId: account.venueId,
-    date,
-    source,
-    sourceLabel: source === "scan"
-      ? "Сканирование инвентаризационной ведомости"
-      : source === "import"
-        ? "Импорт инвентаризационной ведомости"
-        : "Вручную",
-    status: "confirmed",
-    items: inventory.items,
-    sections: inventory.sections,
-    total: inventory.summary.actualValue,
-    expectedTotal: inventory.summary.expectedValue,
-    differenceTotal: inventory.summary.differenceValue,
-    note: text(requested.note, "", 1_000) || undefined,
-    createdAt: text(existing?.createdAt, now, 40),
+  for (const movement of result.movements) {
+    const line = existing.items.find((item) => item.productKey === movement.productKey);
+    if (line?.valuationKnown === false) {
+      delete movement.costAmount;
+      Object.assign(movement, {
+        valuationStatus: "unvalued",
+        valuationReason: line.valuationReason ?? "Нет cost basis для денежной оценки",
+      });
+    }
+  }
+  const completed: InventoryCountDocument & JsonRecord = {
+    ...existing,
+    status: "completed",
+    completedAt: now,
     updatedAt: now,
+    summary,
+    adjustmentMovementIds: result.movements.map((movement) => movement.id),
+    createdAdjustments: result.movements.map((movement) => ({
+      id: movement.id,
+      productKey: movement.productKey,
+      amount: movement.amount,
+      unit: movement.unit,
+      costAmount: movement.costAmount,
+      currency: movement.currency,
+    })),
+    total: result.summary.actualValue,
+    expectedTotal: result.summary.expectedValue,
+    differenceTotal: summary.calculatedDifferenceValue,
   };
-  if (existingIndex >= 0) snapshots[existingIndex] = snapshot;
-  else snapshots.unshift(snapshot);
-  const nextMovements = [...inventory.movements, ...movements].slice(0, 20_000);
-  const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")
-    || account.appEmail;
-  const action = existing ? "update" : "create";
+  snapshots[index] = completed;
+  const nextMovements = [...result.movements, ...stores.movements].slice(0, 20_000);
   await database.batch([
-    upsertStore(database, account.id, INVENTORY_SNAPSHOT_STORE_KEY, snapshots, now),
-    upsertStore(database, account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
+    upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
+    upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
-    database.prepare(`
-      INSERT INTO audit_log (
-        account_id, store_key, action, entity_id, entity_label, month_key,
-        before_json, after_json, changed_fields_json, actor_name, actor_role,
-        reason, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(
-      account.id,
-      INVENTORY_SNAPSHOT_STORE_KEY,
-      action,
-      id,
-      `Инвентаризация: ${date}`,
-      monthKey,
-      existing ? JSON.stringify(existing) : null,
-      JSON.stringify(snapshot),
-      JSON.stringify(["items", "sections", "total", "differenceTotal"]),
-      actorName,
-      account.role,
-      `Фактический остаток подтверждён; скорректировано позиций: ${inventory.summary.changedLines}`,
+    auditStatement({
+      database,
+      accountId: account.id,
+      action: "complete",
+      document: completed,
+      before: existing,
+      actorName: name,
+      actorRole: account.role,
+      reason: `Инвентаризация завершена; создано корректировок: ${result.movements.length}`,
       now,
-    ),
+    }),
   ]);
 
   return Response.json({
     ok: true,
-    snapshot,
-    snapshots,
-    assortment: inventory.assortment,
+    venueId: account.venueId,
+    inventory: presentDocument(completed),
+    snapshots: presentSnapshots(snapshots),
+    assortment: result.assortment,
     stockMovements: nextMovements,
-    summary: inventory.summary,
-  }, { status: existing ? 200 : 201 });
+    summary,
+    stockChanged: result.movements.length > 0,
+  });
 }
