@@ -2,6 +2,7 @@
   "use strict";
 
   window.__bdBootstrapPending = true;
+  window.__bdAuthBootstrapV274 = { state: "loading", reason: "auth_bootstrap_pending" };
 
   var currentFirstName = localStorage.getItem("bd_user_first_name") || "";
   var currentRole = localStorage.getItem("bd_active_role") || "";
@@ -675,6 +676,9 @@
 
   function rememberAccessContext(result) {
     if (!result || !result.ok) return;
+    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"
+      ? result.bootstrap
+      : { state: "recovery_required", reason: "bootstrap_contract_missing" };
     if (Object.prototype.hasOwnProperty.call(result, "role")) {
       currentRole = typeof result.role === "string" ? result.role : "";
     }
@@ -1359,7 +1363,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260";
+    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260-20260824-auth-bootstrap-state-v274";
     document.head.appendChild(script);
   }
 
@@ -1701,6 +1705,7 @@
       }
       await refreshServerInventoryCacheV235();
     } else if (result.needsLogin) {
+      window.__bdAuthBootstrapV274 = { state: "unauthenticated", reason: "login_required" };
       localStorage.removeItem("bd_session");
       localStorage.removeItem("bd_session_token");
       localStorage.removeItem("bd_session_userid");
@@ -1708,9 +1713,11 @@
       localStorage.removeItem("bd_active_permissions");
       localStorage.removeItem("bd_active_venue_id");
       localStorage.removeItem("bd_active_venue_is_primary");
+    } else {
+      window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed" };
     }
   } catch {
-    // The application still loads and will surface its normal connection state.
+    window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_request_failed" };
   }
 
   window.__bdBootstrapPending = false;

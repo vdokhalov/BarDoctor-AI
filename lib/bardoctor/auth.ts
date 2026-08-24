@@ -23,6 +23,9 @@ import {
   reconcileConfirmedOwnerVenues,
   reconcileVenueOwnerAccess,
 } from "./owner-access";
+import {
+  classifyAuthBootstrap,
+} from "./bootstrap-state";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
@@ -212,7 +215,7 @@ async function sessionForRequest(request: Request): Promise<{
 async function rememberActiveVenueForToken(
   token: string,
   accountId: number,
-  venueId: number,
+  venueId: number | null,
 ): Promise<void> {
   const tokenHash = await sha256Hex(token);
   await getDb()
@@ -492,7 +495,23 @@ export async function authResult(account: Account, token: string, request?: Requ
     true,
   );
   const activeRole = active?.role ?? null;
-  if (active) await rememberActiveVenueForToken(token, account.id, active.venue.id);
+  // Clear invalid persisted selections as part of bootstrap. Missing activeVenue
+  // means "no accessible venue", never "keep a stale archived/revoked venue".
+  await rememberActiveVenueForToken(token, account.id, active?.venue.id ?? null);
+  const ownedVenueStatuses = (await getDb()
+    .select({ status: venues.status })
+    .from(venues)
+    .where(eq(venues.createdByAccountId, account.id)))
+    .map((venue) => venue.status);
+  const bootstrap = classifyAuthBootstrap({
+    ownsVenue: account.ownsVenue,
+    activeVenue: active ? {
+      role: active.role,
+      isPrimary: active.venue.dataAccountId === account.id,
+      hasProfile: Boolean(active.dataAccount.restaurantJson),
+    } : null,
+    confirmedOwnedVenueStatuses: ownedVenueStatuses,
+  });
   return {
     ok: true as const,
     email: account.appEmail,
@@ -507,6 +526,15 @@ export async function authResult(account: Account, token: string, request?: Requ
     activeWorkspaceId: active?.venue.workspaceId ?? null,
     activeVenueIsPrimary: Boolean(active && active.venue.dataAccountId === account.id),
     canCreateVenues: activeRole === "owner",
+    bootstrap: {
+      ...bootstrap,
+      membershipsLoaded: true,
+      venuesLoaded: true,
+      activeVenueRestored: Boolean(active && active.venue.id !== requestedVenueId),
+      accessibleVenueCount: memberships.length,
+      confirmedOwnedVenueCount: ownedVenueStatuses.length,
+      inaccessibleOwnedVenueCount: ownedVenueStatuses.filter((status) => status !== "active").length,
+    },
     venues: memberships.map((item) => ({
       id: item.venue.id,
       workspaceId: item.venue.workspaceId,

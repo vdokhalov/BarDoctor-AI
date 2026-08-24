@@ -13,14 +13,14 @@ test("auth context distinguishes a placeholder venue from a configured venue", a
   assert.match(auth, /hasProfile: Boolean\(item\.dataAccount\.restaurantJson\)/);
 });
 
-test("setup is shown only for an authenticated venue without a saved profile", async () => {
+test("setup is shown only when the authoritative bootstrap requires onboarding", async () => {
   const bundle = await readFile(bundleUrl, "utf8");
   assert.match(bundle, /bdVenueSetupBoundaryVersionV251="venue-setup-boundary-v251"/);
   assert.match(bundle, /hasProfile:r\.hasProfile!==!1/);
   assert.match(bundle, /function bdVenueConfiguredV251\(\)\{return bdVenueAccessV249\(\)\?\.hasProfile===!0\}/);
-  assert.match(bundle, /function oEe\(\{component:e\}\)\{return Ot\(\)\?bdVenueConfiguredV251\(\)\?/);
-  assert.match(bundle, /bdVenueConfiguredV251\(\)\?i\.jsx\(bdVenueProfileRecoveryV249/);
-  assert.match(bundle, /Fse\(\)\|\|bdVenueConfiguredV251\(\)\?bdVenueHomeV249\(\):"\/setup"/);
+  assert.match(bundle, /bdAuthBootstrapV274/);
+  assert.match(bundle, /t\.state==="onboarding_required"\?i\.jsx\(e,\{\}\)/);
+  assert.doesNotMatch(bundle, /bdVenueConfiguredV251\(\)\?i\.jsx\(bdVenueProfileRecoveryV249/);
 });
 
 test("venue setup boundary release token is wired through every application shell", async () => {
@@ -30,6 +30,6 @@ test("venue setup boundary release token is wired through every application shel
     readFile(responseUrl, "utf8"),
   ]);
   for (const source of sources) {
-    assert.match(source, /20260823-venue-setup-boundary-v251/);
+    assert.match(source, /20260824-auth-bootstrap-state-v274/);
   }
 });

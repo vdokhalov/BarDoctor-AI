@@ -157,7 +157,31 @@ async function createRun(browser, profile, label, options = {}) {
     const method = request.method();
     const activeProfile = profileFor(state.activeVenueId);
     if (url.pathname === "/api/auth/bootstrap") {
-      return route.fulfill(jsonResponse({ ok: true, email: "mobile-qa@bardoctor.local", userId: "mobile-qa-user", token: "mobile-qa-token", firstName: "Mobile", lastName: "QA", role: "owner", permissions, activeVenueId: state.activeVenueId, activeWorkspaceId: "mobile-qa", activeVenueIsPrimary: state.activeVenueId === 901, canCreateVenues: true, venues }));
+      return route.fulfill(jsonResponse({
+        ok: true,
+        email: "mobile-qa@bardoctor.local",
+        userId: "mobile-qa-user",
+        token: "mobile-qa-token",
+        firstName: "Mobile",
+        lastName: "QA",
+        role: "owner",
+        permissions,
+        activeVenueId: state.activeVenueId,
+        activeWorkspaceId: "mobile-qa",
+        activeVenueIsPrimary: state.activeVenueId === 901,
+        canCreateVenues: true,
+        venues,
+        bootstrap: {
+          state: "ready",
+          reason: "active_venue_ready",
+          membershipsLoaded: true,
+          venuesLoaded: true,
+          activeVenueRestored: false,
+          accessibleVenueCount: venues.length,
+          confirmedOwnedVenueCount: 1,
+          inaccessibleOwnedVenueCount: 0,
+        },
+      }));
     }
     if (url.pathname === "/api/restaurants/me") return route.fulfill(jsonResponse({ ok: true, restaurant: activeProfile }));
     if (url.pathname === "/api/users/me") return route.fulfill(jsonResponse({ ok: true, user: { firstName: "Mobile", lastName: "QA", email: "mobile-qa@bardoctor.local", role: "owner", permissions } }));

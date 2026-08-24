@@ -18,15 +18,15 @@ test("successful login reloads the authenticated venue route without exposing se
   assert.match(helper, /bd_venue_profile_recovery_v249/);
 });
 
-test("setup is reserved for authenticated accounts without venues", async () => {
+test("legacy local venue cache is no longer the bootstrap source of truth", async () => {
   const bundle = await readFile(bundleUrl, "utf8");
   assert.match(bundle, /bdExistingVenueGateVersionV249="existing-venue-gate-v249"/);
   assert.match(bundle, /function bdVenueAccessV249/);
   assert.match(bundle, /bd_venue_context__/);
   assert.match(bundle, /function bdVenueConfiguredV251/);
-  assert.match(bundle, /function oEe\(\{component:e\}\)\{return Ot\(\)\?bdVenueConfiguredV251\(\)\?/);
-  assert.match(bundle, /bdVenueConfiguredV251\(\)\?i\.jsx\(bdVenueProfileRecoveryV249/);
-  assert.match(bundle, /Fse\(\)\|\|bdVenueConfiguredV251\(\)\?bdVenueHomeV249\(\):"\/setup"/);
+  assert.match(bundle, /bdAuthBootstrapStateVersionV274="auth-bootstrap-state-v274"/);
+  assert.match(bundle, /t\.state==="onboarding_required"\?i\.jsx\(e,\{\}\)/);
+  assert.doesNotMatch(bundle, /Fse\(\)\|\|bdVenueConfiguredV251\(\)\?bdVenueHomeV249\(\):"\/setup"/);
 });
 
 test("existing venue recovery is bounded and never offers to create a duplicate venue", async () => {
@@ -48,5 +48,5 @@ test("venue gate release cache token is wired through every application shell", 
     readFile(appHtmlUrl, "utf8"),
     readFile(responseUrl, "utf8"),
   ]);
-  for (const source of sources) assert.match(source, /20260823-existing-venue-gate-v249/);
+  for (const source of sources) assert.match(source, /20260824-auth-bootstrap-state-v274/);
 });
