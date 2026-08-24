@@ -13,6 +13,7 @@ const profiles = [
   { name: "iphone-13", descriptor: devices["iPhone 13"], userAgentPattern: /iPhone/ },
   { name: "pixel-7", descriptor: devices["Pixel 7"], userAgentPattern: /Android/ },
 ];
+const desktopProfile = { name: "desktop-chrome", descriptor: devices["Desktop Chrome"] };
 
 const permissions = [
   "inventory.view", "inventory.manage", "finance.view", "finance.manage",
@@ -78,10 +79,21 @@ function inventoryDocument() {
   };
 }
 
+function inventoryFixtures() {
+  const base = inventoryDocument();
+  return [
+    base,
+    { ...structuredClone(base), id: "inv-mobile-18", internalId: "INV-00018", number: 18, status: "draft", items: [], summary: { totalLines: 0, countedLines: 0, uncountedLines: 0, changedLines: 0 } },
+    { ...structuredClone(base), id: "inv-mobile-19", internalId: "INV-00019", number: 19, status: "review" },
+    { ...structuredClone(base), id: "inv-mobile-20", internalId: "INV-00020", number: 20, status: "completed", completedAt: "2026-08-24T09:00:00.000Z", adjustmentMovementIds: ["movement-20"] },
+    { ...structuredClone(base), id: "inv-mobile-legacy", internalId: "legacy-empty", number: undefined, status: "counting", items: [], summary: { totalLines: 0, countedLines: 0, uncountedLines: 0, changedLines: 0 }, date: "2025-01-02" },
+  ];
+}
+
 function storeData(venueId) {
   return {
     bd_assortment_v1: assortmentFor(venueId),
-    bd_inventory_snapshots: venueId === 901 ? [inventoryDocument()] : [],
+    bd_inventory_snapshots: venueId === 901 ? inventoryFixtures() : [],
     bd_stock_movements: [],
     bd_finance_settings: { inventoryFrequency: "monthly", customFrequencyDays: 30, inventorySections: ["Бар", "Кухня"], taxModel: { mode: "fixed", amount: 0 }, utilityModel: { mode: "fixed", amount: 0 }, updatedAt: "2026-08-24T08:00:00.000Z" },
   };
@@ -122,7 +134,7 @@ async function createRun(browser, profile, label, options = {}) {
   }, {
     permissions,
     venues,
-    snapshots: { 901: [inventoryDocument()], 902: [] },
+    snapshots: { 901: inventoryFixtures(), 902: [] },
     assortments: { 901: assortmentFor(901), 902: assortmentFor(902) },
   });
 
@@ -156,6 +168,20 @@ async function createRun(browser, profile, label, options = {}) {
     }
     if (url.pathname === "/api/inventory/products") return route.fulfill(jsonResponse({ ok: true, assortment: state.stores[state.activeVenueId].bd_assortment_v1, duplicateRepair: { changed: false } }));
     if (url.pathname === "/api/inventory/counts") {
+      if (method === "POST") {
+        const body = request.postDataJSON();
+        if (body.action === "delete") {
+          const snapshots = state.stores[state.activeVenueId].bd_inventory_snapshots;
+          const index = snapshots.findIndex((item) => item.id === body.id);
+          if (index < 0) return route.fulfill(jsonResponse({ ok: true, deleted: false, idempotent: true, venueId: state.activeVenueId, snapshots, stockChanged: false }));
+          const current = snapshots[index];
+          if (!["draft", "counting", "review"].includes(String(current.status || "")) || (current.adjustmentMovementIds || []).length) {
+            return route.fulfill(jsonResponse({ ok: false, code: "INVENTORY_DELETE_PROTECTED", error: "Инвентаризация уже завершена или повлияла на склад" }, 409));
+          }
+          snapshots.splice(index, 1);
+          return route.fulfill(jsonResponse({ ok: true, deleted: true, deletedInventoryId: body.id, venueId: state.activeVenueId, snapshots, stockChanged: false }));
+        }
+      }
       const document = state.stores[state.activeVenueId].bd_inventory_snapshots.find((item) => item.id === url.searchParams.get("id"));
       if (url.searchParams.get("format") === "print") {
         const returnUrl = `/warehouse?venue=${state.activeVenueId}&tab=counts&inventory=${encodeURIComponent(document?.id || "")}`;
@@ -301,6 +327,61 @@ async function inventoryFlow(browser, profile) {
   assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: inventory leaked across venue switch`);
   assert.equal(await page.locator(".bd-inventory-layer-v246").count(), 0);
   assert.doesNotMatch(await page.locator("body").textContent(), /Инвентаризация № 17/);
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true };
+}
+
+async function inventoryDeleteFlow(browser, profile) {
+  const run = await createRun(browser, profile, "inventory-delete");
+  const { page, state } = run;
+  await goto(page, "/warehouse?venue=901&tab=counts");
+  if (process.env.BD_QA_DEBUG) process.stderr.write(`[mobile-qa] inventory-delete DOM ${JSON.stringify({ cards: await page.locator(".bd-inventory-history-card-v270").count(), summaries: await page.locator(".bd-inventory-history-menu-v270 summary").count(), body: (await page.locator("body").innerText()).slice(0, 1400), issues: run.issues })}\n`);
+  const draftCard = page.locator(".bd-inventory-history-card-v270").filter({ hasText: "Инвентаризация № 18" });
+  await draftCard.locator("summary").click();
+  const menuBox = await draftCard.locator("summary").boundingBox();
+  assert.ok(menuBox.width >= 44 && menuBox.height >= 44, `${profile.name}: inventory action target is smaller than 44px`);
+  await draftCard.getByRole("button", { name: "Удалить инвентаризацию" }).click();
+  const dialog = page.locator(".bd-inventory-delete-dialog-v270");
+  await dialog.waitFor();
+  assert.match(await dialog.textContent(), /Остатки склада не изменятся/);
+  assert.equal(await page.evaluate(() => document.body.classList.contains("bd-inventory-delete-open-v270")), true);
+  const dialogBox = await dialog.boundingBox();
+  assert.ok(dialogBox.x >= 0 && dialogBox.y >= 0 && dialogBox.x + dialogBox.width <= (profile.descriptor.viewport?.width || 1280) + 1, `${profile.name}: delete dialog is clipped`);
+  await dialog.getByRole("button", { name: "Отмена" }).click();
+  await dialog.waitFor({ state: "detached" });
+  assert.equal(await page.evaluate(() => document.body.classList.contains("bd-inventory-delete-open-v270")), false);
+
+  await draftCard.locator("summary").click();
+  await draftCard.getByRole("button", { name: "Удалить инвентаризацию" }).click();
+  await dialog.getByRole("button", { name: "Удалить", exact: true }).click();
+  await draftCard.waitFor({ state: "detached" });
+  assert.equal(state.stores[901].bd_stock_movements.length, 0, `${profile.name}: draft delete changed movements`);
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
+  await page.reload({ waitUntil: "networkidle" });
+  assert.equal(await page.getByText("Инвентаризация № 18", { exact: true }).count(), 0, `${profile.name}: deleted inventory returned after refresh`);
+
+  const completedCard = page.locator(".bd-inventory-history-card-v270").filter({ hasText: "Инвентаризация № 20" });
+  assert.equal(await completedCard.locator("summary").count(), 0, `${profile.name}: completed inventory exposes destructive delete`);
+  assert.equal(await page.getByText("Инвентаризация № —", { exact: true }).count(), 0, `${profile.name}: legacy dash label remains visible`);
+  const legacyCard = page.locator(".bd-inventory-history-card-v270").filter({ hasText: "Инвентаризация от" });
+  await legacyCard.locator("summary").click();
+  await legacyCard.getByRole("button", { name: "Удалить инвентаризацию" }).click();
+  await dialog.getByRole("button", { name: "Удалить", exact: true }).click();
+  await legacyCard.waitFor({ state: "detached" });
+
+  await page.getByRole("button", { name: /Инвентаризация № 19/ }).click();
+  await page.waitForSelector(".bd-inventory-layer-v246");
+  await page.getByRole("button", { name: "Удалить инвентаризацию", exact: true }).click();
+  await dialog.getByRole("button", { name: "Удалить", exact: true }).click();
+  await page.waitForSelector(".bd-inventory-layer-v246", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: fullscreen delete left a stale deep link`);
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: fullscreen delete leaked scroll lock`);
+
+  await goto(page, "/warehouse?venue=901&tab=counts&inventory=inv-mobile-19");
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator(".bd-inventory-layer-v246").count(), 0, `${profile.name}: deleted deep link reopened inventory`);
+  assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: deleted deep link did not fall back to list`);
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true };
 }
@@ -513,6 +594,7 @@ async function runProfile(browser, profile) {
   const results = [];
   for (const [name, flow] of [
     ["inventory-fullscreen", inventoryFlow],
+    ["inventory-delete", inventoryDeleteFlow],
     ["warehouse-nomenclature", nomenclatureFlow],
     ["shifts", shiftsFlow],
     ["suppliers-purchases", procurementFlow],
@@ -542,6 +624,12 @@ async function runProfile(browser, profile) {
       if (process.env.BD_QA_PROFILE && process.env.BD_QA_PROFILE !== profile.name) continue;
       results.push(...await runProfile(browser, profile));
     }
+    if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);
+        results.push(await inventoryDeleteFlow(browser, desktopProfile));
+      }
+    }
   } catch (error) {
     failures.push(error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) });
     process.stderr.write(`[mobile-qa] failure: ${failures[failures.length - 1].message}\n`);
@@ -553,7 +641,7 @@ async function runProfile(browser, profile) {
     generatedAt: new Date().toISOString(),
     baseUrl,
     browserPath,
-    profiles: profiles.map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgent: profile.descriptor.userAgent })),
+    profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgent: profile.descriptor.userAgent })),
     results,
     failures,
     passed: failures.length === 0,

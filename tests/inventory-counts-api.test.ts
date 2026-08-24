@@ -17,6 +17,11 @@ test("inventory lifecycle API is venue-scoped, permission-checked and draft-safe
   assert.match(route, /INVENTORY_INCOMPLETE/);
   assert.match(route, /INVENTORY_STOCK_CHANGED/);
   assert.match(route, /INVENTORY_READ_ONLY/);
+  assert.match(route, /action === "delete"/);
+  assert.match(route, /deleteInventoryCountDocument/);
+  assert.match(route, /inventory\.deleted/);
+  assert.match(route, /deletionAuditStatement/);
+  assert.match(route, /nextInventoryCountNumber/);
   assert.match(route, /idempotent: true/);
   assert.match(route, /stockChanged: false/);
   assert.match(route, /applyInventoryCount/);
@@ -24,6 +29,24 @@ test("inventory lifecycle API is venue-scoped, permission-checked and draft-safe
     route.indexOf('action !== "finalize"') < route.indexOf("const result = applyInventoryCount"),
     "the existing adjustment engine must run only in finalization",
   );
+  assert.ok(
+    route.indexOf('action === "delete"') < route.indexOf("const result = applyInventoryCount"),
+    "draft deletion must be handled without entering the stock reconciliation engine",
+  );
+});
+
+test("inventory deletion persists only the snapshot store and records an audit event", async () => {
+  const [route, engine] = await Promise.all([
+    read("app/api/inventory/counts/route.ts"),
+    read("lib/bardoctor/inventory-counts.ts"),
+  ]);
+  const branch = route.slice(route.indexOf('if (action === "delete")'), route.indexOf('if (!existing ||', route.indexOf('if (action === "delete")')));
+  assert.match(branch, /conditionalInventoryUpdateStatement/);
+  assert.match(branch, /deletionAuditStatement/);
+  assert.doesNotMatch(branch, /ASSORTMENT_STORE_KEY|STOCK_MOVEMENT_STORE_KEY|applyInventoryCount/);
+  assert.match(branch, /stockChanged: false/);
+  assert.match(branch, /INVENTORY_CONCURRENT_MODIFICATION/);
+  assert.match(engine, /INVENTORY_DELETE_PROTECTED/);
 });
 
 test("scope options and creation share one canonical venue validation contract", async () => {

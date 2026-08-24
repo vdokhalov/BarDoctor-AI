@@ -108,6 +108,71 @@ function numeric(value: unknown, fallback = Number.NaN): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+export function nextInventoryCountNumber(snapshots: unknown[], venueId: number): number {
+  const highest = snapshots.reduce<number>((maximum, value) => {
+    const item = record(value);
+    const itemVenueId = numeric(item.venueId, venueId);
+    const number = numeric(item.number, 0);
+    if (itemVenueId !== venueId || !Number.isInteger(number) || number < 1) return maximum;
+    return Math.max(maximum, number);
+  }, 0);
+  return highest + 1;
+}
+
+export function inventoryCountHasStockEffects(document: unknown, stockMovements: unknown[]): boolean {
+  const item = record(document);
+  if (array(item.adjustmentMovementIds).length > 0 || array(item.createdAdjustments).length > 0) return true;
+  const inventoryId = text(item.id, "", 100);
+  return Boolean(inventoryId) && stockMovements.some((movement) =>
+    text(record(movement).sourceDocumentId, "", 100) === inventoryId
+  );
+}
+
+export type InventoryCountDeleteResult =
+  | { ok: true; deleted: boolean; idempotent: boolean; snapshots: unknown[]; document?: InventoryCountDocument }
+  | { ok: false; code: "INVENTORY_NOT_FOUND" | "INVENTORY_DELETE_PROTECTED"; error: string; snapshots: unknown[] };
+
+export function deleteInventoryCountDocument(input: {
+  snapshots: unknown[];
+  inventoryId: string;
+  venueId: number;
+  stockMovements?: unknown[];
+}): InventoryCountDeleteResult {
+  const index = input.snapshots.findIndex((value) => text(record(value).id, "", 100) === input.inventoryId);
+  if (index < 0) {
+    return { ok: true, deleted: false, idempotent: true, snapshots: [...input.snapshots] };
+  }
+  const raw = record(input.snapshots[index]);
+  const documentVenueId = numeric(raw.venueId, input.venueId);
+  if (documentVenueId !== input.venueId) {
+    return {
+      ok: false,
+      code: "INVENTORY_NOT_FOUND",
+      error: "Инвентаризация текущего заведения не найдена",
+      snapshots: [...input.snapshots],
+    };
+  }
+  const status = text(raw.status, "", 30);
+  const safeStatus = !status || ["draft", "counting", "review"].includes(status);
+  if (!safeStatus || inventoryCountHasStockEffects(raw, input.stockMovements ?? [])) {
+    return {
+      ok: false,
+      code: "INVENTORY_DELETE_PROTECTED",
+      error: "Инвентаризация уже завершена, отменена или повлияла на склад. Удаление запрещено.",
+      snapshots: [...input.snapshots],
+    };
+  }
+  const snapshots = [...input.snapshots];
+  const [deleted] = snapshots.splice(index, 1);
+  return {
+    ok: true,
+    deleted: true,
+    idempotent: false,
+    snapshots,
+    document: deleted as InventoryCountDocument,
+  };
+}
+
 function rounded(value: number, digits = 3): number {
   const factor = 10 ** digits;
   return Math.round((value + Number.EPSILON) * factor) / factor;

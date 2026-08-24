@@ -5,6 +5,7 @@ import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import {
   createInventoryCountDocument,
+  deleteInventoryCountDocument,
   INVENTORY_COUNT_STORE_KEY,
   type InventoryCountDocument,
   type InventoryCountScope,
@@ -13,6 +14,7 @@ import {
   inventoryCountLineDifference,
   inventoryCountScopes,
   inventoryCountSummary,
+  nextInventoryCountNumber,
   renderInventoryCountPrintSheet,
   resolveInventoryCountScope,
   updateInventoryCountDocument,
@@ -117,6 +119,73 @@ function auditStatement(input: {
   );
 }
 
+function inventoryLabel(document: InventoryCountDocument): string {
+  const number = Number(document.number);
+  if (Number.isInteger(number) && number > 0) return `Инвентаризация № ${number}`;
+  return `Инвентаризация ${document.date || document.id.slice(-8)}`;
+}
+
+function deletionAuditStatement(input: {
+  database: D1Database;
+  accountId: number;
+  venueId: number;
+  document: InventoryCountDocument;
+  actorName: string;
+  actorRole: string;
+  expectedInventoryJson: string;
+  now: string;
+}): D1PreparedStatement {
+  return input.database.prepare(`
+    INSERT INTO audit_log (
+      account_id, store_key, action, entity_id, entity_label, month_key,
+      before_json, after_json, changed_fields_json, actor_name, actor_role,
+      reason, created_at
+    )
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+    WHERE EXISTS (
+      SELECT 1 FROM domain_data
+      WHERE account_id = ? AND store_key = ? AND data_json = ?
+    )
+  `).bind(
+    input.accountId,
+    INVENTORY_COUNT_STORE_KEY,
+    "inventory.deleted",
+    input.document.id,
+    inventoryLabel(input.document),
+    input.document.date?.slice(0, 7) || null,
+    JSON.stringify(input.document),
+    null,
+    JSON.stringify(["inventory", "countItems"]),
+    input.actorName,
+    input.actorRole,
+    `Удалена незавершённая инвентаризация; venue=${input.venueId}; status=${String(input.document.status || "legacy")}; склад не изменён`,
+    input.now,
+    input.accountId,
+    INVENTORY_COUNT_STORE_KEY,
+    input.expectedInventoryJson,
+  );
+}
+
+function conditionalInventoryUpdateStatement(input: {
+  database: D1Database;
+  accountId: number;
+  snapshots: unknown[];
+  expectedInventoryJson: string;
+  now: string;
+}): D1PreparedStatement {
+  return input.database.prepare(`
+    UPDATE domain_data
+    SET data_json = ?, updated_at = ?
+    WHERE account_id = ? AND store_key = ? AND data_json = ?
+  `).bind(
+    JSON.stringify(input.snapshots),
+    input.now,
+    input.accountId,
+    INVENTORY_COUNT_STORE_KEY,
+    input.expectedInventoryJson,
+  );
+}
+
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json
@@ -132,6 +201,7 @@ async function readStores(database: D1Database, accountId: number) {
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   return {
     snapshots: array(stores.get(INVENTORY_COUNT_STORE_KEY)),
+    inventoryJson: stores.get(INVENTORY_COUNT_STORE_KEY),
     assortment: json(stores.get(ASSORTMENT_STORE_KEY), {}),
     assortmentExists: stores.has(ASSORTMENT_STORE_KEY),
     movements: array(stores.get(STOCK_MOVEMENT_STORE_KEY)),
@@ -277,7 +347,7 @@ export async function POST(request: Request): Promise<Response> {
     let document = createInventoryCountDocument({
       assortment: stores.assortment,
       venueId: account.venueId,
-      sequenceNumber: snapshots.filter(isDocument).reduce((max, value) => Math.max(max, Number(value.number) || 0), 0) + 1,
+      sequenceNumber: nextInventoryCountNumber(snapshots, account.venueId),
       scope: allowedScope as InventoryCountScope,
       accountingCurrency,
       creator: { accountId: account.actorAccountId, name, role: account.role },
@@ -338,6 +408,67 @@ export async function POST(request: Request): Promise<Response> {
   const id = text(body.id ?? requestedSnapshot.id, "", 100);
   const index = snapshots.findIndex((value) => text(record(value).id, "", 100) === id);
   const existing = index >= 0 && isDocument(snapshots[index]) ? snapshots[index] : null;
+  if (action === "delete") {
+    const deletion = deleteInventoryCountDocument({
+      snapshots,
+      inventoryId: id,
+      venueId: account.venueId,
+      stockMovements: stores.movements,
+    });
+    if (!deletion.ok) {
+      return Response.json({ ok: false, code: deletion.code, error: deletion.error }, {
+        status: deletion.code === "INVENTORY_NOT_FOUND" ? 404 : 409,
+      });
+    }
+    if (!deletion.deleted || !deletion.document) {
+      return Response.json({
+        ok: true,
+        deleted: false,
+        idempotent: true,
+        venueId: account.venueId,
+        snapshots: presentSnapshots(deletion.snapshots),
+        stockChanged: false,
+      });
+    }
+    const expectedInventoryJson = stores.inventoryJson;
+    if (!expectedInventoryJson) {
+      return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация текущего заведения не найдена" }, { status: 404 });
+    }
+    const deletionBatch = await database.batch([
+      deletionAuditStatement({
+        database,
+        accountId: account.id,
+        venueId: account.venueId,
+        document: deletion.document,
+        actorName: name,
+        actorRole: account.role,
+        expectedInventoryJson,
+        now,
+      }),
+      conditionalInventoryUpdateStatement({
+        database,
+        accountId: account.id,
+        snapshots: deletion.snapshots,
+        expectedInventoryJson,
+        now,
+      }),
+    ]);
+    if (Number(deletionBatch[1]?.meta?.changes ?? 0) !== 1) {
+      return Response.json({
+        ok: false,
+        code: "INVENTORY_CONCURRENT_MODIFICATION",
+        error: "Инвентаризация изменилась в другой вкладке. Список обновлён — проверьте её актуальный статус.",
+      }, { status: 409 });
+    }
+    return Response.json({
+      ok: true,
+      deleted: true,
+      deletedInventoryId: deletion.document.id,
+      venueId: account.venueId,
+      snapshots: presentSnapshots(deletion.snapshots),
+      stockChanged: false,
+    });
+  }
   if (!existing || (existing.venueId && existing.venueId !== account.venueId)) {
     return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация текущего заведения не найдена" }, { status: 404 });
   }

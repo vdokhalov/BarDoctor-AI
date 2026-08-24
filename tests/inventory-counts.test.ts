@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createInventoryCountDocument,
+  deleteInventoryCountDocument,
   inventoryCountConflicts,
   inventoryCountDocumentScope,
   inventoryCountLineDifference,
   inventoryCountScopes,
   inventoryCountSummary,
+  nextInventoryCountNumber,
   renderInventoryCountPrintSheet,
   resolveInventoryCountScope,
   updateInventoryCountDocument,
@@ -82,6 +84,53 @@ const assortment = {
 };
 
 const creator = { accountId: 7, name: "Тестовый управляющий", role: "manager" };
+
+test("draft/count/review deletion is idempotent, venue-scoped and stock-safe", () => {
+  const draft = { id: "draft-a", venueId: 101, number: 3, date: "2026-08-24", status: "draft", items: [] };
+  const review = { id: "review-a", venueId: 101, number: 4, date: "2026-08-24", status: "review", items: [{ productKey: "milk", actual: 0 }] };
+  const foreign = { id: "draft-b", venueId: 202, number: 3, date: "2026-08-24", status: "counting", items: [] };
+  const movements = [{ id: "sale-1", sourceDocumentId: "purchase-1", amount: -1 }];
+  const first = deleteInventoryCountDocument({ snapshots: [draft, review, foreign], inventoryId: "draft-a", venueId: 101, stockMovements: movements });
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  assert.equal(first.deleted, true);
+  assert.deepEqual(first.snapshots.map((item) => (item as { id: string }).id), ["review-a", "draft-b"]);
+  assert.deepEqual(movements, [{ id: "sale-1", sourceDocumentId: "purchase-1", amount: -1 }], "draft delete must not mutate stock movements");
+  const retry = deleteInventoryCountDocument({ snapshots: first.snapshots, inventoryId: "draft-a", venueId: 101, stockMovements: movements });
+  assert.deepEqual(retry, { ok: true, deleted: false, idempotent: true, snapshots: first.snapshots });
+  const wrongVenue = deleteInventoryCountDocument({ snapshots: [foreign], inventoryId: "draft-b", venueId: 101, stockMovements: [] });
+  assert.equal(wrongVenue.ok, false);
+  if (!wrongVenue.ok) assert.equal(wrongVenue.code, "INVENTORY_NOT_FOUND");
+});
+
+test("completed or stock-affecting inventories cannot be deleted after a concurrent state change", () => {
+  for (const document of [
+    { id: "complete", venueId: 101, number: 5, status: "completed", date: "2026-08-24", items: [] },
+    { id: "adjusted", venueId: 101, number: 6, status: "review", date: "2026-08-24", items: [], adjustmentMovementIds: ["move-6"] },
+    { id: "movement-linked", venueId: 101, number: 7, status: "counting", date: "2026-08-24", items: [] },
+  ]) {
+    const result = deleteInventoryCountDocument({
+      snapshots: [document],
+      inventoryId: document.id,
+      venueId: 101,
+      stockMovements: document.id === "movement-linked" ? [{ id: "move-7", sourceDocumentId: "movement-linked" }] : [],
+    });
+    assert.equal(result.ok, false, `${document.id} must be protected`);
+    if (!result.ok) assert.equal(result.code, "INVENTORY_DELETE_PROTECTED");
+  }
+});
+
+test("legacy zero-of-zero draft can be removed and numbering never reuses the missing dash state", () => {
+  const legacy = { id: "legacy-empty", venueId: 101, date: "2025-01-02", status: "counting", items: [] };
+  const result = deleteInventoryCountDocument({ snapshots: [legacy], inventoryId: "legacy-empty", venueId: 101 });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.deepEqual(result.snapshots, []);
+  assert.equal(nextInventoryCountNumber([
+    legacy,
+    { id: "valid", venueId: 101, number: 9 },
+    { id: "foreign", venueId: 202, number: 40 },
+  ], 101), 10);
+});
 
 test("inventory creation snapshots only the selected venue scope and stays blind", () => {
   const before = structuredClone(assortment);
