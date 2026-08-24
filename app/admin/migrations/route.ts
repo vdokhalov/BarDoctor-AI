@@ -38,6 +38,14 @@ function page(): string {
       <h2>Классификация заведений</h2>
       <div id="phase-a-venues" class="venues"></div>
     </section>
+    <section class="archive-panel" aria-labelledby="archive-title">
+      <p class="kicker">CONFIRMED ARCHIVE · REVERSIBLE</p>
+      <h2 id="archive-title">Оставить только три рабочих заведения</h2>
+      <p class="lead">Будут архивированы 11 подтверждённых заведений. Кёльн #1, EazywaY #2088 и Плакучая Ива #3280 останутся активными. Данные и резервные копии не удаляются.</p>
+      <button id="archive-confirmed" class="danger" type="button">Архивировать 11 подтверждённых заведений</button>
+      <div id="archive-status" role="status" aria-live="polite"></div>
+      <div id="archive-result" class="venues" hidden></div>
+    </section>
   </main>
 </body>
 </html>`;

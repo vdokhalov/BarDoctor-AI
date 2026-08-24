@@ -5,7 +5,10 @@
   var result = document.getElementById("phase-a-result");
   var kpis = document.getElementById("phase-a-kpis");
   var venues = document.getElementById("phase-a-venues");
-  if (!button || !status || !result || !kpis || !venues) return;
+  var archiveButton = document.getElementById("archive-confirmed");
+  var archiveStatus = document.getElementById("archive-status");
+  var archiveResult = document.getElementById("archive-result");
+  if (!button || !status || !result || !kpis || !venues || !archiveButton || !archiveStatus || !archiveResult) return;
 
   function text(value) {
     return String(value == null ? "" : value);
@@ -70,6 +73,52 @@
       status.textContent = error && error.message ? error.message : "Phase A завершилась с ошибкой";
     } finally {
       button.disabled = false;
+    }
+  });
+
+  archiveButton.addEventListener("click", async function () {
+    archiveButton.disabled = true;
+    archiveStatus.className = "running";
+    archiveStatus.textContent = "Архивирую только подтверждённый список и проверяю результат…";
+    try {
+      var venueIds = [2, 3, 1080, 3162, 3281, 3282, 3283, 3284, 3285, 3286, 3287];
+      var response = await fetch("/api/admin/venues/archive-confirmed", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Intent": "archive-confirmed-venues"
+        },
+        body: JSON.stringify({
+          venueIds: venueIds,
+          confirmation: "ARCHIVE 11 CONFIRMED VENUES; KEEP 1,2088,3280 ACTIVE"
+        })
+      });
+      var payload = await response.json().catch(function () { return {}; });
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Архивация завершилась с ошибкой");
+      archiveResult.textContent = "";
+      var archived = document.createElement("article");
+      var archivedTitle = document.createElement("strong");
+      var archivedDetail = document.createElement("small");
+      archivedTitle.textContent = "Архивировано: " + text(payload.archived && payload.archived.length);
+      archivedDetail.textContent = (payload.archived || []).map(function (venue) { return text(venue.name) + " #" + text(venue.id); }).join(" · ");
+      archived.append(archivedTitle, archivedDetail);
+      var kept = document.createElement("article");
+      var keptTitle = document.createElement("strong");
+      var keptDetail = document.createElement("small");
+      keptTitle.textContent = "Остались активными: " + text(payload.keptActive && payload.keptActive.length);
+      keptDetail.textContent = (payload.keptActive || []).map(function (venue) { return text(venue.name) + " #" + text(venue.id); }).join(" · ");
+      kept.append(keptTitle, keptDetail);
+      archiveResult.append(archived, kept);
+      archiveResult.hidden = false;
+      archiveStatus.className = "success";
+      archiveStatus.textContent = "Архивация подтверждена сервером. Данные не удалены.";
+    } catch (error) {
+      archiveStatus.className = "error";
+      archiveStatus.textContent = error && error.message ? error.message : "Архивация завершилась с ошибкой";
+    } finally {
+      archiveButton.disabled = false;
     }
   });
 })();
