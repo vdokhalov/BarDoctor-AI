@@ -72,6 +72,7 @@ export function auditDataIntegrity(input: {
   purchaseDocuments?: unknown[];
   stockMovements?: unknown[];
   inventorySnapshots?: unknown[];
+  writeOffDocuments?: unknown[];
   venueId?: number;
   now?: Date;
 }): DataIntegrityAuditReport {
@@ -82,6 +83,7 @@ export function auditDataIntegrity(input: {
   const purchases = (input.purchaseDocuments ?? []).map(record);
   const movements = (input.stockMovements ?? []).map(record);
   const snapshots = (input.inventorySnapshots ?? array(assortment.inventorySnapshots)).map(record);
+  const writeOffs = (input.writeOffDocuments ?? []).map(record).filter((item) => sameVenue(item, input.venueId));
   const canonicalAudit = auditCanonicalNomenclature({ assortment, purchaseDocuments: purchases, venueId: input.venueId });
   const techResult = reconcileTechCards({ assortment, purchaseDocuments: purchases, venueId: input.venueId, now: input.now ?? new Date(0) });
   const tech = techResult.report;
@@ -90,6 +92,24 @@ export function auditDataIntegrity(input: {
   const balanceKeys = new Set(balances.filter((item) => sameVenue(item, input.venueId)).map(keyOf).filter(Boolean));
   const purchaseIds = new Set(purchases.filter((item) => sameVenue(item, input.venueId)).map((item) => text(item.id, "", 100)).filter(Boolean));
   const activeReceipts = movements.filter((movement) => sameVenue(movement, input.venueId) && activeMovement(movement) && text(movement.type) === "receipt");
+  const activeWriteOffMovements = movements.filter((movement) => sameVenue(movement, input.venueId) && activeMovement(movement) && text(movement.type) === "writeoff");
+  const writeOffIds = new Set(writeOffs.map((item) => text(item.id, "", 100)).filter(Boolean));
+  const postedWriteOffs = writeOffs.filter((item) => ["posted", "confirmed"].includes(text(item.status, "", 30)));
+  const writeOffItems: JsonRecord[] = writeOffs.flatMap((document) => array(document.items).map((value): JsonRecord => ({ ...record(value), documentId: text(document.id, "writeoff", 100) })));
+  const writeOffWithoutCanonical = writeOffItems.filter((item) => {
+    const key = keyOf(item);
+    return !key || !balanceKeys.has(resolveInventoryProductKey(assortment, key));
+  }).map((item) => `${text(item.documentId)}:${text(item.id, keyOf(item) || "line", 100)}`);
+  const writeOffMissingCost = writeOffItems.filter((item) => item.totalCost == null || text(item.costStatus, "", 30) === "unvalued")
+    .map((item) => `${text(item.documentId)}:${text(item.id, keyOf(item) || "line", 100)}`);
+  const writeOffInvalidUnit = writeOffItems.filter((item) => {
+    const base = toInventoryBaseAmount(item.baseQuantity ?? item.quantity, item.baseUnit ?? item.unit);
+    return !(numeric(item.baseQuantity ?? base.amount) > 0) || (text(item.baseUnit, "", 20) && !["ml", "g", "pcs"].includes(text(item.baseUnit, "", 20)));
+  }).map((item) => `${text(item.documentId)}:${text(item.id, keyOf(item) || "line", 100)}`);
+  const writeOffWithoutMovement = postedWriteOffs.filter((document) => !activeWriteOffMovements.some((movement) => text(movement.sourceDocumentId, "", 100) === text(document.id, "", 100)))
+    .map((document) => text(document.id, "writeoff", 100));
+  const orphanWriteOffMovements = activeWriteOffMovements.filter((movement) => !writeOffIds.has(text(movement.sourceDocumentId, "", 100)))
+    .map((movement) => text(movement.id, "movement", 100));
 
   const missingCost = balances.filter((balance) => sameVenue(balance, input.venueId)
     && numeric(balance.current) > 0
@@ -152,6 +172,10 @@ export function auditDataIntegrity(input: {
     finding("PURCHASE_MOVEMENT_CHAIN_BROKEN", "high", [...purchaseWithoutMovement, ...orphanMovements], "Purchase, movement, and balance stores are persisted independently and can diverge after partial or legacy writes."),
     finding("PURCHASE_REPOST_OR_CANCEL_CONFLICT", "high", [...duplicateReceipts, ...cancelledWithActiveReceipts], "Receipt posting identity and reversal invariants were not uniquely persisted."),
     finding("INVENTORY_SNAPSHOT_ORPHAN", "medium", snapshotOrphans, "Snapshots preserve historical keys while readers do not uniformly resolve canonical aliases."),
+    finding("WRITE_OFF_ITEM_WITHOUT_NOMENCLATURE", "high", writeOffWithoutCanonical, "A structured write-off line must resolve to the venue's canonical stock balance."),
+    finding("WRITE_OFF_COST_BASIS_MISSING", "medium", writeOffMissingCost, "Quantity was posted honestly, but the warehouse cost basis is missing or requires review."),
+    finding("WRITE_OFF_UNIT_OR_CONVERSION_INVALID", "high", writeOffInvalidUnit, "A write-off line has no valid base quantity or canonical unit conversion."),
+    finding("WRITE_OFF_MOVEMENT_CHAIN_BROKEN", "high", [...writeOffWithoutMovement, ...orphanWriteOffMovements], "Posted write-off documents and stock movements must reference each other without orphan states."),
     finding("CROSS_VENUE_RECORD_OR_REFERENCE", "high", [...crossVenueRecords, ...crossVenueReferences], "Legacy null/shared venue data and filtered lookups weakened explicit venue boundaries."),
     finding("STALE_OR_SUPERSEDED_ALIAS", "medium", staleAliases, "Canonical supersession aliases are additive but not uniformly validated by historical readers."),
   ].filter((value): value is DataIntegrityFinding => Boolean(value));
@@ -168,6 +192,8 @@ export function auditDataIntegrity(input: {
       stockPositions: balances.filter((item) => sameVenue(item, input.venueId)).length,
       purchases: confirmedPurchases.length, activeReceiptMovements: activeReceipts.length,
       inventorySnapshots: snapshots.filter((item) => sameVenue(item, input.venueId)).length,
+      writeOffDocuments: writeOffs.length,
+      writeOffItems: writeOffItems.length,
       dataQualityIssues: affectedRecords,
     },
     findings,

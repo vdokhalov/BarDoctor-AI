@@ -596,6 +596,7 @@ function summarisePurchasesAndInventory(sources: VenueAIContextSources, now: Dat
   const expenseStore = store(sources, "bd_finance_expenses");
   const stockMovementStore = store(sources, "bd_stock_movements");
   const supplierAlternativeStore = store(sources, "bd_supplier_alternatives_v1");
+  const writeOffStore = store(sources, "bd_inventory_writeoffs");
   const documents = array(purchaseStore?.data).map(record);
   const confirmed = documents.filter((item) =>
     text(item.status) === "confirmed" && text(item.documentType) !== "price_list"
@@ -647,6 +648,11 @@ function summarisePurchasesAndInventory(sources: VenueAIContextSources, now: Dat
       unit: text(item.unit, "", 24),
     }));
   const available = confirmed.length > 0 || inventorySnapshots.length > 0 || stockBalances.length > 0;
+  const writeOffDocuments = array(writeOffStore?.data).map(record).filter((item) => ["posted", "confirmed"].includes(text(item.status, "", 30)));
+  const writeOffCutoff = new Date(now.getTime() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const recentWriteOffs = writeOffDocuments.filter((item) => (dateOnly(item.date) ?? "") >= writeOffCutoff);
+  const writeOffItems: JsonRecord[] = recentWriteOffs.flatMap((document) => array(document.items).map((item): JsonRecord => ({ ...record(item), reasonCode: text(document.reasonCode, "other", 50), actor: text(record(document.createdBy).name, "Не указан", 120) })));
+  const writeOffCost = sum(recentWriteOffs, (item) => number(item.totalCost));
 
   return {
     available,
@@ -658,6 +664,7 @@ function summarisePurchasesAndInventory(sources: VenueAIContextSources, now: Dat
       expenseStore?.updatedAt,
       stockMovementStore?.updatedAt,
       supplierAlternativeStore?.updatedAt,
+      writeOffStore?.updatedAt,
       latestDateFromRows(confirmed, ["confirmedAt", "updatedAt", "date"]),
     ),
     data: {
@@ -681,6 +688,18 @@ function summarisePurchasesAndInventory(sources: VenueAIContextSources, now: Dat
       procurement: procurement.aiContext,
       procurementSignals: procurement.signals.slice(0, 12),
       procurementIntegrity: procurement.integrity,
+      writeOffs: {
+        canonicalSource: "bd_inventory_writeoffs",
+        postedDocuments: writeOffDocuments.length,
+        last30DaysDocuments: recentWriteOffs.length,
+        last30DaysItems: writeOffItems.length,
+        last30DaysKnownCost: writeOffCost,
+        unvaluedItems: writeOffItems.filter((item) => item.totalCost == null || text(item.costStatus) === "unvalued").length,
+        byReason: countsBy(recentWriteOffs, (item) => text(item.reasonCode, "other", 50)),
+        byProduct: countsBy(writeOffItems, (item) => text(item.productName ?? item.name, "Товар", 120)),
+        byEmployee: countsBy(writeOffItems, (item) => text(item.actor, "Не указан", 120)),
+        analyticsReady: true,
+      },
     },
   };
 }

@@ -18,11 +18,11 @@ import type {
   IntegrationEntityType,
 } from "./contracts";
 import type { BusinessWriteResult } from "./sync-engine";
+import { WRITE_OFF_STORE_KEY } from "../write-offs";
 
 const EMPLOYEE_STORE_KEY = "bd_employees";
 export const WAREHOUSE_STORE_KEY = "bd_warehouses";
 const INVENTORY_SNAPSHOT_STORE_KEY = "bd_inventory_snapshots";
-const WRITE_OFF_STORE_KEY = "bd_inventory_writeoffs";
 const RETURN_STORE_KEY = "bd_inventory_returns";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 

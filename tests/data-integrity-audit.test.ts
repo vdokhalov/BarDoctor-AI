@@ -92,3 +92,22 @@ test("data-integrity audit resolves historical snapshot aliases without rewritin
   assert.equal(report.findings.some((item) => item.code === "INVENTORY_SNAPSHOT_ORPHAN"), false);
   assert.equal(JSON.stringify(snapshot), before);
 });
+
+test("data-integrity audit reports broken structured write-off chains and missing cost", () => {
+  const report = auditDataIntegrity({
+    assortment: { stockBalances: [{ productKey: "known", name: "Лимон", unit: "g", current: 10, averageUnitCost: 1 }] },
+    writeOffDocuments: [{
+      id: "wo-1", venueId: 1, status: "posted", items: [
+        { id: "line-1", productKey: "known", baseQuantity: 2, baseUnit: "g", totalCost: null, costStatus: "unvalued" },
+        { id: "line-2", productKey: "missing", baseQuantity: 1, baseUnit: "crate", totalCost: 10 },
+      ],
+    }],
+    stockMovements: [{ id: "orphan", venueId: 1, type: "writeoff", productKey: "known", sourceDocumentId: "wo-missing", status: "active" }],
+    venueId: 1,
+  });
+  const codes = new Set(report.findings.map((item) => item.code));
+  assert.equal(codes.has("WRITE_OFF_ITEM_WITHOUT_NOMENCLATURE"), true);
+  assert.equal(codes.has("WRITE_OFF_COST_BASIS_MISSING"), true);
+  assert.equal(codes.has("WRITE_OFF_UNIT_OR_CONVERSION_INVALID"), true);
+  assert.equal(codes.has("WRITE_OFF_MOVEMENT_CHAIN_BROKEN"), true);
+});

@@ -21,6 +21,7 @@ fi
 echo "Running bounded vinext build..."
 node "${script_dir}/patch-inventory-layer-v246.mjs"
 node "${script_dir}/patch-inventory-delete-v270.mjs"
+node "${script_dir}/patch-writeoff-workflow-v271.mjs"
 node "${script_dir}/patch-navigation-qa-v268.mjs"
 timeout \
   --signal=TERM \
@@ -30,5 +31,6 @@ timeout \
 
 node "${script_dir}/patch-inventory-layer-v246.mjs"
 node "${script_dir}/patch-inventory-delete-v270.mjs"
+node "${script_dir}/patch-writeoff-workflow-v271.mjs"
 node "${script_dir}/patch-navigation-qa-v268.mjs"
 "${script_dir}/validate-artifact.sh"

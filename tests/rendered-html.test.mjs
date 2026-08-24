@@ -1571,7 +1571,10 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /Остатки не сходятся/);
   assert.match(mainBundle, /"aria-label":"Дата смены"/);
   assert.match(mainBundle, /"aria-label":"Количество чеков"/);
-  assert.match(mainBundle, /Что списали и почему \*/);
+  assert.match(mainBundle, /canonical-document-v271/);
+  assert.match(mainBundle, /Провести списание/);
+  assert.match(mainBundle, /"aria-label":"Причина списания"/);
+  assert.doesNotMatch(mainBundle, /Себестоимость списания/);
   assert.match(mainBundle, /"aria-label":"Дата расхода"/);
   assert.match(mainBundle, /"aria-label":"Сумма расхода, ₽"/);
   assert.match(mainBundle, /"aria-label":d==="writeoff"\?"Причина списания":"Описание расхода"/);

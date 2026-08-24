@@ -95,6 +95,7 @@ function storeData(venueId) {
     bd_assortment_v1: assortmentFor(venueId),
     bd_inventory_snapshots: venueId === 901 ? inventoryFixtures() : [],
     bd_stock_movements: [],
+    bd_inventory_writeoffs: [],
     bd_finance_settings: { inventoryFrequency: "monthly", customFrequencyDays: 30, inventorySections: ["Бар", "Кухня"], taxModel: { mode: "fixed", amount: 0 }, utilityModel: { mode: "fixed", amount: 0 }, updatedAt: "2026-08-24T08:00:00.000Z" },
   };
 }
@@ -167,6 +168,76 @@ async function createRun(browser, profile, label, options = {}) {
       return route.fulfill(jsonResponse({ ok: true, data: state.stores[state.activeVenueId][key] ?? null }));
     }
     if (url.pathname === "/api/inventory/products") return route.fulfill(jsonResponse({ ok: true, assortment: state.stores[state.activeVenueId].bd_assortment_v1, duplicateRepair: { changed: false } }));
+    if (url.pathname === "/api/write-offs") {
+      const stores = state.stores[state.activeVenueId];
+      const assortment = stores.bd_assortment_v1;
+      const catalog = assortment.stockBalances.map((item) => ({
+        nomenclatureItemId: item.productKey, productKey: item.productKey, name: item.name,
+        aliases: item.name.startsWith("Coca") ? ["Кола", "Cola"] : [],
+        category: item.taxonomyCategoryId, section: item.sectionId,
+        current: item.current, unit: item.unit, displayUnit: item.displayUnit || "auto",
+        packageOptions: item.packageOptions || (item.packageSize ? [item.packageSize] : []),
+        averageUnitCost: item.averageUnitCost || null,
+        costStatus: item.averageUnitCost > 0 ? "valued" : "unvalued",
+        currency: item.currency,
+      }));
+      const reasons = [
+        { code: "spoilage", label: "Порча" }, { code: "breakage", label: "Бой / разбили" },
+        { code: "staff_meal", label: "Питание персонала" }, { code: "other", label: "Другое" },
+      ];
+      if (method === "GET") return route.fulfill(jsonResponse({ ok: true, venueId: state.activeVenueId, reasons, writeOffs: stores.bd_inventory_writeoffs, catalog }));
+      const body = request.postDataJSON();
+      if (body.action === "delete_draft") {
+        stores.bd_inventory_writeoffs = stores.bd_inventory_writeoffs.filter((item) => item.id !== body.id || item.status !== "draft");
+        return route.fulfill(jsonResponse({ ok: true, deleted: true, writeOffs: stores.bd_inventory_writeoffs, stockChanged: false }));
+      }
+      if (body.action === "cancel") {
+        const document = stores.bd_inventory_writeoffs.find((item) => item.id === body.id);
+        if (!document) return route.fulfill(jsonResponse({ ok: false, error: "Списание не найдено" }, 404));
+        if (document.status !== "cancelled") {
+          for (const line of document.items) {
+            const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
+            balance.current += line.baseQuantity;
+            stores.bd_stock_movements.unshift({ id: `reverse-${line.id}`, type: "return", date: "2026-08-24", productKey: line.productKey, productName: line.productName, amount: line.baseQuantity, unit: line.baseUnit, costAmount: line.totalCost, currency: line.currency, sourceDocumentId: document.id, sourceLineId: `reversal:${line.id}`, createdAt: "2026-08-24T12:00:00.000Z" });
+          }
+          document.status = "cancelled";
+          document.cancelledAt = "2026-08-24T12:00:00.000Z";
+        }
+        return route.fulfill(jsonResponse({ ok: true, writeOff: document, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, stockChanged: true }));
+      }
+      const input = body.document;
+      const existing = stores.bd_inventory_writeoffs.find((item) => item.id === input.id);
+      if (existing?.status === "posted") return route.fulfill(jsonResponse({ ok: true, idempotent: true, writeOff: existing, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, stockChanged: false }));
+      const preparedItems = input.items.map((line) => {
+        const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
+        const baseQuantity = balance.unit === "g" && line.unit === "kg" ? line.quantity * 1000 : balance.unit === "ml" && line.unit === "l" ? line.quantity * 1000 : line.quantity;
+        return { ...line, productName: balance.name, baseQuantity, baseUnit: balance.unit, unitCost: balance.averageUnitCost, totalCost: balance.averageUnitCost ? baseQuantity * balance.averageUnitCost : null, currency: balance.currency, costStatus: balance.averageUnitCost ? "valued" : "unvalued", stockBefore: balance.current, stockAfter: balance.current - baseQuantity };
+      });
+      const document = {
+        ...input, venueId: state.activeVenueId, number: existing?.number || stores.bd_inventory_writeoffs.length + 1,
+        reasonLabel: reasons.find((item) => item.code === input.reasonCode)?.label || input.reasonCode,
+        items: preparedItems, itemCount: preparedItems.length,
+        totalCost: preparedItems.some((item) => item.totalCost === null) ? null : preparedItems.reduce((sum, item) => sum + item.totalCost, 0),
+        costStatus: preparedItems.some((item) => item.totalCost === null) ? "partial" : "full",
+        unvaluedItemCount: preparedItems.filter((item) => item.totalCost === null).length,
+        currency: preparedItems.find((item) => item.currency)?.currency,
+        status: body.action === "save_draft" ? "draft" : "posted",
+        movementIds: body.action === "save_draft" ? [] : preparedItems.map((item) => `movement-${item.id}`),
+        createdBy: { accountId: 1, name: "Mobile QA", role: "owner" },
+        createdAt: existing?.createdAt || "2026-08-24T10:00:00.000Z", updatedAt: "2026-08-24T10:00:00.000Z",
+        postedAt: body.action === "post" ? "2026-08-24T10:00:00.000Z" : undefined,
+      };
+      stores.bd_inventory_writeoffs = [document, ...stores.bd_inventory_writeoffs.filter((item) => item.id !== document.id)];
+      if (body.action === "post") {
+        for (const line of preparedItems) {
+          const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
+          balance.current = line.stockAfter;
+          balance.inventoryValue = Math.max(0, Number(balance.inventoryValue || 0) - Number(line.totalCost || 0));
+          stores.bd_stock_movements.unshift({ id: `movement-${line.id}`, type: "writeoff", date: input.date, productKey: line.productKey, productName: line.productName, amount: -line.baseQuantity, unit: line.baseUnit, costAmount: line.totalCost === null ? undefined : -line.totalCost, currency: line.currency, sourceDocumentId: document.id, sourceLineId: line.id, createdAt: "2026-08-24T10:00:00.000Z" });
+        }
+      }
+      return route.fulfill(jsonResponse({ ok: true, writeOff: document, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, stockChanged: body.action === "post" }, body.action === "post" ? 201 : 200));
+    }
     if (url.pathname === "/api/inventory/counts") {
       if (method === "POST") {
         const body = request.postDataJSON();
@@ -195,6 +266,10 @@ async function createRun(browser, profile, label, options = {}) {
 
   const page = await context.newPage();
   const issues = [];
+  page.on("dialog", async (dialog) => {
+    issues.push({ type: "native-dialog", message: dialog.message() });
+    await dialog.dismiss();
+  });
   page.on("pageerror", (error) => issues.push({ type: "pageerror", message: error.message }));
   page.on("console", (message) => {
     if (message.type() === "error" && !/401 \(Unauthorized\)|Failed to load resource/.test(message.text())) issues.push({ type: "console", url: page.url(), location: message.location(), message: message.text() });
@@ -587,12 +662,136 @@ async function formCloseFlow(browser, profile) {
   return { profile: profile.name, scenario: run.label, passed: true };
 }
 
+async function writeoffFlow(browser, profile) {
+  const run = await createRun(browser, profile, "writeoffs");
+  const { page, state } = run;
+  await goto(page, "/warehouse?venue=901&tab=writeoffs");
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-flow]");
+
+  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "writeoff-new", { fullscreen: true });
+  const shell = page.locator(".bd-writeoff-fullscreen-v271");
+  const close = page.getByRole("button", { name: "Закрыть списание", exact: true });
+  const closeBox = await close.boundingBox();
+  assert.ok(closeBox.width >= 44 && closeBox.height >= 44, `${profile.name}: write-off Close target is smaller than 44px`);
+  const viewport = page.viewportSize();
+  const shellBox = await shell.boundingBox();
+  assert.ok(shellBox.x >= 0 && shellBox.y >= 0 && shellBox.x + shellBox.width <= viewport.width + 1 && shellBox.y + shellBox.height <= viewport.height + 1, `${profile.name}: write-off fullscreen is clipped`);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: write-off did not own scrolling`);
+
+  await close.click();
+  await shell.waitFor({ state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null);
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: Close leaked body scroll lock`);
+
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("spoilage");
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  await page.waitForSelector(".bd-writeoff-picker-v271");
+  await page.locator(".bd-writeoff-picker-row-v271").filter({ hasText: "Пиво Mobile A" }).click();
+  await page.getByLabel("Количество Пиво Mobile A").fill("2");
+
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  const search = page.getByLabel("Поиск по номенклатуре");
+  await search.fill("Кола");
+  assert.equal(await page.locator(".bd-writeoff-picker-row-v271").count(), 1, `${profile.name}: canonical alias search did not narrow the catalog`);
+  await page.locator(".bd-writeoff-picker-row-v271").click();
+  await page.getByLabel("Количество Coca-Cola Mobile A").fill("1");
+
+  const main = page.locator(".bd-writeoff-flow-v271");
+  await main.evaluate((node) => { node.scrollTop = Math.max(1, node.scrollHeight - node.clientHeight); });
+  if (await main.evaluate((node) => node.scrollHeight > node.clientHeight)) {
+    assert.ok(await main.evaluate((node) => node.scrollTop > 0), `${profile.name}: long write-off form does not own scrolling`);
+  }
+  await page.getByRole("button", { name: "Провести списание", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  const documentId = new URL(page.url()).searchParams.get("writeoff");
+  assert.ok(documentId && documentId !== "new", `${profile.name}: posting did not replace new deep link with document detail`);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Пиво Mobile A").current, 18);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Coca-Cola Mobile A").current, 11);
+  assert.equal(state.stores[901].bd_stock_movements.filter((item) => item.type === "writeoff").length, 2);
+  assert.match(await page.locator("[data-bd-writeoff-detail]").textContent(), /2 позиций/);
+
+  await page.getByRole("button", { name: "Закрыть документ списания", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: detail Close did not return to list`);
+  await page.reload({ waitUntil: "networkidle" });
+  assert.equal(await page.locator(".bd-writeoff-document-list-v271 article").count(), 1, `${profile.name}: server-authoritative document disappeared after refresh`);
+
+  await page.locator(".bd-writeoff-document-list-v271 article > button").first().click();
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.goBack();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
+
+  await goto(page, `/warehouse?venue=901&tab=writeoffs&writeoff=${encodeURIComponent(documentId)}`);
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: deep-link Back escaped Warehouse`);
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: deep-link Back retained stale document state`);
+
+  await goto(page, "/warehouse?venue=901&tab=writeoffs");
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Движения" }).click();
+  const movementLink = page.getByRole("button", { name: "Документ", exact: true }).first();
+  await movementLink.waitFor();
+  await movementLink.click();
+  await page.waitForFunction((expectedId) => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") === "writeoffs" && params.get("writeoff") === expectedId;
+  }, documentId);
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), documentId);
+  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
+
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Списания" }).click();
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("breakage");
+  await close.click();
+  const confirm = page.locator(".bd-writeoff-confirm-v271");
+  await confirm.waitFor();
+  await confirm.getByRole("button", { name: "Отмена", exact: true }).click();
+  await confirm.waitFor({ state: "detached" });
+  assert.equal(await shell.count(), 1, `${profile.name}: cancelling unsaved guard closed the form`);
+  await close.click();
+  await confirm.waitFor();
+  await confirm.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await confirm.waitFor({ state: "detached" });
+  try {
+    await page.waitForFunction(() => new URLSearchParams(location.search).get("writeoff") === null, undefined, { timeout: 3_000 });
+  } catch {
+    throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
+  }
+  await shell.waitFor({ state: "detached" });
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
+
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("staff_meal");
+  state.activeVenueId = 902;
+  await page.evaluate(() => {
+    localStorage.setItem("bd_active_venue_id", "902");
+    window.dispatchEvent(new CustomEvent("bd:venue-changed", { detail: { venueId: 902 } }));
+  });
+  await page.waitForSelector("[data-bd-writeoff-flow]", { state: "detached" });
+  await page.waitForTimeout(250);
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: draft leaked across venue switch`);
+  assert.doesNotMatch(await page.locator("body").textContent(), /Пиво Mobile A|Coca-Cola Mobile A/, `${profile.name}: Venue A nomenclature leaked into Venue B`);
+  assert.equal(state.stores[902].bd_inventory_writeoffs.length, 0, `${profile.name}: Venue A document leaked into Venue B`);
+
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, documentId };
+}
+
 async function runProfile(browser, profile) {
   assert.ok(profile.descriptor.isMobile, `${profile.name}: Playwright descriptor is not mobile`);
   assert.ok(profile.descriptor.hasTouch, `${profile.name}: Playwright descriptor has no touch`);
   assert.match(profile.descriptor.userAgent, profile.userAgentPattern);
   const results = [];
   for (const [name, flow] of [
+    ["writeoffs", writeoffFlow],
     ["inventory-fullscreen", inventoryFlow],
     ["inventory-delete", inventoryDeleteFlow],
     ["warehouse-nomenclature", nomenclatureFlow],
@@ -625,6 +824,10 @@ async function runProfile(browser, profile) {
       results.push(...await runProfile(browser, profile));
     }
     if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
+        results.push(await writeoffFlow(browser, desktopProfile));
+      }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);
         results.push(await inventoryDeleteFlow(browser, desktopProfile));
