@@ -12,6 +12,8 @@ test("inventory lifecycle API is venue-scoped, permission-checked and draft-safe
   assert.match(route, /account_id = \?/);
   assert.match(route, /account\.id/);
   assert.match(route, /venueId: account\.venueId/);
+  assert.match(route, /resolveInventoryCountScope\(stores\.assortment/);
+  assert.match(route, /INVALID_SCOPE/);
   assert.match(route, /INVENTORY_INCOMPLETE/);
   assert.match(route, /INVENTORY_STOCK_CHANGED/);
   assert.match(route, /INVENTORY_READ_ONLY/);
@@ -22,6 +24,18 @@ test("inventory lifecycle API is venue-scoped, permission-checked and draft-safe
     route.indexOf('action !== "finalize"') < route.indexOf("const result = applyInventoryCount"),
     "the existing adjustment engine must run only in finalization",
   );
+});
+
+test("scope options and creation share one canonical venue validation contract", async () => {
+  const [route, engine] = await Promise.all([
+    read("app/api/inventory/counts/route.ts"),
+    read("lib/bardoctor/inventory-counts.ts"),
+  ]);
+  assert.match(route, /scopes: inventoryCountScopes\(stores\.assortment\)/);
+  assert.match(route, /resolveInventoryCountScope\(stores\.assortment/);
+  assert.match(engine, /parentId: category\.parentId/);
+  assert.match(engine, /itemCount/);
+  assert.doesNotMatch(engine.slice(engine.indexOf("export function inventoryCountScopes"), engine.indexOf("export function resolveInventoryCountScope")), /Склад \/ зона/);
 });
 
 test("print action is read-only and serves a blind, no-store sheet", async () => {

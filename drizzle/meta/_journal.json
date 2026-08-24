@@ -134,6 +134,13 @@
       "when": 1786641842975,
       "tag": "0018_gigantic_arachne",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1787470513945,
+      "tag": "0019_whole_the_hand",
+      "breakpoints": true
     }
   ]
 }

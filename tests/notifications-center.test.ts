@@ -90,6 +90,9 @@ test("client autosaves preferences with rollback and renders a user-safe history
   assert.match(client, /nodes\.quietStart\.value = previousStart/);
   assert.match(client, /Системные настройки отсюда открыть нельзя/);
   assert.match(client, /var supported = "serviceWorker" in navigator/);
+  assert.match(client, /async function reportDeviceState/);
+  assert.match(client, /subscriptionId: subscriptionId/);
+  assert.match(api, /saveNotificationDeviceTelemetry/);
   assert.doesNotMatch(client, /item\.detail|providerMessageId|dedupeKey|lease|backoff/i);
 
   assert.match(api, /notificationHistoryForAccount/);

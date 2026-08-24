@@ -786,6 +786,28 @@ export const notificationPreferences = sqliteTable(
   },
 );
 
+/** Device/subscription telemetry. Preferences remain account-scoped. */
+export const notificationDevices = sqliteTable(
+  "notification_devices",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    accountId: integer("account_id").notNull().references(() => accounts.id, { onDelete: "cascade" }),
+    deviceKey: text("device_key").notNull(),
+    subscriptionId: text("subscription_id"),
+    permission: text("permission").notNull().default("default"),
+    optedIn: integer("opted_in", { mode: "boolean" }).notNull().default(false),
+    active: integer("active", { mode: "boolean" }).notNull().default(false),
+    lastSeenAt: text("last_seen_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("notification_devices_account_device_uq").on(table.accountId, table.deviceKey),
+    index("notification_devices_active_seen_idx").on(table.active, table.lastSeenAt),
+    index("notification_devices_subscription_idx").on(table.subscriptionId),
+  ],
+);
+
 export const notificationDeliveries = sqliteTable(
   "notification_deliveries",
   {
@@ -933,4 +955,5 @@ export type Workspace = typeof workspaces.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
 export type VenueMembership = typeof venueMemberships.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type NotificationDevice = typeof notificationDevices.$inferSelect;
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;

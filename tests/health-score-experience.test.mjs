@@ -25,8 +25,9 @@ test("Home keeps a prominent Health Index card before the financial result", asy
   const home = bundle.slice(homeStart, homeEnd);
 
   assert.match(bundle, /bdHomeHealthIndexVersion="home-health-v200"/);
-  assert.match(bundle, /data-bd-home-health-index":"hero-v200/);
-  assert.match(bundle, /children:"Индекс здоровья"/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-v252/);
+  assert.match(bundle, /Достоверность диагноза/);
+  assert.match(bundle, /children:"Business Health"/);
   assert.ok(home.indexOf("i.jsx(bdHomeHealthIndexV200") < home.indexOf("i.jsx(bdHomeMoneyCard"));
   assert.match(css, /\.bd-home-health-index\s*\{/);
   assert.match(css, /grid-template-columns:\s*100px minmax\(0, 1fr\) 24px/);

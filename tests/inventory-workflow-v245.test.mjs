@@ -57,13 +57,13 @@ test("inventory count UI is mobile-first without losing the desktop table layout
   assert.match(css, /\.bd-inventory-entry-v245 input/);
 });
 
-test("cache markers deliver the inventory workflow asset and styles", async () => {
+test("cache markers deliver the current inventory scope hierarchy styles", async () => {
   const [html, response, bootstrap] = await Promise.all([
     read("public/app.html"),
     read("app/bar-doctor-response.ts"),
     read("public/bardoctor-preview.js"),
   ]);
-  assert.match(html, /inventory-workflow-v245/);
-  assert.match(response, /inventory-workflow-v245/);
+  assert.match(html, /inventory-scope-hierarchy-v256/);
+  assert.match(response, /inventory-scope-hierarchy-v256/);
   assert.match(bootstrap, /inventory-workflow-v245/);
 });

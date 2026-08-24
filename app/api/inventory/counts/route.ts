@@ -8,11 +8,13 @@ import {
   INVENTORY_COUNT_STORE_KEY,
   type InventoryCountDocument,
   type InventoryCountScope,
+  inventoryCountDocumentScope,
   inventoryCountConflicts,
   inventoryCountLineDifference,
   inventoryCountScopes,
   inventoryCountSummary,
   renderInventoryCountPrintSheet,
+  resolveInventoryCountScope,
   updateInventoryCountDocument,
 } from "../../../../lib/bardoctor/inventory-counts";
 import {
@@ -131,6 +133,7 @@ async function readStores(database: D1Database, accountId: number) {
   return {
     snapshots: array(stores.get(INVENTORY_COUNT_STORE_KEY)),
     assortment: json(stores.get(ASSORTMENT_STORE_KEY), {}),
+    assortmentExists: stores.has(ASSORTMENT_STORE_KEY),
     movements: array(stores.get(STOCK_MOVEMENT_STORE_KEY)),
     closedMonths: closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY), null)),
   };
@@ -139,6 +142,7 @@ async function readStores(database: D1Database, accountId: number) {
 function presentDocument(document: InventoryCountDocument) {
   return {
     ...document,
+    scope: inventoryCountDocumentScope(document),
     summary: document.summary ?? inventoryCountSummary(document),
     items: document.items.map((line) => ({ ...line, ...inventoryCountLineDifference(line) })),
   };
@@ -260,9 +264,7 @@ export async function POST(request: Request): Promise<Response> {
         id: text(requestedScope.id, "", 100) || undefined,
         label: text(requestedScope.label, "", 120),
       };
-    const allowedScope = inventoryCountScopes(stores.assortment).find((value) =>
-      value.type === scope.type && String(value.id ?? "") === String(scope.id ?? "")
-    );
+    const allowedScope = resolveInventoryCountScope(stores.assortment, scope as Pick<InventoryCountScope, "type" | "id">);
     if (!allowedScope) {
       return Response.json({ ok: false, code: "INVALID_SCOPE", error: "Выбранный охват недоступен для текущего заведения" }, { status: 422 });
     }
@@ -409,6 +411,13 @@ export async function POST(request: Request): Promise<Response> {
 
   if (action !== "finalize") {
     return Response.json({ ok: false, error: "Неизвестное действие инвентаризации" }, { status: 400 });
+  }
+  if (!stores.assortmentExists) {
+    return Response.json({
+      ok: false,
+      code: "AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED",
+      error: "Инвентаризация не проведена: authoritative номенклатура отсутствует. Требуется immutable export и отдельное разрешение на import/reconciliation.",
+    }, { status: 409 });
   }
   const summary = inventoryCountSummary(existing);
   if (summary.uncountedLines > 0) {

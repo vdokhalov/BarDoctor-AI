@@ -27,6 +27,12 @@ export type ConfirmedCompetitor = {
   strengths: string[];
   gaps: string[];
   sourceUrls: string[];
+  lat: number | null;
+  lng: number | null;
+  distanceKm: number | null;
+  eventDistanceKm: number | null;
+  audienceOverlap: number | null;
+  openingHours: JsonRecord;
 };
 
 export type DiagnosisExternalContext = {
@@ -143,6 +149,12 @@ function confirmedCompetitors(value: unknown): ConfirmedCompetitor[] {
       strengths: strings(item.strengths, 6),
       gaps: strings(item.gaps, 6),
       sourceUrls: strings(item.sourceUrls, 6).filter((url) => /^https?:\/\//i.test(url)),
+      lat: number(item.lat ?? item.latitude),
+      lng: number(item.lng ?? item.longitude),
+      distanceKm: number(item.distanceKm),
+      eventDistanceKm: number(item.eventDistanceKm),
+      audienceOverlap: number(item.audienceOverlap),
+      openingHours: record(item.openingHours ?? item.schedule) ?? {},
     }));
 }
 

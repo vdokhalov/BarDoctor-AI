@@ -1931,3 +1931,40 @@ body:has(.bd-nomenclature-main-v238) .bd-scroll-top {
     min-height: 56px;
   }
 }
+.bd-canonical-duplicate-warning-v260,
+.bd-nomenclature-suppliers-v260 {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #f59e0b 35%, var(--border, #e5e7eb));
+  border-radius: 14px;
+  background: color-mix(in srgb, #f59e0b 8%, var(--card, #fff));
+}
+
+.bd-canonical-duplicate-warning-v260 strong,
+.bd-nomenclature-suppliers-v260 strong { font-size: 13px; }
+.bd-canonical-duplicate-warning-v260 p,
+.bd-canonical-duplicate-warning-v260 small,
+.bd-nomenclature-suppliers-v260 small { margin: 0; font-size: 11px; line-height: 1.4; color: var(--muted-foreground, #667085); }
+
+.bd-nomenclature-suppliers-v260 {
+  border-color: var(--border, #e5e7eb);
+  background: var(--muted, #f8fafc);
+}
+
+.bd-nomenclature-suppliers-v260 > header,
+.bd-nomenclature-suppliers-v260 article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.bd-nomenclature-suppliers-v260 article {
+  padding-top: 8px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+
+.bd-nomenclature-suppliers-v260 article span { display: grid; min-width: 0; }
+.bd-nomenclature-suppliers-v260 article b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.bd-nomenclature-suppliers-v260 article em { flex: none; font-size: 11px; font-style: normal; color: var(--muted-foreground, #667085); }

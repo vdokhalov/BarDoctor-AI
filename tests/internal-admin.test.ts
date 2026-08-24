@@ -136,6 +136,29 @@ test("Internal Admin v2 observability and durable push scheduling are additive",
   assert.match(worker, /async scheduled/);
 });
 
+test("push observability tracks device health without sending user spam", async () => {
+  const [schema, migration, adminData, adminClient] = await Promise.all([
+    source("db/schema.ts"),
+    source("drizzle/0019_whole_the_hand.sql"),
+    source("lib/bardoctor/internal-admin-data.ts"),
+    source("public/admin-v175.js"),
+  ]);
+  assert.match(schema, /notificationDevices = sqliteTable/);
+  assert.match(migration, /CREATE TABLE `notification_devices`/);
+  assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE `/);
+  assert.match(adminData, /lastGeneratedAt/);
+  assert.match(adminData, /lastAttemptAt/);
+  assert.match(adminData, /lastSuccessAt/);
+  assert.match(adminData, /lastFailureAt/);
+  assert.match(adminData, /lastSuppressedAt/);
+  assert.match(adminData, /NO_RECENT_SUCCESS/);
+  assert.match(adminData, /STALE_SUBSCRIPTIONS/);
+  assert.match(adminData, /testNotificationAvailable: false/);
+  assert.match(adminClient, /Предупреждения здоровья/);
+  assert.match(adminClient, /Устройства и подписки/);
+  assert.match(adminClient, /Последние этапы цепочки/);
+});
+
 test("admin audit is separate and sensitive bootstrap is CSRF- and rate-limit guarded", async () => {
   const [platformAccess, schema, venueAudit] = await Promise.all([
     source("lib/bardoctor/platform-admin.ts"),

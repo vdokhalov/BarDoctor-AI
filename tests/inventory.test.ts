@@ -2342,3 +2342,17 @@ test("warehouse product editor blocks a base-unit change after stock movements",
   if (result.ok) return;
   assert.equal(result.code, "UNIT_CHANGE_LOCKED");
 });
+
+test("inventory count resolves a historical product key through aliases", () => {
+  const result = applyInventoryCount({
+    assortment: {
+      stockBalances: [{ productKey: "new-key", name: "Сыр", current: 5, unit: "g", averageUnitCost: 2 }],
+      inventoryProductAliases: [{ from: "old-key", to: "new-key" }],
+    },
+    snapshot: { id: "snapshot-alias", date: "2026-08-24", items: [{ id: "line", productKey: "old-key", actual: 4 }] },
+    now: "2026-08-24T12:00:00.000Z",
+  });
+  assert.equal(result.summary.unresolvedLines.length, 0);
+  assert.equal(result.items[0]?.productKey, "new-key");
+  assert.equal(result.movements[0]?.productKey, "new-key");
+});

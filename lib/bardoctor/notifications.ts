@@ -2,12 +2,14 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
   notificationDeliveries,
+  notificationDevices,
   notificationJobs,
   notificationPreferences,
   type NotificationPreference,
 } from "../../db/schema";
 import { getIntegrationValue } from "./integration-secrets";
 import type {
+  NotificationDeviceTelemetryInput,
   NotificationPreferencesInput,
   PushMessage,
 } from "./notification-types";
@@ -142,6 +144,38 @@ export async function saveNotificationPreferences(
     });
 
   return getNotificationPreferences(accountId);
+}
+
+export async function saveNotificationDeviceTelemetry(
+  accountId: number,
+  input: NotificationDeviceTelemetryInput | undefined,
+) {
+  if (!input) return null;
+  const deviceKey = typeof input.deviceKey === "string" && /^[a-zA-Z0-9:_-]{8,160}$/.test(input.deviceKey)
+    ? input.deviceKey
+    : null;
+  if (!deviceKey) throw new NotificationError("Некорректный идентификатор устройства.", 400, "INVALID_DEVICE_KEY");
+  const permission = ["default", "granted", "denied"].includes(String(input.permission))
+    ? String(input.permission)
+    : "default";
+  const subscriptionId = typeof input.subscriptionId === "string"
+    ? input.subscriptionId.trim().slice(0, 240) || null
+    : null;
+  const now = new Date().toISOString();
+  const next = {
+    subscriptionId,
+    permission,
+    optedIn: input.optedIn === true,
+    active: input.active === true && input.optedIn === true && permission === "granted" && Boolean(subscriptionId),
+    lastSeenAt: now,
+    updatedAt: now,
+  };
+  await getDb().insert(notificationDevices).values({ accountId, deviceKey, ...next })
+    .onConflictDoUpdate({
+      target: [notificationDevices.accountId, notificationDevices.deviceKey],
+      set: next,
+    });
+  return { deviceKey, ...next };
 }
 
 export async function markNotificationTest(accountId: number) {

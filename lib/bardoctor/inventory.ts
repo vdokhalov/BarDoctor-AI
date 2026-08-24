@@ -1,4 +1,10 @@
 import { classifyNomenclatureItemWithRules, defaultNomenclatureStructure } from "./nomenclature";
+import {
+  auditCanonicalNomenclature,
+  enrichCanonicalSupplierSummary,
+  resolveCanonicalPurchaseItem,
+  upsertSupplierProductMapping,
+} from "./nomenclature-identity";
 import { PURCHASE_STOCK_CATEGORIES } from "./purchases";
 import { resolvePurchaseLineAccountingCost } from "./valuation";
 
@@ -64,6 +70,9 @@ export type InventoryUpdateSummary = {
   linkedIngredients: number;
   unresolvedLines: Array<{ id: string; name: string; reason: string }>;
   currencyConflicts: number;
+  sourceMappingsUpserted?: number;
+  canonicalItemsReused?: number;
+  sourceMappingsNeedingReview?: number;
   valuationIssues?: Array<{
     id: string;
     name: string;
@@ -735,7 +744,6 @@ function inventoryWaterPackageAnchor(value: JsonRecord, balances: JsonRecord[]):
   const currency = text(value.currency, "", 12).toUpperCase();
   return balances.find((candidate) => {
     if (candidate === value || inventoryBalanceUnit(candidate) !== unit) return false;
-    const candidateName = text(candidate.name ?? candidate.productName, "", 240);
     const candidateTokens = inventoryNameTokens(candidate);
     if (!candidateTokens.some((token) => INVENTORY_WATER_DESCRIPTORS.has(token))) return false;
     const candidateCurrency = text(candidate.currency, "", 12).toUpperCase();
@@ -2325,9 +2333,18 @@ function incomingInventoryProductKey(
         - Number(Boolean(text(left.balance.preferredDisplayName, "", 240)))
       || Number(number(right.balance.current) > 0) - Number(number(left.balance.current) > 0)
       || text(left.balance.name).length - text(right.balance.name).length
-    )[0]?.balance;
+    );
+  const best = match[0];
+  const second = match[1];
+  // A high score is not sufficient when two canonical positions are nearly
+  // indistinguishable.  Do not make an order-dependent stock merge.
+  const unambiguous = best && (!second || best.score - second.score >= 0.08)
+    ? best.balance
+    : undefined;
   return {
-    key: match ? text(match.productKey ?? match.key, requestedKey, 300) : requestedKey,
+    key: unambiguous
+      ? text(unambiguous.productKey ?? unambiguous.key, requestedKey, 300)
+      : requestedKey,
     requestedKey,
   };
 }
@@ -2374,14 +2391,57 @@ export function applyPurchaseToInventory(input: {
       .map((value) => [text(value.from, "", 300), value] as const)
       .filter(([from]) => Boolean(from)),
   );
+  let supplierProductMappings = array(parts.root.supplierProductMappings);
+  let sourceMappingsUpserted = 0;
+  let canonicalItemsReused = 0;
+  let sourceMappingsNeedingReview = 0;
 
   array(document.items).forEach((value, index) => {
     const item = record(value);
     const itemId = sourceLineId(item, index);
-    const name = text(item.name, `Позиция ${index + 1}`);
+    const sourceName = text(item.name, `Позиция ${index + 1}`);
     const received = purchaseLineBaseAmount(item);
-    const identity = incomingInventoryProductKey(parts.root, parts.balances, { ...item, currency });
+    const canonicalResolution = resolveCanonicalPurchaseItem({
+      assortment: { ...parts.root, supplierProductMappings },
+      document,
+      item: { ...item, unit: received.unit },
+      canonicalItems: [...nomenclature, ...parts.balances],
+      now,
+    });
+    const name = canonicalResolution.canonicalName || sourceName;
+    if (canonicalResolution.status === "review") {
+      sourceMappingsNeedingReview += 1;
+      unresolvedLines.push({
+        id: itemId,
+        name,
+        reason: "Неоднозначное сопоставление с номенклатурой — подтвердите каноническую позицию",
+      });
+      return;
+    }
+    const sourceRequestedKey = text(
+      item.purchaseProductKey ?? item.productKey ?? item.canonicalProductKey,
+      "",
+      300,
+    );
+    const canonicalHint = ["stable_mapping", "explicit", "high_confidence"].includes(canonicalResolution.status)
+      ? canonicalResolution.canonicalProductKey
+      : sourceRequestedKey || canonicalResolution.canonicalProductKey;
+    const identity = incomingInventoryProductKey(parts.root, parts.balances, {
+      ...item,
+      name,
+      purchaseProductKey: canonicalHint,
+      unit: received.unit,
+      currency,
+    });
     const productKey = identity.key;
+    supplierProductMappings = upsertSupplierProductMapping(supplierProductMappings, {
+      ...canonicalResolution.sourceMapping,
+      canonicalProductKey: productKey,
+    });
+    sourceMappingsUpserted += 1;
+    if (["stable_mapping", "explicit", "high_confidence"].includes(canonicalResolution.status)) {
+      canonicalItemsReused += 1;
+    }
     if (identity.requestedKey && identity.requestedKey !== productKey) {
       identityAliases.set(identity.requestedKey, {
         from: identity.requestedKey,
@@ -2592,8 +2652,14 @@ export function applyPurchaseToInventory(input: {
   parts.root.stockBalances = parts.balances;
   parts.root.recipes = parts.recipes;
   parts.root.nomenclature = nomenclature;
+  parts.root.supplierProductMappings = supplierProductMappings;
   parts.root.inventoryProductAliases = [...identityAliases.values()].slice(0, 5_000);
   parts.root.updatedAt = now;
+  parts.root = enrichCanonicalSupplierSummary(parts.root);
+  parts.root.nomenclatureIdentityReport = auditCanonicalNomenclature({
+    assortment: parts.root,
+    venueId: number(document.venueId, 0) || undefined,
+  });
   return {
     assortment: parts.root,
     movements,
@@ -2603,6 +2669,9 @@ export function applyPurchaseToInventory(input: {
       linkedIngredients,
       unresolvedLines,
       currencyConflicts,
+      sourceMappingsUpserted,
+      canonicalItemsReused,
+      sourceMappingsNeedingReview,
       valuationIssues,
     },
   };
@@ -2681,10 +2750,11 @@ export function applyInventoryCount(input: {
   array(snapshot.items).forEach((value, index) => {
     const requested = record(value);
     const lineId = sourceLineId(requested, index);
-    const productKey = text(requested.productKey, "", 300);
+    const originalProductKey = text(requested.productKey, "", 300);
+    const productKey = resolveInventoryProductKey(parts.root, originalProductKey);
     const balance = indexedBalances.get(productKey);
     const requestedName = text(requested.productName ?? requested.name, `Позиция ${index + 1}`);
-    if (!productKey || !balance) {
+    if (!originalProductKey || !productKey || !balance) {
       unresolvedLines.push({
         id: lineId,
         name: requestedName,

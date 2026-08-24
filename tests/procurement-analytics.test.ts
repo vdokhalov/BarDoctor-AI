@@ -66,6 +66,15 @@ test("price history uses only confirmed, mapped and normalized lines", () => {
   assert.equal(points[0].normalizedDisplayUnit, "л");
 });
 
+test("historical price points resolve canonical supersession aliases", () => {
+  const points = procurementPricePoints([
+    document({ id: "old-document" }),
+  ], {
+    productAliases: [{ from: "vodka-x", to: "canonical-vodka" }],
+  });
+  assert.equal(points[0].productKey, "canonical-vodka");
+});
+
 test("document revisions replace a price point instead of creating false history", () => {
   const points = procurementPricePoints([
     document({ id: "same", updatedAt: "2026-08-07T10:00:00.000Z", total: 120 }),

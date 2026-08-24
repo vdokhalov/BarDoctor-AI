@@ -213,10 +213,10 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/market-entry.css?v=20260722-competitors-v28" />
     <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
     <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224" />
-    <link rel="stylesheet" href="/warehouse.css?v=20260822-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246" />
-    <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239" />
+    <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259" />
+    <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
-    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44" />
+    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/ai-action-plan.css?v=20260803-action-plan-v2" />
     <link rel="stylesheet" href="/employee-detail.css?v=20260817-employee-edit-page-v206" />
     <link rel="stylesheet" href="/employee-list.css?v=20260817-employee-edit-page-v206" />
@@ -233,9 +233,9 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" />
     <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" />
     <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" />
-    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171" />
+    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" />
-    <link rel="stylesheet" href="/ai-doctor-attention-v196.css?v=20260817-ai-doctor-mobile-v203" />
+    <link rel="stylesheet" href="/ai-doctor-attention-v196.css?v=20260823-self-service-v255" />
     ${canonicalUserShellAssets()}
     <script src="/monthly-report-qa-v165.js?v=20260812-monthly-v165"></script>
     <script src="/more-hub-qa-v166.js?v=20260812-more-v166"></script>
@@ -244,7 +244,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/assortment-qa-v170.js?v=20260813-assortment-v171"></script>
     <script src="/nomenclature-qa-v238.js?v=20260821-accounting-currency-v243"></script>
     <script src="/health-score-experience.js?v=20260811-health-v155"></script>
-    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247"></script>
+    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260"></script>
     <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>

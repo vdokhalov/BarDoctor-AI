@@ -3,10 +3,12 @@ import test from "node:test";
 import {
   createInventoryCountDocument,
   inventoryCountConflicts,
+  inventoryCountDocumentScope,
   inventoryCountLineDifference,
   inventoryCountScopes,
   inventoryCountSummary,
   renderInventoryCountPrintSheet,
+  resolveInventoryCountScope,
   updateInventoryCountDocument,
 } from "../lib/bardoctor/inventory-counts";
 
@@ -84,7 +86,7 @@ const creator = { accountId: 7, name: "Тестовый управляющий",
 test("inventory creation snapshots only the selected venue scope and stays blind", () => {
   const before = structuredClone(assortment);
   const scopes = inventoryCountScopes(assortment);
-  assert.deepEqual(scopes.map((scope) => scope.label), [
+  assert.deepEqual(scopes.map((scope) => scope.name), [
     "Весь активный склад",
     "Бар",
     "Кухня",
@@ -93,6 +95,11 @@ test("inventory creation snapshots only the selected venue scope and stays blind
     "Коньяк и бренди",
     "Молочные продукты",
   ]);
+  assert.deepEqual(scopes.map((scope) => scope.type), [
+    "all", "section", "section", "category", "category", "subcategory", "subcategory",
+  ]);
+  assert.equal(scopes.find((scope) => scope.id === "food")?.parentId, "kitchen");
+  assert.equal(scopes.find((scope) => scope.id === "dairy")?.label, "Кухня → Продукты → Молочные продукты");
   const document = createInventoryCountDocument({
     assortment,
     venueId: 101,
@@ -112,6 +119,101 @@ test("inventory creation snapshots only the selected venue scope and stays blind
   assert.equal(document.items[0].storageLocationName, "Стеллаж бара");
   assert.equal(document.status, "counting");
   assert.deepEqual(assortment, before, "creating a snapshot must not mutate warehouse state");
+});
+
+test("canonical hierarchy exposes every eligible top-level section without hardcoded venue names", () => {
+  const otherVenue = {
+    nomenclatureStructure: {
+      sections: [{ id: "floor", name: "Торговый зал", active: true }, { id: "empty", name: "Пустой раздел", active: true }],
+      categories: [{ id: "retail", parentId: "floor", name: "Розница", active: true }],
+      subcategories: [{ id: "souvenirs", parentId: "retail", name: "Сувениры", active: true }],
+    },
+    nomenclature: [{
+      productKey: "magnet",
+      name: "Магнит",
+      sectionId: "floor",
+      taxonomyCategoryId: "retail",
+      subcategoryId: "souvenirs",
+      unit: "pcs",
+    }],
+    stockBalances: [{ productKey: "magnet", current: 4, unit: "pcs" }],
+  };
+  const scopes = inventoryCountScopes(otherVenue);
+  assert.deepEqual(scopes.filter((scope) => scope.type === "section").map((scope) => scope.name), ["Торговый зал"]);
+  assert.doesNotMatch(JSON.stringify(scopes), /Бар|Кухня|Пустой раздел/);
+  assert.equal(scopes[0].itemCount, 1);
+});
+
+test("section, category and subcategory scopes snapshot only their stable-ID descendants", () => {
+  const expected = new Map<"section" | "category" | "subcategory", string[]>([
+    ["section", ["cognac"]],
+    ["category", ["cognac"]],
+    ["subcategory", ["cognac"]],
+  ]);
+  for (const [type, productKeys] of expected) {
+    const id = type === "section" ? "bar" : type === "category" ? "alcohol" : "cognac";
+    const resolved = resolveInventoryCountScope(assortment, { type, id });
+    assert.ok(resolved);
+    const document = createInventoryCountDocument({
+      assortment,
+      venueId: 101,
+      sequenceNumber: 20,
+      scope: resolved,
+      accountingCurrency: "RUB",
+      creator,
+    });
+    assert.deepEqual(document.items.map((item) => item.productKey), productKeys);
+  }
+});
+
+test("foreign, archived and inactive hierarchy nodes cannot become a current-venue scope", () => {
+  assert.equal(resolveInventoryCountScope(assortment, { type: "section", id: "foreign-venue-section" }), null);
+  const changed = structuredClone(assortment) as unknown as {
+    nomenclatureStructure: {
+      sections: Array<Record<string, unknown>>;
+      categories: Array<Record<string, unknown>>;
+      subcategories: Array<Record<string, unknown>>;
+    };
+    nomenclature: Array<Record<string, unknown>>;
+    stockBalances: Array<Record<string, unknown>>;
+  };
+  changed.nomenclatureStructure.sections.push({ id: "archive-section", name: "Архивный раздел", active: false });
+  changed.nomenclatureStructure.categories.push({ id: "archive-category", parentId: "archive-section", name: "Архив", active: true });
+  changed.nomenclatureStructure.subcategories.push({ id: "archive-subcategory", parentId: "archive-category", name: "Архив", active: true });
+  changed.nomenclature.push({
+    productKey: "archive-node-item",
+    name: "Неактивная ветка",
+    sectionId: "archive-section",
+    taxonomyCategoryId: "archive-category",
+    subcategoryId: "archive-subcategory",
+    unit: "pcs",
+  });
+  changed.stockBalances.push({ productKey: "archive-node-item", current: 1, unit: "pcs" });
+  const scopes = inventoryCountScopes(changed);
+  assert.doesNotMatch(JSON.stringify(scopes), /archive-section|archive-category|archive-subcategory|Архивный раздел/);
+  const document = createInventoryCountDocument({
+    assortment: changed,
+    venueId: 101,
+    sequenceNumber: 21,
+    scope: scopes[0],
+    accountingCurrency: "RUB",
+    creator,
+  });
+  assert.ok(!document.items.some((item) => item.productKey === "archive-node-item"));
+});
+
+test("legacy inventory without structured scope remains readable and printable", () => {
+  const document = createInventoryCountDocument({
+    assortment,
+    venueId: 1,
+    sequenceNumber: 22,
+    scope: { type: "section", id: "bar", label: "Бар" },
+    creator,
+  });
+  const legacy = { ...document, scope: undefined, scopeLabel: "Старый охват" } as unknown as typeof document;
+  assert.equal(inventoryCountDocumentScope(legacy).label, "Старый охват");
+  const html = renderInventoryCountPrintSheet({ document: legacy, venueName: "Старое заведение" });
+  assert.match(html, /Охват:<\/dt><dd>Старый охват<\/dd>/);
 });
 
 test("piece, bottle, litre, millilitre, kilogram, gram and multiple packaging inputs normalize through one base model", () => {

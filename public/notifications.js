@@ -631,10 +631,42 @@
     var refresh = function () {
       state.optedIn = Boolean(OneSignal.User.PushSubscription.optedIn);
       renderDevice();
+      reportDeviceState(OneSignal).catch(function () { /* health telemetry is best-effort */ });
     };
     OneSignal.User.PushSubscription.addEventListener("change", refresh);
     OneSignal.Notifications.addEventListener("permissionChange", refresh);
     state.sdkListenersTarget = OneSignal;
+  }
+
+  function deviceKey() {
+    var key = localStorage.getItem("bd_push_device_key");
+    if (!key) {
+      key = "web:" + (window.crypto && window.crypto.randomUUID
+        ? window.crypto.randomUUID()
+        : String(Date.now()) + ":" + Math.random().toString(36).slice(2));
+      localStorage.setItem("bd_push_device_key", key);
+    }
+    return key;
+  }
+
+  async function reportDeviceState(OneSignal) {
+    if (!state.loaded && !state.config) return;
+    var subscription = OneSignal && OneSignal.User ? OneSignal.User.PushSubscription : null;
+    var subscriptionId = subscription && typeof subscription.id === "string" ? subscription.id : null;
+    var permission = permissionState();
+    var optedIn = Boolean(subscription && subscription.optedIn);
+    await api("/api/notifications", {
+      method: "PUT",
+      body: JSON.stringify({
+        device: {
+          deviceKey: deviceKey(),
+          subscriptionId: subscriptionId,
+          permission: permission,
+          optedIn: optedIn,
+          active: permission === "granted" && optedIn && Boolean(subscriptionId),
+        },
+      }),
+    });
   }
 
   function connectSdk(OneSignal) {
@@ -643,6 +675,7 @@
     attachSdkListeners(OneSignal);
     state.sdkError = null;
     renderDevice();
+    reportDeviceState(OneSignal).catch(function () { /* connection still works if telemetry is delayed */ });
     return OneSignal;
   }
 
@@ -654,6 +687,7 @@
     state.optedIn = Boolean(OneSignal.User.PushSubscription.optedIn);
     if (!state.optedIn) throw new Error("PUSH_SUBSCRIPTION_NOT_CREATED");
     await savePreferencePatch({ enabled: true });
+    await reportDeviceState(OneSignal);
   }
 
   function ensureSdk() {
@@ -806,6 +840,7 @@
       }
       state.optedIn = false;
       await savePreferencePatch({ enabled: false });
+      await reportDeviceState(state.oneSignal);
       showNotice("Уведомления отключены.", "success");
       renderDevice();
     } catch {
@@ -834,6 +869,7 @@
     try {
       await refreshConfig();
       await inspectSdkIfAvailable();
+      if (state.oneSignal) await reportDeviceState(state.oneSignal);
       showNotice("Состояние устройства обновлено.", "success");
     } catch (error) {
       showNotice(error.message, "error");

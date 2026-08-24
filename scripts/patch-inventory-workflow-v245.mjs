@@ -10,7 +10,8 @@ if (source.includes("bd-inventory-sheet-v245")) {
   process.exit(0);
 }
 
-const sheetStart = source.indexOf("function bdInventoryCountSheet");
+const hierarchyMarker = source.indexOf('const bdInventoryScopeHierarchyVersion="scope-hierarchy-v256";');
+const sheetStart = hierarchyMarker >= 0 ? hierarchyMarker : source.indexOf("function bdInventoryCountSheet");
 const sheetEnd = source.indexOf("function bdWriteoffSheet", sheetStart);
 if (sheetStart < 0 || sheetEnd < 0) throw new Error("Inventory count sheet anchors were not found");
 source = source.slice(0, sheetStart) + fragment + "\n" + source.slice(sheetEnd);

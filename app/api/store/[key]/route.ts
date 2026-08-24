@@ -14,17 +14,23 @@ import {
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import {
   ASSORTMENT_STORE_KEY,
-  consolidateInventoryDuplicates,
-  repairInventoryBalanceMetadata,
-  repairInventoryPurchaseAmounts,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
+import { INVENTORY_SNAPSHOT_STORE_KEY } from "../../../../lib/bardoctor/authoritative-persistence";
 import {
   EXPENSE_STORE_KEY,
   isPurchasePayment,
   PURCHASE_STOCK_CATEGORIES,
   PURCHASE_STORE_KEY,
 } from "../../../../lib/bardoctor/purchases";
+import {
+  reconcileTechCards,
+  validateTechCardVenueIsolation,
+} from "../../../../lib/bardoctor/tech-card-reconciliation";
+import {
+  auditCanonicalNomenclature,
+  enrichCanonicalSupplierSummary,
+} from "../../../../lib/bardoctor/nomenclature-identity";
 
 type RouteContext = { params: Promise<{ key: string }> };
 
@@ -60,10 +66,14 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     .where(and(eq(domainData.accountId, account.id), eq(domainData.storeKey, key)))
     .limit(1);
 
+  const data = row ? JSON.parse(row.dataJson) : null;
   return Response.json({
     ok: true,
-    data: row ? JSON.parse(row.dataJson) : null,
+    data,
     updatedAt: row?.updatedAt ?? null,
+    source: row ? "server_d1" : "missing",
+    authoritative: Boolean(row),
+    legacyImportRequired: !row && [ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY].includes(key),
   });
 }
 
@@ -98,58 +108,83 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     .where(and(eq(domainData.accountId, account.id), eq(domainData.storeKey, key)))
     .limit(1);
   const before = existing ? JSON.parse(existing.dataJson) : null;
+  if (key === STOCK_MOVEMENT_STORE_KEY) {
+    return Response.json(
+      {
+        ok: false,
+        code: "IMMUTABLE_STOCK_LEDGER",
+        error: "Складские движения создаются и сторнируются только lifecycle-операциями.",
+      },
+      { status: 409 },
+    );
+  }
+  if (key === ASSORTMENT_STORE_KEY && before == null) {
+    const dependent = await db
+      .select()
+      .from(domainData)
+      .where(and(
+        eq(domainData.accountId, account.id),
+        inArray(domainData.storeKey, [STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY, INVENTORY_SNAPSHOT_STORE_KEY]),
+      ));
+    const hasDependentHistory = dependent.some((row) => {
+      const value = JSON.parse(row.dataJson) as unknown;
+      return Array.isArray(value) ? value.length > 0 : Boolean(value);
+    });
+    if (hasDependentHistory) {
+      return Response.json(
+        {
+          ok: false,
+          code: "AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED",
+          error: "Нельзя автоматически объявить client cache авторитетным при существующей истории. Сначала выполните immutable export и import dry-run.",
+        },
+        { status: 409 },
+      );
+    }
+  }
   const merge = Object.prototype.hasOwnProperty.call(body, "baseData")
     ? mergeConcurrentStoreData(body.baseData ?? null, body.data ?? null, before)
     : { data: body.data ?? null, conflicts: 0 };
   let after = merge.data;
-  let repairedStockMovements: unknown[] | null = null;
+  let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
+    const venueIssues = validateTechCardVenueIsolation(after, account.venueId);
+    if (venueIssues.length) {
+      return Response.json(
+        {
+          ok: false,
+          code: "TECH_CARD_VENUE_ISOLATION",
+          error: "Техкарта или ингредиент ссылается на данные другого заведения.",
+          issues: venueIssues.slice(0, 50),
+        },
+        { status: 409 },
+      );
+    }
     const related = await db
       .select()
       .from(domainData)
       .where(and(
         eq(domainData.accountId, account.id),
-        inArray(domainData.storeKey, [STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY]),
+        eq(domainData.storeKey, PURCHASE_STORE_KEY),
       ));
     const relatedStores = new Map(related.map((row) => [row.storeKey, row.dataJson]));
-    const parsedStockMovements = JSON.parse(
-      relatedStores.get(STOCK_MOVEMENT_STORE_KEY) ?? "[]",
-    ) as unknown;
     const parsedPurchaseDocuments = JSON.parse(
       relatedStores.get(PURCHASE_STORE_KEY) ?? "[]",
     ) as unknown;
-    const stockMovements = Array.isArray(parsedStockMovements) ? parsedStockMovements : [];
     const purchaseDocuments = Array.isArray(parsedPurchaseDocuments) ? parsedPurchaseDocuments : [];
     const now = new Date().toISOString();
-    const consolidated = consolidateInventoryDuplicates({
+    const techCards = reconcileTechCards({
       assortment: after,
-      stockMovements,
-      now,
-    });
-    const amountRepair = repairInventoryPurchaseAmounts({
-      assortment: consolidated.assortment,
       purchaseDocuments,
-      stockMovements: consolidated.stockMovements,
-      now,
+      venueId: account.venueId,
+      now: new Date(now),
     });
-    const reconciled = consolidateInventoryDuplicates({
-      assortment: amountRepair.assortment,
-      stockMovements: amountRepair.stockMovements,
-      now,
+    after = enrichCanonicalSupplierSummary(techCards.assortment);
+    record(after).nomenclatureIdentityReport = auditCanonicalNomenclature({
+      assortment: after,
+      purchaseDocuments,
+      venueId: account.venueId,
     });
-    const metadataRepair = repairInventoryBalanceMetadata({
-      assortment: reconciled.assortment,
-      stockMovements: reconciled.stockMovements,
-      now,
-    });
-    after = metadataRepair.assortment;
-    if (
-      consolidated.summary.changed
-      || amountRepair.summary.changed
-      || reconciled.summary.changed
-    ) {
-      repairedStockMovements = reconciled.stockMovements;
-    }
+    techCardReconciliation = techCards.report;
   }
   const auditBefore = before == null && Array.isArray(after) ? [] : before;
   const auditAfter = after == null && Array.isArray(before) ? [] : after;
@@ -276,21 +311,6 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       set: { dataJson: JSON.stringify(after), updatedAt },
     });
 
-  if (repairedStockMovements) {
-    await db
-      .insert(domainData)
-      .values({
-        accountId: account.id,
-        storeKey: STOCK_MOVEMENT_STORE_KEY,
-        dataJson: JSON.stringify(repairedStockMovements),
-        updatedAt,
-      })
-      .onConflictDoUpdate({
-        target: [domainData.accountId, domainData.storeKey],
-        set: { dataJson: JSON.stringify(repairedStockMovements), updatedAt },
-      });
-  }
-
   if (mutations.length > 0) {
     const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
     for (const mutation of mutations.slice(0, 250)) {
@@ -336,5 +356,6 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     auditedChanges: mutations.length,
     mergedConflicts: merge.conflicts,
     data: after,
+    techCardReconciliation,
   });
 }

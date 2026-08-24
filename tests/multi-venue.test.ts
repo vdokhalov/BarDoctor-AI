@@ -243,7 +243,9 @@ test("multi-venue endpoints enforce membership, persist active session and creat
   assert.match(joinRoute, /rememberActiveVenueForRequest/);
   assert.match(venueService, /accountKind: "venue_data"/);
   assert.match(venueService, /restaurantJson: JSON\.stringify\(profile\)/);
-  assert.doesNotMatch(venueService, /domainData|bd_employees|bd_assortment|bd_finance|integrationConnections/);
+  assert.match(venueService, /authoritativeVenueStoreRows/);
+  assert.match(venueService, /venueId: venue\.id/);
+  assert.doesNotMatch(venueService, /bd_employees|bd_finance|integrationConnections/);
   assert.match(venueRoute, /cleanVenue: true/);
   assert.match(client, /window\.location\.replace\(safeTargetForVenue\(result\.activeVenueId\)\)/);
   assert.match(client, /selected \? "Текущее" : "Перейти"/);

@@ -33,7 +33,8 @@ function moveActionsToFooter(linePrefix, tail, ending) {
 moveActionsToFooter('if(phase==="count")', ']}));', ');');
 moveActionsToFooter('const reviewFilters=', ']}))}', ')}');
 
-const sheetStart = source.indexOf("function bdInventoryCountStatusLabel");
+const hierarchyMarker = source.indexOf('const bdInventoryScopeHierarchyVersion="scope-hierarchy-v256";');
+const sheetStart = hierarchyMarker >= 0 ? hierarchyMarker : source.indexOf("function bdInventoryCountStatusLabel");
 const sheetEnd = source.indexOf("function bdWriteoffSheet", sheetStart);
 if (sheetStart < 0 || sheetEnd < 0) throw new Error("Inventory sheet anchors were not found");
 source = source.slice(0, sheetStart) + fragment + "\n" + source.slice(sheetEnd);

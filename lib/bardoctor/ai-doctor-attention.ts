@@ -10,6 +10,7 @@ export type AIDoctorLifecycle =
   | "accepted"
   | "in_progress"
   | "verify_result"
+  | "reopened"
   | "closed"
   | "rejected"
   | "overdue";
@@ -42,6 +43,13 @@ export type AIDoctorAttention = {
   };
   priorities: JsonRecord[];
   inProgress: JsonRecord[];
+  activeProblems: JsonRecord[];
+  timeBuckets: {
+    today: JsonRecord[];
+    overdue: JsonRecord[];
+    upcoming: JsonRecord[];
+    backlog: JsonRecord[];
+  };
   opportunities: JsonRecord[];
   dataQuality: {
     reliabilityPercent: number;
@@ -89,6 +97,28 @@ function dateOnly(value: unknown): string | null {
   return match?.[0] ?? null;
 }
 
+type AIDoctorTimeBucket = "today" | "overdue" | "upcoming" | "backlog";
+
+function timeBucketFor(value: unknown, now: Date): AIDoctorTimeBucket {
+  const item = record(value);
+  if (text(item.lifecycle) === "overdue") return "overdue";
+  const today = now.toISOString().slice(0, 10);
+  const dueDate = dateOnly(item.taskDeadlineDate ?? item.canonicalDeadlineDate ?? item.deadlineDate);
+  if (dueDate) {
+    if (dueDate < today) return "overdue";
+    if (dueDate === today) return "today";
+    return "upcoming";
+  }
+  const deadline = [item.taskDeadline, item.recommendationDeadline, item.deadline]
+    .map((part) => text(part).toLocaleLowerCase("ru"))
+    .filter(Boolean)
+    .join(" ");
+  if (/просроч/.test(deadline)) return "overdue";
+  if (/немедлен|сейчас|сегодня|до открытия|до (ближайшей|следующей) смен|текущ(ей|ую) смен/.test(deadline)) return "today";
+  if (/завтра|в течение [1-7] (д|сут)|недел/.test(deadline)) return "upcoming";
+  return "backlog";
+}
+
 function sourceOf(value: unknown): string {
   return text(record(value).source, "operations", 60);
 }
@@ -130,8 +160,14 @@ function slug(value: string): string {
 }
 
 export function aiDoctorIssueKey(value: unknown): string {
+  const item = record(value);
+  const structured = text(item.issueKey, "", 80);
+  if ([
+    "profit", "revenue", "traffic", "average-check", "demand-and-average-check",
+    "external-traffic-risk", "operational-blocker", "equipment-recurring",
+  ].includes(structured)) return structured;
   const haystack = searchable(value);
-  if (/кондиц|климат|жар[аые]|вентиляц|температур/.test(haystack)) return "climate";
+  if (/кондиц|климат|жар[аыеу]|вентиляц|температур/.test(haystack)) return "climate";
   if (/караоке|микрофон|звук|акустик|аудио|колонк/.test(haystack)) return "audio";
   if (/незакрыт.{0,12}смен|смен.{0,12}(без отч[её]та|не заполн)|missing[- _]?shift|полнот.{0,10}смен/.test(haystack)) return "unclosed-shifts";
   if (/техкарт|рецепт.{0,12}(нет|отсутств|не заполн)|recipe/.test(haystack)) return "recipes";
@@ -146,6 +182,20 @@ export function aiDoctorIssueKey(value: unknown): string {
   if (/остат|дефицит|stock|склад/.test(haystack)) return "stock";
   if (/оборуд|ремонт|неисправ|broken/.test(haystack)) return `equipment-${slug(text(record(value).equipmentName, text(record(value).title, "equipment")))}`;
   return slug(text(record(value).title, text(record(value).action, "signal")));
+}
+
+/** Stable identity for a real problem, independent of changing recommendation wording. */
+export function aiDoctorProblemFingerprint(value: unknown, venueId?: string | number | null): string {
+  const item = record(value);
+  const evidence = evidenceOf(item);
+  const entity = text(
+    item.affectedEntity ?? item.entityId ?? item.equipmentName ?? item.zone ?? item.area,
+    evidence.map((entry) => text(entry.entityId ?? entry.equipmentName ?? entry.zone)).find(Boolean) ?? "",
+    120,
+  );
+  return [text(venueId, "venue"), aiDoctorIssueKey(item), entity ? slug(entity) : "all"]
+    .join(":")
+    .slice(0, 220);
 }
 
 export function classifyAIDoctorSignal(value: unknown): AIDoctorSignalClass {
@@ -208,7 +258,7 @@ function urgencyScore(value: unknown, now: Date): number {
   const dueDate = dateOnly(item.verificationDate) ?? dateOnly(item.deadline);
   const today = now.toISOString().slice(0, 10);
   if (hasCriticalOverride(item)) return 20;
-  if ((dueDate && dueDate <= today) || /немедлен|сейчас|до (ближайшей|следующей) смен|сегодня|просроч/.test(`${deadline} ${haystack}`)) return 18;
+  if ((dueDate && dueDate <= today) || /немедлен|сейчас|до открытия|до (ближайшей|следующей) смен|сегодня|просроч/.test(`${deadline} ${haystack}`)) return 18;
   if (dueDate) {
     const days = Math.ceil((Date.parse(`${dueDate}T00:00:00.000Z`) - Date.parse(`${today}T00:00:00.000Z`)) / 86_400_000);
     if (days <= 3) return 14;
@@ -222,9 +272,16 @@ function urgencyScore(value: unknown, now: Date): number {
 }
 
 function impactScore(value: unknown, signalClass: AIDoctorSignalClass): number {
+  const item = record(value);
   const haystack = searchable(value);
   if (hasCriticalOverride(value)) return 30;
-  if (/жалоб|неисправ|климат|жар|гост|репутац|падени.{0,12}выруч|убыт|дефицит/.test(haystack)) return 26;
+  if (item.businessWideImpact === true && (item.financialImpact === "high" || item.demandImpact === "high")) return 30;
+  if (item.financialImpact === "high" || item.demandImpact === "high") return 28;
+  if (item.operationalImpact === "critical") return 27;
+  if (item.guestImpact === "high" && item.businessWideImpact === true) return 26;
+  if (item.provenFinancialImpact === false && /оборуд|климат|микрофон|караоке/.test(haystack)) return 18;
+  if (/падени.{0,12}выруч|убыт|отрицательн.{0,16}(результат|прибыл)|спрос|трафик|средн.{0,8}чек/.test(haystack)) return 27;
+  if (/жалоб|неисправ|климат|жар|гост|репутац|дефицит/.test(haystack)) return 21;
   if (/марж|расход|выруч|прибыл|персонал|операц|смен/.test(haystack)) return 22;
   if (signalClass === "data_quality") return 13;
   if (signalClass === "opportunity") return 17;
@@ -243,8 +300,10 @@ function confirmationScore(value: unknown): number {
 }
 
 function scaleScore(value: unknown): number {
+  const item = record(value);
   const evidence = evidenceOf(value);
   const haystack = searchable(value);
+  if (item.businessWideImpact === true) return 10;
   if (/массов|системн|тенденц|продолжа|повтор/.test(haystack) || evidence.length >= 4) return 10;
   if (/нескольк|[2-9] жалоб|[2-9] смен/.test(haystack) || evidence.length >= 2) return 7;
   return 4;
@@ -261,8 +320,8 @@ function actionabilityScore(value: unknown): number {
 }
 
 function relatedTaskCount(value: unknown, tasks: JsonRecord[]): number {
-  const issueKey = aiDoctorIssueKey(value);
-  return tasks.filter((task) => aiDoctorIssueKey(task) === issueKey).length;
+  const fingerprint = aiDoctorProblemFingerprint(value);
+  return tasks.filter((task) => aiDoctorProblemFingerprint(task) === fingerprint).length;
 }
 
 function score(value: unknown, signalClass: AIDoctorSignalClass, tasks: JsonRecord[], now: Date) {
@@ -332,7 +391,18 @@ function lifecycleForTask(task: JsonRecord | undefined, now: Date): AIDoctorLife
   if (!task) return "new";
   const approval = text(task.approvalStatus);
   const status = text(task.status, "not_started");
-  if (task.hidden === true || approval === "deleted" || status === "cancelled") return "rejected";
+  const canonicalState = text(task.canonicalState);
+  if (
+    task.hidden === true
+    || task.stale === true
+    || task.superseded === true
+    || Boolean(text(task.supersededBy))
+    || ["deleted", "superseded"].includes(approval)
+    || ["cancelled", "superseded", "stale", "resolved", "closed"].includes(status)
+    || ["superseded", "resolved", "closed"].includes(canonicalState)
+  ) return status === "resolved" || status === "closed" || canonicalState === "resolved" || canonicalState === "closed"
+    ? "closed"
+    : "rejected";
   const outcome = text(record(task.actualResult).status, text(task.outcomeStatus));
   if (status === "completed") {
     if (outcome === "helped") return "closed";
@@ -348,9 +418,9 @@ function lifecycleForTask(task: JsonRecord | undefined, now: Date): AIDoctorLife
 function newestTaskFor(value: unknown, tasks: JsonRecord[]): JsonRecord | undefined {
   const item = record(value);
   const id = text(item.recommendationId);
-  const issueKey = aiDoctorIssueKey(item);
+  const fingerprint = aiDoctorProblemFingerprint(item);
   return tasks
-    .filter((task) => text(task.recommendationId) === id || aiDoctorIssueKey(task) === issueKey)
+    .filter((task) => text(task.recommendationId) === id || aiDoctorProblemFingerprint(task) === fingerprint)
     .sort((left, right) => text(right.updatedAt, text(right.createdAt)).localeCompare(text(left.updatedAt, text(left.createdAt))))[0];
 }
 
@@ -376,6 +446,7 @@ function mergeGroup(values: JsonRecord[], signalClass: AIDoctorSignalClass, task
   }));
   base.signalClass = signalClass;
   base.issueKey = issueKey;
+  base.problemFingerprint = aiDoctorProblemFingerprint(base);
   base.recommendationId = recommendationId(signalClass, issueKey);
   const countedQualityTitle = signalClass === "data_quality"
     ? values.map((value) => text(value.title, "", 140)).find((title) => /^\d+\s/.test(title))
@@ -397,9 +468,13 @@ function mergeGroup(values: JsonRecord[], signalClass: AIDoctorSignalClass, task
   const haystack = searchable(base);
   base.impactAreas = impactAreas(haystack, signalClass);
   base.riskWithoutAction = riskLabel(scored.total, scored.criticalOverride);
-  base.whyImportant = text(base.consequence, text(base.expectedEffect, "Сигнал может повлиять на работу заведения."), 300);
+  base.whyImportant = text(
+    base.consequence,
+    text(base.expectedEffect, evidence[0] ? `Влияние проверяется по факту: ${text(evidence[0].fact, text(evidence[0].label))}` : "Влияние пока не доказано; это гипотеза для проверки."),
+    300,
+  );
   base.whyNow = text(base.deadline)
-    ? `Срок действия: ${humanizeValue(base.deadline)}.`
+    ? `Рекомендованный срок: ${humanizeValue(base.deadline)}.`
     : scored.breakdown.urgency >= 18
       ? "Проверить до ближайшей смены."
       : "Проверить в текущем рабочем цикле.";
@@ -407,8 +482,9 @@ function mergeGroup(values: JsonRecord[], signalClass: AIDoctorSignalClass, task
   base.financialEffect = "Финансовый эффект пока нельзя надёжно оценить.";
   base.fact = humanizeValue(text(base.fact, text(base.basisSummary, "Сигнал требует проверки"), 600));
   base.factPeriod = humanizeValue(text(base.factPeriod));
-  base.deadline = humanizeValue(text(base.deadline, text(base.estimatedTime, "В течение 2 дней")));
-  base.estimatedTime = base.deadline;
+  base.recommendationDeadline = humanizeValue(text(base.deadline, text(base.estimatedTime)));
+  base.deadline = text(base.recommendationDeadline, "Без срока");
+  base.estimatedTime = base.recommendationDeadline;
   base.lifecycle = "new";
   return base;
 }
@@ -492,6 +568,9 @@ function dataQualityCandidates(context: VenueAIContext, candidates: JsonRecord[]
   const confirmedRecipes = number(menu.confirmedRecipes) ?? 0;
   const missingRecipes = number(qualityCounts.missingRecipes) ?? Math.max(0, activeItems - confirmedRecipes);
   const unmappedIngredients = number(qualityCounts.unmappedIngredients) ?? 0;
+  const linkedUnitReviewIngredients = number(qualityCounts.linkedUnitReviewIngredients) ?? 0;
+  const linkedPackagingReviewIngredients = number(qualityCounts.linkedPackagingReviewIngredients) ?? 0;
+  const ambiguousEntityIngredients = number(qualityCounts.ambiguousEntityIngredients) ?? 0;
   const missingPurchasePrices = number(qualityCounts.missingPurchasePrices) ?? 0;
   const add = (key: string, count: number, title: string, impact: string) => {
     if (count <= 0 || result.some((item) => aiDoctorIssueKey(item) === key)) return;
@@ -509,6 +588,9 @@ function dataQualityCandidates(context: VenueAIContext, candidates: JsonRecord[]
   };
   add("recipes", missingRecipes, `${missingRecipes} ${missingRecipes === 1 ? "позиция без техкарты" : "позиций без техкарт"}`, "Без техкарт AI не может надёжно оценить себестоимость меню.");
   add("ingredient-mapping", unmappedIngredients, `${unmappedIngredients} ${unmappedIngredients === 1 ? "ингредиент не связан" : "ингредиентов не связаны"} с закупками`, "Связь ingredient → purchase нужна для достоверной себестоимости.");
+  add("ingredient-unit-review", linkedUnitReviewIngredients, `${linkedUnitReviewIngredients} ${linkedUnitReviewIngredients === 1 ? "связанная позиция требует" : "связанных позиций требуют"} уточнения нормы`, "Товар найден, но себестоимость нельзя рассчитать до подтверждения единицы или количества.");
+  add("ingredient-packaging-review", linkedPackagingReviewIngredients, `${linkedPackagingReviewIngredients} ${linkedPackagingReviewIngredients === 1 ? "связанная позиция требует" : "связанных позиций требуют"} выбора фасовки`, "Товар найден, но для пересчёта нормы нужно выбрать подтверждённую фасовку.");
+  add("ingredient-candidates", ambiguousEntityIngredients, `${ambiguousEntityIngredients} ${ambiguousEntityIngredients === 1 ? "ингредиент имеет несколько кандидатов" : "ингредиентов имеют несколько кандидатов"}`, "Нужно подтвердить конкретную номенклатурную позицию без автоматического угадывания.");
   add("purchase-prices", missingPurchasePrices, `${missingPurchasePrices} ${missingPurchasePrices === 1 ? "ингредиент без закупочной цены" : "ингредиентов без закупочных цен"}`, "Без подтверждённых цен финансовый эффект рекомендаций нельзя считать надёжно.");
 
   for (const block of context.blocks) {
@@ -587,6 +669,14 @@ export function humanizeValue(value: unknown): string {
   return source
     .replace(/(\d+(?:[.,]\d+)?)\s+monetary units?/gi, (_match, amount: string) => `${new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 1 }).format(Number(amount.replace(",", ".")))} ₽`)
     .replace(/coveragePercent\s*=\s*(\d+(?:[.,]\d+)?)/gi, "Заполнено только $1% смен")
+    .replace(/\bcomplaint\b/gi, "жалоба")
+    .replace(/\bcritical\b/gi, "критический приоритет")
+    .replace(/\bhigh\b/gi, "высокий приоритет")
+    .replace(/\bmedium\b/gi, "средний приоритет")
+    .replace(/\blow\b/gi, "низкий приоритет")
+    .replace(/\bin_progress\b/gi, "в работе")
+    .replace(/\bopen\b/gi, "открыто")
+    .replace(/\bclosed\b/gi, "закрыто")
     .replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z\b/g, (match) => humanDate(match));
 }
 
@@ -621,6 +711,37 @@ function historyFrom(tasks: JsonRecord[], now: Date): JsonRecord[] {
     });
 }
 
+function uniqueProblems(items: JsonRecord[]): JsonRecord[] {
+  const byFingerprint = new Map<string, JsonRecord>();
+  for (const item of items) {
+    const fingerprint = text(item.problemFingerprint, aiDoctorProblemFingerprint(item));
+    const existing = byFingerprint.get(fingerprint);
+    if (!existing || text(item.updatedAt, text(item.createdAt)) > text(existing.updatedAt, text(existing.createdAt))) {
+      byFingerprint.set(fingerprint, item);
+    }
+  }
+  return [...byFingerprint.values()];
+}
+
+function operationalProblemRow(item: JsonRecord): JsonRecord {
+  const lifecycle = text(item.lifecycle, "new");
+  return {
+    canonicalProblemId: text(item.problemFingerprint, aiDoctorProblemFingerprint(item)),
+    recommendationId: text(item.recommendationId),
+    issueKey: text(item.issueKey, aiDoctorIssueKey(item)),
+    title: humanizeValue(text(item.title, "Операционная проблема")),
+    status: lifecycle,
+    signalCount: Math.max(1, Math.round(number(item.signalCount) ?? number(item.historyCount) ?? 1)),
+    taskStatus: text(item.linkedTaskId) ? (lifecycle === "overdue" ? "Просрочено" : "Задача создана") : "Задача не создана",
+    responsible: humanizeValue(text(item.responsibleRole, "Не назначен")),
+    timeBucket: text(item.timeBucket, "backlog"),
+    deadlineSources: array(item.deadlineSources).map(record),
+    nextCheck: humanizeValue(text(item.resolutionCheck, text(item.successCriterion, "Назначить следующую проверку"))),
+    priority: text(item.priority, "medium"),
+    fact: humanizeValue(text(item.fact)),
+  };
+}
+
 export function buildAIDoctorAttention(input: {
   candidates: unknown[];
   context: VenueAIContext;
@@ -628,6 +749,7 @@ export function buildAIDoctorAttention(input: {
   operationalInput?: unknown;
   evidenceCatalog?: unknown[];
   areas?: unknown[];
+  dataReliabilityPercent?: number;
   now?: Date;
 }): AIDoctorAttention {
   const now = input.now ?? new Date();
@@ -670,7 +792,7 @@ export function buildAIDoctorAttention(input: {
     if (!text(candidate.title) && !text(candidate.action)) continue;
     const signalClass = classifyAIDoctorSignal(candidate);
     if (signalClass === "data_quality") continue;
-    const key = `${signalClass}:${aiDoctorIssueKey(candidate)}`;
+    const key = `${signalClass}:${aiDoctorProblemFingerprint(candidate)}`;
     groups.set(key, [...(groups.get(key) ?? []), candidate]);
   }
   const merged = [...groups.entries()].map(([key, values]) => mergeGroup(
@@ -686,38 +808,106 @@ export function buildAIDoctorAttention(input: {
   const matchedTaskIds = new Set<string>();
   for (const candidate of merged) {
     const task = newestTaskFor(candidate, tasks);
-    if (task && text(task.id)) matchedTaskIds.add(text(task.id));
+    if (task) {
+      const fingerprint = aiDoctorProblemFingerprint(candidate);
+      for (const related of tasks) {
+        if (
+          text(related.recommendationId) === text(candidate.recommendationId)
+          || aiDoctorProblemFingerprint(related) === fingerprint
+        ) {
+          if (text(related.id)) matchedTaskIds.add(text(related.id));
+        }
+      }
+    }
     let lifecycle = lifecycleForTask(task, now);
     const taskOutcome = text(record(task?.actualResult).status, text(task?.outcomeStatus));
-    if (task && text(task.status) === "completed" && taskOutcome === "helped") {
-      lifecycle = "verify_result";
-      candidate.resultMessage = "Проблема снова подтверждается после выполненного действия. Требуется повторная проверка.";
+    const taskUpdatedAt = Date.parse(text(task?.updatedAt, text(task?.createdAt)));
+    const newestEvidenceAt = Math.max(
+      ...evidenceOf(candidate)
+        .map((entry) => Date.parse(text(entry.observedAt)))
+        .filter(Number.isFinite),
+      Number.NEGATIVE_INFINITY,
+    );
+    const hasNewEvidence = Number.isFinite(taskUpdatedAt)
+      && Number.isFinite(newestEvidenceAt)
+      && newestEvidenceAt > taskUpdatedAt;
+    if (task && text(task.status) === "completed" && taskOutcome === "helped" && hasNewEvidence) {
+      lifecycle = "reopened";
+      candidate.resultMessage = "После закрытия появилась новая фактическая точка: проблема открыта повторно.";
+    } else if (task && text(task.status) === "completed" && taskOutcome === "not_helped" && hasNewEvidence) {
+      lifecycle = "reopened";
+      candidate.resultMessage = "Предыдущее действие не помогло, а новое измерение подтверждает проблему. Нужна другая гипотеза.";
     } else if (task && text(task.status) === "completed" && taskOutcome === "not_helped") {
       lifecycle = "verify_result";
-      candidate.resultMessage = "Действие не дало ожидаемого результата. Требуется повторное вмешательство.";
+      candidate.resultMessage = "Действие не помогло; повтор той же рекомендации подавлен до появления нового факта.";
     }
     candidate.lifecycle = lifecycle;
     candidate.linkedTaskId = text(task?.id) || null;
     candidate.responsibleRole = text(task?.responsible, text(candidate.responsibleRole, "управляющий"));
-    candidate.deadlineDate = dateOnly(task?.deadline ?? task?.verificationDate ?? candidate.verificationDate ?? candidate.deadline);
-    candidate.deadline = humanizeValue(text(task?.deadline, text(candidate.deadline)));
+    candidate.recommendationDeadline = humanizeValue(text(candidate.recommendationDeadline, text(candidate.deadline)));
+    candidate.taskDeadline = task ? humanizeValue(task.deadline) : "";
+    candidate.verificationDeadline = humanizeValue(task?.verificationDate ?? candidate.verificationDate);
+    candidate.taskDeadlineDate = dateOnly(task?.deadline);
+    candidate.verificationDeadlineDate = dateOnly(task?.verificationDate ?? candidate.verificationDate);
+    candidate.canonicalDeadlineDate = candidate.taskDeadlineDate ?? candidate.verificationDeadlineDate ?? dateOnly(candidate.deadline);
+    candidate.deadlineDate = candidate.canonicalDeadlineDate;
+    candidate.deadline = text(candidate.taskDeadline, text(candidate.recommendationDeadline, "Без срока"));
+    candidate.deadlineSources = [
+      text(candidate.recommendationDeadline) ? { kind: "recommendation", label: "Рекомендованный срок", value: candidate.recommendationDeadline } : null,
+      text(candidate.taskDeadline) ? { kind: "task", label: "Срок задачи", value: candidate.taskDeadline } : null,
+      text(candidate.verificationDeadline) ? { kind: "verification", label: "Дата проверки результата", value: candidate.verificationDeadline } : null,
+    ].filter(Boolean);
+    candidate.whyNow = text(candidate.taskDeadline)
+      ? `Срок задачи: ${candidate.taskDeadline}.`
+      : text(candidate.recommendationDeadline)
+        ? `Рекомендованный срок: ${candidate.recommendationDeadline}.`
+        : "Срок не назначен; задача остаётся в backlog.";
+    candidate.timeBucket = timeBucketFor(candidate, now);
     if (candidate.signalClass === "opportunity") {
       if (!ACTIVE_LIFECYCLES.has(lifecycle)) opportunities.push(candidate);
       else inProgress.push(candidate);
       continue;
     }
-    if (lifecycle === "accepted" || lifecycle === "in_progress") inProgress.push(candidate);
-    else if (lifecycle !== "rejected") actionable.push(candidate);
+    if (lifecycle === "accepted" || lifecycle === "in_progress" || lifecycle === "verify_result") inProgress.push(candidate);
+    else if (lifecycle !== "rejected" && lifecycle !== "closed") actionable.push(candidate);
   }
 
+  const unmatchedActiveGroups = new Map<string, JsonRecord[]>();
   for (const task of tasks) {
     if (text(task.id) && matchedTaskIds.has(text(task.id))) continue;
+    if (!ACTIVE_LIFECYCLES.has(lifecycleForTask(task, now))) continue;
+    const key = aiDoctorProblemFingerprint(task);
+    unmatchedActiveGroups.set(key, [...(unmatchedActiveGroups.get(key) ?? []), task]);
+  }
+  for (const groupedTasks of unmatchedActiveGroups.values()) {
+    const task = groupedTasks
+      .slice()
+      .sort((left, right) => text(right.updatedAt, text(right.createdAt)).localeCompare(text(left.updatedAt, text(left.createdAt))))[0]!;
     const lifecycle = lifecycleForTask(task, now);
-    if (!ACTIVE_LIFECYCLES.has(lifecycle)) continue;
-    const candidate = mergeGroup([taskAsRecommendation(task)], "problem", tasks, now);
+    const candidate = mergeGroup(groupedTasks.map(taskAsRecommendation), "problem", tasks, now);
     candidate.lifecycle = lifecycle;
     candidate.linkedTaskId = text(task.id) || null;
-    candidate.deadlineDate = dateOnly(task.deadline ?? task.verificationDate);
+    candidate.linkedTaskIds = groupedTasks.map((item) => text(item.id)).filter(Boolean);
+    candidate.historyCount = groupedTasks.length;
+    candidate.recommendationDeadline = humanizeValue(candidate.recommendationDeadline ?? candidate.deadline);
+    candidate.taskDeadline = humanizeValue(task.deadline);
+    candidate.verificationDeadline = humanizeValue(task.verificationDate);
+    candidate.taskDeadlineDate = dateOnly(task.deadline);
+    candidate.verificationDeadlineDate = dateOnly(task.verificationDate);
+    candidate.canonicalDeadlineDate = candidate.taskDeadlineDate ?? candidate.verificationDeadlineDate;
+    candidate.deadlineDate = candidate.canonicalDeadlineDate;
+    candidate.deadline = text(candidate.taskDeadline, text(candidate.recommendationDeadline, "Без срока"));
+    candidate.deadlineSources = [
+      text(candidate.recommendationDeadline) ? { kind: "recommendation", label: "Рекомендованный срок", value: candidate.recommendationDeadline } : null,
+      text(candidate.taskDeadline) ? { kind: "task", label: "Срок задачи", value: candidate.taskDeadline } : null,
+      text(candidate.verificationDeadline) ? { kind: "verification", label: "Дата проверки результата", value: candidate.verificationDeadline } : null,
+    ].filter(Boolean);
+    candidate.whyNow = text(candidate.taskDeadline)
+      ? `Срок задачи: ${candidate.taskDeadline}.`
+      : text(candidate.recommendationDeadline)
+        ? `Рекомендованный срок: ${candidate.recommendationDeadline}.`
+        : "Срок не назначен; задача остаётся в backlog.";
+    candidate.timeBucket = timeBucketFor(candidate, now);
     if (lifecycle === "overdue" || (lifecycle === "verify_result" && text(record(task.actualResult).status) === "not_helped")) {
       if (lifecycle === "overdue") candidate.resultMessage = "Срок прошёл, а результат ещё не подтверждён.";
       actionable.push(candidate);
@@ -753,13 +943,29 @@ export function buildAIDoctorAttention(input: {
     .sort((left, right) => (number(right.priorityScore) ?? 0) - (number(left.priorityScore) ?? 0))
     .slice(0, 8);
 
-  const priorities = actionable.slice(0, 3);
+  const activeProblemCandidates = uniqueProblems([...actionable, ...inProgress])
+    .filter((item) => classifyAIDoctorSignal(item) === "problem")
+    .filter((item) => item.stale !== true && item.superseded !== true && !text(item.supersededBy));
+  const timeBuckets = {
+    today: activeProblemCandidates.filter((item) => text(item.timeBucket) === "today"),
+    overdue: activeProblemCandidates.filter((item) => text(item.timeBucket) === "overdue"),
+    upcoming: activeProblemCandidates.filter((item) => text(item.timeBucket) === "upcoming"),
+    backlog: activeProblemCandidates.filter((item) => text(item.timeBucket) === "backlog"),
+  };
+  const priorities = actionable.filter((item) => text(item.timeBucket) === "today").slice(0, 3);
+  const businessIssueKeys = new Set(["profit", "revenue", "traffic", "average-check", "demand-and-average-check", "external-traffic-risk"]);
+  const activeProblems = activeProblemCandidates
+    .filter((item) => !businessIssueKeys.has(aiDoctorIssueKey(item)))
+    .map(operationalProblemRow)
+    .slice(0, 12);
   const critical = actionable.filter((item) => item.criticalOverride === true).length;
   const important = actionable.filter((item) => (number(item.priorityScore) ?? 0) >= 45 && item.criticalOverride !== true).length;
   const stable = (input.areas ?? [])
     .map(record)
     .filter((area) => area.status === "stable").length;
-  const reliabilityPercent = dataReliabilityPercent(input.context);
+  const reliabilityPercent = Number.isFinite(input.dataReliabilityPercent)
+    ? Math.max(0, Math.min(100, Math.round(input.dataReliabilityPercent!)))
+    : dataReliabilityPercent(input.context);
 
   return {
     version: "ai-doctor-attention-v1",
@@ -774,6 +980,13 @@ export function buildAIDoctorAttention(input: {
     },
     priorities,
     inProgress: inProgress.slice(0, 12),
+    activeProblems,
+    timeBuckets: {
+      today: timeBuckets.today.slice(0, 12),
+      overdue: timeBuckets.overdue.slice(0, 12),
+      upcoming: timeBuckets.upcoming.slice(0, 12),
+      backlog: timeBuckets.backlog.slice(0, 12),
+    },
     opportunities: opportunities.slice(0, 8),
     dataQuality: {
       reliabilityPercent,

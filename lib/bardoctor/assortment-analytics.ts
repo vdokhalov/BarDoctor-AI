@@ -6,6 +6,10 @@ import {
   procurementPricePoints,
   type ProcurementPricePoint,
 } from "./procurement-analytics";
+import {
+  canonicalTechCardForOwner,
+  reconcileTechCards,
+} from "./tech-card-reconciliation";
 
 type JsonRecord = Record<string, unknown>;
 type BaseUnit = "ml" | "g" | "pcs";
@@ -178,13 +182,47 @@ function balanceMap(value: JsonRecord) {
   return map;
 }
 
+function resolvedIngredientAmount(ingredient: JsonRecord): {
+  amount: number;
+  unit: ReturnType<typeof toInventoryBaseAmount>["unit"];
+  reason: "unit" | "unit_resolution" | "packaging_resolution" | null;
+} {
+  const resolutionStatus = text(ingredient.resolutionStatus, "", 50);
+  if (resolutionStatus === "linked_unit_review") {
+    const fallback = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+    return { ...fallback, reason: "unit_resolution" };
+  }
+  if (resolutionStatus === "linked_packaging_review") {
+    const fallback = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+    return { ...fallback, reason: "packaging_resolution" };
+  }
+  const normalizedAmount = nonNegative(ingredient.normalizedQuantity);
+  const normalizedUnit = text(ingredient.normalizedUnit, "", 20);
+  if (
+    normalizedAmount !== null
+    && ["g", "ml", "pcs"].includes(normalizedUnit)
+    && ["exact_compatible", "packaging_compatible"].includes(text(ingredient.unitResolutionStatus))
+  ) {
+    return {
+      amount: normalizedAmount,
+      unit: normalizedUnit as ReturnType<typeof toInventoryBaseAmount>["unit"],
+      reason: null,
+    };
+  }
+  const fallback = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+  return { ...fallback, reason: fallback.unit === "unknown" ? "unit" : null };
+}
+
 function ingredientCost(
   ingredient: JsonRecord,
   prices: Map<string, ProcurementPricePoint>,
   balances: Map<string, JsonRecord>,
 ) {
-  const amount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+  const amount = resolvedIngredientAmount(ingredient);
   const productKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
+  if (amount.reason) {
+    return { complete: false, reason: amount.reason, amount: amount.amount, unit: amount.unit, productKey };
+  }
   if (amount.unit === "unknown") {
     return { complete: false, reason: "unit", amount: amount.amount, unit: amount.unit, productKey };
   }
@@ -233,14 +271,15 @@ function historicalRecipeCosts(
 ) {
   if (!ingredients.length) return [];
   const normalized = ingredients.map((ingredient) => {
-    const amount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+    const amount = resolvedIngredientAmount(ingredient);
     return {
       amount: amount.amount,
       unit: amount.unit,
+      reason: amount.reason,
       productKey: text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300),
     };
   });
-  if (normalized.some((item) => item.unit === "unknown" || !item.productKey)) return [];
+  if (normalized.some((item) => item.unit === "unknown" || item.reason || !item.productKey)) return [];
   const dates = [...new Set(normalized.flatMap((item) =>
     (history.get(pointKey(item.productKey, item.unit)) ?? []).map((point) => point.date)
   ))].sort();
@@ -280,9 +319,9 @@ function recipeCostDrivers(
   currency: string,
 ) {
   return ingredients.flatMap((ingredient) => {
-    const amount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+    const amount = resolvedIngredientAmount(ingredient);
     const productKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
-    if (amount.unit === "unknown" || !productKey) return [];
+    if (amount.unit === "unknown" || amount.reason || !productKey) return [];
     const points = history.get(pointKey(productKey, amount.unit)) ?? [];
     const previous = points.filter((point) =>
       point.date <= previousDate && point.currency === currency
@@ -322,7 +361,7 @@ function signedMoney(value: number, currency: string): string {
 function itemStatus(item: JsonRecord, recipe: JsonRecord | undefined, costComplete: boolean) {
   if (text(item.type) === "service") return nonNegative(item.salePrice) ? "ready" : "attention";
   if (!recipe) return "missing_recipe";
-  if (text(recipe.status) !== "confirmed") return "review";
+  if (text(recipe.reviewStatus) !== "approved") return "review";
   return costComplete ? "ready" : "attention";
 }
 
@@ -337,15 +376,31 @@ export function buildAssortmentAnalytics(input: {
 }) {
   const now = input.now ?? new Date();
   const period = periodWindow(input.period, now);
-  const assortment = record(input.assortment);
+  const reconciliation = reconcileTechCards({
+    assortment: input.assortment,
+    purchaseDocuments: input.purchaseDocuments,
+    venueId: input.venueId,
+    now,
+  });
+  const assortment = record(reconciliation.assortment);
   const groups = array(assortment.groups).map(record);
   const menuItems = array(assortment.menuItems).map(record).filter((item) => item.active !== false);
   const recipes = array(assortment.recipes).map(record);
-  const recipeByMenuId = new Map(recipes.map((recipe) => [text(recipe.menuItemId), recipe]));
+  const activeAiDraftCards = recipes.filter((recipe) =>
+    recipe.currentDraft === true && text(recipe.reviewStatus) === "ai_draft"
+  );
+  const activeReviewCards = recipes.filter((recipe) =>
+    recipe.currentDraft === true && text(recipe.reviewStatus) === "requires_review"
+  );
+  const recipeByMenuId = new Map(menuItems.map((item) => [
+    text(item.id),
+    canonicalTechCardForOwner(item.id, recipes),
+  ]));
   const balances = balanceMap(assortment);
   const pricePoints = procurementPricePoints(input.purchaseDocuments ?? [], {
     venueId: input.venueId,
     includePriceLists: false,
+    productAliases: assortment.canonicalProductAliases,
   });
   const currentPrices = latestPoints(pricePoints);
   const priceHistory = pointHistory(pricePoints);
@@ -387,6 +442,10 @@ export function buildAssortmentAnalytics(input: {
   const itemAnalytics = menuItems.map((item) => {
     const id = text(item.id, crypto.randomUUID(), 120);
     const recipe = recipeByMenuId.get(id);
+    const ownerCards = recipes.filter((candidate) =>
+      text(candidate.menuItemId ?? candidate.ownerId, "", 120) === id
+    );
+    const pendingDraft = ownerCards.find((candidate) => candidate.currentDraft === true);
     const ingredients = array(recipe?.ingredients).map(record);
     const ingredientRows = ingredients.map((ingredient) => ({
       id: text(ingredient.id, crypto.randomUUID(), 120),
@@ -395,8 +454,9 @@ export function buildAssortmentAnalytics(input: {
       ...ingredientCost(ingredient, currentPrices, balances),
     }));
     const isService = text(item.type) === "service";
+    const reviewStatus = recipe ? text(recipe.reviewStatus, "requires_review", 40) : "missing";
     const costComplete = !isService
-      && text(recipe?.status) === "confirmed"
+      && reviewStatus === "approved"
       && ingredientRows.length > 0
       && ingredientRows.every((ingredient) => ingredient.complete);
     const costCurrencies = new Set(
@@ -451,6 +511,14 @@ export function buildAssortmentAnalytics(input: {
       currency: saleCurrency,
       recipeId: text(recipe?.id, "", 120) || null,
       recipeStatus: recipe ? text(recipe.status, "draft", 30) : "missing",
+      techCardStatus: reviewStatus,
+      techCardSource: recipe ? text(recipe.source, "manual", 30) : null,
+      techCardVersion: recipe ? number(recipe.version) ?? 1 : null,
+      techCardUpdatedAt: recipe ? latestStamp(recipe) || null : null,
+      ownerLinkStatus: recipe ? text(recipe.ownerLinkStatus, "linked", 40) : "missing",
+      hasPendingDraft: Boolean(pendingDraft && pendingDraft.id !== recipe?.id),
+      pendingDraftId: pendingDraft ? text(pendingDraft.id, "", 120) || null : null,
+      pendingDraftStatus: pendingDraft ? text(pendingDraft.reviewStatus, "requires_review", 40) : null,
       status: itemStatus(item, recipe, costComplete),
       ingredientCount: ingredients.length,
       mappedIngredientCount: ingredients.filter((ingredient) =>
@@ -458,6 +526,9 @@ export function buildAssortmentAnalytics(input: {
       ).length,
       pricedIngredientCount: ingredientRows.filter((ingredient) => ingredient.complete).length,
       invalidUnitCount: ingredientRows.filter((ingredient) => ingredient.reason === "unit").length,
+      unitReviewCount: ingredientRows.filter((ingredient) => ingredient.reason === "unit_resolution").length,
+      packagingReviewCount: ingredientRows.filter((ingredient) => ingredient.reason === "packaging_resolution").length,
+      ambiguousEntityCount: ingredients.filter((ingredient) => text(ingredient.resolutionStatus) === "candidates_review").length,
       unmappedIngredientCount: ingredientRows.filter((ingredient) => ingredient.reason === "mapping").length,
       missingPriceCount: ingredientRows.filter((ingredient) => ingredient.reason === "price").length,
       ingredientRows,
@@ -495,7 +566,7 @@ export function buildAssortmentAnalytics(input: {
   for (const item of itemAnalytics) {
     requiredChecks.push({ id: `${item.id}:sale-price`, complete: item.salePrice !== null });
     if (item.type === "service") continue;
-    requiredChecks.push({ id: `${item.id}:recipe`, complete: item.recipeStatus === "confirmed" });
+    requiredChecks.push({ id: `${item.id}:recipe`, complete: item.techCardStatus === "approved" });
     requiredChecks.push({ id: `${item.id}:units`, complete: item.ingredientCount > 0 && item.invalidUnitCount === 0 });
     requiredChecks.push({ id: `${item.id}:mapping`, complete: item.ingredientCount > 0 && item.unmappedIngredientCount === 0 });
     requiredChecks.push({ id: `${item.id}:prices`, complete: item.ingredientCount > 0 && item.missingPriceCount === 0 });
@@ -506,7 +577,9 @@ export function buildAssortmentAnalytics(input: {
     : 0;
 
   const missingRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.recipeStatus === "missing");
-  const draftRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.recipeStatus === "draft");
+  const aiDraftRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.techCardStatus === "ai_draft");
+  const reviewRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.techCardStatus === "requires_review");
+  const draftRecipes = [...aiDraftRecipes, ...reviewRecipes];
   const unmappedItems = itemAnalytics.filter((item) => item.unmappedIngredientCount > 0);
   const invalidUnitItems = itemAnalytics.filter((item) => item.invalidUnitCount > 0);
   const missingPriceItems = itemAnalytics.filter((item) => item.missingPriceCount > 0);
@@ -556,6 +629,16 @@ export function buildAssortmentAnalytics(input: {
     tab: "recipes",
     filter: "review",
     itemId: draftRecipes[0].id,
+  });
+  if (activeAiDraftCards.length) signals.push({
+    id: "ai-draft-recipes",
+    type: "recipe_ai_draft",
+    tone: "orange",
+    title: `${activeAiDraftCards.length} ${plural(activeAiDraftCards.length, "AI-черновик", "AI-черновика", "AI-черновиков")}`,
+    detail: "AI-предложения существуют и привязаны к позициям, но ещё не утверждены",
+    tab: "recipes",
+    filter: "ai_draft",
+    itemId: text(activeAiDraftCards[0].menuItemId, "", 120) || null,
   });
   if (unmappedItems.length) signals.push({
     id: "ingredient-mapping",
@@ -711,7 +794,7 @@ export function buildAssortmentAnalytics(input: {
       needIssues.push(`${item.name}: нет плана и недостаточно истории продаж`);
       continue;
     }
-    if (item.recipeStatus !== "confirmed") {
+    if (item.techCardStatus !== "approved") {
       needIssues.push(`${item.name}: техкарта не подтверждена`);
       continue;
     }
@@ -785,7 +868,7 @@ export function buildAssortmentAnalytics(input: {
     summary: {
       menuItems: itemAnalytics.length,
       readinessPercent,
-      readyRecipes: itemAnalytics.filter((item) => item.recipeStatus === "confirmed").length,
+      readyRecipes: itemAnalytics.filter((item) => item.techCardStatus === "approved").length,
       attentionItems: attentionIds.size,
     },
     readiness: {
@@ -795,7 +878,7 @@ export function buildAssortmentAnalytics(input: {
       formula: "Выполненные обязательные проверки ÷ все применимые обязательные проверки",
       mandatory: [
         { id: "sale_price", label: "Актуальная цена продажи", complete: itemAnalytics.filter((item) => item.salePrice !== null).length, total: itemAnalytics.length },
-        { id: "recipe", label: "Подтверждённая техкарта", complete: itemAnalytics.filter((item) => item.type === "service" || item.recipeStatus === "confirmed").length, total: itemAnalytics.length },
+        { id: "recipe", label: "Подтверждённая техкарта", complete: itemAnalytics.filter((item) => item.type === "service" || item.techCardStatus === "approved").length, total: itemAnalytics.length },
         { id: "units", label: "Нормализованные единицы", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.invalidUnitCount === 0)).length, total: itemAnalytics.length },
         { id: "mapping", label: "Связь ингредиентов с закупками", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.unmappedIngredientCount === 0)).length, total: itemAnalytics.length },
         { id: "purchase_price", label: "Подтверждённая стоимость ингредиентов", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.missingPriceCount === 0)).length, total: itemAnalytics.length },
@@ -824,12 +907,21 @@ export function buildAssortmentAnalytics(input: {
     },
     counts: {
       activeItems: itemAnalytics.length,
-      confirmedRecipes: itemAnalytics.filter((item) => item.recipeStatus === "confirmed").length,
+      confirmedRecipes: itemAnalytics.filter((item) => item.techCardStatus === "approved").length,
       draftRecipes: draftRecipes.length,
+      aiDraftRecipes: activeAiDraftCards.length,
+      reviewRecipes: activeReviewCards.length,
       missingRecipes: missingRecipes.length,
+      incompleteIngredientLinks: itemAnalytics.filter((item) => item.unmappedIngredientCount > 0).length,
+      orphanRecipes: reconciliation.report.orphan,
+      ambiguousRecipes: reconciliation.report.ambiguous,
+      duplicateCandidates: reconciliation.report.duplicateCandidates,
       attentionItems: attentionIds.size,
       unmappedIngredients: itemAnalytics.reduce((sum, item) => sum + item.unmappedIngredientCount, 0),
       invalidUnits: itemAnalytics.reduce((sum, item) => sum + item.invalidUnitCount, 0),
+      linkedUnitReviewIngredients: itemAnalytics.reduce((sum, item) => sum + item.unitReviewCount, 0),
+      linkedPackagingReviewIngredients: itemAnalytics.reduce((sum, item) => sum + item.packagingReviewCount, 0),
+      ambiguousEntityIngredients: itemAnalytics.reduce((sum, item) => sum + item.ambiguousEntityCount, 0),
       missingPurchasePrices: itemAnalytics.reduce((sum, item) => sum + item.missingPriceCount, 0),
       missingSalePrices: unpricedItems.length,
     },
@@ -879,7 +971,7 @@ export function buildAssortmentAnalytics(input: {
     },
     aiContext: {
       confirmedMenuEconomics: itemAnalytics
-        .filter((item) => item.recipeCost !== null && item.recipeStatus === "confirmed")
+        .filter((item) => item.recipeCost !== null && item.techCardStatus === "approved")
         .map((item) => ({
           id: item.id,
           name: item.name,
@@ -904,5 +996,6 @@ export function buildAssortmentAnalytics(input: {
         "При неполных item-level продажах маржа не рассчитывается",
       ],
     },
+    techCardReconciliation: reconciliation.report,
   };
 }

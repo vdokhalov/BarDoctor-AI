@@ -767,6 +767,19 @@ export async function internalAdminPush(options: QueryOptions = {}) {
     timezone:row.timezone,attempts:row.attempt_count,nextAttemptAt:row.next_attempt_at,detail:redactText(row.last_error),
     createdAt:row.created_at,updatedAt:row.updated_at,
   }));
+  const devices = await getD1().prepare(`
+    SELECT d.account_id,d.device_key,d.subscription_id,d.permission,d.opted_in,d.active,d.last_seen_at,d.updated_at,
+      a.app_email,a.first_name,a.last_name
+    FROM notification_devices d INNER JOIN accounts a ON a.id=d.account_id
+    ORDER BY d.last_seen_at DESC LIMIT 1000
+  `).all<{
+    account_id:number;device_key:string;subscription_id:string|null;permission:string;opted_in:number;active:number;
+    last_seen_at:string;updated_at:string;app_email:string;first_name:string;last_name:string|null;
+  }>();
+  const deviceItems=(devices.results??[]).map((row)=>({
+    accountId:row.account_id,account:fullName(row),deviceKey:row.device_key,subscriptionId:row.subscription_id ? "present" : "missing",
+    permission:row.permission,optedIn:Boolean(row.opted_in),active:Boolean(row.active),lastSeenAt:row.last_seen_at,updatedAt:row.updated_at,
+  }));
   const q=options.q?.trim().toLocaleLowerCase("ru")??"";
   const matches=(item:{account:string;category:string;status:string;detail:string|null})=>(!options.status||item.status===options.status)
     &&(!q||[item.account,item.category,item.status,item.detail].filter(Boolean).some((value)=>String(value).toLocaleLowerCase("ru").includes(q)));
@@ -778,13 +791,19 @@ export async function internalAdminPush(options: QueryOptions = {}) {
   const groups=new Map<string,typeof failedItems>();
   for(const item of failedItems){const key=`${item.category}|${item.detail??"Неизвестная ошибка провайдера"}`;groups.set(key,[...(groups.get(key)??[]),item]);}
   const failedJobs = jobItems.filter((item)=>item.status==="failed").length;
+  const activeDevices=deviceItems.filter((item)=>item.active);
+  const staleCutoff=Date.now()-7*86_400_000;
+  const staleDevices=deviceItems.filter((item)=>item.active && Date.parse(item.lastSeenAt)<staleCutoff);
+  const successful=allDeliveries.filter((item)=>item.status==="accepted"||item.status==="scheduled");
+  const recentSuccessful=successful.filter((item)=>Date.parse(item.createdAt)>=staleCutoff);
+  const enabledWithoutRecentSuccess=activeDevices.length>0 && recentSuccessful.length===0;
   const health = !serverConfigured
     ? "not_configured"
     : allDeliveries.length === 0 && jobItems.length === 0
       ? "unknown"
-      : (failed > 0 || failedJobs > 0) && accepted + scheduled === 0
+      : enabledWithoutRecentSuccess || (failed > 0 || failedJobs > 0) && accepted + scheduled === 0
         ? "error"
-        : failed > 0 || failedJobs > 0 ? "attention" : "working";
+        : failed > 0 || failedJobs > 0 || staleDevices.length > 0 ? "attention" : "working";
   return {
     provider: "OneSignal",
     configured: serverConfigured,
@@ -802,13 +821,27 @@ export async function internalAdminPush(options: QueryOptions = {}) {
       noSubscription: allDeliveries.filter((item) => item.status === "no_subscription").length,
       queuedJobs: jobItems.filter((item)=>item.status==="queued").length,
       failedJobs,
+      activeDevices:activeDevices.length,
+      staleDevices:staleDevices.length,
     },
+    observability: {
+      lastGeneratedAt:jobItems.map((item)=>item.createdAt).sort().at(-1)??null,
+      lastAttemptAt:jobItems.filter((item)=>item.attempts>0).map((item)=>item.updatedAt).sort().at(-1)??null,
+      lastSuccessAt:successful.map((item)=>item.createdAt).sort().at(-1)??null,
+      lastFailureAt:[...failedItems.map((item)=>item.createdAt),...jobItems.filter((item)=>item.status==="failed").map((item)=>item.updatedAt)].sort().at(-1)??null,
+      lastSuppressedAt:jobItems.filter((item)=>["cancelled","expired"].includes(item.status)).map((item)=>item.updatedAt).sort().at(-1)??null,
+    },
+    warnings: [
+      ...(enabledWithoutRecentSuccess ? [{code:"NO_RECENT_SUCCESS",severity:"error",message:"Есть активные push-устройства, но за 7 дней нет ни одной успешной передачи провайдеру."}] : []),
+      ...(staleDevices.length ? [{code:"STALE_SUBSCRIPTIONS",severity:"attention",message:`${staleDevices.length} активных подписок не подтверждали состояние более 7 дней.`}] : []),
+    ],
     errorGroups:[...groups.entries()].map(([key,values])=>({
       key,category:values[0].category,count:values.length,reason:values[0].detail??"Неизвестная ошибка провайдера",
       lastErrorAt:values[0].createdAt,affectedAccounts:new Set(values.map((item)=>item.accountId)).size,eventIds:values.map((item)=>item.id),
     })).sort((a,b)=>b.count-a.count),
     deliveries: items,
     jobs:jobItems.filter(matches),
+    devices:deviceItems,
     testNotificationAvailable: false,
     testNotificationReason: "Internal Admin не отправляет уведомление на устройство пользователя без явного выбора получателя",
   };

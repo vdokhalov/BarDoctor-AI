@@ -10,6 +10,7 @@ const STORE_KEYS = [
   "bd_finance_expenses",
   "bd_stock_movements",
   "bd_supplier_alternatives_v1",
+  "bd_assortment_v1",
 ] as const;
 
 type StoreRow = { store_key: string; data_json: string };
@@ -67,6 +68,7 @@ export async function GET(request: Request): Promise<Response> {
     expenses: ledger.expenses,
     stockMovements: values(stores.get("bd_stock_movements")),
     supplierAlternatives: parsed(stores.get("bd_supplier_alternatives_v1"), null),
+    assortment: parsed(stores.get("bd_assortment_v1"), {}),
     period,
     venueId: account.venueId,
   });

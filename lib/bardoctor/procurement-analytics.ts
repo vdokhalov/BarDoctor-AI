@@ -150,8 +150,20 @@ export function confirmedProcurementDocuments(
 
 export function procurementPricePoints(
   values: unknown[],
-  options: { venueId?: number; includePriceLists?: boolean } = {},
+  options: { venueId?: number; includePriceLists?: boolean; productAliases?: unknown } = {},
 ): ProcurementPricePoint[] {
+  const aliases = new Map(array(options.productAliases).map(record)
+    .map((alias) => [text(alias.from, "", 300), text(alias.to, "", 300)] as const)
+    .filter(([from, to]) => Boolean(from && to && from !== to)));
+  const canonicalKey = (initial: string): string => {
+    let current = initial;
+    const seen = new Set<string>();
+    while (aliases.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = aliases.get(current)!;
+    }
+    return current;
+  };
   const includePriceLists = options.includePriceLists !== false;
   const points: ProcurementPricePoint[] = [];
   for (const document of confirmedProcurementDocuments(values, options.venueId)) {
@@ -164,7 +176,7 @@ export function procurementPricePoints(
     const date = isoDate(document.date);
     array(document.items).map(record).forEach((item, index) => {
       const itemId = text(item.id, `line-${index + 1}`, 100);
-      const productKey = text(item.purchaseProductKey ?? item.productKey, "", 300);
+      const productKey = canonicalKey(text(item.purchaseProductKey ?? item.productKey, "", 300));
       const mappingStatus = productKey ? "confirmed" as const : "unconfirmed" as const;
       const received = purchaseLineBaseAmount(item);
       if (!productKey || received.amount <= 0 || received.unit === "unknown") return;
@@ -213,8 +225,8 @@ function supplierGroupingKey(point: ProcurementPricePoint): string {
   return [groupingKey(point), point.supplierId].join("|");
 }
 
-export function procurementPriceChanges(values: unknown[], venueId?: number) {
-  const actual = procurementPricePoints(values, { venueId, includePriceLists: false });
+export function procurementPriceChanges(values: unknown[], venueId?: number, productAliases?: unknown) {
+  const actual = procurementPricePoints(values, { venueId, includePriceLists: false, productAliases });
   const groups = new Map<string, ProcurementPricePoint[]>();
   for (const point of actual) {
     const key = supplierGroupingKey(point);
@@ -291,10 +303,10 @@ function daysBetween(left: string, right: Date): number {
 export function procurementComparisons(
   values: unknown[],
   suppliers: unknown[] = [],
-  options: { venueId?: number; now?: Date } = {},
+  options: { venueId?: number; now?: Date; productAliases?: unknown } = {},
 ) {
   const now = options.now ?? new Date();
-  const all = procurementPricePoints(values, { venueId: options.venueId, includePriceLists: true });
+  const all = procurementPricePoints(values, { venueId: options.venueId, includePriceLists: true, productAliases: options.productAliases });
   const actual = all.filter((point) => point.sourceKind === "purchase");
   const supplierMap = new Map<string, JsonRecord>();
   suppliers.map(record).forEach((supplier) => {
@@ -413,6 +425,7 @@ export function buildProcurementAnalytics(input: {
   expenses?: unknown[];
   stockMovements?: unknown[];
   supplierAlternatives?: unknown;
+  assortment?: unknown;
   period?: string;
   venueId?: number;
   now?: Date;
@@ -442,12 +455,14 @@ export function buildProcurementAnalytics(input: {
     text(supplier.status, "active") !== "archived"
   );
 
-  const priceChanges = procurementPriceChanges(allDocuments, input.venueId);
+  const aliases = record(input.assortment).canonicalProductAliases;
+  const priceChanges = procurementPriceChanges(allDocuments, input.venueId, aliases);
   const comparisons = procurementComparisons(allDocuments, input.suppliers ?? [], {
     venueId: input.venueId,
     now,
+    productAliases: aliases,
   });
-  const points = procurementPricePoints(allDocuments, { venueId: input.venueId });
+  const points = procurementPricePoints(allDocuments, { venueId: input.venueId, productAliases: aliases });
   const actualPoints = points.filter((point) => point.sourceKind === "purchase");
   const expenses = (input.expenses ?? []).map(record).filter((expense) => {
     const expenseVenueId = number(expense.venueId, 0);

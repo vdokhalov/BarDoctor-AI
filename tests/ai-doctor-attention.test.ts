@@ -135,7 +135,7 @@ test("does not repeat one local event as both a risk and an opportunity", () => 
     evidenceCatalog: [],
   });
 
-  assert.equal(result.priorities[0]?.issueKey, "local-demand-event");
+  assert.equal(result.timeBuckets.backlog[0]?.issueKey, "local-demand-event");
   assert.equal(result.opportunities.length, 0);
 });
 
@@ -153,7 +153,7 @@ test("moves an accepted recommendation to in progress without creating a duplica
   assert.equal(result.inProgress.find((item) => item.issueKey === "climate")?.lifecycle, "in_progress");
 });
 
-test("keeps an omitted active task visible and returns overdue work to priority", () => {
+test("keeps an omitted active task visible but separates overdue work from Today", () => {
   const task = { id: "task-climate", recommendationId: "ai:climate", title: "Починить кондиционер", fact: "Кондиционер неисправен", aiGenerated: true, approvalStatus: "approved", status: "in_progress", deadline: "2026-08-14", updatedAt: "2026-08-14T08:00:00.000Z" };
   const result = build({
     candidates: [],
@@ -162,12 +162,13 @@ test("keeps an omitted active task visible and returns overdue work to priority"
     memory: { tasks: [task], actionTasks: [], decisions: [] },
   });
 
-  assert.equal(result.priorities[0]?.issueKey, "climate");
-  assert.equal(result.priorities[0]?.lifecycle, "overdue");
-  assert.equal(result.priorities.filter((item) => item.issueKey === "climate").length, 1);
+  assert.equal(result.priorities.some((item) => item.issueKey === "climate"), false);
+  assert.equal(result.timeBuckets.overdue[0]?.issueKey, "climate");
+  assert.equal(result.timeBuckets.overdue[0]?.lifecycle, "overdue");
+  assert.equal(result.activeProblems.filter((item) => item.issueKey === "climate").length, 1);
 });
 
-test("does not auto-close a signal that remains after a completed task", () => {
+test("does not reissue a closed recommendation without new evidence", () => {
   const result = build({
     memory: {
       tasks: [{ id: "task-climate", recommendationId: "ai:climate", title: "Починить кондиционер", aiGenerated: true, approvalStatus: "approved", status: "completed", deadline: "2026-08-14", actualResult: { status: "helped", summary: "Новых жалоб не было" }, updatedAt: "2026-08-14T22:00:00.000Z" }],
@@ -176,9 +177,29 @@ test("does not auto-close a signal that remains after a completed task", () => {
     },
   });
 
+  assert.equal(result.priorities.some((item) => item.issueKey === "climate"), false);
+  assert.equal(result.history.find((item) => item.recommendationId === "ai:climate")?.lifecycle, "closed");
+});
+
+test("reopens a completed problem only when a newer fact appears", () => {
+  const newReview = { ...reviewClimate, observedAt: "2026-08-15T07:00:00.000Z" };
+  const newEquipment = { ...equipmentClimate, observedAt: "2026-08-15T07:05:00.000Z" };
+  const result = build({
+    candidates: [{
+      ...candidates()[0],
+      evidence: [newReview, newEquipment],
+    }],
+    evidenceCatalog: [newReview, newEquipment],
+    memory: {
+      tasks: [{ id: "task-climate", recommendationId: "ai:climate", title: "Починить кондиционер", aiGenerated: true, approvalStatus: "approved", status: "completed", actualResult: { status: "not_helped" }, updatedAt: "2026-08-14T22:00:00.000Z" }],
+      actionTasks: [],
+      decisions: [],
+    },
+  });
+
   const climate = result.priorities.find((item) => item.issueKey === "climate");
-  assert.equal(climate?.lifecycle, "verify_result");
-  assert.match(String(climate?.resultMessage), /снова подтверждается/);
+  assert.equal(climate?.lifecycle, "reopened");
+  assert.match(String(climate?.resultMessage), /новое измерение/i);
 });
 
 test("records rejected recommendations in history", () => {
@@ -209,6 +230,10 @@ test("classification and humanisation stay management-facing", () => {
   assert.match(humanizeValue("2026-07-11T11:25:00.000Z"), /11 июля/);
   assert.equal(humanizeValue("coveragePercent = 20"), "Заполнено только 20% смен");
   assert.match(humanizeValue("19063.3 monetary units"), /19\s063,3 ₽/);
+  assert.match(
+    humanizeValue("complaint · medium · open · 2026-07-12T11:22:00.000Z"),
+    /^жалоба · средний приоритет · открыто · 12 июля/,
+  );
 });
 
 test("treats a new venue as cold start instead of inventing a business risk", () => {
@@ -271,7 +296,7 @@ test("uses the exact verification date when ranking urgency", () => {
   });
 
   const urgent = result.priorities.find((item) => item.title === "Проверить кассовую дисциплину");
-  const later = result.priorities.find((item) => item.title === "Проверить договор поставщика");
+  const later = result.timeBuckets.upcoming.find((item) => item.title === "Проверить договор поставщика");
   assert.equal((urgent?.priorityBreakdown as { urgency?: number } | undefined)?.urgency, 18);
   assert.equal((later?.priorityBreakdown as { urgency?: number } | undefined)?.urgency, 8);
 });
@@ -314,4 +339,154 @@ test("critical safety override bypasses normal ranking while UI still stays TOP-
   assert.equal(result.priorities[0]?.criticalOverride, true);
   assert.equal(result.priorities[0]?.priorityScore, 100);
   assert.ok(result.counts.moreSignals > 0);
+});
+
+test("corrective read-model shows one active problem for repeated climate and audio tasks", () => {
+  const active = (id: string, recommendationId: string, title: string, updatedAt: string) => ({
+    id,
+    recommendationId,
+    title,
+    aiGenerated: true,
+    approvalStatus: "approved",
+    status: "in_progress",
+    deadline: "2026-08-20",
+    updatedAt,
+  });
+  const result = build({
+    candidates: [],
+    evidenceCatalog: [],
+    operationalInput: {},
+    memory: {
+      tasks: [
+        active("climate-1", "legacy-climate-1", "Починить кондиционер", "2026-08-13T10:00:00.000Z"),
+        active("climate-2", "legacy-climate-2", "Восстановить климат в зале", "2026-08-14T10:00:00.000Z"),
+        active("climate-3", "legacy-climate-3", "Разобрать жалобу на жару", "2026-08-15T10:00:00.000Z"),
+        active("audio-1", "legacy-audio-1", "Проверить караоке", "2026-08-14T11:00:00.000Z"),
+        active("audio-2", "legacy-audio-2", "Проверить микрофоны", "2026-08-15T11:00:00.000Z"),
+      ],
+      actionTasks: [],
+      decisions: [],
+    },
+  });
+
+  assert.equal(result.inProgress.filter((item) => item.issueKey === "climate").length, 1);
+  assert.equal(result.inProgress.filter((item) => item.issueKey === "audio").length, 1);
+  assert.equal(result.inProgress.find((item) => item.issueKey === "climate")?.historyCount, 3);
+  assert.equal(result.inProgress.find((item) => item.issueKey === "audio")?.historyCount, 2);
+  assert.equal(result.activeProblems.filter((item) => item.issueKey === "climate").length, 1);
+  assert.equal(result.activeProblems.filter((item) => item.issueKey === "audio").length, 1);
+});
+
+test("management briefing read-model separates Today, Overdue, Upcoming and Backlog", () => {
+  const active = (id: string, title: string, deadline?: string) => ({
+    id,
+    title,
+    aiGenerated: true,
+    approvalStatus: "approved",
+    status: "in_progress",
+    deadline,
+    updatedAt: "2026-08-15T07:00:00.000Z",
+  });
+  const result = build({
+    candidates: [],
+    evidenceCatalog: [],
+    operationalInput: {},
+    memory: {
+      tasks: [
+        active("overdue", "Починить кондиционер", "2026-08-14"),
+        active("today", "Проверить микрофоны", "2026-08-15"),
+        active("upcoming", "Проверить остатки на складе", "2026-08-20"),
+        active("backlog", "Провести плановый осмотр оборудования"),
+      ],
+      actionTasks: [],
+      decisions: [],
+    },
+  });
+
+  assert.equal(result.timeBuckets.overdue.length, 1);
+  assert.equal(result.timeBuckets.today.length, 1);
+  assert.equal(result.timeBuckets.upcoming.length, 1);
+  assert.equal(result.timeBuckets.backlog.length, 1);
+  assert.ok(result.priorities.every((item) => item.timeBucket === "today"));
+});
+
+test("management briefing keeps recommendation, task and verification deadlines explicitly labelled", () => {
+  const result = build({
+    candidates: [{
+      title: "Проверить караоке и микрофоны",
+      deadline: "До следующей смены",
+      verificationDate: "2026-08-16",
+      action: "Провести контрольный тест",
+      evidence: [reviewAudio],
+    }],
+    memory: {
+      tasks: [{
+        id: "audio-deadlines",
+        recommendationId: "ai:audio",
+        title: "Проверить микрофоны",
+        aiGenerated: true,
+        approvalStatus: "approved",
+        status: "in_progress",
+        deadline: "2026-08-15",
+        verificationDate: "2026-08-16",
+        updatedAt: "2026-08-15T07:00:00.000Z",
+      }],
+      actionTasks: [],
+      decisions: [],
+    },
+  });
+  const audio = result.inProgress.find((item) => item.issueKey === "audio");
+  const sources = audio?.deadlineSources as Array<{ kind: string; label: string; value: string }>;
+
+  assert.deepEqual(sources.map((item) => item.label), ["Рекомендованный срок", "Срок задачи", "Дата проверки результата"]);
+  assert.equal(new Set(sources.map((item) => item.kind)).size, 3);
+});
+
+test("corrective business-wide commercial impact ranks above repeated local climate signals", () => {
+  const result = build({
+    candidates: [
+      ...candidates(),
+      {
+        title: "Восстановить трафик и средний чек",
+        issueKey: "demand-and-average-check",
+        fact: "Выручка -46%, чеки -35%, средний чек -17% за сопоставимую смену",
+        consequence: "Просадка влияет на результат всего заведения",
+        action: "До открытия выбрать канал привлечения и предложение для среднего чека",
+        deadline: "До открытия ближайшей смены",
+        successCriterion: "После смены сравнить checks, average check и revenue с baseline",
+        financialImpact: "high",
+        demandImpact: "high",
+        guestImpact: "high",
+        businessWideImpact: true,
+        evidence: [{ id: "finance:demand", source: "finance", label: "Сопоставимая смена", fact: "Выручка -46%, чеки -35%, средний чек -17%" }],
+      },
+    ],
+  });
+
+  assert.equal(result.priorities[0]?.issueKey, "demand-and-average-check");
+  assert.ok(Number(result.priorities[0]?.priorityScore) > Number(result.priorities.find((item) => item.issueKey === "climate")?.priorityScore));
+});
+
+test("stale and superseded operational problems stay in history but not in active problems", () => {
+  const result = build({
+    candidates: [],
+    evidenceCatalog: [],
+    operationalInput: {},
+    memory: {
+      tasks: [{
+        id: "legacy-climate",
+        recommendationId: "ai:climate",
+        title: "Починить старый кондиционер",
+        aiGenerated: true,
+        approvalStatus: "approved",
+        status: "superseded",
+        supersededBy: "climate-current",
+        updatedAt: "2026-08-14T08:00:00.000Z",
+      }],
+      actionTasks: [],
+      decisions: [],
+    },
+  });
+  assert.equal(result.activeProblems.some((item) => item.issueKey === "climate"), false);
+  assert.ok(result.history.some((item) => item.recommendationId === "ai:climate"));
 });

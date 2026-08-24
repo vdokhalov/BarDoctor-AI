@@ -6,6 +6,7 @@ import {
   oneSignalConfig,
   oneSignalExternalId,
   saveNotificationPreferences,
+  saveNotificationDeviceTelemetry,
   type NotificationPreferencesInput,
 } from "../../../lib/bardoctor/notifications";
 import {
@@ -65,10 +66,15 @@ export async function PUT(request: Request): Promise<Response> {
   if (!account) return noStore(unauthorized());
 
   try {
-    const preferences = await saveNotificationPreferences(account.id, await requestBody(request));
+    const input = await requestBody(request);
+    const [preferences, device] = await Promise.all([
+      saveNotificationPreferences(account.id, input),
+      saveNotificationDeviceTelemetry(account.id, input.device),
+    ]);
     return noStore(Response.json({
       ok: true,
       preferences,
+      device,
       message: "Настройки уведомлений сохранены.",
     }));
   } catch (error) {

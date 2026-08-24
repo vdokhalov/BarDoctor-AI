@@ -12,7 +12,7 @@ test("diagnosis evidence and technical detail start collapsed and expand on dema
   assert.match(bundle, /children:\["Почему\?"/);
   assert.match(bundle, /children:"Источники: "/);
   assert.match(bundle, /u\.fact\?" — "\+u\.fact:""/);
-  assert.match(bundle, /children:\["Финансовый контекст"/);
+  assert.match(bundle, /children:\["Финансовый контекст закрытого периода"/);
   assert.match(bundle, /children:\["История AI Doctor"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf('className:"bd-ai-why"'), bundle.indexOf('className:"bd-ai-task-action"')), /\bopen:/);
 });
@@ -42,7 +42,7 @@ test("diagnosis actions require an executable and measurable contract", async ()
   }
   assert.match(handler, /Каждый элемент actions должен содержать 2–5 последовательных шагов/);
   assert.match(handler, /Каждая рекомендация — управленческий эксперимент/);
-  assert.match(bundle, /children:"Что делать сейчас"/);
+  assert.match(bundle, /children:"Что делать сегодня"/);
   assert.match(bundle, /children:"Проверка: "/);
   assert.match(bundle, /"Подготовить задачу"/);
   assert.match(bundle, /Проверка рекомендации:/);
@@ -53,6 +53,10 @@ test("diagnosis actions require an executable and measurable contract", async ()
   assert.match(bundle, /bdAIDoctorFollowThroughVersion="attention-v197"/);
   assert.match(bundle, /bdAIDoctorUniversalVersion="attention-v198"/);
   assert.match(bundle, /bdAIDoctorRuntimeVersion="attention-v199"/);
+  assert.match(bundle, /bdAIDoctorBriefingVersion="briefing-first-v253"/);
+  assert.match(bundle, /bdAIManagementBriefingVersion="management-briefing-v254"/);
+  assert.match(bundle, /bdAISelfServiceVersion="self-service-v255"/);
+  assert.match(bundle, /verificationPlanId:e\.verificationPlanId/);
   assert.match(bundle, /Почему такая уверенность:/);
   assert.match(bundle, /IC="bd_ai_diagnosis_v9"/);
   assert.match(handler, /\.\.\.memory\.actionTasks/);
@@ -116,11 +120,17 @@ test("AI Doctor attention UI is linked and responsive on mobile and desktop", as
   assert.match(bundle, /"Главная возможность: "\+m/);
   assert.match(bundle, /mode:"opportunity"/);
   assert.match(bundle, /className:"bd-ai-compact-action"/);
-  assert.match(bundle, /data-bd-ai-result":"attention-v199/);
-  assert.match(bundle, /data-bd-ai-attention":"runtime-v199/);
+  assert.match(bundle, /data-bd-ai-result":"self-service-v255/);
+  assert.match(bundle, /data-bd-management-briefing":"self-service-v1/);
   assert.match(bundle, /function bdAIDoctorNormalizeV199\(/);
   assert.match(bundle, /className:"bd-ai-data-summary"/);
   assert.match(bundle, /className:"bd-ai-footer-actions"/);
+  assert.match(bundle, /children:"После смены проверю"/);
+  assert.match(bundle, /children:"Что AI уже выяснил"/);
+  assert.match(bundle, /C\.message\?\?"Недостаточно внешних данных/);
+  assert.match(bundle, /children:"Операционные проблемы"/);
+  assert.match(css, /\.bd-ai-management-drivers/);
+  assert.match(css, /\.bd-ai-operational-rows/);
   assert.match(bundle, /children:e\?"Открыть AI Doctor":"Запустить анализ"/);
 });
 

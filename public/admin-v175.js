@@ -351,14 +351,24 @@
       return '<tr data-delivery-id="' + item.id + '" data-push-detail="delivery" data-id="' + esc(item.id) + '"><td data-label="Аккаунт"><strong>' + esc(item.account) + '</strong><small>Аккаунт №' + item.accountId + '</small></td><td data-label="Категория">' + esc(humanCategory(item.category))
         + '</td><td data-label="Статус">' + status(item.status) + '</td><td data-label="Детали"><span class="admin-connector-detail">' + esc(humanPushError(item.detail)) + '</span></td><td data-label="Создано">' + esc(date(item.createdAt)) + "</td></tr>";
     }).join("");
+    var warnings = (data.warnings || []).map(function (item) {
+      return '<div class="admin-issue ' + esc(item.severity) + '"><strong>' + esc(item.code) + '</strong><small>' + esc(item.message) + '</small></div>';
+    }).join("");
+    var devices = (data.devices || []).map(function (item) {
+      return '<tr><td data-label="Аккаунт"><strong>' + esc(item.account) + '</strong><small>Аккаунт №' + item.accountId + '</small></td><td data-label="Активно">' + status(item.active ? "working" : "inactive") + '</td><td data-label="Разрешение">' + esc(item.permission) + '</td><td data-label="Подписка">' + esc(item.subscriptionId) + '</td><td data-label="Последний контакт">' + esc(date(item.lastSeenAt)) + '</td></tr>';
+    }).join("");
+    var observation = data.observability || {};
     main.innerHTML = sectionHead("Push-инфраструктура", "Конфигурация и доставка показаны отдельно")
       + '<div class="admin-provider"><div><h3>' + esc(data.provider) + '</h3><p>ID приложения: ' + esc(humanStatus(data.credentials.appId)) + ' · REST API-ключ: ' + esc(humanStatus(data.credentials.restApiKey)) + '</p></div>' + status(data.health) + "</div>"
-      + '<div class="admin-metrics admin-metrics-compact">' + metric("Принято", data.summary.accepted) + metric("Запланировано", data.summary.scheduled) + metric("Ошибки", data.summary.failed) + metric("В очереди BarDoctor", data.summary.queuedJobs) + "</div>"
+      + '<div class="admin-metrics admin-metrics-compact">' + metric("Принято", data.summary.accepted) + metric("Активные устройства", data.summary.activeDevices) + metric("Устаревшие подписки", data.summary.staleDevices) + metric("Ошибки", data.summary.failed) + metric("В очереди BarDoctor", data.summary.queuedJobs) + "</div>"
+      + (warnings ? '<section class="admin-card"><div class="admin-card-header"><div><h3>Предупреждения здоровья</h3><p>Формируются по телеметрии, без тестовой отправки пользователю</p></div></div><div class="admin-card-body admin-issues">' + warnings + '</div></section><br>' : "")
+      + '<div class="admin-honest"><strong>Последние этапы цепочки.</strong> Сгенерировано: ' + esc(date(observation.lastGeneratedAt)) + ' · попытка: ' + esc(date(observation.lastAttemptAt)) + ' · успех: ' + esc(date(observation.lastSuccessAt)) + ' · ошибка: ' + esc(date(observation.lastFailureAt)) + ' · подавлено: ' + esc(date(observation.lastSuppressedAt)) + '</div><br>'
       + toolbar("push", [
         { value: "failed", label: "Ошибки" }, { value: "scheduled", label: "Запланированные" },
         { value: "accepted", label: "Принятые" }, { value: "cancelled", label: "Отменённые" }
       ])
       + (errors ? '<section class="admin-card"><div class="admin-card-header"><div><h3>Сгруппированные ошибки</h3><p>Повторяющиеся ответы провайдера объединены</p></div></div><div class="admin-card-body admin-issues">' + errors + "</div></section><br>" : "")
+      + (devices ? '<section class="admin-card admin-table-card"><div class="admin-card-header"><div><h3>Устройства и подписки</h3><p>Фактическое состояние SDK на последнем контакте</p></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Аккаунт</th><th>Активно</th><th>Разрешение</th><th>Подписка</th><th>Последний контакт</th></tr></thead><tbody>' + devices + "</tbody></table></div></section><br>" : "")
       + (jobs ? '<section class="admin-card admin-table-card"><div class="admin-card-header"><div><h3>Будущие задания BarDoctor</h3><p>Передаются OneSignal только внутри допустимого окна</p></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Аккаунт</th><th>Тип</th><th>Статус</th><th>Целевое время</th><th>Попытки</th><th>Детали</th></tr></thead><tbody>' + jobs + "</tbody></table></div></section><br>" : "")
       + (deliveries ? '<section class="admin-card admin-table-card"><div class="admin-card-header"><div><h3>События доставки</h3><p>«Принято провайдером» не означает подтверждённую доставку</p></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Аккаунт</th><th>Категория</th><th>Статус</th><th>Детали</th><th>Создано</th></tr></thead><tbody>' + deliveries + "</tbody></table></div></section>" : empty("Push-событий нет", "Состояние доставки остаётся неизвестным до первого реального результата"));
     bindToolbar();

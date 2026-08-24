@@ -143,7 +143,8 @@ export async function runModernUxAudit() {
   requireText(bundle, "S.useId()", "stable form field ids");
   requireText(bundle, "htmlFor:bdFieldId", "field label association");
   requireText(bundle, '"aria-describedby":bdDescribedBy', "validation description");
-  requireText(bundle, '"data-bd-ai-result":"attention-v199"', "AI attention hook");
+  requireText(bundle, '"data-bd-ai-result":"self-service-v255"', "AI self-service briefing hook");
+  requireText(bundle, 'children:"Что AI уже выяснил"', "AI ready-to-use findings");
   requireText(bundle, '"data-bd-ai-attention":"runtime-v199"', "React-native AI attention order");
   requireText(bundle, 'bdAIDoctorNormalizeV199', "legacy diagnosis runtime normalisation");
   requireText(bundle, '"data-bd-not-found":"modern-v86"', "professional not-found screen");
@@ -171,16 +172,20 @@ export async function runModernUxAudit() {
   const aiEnd = bundle.indexOf("function Uce()", aiStart);
   assert.ok(aiStart >= 0 && aiEnd > aiStart, "AI result component not found");
   requireOrder(bundle.slice(aiStart, aiEnd), [
-    "Требуют внимания",
-    "Что делать сейчас",
-    "bdAIDoctorPriorityCardV196",
-    "В работе",
-    "Возможности",
+    "Что происходит",
+    "Что делать сегодня",
+    "Контекст сегодня",
+    "После смены проверю",
+    "Операционные проблемы",
+    "Business Health",
+    "Полнота данных",
     "bdAIDoctorDataQualityV198",
-    "Финансовый контекст",
+    "Возможности",
+    "Финансовый контекст закрытого периода",
     "История AI Doctor",
     "Обновить анализ",
   ], "React AI attention scan");
+  assert.ok(!bundle.slice(aiStart, aiEnd).includes("bdAIDoctorPriorityCardV196"), "Legacy large priority cards remain in the top management briefing");
 
   for (const contract of [
     'return { key: "problem", order: 10 }',

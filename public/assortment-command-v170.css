@@ -1295,3 +1295,85 @@
   .bd-assortment-loading-v170 > div > span { animation-duration: 1.8s; }
   .bd-assortment-expand-v171 { animation: none; }
 }
+
+/* Tech-card reconciliation v257 */
+.bd-assortment-filter-row-v170 {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.bd-assortment-filter-row-v170::-webkit-scrollbar { display: none; }
+.bd-assortment-filter-row-v170 > button { flex: 0 0 auto; white-space: nowrap; }
+.bd-assortment-menu-row-v170 .amount small.tech-card,
+.bd-assortment-recipe-card-v170 header em {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 3px 7px;
+  font-style: normal;
+  font-weight: 800;
+}
+.bd-assortment-menu-row-v170 .amount small.tech-card.approved,
+.bd-assortment-recipe-card-v170 header em.approved {
+  color: #16765e;
+  border-color: #bfe8dc;
+  background: #ecfaf5;
+}
+.bd-assortment-menu-row-v170 .amount small.tech-card.ai_draft,
+.bd-assortment-menu-row-v170 .amount small.tech-card.requires_review,
+.bd-assortment-recipe-card-v170 header em.ai_draft,
+.bd-assortment-recipe-card-v170 header em.requires_review {
+  color: #8a5a00;
+  border-color: #f0d89a;
+  background: #fff8e6;
+}
+.bd-assortment-menu-row-v170 .amount small.tech-card.missing,
+.bd-assortment-menu-row-v170 .amount small.tech-card.link_error,
+.bd-assortment-recipe-card-v170 header em.missing,
+.bd-assortment-recipe-card-v170 header em.link_error {
+  color: #a23a42;
+  border-color: #f1c6ca;
+  background: #fff1f2;
+}
+.bd-tech-card-detail-v257 > header { align-items: center; }
+.bd-tech-card-detail-v257 > header > span.tech-card {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-weight: 820;
+}
+.bd-tech-card-detail-v257 > header > span.approved { color: #16765e; background: #ecfaf5; }
+.bd-tech-card-detail-v257 > header > span.ai_draft,
+.bd-tech-card-detail-v257 > header > span.requires_review { color: #8a5a00; background: #fff8e6; }
+.bd-tech-card-detail-v257 > header > span.missing,
+.bd-tech-card-detail-v257 > header > span.link_error { color: #a23a42; background: #fff1f2; }
+.bd-tech-card-meta-v257 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 9px 0 10px;
+}
+.bd-tech-card-meta-v257 > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  padding: 9px;
+  border: 1px solid #e8eaf0;
+  border-radius: 11px;
+  background: #fafbfe;
+}
+.bd-tech-card-meta-v257 span { color: var(--bd-assort-muted); font-size: 8px; }
+.bd-tech-card-meta-v257 strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; }
+.bd-tech-card-pending-v257 {
+  margin: 0 0 10px;
+  padding: 9px 10px;
+  color: #755000;
+  border: 1px solid #f0d89a;
+  border-radius: 11px;
+  background: #fff8e6;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+@media (min-width: 720px) {
+  .bd-tech-card-meta-v257 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

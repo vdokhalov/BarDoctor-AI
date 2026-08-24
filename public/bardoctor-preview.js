@@ -1311,14 +1311,25 @@
       && requestUrl.origin === window.location.origin
       && ["/api/auth/login", "/api/auth/register", "/api/auth/bootstrap"].indexOf(requestUrl.pathname) >= 0
     ) {
+      // bd-auth-single-read-v248: consume the auth body once. Response.clone()
+      // could leave both readers waiting indefinitely in embedded browsers.
       return pendingResponse.then(function (response) {
-        response.clone().json().then(function (result) {
-          rememberAccessContext(result);
-          if (result && result.ok && result.joinedVenue) {
-            sessionStorage.removeItem("bd_pending_invite_code");
+        return response.text().then(function (body) {
+          try {
+            var result = JSON.parse(body);
+            rememberAccessContext(result);
+            if (result && result.ok && result.joinedVenue) {
+              sessionStorage.removeItem("bd_pending_invite_code");
+            }
+          } catch {
+            // The caller will surface malformed auth responses.
           }
-        }).catch(function () {});
-        return response;
+          return new Response(body, {
+            status: response.status,
+            statusText: response.statusText,
+            headers: response.headers
+          });
+        });
       });
     }
     if (["POST", "PUT", "PATCH", "DELETE"].indexOf(requestMethod) >= 0 && Date.now() < bdSaveIntentUntil) {
@@ -1337,7 +1348,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246";
+    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260";
     document.head.appendChild(script);
   }
 

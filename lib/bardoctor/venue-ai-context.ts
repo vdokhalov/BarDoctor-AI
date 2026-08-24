@@ -3,6 +3,10 @@ import { domainData, type Account } from "../../db/schema";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
 import { accountingCurrencyFromProfile } from "./currency";
+import {
+  canonicalTechCardForOwner,
+  reconcileTechCards,
+} from "./tech-card-reconciliation";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -388,6 +392,14 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const expenseRows = array(storedExpenses?.data);
   const requestRecent = array(requestFinance.recentDaily);
   const rows = requestRecent.length ? requestRecent : revenueRows;
+  const salesDocuments = array(store(sources, "bd_sales_documents")?.data).map(record)
+    .filter((item) => !item.status || text(item.status) === "confirmed")
+    .sort((left, right) => text(right.date).localeCompare(text(left.date)))
+    .slice(0, 90);
+  const assortment = record(store(sources, "bd_assortment_v1")?.data);
+  const menuItems = array(assortment.menuItems).map(record);
+  const menuById = new Map(menuItems.map((item) => [text(item.id), item]));
+  const menuByName = new Map(menuItems.map((item) => [text(item.name).toLocaleLowerCase("ru"), item]));
   const today = now.toISOString().slice(0, 10);
   const start30 = new Date(now.getTime() - 29 * 86_400_000).toISOString().slice(0, 10);
   const start60 = new Date(now.getTime() - 59 * 86_400_000).toISOString().slice(0, 10);
@@ -409,6 +421,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const monthToDate = record(requestFinance.monthToDate);
   const effectiveRevenue = number(monthToDate.revenue) ?? currentRevenue;
   const effectiveReceipts = number(monthToDate.receipts) ?? currentReceipts;
+  const currentMonthKey = today.slice(0, 7);
   const closedMonths = summariseClosedMonths(sources);
 
   return {
@@ -417,12 +430,20 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       || expenseRows.length > 0
       || closedMonths.available,
     period: {
+      monthKey: currentMonthKey,
+      periodLabel: `Текущий месяц · ${monthLabel(currentMonthKey)}`,
+      startDate: `${currentMonthKey}-01`,
+      endDate: today,
+      updatedAt: maxIso(storedRevenue?.updatedAt, storedExpenses?.updatedAt, latestDateFromRows(rows)),
       revenue: effectiveRevenue,
       receipts: effectiveReceipts,
       guests: (number(monthToDate.guests) ?? currentGuests) || null,
       averageReceipt: number(monthToDate.avgReceipt)
         ?? (effectiveReceipts > 0 ? rounded(effectiveRevenue / effectiveReceipts, 2) : null),
       expenses: number(monthToDate.expenses) ?? null,
+      result: number(monthToDate.expenses) !== null
+        ? rounded(effectiveRevenue - (number(monthToDate.expenses) ?? 0), 2)
+        : null,
     },
     last30Days: {
       shifts: current.length,
@@ -435,13 +456,43 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
     recentDaily: rows
       .map((value) => record(value))
       .sort((left, right) => text(right.date).localeCompare(text(left.date)))
-      .slice(0, 18)
+      // Comparable weekday baselines need enough history to avoid comparing a
+      // Saturday with an arbitrary recent weekday.
+      .slice(0, 90)
       .map((item) => ({
         date: dateOnly(item.date),
         revenue: revenueOf(item),
         receipts: receiptsOf(item),
         guests: number(item.guests),
+        avgReceipt: number(item.avgReceipt ?? item.averageReceipt)
+          ?? (receiptsOf(item) > 0 ? rounded(revenueOf(item) / receiptsOf(item), 2) : null),
       })),
+    hourly: [
+      ...array(requestFinance.hourly),
+      ...rows.flatMap((value) => {
+        const item = record(value);
+        const date = dateOnly(item.date);
+        return array(item.hourly ?? item.hours ?? item.byHour).map((raw) => ({ ...record(raw), date }));
+      }),
+    ].slice(0, 1_200),
+    salesDocuments: salesDocuments.map((document) => ({
+      id: text(document.id, "", 100) || null,
+      date: dateOnly(document.date),
+      status: text(document.status, "confirmed", 30),
+      checks: number(document.checks ?? document.receipts),
+      totalRevenue: number(document.totalRevenue ?? document.revenue),
+      items: array(document.items).map(record).slice(0, 1_000).map((item) => {
+        const menu = menuById.get(text(item.menuItemId))
+          ?? menuByName.get(text(item.name ?? item.productName).toLocaleLowerCase("ru"));
+        return {
+          name: text(item.name ?? item.productName, "Позиция", 140),
+          menuItemId: text(item.menuItemId, "", 100) || null,
+          category: text(item.category ?? item.categoryName ?? menu?.category, "Без категории", 100),
+          quantity: number(item.quantity),
+          grossSales: number(item.grossSales ?? item.revenue ?? item.lineTotal),
+        };
+      }),
+    })),
     expenseCategories: countsBy(expenseRows, (item) => text(item.category, "other", 60)),
     latestClosedMonth: closedMonths.latest,
     previousClosedMonth: closedMonths.previous,
@@ -458,14 +509,26 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
 
 function summariseMenu(sources: VenueAIContextSources, now: Date) {
   const stored = store(sources, "bd_assortment_v1");
-  const root = record(stored?.data);
+  const purchaseDocuments = array(store(sources, "bd_purchase_documents")?.data);
+  const reconciliation = reconcileTechCards({
+    assortment: stored?.data,
+    purchaseDocuments,
+    now,
+  });
+  const root = record(reconciliation.assortment);
   const menuItems = array(root.menuItems).map(record);
   const recipes = array(root.recipes).map(record);
   const groups = array(root.groups).map(record);
   const subgroups = array(root.subgroups).map(record);
   const activeItems = menuItems.filter((item) => item.active !== false);
-  const recipeByMenuItem = new Map(recipes.map((recipe) => [text(recipe.menuItemId), recipe]));
-  const confirmedRecipes = recipes.filter((recipe) => text(recipe.status) === "confirmed");
+  const recipeByMenuItem = new Map(activeItems.map((item) => [
+    text(item.id),
+    canonicalTechCardForOwner(item.id, recipes),
+  ]));
+  const confirmedRecipes = recipes.filter((recipe) =>
+    recipe.current === true && text(recipe.reviewStatus) === "approved"
+  );
+  const recipeRequiredItems = activeItems.filter((item) => text(item.type) !== "service");
   const prices = activeItems.map((item) => number(item.salePrice)).filter((value): value is number => value !== null);
   const samples = activeItems
     .map((item) => {
@@ -477,6 +540,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
         salePrice: number(item.salePrice),
         plannedSales: number(item.plannedSales),
         recipeStatus: text(recipe?.status, recipe ? "draft" : "missing", 30),
+        techCardStatus: text(recipe?.reviewStatus, recipe ? "requires_review" : "missing", 40),
         ingredientCount: array(recipe?.ingredients).length,
       };
     })
@@ -488,7 +552,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     .map((item) => text(item.name, "Позиция", 120));
   const analytics = buildAssortmentAnalytics({
     assortment: stored?.data,
-    purchaseDocuments: array(store(sources, "bd_purchase_documents")?.data),
+    purchaseDocuments,
     salesDocuments: array(store(sources, "bd_sales_documents")?.data),
     financeRevenue: array(store(sources, "bd_finance_revenue")?.data),
     now,
@@ -505,14 +569,15 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
       byDepartment: countsBy(activeItems, (item) => text(item.department, "other", 40)),
       recipes: recipes.length,
       confirmedRecipes: confirmedRecipes.length,
-      recipeCoveragePercent: activeItems.length
-        ? rounded(confirmedRecipes.length / activeItems.length * 100)
+      recipeCoveragePercent: recipeRequiredItems.length
+        ? rounded(confirmedRecipes.length / recipeRequiredItems.length * 100)
         : 0,
       priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null,
       sample: samples,
       missingRecipeNames,
       readiness: analytics.readiness,
       qualityCounts: analytics.counts,
+      techCardReconciliation: reconciliation.report,
       economics: analytics.economics,
       assortmentSignals: analytics.signals,
       purchaseNeeds: analytics.needs,
@@ -694,12 +759,25 @@ function summariseSeasonality(request: JsonRecord, sources: VenueAIContextSource
     .sort((left, right) => text(left.startDate).localeCompare(text(right.startDate)))
     .slice(0, 12)
     .map((item) => ({
+      id: text(item.id, "", 140) || null,
       title: text(item.title, "Событие", 150),
       date: dateOnly(item.startDate ?? item.eventDate),
+      startDate: dateOnly(item.startDate ?? item.eventDate),
+      endDate: dateOnly(item.endDate),
+      startTime: text(item.startTime, "", 16) || null,
+      endTime: text(item.endTime, "", 16) || null,
       activationDate: dateOnly(item.activationDate),
       category: text(item.category, "other", 40),
       potentialScore: number(item.potentialScore),
       decision: text(item.decision, "watching", 30),
+      location: text(item.location ?? item.address, "", 180) || null,
+      lat: number(item.lat ?? item.latitude),
+      lng: number(item.lng ?? item.longitude),
+      distanceKm: number(item.distanceKm),
+      relation: record(item.relation),
+      sourceUrls: array(item.sourceUrls)
+        .filter((url): url is string => typeof url === "string" && /^https?:\/\//i.test(url))
+        .slice(0, 4),
     }));
   const recentDaily = array(record(request.finance).recentDaily).map(record);
   const weekday = new Map<number, { revenue: number; shifts: number }>();
@@ -744,13 +822,23 @@ function summariseMarket(sources: VenueAIContextSources) {
     updatedAt: maxIso(marketStore?.updatedAt, iso(market.refreshedAt ?? market.generatedAt)),
     data: {
       confirmedCompetitors: competitors.slice(0, 12).map((item) => ({
+        key: text(item.key, "", 300) || null,
         name: text(item.name, "Конкурент", 140),
         category: text(item.category, "Заведение", 80),
         relation: text(item.relation, "alternative", 40),
         rating: number(item.rating) ?? (text(item.rating, "", 30) || null),
         distance: text(item.distance, "", 80) || null,
+        distanceKm: number(item.distanceKm),
+        lat: number(item.lat ?? item.latitude),
+        lng: number(item.lng ?? item.longitude),
+        eventDistanceKm: number(item.eventDistanceKm),
+        openingHours: record(item.openingHours ?? item.schedule),
+        audienceOverlap: number(item.audienceOverlap),
         strengths: array(item.strengths).slice(0, 5),
         gaps: array(item.gaps).slice(0, 5),
+        sourceUrls: array(item.sourceUrls)
+          .filter((url): url is string => typeof url === "string" && /^https?:\/\//i.test(url))
+          .slice(0, 6),
       })),
       audience: record(market.audience),
       economy: record(market.economy),
@@ -807,6 +895,8 @@ export function buildVenueAIContextFromSources(
         region: text(profile.region) || null,
         city: text(profile.city) || null,
         district: text(profile.district ?? profile.address) || null,
+        lat: number(profile.lat ?? profile.latitude),
+        lng: number(profile.lng ?? profile.longitude),
       },
       now,
       freshDays: 90,
@@ -864,6 +954,7 @@ export function buildVenueAIContextFromSources(
       data: {
         openTime: text(profile.openTime) || null,
         closeTime: text(profile.closeTime) || null,
+        timezone: text(profile.timezone, "Europe/Chisinau", 80),
         workingDays: record(profile.workingDays),
         currentStatus: record(request.operatingCalendar),
       },

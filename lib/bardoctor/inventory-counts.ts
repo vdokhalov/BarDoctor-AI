@@ -7,6 +7,11 @@ export type InventoryCountScope = {
   type: InventoryCountScopeType;
   id?: string;
   label: string;
+  name?: string;
+  parentId?: string;
+  sectionId?: string;
+  categoryId?: string;
+  itemCount?: number;
 };
 
 export type InventoryCountLine = {
@@ -127,16 +132,68 @@ function activeStockBalances(assortment: unknown): JsonRecord[] {
     );
 }
 
-function structureIndex(assortment: unknown) {
+type InventoryHierarchyNode = {
+  id: string;
+  name: string;
+  parentId?: string;
+  order: number;
+  active: boolean;
+};
+
+function inventoryHierarchyNodes(assortment: unknown) {
   const structure = record(record(assortment).nomenclatureStructure);
-  const index = (key: string) => new Map(
-    array(structure[key]).map(record).map((value) => [text(value.id, "", 100), text(value.name, "", 120)]),
-  );
+  const nodes = (key: string): InventoryHierarchyNode[] => array(structure[key])
+    .map(record)
+    .map((value, index) => ({
+      id: text(value.id, "", 100),
+      name: text(value.name, "Без названия", 120),
+      parentId: text(value.parentId, "", 100) || undefined,
+      order: numeric(value.order, index),
+      active: value.active !== false
+        && value.archived !== true
+        && value.deleted !== true
+        && !["archived", "inactive", "deleted"].includes(text(value.status, "", 30)),
+    }))
+    .filter((value) => Boolean(value.id))
+    .sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
   return {
-    sections: index("sections"),
-    categories: index("categories"),
-    subcategories: index("subcategories"),
-    locations: index("locations"),
+    sections: nodes("sections"),
+    categories: nodes("categories"),
+    subcategories: nodes("subcategories"),
+    locations: nodes("locations"),
+  };
+}
+
+function inventoryEligibleBalances(assortment: unknown): JsonRecord[] {
+  const hierarchy = inventoryHierarchyNodes(assortment);
+  const sectionById = new Map(hierarchy.sections.map((value) => [value.id, value]));
+  const categoryById = new Map(hierarchy.categories.map((value) => [value.id, value]));
+  const subcategoryById = new Map(hierarchy.subcategories.map((value) => [value.id, value]));
+  return activeStockBalances(assortment).filter((balance) => {
+    if (!["ml", "g", "pcs"].includes(text(balance.unit, "", 20))) return false;
+    const sectionId = text(balance.sectionId, "", 100);
+    const categoryId = text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100);
+    const subcategoryId = text(balance.subcategoryId, "", 100);
+    const section = sectionById.get(sectionId);
+    const category = categoryById.get(categoryId);
+    const subcategory = subcategoryById.get(subcategoryId);
+    if (section && !section.active) return false;
+    if (category && !category.active) return false;
+    if (subcategory && !subcategory.active) return false;
+    if (category?.parentId && sectionId && category.parentId !== sectionId) return false;
+    if (subcategory?.parentId && categoryId && subcategory.parentId !== categoryId) return false;
+    return true;
+  });
+}
+
+function structureIndex(assortment: unknown) {
+  const structure = inventoryHierarchyNodes(assortment);
+  const index = (values: InventoryHierarchyNode[]) => new Map(values.map((value) => [value.id, value.name]));
+  return {
+    sections: index(structure.sections),
+    categories: index(structure.categories),
+    subcategories: index(structure.subcategories),
+    locations: index(structure.locations),
   };
 }
 
@@ -239,41 +296,105 @@ function scopeMatches(balance: JsonRecord, scope: InventoryCountScope): boolean 
 
 function scopeLabel(scope: InventoryCountScope, assortment: unknown): string {
   if (scope.type === "all") return "Весь активный склад";
-  const structure = structureIndex(assortment);
+  const structure = inventoryHierarchyNodes(assortment);
   const id = text(scope.id, "", 100);
-  const source = scope.type === "section"
-    ? structure.sections
-    : scope.type === "category"
-      ? structure.categories
-      : scope.type === "subcategory"
-        ? structure.subcategories
-        : null;
-  return text(scope.label, source?.get(id) ?? (scope.type === "warehouse" ? "Склад / зона" : "Выбранный охват"), 120);
+  const sectionById = new Map(structure.sections.map((value) => [value.id, value]));
+  const categoryById = new Map(structure.categories.map((value) => [value.id, value]));
+  if (scope.type === "section") return sectionById.get(id)?.name ?? text(scope.label, "Выбранный раздел", 120);
+  if (scope.type === "category") {
+    const category = categoryById.get(id);
+    const section = category?.parentId ? sectionById.get(category.parentId) : undefined;
+    return [section?.name, category?.name].filter(Boolean).join(" → ") || text(scope.label, "Выбранная категория", 120);
+  }
+  if (scope.type === "subcategory") {
+    const subcategory = structure.subcategories.find((value) => value.id === id);
+    const category = subcategory?.parentId ? categoryById.get(subcategory.parentId) : undefined;
+    const section = category?.parentId ? sectionById.get(category.parentId) : undefined;
+    return [section?.name, category?.name, subcategory?.name].filter(Boolean).join(" → ")
+      || text(scope.label, "Выбранный подраздел", 120);
+  }
+  return text(scope.label, "Склад / зона", 120);
 }
 
 export function inventoryCountScopes(assortment: unknown): InventoryCountScope[] {
-  const balances = activeStockBalances(assortment);
-  const structure = structureIndex(assortment);
-  const result: InventoryCountScope[] = [{ type: "all", label: "Весь активный склад" }];
-  const append = (
-    type: InventoryCountScopeType,
-    field: string,
-    names: Map<string, string>,
-  ) => {
-    const ids = new Set(balances.map((value) => text(value[field], "", 100)).filter(Boolean));
-    for (const id of ids) result.push({ type, id, label: names.get(id) ?? "Без названия" });
-  };
-  append("section", "sectionId", structure.sections);
-  const categoryBalances = balances.map((value) => ({
-    ...value,
-    inventoryCountCategoryId: value.taxonomyCategoryId ?? value.categoryId,
-  }));
-  const categoryIds = new Set(categoryBalances.map((value) => text(value.inventoryCountCategoryId, "", 100)).filter(Boolean));
-  for (const id of categoryIds) result.push({ type: "category", id, label: structure.categories.get(id) ?? "Без названия" });
-  append("subcategory", "subcategoryId", structure.subcategories);
-  const warehouseIds = new Set(balances.map((value) => text(value.warehouseId, "", 100)).filter(Boolean));
-  for (const id of warehouseIds) result.push({ type: "warehouse", id, label: `Склад / зона: ${id}` });
+  const balances = inventoryEligibleBalances(assortment);
+  const structure = inventoryHierarchyNodes(assortment);
+  const result: InventoryCountScope[] = [{
+    type: "all",
+    label: "Весь активный склад",
+    name: "Весь активный склад",
+    itemCount: balances.length,
+  }];
+  const count = (predicate: (balance: JsonRecord) => boolean) => balances.filter(predicate).length;
+  for (const section of structure.sections.filter((value) => value.active)) {
+    const itemCount = count((balance) => text(balance.sectionId, "", 100) === section.id);
+    if (!itemCount) continue;
+    result.push({ type: "section", id: section.id, label: section.name, name: section.name, itemCount });
+  }
+  for (const category of structure.categories.filter((value) => value.active && value.parentId)) {
+    const itemCount = count((balance) =>
+      text(balance.sectionId, "", 100) === category.parentId
+      && text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100) === category.id
+    );
+    if (!itemCount) continue;
+    result.push({
+      type: "category",
+      id: category.id,
+      parentId: category.parentId,
+      sectionId: category.parentId,
+      name: category.name,
+      label: scopeLabel({ type: "category", id: category.id, label: category.name }, assortment),
+      itemCount,
+    });
+  }
+  const categoryById = new Map(structure.categories.map((value) => [value.id, value]));
+  for (const subcategory of structure.subcategories.filter((value) => value.active && value.parentId)) {
+    const parentId = subcategory.parentId;
+    if (!parentId) continue;
+    const category = categoryById.get(parentId);
+    if (!category?.active || !category.parentId) continue;
+    const itemCount = count((balance) =>
+      text(balance.sectionId, "", 100) === category.parentId
+      && text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100) === category.id
+      && text(balance.subcategoryId, "", 100) === subcategory.id
+    );
+    if (!itemCount) continue;
+    result.push({
+      type: "subcategory",
+      id: subcategory.id,
+      parentId: subcategory.parentId,
+      sectionId: category.parentId,
+      categoryId: category.id,
+      name: subcategory.name,
+      label: scopeLabel({ type: "subcategory", id: subcategory.id, label: subcategory.name }, assortment),
+      itemCount,
+    });
+  }
   return result;
+}
+
+export function resolveInventoryCountScope(
+  assortment: unknown,
+  requested: Pick<InventoryCountScope, "type" | "id">,
+): InventoryCountScope | null {
+  return inventoryCountScopes(assortment).find((scope) =>
+    scope.type === requested.type && String(scope.id ?? "") === String(requested.id ?? "")
+  ) ?? null;
+}
+
+export function inventoryCountDocumentScope(document: InventoryCountDocument): InventoryCountScope {
+  const raw = record((document as unknown as JsonRecord).scope);
+  const type = text(raw.type, "", 30);
+  const label = text(raw.label ?? (document as unknown as JsonRecord).scopeLabel, "", 180);
+  if (["all", "section", "category", "subcategory", "warehouse"].includes(type) && label) {
+    return {
+      ...raw,
+      type: type as InventoryCountScopeType,
+      id: text(raw.id, "", 100) || undefined,
+      label,
+    } as InventoryCountScope;
+  }
+  return { type: "all", label: label || document.sourceLabel || "Весь активный склад" };
 }
 
 export function createInventoryCountDocument(input: {
@@ -301,7 +422,7 @@ export function createInventoryCountDocument(input: {
     : source === "import"
       ? "Импорт инвентаризационной ведомости"
       : "Вручную";
-  const items = activeStockBalances(input.assortment)
+  const items = inventoryEligibleBalances(input.assortment)
     .filter((balance) => scopeMatches(balance, scope))
     .map((balance, index): InventoryCountLine | null => {
       const key = productKey(balance);
@@ -513,6 +634,7 @@ export function renderInventoryCountPrintSheet(input: {
   venueName: string;
   returnUrl?: string;
 }): string {
+  const printableScope = inventoryCountDocumentScope(input.document);
   const groups = new Map<string, { title: string; items: InventoryCountLine[] }>();
   for (const item of input.document.items) {
     const title = [item.sectionName, item.categoryName, item.subcategoryName].filter(Boolean).join(" · ");
@@ -530,5 +652,5 @@ export function renderInventoryCountPrintSheet(input: {
   const returnUrl = input.returnUrl || `/warehouse?tab=counts&inventory=${encodeURIComponent(input.document.id)}`;
   return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>Инвентаризация № ${input.document.number}</title><style>
     @page{size:A4 portrait;margin:14mm 12mm 16mm}*{box-sizing:border-box}body{margin:0;padding:76px 12mm 16mm;color:#111;background:#f3f4f7;font-family:Arial,"DejaVu Sans",sans-serif;font-size:10pt;line-height:1.3}.document{width:min(100%,210mm);min-height:297mm;margin:0 auto;padding:14mm 12mm 16mm;background:#fff;box-shadow:0 16px 50px rgba(19,24,44,.12)}.document>header{border-bottom:2px solid #111;padding-bottom:5mm;margin-bottom:5mm}h1{font-size:16pt;letter-spacing:.035em;margin:0 0 4mm;text-align:center}dl{display:grid;grid-template-columns:32mm 1fr 37mm 1fr;gap:2.5mm 4mm;margin:0}dt{font-weight:700}dd{margin:0;border-bottom:1px solid #777;min-height:5mm}.group{break-inside:auto;margin:0 0 5mm}.group h2{font-size:10.5pt;margin:4mm 0 1.5mm;break-after:avoid}table{width:100%;border-collapse:collapse;table-layout:fixed}thead{display:table-header-group}tr{break-inside:avoid}th,td{border:1px solid #666;padding:2.2mm 2mm;vertical-align:top;overflow-wrap:anywhere;word-break:normal}th{background:#eee;text-align:left;font-size:9pt}.unit{width:15mm;text-align:center}.fact{width:24mm}td{height:10mm}td small{display:block;margin-top:1mm;color:#444;font-size:8pt}.signatures{display:grid;grid-template-columns:1fr 1fr;gap:8mm;margin-top:10mm;break-inside:avoid}.signature{border-bottom:1px solid #333;padding-top:8mm}.date{margin-top:7mm;border-bottom:1px solid #333;width:75mm}.document-toolbar{position:fixed;z-index:10;top:0;right:0;left:0;display:flex;min-height:64px;padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));align-items:center;gap:10px;border-bottom:1px solid #dde0e8;background:rgba(255,255,255,.96);box-shadow:0 8px 28px rgba(19,24,44,.08);backdrop-filter:blur(16px)}.document-toolbar a,.document-toolbar button{display:inline-flex;min-height:44px;align-items:center;justify-content:center;border:1px solid #dfe2ea;border-radius:13px;padding:0 14px;color:#242a3f;background:#fff;font:700 14px Arial,sans-serif;text-decoration:none;cursor:pointer}.document-toolbar a{margin-right:auto}.document-toolbar button{border-color:#25255f;color:#fff;background:#25255f}@media(max-width:600px){body{padding:72px 0 0}.document{min-height:calc(100dvh - 72px);padding:9mm 5mm;box-shadow:none}dl{grid-template-columns:28mm 1fr}.document-toolbar a,.document-toolbar button{padding-inline:11px;font-size:12px}}@media print{body{padding:0;background:#fff}.document{width:auto;min-height:0;margin:0;padding:0;box-shadow:none}.document-toolbar{display:none}}
-  </style></head><body><nav class="document-toolbar" aria-label="Навигация документа"><a href="${escapeHtml(returnUrl)}" onclick="if(window.opener&&!window.opener.closed){event.preventDefault();window.opener.focus();window.close();setTimeout(()=>window.location.assign(this.href),120)}">← Назад к инвентаризации</a><button type="button" onclick="window.print()">Печать / PDF</button></nav><main class="document"><header><h1>ИНВЕНТАРИЗАЦИОННАЯ ВЕДОМОСТЬ</h1><dl><dt>Заведение:</dt><dd>${escapeHtml(input.venueName)}</dd><dt>Инвентаризация №:</dt><dd>${input.document.number}</dd><dt>Дата:</dt><dd></dd><dt>Ответственный:</dt><dd>${escapeHtml(input.document.creator.name)}</dd><dt>Начало подсчёта:</dt><dd>${escapeHtml(input.document.startedAt.slice(0, 16).replace("T", " "))}</dd><dt>Охват:</dt><dd>${escapeHtml(input.document.scope.label)}</dd></dl></header>${tables}<footer class="signatures"><div class="signature">Инвентаризацию провёл</div><div class="signature">Проверил</div></footer><div class="date">Дата</div></main><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250));</script></body></html>`;
+  </style></head><body><nav class="document-toolbar" aria-label="Навигация документа"><a href="${escapeHtml(returnUrl)}" onclick="if(window.opener&&!window.opener.closed){event.preventDefault();window.opener.focus();window.close();setTimeout(()=>window.location.assign(this.href),120)}">← Назад к инвентаризации</a><button type="button" onclick="window.print()">Печать / PDF</button></nav><main class="document"><header><h1>ИНВЕНТАРИЗАЦИОННАЯ ВЕДОМОСТЬ</h1><dl><dt>Заведение:</dt><dd>${escapeHtml(input.venueName)}</dd><dt>Инвентаризация №:</dt><dd>${input.document.number}</dd><dt>Дата:</dt><dd></dd><dt>Ответственный:</dt><dd>${escapeHtml(input.document.creator.name)}</dd><dt>Начало подсчёта:</dt><dd>${escapeHtml(input.document.startedAt.slice(0, 16).replace("T", " "))}</dd><dt>Охват:</dt><dd>${escapeHtml(printableScope.label)}</dd></dl></header>${tables}<footer class="signatures"><div class="signature">Инвентаризацию провёл</div><div class="signature">Проверил</div></footer><div class="date">Дата</div></main><script>window.addEventListener("load",()=>setTimeout(()=>window.print(),250));</script></body></html>`;
 }

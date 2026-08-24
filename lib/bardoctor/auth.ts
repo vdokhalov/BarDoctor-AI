@@ -2,6 +2,7 @@ import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
 import {
   accounts,
+  domainData,
   sessions,
   venueMemberships,
   venues,
@@ -17,6 +18,7 @@ import {
   type AuthenticatedAccount,
 } from "./access-control";
 import { selectVenueMembership } from "./venue-selection";
+import { authoritativeVenueStoreRows } from "./authoritative-persistence";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
@@ -314,6 +316,7 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
     .where(eq(venues.dataAccountId, account.id))
     .limit(1);
   let workspaceId = venue?.workspaceId ?? null;
+  let createdVenue = false;
   if (!workspaceId) {
     const [workspace] = await db
       .insert(workspaces)
@@ -337,6 +340,7 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
         updatedAt: now,
       })
       .returning();
+    createdVenue = true;
   } else if (venue.workspaceId !== workspaceId || !venue.createdByAccountId) {
     await db
       .update(venues)
@@ -345,6 +349,16 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
     venue = { ...venue, workspaceId, createdByAccountId: venue.createdByAccountId ?? account.id };
   }
   if (!venue) throw new Error("VENUE_INITIALIZATION_FAILED");
+  if (createdVenue) {
+    await db
+      .insert(domainData)
+      .values(authoritativeVenueStoreRows({
+        dataAccountId: account.id,
+        venueId: venue.id,
+        updatedAt: now,
+      }))
+      .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
+  }
   await db
     .insert(workspaceMemberships)
     .values({
@@ -518,6 +532,7 @@ export async function authResult(account: Account, token: string, request?: Requ
       id: item.venue.id,
       workspaceId: item.venue.workspaceId,
       name: venueName(item.dataAccount),
+      hasProfile: Boolean(item.dataAccount.restaurantJson),
       role: item.role,
       permissions: item.permissions,
       status: item.venue.status,

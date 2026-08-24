@@ -4,6 +4,7 @@ import {
   buildAssortmentAnalytics,
 } from "../../../../lib/bardoctor/assortment-analytics";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { reconcileTechCards } from "../../../../lib/bardoctor/tech-card-reconciliation";
 
 const STORE_KEYS = [
   "bd_assortment_v1",
@@ -55,8 +56,13 @@ export async function GET(request: Request): Promise<Response> {
     WHERE account_id = ? AND store_key IN (${placeholders})
   `).bind(account.id, ...STORE_KEYS).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
-  const analytics = buildAssortmentAnalytics({
+  const reconciliation = reconcileTechCards({
     assortment: parsed(stores.get("bd_assortment_v1"), {}),
+    purchaseDocuments: values(stores.get("bd_purchase_documents")),
+    venueId: account.venueId,
+  });
+  const analytics = buildAssortmentAnalytics({
+    assortment: reconciliation.assortment,
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
     salesDocuments: values(stores.get("bd_sales_documents")),
     financeRevenue: values(stores.get("bd_finance_revenue")),
@@ -69,5 +75,6 @@ export async function GET(request: Request): Promise<Response> {
     venueId: account.venueId,
     generatedAt: new Date().toISOString(),
     analytics,
+    techCardReconciliation: reconciliation.report,
   });
 }

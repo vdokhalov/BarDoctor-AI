@@ -18,9 +18,9 @@ import {
   applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
   consolidateInventoryDuplicates,
-  inventoryProductKey,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
+import { INVENTORY_SNAPSHOT_STORE_KEY } from "../../../../lib/bardoctor/authoritative-persistence";
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 
@@ -188,7 +188,7 @@ export async function POST(request: Request): Promise<Response> {
     SELECT store_key, data_json
     FROM domain_data
     WHERE account_id = ?
-      AND store_key IN (?, ?, ?, ?, ?, ?)
+      AND store_key IN (?, ?, ?, ?, ?, ?, ?)
   `).bind(
     account.id,
     PURCHASE_STORE_KEY,
@@ -197,6 +197,7 @@ export async function POST(request: Request): Promise<Response> {
     MONTH_CLOSING_STORE_KEY,
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
+    INVENTORY_SNAPSHOT_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   let documents = array(stores.get(PURCHASE_STORE_KEY));
@@ -232,6 +233,19 @@ export async function POST(request: Request): Promise<Response> {
       assortment,
       stockMovements,
     });
+  }
+  if (
+    document.documentType !== "price_list"
+    && !stores.has(ASSORTMENT_STORE_KEY)
+    && (documents.length > 0
+      || stockMovements.length > 0
+      || array(stores.get(INVENTORY_SNAPSHOT_STORE_KEY)).length > 0)
+  ) {
+    return Response.json({
+      ok: false,
+      code: "AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED",
+      error: "Закупка не проведена: серверная номенклатура отсутствует при существующей истории. Требуется immutable export и отдельное разрешение на import/reconciliation.",
+    }, { status: 409 });
   }
 
   const requestedSourceFileIds = new Set(
@@ -396,10 +410,11 @@ export async function POST(request: Request): Promise<Response> {
     venueId: account.venueId,
     idempotencyKey,
     syncStatus: document.externalId ? "success" as const : document.syncStatus,
-    items: document.items.map((item) => ({
-      ...item,
-      purchaseProductKey: inventoryProductKey(item),
-    })),
+    // Keep supplier/invoice identity separate from canonical stock identity.
+    // applyPurchaseToInventory resolves an explicit or stable canonical link;
+    // generating a key here used to turn every raw invoice label into a
+    // canonical product before ambiguity could be detected.
+    items: document.items,
     supplierId: String(supplier.id),
     supplierName: String(supplier.name),
     status: "confirmed",

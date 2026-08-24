@@ -15,10 +15,11 @@ test("the repaired inventory cache is refreshed before the application starts", 
   assert.match(shell, /inventory-cache-reconciliation-v235/);
 });
 
-test("every assortment write is rechecked against purchase and movement evidence", () => {
+test("ordinary assortment writes cannot silently repair or rewrite movement history", () => {
   assert.match(storeRoute, /if \(key === ASSORTMENT_STORE_KEY\)/);
-  assert.match(storeRoute, /repairInventoryPurchaseAmounts\(\{/);
+  assert.doesNotMatch(storeRoute, /repairInventoryPurchaseAmounts\(\{/);
   assert.match(storeRoute, /purchaseDocuments,/);
-  assert.match(storeRoute, /stockMovements: consolidated\.stockMovements/);
-  assert.match(storeRoute, /after = metadataRepair\.assortment/);
+  assert.doesNotMatch(storeRoute, /stockMovements: consolidated\.stockMovements/);
+  assert.match(storeRoute, /IMMUTABLE_STOCK_LEDGER/);
+  assert.match(storeRoute, /AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED/);
 });

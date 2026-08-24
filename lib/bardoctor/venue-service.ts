@@ -2,12 +2,14 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
   accounts,
+  domainData,
   venueMemberships,
   venues,
   workspaceMemberships,
 } from "../../db/schema";
 import type { AuthenticatedAccount } from "./access-control";
 import type { VenueProfile } from "./venue-profile";
+import { authoritativeVenueStoreRows } from "./authoritative-persistence";
 
 function internalVenueEmail(): string {
   return `venue-${crypto.randomUUID()}@tenant.bardoctor.invalid`;
@@ -64,6 +66,15 @@ export async function createVenueForOwner(
       })
       .returning();
 
+    await db
+      .insert(domainData)
+      .values(authoritativeVenueStoreRows({
+        dataAccountId,
+        venueId: venue.id,
+        updatedAt: now,
+      }))
+      .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
+
     const [membership] = await db
       .insert(venueMemberships)
       .values({
@@ -99,4 +110,3 @@ export async function createVenueForOwner(
     throw error;
   }
 }
-

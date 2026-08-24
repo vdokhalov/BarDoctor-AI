@@ -18,6 +18,15 @@ export type NotificationPreferencesInput = {
   quietStart?: string;
   quietEnd?: string;
   timezone?: string;
+  device?: NotificationDeviceTelemetryInput;
+};
+
+export type NotificationDeviceTelemetryInput = {
+  deviceKey?: string;
+  subscriptionId?: string | null;
+  permission?: "default" | "granted" | "denied";
+  optedIn?: boolean;
+  active?: boolean;
 };
 
 export type PushMessage = {

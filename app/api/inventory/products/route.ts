@@ -23,6 +23,11 @@ import {
   manualClassification,
   rememberNomenclatureCorrection,
 } from "../../../../lib/bardoctor/nomenclature";
+import {
+  auditCanonicalNomenclature,
+  enrichCanonicalSupplierSummary,
+  manualCanonicalDuplicateSuggestions,
+} from "../../../../lib/bardoctor/nomenclature-identity";
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -174,6 +179,12 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "classify") {
     const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
     const result = ensureNomenclatureHierarchy(consolidated.assortment, now);
+    result.assortment = enrichCanonicalSupplierSummary(result.assortment);
+    result.assortment.nomenclatureIdentityReport = auditCanonicalNomenclature({
+      assortment: result.assortment,
+      purchaseDocuments,
+      venueId: account.venueId,
+    });
     const statements = [
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
       auditUpdate(database, {
@@ -229,6 +240,12 @@ export async function POST(request: Request): Promise<Response> {
       assortment: reconciled.assortment,
       stockMovements: reconciled.stockMovements,
       now,
+    });
+    repaired.assortment = enrichCanonicalSupplierSummary(repaired.assortment);
+    repaired.assortment.nomenclatureIdentityReport = auditCanonicalNomenclature({
+      assortment: repaired.assortment,
+      purchaseDocuments,
+      venueId: account.venueId,
     });
     if (
       repaired.summary.repaired
@@ -302,12 +319,23 @@ export async function POST(request: Request): Promise<Response> {
     const balances = Array.isArray(root.stockBalances) ? root.stockBalances.map(record) : [];
     const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
     const productKey = inventoryProductKey({ name, unit, packageSize });
+    const possibleDuplicates = manualCanonicalDuplicateSuggestions({
+      assortment,
+      name,
+      unit,
+      venueId: account.venueId,
+    });
     const duplicate = [...balances, ...nomenclature].find((value) =>
       inventoryProductKey(value) === productKey
     );
     if (duplicate) {
       return Response.json(
-        { ok: false, code: "PRODUCT_EXISTS", error: "Такая позиция уже есть в номенклатуре" },
+        {
+          ok: false,
+          code: "PRODUCT_EXISTS",
+          error: "Такая позиция уже есть в номенклатуре",
+          possibleDuplicates,
+        },
         { status: 409 },
       );
     }
@@ -407,8 +435,14 @@ export async function POST(request: Request): Promise<Response> {
       root.nomenclatureRules = rememberNomenclatureCorrection(root.nomenclatureRules, product, manual, now);
     }
     root.updatedAt = now;
+    const enriched = enrichCanonicalSupplierSummary(root);
+    enriched.nomenclatureIdentityReport = auditCanonicalNomenclature({
+      assortment: enriched,
+      purchaseDocuments,
+      venueId: account.venueId,
+    });
     await database.batch([
-      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, enriched, now),
       auditUpdate(database, {
         accountId: account.id,
         entityId: productKey,
@@ -421,7 +455,16 @@ export async function POST(request: Request): Promise<Response> {
         createdAt: now,
       }),
     ]);
-    return Response.json({ ok: true, assortment: root, product, created: true });
+    return Response.json({
+      ok: true,
+      assortment: enriched,
+      product,
+      created: true,
+      possibleDuplicates,
+      duplicateWarning: possibleDuplicates.length
+        ? "Возможно, такой товар уже существует"
+        : null,
+    });
   }
 
   const productKey = text(body.productKey, "", 300);

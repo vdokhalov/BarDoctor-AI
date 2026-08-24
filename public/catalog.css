@@ -1320,3 +1320,213 @@
     width: 100%;
   }
 }
+
+/* Entity identity and unit reconciliation v259 */
+.bd-ingredient-match-v258.needs-unit-review-v259 {
+  border-color: #e7cf86;
+  background: #fffaf0;
+}
+
+.bd-ingredient-unit-review-v259 {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid #eadba8;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bd-ingredient-unit-review-v259 > strong {
+  color: #8a6200;
+  font-size: 10px;
+}
+
+.bd-ingredient-unit-review-v259 p {
+  margin: 0;
+  color: #545c70;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.bd-ingredient-conversion-v259 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.bd-ingredient-conversion-v259 input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 9px;
+  border: 1px solid #dfe2eb;
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.bd-ingredient-conversion-v259 > span {
+  color: #596176;
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.bd-ingredient-package-options-v259 {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bd-ingredient-package-options-v259 button {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 520px) {
+  .bd-ingredient-conversion-v259 {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bd-ingredient-conversion-v259 button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+/* Tech-card semantic matching v258 */
+.bd-ingredient-match-v258,
+.bd-ingredient-full-search-v258 {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #e1e4ec;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.bd-ingredient-match-v258.is-linked {
+  border-color: #cce7db;
+  background: #f5fbf8;
+}
+
+.bd-ingredient-match-v258.is-review {
+  border-color: #eadfae;
+  background: #fffdf4;
+}
+
+.bd-ingredient-match-v258.is-missing {
+  border-color: #ead8d8;
+  background: #fff8f8;
+}
+
+.bd-ingredient-match-main-v258,
+.bd-ingredient-match-v258.is-missing {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bd-ingredient-match-v258 header,
+.bd-ingredient-match-v258 span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bd-ingredient-match-v258 strong,
+.bd-ingredient-match-v258 b {
+  overflow-wrap: anywhere;
+  color: #20263a;
+  font-size: 11px;
+}
+
+.bd-ingredient-match-v258 small,
+.bd-ingredient-full-search-v258 small,
+.bd-ingredient-match-v258 details p {
+  margin: 0;
+  color: #737b8e;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.bd-ingredient-match-v258 button,
+.bd-ingredient-full-search-v258 button {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #d9dce6;
+  border-radius: 10px;
+  background: #fff;
+  color: #454d63;
+  font-size: 10px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.bd-ingredient-match-v258 details summary {
+  color: #5e58c8;
+  font-size: 9px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.bd-ingredient-suggestions-v258 {
+  display: grid;
+  gap: 6px;
+}
+
+.bd-ingredient-suggestions-v258 button {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+}
+
+.bd-ingredient-suggestions-v258 em {
+  flex: 0 0 auto;
+  color: #655df2;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 820;
+}
+
+.bd-ingredient-show-all-v258 {
+  justify-self: start;
+}
+
+.bd-ingredient-full-search-v258 input,
+.bd-ingredient-full-search-v258 select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #dfe2eb;
+  border-radius: 10px;
+  outline: 0;
+  background: #fff;
+  color: #20263a;
+  font-size: 11px;
+}
+
+@media (max-width: 520px) {
+  .bd-ingredient-match-main-v258,
+  .bd-ingredient-match-v258.is-missing,
+  .bd-ingredient-suggestions-v258 button {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bd-ingredient-match-main-v258 > button,
+  .bd-ingredient-match-v258.is-missing > button,
+  .bd-ingredient-show-all-v258 {
+    width: 100%;
+  }
+}

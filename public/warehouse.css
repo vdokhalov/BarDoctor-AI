@@ -2315,6 +2315,124 @@ body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top::before
 }
 
 .bd-inventory-primary-v245:disabled { opacity: .5; }
+
+.bd-inventory-scope-list-v256,
+.bd-inventory-scope-level-v256 {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.bd-inventory-scope-level-v256 {
+  margin-left: 12px;
+  padding: 10px 0 0 12px;
+  border-left: 2px solid #d9dcf8;
+}
+
+.bd-inventory-scope-level-v256.nested {
+  margin-left: 24px;
+}
+
+.bd-inventory-scope-level-v256 > p {
+  margin: 0 0 1px;
+  color: #676e82;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.bd-inventory-scope-row-v256 {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 54px;
+  padding: 9px 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #dfe2e9;
+  border-radius: 14px;
+  color: #20243a;
+  background: #fff;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+.bd-inventory-scope-row-v256 > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.bd-inventory-scope-row-v256 strong,
+.bd-inventory-scope-row-v256 small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.bd-inventory-scope-row-v256 strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.bd-inventory-scope-row-v256 small {
+  color: #73798c;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.bd-inventory-scope-row-v256 > b {
+  flex: 0 0 auto;
+  color: #777e92;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.bd-inventory-scope-row-v256 > b.check {
+  color: #514be3;
+  font-size: 15px;
+}
+
+.bd-inventory-scope-row-v256.selected {
+  border-color: #7773ef;
+  background: #f3f2ff;
+  box-shadow: 0 0 0 2px rgba(91, 85, 238, .08);
+}
+
+.bd-inventory-scope-selected-v256 {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 11px 13px;
+  border: 1px solid #cfd1ff;
+  border-radius: 14px;
+  background: #f7f7ff;
+}
+
+.bd-inventory-scope-selected-v256 span,
+.bd-inventory-scope-selected-v256 small {
+  color: #6a6f86;
+  font-size: 10px;
+}
+
+.bd-inventory-scope-selected-v256 strong {
+  color: #38359f;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.bd-inventory-scope-loading-v256 {
+  min-height: 72px;
+  padding: 24px 14px;
+  border: 1px dashed #d9dce6;
+  border-radius: 14px;
+  color: #70778a;
+  background: #fff;
+  text-align: center;
+  font-size: 12px;
+}
 .bd-inventory-info-v245,
 .bd-inventory-blind-v245 {
   padding: 11px 13px;
@@ -2658,5 +2776,14 @@ body.bd-inventory-overlay-open-v246 > #bd-canonical-bottom-nav {
 @media (max-width: 620px) {
   .bd-inventory-footer-v246 {
     padding-inline: 13px;
+  }
+
+  .bd-inventory-scope-level-v256 {
+    margin-left: 7px;
+    padding-left: 9px;
+  }
+
+  .bd-inventory-scope-level-v256.nested {
+    margin-left: 14px;
   }
 }

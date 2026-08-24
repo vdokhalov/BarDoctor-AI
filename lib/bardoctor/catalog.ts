@@ -16,8 +16,14 @@ export type ImportedMenuIngredient = {
 export type ImportedMenuRecipe = {
   id: string;
   menuItemId: string;
+  ownerId: string;
+  ownerType: "menu_item";
   status: "draft";
   source: "ai";
+  reviewStatus: "ai_draft";
+  version: 1;
+  currentDraft: true;
+  idempotencyKey: string;
   ingredients: ImportedMenuIngredient[];
   confidence: number;
   warnings: string[];
@@ -220,8 +226,14 @@ export function normalizeMenuImport(
     return [{
       id: text(recipe.id, crypto.randomUUID(), 80),
       menuItemId: matchedId,
+      ownerId: matchedId,
+      ownerType: "menu_item" as const,
       status: "draft" as const,
       source: "ai" as const,
+      reviewStatus: "ai_draft" as const,
+      version: 1 as const,
+      currentDraft: true as const,
+      idempotencyKey: `menu-import:${input.id ?? "draft"}:${matchedId}`,
       ingredients,
       confidence: bounded(recipe.confidence, 0.35),
       warnings: Array.isArray(recipe.warnings)
@@ -345,6 +357,8 @@ export function mergeMenuImportParts(value: unknown): {
         ...recipe,
         id: crypto.randomUUID(),
         menuItemId,
+        ownerId: menuItemId,
+        idempotencyKey: `menu-import:merged:${menuItemId}`,
         ingredients: recipe.ingredients.map((ingredient) => ({
           ...ingredient,
           id: crypto.randomUUID(),
