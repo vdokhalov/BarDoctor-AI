@@ -89,7 +89,7 @@ export async function POST(request: Request): Promise<Response> {
         accountKind: "user",
         role: invite?.role ?? "owner",
         ownsVenue: !invite,
-        migrationStatus: "local",
+        migrationStatus: "server_authoritative",
         updatedAt: now,
       })
       .returning();

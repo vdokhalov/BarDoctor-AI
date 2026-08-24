@@ -49,7 +49,7 @@ export async function createVenueForOwner(
         role: "owner",
         ownsVenue: false,
         restaurantJson: JSON.stringify(profile),
-        migrationStatus: "venue_data",
+        migrationStatus: "server_authoritative",
         updatedAt: now,
       })
       .returning({ id: accounts.id });

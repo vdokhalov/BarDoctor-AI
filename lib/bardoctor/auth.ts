@@ -349,7 +349,7 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
     venue = { ...venue, workspaceId, createdByAccountId: venue.createdByAccountId ?? account.id };
   }
   if (!venue) throw new Error("VENUE_INITIALIZATION_FAILED");
-  if (createdVenue) {
+  if (createdVenue || account.migrationStatus === "server_authoritative") {
     await db
       .insert(domainData)
       .values(authoritativeVenueStoreRows({
