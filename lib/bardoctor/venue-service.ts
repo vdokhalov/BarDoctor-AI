@@ -5,11 +5,11 @@ import {
   domainData,
   venueMemberships,
   venues,
-  workspaceMemberships,
 } from "../../db/schema";
 import type { AuthenticatedAccount } from "./access-control";
 import type { VenueProfile } from "./venue-profile";
 import { authoritativeVenueStoreRows } from "./authoritative-persistence";
+import { reconcileVenueOwnerAccess } from "./owner-access";
 
 function internalVenueEmail(): string {
   return `venue-${crypto.randomUUID()}@tenant.bardoctor.invalid`;
@@ -75,32 +75,20 @@ export async function createVenueForOwner(
       }))
       .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
 
+    await reconcileVenueOwnerAccess(venue.id);
     const [membership] = await db
-      .insert(venueMemberships)
-      .values({
-        venueId: venue.id,
-        accountId: actor.actorAccountId,
-        role: "owner",
-        status: "active",
-        joinedAt: now,
-        updatedAt: now,
-      })
-      .returning();
-
-    await db
-      .insert(workspaceMemberships)
-      .values({
-        workspaceId: currentVenue.workspaceId,
-        accountId: actor.actorAccountId,
-        role: "owner",
-        status: "active",
-        joinedAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [workspaceMemberships.workspaceId, workspaceMemberships.accountId],
-        set: { role: "owner", status: "active", updatedAt: now },
-      });
+      .select()
+      .from(venueMemberships)
+      .where(
+        and(
+          eq(venueMemberships.venueId, venue.id),
+          eq(venueMemberships.accountId, actor.actorAccountId),
+        ),
+      )
+      .limit(1);
+    if (!membership || membership.role !== "owner" || membership.status !== "active") {
+      throw new Error("VENUE_OWNER_PROVISIONING_FAILED");
+    }
 
     return { venue, membership, profile };
   } catch (error) {

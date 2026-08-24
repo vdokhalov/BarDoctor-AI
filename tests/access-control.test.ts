@@ -77,13 +77,13 @@ test("client navigation keeps audit viewing separate from canonical access manag
     "/market",
     "/reviews",
     "/opportunities",
-    "/settings",
     "/integrations",
   ]) {
     assert.match(client, new RegExp(`prefix: "${path.replace("/", "\\/")}"`));
   }
   assert.match(client, /prefix: "\/data-control", permission: "audit\.view"/);
   assert.match(client, /prefix: "\/team-access", permission: "access\.manage"/);
+  assert.doesNotMatch(client, /prefix: "\/settings", permission: "settings\.manage"/);
   assert.match(dataControl, /\/api\/audit/);
   assert.match(dataControl, /options && options\.canReopen/);
   assert.doesNotMatch(dataControl, /permissionSheet|\/api\/import\/preview/);

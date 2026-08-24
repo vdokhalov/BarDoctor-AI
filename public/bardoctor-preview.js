@@ -675,13 +675,16 @@
 
   function rememberAccessContext(result) {
     if (!result || !result.ok) return;
-    currentRole = typeof result.role === "string" ? result.role : currentRole;
-    currentPermissions = Array.isArray(result.permissions) ? result.permissions : currentPermissions;
-    if (currentRole) localStorage.setItem("bd_active_role", currentRole);
-    if (Array.isArray(currentPermissions)) {
-      localStorage.setItem("bd_active_permissions", JSON.stringify(currentPermissions));
+    if (Object.prototype.hasOwnProperty.call(result, "role")) {
+      currentRole = typeof result.role === "string" ? result.role : "";
     }
-    if (result.activeVenueId) {
+    if (Object.prototype.hasOwnProperty.call(result, "permissions")) {
+      currentPermissions = Array.isArray(result.permissions) ? result.permissions : [];
+    }
+    if (currentRole) localStorage.setItem("bd_active_role", currentRole);
+    else localStorage.removeItem("bd_active_role");
+    localStorage.setItem("bd_active_permissions", JSON.stringify(currentPermissions));
+    if (Object.prototype.hasOwnProperty.call(result, "activeVenueId") && result.activeVenueId) {
       localStorage.setItem("bd_active_venue_id", String(result.activeVenueId));
       if (typeof bdEnsureCurrentEntry === "function") bdEnsureCurrentEntry();
       var activeVenueMeta = Array.isArray(result.venues)
@@ -698,6 +701,9 @@
           window.history.replaceState(null, "", scopedUrl.pathname + scopedUrl.search + scopedUrl.hash);
         }
       }
+    } else if (Object.prototype.hasOwnProperty.call(result, "activeVenueId")) {
+      localStorage.removeItem("bd_active_venue_id");
+      localStorage.removeItem("bd_active_venue_is_primary");
     }
     if (Array.isArray(result.venues)) {
       var venueContextKey = "bd_venue_context__" + (result.email || localStorage.getItem("bd_session") || "session");
@@ -803,7 +809,6 @@
     { prefix: "/opportunities", permission: "calendar.view" },
     { prefix: "/data-control", permission: "audit.view" },
     { prefix: "/team-access", permission: "access.manage" },
-    { prefix: "/settings", permission: "settings.manage" },
     { prefix: "/setup", permission: "settings.manage" },
     { prefix: "/integrations", permission: "integrations.manage" },
   ];
@@ -822,7 +827,9 @@
     overlay.setAttribute("data-bd-access-denied", "");
     overlay.innerHTML = [
       '<section><span>ДОСТУП ОГРАНИЧЕН</span><h2>Раздел не входит в ваши права</h2>',
-      '<p>Владелец может включить это право в разделе «Команда → Роли и доступ».</p>',
+      '<p>' + (currentRole === "owner"
+        ? 'Права владельца не удалось синхронизировать. Обновите страницу; если ошибка повторится, доступ требует проверки.'
+        : 'Владелец может включить это право в разделе «Команда → Роли и доступ».') + '</p>',
       '<a href="/home">Вернуться на главную</a><small>' + String(permission) + '</small></section>',
     ].join("");
     var homeLink = overlay.querySelector("a");
@@ -836,7 +843,11 @@
   }
 
   function applyAccessUi() {
-    if (!currentRole) return;
+    if (!currentRole) {
+      var staleDenial = document.querySelector("[data-bd-access-denied]");
+      if (staleDenial) staleDenial.remove();
+      return;
+    }
     var required = requiredPermissionForPath(window.location.pathname);
     var existingDenial = document.querySelector("[data-bd-access-denied]");
     if (required && !hasClientPermission(required)) {

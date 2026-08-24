@@ -19,6 +19,10 @@ import {
 } from "./access-control";
 import { selectVenueMembership } from "./venue-selection";
 import { authoritativeVenueStoreRows } from "./authoritative-persistence";
+import {
+  reconcileConfirmedOwnerVenues,
+  reconcileVenueOwnerAccess,
+} from "./owner-access";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
@@ -359,37 +363,12 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
       }))
       .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
   }
-  await db
-    .insert(workspaceMemberships)
-    .values({
-      workspaceId,
-      accountId: account.id,
-      role: "owner",
-      status: "active",
-      joinedAt: account.createdAt,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [workspaceMemberships.workspaceId, workspaceMemberships.accountId],
-      set: { role: "owner", status: "active", updatedAt: now },
-    });
-  await db
-    .insert(venueMemberships)
-    .values({
-      venueId: venue.id,
-      accountId: account.id,
-      role: "owner",
-      status: "active",
-      joinedAt: account.createdAt,
-      updatedAt: now,
-    })
-    .onConflictDoNothing({
-      target: [venueMemberships.venueId, venueMemberships.accountId],
-    });
+  await reconcileVenueOwnerAccess(venue.id);
 }
 
 export async function membershipsForAccount(account: Account) {
   await ensureOwnerVenue(account);
+  await reconcileConfirmedOwnerVenues(account.id);
   const rows = await getDb()
     .select({
       membership: venueMemberships,
@@ -512,7 +491,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     account.id,
     true,
   );
-  const activeRole = active?.role ?? "shift_manager";
+  const activeRole = active?.role ?? null;
   if (active) await rememberActiveVenueForToken(token, account.id, active.venue.id);
   return {
     ok: true as const,
@@ -527,7 +506,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     activeVenueId: active?.venue.id ?? null,
     activeWorkspaceId: active?.venue.workspaceId ?? null,
     activeVenueIsPrimary: Boolean(active && active.venue.dataAccountId === account.id),
-    canCreateVenues: Boolean(active && activeRole === "owner"),
+    canCreateVenues: activeRole === "owner",
     venues: memberships.map((item) => ({
       id: item.venue.id,
       workspaceId: item.venue.workspaceId,
