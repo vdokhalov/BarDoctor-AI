@@ -14,6 +14,9 @@ test("platform migration endpoint separates read-only phase A from explicit per-
   assert.match(route, /persist-phase-a-backups/);
   assert.match(route, /venue_data_migration\.phase_a_backups/);
   assert.match(route, /migrate_safe_venue/);
+  assert.match(route, /migrate_captured_venue/);
+  assert.match(route, /latestCapturedCandidates/);
+  assert.match(route, /migrate-captured-venue/);
   assert.match(route, /PHASE_B_CONFIRMATION/);
   assert.match(route, /x-admin-intent/);
   assert.match(route, /plan\.migrationClass !== "SAFE_AUTOMATABLE"/);

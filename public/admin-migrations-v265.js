@@ -8,7 +8,9 @@
   var archiveButton = document.getElementById("archive-confirmed");
   var archiveStatus = document.getElementById("archive-status");
   var archiveResult = document.getElementById("archive-result");
-  if (!button || !status || !result || !kpis || !venues || !archiveButton || !archiveStatus || !archiveResult) return;
+  var capturedVenues = document.getElementById("captured-venues");
+  var capturedStatus = document.getElementById("captured-status");
+  if (!button || !status || !result || !kpis || !venues || !archiveButton || !archiveStatus || !archiveResult || !capturedVenues || !capturedStatus) return;
 
   function text(value) {
     return String(value == null ? "" : value);
@@ -120,5 +122,73 @@
     } finally {
       archiveButton.disabled = false;
     }
+  });
+
+  async function checkCaptured(venueId, row) {
+    var control = row.querySelector("button");
+    var detail = row.querySelector("small");
+    control.disabled = true;
+    capturedStatus.className = "running";
+    capturedStatus.textContent = "Проверяю неизменяемую копию…";
+    try {
+      var response = await fetch("/api/admin/data-migrations?venueId=" + encodeURIComponent(venueId) + "&mode=captured", { credentials: "same-origin", cache: "no-store" });
+      var payload = await response.json().catch(function () { return {}; });
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "Собранные данные не найдены");
+      var plan = payload.plan || {};
+      detail.textContent = "Класс: " + text(plan.migrationClass) + " · хранилищ к добавлению: " + text((plan.writes || []).length) + " · записей: " + text(plan.records && plan.records.toMigrate);
+      if (plan.migrationClass !== "SAFE_AUTOMATABLE") {
+        control.textContent = "Требуется ручная проверка";
+        capturedStatus.className = "warning";
+        capturedStatus.textContent = "Копия сохранена, но автоматический перенос заблокирован проверками целостности.";
+        return;
+      }
+      control.disabled = false;
+      control.textContent = "Перенести на сервер";
+      control.onclick = async function () {
+        control.disabled = true;
+        capturedStatus.className = "running";
+        capturedStatus.textContent = "Добавляю отсутствующие хранилища и проверяю контрольные суммы…";
+        try {
+          var migrate = await fetch("/api/admin/data-migrations", {
+            method: "POST",
+            credentials: "same-origin",
+            cache: "no-store",
+            headers: { "Content-Type": "application/json", "X-Admin-Intent": "migrate-captured-venue" },
+            body: JSON.stringify({
+              action: "migrate_captured_venue",
+              venueId: Number(venueId),
+              operationId: plan.operationId,
+              exportId: plan.backup && plan.backup.exportId,
+              backupChecksum: plan.backup && plan.backup.checksum && plan.backup.checksum.value,
+              confirmation: "PHASE_B_SAFE_VENUE_MIGRATION_APPROVED"
+            })
+          });
+          var migrated = await migrate.json().catch(function () { return {}; });
+          if (!migrate.ok || !migrated.ok) throw new Error(migrated.error || "Перенос завершился с ошибкой");
+          detail.textContent = "Перенесено и проверено · операция " + text(migrated.result && migrated.result.operationId);
+          control.textContent = "Перенесено";
+          capturedStatus.className = "success";
+          capturedStatus.textContent = "Заведение переведено на серверное хранение.";
+        } catch (error) {
+          control.disabled = false;
+          capturedStatus.className = "error";
+          capturedStatus.textContent = error && error.message ? error.message : "Перенос завершился с ошибкой";
+        }
+      };
+      capturedStatus.className = "success";
+      capturedStatus.textContent = "Контрольный план готов. Можно запускать перенос одного заведения.";
+    } catch (error) {
+      control.disabled = false;
+      detail.textContent = "Сначала владелец должен открыть /migration в нужном браузере и сохранить копию.";
+      capturedStatus.className = "error";
+      capturedStatus.textContent = error && error.message ? error.message : "Собранные данные не найдены";
+    }
+  }
+
+  capturedVenues.addEventListener("click", function (event) {
+    var control = event.target.closest("[data-capture-check]");
+    if (!control || control.onclick) return;
+    var row = control.closest("[data-captured-venue]");
+    if (row) checkCaptured(control.getAttribute("data-capture-check"), row);
   });
 })();

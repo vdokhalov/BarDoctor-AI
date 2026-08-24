@@ -1,10 +1,14 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getD1, getDb } from "../../../../db";
 import {
   domainData,
   venueMigrationExports,
   venueMigrationOperations,
 } from "../../../../db/schema";
+import {
+  AUTHORITATIVE_STORE_KEYS,
+  type AuthoritativeStoreKey,
+} from "../../../../lib/bardoctor/authoritative-persistence";
 import {
   buildControlledPlatformDryRun,
   PHASE_B_CONFIRMATION,
@@ -24,7 +28,13 @@ import {
 } from "../../../../lib/bardoctor/platform-persistence-service";
 import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
 
-type MigrationAction = "dry_run" | "persist_phase_a_backups" | "migrate_safe_venue" | "rollback_fixture_only";
+type MigrationAction = "dry_run" | "persist_phase_a_backups" | "migrate_safe_venue" | "migrate_captured_venue" | "rollback_fixture_only";
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
 
 function positiveInteger(value: unknown): number | null {
   const parsed = Number(value);
@@ -68,6 +78,31 @@ async function dryRun(legacyCandidatesByVenue: unknown) {
     sourceCommit: BARDOCTOR_SOURCE_COMMIT,
   });
   return { inventory, report };
+}
+
+async function latestCapturedCandidates(venueId: number) {
+  const exports = await getDb().select().from(venueMigrationExports)
+    .where(eq(venueMigrationExports.venueId, venueId))
+    .orderBy(desc(venueMigrationExports.createdAt)).limit(25);
+  for (const item of exports) {
+    try {
+      const payload = record(JSON.parse(item.payloadJson));
+      const provenance = record(payload.storeProvenance);
+      const stores = record(payload.stores);
+      const candidates = Object.fromEntries(AUTHORITATIVE_STORE_KEYS.flatMap((key) => {
+        if (record(provenance[key]).source !== "legacy_client_candidate"
+          || !Object.prototype.hasOwnProperty.call(stores, key)) return [];
+        return [[key, {
+          source: "browser_local_storage",
+          sourceKey: `immutable_capture:${item.exportId}:${key}`,
+          capturedAt: item.generatedAt,
+          data: stores[key],
+        }]];
+      })) as Partial<Record<AuthoritativeStoreKey, unknown>>;
+      if (Object.keys(candidates).length) return { export: item, candidates };
+    } catch { /* Ignore malformed historical rows; immutable checksum verification remains mandatory. */ }
+  }
+  return null;
 }
 
 async function persistBackup(plan: VenueMigrationPlan, adminAccountId: number): Promise<void> {
@@ -177,6 +212,20 @@ export async function GET(request: Request): Promise<Response> {
   const venueId = positiveInteger(url.searchParams.get("venueId"));
   if (url.searchParams.has("venueId") && !venueId) return adminJson({ ok: false, error: "Некорректный venue ID" }, 400);
   if (venueId) {
+    if (url.searchParams.get("mode") === "captured") {
+      const capture = await latestCapturedCandidates(venueId);
+      if (!capture) return adminJson({ ok: false, code: "CAPTURE_NOT_FOUND", error: "Собранные браузерные данные не найдены" }, 404);
+      const captured = await dryRun({ [String(venueId)]: capture.candidates });
+      const capturedPlan = captured.report.venues.find((venue) => venue.venue.id === venueId);
+      if (!capturedPlan) return adminJson({ ok: false, error: "Venue не найден" }, 404);
+      return adminJson({
+        ok: true,
+        phase: "B_PREVIEW",
+        capturedExportId: capture.export.exportId,
+        capturedAt: capture.export.createdAt,
+        plan: summary(capturedPlan),
+      });
+    }
     const plan = report.venues.find((venue) => venue.venue.id === venueId);
     if (!plan) return adminJson({ ok: false, error: "Venue не найден" }, 404);
     return adminJson({ ok: true, phase: "A", plan: url.searchParams.get("mode") === "bundle" ? plan : summary(plan) });
@@ -211,7 +260,17 @@ export async function POST(request: Request): Promise<Response> {
   }>(request, { maxBytes: 16 * 1024 * 1024 });
   if (!parsed.ok) return parsed.response;
   const action = parsed.data.action ?? "dry_run";
-  const { inventory, report } = await dryRun(parsed.data.legacyCandidatesByVenue ?? {});
+  const requestedVenueId = positiveInteger(parsed.data.venueId);
+  const capture = action === "migrate_captured_venue" && requestedVenueId
+    ? await latestCapturedCandidates(requestedVenueId)
+    : null;
+  if (action === "migrate_captured_venue" && !capture) {
+    return adminJson({ ok: false, code: "CAPTURE_NOT_FOUND", error: "Собранные браузерные данные не найдены" }, 404);
+  }
+  const legacyCandidates = capture
+    ? { [String(requestedVenueId)]: capture.candidates }
+    : parsed.data.legacyCandidatesByVenue ?? {};
+  const { inventory, report } = await dryRun(legacyCandidates);
   if (action === "dry_run") return adminJson({ ok: true, phase: "A", report: {
     ...report,
     venues: report.venues.map(summary),
@@ -255,10 +314,11 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "rollback_fixture_only") {
     return adminJson({ ok: false, code: "PRODUCTION_ROLLBACK_NOT_AUTHORIZED", error: "Production rollback требует отдельного явного разрешения." }, 409);
   }
-  if (!sameOrigin(request) || request.headers.get("x-admin-intent") !== "migrate-safe-venue") {
+  const expectedIntent = action === "migrate_captured_venue" ? "migrate-captured-venue" : "migrate-safe-venue";
+  if (!sameOrigin(request) || request.headers.get("x-admin-intent") !== expectedIntent) {
     return adminJson({ ok: false, code: "MIGRATION_INTENT_REQUIRED", error: "Запрос миграции отклонён." }, 403);
   }
-  const venueId = positiveInteger(parsed.data.venueId);
+  const venueId = requestedVenueId;
   const venue = venueId ? inventory.venues.find((item) => item.id === venueId) : null;
   const plan = venueId ? report.venues.find((item) => item.venue.id === venueId) : null;
   if (!venue || !plan) return adminJson({ ok: false, error: "Venue не найден" }, 404);
@@ -282,7 +342,9 @@ export async function POST(request: Request): Promise<Response> {
       before: { exportId: plan.backup.exportId, checksum: plan.backup.checksum.value },
       after: result,
       result: "success",
-      reason: "Controlled per-venue server-authoritative migration",
+      reason: action === "migrate_captured_venue"
+        ? "Controlled migration from verified immutable browser capture"
+        : "Controlled per-venue server-authoritative migration",
     });
     return adminJson({ ok: true, phase: "B", result });
   } catch (error) {

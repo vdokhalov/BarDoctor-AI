@@ -46,6 +46,16 @@ function page(): string {
       <div id="archive-status" role="status" aria-live="polite"></div>
       <div id="archive-result" class="venues" hidden></div>
     </section>
+    <section class="capture-panel" aria-labelledby="capture-title">
+      <p class="kicker">PHASE B · CAPTURED DATA</p>
+      <h2 id="capture-title">Перенос Плакучей Ивы и EazywaY</h2>
+      <p class="lead">После сбора данных владельцем здесь появится контрольный план. Перенос добавляет только отсутствующие серверные хранилища и никогда не перезаписывает существующие.</p>
+      <div id="captured-venues" class="venues">
+        <article data-captured-venue="3280"><strong>Плакучая Ива · #3280</strong><button type="button" data-capture-check="3280">Проверить собранные данные</button><small></small></article>
+        <article data-captured-venue="2088"><strong>EazywaY · #2088</strong><button type="button" data-capture-check="2088">Проверить собранные данные</button><small></small></article>
+      </div>
+      <div id="captured-status" role="status" aria-live="polite"></div>
+    </section>
   </main>
 </body>
 </html>`;
