@@ -1590,6 +1590,7 @@
   }
 
   function bdIsDiscardControl(control) {
+    if (control?.hasAttribute?.("data-bd-internal-step-navigation")) return false;
     var label = bdNavigationControlLabel(control);
     return label === "назад" || label === "отмена" || label === "закрыть" || label === "×" || label.startsWith("вернуться");
   }

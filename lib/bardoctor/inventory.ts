@@ -17,6 +17,7 @@ export type InventoryDisplayUnit = "auto" | "ml" | "l" | "g" | "kg" | "pcs";
 
 export type StockMovement = {
   id: string;
+  venueId?: number;
   type: "receipt" | "sale" | "inventory_adjustment" | "writeoff" | "return";
   date: string;
   productKey: string;

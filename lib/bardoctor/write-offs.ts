@@ -63,6 +63,11 @@ export type WriteOffDocument = {
   unvaluedItemCount: number;
   currency?: string;
   idempotencyKey?: string;
+  source: "warehouse" | "shift_close" | "integration";
+  shiftId?: string;
+  shiftCloseId?: string;
+  externalSystem?: string;
+  externalId?: string;
   movementIds: string[];
   reversalMovementIds?: string[];
   createdBy: { accountId: number; name: string; role: string };
@@ -92,6 +97,11 @@ export type WriteOffDraftInput = {
   comment?: unknown;
   items?: unknown;
   idempotencyKey?: unknown;
+  source?: unknown;
+  shiftId?: unknown;
+  shiftCloseId?: unknown;
+  externalSystem?: unknown;
+  externalId?: unknown;
 };
 
 export type WriteOffFailureCode =
@@ -157,6 +167,9 @@ function document(value: unknown, fallbackVenueId?: number): WriteOffDocument | 
     ...item,
     venueId,
     status: status === "confirmed" ? "posted" : status,
+    source: (["warehouse", "shift_close", "integration"] as const).includes(item.source as "warehouse" | "shift_close" | "integration")
+      ? item.source as "warehouse" | "shift_close" | "integration"
+      : "warehouse",
     movementIds: array(item.movementIds).map((value) => text(value, "", 100)).filter(Boolean),
   } as unknown as WriteOffDocument;
 }
@@ -315,6 +328,13 @@ export function saveWriteOffDraft(input: {
     unvaluedItemCount,
     currency: currencies.length === 1 ? currencies[0] : undefined,
     idempotencyKey: text(input.draft.idempotencyKey, existing?.idempotencyKey ?? "", 240) || undefined,
+    source: (["warehouse", "shift_close", "integration"] as const).includes(text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration")
+      ? text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration"
+      : "warehouse",
+    shiftId: text(input.draft.shiftId, existing?.shiftId ?? "", 140) || undefined,
+    shiftCloseId: text(input.draft.shiftCloseId, existing?.shiftCloseId ?? "", 140) || undefined,
+    externalSystem: text(input.draft.externalSystem, existing?.externalSystem ?? "", 120) || undefined,
+    externalId: text(input.draft.externalId, existing?.externalId ?? "", 180) || undefined,
     movementIds: [],
     createdBy: existing?.createdBy ?? input.actor,
     createdAt: existing?.createdAt ?? now,
@@ -323,6 +343,44 @@ export function saveWriteOffDraft(input: {
   const nextDocuments = existingDocuments.filter((item) => item.id !== next.id);
   nextDocuments.unshift(next);
   return { ok: true, document: next, documents: nextDocuments };
+}
+
+export function writeOffExpenseFor(document: WriteOffDocument, previous?: JsonRecord): JsonRecord | null {
+  if (document.totalCost === null || document.totalCost <= 0) return null;
+  return {
+    ...previous,
+    id: `writeoff:${document.id}`,
+    venueId: document.venueId,
+    date: document.date,
+    accountingMonth: document.date.slice(0, 7),
+    category: "writeoff",
+    amount: document.totalCost,
+    area: document.location,
+    description: `${document.reasonLabel} · ${document.itemCount} поз.`,
+    source: "write_off_document",
+    sourceDocumentId: document.id,
+    shiftId: document.shiftId,
+    entryPoint: document.source,
+    currency: document.currency,
+    status: document.status === "cancelled" ? "voided" : "posted",
+    reversedAt: document.status === "cancelled" ? document.cancelledAt : undefined,
+    unvaluedItemCount: document.unvaluedItemCount,
+    createdAt: text(previous?.createdAt, document.createdAt, 40),
+    updatedAt: document.updatedAt,
+    createdByAccountId: document.createdBy.accountId,
+  };
+}
+
+export function syncWriteOffExpense(expenses: unknown[], document: WriteOffDocument): unknown[] {
+  const values = expenses.map(record);
+  const id = `writeoff:${document.id}`;
+  const index = values.findIndex((item) => text(item.id, "", 140) === id
+    || text(item.sourceDocumentId, "", 100) === document.id && item.source === "write_off_document");
+  const next = writeOffExpenseFor(document, index >= 0 ? values[index] : undefined);
+  if (!next) return values;
+  if (index >= 0) values[index] = next;
+  else values.unshift(next);
+  return values;
 }
 
 export function postWriteOffDocument(input: {
@@ -373,6 +431,7 @@ export function postWriteOffDocument(input: {
     balance.updatedAt = now;
     movements.push({
       id: movementId,
+      venueId: input.venueId,
       type: "writeoff",
       date: saved.document.date,
       productKey: item.productKey,
@@ -439,7 +498,7 @@ export function cancelPostedWriteOff(input: {
     balance.lastWriteOffReversalAt = now;
     balance.updatedAt = now;
     reversals.push({
-      id: crypto.randomUUID(), type: "return", date: now.slice(0, 10), productKey: item.productKey,
+      id: crypto.randomUUID(), venueId: input.venueId, type: "return", date: now.slice(0, 10), productKey: item.productKey,
       productName: item.productName, amount: item.baseQuantity, unit: item.baseUnit,
       costAmount: item.totalCost ?? undefined, currency: item.currency,
       sourceDocumentId: existing.id, sourceLineId: `reversal:${item.id}`, createdAt: now, status: "active",

@@ -18,7 +18,13 @@ import type {
   IntegrationEntityType,
 } from "./contracts";
 import type { BusinessWriteResult } from "./sync-engine";
-import { WRITE_OFF_STORE_KEY } from "../write-offs";
+import {
+  postWriteOffDocument,
+  syncWriteOffExpense,
+  WRITE_OFF_REASONS,
+  WRITE_OFF_STORE_KEY,
+  writeOffDisplayNumber,
+} from "../write-offs";
 
 const EMPLOYEE_STORE_KEY = "bd_employees";
 export const WAREHOUSE_STORE_KEY = "bd_warehouses";
@@ -368,10 +374,85 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   return { ok: true, internalId: input.internalId };
 }
 
-async function writeInventoryDocument(input: WriterInput & { kind: "write_off" | "return" }): Promise<BusinessWriteResult> {
+async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const documentStoreKey = input.kind === "write_off" ? WRITE_OFF_STORE_KEY : RETURN_STORE_KEY;
+  const loaded = await stores(input.account.id, [
+    ASSORTMENT_STORE_KEY,
+    STOCK_MOVEMENT_STORE_KEY,
+    WRITE_OFF_STORE_KEY,
+    EXPENSE_STORE_KEY,
+    MONTH_CLOSING_STORE_KEY,
+  ]);
+  const value = record(input.data);
+  const date = text(value.date, now.slice(0, 10), 10);
+  const locked = closedMonthFailure(loaded, date);
+  if (locked) return locked;
+  const requestedReason = text(value.reasonCode, "", 40);
+  const reasonCode = WRITE_OFF_REASONS.some((reason) => reason.code === requestedReason)
+    ? requestedReason
+    : "other";
+  const comment = text(value.comment ?? value.description, `Импорт из ${input.envelope.externalSystem}`, 1_000);
+  const result = postWriteOffDocument({
+    documents: array(parse(loaded.get(WRITE_OFF_STORE_KEY), [])),
+    assortment: record(parse(loaded.get(ASSORTMENT_STORE_KEY), {})),
+    stockMovements: array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    venueId: input.account.venueId,
+    draft: {
+      id: input.internalId,
+      date,
+      location: text(value.location ?? value.warehouseName, "Основной склад", 120),
+      reasonCode,
+      comment,
+      items: array(value.items).map((item) => ({
+        id: item.id,
+        nomenclatureItemId: item.nomenclatureItemId ?? item.productKey,
+        productKey: item.productKey,
+        quantity: item.quantity,
+        unit: item.unit,
+        packagingVariantId: item.packagingVariantId,
+        packagingLabel: item.packagingLabel,
+      })),
+      source: "integration",
+      externalSystem: input.envelope.externalSystem,
+      externalId: input.envelope.externalId,
+      idempotencyKey: `integration:${input.envelope.externalSystem}:${input.envelope.externalId}`,
+    },
+    actor: {
+      accountId: input.account.actorAccountId,
+      name: [input.account.firstName, input.account.lastName].filter(Boolean).join(" ") || input.account.appEmail,
+      role: input.account.role,
+    },
+    allowNegativeStock: false,
+    now,
+  });
+  if (!result.ok) return { ok: false, code: result.code, error: result.error };
+  if (result.idempotent) return { ok: true, internalId: result.document.id, duplicate: true };
+  const expenses = syncWriteOffExpense(array(parse(loaded.get(EXPENSE_STORE_KEY), [])), result.document);
+  await database.batch([
+    upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
+    upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+    upsertStore(database, input.account.id, WRITE_OFF_STORE_KEY, result.documents, now),
+    upsertStore(database, input.account.id, EXPENSE_STORE_KEY, expenses, now),
+    auditStatement(database, {
+      account: input.account,
+      storeKey: WRITE_OFF_STORE_KEY,
+      action: "create",
+      entityId: result.document.id,
+      label: `Списание ${writeOffDisplayNumber(result.document)}`,
+      monthKey: date.slice(0, 7),
+      after: result.document,
+      reason: `Canonical write-off синхронизирован из ${input.envelope.externalSystem}; движений: ${result.document.movementIds.length}`,
+      now,
+    }),
+  ]);
+  return { ok: true, internalId: result.document.id };
+}
+
+async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteResult> {
+  const database = getD1();
+  const now = new Date().toISOString();
+  const documentStoreKey = RETURN_STORE_KEY;
   const loaded = await stores(input.account.id, [
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
@@ -396,7 +477,7 @@ async function writeInventoryDocument(input: WriterInput & { kind: "write_off" |
     if (base.unit === "unknown" || base.amount <= 0 || text(balance.unit) !== base.unit) {
       return { ok: false, code: "INVENTORY_UNIT_CONFLICT", error: `Проверьте единицу позиции «${text(original.name, text(balance.name, "Товар"))}»` };
     }
-    const direction = input.kind === "return" && value.direction === "from_customer" ? 1 : -1;
+    const direction = value.direction === "from_customer" ? 1 : -1;
     if (direction < 0 && number(balance.current) + 0.0001 < base.amount) {
       return { ok: false, code: "INSUFFICIENT_STOCK", error: `Недостаточно остатка для «${text(balance.name, "Товар") }»` };
     }
@@ -414,11 +495,10 @@ async function writeInventoryDocument(input: WriterInput & { kind: "write_off" |
     balance.current = nextCurrent;
     balance.inventoryValue = rounded(Math.max(0, nextCurrent) * Math.max(0, number(balance.averageUnitCost)), 2);
     balance.updatedAt = now;
-    if (input.kind === "write_off") balance.lastWriteOffAt = date;
-    else balance.lastReturnAt = date;
+    balance.lastReturnAt = date;
     movements.push({
       id: crypto.randomUUID(),
-      type: input.kind === "write_off" ? "writeoff" : "return",
+      type: "return",
       date,
       productKey: text(item.productKey),
       productName: text(balance.name, text(item.name, "Товар")),
@@ -461,11 +541,11 @@ async function writeInventoryDocument(input: WriterInput & { kind: "write_off" |
       storeKey: documentStoreKey,
       action: existingIndex >= 0 ? "update" : "create",
       entityId: input.internalId,
-      label: input.kind === "write_off" ? `Списание: ${date}` : `Возврат: ${date}`,
+      label: `Возврат: ${date}`,
       monthKey: date.slice(0, 7),
       before,
       after: document,
-      reason: `${input.kind === "write_off" ? "Списание" : "Возврат"} синхронизировано из ${input.envelope.externalSystem}`,
+      reason: `Возврат синхронизирован из ${input.envelope.externalSystem}`,
       now,
     }),
   ];
@@ -477,9 +557,9 @@ async function writeInventoryDocument(input: WriterInput & { kind: "write_off" |
       id: expenseId,
       date,
       accountingMonth: date.slice(0, 7),
-      category: input.kind === "write_off" ? "writeoff" : "returns",
-      amount: input.kind === "return" && value.direction === "to_supplier" ? -total : total,
-      description: input.kind === "write_off" ? "Списание запасов" : "Возврат",
+      category: "returns",
+      amount: value.direction === "to_supplier" ? -total : total,
+      description: "Возврат",
       sourceDocumentId: input.internalId,
       source: "integration",
       externalSystem: input.envelope.externalSystem,
@@ -720,8 +800,8 @@ export async function writeCanonicalDomainEntity(input: WriterInput): Promise<Bu
     return writeSimpleList({ ...input, storeKey: WAREHOUSE_STORE_KEY, label: "Склад" });
   }
   if (input.entityType === "stock_balance") return writeStockBalance(input);
-  if (input.entityType === "write_off") return writeInventoryDocument({ ...input, kind: "write_off" });
-  if (input.entityType === "return") return writeInventoryDocument({ ...input, kind: "return" });
+  if (input.entityType === "write_off") return writeCanonicalWriteOff(input);
+  if (input.entityType === "return") return writeReturnDocument(input);
   if (input.entityType === "recipe") return writeRecipe(input);
   if (input.entityType === "supplier") {
     return writeSimpleList({ ...input, storeKey: SUPPLIER_STORE_KEY, label: "Поставщик" });

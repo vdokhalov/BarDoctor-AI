@@ -19,7 +19,7 @@ const permissions = [
   "inventory.view", "inventory.manage", "finance.view", "finance.manage",
   "expenses.create", "team.view", "team.manage", "equipment.view",
   "equipment.manage", "integrations.manage", "settings.manage", "access.manage",
-  "data.import", "finance.export", "reviews.view",
+  "data.import", "finance.export", "reviews.view", "shifts.manage",
 ];
 
 const venues = [
@@ -46,13 +46,15 @@ function assortmentFor(venueId) {
         { key: `stock:beer-${suffix}|pcs`, productKey: `stock:beer-${suffix}|pcs`, name: "Пиво Mobile A", current: 20, unit: "pcs", sectionId: "bar", taxonomyCategoryId: "drinks", subcategoryId: "beer", storageLocationId: "bar-fridge", packageSize: "1 шт.", kind: "stock", active: true, classificationStatus: "confirmed", averageUnitCost: 50, inventoryValue: 1000, currency: "RUB" },
         { key: `stock:cola-${suffix}|pcs`, productKey: `stock:cola-${suffix}|pcs`, name: "Coca-Cola Mobile A", current: 12, unit: "pcs", sectionId: "bar", taxonomyCategoryId: "drinks", subcategoryId: "soft", storageLocationId: "bar-fridge", packageSize: "1 шт.", kind: "stock", active: true, classificationStatus: "confirmed", averageUnitCost: 30, inventoryValue: 360, currency: "RUB" },
         { key: `stock:chicken-${suffix}|g`, productKey: `stock:chicken-${suffix}|g`, name: "Куриное филе Mobile A", current: 3000, unit: "g", displayUnit: "kg", sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "meat", storageLocationId: "kitchen-fridge", packageSize: "1 кг", kind: "stock", active: true, classificationStatus: "confirmed", averageUnitCost: 0.4, inventoryValue: 1200, currency: "RUB" },
+        { key: `stock:jack-${suffix}|ml`, productKey: `stock:jack-${suffix}|ml`, name: "Jack Daniel's", aliases: ["Джек Дэниэлс", "Jack Daniels"], current: 5700, unit: "ml", displayUnit: "l", sectionId: "bar", taxonomyCategoryId: "drinks", subcategoryId: "spirits", storageLocationId: "bar-fridge", packageSize: "0.7 л", packageOptions: ["0.7 л"], kind: "stock", active: true, classificationStatus: "confirmed", averageUnitCost: 0.18, inventoryValue: 1026, currency: "RUB" },
+        { key: `stock:lemon-${suffix}|g`, productKey: `stock:lemon-${suffix}|g`, name: "Лимон", aliases: ["Lemon"], current: 3250, unit: "g", displayUnit: "kg", sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "fruit", storageLocationId: "kitchen-fridge", packageSize: "1 кг", kind: "stock", active: true, classificationStatus: "confirmed", averageUnitCost: 0.045, inventoryValue: 146.25, currency: "RUB" },
       ];
   return {
     version: "mobile-qa-v269",
     nomenclatureStructure: {
       sections: [{ id: "bar", name: "Бар", order: 10 }, { id: "kitchen", name: "Кухня", order: 20 }],
       categories: [{ id: "drinks", name: "Напитки", parentId: "bar", order: 10 }, { id: "food", name: "Продукты", parentId: "kitchen", order: 10 }],
-      subcategories: [{ id: "beer", name: "Пиво", parentId: "drinks", order: 10 }, { id: "soft", name: "Безалкогольные", parentId: "drinks", order: 20 }, { id: "coffee", name: "Кофе", parentId: "drinks", order: 30 }, { id: "meat", name: "Мясо", parentId: "food", order: 10 }],
+      subcategories: [{ id: "beer", name: "Пиво", parentId: "drinks", order: 10 }, { id: "soft", name: "Безалкогольные", parentId: "drinks", order: 20 }, { id: "coffee", name: "Кофе", parentId: "drinks", order: 30 }, { id: "spirits", name: "Крепкий алкоголь", parentId: "drinks", order: 40 }, { id: "meat", name: "Мясо", parentId: "food", order: 10 }, { id: "fruit", name: "Фрукты", parentId: "food", order: 20 }],
       locations: [{ id: "bar-fridge", name: "Холодильник бара", parentId: "bar", order: 10 }, { id: "bar-store", name: "Склад бара", parentId: "bar", order: 20 }, { id: "kitchen-fridge", name: "Холодильник кухни", parentId: "kitchen", order: 10 }],
     },
     nomenclature: rows,
@@ -96,6 +98,9 @@ function storeData(venueId) {
     bd_inventory_snapshots: venueId === 901 ? inventoryFixtures() : [],
     bd_stock_movements: [],
     bd_inventory_writeoffs: [],
+    bd_finance_revenue: [],
+    bd_employees: venueId === 901 ? [{ id: "employee-mobile-qa", name: "Тест Бармен", position: "bartender", department: "Бар", status: "active" }] : [],
+    bd_payroll_rules: [],
     bd_finance_settings: { inventoryFrequency: "monthly", customFrequencyDays: 30, inventorySections: ["Бар", "Кухня"], taxModel: { mode: "fixed", amount: 0 }, utilityModel: { mode: "fixed", amount: 0 }, updatedAt: "2026-08-24T08:00:00.000Z" },
   };
 }
@@ -105,7 +110,14 @@ function jsonResponse(value, status = 200) {
 }
 
 async function createRun(browser, profile, label, options = {}) {
-  const state = { activeVenueId: options.venueId || 901, stores: { 901: storeData(901), 902: storeData(902) } };
+  const state = {
+    activeVenueId: options.venueId || 901,
+    stores: { 901: storeData(901), 902: storeData(902) },
+    shiftCloses: new Map(),
+    shiftCloseRequests: [],
+    shiftCloseFulfilled: false,
+    storeWrites: [],
+  };
   const context = await browser.newContext({
     ...profile.descriptor,
     locale: "ru-RU",
@@ -163,11 +175,111 @@ async function createRun(browser, profile, label, options = {}) {
       const key = decodeURIComponent(url.pathname.slice("/api/store/".length));
       if (method === "PUT") {
         const body = request.postDataJSON();
+        state.storeWrites.push({ key, size: Array.isArray(body.data) ? body.data.length : null, at: Date.now() });
         state.stores[state.activeVenueId][key] = body.data;
       }
       return route.fulfill(jsonResponse({ ok: true, data: state.stores[state.activeVenueId][key] ?? null }));
     }
     if (url.pathname === "/api/inventory/products") return route.fulfill(jsonResponse({ ok: true, assortment: state.stores[state.activeVenueId].bd_assortment_v1, duplicateRepair: { changed: false } }));
+    if (url.pathname === "/api/shifts/close" && method === "POST") {
+      const body = request.postDataJSON();
+      state.shiftCloseRequests.push(body);
+      const previous = state.shiftCloses.get(body.shiftCloseId);
+      if (previous) return route.fulfill(jsonResponse({ ...previous, idempotent: true, stockChanged: false }));
+      if (body.venueId != null && Number(body.venueId) !== state.activeVenueId) return route.fulfill(jsonResponse({ ok: false, code: "SHIFT_VENUE_MISMATCH", error: "Смена относится к другому заведению" }, 403));
+      const stores = state.stores[state.activeVenueId];
+      const assortment = stores.bd_assortment_v1;
+      const reasons = new Map([["spoilage", "Порча"], ["breakage", "Бой / разбили"], ["staff_meal", "Питание персонала"], ["other", "Другое"]]);
+      const groups = new Map();
+      for (const line of body.writeOffItems || []) {
+        const key = `${line.reasonCode}\u0000${line.location || "Основной склад"}`;
+        groups.set(key, [...(groups.get(key) || []), line]);
+      }
+      const documents = [];
+      let groupIndex = 0;
+      for (const [key, lines] of groups) {
+        groupIndex += 1;
+        const [reasonCode, location] = key.split("\u0000");
+        const items = lines.map((line, lineIndex) => {
+          const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
+          assert.ok(balance, `shift-close QA: missing canonical product ${line.productKey}`);
+          const baseQuantity = balance.unit === "g" && line.unit === "kg" ? Number(line.quantity) * 1000
+            : balance.unit === "ml" && line.unit === "l" ? Number(line.quantity) * 1000
+              : Number(line.quantity);
+          const totalCost = Number(balance.averageUnitCost) > 0 ? baseQuantity * Number(balance.averageUnitCost) : null;
+          balance.current -= baseQuantity;
+          const item = {
+            id: `${body.shiftCloseId}:${groupIndex}:${lineIndex + 1}`,
+            nomenclatureItemId: line.nomenclatureItemId,
+            productKey: line.productKey,
+            productName: balance.name,
+            quantity: Number(line.quantity),
+            unit: line.unit,
+            baseQuantity,
+            baseUnit: balance.unit,
+            unitCost: Number(balance.averageUnitCost) || null,
+            totalCost,
+            currency: balance.currency,
+          };
+          stores.bd_stock_movements.unshift({
+            id: `shift-movement:${item.id}`,
+            venueId: state.activeVenueId,
+            type: "writeoff",
+            date: body.revenueRecord.date,
+            productKey: item.productKey,
+            productName: item.productName,
+            amount: -baseQuantity,
+            unit: item.baseUnit,
+            costAmount: totalCost === null ? undefined : -totalCost,
+            currency: item.currency,
+            sourceDocumentId: `shift-writeoff:${body.shiftCloseId}:${groupIndex}`,
+            sourceLineId: item.id,
+            createdAt: "2026-08-24T15:00:00.000Z",
+          });
+          return item;
+        });
+        const totalCost = items.some((item) => item.totalCost === null) ? null : items.reduce((sum, item) => sum + item.totalCost, 0);
+        documents.push({
+          id: `shift-writeoff:${body.shiftCloseId}:${groupIndex}`,
+          internalId: `WO-QA-${groupIndex}`,
+          venueId: state.activeVenueId,
+          number: stores.bd_inventory_writeoffs.length + groupIndex,
+          date: body.revenueRecord.date,
+          location,
+          reasonCode,
+          reasonLabel: reasons.get(reasonCode) || reasonCode,
+          status: "posted",
+          source: "shift_close",
+          shiftId: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
+          shiftCloseId: body.shiftCloseId,
+          items,
+          itemCount: items.length,
+          totalCost,
+          currency: items.find((item) => item.currency)?.currency || "RUB",
+          movementIds: items.map((item) => `shift-movement:${item.id}`),
+          createdAt: "2026-08-24T15:00:00.000Z",
+          postedAt: "2026-08-24T15:00:00.000Z",
+        });
+      }
+      stores.bd_inventory_writeoffs = [...documents, ...stores.bd_inventory_writeoffs];
+      const revenueRecord = {
+        ...body.revenueRecord,
+        id: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
+        venueId: state.activeVenueId,
+        shiftCloseId: body.shiftCloseId,
+        closingStatus: "closed",
+        closedVia: "canonical-writeoff-v272",
+        writeOffDocumentIds: documents.map((document) => document.id),
+        writeOffItemCount: (body.writeOffItems || []).length,
+        writeOffTotalCost: documents.some((document) => document.totalCost === null) ? null : documents.reduce((sum, document) => sum + document.totalCost, 0),
+      };
+      stores.bd_finance_revenue = [revenueRecord, ...stores.bd_finance_revenue.filter((row) => row.shiftCloseId !== body.shiftCloseId)];
+      const response = { ok: true, idempotent: false, shiftId: revenueRecord.id, revenueRecord, writeOffDocuments: documents, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, expenses: stores.bd_finance_expenses || [], stockChanged: documents.length > 0 };
+      state.shiftCloses.set(body.shiftCloseId, response);
+      await route.fulfill(jsonResponse(response, 201));
+      state.shiftCloseFulfilled = true;
+      return;
+    }
     if (url.pathname === "/api/write-offs") {
       const stores = state.stores[state.activeVenueId];
       const assortment = stores.bd_assortment_v1;
@@ -529,6 +641,144 @@ async function shiftsFlow(browser, profile) {
   return { profile: profile.name, scenario: "shifts", passed: true };
 }
 
+async function shiftCanonicalWriteoffFlow(browser, profile) {
+  const run = await createRun(browser, profile, "shift-canonical-writeoffs");
+  const { page, state } = run;
+  await goto(page, "/shifts?venue=901&closeShift=1");
+  try {
+    await page.getByLabel("Дата смены", { exact: true }).waitFor({ timeout: 8_000 });
+  } catch {
+    const visibleControls = await page.locator("button,a").evaluateAll((nodes) => nodes.filter((node) => {
+      const box = node.getBoundingClientRect();
+      return box.width > 0 && box.height > 0;
+    }).map((node) => (node.getAttribute("aria-label") || node.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 60));
+    throw new Error(`${profile.name}: shift close wizard did not open at ${page.url()}; visible controls=${JSON.stringify(visibleControls)}`);
+  }
+  await page.getByLabel("Дата смены", { exact: true }).fill("2026-08-24");
+  await page.getByLabel("Выручка, ₽", { exact: true }).fill("10000");
+  await page.getByLabel("Количество чеков", { exact: true }).fill("50");
+  await page.getByLabel("Количество гостей", { exact: true }).fill("60");
+  await page.getByRole("button", { name: "Далее", exact: true }).click();
+  await page.getByText(/Шаг 2 из 5 · Команда/).waitFor();
+  await page.getByRole("button", { name: /Тест Бармен/ }).click();
+  await page.getByRole("button", { name: "Далее", exact: true }).click();
+  await page.waitForSelector('[data-bd-shift-writeoffs="canonical-v272"]');
+  assert.doesNotMatch(await page.locator('[data-bd-shift-writeoffs="canonical-v272"]').textContent(), /Что списано и почему|Сумма/);
+
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  await page.waitForSelector(".bd-writeoff-picker-v271");
+  if (profile.descriptor.isMobile) {
+    const pickerBox = await page.locator(".bd-writeoff-picker-v271").boundingBox();
+    const viewport = page.viewportSize();
+    assert.ok(pickerBox.x >= 0 && pickerBox.y >= 0 && pickerBox.x + pickerBox.width <= viewport.width + 1 && pickerBox.y + pickerBox.height <= viewport.height + 1, `${profile.name}: shift nomenclature picker is clipped`);
+  }
+  await page.locator(".bd-writeoff-picker-row-v271").filter({ hasText: "Jack Daniel's" }).click();
+  const jackQuantity = page.getByLabel("Количество Jack Daniel's", { exact: true });
+  await jackQuantity.focus();
+  await page.keyboard.type("0.7");
+  assert.equal(await jackQuantity.getAttribute("inputmode"), "decimal", `${profile.name}: quantity input does not request a numeric keyboard`);
+  await jackQuantity.scrollIntoViewIfNeeded();
+  assert.ok(await jackQuantity.isVisible(), `${profile.name}: focused quantity field is not visible`);
+  await page.getByLabel("Причина Jack Daniel's", { exact: true }).selectOption("breakage");
+
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  await page.locator(".bd-writeoff-picker-row-v271").filter({ hasText: "Лимон" }).click();
+  await page.getByLabel("Количество Лимон", { exact: true }).fill("0.4");
+  await page.getByLabel("Причина Лимон", { exact: true }).selectOption("spoilage");
+  assert.match(await page.locator(".bd-shift-writeoff-total-v272").textContent(), /2 поз\.|144/);
+  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "shift-writeoffs-step-3");
+
+  await page.getByRole("button", { name: "Далее", exact: true }).click();
+  await page.getByText(/Шаг 4 из 5 · Происшествия/).waitFor();
+  const stepBack = page.locator('[data-bd-shift-closing="guided-v17"]').getByRole("button", { name: "Назад", exact: true });
+  const stepBackHit = await stepBack.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+    return { insideViewport: box.top >= 0 && box.bottom <= innerHeight, ownsHit: hit === node || node.contains(hit), hit: hit?.outerHTML?.slice(0, 240) || "" };
+  });
+  assert.ok(stepBackHit.insideViewport && stepBackHit.ownsHit, `${profile.name}: wizard Back is not touchable ${JSON.stringify(stepBackHit)}`);
+  await stepBack.click();
+  try {
+    await page.waitForSelector('[data-bd-shift-writeoffs="canonical-v272"]', { timeout: 8_000 });
+  } catch {
+    const wizardText = await page.locator("body").textContent();
+    throw new Error(`${profile.name}: Step 4 -> Back did not restore canonical Step 3; url=${page.url()}; page=${wizardText.replace(/\s+/g, " ").slice(0, 1200)}`);
+  }
+  assert.equal(await page.getByLabel("Количество Jack Daniel's", { exact: true }).inputValue(), "0.7", `${profile.name}: Step 4 -> Back lost Jack quantity`);
+  assert.equal(await page.getByLabel("Количество Лимон", { exact: true }).inputValue(), "0.4", `${profile.name}: Step 4 -> Back lost lemon quantity`);
+  assert.equal(await page.getByLabel("Причина Jack Daniel's", { exact: true }).inputValue(), "breakage", `${profile.name}: Step 4 -> Back lost reason`);
+
+  await page.getByRole("button", { name: "Далее", exact: true }).click();
+  await page.getByText(/Шаг 4 из 5 · Происшествия/).waitFor();
+  await page.getByRole("button", { name: "Далее", exact: true }).click();
+  await page.getByText(/Шаг 5 из 5 · Проверка/).waitFor();
+  await page.getByRole("button", { name: "Закрыть смену", exact: true }).click();
+  try {
+    await page.locator('[data-bd-shift-closing="guided-v17"]').waitFor({ state: "detached", timeout: 8_000 });
+  } catch {
+    const errorText = await page.locator(".bd-shift-writeoff-error-v272").textContent().catch(() => "");
+    const wizardState = await page.locator('[data-bd-shift-closing="guided-v17"]').evaluate((node) => ({ text: node.textContent.replace(/\s+/g, " ").slice(-900), buttons: [...node.querySelectorAll("button")].map((button) => button.textContent.trim()).filter(Boolean), connected: node.isConnected, display: getComputedStyle(node).display, visibility: getComputedStyle(node).visibility, rect: node.getBoundingClientRect().toJSON(), url: location.href }));
+    const revenueCaches = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter((key) => key.includes("bd_finance_revenue")).map((key) => [key, localStorage.getItem(key)])));
+    throw new Error(`${profile.name}: shift close did not finish; error=${errorText}; wizard=${JSON.stringify(wizardState)}; revenueCaches=${JSON.stringify(revenueCaches)}; fulfilled=${state.shiftCloseFulfilled}; responses=${JSON.stringify([...state.shiftCloses.keys()])}; canonicalStore=${state.stores[901].bd_inventory_writeoffs.length}; issues=${JSON.stringify(run.issues)}; requests=${JSON.stringify(state.shiftCloseRequests)}`);
+  }
+
+  assert.equal(state.shiftCloseRequests.length, 1, `${profile.name}: shift close submitted more than once`);
+  const payload = state.shiftCloseRequests[0];
+  assert.equal(payload.writeOffItems.length, 2);
+  assert.equal(Object.hasOwn(payload.writeOffItems[0], "amount"), false, `${profile.name}: manual amount leaked into canonical payload`);
+  assert.equal(state.stores[901].bd_inventory_writeoffs.length, 2, `${profile.name}: shift write-offs were not persisted in canonical Warehouse store; responseDocs=${state.shiftCloses.get(payload.shiftCloseId)?.writeOffDocuments?.length}; responseStore=${state.shiftCloses.get(payload.shiftCloseId)?.writeOffs?.length}; writes=${JSON.stringify(state.storeWrites)}`);
+  assert.equal(state.stores[901].bd_stock_movements.filter((movement) => movement.type === "writeoff").length, 2);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Jack Daniel's").current, 5000);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Лимон").current, 2850);
+
+  const retry = await page.evaluate(async (body) => {
+    const response = await fetch("/api/shifts/close", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "Idempotency-Key": body.shiftCloseId }, body: JSON.stringify(body) });
+    return { status: response.status, json: await response.json() };
+  }, payload);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.json.idempotent, true);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Jack Daniel's").current, 5000, `${profile.name}: retry decremented stock twice`);
+
+  const venueMismatch = await page.evaluate(async (body) => {
+    const response = await fetch("/api/shifts/close", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json", "Idempotency-Key": "venue-mismatch" }, body: JSON.stringify({ ...body, shiftCloseId: "venue-mismatch", venueId: 902 }) });
+    return { status: response.status, json: await response.json() };
+  }, payload);
+  assert.equal(venueMismatch.status, 403);
+  assert.equal(venueMismatch.json.code, "SHIFT_VENUE_MISMATCH");
+
+  await goto(page, "/warehouse?venue=901&tab=writeoffs");
+  await page.reload({ waitUntil: "networkidle" });
+  assert.equal(await page.locator(".bd-writeoff-document-list-v271 article").count(), 2, `${profile.name}: shift documents disappeared after Warehouse refresh`);
+  assert.match(await page.locator(".bd-writeoff-document-list-v271").textContent(), /Смена/);
+  await page.locator(".bd-writeoff-document-list-v271 article > button").first().click();
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  assert.match(await page.locator("[data-bd-writeoff-detail]").textContent(), /Связано со сменой/);
+  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Движения" }).click();
+  assert.ok(await page.getByRole("button", { name: "Документ", exact: true }).count() >= 2, `${profile.name}: shift movements are not linked to canonical documents`);
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Остатки" }).click();
+  await page.getByLabel("Группировка остатков", { exact: true }).selectOption("list");
+  assert.match(await page.locator("body").textContent(), /Jack Daniel's|Лимон/);
+  await page.reload({ waitUntil: "networkidle" });
+  assert.equal(state.stores[901].bd_inventory_writeoffs.length, 2, `${profile.name}: refresh lost canonical shift documents`);
+
+  await goto(page, "/finance?venue=901");
+  const financeWriteoffEntry = page.locator(".bd-finance-actions-v160 button").filter({ hasText: "Создать списание" });
+  assert.equal(await financeWriteoffEntry.count(), 1, `${profile.name}: Finance canonical write-off quick action is missing`);
+  await financeWriteoffEntry.click();
+  await page.waitForURL(/\/warehouse\?.*tab=writeoffs/);
+  try {
+    await page.waitForSelector('[data-bd-writeoff-flow="canonical-v271"]', { timeout: 8_000 });
+  } catch {
+    throw new Error(`${profile.name}: Finance canonical entry did not open the write-off form; url=${page.url()}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
+  }
+  assert.match(page.url(), /writeoff=new/);
+  assert.doesNotMatch(await page.locator('[data-bd-writeoff-flow="canonical-v271"]').textContent(), /Что списано и почему|Сумма/);
+
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, documents: 2, movements: 2 };
+}
+
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
   const { page } = run;
@@ -792,6 +1042,7 @@ async function runProfile(browser, profile) {
   const results = [];
   for (const [name, flow] of [
     ["writeoffs", writeoffFlow],
+    ["shift-canonical-writeoffs", shiftCanonicalWriteoffFlow],
     ["inventory-fullscreen", inventoryFlow],
     ["inventory-delete", inventoryDeleteFlow],
     ["warehouse-nomenclature", nomenclatureFlow],
@@ -827,6 +1078,10 @@ async function runProfile(browser, profile) {
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
         results.push(await writeoffFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "shift-canonical-writeoffs") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/shift-canonical-writeoffs\n`);
+        results.push(await shiftCanonicalWriteoffFlow(browser, desktopProfile));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);

@@ -3859,3 +3859,138 @@ body.bd-inventory-delete-open-v270 {
     margin-left: 14px;
   }
 }
+
+/* Shift close → canonical write-offs · v272 */
+.bd-shift-writeoffs-v272 {
+  position: relative;
+  min-width: 0;
+}
+
+.bd-shift-writeoff-item-v272 {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5e7ef;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.bd-shift-writeoff-item-v272 .bd-writeoff-line-v271 {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.bd-shift-writeoff-meta-v272 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.bd-shift-writeoff-meta-v272 label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.bd-shift-writeoff-meta-v272 label > span {
+  color: #7b8194;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.bd-shift-writeoff-meta-v272 input,
+.bd-shift-writeoff-meta-v272 select {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  padding: 0 11px;
+  border: 1px solid #dfe2ec;
+  border-radius: 12px;
+  background: #f8f9fc;
+  color: #20243b;
+  font-size: 13px;
+  outline: none;
+}
+
+.bd-shift-writeoff-meta-v272 input:focus,
+.bd-shift-writeoff-meta-v272 select:focus {
+  border-color: #5b5ceb;
+  box-shadow: 0 0 0 3px rgba(91, 92, 235, .1);
+}
+
+.bd-shift-writeoff-total-v272,
+.bd-shift-writeoff-linked-v272,
+.bd-shift-writeoff-error-v272 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.bd-shift-writeoff-total-v272 {
+  background: #111936;
+  color: #fff;
+}
+
+.bd-shift-writeoff-total-v272 span {
+  color: rgba(255, 255, 255, .65);
+  font-size: 12px;
+}
+
+.bd-shift-writeoff-total-v272 strong {
+  font-size: 14px;
+}
+
+.bd-shift-writeoff-linked-v272 {
+  align-items: flex-start;
+  flex-direction: column;
+  border: 1px solid #cde9da;
+  background: #f1fbf6;
+  color: #176b45;
+}
+
+.bd-shift-writeoff-linked-v272 span,
+.bd-shift-writeoff-error-v272 {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bd-shift-writeoff-error-v272 {
+  justify-content: flex-start;
+  border: 1px solid #fecaca;
+  background: #fff4f4;
+  color: #b42318;
+  font-weight: 650;
+}
+
+.bd-writeoff-shift-link-v272 button {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 8px;
+  border: 1px solid #cfd1ff;
+  border-radius: 12px;
+  background: #f1f1ff;
+  color: #4f46d8;
+  font-weight: 750;
+}
+
+@media (max-width: 480px) {
+  .bd-shift-writeoff-meta-v272 {
+    grid-template-columns: 1fr;
+  }
+
+  .bd-shift-writeoff-item-v272 {
+    padding: 9px;
+  }
+
+  .bd-shift-writeoffs-v272 .bd-writeoff-picker-v271 {
+    max-height: 94dvh;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

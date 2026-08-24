@@ -11,43 +11,23 @@ function replaceOnceUnlessPresent(from, to, marker, label) {
   source = source.replace(from, to);
 }
 
-function replaceOnceInSectionUnlessPresent(sectionStart, sectionEnd, from, to, marker, label) {
-  const start = source.indexOf(sectionStart);
-  const end = source.indexOf(sectionEnd, start);
-  if (start < 0 || end < 0) throw new Error(`${label}: canonical section not found`);
-  const section = source.slice(start, end);
-  if (section.includes(marker)) return;
-  const matches = section.split(from).length - 1;
-  if (matches !== 1) throw new Error(`${label}: expected one canonical match, found ${matches}`);
-  source = source.slice(0, start) + section.replace(from, to) + source.slice(end);
-}
-
-const nomenclatureStart = "function bdNomenclaturePageV238()";
-const nomenclatureEnd = "\nbdNomenclaturePage=bdNomenclaturePageV238;";
-
-replaceOnceInSectionUnlessPresent(
-  nomenclatureStart,
-  nomenclatureEnd,
+replaceOnceUnlessPresent(
   '[a,s]=S.useState("")',
   '[a,s]=S.useState(()=>window.bdReadNavigationQuery("q",""))',
   '[a,s]=S.useState(()=>window.bdReadNavigationQuery("q",""))',
   "nomenclature search reconstruction",
 );
-replaceOnceInSectionUnlessPresent(
-  nomenclatureStart,
-  nomenclatureEnd,
+replaceOnceUnlessPresent(
   'window.bdSyncNavigationQuery({view:l==="structure"?null:l})},[l])',
   'window.bdSyncNavigationQuery({view:l==="structure"?null:l,q:a||null})},[l,a])',
   'window.bdSyncNavigationQuery({view:l==="structure"?null:l,q:a||null})},[l,a])',
   "nomenclature search persistence",
 );
-replaceOnceInSectionUnlessPresent(
-  nomenclatureStart,
-  nomenclatureEnd,
+replaceOnceUnlessPresent(
   'title:"Номенклатура",back:"/more"',
   'title:"Номенклатура",back:window.bdReadNavigationQuery("returnTo","")==="warehouse"?"/warehouse":"/more"',
   'back:window.bdReadNavigationQuery("returnTo","")==="warehouse"?"/warehouse":"/more"',
-  "canonical nomenclature return context",
+  "nomenclature return context",
 );
 replaceOnceUnlessPresent(
   'onClick:()=>e("/nomenclature"),children:[i.jsx("span",{children:"Номенклатура"})',

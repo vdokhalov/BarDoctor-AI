@@ -1493,8 +1493,10 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
     /Налоги и коммунальные услуги распределяются автоматически по графику заведения/,
   );
   assert.match(mainBundle, /new CustomEvent\("bd:shift-closed"/);
-  assert.match(mainBundle, /category:"writeoff"/);
-  assert.match(mainBundle, /participantIds:ye\.participantIds/);
+  assert.match(mainBundle, /bdShiftWriteoffVersionV272="canonical-shift-writeoff-v272"/);
+  assert.match(mainBundle, /bdShiftCloseApiV272/);
+  assert.match(mainBundle, /writeOffItems:writeoffs\.map/);
+  assert.match(mainBundle, /participantIds:\w+\.participantIds/);
   assert.match(mainBundle, /\.get\("closeShift"\)==="1"/);
   assert.match(mainBundle, /title:[A-Za-z_$][\w$]*\?"Смена обновлена":"Смена закрыта"/);
   assert.match(mainBundle, /Отсутствующие категории не получают 50 или другой условный балл/);
@@ -1577,7 +1579,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.doesNotMatch(mainBundle, /Себестоимость списания/);
   assert.match(mainBundle, /"aria-label":"Дата расхода"/);
   assert.match(mainBundle, /"aria-label":"Сумма расхода, ₽"/);
-  assert.match(mainBundle, /"aria-label":d==="writeoff"\?"Причина списания":"Описание расхода"/);
+  assert.match(mainBundle, /"aria-label":"Описание расхода"/);
+  assert.doesNotMatch(mainBundle, /"aria-label":d==="writeoff"\?"Причина списания":"Описание расхода"/);
   assert.match(mainBundle, /В результате завершённого месяца учтена полная сумма/);
   assert.match(mainBundle, /Операционный результат по сменам/);
   assert.doesNotMatch(mainBundle, /Ориентир по чистым деньгам смен/);

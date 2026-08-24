@@ -12,6 +12,7 @@ import {
   deleteWriteOffDraft,
   postWriteOffDocument,
   saveWriteOffDraft,
+  syncWriteOffExpense,
   WRITE_OFF_REASONS,
   WRITE_OFF_STORE_KEY,
   writeOffDisplayNumber,
@@ -155,41 +156,6 @@ function catalog(assortment: JsonRecord, venueId: number) {
   }).filter((item) => item.productKey);
 }
 
-function expenseFor(document: WriteOffDocument, previous?: JsonRecord): JsonRecord | null {
-  if (document.totalCost === null || document.totalCost <= 0) return null;
-  return {
-    ...previous,
-    id: `writeoff:${document.id}`,
-    venueId: document.venueId,
-    date: document.date,
-    accountingMonth: document.date.slice(0, 7),
-    category: "writeoff",
-    amount: document.totalCost,
-    area: document.location,
-    description: `${document.reasonLabel} · ${document.itemCount} поз.`,
-    source: "write_off_document",
-    sourceDocumentId: document.id,
-    currency: document.currency,
-    status: document.status === "cancelled" ? "voided" : "posted",
-    reversedAt: document.status === "cancelled" ? document.cancelledAt : undefined,
-    unvaluedItemCount: document.unvaluedItemCount,
-    createdAt: text(previous?.createdAt, document.createdAt, 40),
-    updatedAt: document.updatedAt,
-    createdByAccountId: document.createdBy.accountId,
-  };
-}
-
-function withExpense(expenses: unknown[], document: WriteOffDocument): unknown[] {
-  const values = expenses.map(record);
-  const id = `writeoff:${document.id}`;
-  const index = values.findIndex((item) => text(item.id, "", 140) === id || text(item.sourceDocumentId, "", 100) === document.id && item.source === "write_off_document");
-  const next = expenseFor(document, index >= 0 ? values[index] : undefined);
-  if (!next) return values;
-  if (index >= 0) values[index] = next;
-  else values.unshift(next);
-  return values;
-}
-
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
@@ -220,7 +186,15 @@ export async function POST(request: Request): Promise<Response> {
   const current = writeOffDocuments(stores.documents, account.venueId);
   const now = new Date().toISOString();
   const currentActor = actor(account);
-  const draft: JsonRecord = { ...record(body.document ?? body.draft), idempotencyKey: text(body.idempotencyKey ?? request.headers.get("idempotency-key") ?? record(body.document).idempotencyKey, "", 240) || undefined };
+  const draft: JsonRecord = {
+    ...record(body.document ?? body.draft),
+    source: "warehouse",
+    shiftId: undefined,
+    shiftCloseId: undefined,
+    externalSystem: undefined,
+    externalId: undefined,
+    idempotencyKey: text(body.idempotencyKey ?? request.headers.get("idempotency-key") ?? record(body.document).idempotencyKey, "", 240) || undefined,
+  };
   const before = current.find((item) => item.id === text(draft.id, "", 100));
 
   if (action === "delete_draft") {
@@ -241,7 +215,7 @@ export async function POST(request: Request): Promise<Response> {
     const result = cancelPostedWriteOff({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, id, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_NOT_FOUND" ? 404 : 409 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, stockChanged: false });
-    const expenses = withExpense(stores.expenses, result.document);
+    const expenses = syncWriteOffExpense(stores.expenses, result.document);
     await database.batch([
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
@@ -268,7 +242,7 @@ export async function POST(request: Request): Promise<Response> {
   const result = postWriteOffDocument({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, draft, actor: currentActor, allowNegativeStock: true, now });
   if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_INSUFFICIENT_STOCK" ? 409 : 422 });
   if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: false });
-  const expenses = withExpense(stores.expenses, result.document);
+  const expenses = syncWriteOffExpense(stores.expenses, result.document);
   await database.batch([
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
