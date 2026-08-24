@@ -24,7 +24,7 @@ import {
 } from "../../../../lib/bardoctor/platform-persistence-service";
 import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
 
-type MigrationAction = "dry_run" | "migrate_safe_venue" | "rollback_fixture_only";
+type MigrationAction = "dry_run" | "persist_phase_a_backups" | "migrate_safe_venue" | "rollback_fixture_only";
 
 function positiveInteger(value: unknown): number | null {
   const parsed = Number(value);
@@ -216,6 +216,42 @@ export async function POST(request: Request): Promise<Response> {
     ...report,
     venues: report.venues.map(summary),
   } });
+  if (action === "persist_phase_a_backups") {
+    if (!sameOrigin(request) || request.headers.get("x-admin-intent") !== "persist-phase-a-backups") {
+      return adminJson({ ok: false, code: "BACKUP_INTENT_REQUIRED", error: "Запрос резервного экспорта отклонён." }, 403);
+    }
+    const verifiedExports: Array<{ venueId: number; exportId: string; checksum: string }> = [];
+    for (const plan of report.venues) {
+      await persistBackup(plan, admin.account.id);
+      verifiedExports.push({
+        venueId: plan.venue.id,
+        exportId: plan.backup.exportId,
+        checksum: plan.backup.checksum.value,
+      });
+    }
+    await recordPlatformAdminAudit({
+      adminAccountId: admin.account.id,
+      action: "venue_data_migration.phase_a_backups",
+      targetType: "platform",
+      targetId: "all-venues",
+      after: { verifiedExports },
+      result: "success",
+      reason: "Immutable per-venue backups before controlled migration dry-run",
+    });
+    return adminJson({
+      ok: true,
+      phase: "A",
+      backups: { requested: report.venues.length, verified: verifiedExports.length, exports: verifiedExports },
+      platform: {
+        accounts: inventory.accountCount,
+        users: inventory.userAccountCount,
+        tenants: inventory.tenantCount,
+        venues: inventory.venues.length,
+        activeVenues: inventory.venues.filter((venue) => venue.status === "active").length,
+      },
+      report: { ...report, venues: report.venues.map(summary) },
+    });
+  }
   if (action === "rollback_fixture_only") {
     return adminJson({ ok: false, code: "PRODUCTION_ROLLBACK_NOT_AUTHORIZED", error: "Production rollback требует отдельного явного разрешения." }, 409);
   }

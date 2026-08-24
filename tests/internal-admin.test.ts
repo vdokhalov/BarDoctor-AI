@@ -33,6 +33,10 @@ test("Internal Admin uses an additive platform permission boundary independent f
   assert.match(platformAccess, /PLATFORM_ADMIN_PERMISSION = "platform\.admin"/);
   assert.match(platformAccess, /eq\(platformAdmins\.status, "active"\)/);
   assert.match(platformAccess, /runtimeEnv\("BARDOCTOR_PLATFORM_ADMIN_IDENTITY_SHA256"\)/);
+  assert.match(platformAccess, /runtimeEnv\("BARDOCTOR_TEMP_MIGRATION_OPERATOR_IDENTITY_SHA256"\)/);
+  assert.match(platformAccess, /temporary_migration_operator/);
+  assert.match(platformAccess, /revokeTemporaryMigrationOperator/);
+  assert.match(platformAccess, /revoke-temporary-migration-operator/);
   assert.doesNotMatch(platformAccess, /if\s*\([^)]*email\s*===\s*["'][^"']+@/i);
 
   const database = await migratedDatabase();
@@ -52,6 +56,20 @@ test("Internal Admin uses an additive platform permission boundary independent f
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM platform_admins WHERE account_id = ?").get(operator.id)?.count, 1);
   assert.equal(database.prepare("SELECT role FROM venue_memberships WHERE account_id = ?").get(operator.id)?.role, "shift_manager");
   database.close();
+});
+
+test("temporary migration operator lifecycle is explicit, identity-bound, auditable, and revocable", async () => {
+  const [platformAccess, revokeRoute] = await Promise.all([
+    source("lib/bardoctor/platform-admin.ts"),
+    source("app/api/admin/revoke-self/route.ts"),
+  ]);
+  assert.match(platformAccess, /isTemporaryMigrationOperator/);
+  assert.match(platformAccess, /constantTimeEqual/);
+  assert.match(platformAccess, /Temporary verified operator for controlled venue migration/);
+  assert.match(platformAccess, /platform_admin\.revoke/);
+  assert.match(platformAccess, /status: "revoked"/);
+  assert.match(revokeRoute, /revokeTemporaryMigrationOperator/);
+  assert.doesNotMatch(revokeRoute, /DELETE|DROP|password|secret/i);
 });
 
 test("admin routes authorize on the backend and expose no venue navigation or mutation surface", async () => {

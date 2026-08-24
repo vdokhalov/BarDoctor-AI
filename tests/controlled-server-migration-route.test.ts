@@ -10,6 +10,9 @@ test("platform migration endpoint separates read-only phase A from explicit per-
   const route = await read("app/api/admin/data-migrations/route.ts");
   assert.match(route, /authenticatePlatformAdmin/);
   assert.match(route, /action === "dry_run"/);
+  assert.match(route, /action === "persist_phase_a_backups"/);
+  assert.match(route, /persist-phase-a-backups/);
+  assert.match(route, /venue_data_migration\.phase_a_backups/);
   assert.match(route, /migrate_safe_venue/);
   assert.match(route, /PHASE_B_CONFIRMATION/);
   assert.match(route, /x-admin-intent/);
@@ -19,6 +22,23 @@ test("platform migration endpoint separates read-only phase A from explicit per-
   assert.match(route, /ON CONFLICT\(account_id, store_key\) DO NOTHING/);
   assert.doesNotMatch(route, /UPDATE domain_data SET data_json/);
   assert.doesNotMatch(route, /DELETE FROM domain_data/);
+});
+
+test("phase A persistence writes immutable exports only and exposes a protected operator surface", async () => {
+  const [route, page, client] = await Promise.all([
+    read("app/api/admin/data-migrations/route.ts"),
+    read("app/admin/migrations/route.ts"),
+    read("public/admin-migrations-v265.js"),
+  ]);
+  const phaseAStart = route.indexOf('action === "persist_phase_a_backups"');
+  const phaseAEnd = route.indexOf('action === "rollback_fixture_only"');
+  const phaseA = route.slice(phaseAStart, phaseAEnd);
+  assert.match(phaseA, /await persistBackup\(plan, admin\.account\.id\)/);
+  assert.doesNotMatch(phaseA, /domainData|INSERT INTO domain_data|UPDATE domain_data|DELETE FROM domain_data/);
+  assert.match(page, /internalAdminRouteState/);
+  assert.match(page, /state !== "admin"/);
+  assert.match(client, /persist_phase_a_backups/);
+  assert.match(client, /X-Admin-Intent/);
 });
 
 test("immutable backup is verified before business-store batch starts", async () => {

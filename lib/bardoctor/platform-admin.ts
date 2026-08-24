@@ -108,13 +108,33 @@ async function isPlatformAdminBootstrapAccount(
   );
 }
 
+async function isTemporaryMigrationOperator(
+  request: Request,
+  account: Account,
+): Promise<boolean> {
+  const expectedHash = runtimeEnv("BARDOCTOR_TEMP_MIGRATION_OPERATOR_IDENTITY_SHA256")?.toLowerCase();
+  if (!expectedHash || !/^[a-f0-9]{64}$/.test(expectedHash)) return false;
+  const forwardedIdentity = getChatGPTEmail(request);
+  if (
+    forwardedIdentity
+    && normalizeEmail(forwardedIdentity) !== normalizeEmail(account.chatgptEmail)
+  ) return false;
+  return constantTimeEqual(
+    await sha256Hex(normalizeEmail(account.chatgptEmail)),
+    expectedHash,
+  );
+}
+
 export async function internalAdminRouteState(
   request: Request,
 ): Promise<"admin" | "bootstrap" | "denied"> {
   if (await authenticatePlatformAdmin(request)) return "admin";
   const account = await authenticateIdentityRequest(request);
   if (!account) return "denied";
-  return await isPlatformAdminBootstrapAccount(request, account) ? "bootstrap" : "denied";
+  return await isPlatformAdminBootstrapAccount(request, account)
+    || await isTemporaryMigrationOperator(request, account)
+    ? "bootstrap"
+    : "denied";
 }
 
 function sameOrigin(request: Request): boolean {
@@ -194,7 +214,9 @@ export async function claimInitialPlatformAdmin(request: Request): Promise<{
   if (!await consumeSensitiveAction(account.id, "platform-admin-claim")) {
     return { ok: false, status: 429, error: "Слишком много попыток. Повторите позже" };
   }
-  if (!await isPlatformAdminBootstrapAccount(request, account)) {
+  const temporaryMigrationOperator = await isTemporaryMigrationOperator(request, account);
+  const initialBootstrapAccount = await isPlatformAdminBootstrapAccount(request, account);
+  if (!temporaryMigrationOperator && !initialBootstrapAccount) {
     return { ok: false, status: 403, error: "Эта учётная запись не назначена оператором платформы" };
   }
 
@@ -203,7 +225,7 @@ export async function claimInitialPlatformAdmin(request: Request): Promise<{
   const count = await getD1().prepare(`
     SELECT COUNT(*) AS count FROM platform_admins WHERE status = 'active'
   `).first<{ count: number }>();
-  if ((count?.count ?? 0) > 0) {
+  if (!temporaryMigrationOperator && (count?.count ?? 0) > 0) {
     return { ok: false, status: 409, error: "Первичная активация уже завершена" };
   }
 
@@ -212,7 +234,9 @@ export async function claimInitialPlatformAdmin(request: Request): Promise<{
     accountId: account.id,
     permissionsJson: JSON.stringify([PLATFORM_ADMIN_PERMISSION]),
     status: "active",
-    provisionedBy: "verified_identity_bootstrap",
+    provisionedBy: temporaryMigrationOperator
+      ? "temporary_migration_operator"
+      : "verified_identity_bootstrap",
     mfaRequired: false,
     updatedAt: now,
   }).onConflictDoNothing({ target: platformAdmins.accountId }).returning({
@@ -230,9 +254,46 @@ export async function claimInitialPlatformAdmin(request: Request): Promise<{
     targetId: account.id,
     after: { permissions: [PLATFORM_ADMIN_PERMISSION], status: "active" },
     result: "success",
-    reason: "Initial verified platform-owner provisioning",
+    reason: temporaryMigrationOperator
+      ? "Temporary verified operator for controlled venue migration"
+      : "Initial verified platform-owner provisioning",
   });
   return { ok: true, status: 201 };
+}
+
+export async function revokeTemporaryMigrationOperator(request: Request): Promise<{
+  ok: boolean;
+  status: number;
+  error?: string;
+}> {
+  const authenticated = await authenticatePlatformAdmin(request);
+  if (!authenticated) return { ok: false, status: 403, error: "Доступ запрещён" };
+  if (
+    !sameOrigin(request)
+    || request.headers.get("x-admin-intent") !== "revoke-temporary-migration-operator"
+  ) {
+    return { ok: false, status: 403, error: "Запрос отзыва доступа отклонён" };
+  }
+  if (authenticated.admin.provisionedBy !== "temporary_migration_operator") {
+    return { ok: false, status: 409, error: "Эта учётная запись не является временным оператором миграции" };
+  }
+  if (!await consumeSensitiveAction(authenticated.account.id, "platform-admin-self-revoke")) {
+    return { ok: false, status: 429, error: "Слишком много попыток. Повторите позже" };
+  }
+  const updatedAt = new Date().toISOString();
+  await getDb().update(platformAdmins).set({ status: "revoked", updatedAt })
+    .where(eq(platformAdmins.accountId, authenticated.account.id));
+  await recordPlatformAdminAudit({
+    adminAccountId: authenticated.account.id,
+    action: "platform_admin.revoke",
+    targetType: "account",
+    targetId: authenticated.account.id,
+    before: { permissions: authenticated.permissions, status: "active" },
+    after: { permissions: authenticated.permissions, status: "revoked" },
+    result: "success",
+    reason: "Temporary migration operator self-revocation",
+  });
+  return { ok: true, status: 200 };
 }
 
 export function adminForbidden(): Response {
