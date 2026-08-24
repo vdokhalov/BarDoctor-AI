@@ -102,9 +102,10 @@ function bdPrepareEmbeddedPage(e,t){
   if(!bdEmbeddedPagePaths.includes(s)){t(s+l+u);return}
   a.documentElement.setAttribute("data-bd-embedded","true");
   if(!a.getElementById("bd-embedded-shell-style")){
-    const d=a.createElement("style");
+    const d=a.createElement("link");
     d.id="bd-embedded-shell-style";
-    d.textContent=".market-bottom-nav,.opportunity-bottom-nav,.trust-bottom-nav,.push-bottom-nav{display:none!important}.market-page,.opportunity-page,.trust-page,.push-page{padding-bottom:28px!important}html[data-bd-embedded],html[data-bd-embedded] body{min-height:100%!important}";
+    d.rel="stylesheet";
+    d.href="/embedded-shell-v269.css";
     a.head.appendChild(d)
   }
   if(a.documentElement.dataset.bdNavigationBound==="true")return;

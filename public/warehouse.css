@@ -2665,6 +2665,7 @@ body:has([data-bd-warehouse-version="compact-tree-v240"]) .bd-scroll-top::before
 }
 
 /* Inventory layer v246 — one viewport, one header, one scroll owner */
+html.bd-inventory-overlay-open-v246,
 body.bd-inventory-overlay-open-v246 {
   overflow: hidden;
   overscroll-behavior: none;
@@ -2678,8 +2679,8 @@ body.bd-inventory-overlay-open-v246 .bd-scroll-top {
 
 body.bd-inventory-overlay-open-v246 > bd-app-header,
 body.bd-inventory-overlay-open-v246 > .bd-venue-trigger,
-body.bd-inventory-overlay-open-v246 > nav[data-bd-bottom-nav],
-body.bd-inventory-overlay-open-v246 > #bd-canonical-bottom-nav {
+body.bd-inventory-overlay-open-v246 nav[data-bd-bottom-nav],
+body.bd-inventory-overlay-open-v246 #bd-canonical-bottom-nav {
   visibility: hidden !important;
   pointer-events: none !important;
 }

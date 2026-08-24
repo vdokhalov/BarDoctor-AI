@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  if (window.location.hostname !== "terminal.local") return;
+  if (!["terminal.local", "127.0.0.1", "localhost"].includes(window.location.hostname)) return;
   var params = new URLSearchParams(window.location.search);
   var state = params.get("qaReport");
   if (!state) return;

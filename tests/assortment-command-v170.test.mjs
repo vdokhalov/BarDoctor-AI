@@ -3,6 +3,13 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const bundleUrl = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
+const cssUrl = new URL("../public/assortment-command-v170.css", import.meta.url);
+
+test("mobile assortment header remains inside the touch viewport", async () => {
+  const css = await readFile(cssUrl, "utf8");
+  assert.match(css, /@media \(max-width: 767px\)[\s\S]*?\.bd-assortment-header-v170\s*\{[^}]*right: 0;[^}]*left: 0;[^}]*margin-inline: auto;[^}]*transform: none;/);
+  assert.doesNotMatch(css, /@media \(max-width: 767px\)[\s\S]*?\.bd-assortment-header-v170\s*\{[^}]*left: 50%;[^}]*translateX\(-50%\)/);
+});
 
 function sliceBetween(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);

@@ -1,0 +1,31 @@
+.market-bottom-nav,
+.opportunity-bottom-nav,
+.trust-bottom-nav,
+.push-bottom-nav,
+.bd-canonical-navigation,
+.market-topbar,
+.opportunity-topbar,
+.trust-header,
+.access-header,
+.integration-header,
+.notification-header,
+.topbar,
+.venue-topbar,
+header.top {
+  display: none !important;
+}
+
+.market-page,
+.opportunity-page,
+.trust-page,
+.push-page,
+.integration-page,
+.notification-page {
+  padding-top: 0 !important;
+  padding-bottom: 28px !important;
+}
+
+html[data-bd-embedded],
+html[data-bd-embedded] body {
+  min-height: 100% !important;
+}

@@ -15,8 +15,9 @@ test("inventory is portalled into one viewport-owned layer", () => {
   assert.match(bundle, /document\.body\);/);
   assert.match(bundle, /"aria-modal":"true"/);
   assert.match(bundle, /bd-inventory-overlay-open-v246/);
-  assert.match(bundle, /o\.style\.overflow="hidden"/);
-  assert.match(bundle, /l\.style\.overflow="hidden"/);
+  assert.match(bundle, /l\.classList\.add\("bd-inventory-overlay-open-v246"\)/);
+  assert.match(bundle, /l\.classList\.remove\("bd-inventory-overlay-open-v246"\)/);
+  assert.doesNotMatch(bundle, /o\.style\.overflow="hidden",l\.style\.overflow="hidden"/);
 });
 
 test("inventory owns its header, scroll body and non-overlapping footer", () => {
@@ -27,6 +28,8 @@ test("inventory owns its header, scroll body and non-overlapping footer", () => 
   assert.match(css, /\.bd-inventory-footer-v246 \.bd-inventory-actions-v245\s*\{[^}]*position: static;/s);
   assert.match(css, /env\(safe-area-inset-top\)/);
   assert.match(css, /env\(safe-area-inset-bottom\)/);
+  assert.match(css, /html\.bd-inventory-overlay-open-v246,\s*body\.bd-inventory-overlay-open-v246\s*\{[^}]*overflow: hidden;/s);
+  assert.match(css, /body\.bd-inventory-overlay-open-v246 nav\[data-bd-bottom-nav\]/);
   assert.match(css, /body\.bd-inventory-overlay-open-v246 \.bd-scroll-top/);
   assert.match(bundle, /className:"bd-inventory-footer-v246"/);
 });

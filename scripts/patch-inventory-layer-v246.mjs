@@ -6,7 +6,7 @@ let source = fs.readFileSync(assetPath, "utf8");
 let fragment = fs.readFileSync(fragmentPath, "utf8").trim();
 
 const lockAnchor = 'S.useEffect(()=>{if(phase!=="setup")return;';
-const scrollLock = 'S.useEffect(()=>{const o=document.body,l=document.documentElement,u=o.style.overflow,d=l.style.overflow,f=o.style.overscrollBehavior,m=l.style.overscrollBehavior;return o.classList.add("bd-inventory-overlay-open-v246"),o.style.overflow="hidden",l.style.overflow="hidden",o.style.overscrollBehavior="none",l.style.overscrollBehavior="none",()=>{o.classList.remove("bd-inventory-overlay-open-v246"),o.style.overflow=u,l.style.overflow=d,o.style.overscrollBehavior=f,l.style.overscrollBehavior=m}},[]);\n';
+const scrollLock = 'S.useEffect(()=>{const o=document.body,l=document.documentElement;return o.classList.add("bd-inventory-overlay-open-v246"),l.classList.add("bd-inventory-overlay-open-v246"),()=>{o.classList.remove("bd-inventory-overlay-open-v246"),l.classList.remove("bd-inventory-overlay-open-v246")}},[]);\n';
 if (!fragment.includes(lockAnchor)) throw new Error("Inventory effect anchor was not found");
 fragment = fragment.replace(lockAnchor, scrollLock + lockAnchor);
 

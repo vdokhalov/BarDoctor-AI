@@ -42,10 +42,12 @@ test("deep links, refreshes and venue-aware query state resolve without browser 
 });
 
 test("modal, sheet, header and print regressions keep explicit exit paths", async () => {
-  const [transient, shellCss, warehouseCss, print, route] = await Promise.all([
+  const [transient, shellCss, warehouseCss, embeddedCss, bundle, print, route] = await Promise.all([
     readFile(new URL("../public/navigation-transient-v247.js", import.meta.url), "utf8"),
     readFile(new URL("../public/app-shell-v185.css", import.meta.url), "utf8"),
     readFile(new URL("../public/warehouse.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/embedded-shell-v269.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8"),
     readFile(new URL("../lib/bardoctor/inventory-counts.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/inventory/counts/route.ts", import.meta.url), "utf8"),
   ]);
@@ -55,6 +57,10 @@ test("modal, sheet, header and print regressions keep explicit exit paths", asyn
   assert.match(transient, /document\.body\.style\.overflow = "hidden"/);
   assert.match(shellCss, /fullscreen-owned/);
   assert.match(warehouseCss, /body\.bd-inventory-overlay-open-v246 > bd-app-header/);
+  assert.match(warehouseCss, /body\.bd-inventory-overlay-open-v246 nav\[data-bd-bottom-nav\]/);
+  assert.match(bundle, /d\.href="\/embedded-shell-v269\.css"/);
+  assert.doesNotMatch(bundle, /d\.id="bd-embedded-shell-style";\s*d\.textContent=/);
+  assert.match(embeddedCss, /\.bd-canonical-navigation/);
   assert.match(print, /← Назад к инвентаризации/);
   assert.match(print, /Печать \/ PDF/);
   assert.match(route, /Сессия завершена/);
