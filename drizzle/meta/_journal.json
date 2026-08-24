@@ -141,6 +141,13 @@
       "when": 1787470513945,
       "tag": "0019_whole_the_hand",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1787548355387,
+      "tag": "0020_deep_silver_centurion",
+      "breakpoints": true
     }
   ]
 }

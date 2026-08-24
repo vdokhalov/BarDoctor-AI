@@ -950,6 +950,69 @@ export const platformAdminRateLimits = sqliteTable(
   ],
 );
 
+/** Immutable pre-migration payload. Rows are append-only and never contain credentials. */
+export const venueMigrationExports = sqliteTable(
+  "venue_migration_exports",
+  {
+    exportId: text("export_id").primaryKey(),
+    venueId: integer("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "restrict" }),
+    dataAccountId: integer("data_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    sourceCommit: text("source_commit").notNull(),
+    schemaVersion: text("schema_version").notNull(),
+    checksum: text("checksum").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    recordCountsJson: text("record_counts_json").notNull(),
+    generatedAt: text("generated_at").notNull(),
+    createdByAccountId: integer("created_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("venue_migration_exports_venue_created_idx").on(table.venueId, table.createdAt),
+    uniqueIndex("venue_migration_exports_venue_checksum_uq").on(table.venueId, table.checksum),
+  ],
+);
+
+/** Durable, idempotent per-venue cutover record. A platform batch is intentionally forbidden. */
+export const venueMigrationOperations = sqliteTable(
+  "venue_migration_operations",
+  {
+    operationId: text("operation_id").primaryKey(),
+    venueId: integer("venue_id")
+      .notNull()
+      .references(() => venues.id, { onDelete: "restrict" }),
+    dataAccountId: integer("data_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    exportId: text("export_id")
+      .notNull()
+      .references(() => venueMigrationExports.exportId, { onDelete: "restrict" }),
+    sourceCommit: text("source_commit").notNull(),
+    status: text("status").notNull().default("prepared"),
+    planJson: text("plan_json").notNull(),
+    affectedStoreKeysJson: text("affected_store_keys_json").notNull(),
+    beforeChecksum: text("before_checksum").notNull(),
+    afterChecksum: text("after_checksum"),
+    cutoverAt: text("cutover_at"),
+    rollbackAt: text("rollback_at"),
+    failureReason: text("failure_reason"),
+    createdByAccountId: integer("created_by_account_id")
+      .notNull()
+      .references(() => accounts.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("venue_migration_operations_venue_created_idx").on(table.venueId, table.createdAt),
+    index("venue_migration_operations_status_idx").on(table.status),
+  ],
+);
+
 export type Account = typeof accounts.$inferSelect;
 export type Workspace = typeof workspaces.$inferSelect;
 export type Venue = typeof venues.$inferSelect;
@@ -957,3 +1020,5 @@ export type VenueMembership = typeof venueMemberships.$inferSelect;
 export type NotificationPreference = typeof notificationPreferences.$inferSelect;
 export type NotificationDevice = typeof notificationDevices.$inferSelect;
 export type PlatformAdmin = typeof platformAdmins.$inferSelect;
+export type VenueMigrationExport = typeof venueMigrationExports.$inferSelect;
+export type VenueMigrationOperation = typeof venueMigrationOperations.$inferSelect;
