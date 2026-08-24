@@ -41,6 +41,15 @@ test("print and close actions remain in the active inventory header", () => {
   assert.match(print, /Назад к инвентаризации/);
   assert.match(print, /window\.opener/);
   assert.match(route, /inventoryPrintUnavailable/);
+  assert.match(route, /inventoryReturnUrl\(account\.venueId, document\.id\)/);
+  assert.match(route, /\/warehouse\?venue=\$\{encodeURIComponent\(String\(venueId\)\)\}&tab=counts/);
+});
+
+test("created inventory replaces the transient new URL with its durable deep link", () => {
+  assert.match(
+    bundle,
+    /l\.inventory\?\.id&&window\.bdSyncNavigationQuery\(\{inventory:l\.inventory\.id,tab:"counts",add:null\}\)/,
+  );
 });
 
 test("v247 navigation cache markers are wired through every app shell", () => {

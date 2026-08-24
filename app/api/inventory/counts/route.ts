@@ -157,6 +157,12 @@ function venueName(restaurantJson: string | null): string {
   return text(profile.name ?? profile.venueName ?? profile.restaurantName, "Заведение", 180);
 }
 
+function inventoryReturnUrl(venueId: number, inventoryId?: string): string {
+  return `/warehouse?venue=${encodeURIComponent(String(venueId))}&tab=counts${
+    inventoryId ? `&inventory=${encodeURIComponent(inventoryId)}` : ""
+  }`;
+}
+
 function inventoryPrintUnavailable(title: string, message: string, status = 404, destination = "/warehouse?tab=counts"): Response {
   const escape = (value: string) => value.replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -176,7 +182,7 @@ export async function GET(request: Request): Promise<Response> {
     ? inventoryPrintUnavailable("Сессия завершена", "Войдите снова, чтобы открыть печатную ведомость.", 401, "/login")
     : unauthorized();
   if (!hasPermission(account, "inventory.view")) {
-    if (printView) return inventoryPrintUnavailable("Нет доступа", "У вас нет права просматривать эту инвентаризацию.", 403, "/warehouse?tab=counts");
+    if (printView) return inventoryPrintUnavailable("Нет доступа", "У вас нет права просматривать эту инвентаризацию.", 403, inventoryReturnUrl(account.venueId));
     return Response.json(
       { ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать инвентаризации" },
       { status: 403 },
@@ -190,17 +196,17 @@ export async function GET(request: Request): Promise<Response> {
   if (id) {
     const document = documents.find((value) => value.id === id);
     if (!document) {
-      if (printView) return inventoryPrintUnavailable("Инвентаризация не найдена", "Документ удалён, недоступен или относится к другому заведению.");
+      if (printView) return inventoryPrintUnavailable("Инвентаризация не найдена", "Документ удалён, недоступен или относится к другому заведению.", 404, inventoryReturnUrl(account.venueId));
       return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация не найдена" }, { status: 404 });
     }
     if (printView) {
       if (document.status === "cancelled") {
-        return inventoryPrintUnavailable("Печать недоступна", "Отменённую инвентаризацию нельзя печатать.", 409, `/warehouse?tab=counts&inventory=${encodeURIComponent(document.id)}`);
+        return inventoryPrintUnavailable("Печать недоступна", "Отменённую инвентаризацию нельзя печатать.", 409, inventoryReturnUrl(account.venueId, document.id));
       }
       return new Response(renderInventoryCountPrintSheet({
         document,
         venueName: venueName(account.restaurantJson),
-        returnUrl: `/warehouse?tab=counts&inventory=${encodeURIComponent(document.id)}`,
+        returnUrl: inventoryReturnUrl(account.venueId, document.id),
       }), {
         headers: {
           "Content-Type": "text/html; charset=utf-8",

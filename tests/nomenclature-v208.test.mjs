@@ -134,7 +134,7 @@ test("warehouse reads canonical names from nomenclature and remains operational"
   assert.match(bundle, /\[N,E\]=S\.useState\(\(\)=>bdWarehouseCanonicalBalances\(xr\("bd_assortment_v1"\)\)\)/);
   assert.match(bundle, /const Se=\{stock:"Остатки",movements:"Движения",counts:"Инвентаризации",writeoffs:"Списания"\}/);
   assert.match(bundle, /children:"Товары на складе"/);
-  assert.match(bundle, /className:"bd-warehouse-nomenclature-link-v241",onClick:\(\)=>e\("\/nomenclature"\)/);
+  assert.match(bundle, /className:"bd-warehouse-nomenclature-link-v241",onClick:\(\)=>e\("\/nomenclature\?returnTo=warehouse"\)/);
   assert.match(bundle, /function bdWarehouseGroupedStock/);
   assert.match(bundle, /value:"sections",children:"Структура"/);
   assert.match(bundle, /value:"categories",children:"Категории"/);

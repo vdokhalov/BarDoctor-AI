@@ -34,6 +34,9 @@ test("navigation runtime sources and patched production bundle parse successfull
   const runtime = await readFile(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
   assert.match(runtime, /var previousSameRoute = bdCanReturnToPreviousContext\(state\)/);
   assert.match(runtime, /if \(previousSameRoute \|\| \(bdCanReturnToPreviousContext\(state\)/);
+
+  const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
+  assert.match(bundle, /"aria-label":"Закрыть редактирование заведения"/);
 });
 
 test("deep-link query flows resolve to a stable logical parent without losing list context", async () => {

@@ -19,10 +19,12 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+node "${script_dir}/patch-navigation-qa-v268.mjs"
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \
   "${SITES_BUILD_TIMEOUT:-3m}" \
   "${vinext}" build
 
+node "${script_dir}/patch-navigation-qa-v268.mjs"
 "${script_dir}/validate-artifact.sh"
