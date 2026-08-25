@@ -1,4 +1,4 @@
-export const APP_SHELL_VERSION = "20260822-navigation-v247";
+export const APP_SHELL_VERSION = "20260825-layout-v279";
 export const CATALOG_ACCOUNTING_VERSION = "20260820-catalog-v208";
 
 /**

@@ -58,7 +58,7 @@ test("modal, sheet, header and print regressions keep explicit exit paths", asyn
   assert.match(shellCss, /fullscreen-owned/);
   assert.match(warehouseCss, /body\.bd-inventory-overlay-open-v246 > bd-app-header/);
   assert.match(warehouseCss, /body\.bd-inventory-overlay-open-v246 nav\[data-bd-bottom-nav\]/);
-  assert.match(bundle, /d\.href="\/embedded-shell-v269\.css"/);
+  assert.match(bundle, /d\.href="\/embedded-shell-v269\.css\?v=20260825-layout-v279"/);
   assert.doesNotMatch(bundle, /d\.id="bd-embedded-shell-style";\s*d\.textContent=/);
   assert.match(embeddedCss, /\.bd-canonical-navigation/);
   assert.match(print, /← Назад к инвентаризации/);

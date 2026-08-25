@@ -17,6 +17,9 @@
   --trust-blue: #3278c6;
   --trust-blue-soft: #eaf4ff;
   --trust-shadow: 0 10px 32px rgba(32, 37, 67, .055);
+  --bd-page-header-height: max(76px, calc(53px + env(safe-area-inset-top)));
+  --bd-secondary-navigation-height: 54px;
+  --bd-page-scroll-padding-top: calc(var(--bd-page-header-height) + var(--bd-secondary-navigation-height) + 12px);
   font-family: Inter, Manrope, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -57,7 +60,7 @@ a { color: inherit; }
   grid-template-columns: 44px minmax(0, 1fr) minmax(0, auto);
   align-items: center;
   gap: 12px;
-  min-height: 76px;
+  min-height: var(--bd-page-header-height);
   padding: max(10px, env(safe-area-inset-top)) clamp(16px, 4vw, 30px) 10px;
   border-bottom: 1px solid rgba(224, 226, 236, .8);
   background: rgba(250, 250, 253, .94);
@@ -137,7 +140,7 @@ select:focus-visible {
 .trust-tabs {
   position: sticky;
   z-index: 35;
-  top: 76px;
+  top: var(--bd-page-header-height);
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   max-width: 1180px;
@@ -149,7 +152,7 @@ select:focus-visible {
 }
 .trust-tabs button {
   position: relative;
-  min-height: 54px;
+  min-height: var(--bd-secondary-navigation-height);
   padding: 0 8px;
   border: 0;
   color: #656b80;
@@ -759,7 +762,7 @@ select:focus-visible {
   position: fixed;
   z-index: 190;
   right: 16px;
-  top: calc(86px + env(safe-area-inset-top));
+  top: calc(var(--bd-page-header-height) + var(--bd-secondary-navigation-height) + 10px);
   max-width: min(390px, calc(100vw - 32px));
   padding: 12px 14px;
   border: 1px solid #b9e2cf;
@@ -810,6 +813,10 @@ body.detail-open { overflow: hidden; }
 }
 
 @media (max-width: 430px) {
+  :root {
+    --bd-page-header-height: max(70px, calc(52px + env(safe-area-inset-top)));
+    --bd-secondary-navigation-height: 51px;
+  }
   .trust-header {
     grid-template-columns: 40px minmax(0, 1fr) auto;
     min-height: 70px;
@@ -828,8 +835,7 @@ body.detail-open { overflow: hidden; }
     padding-inline: 7px;
   }
   .trust-venue-host .bd-venue-trigger-copy strong { max-width: 54px; font-size: 9px; }
-  .trust-tabs { top: 70px; }
-  .trust-tabs button { min-height: 51px; }
+  .trust-tabs button { min-height: var(--bd-secondary-navigation-height); }
   .trust-main { padding-inline: 14px; }
   .state-card { padding: 17px 16px; }
   .state-main { grid-template-columns: 37px minmax(0, 1fr); gap: 11px; }

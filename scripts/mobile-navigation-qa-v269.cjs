@@ -901,6 +901,63 @@ async function embeddedModulesFlow(browser, profile) {
   const { page } = run;
 
   await goto(page, "/data-control?venue=901");
+  const dataControlFrame = page.frames().find((candidate) => {
+    try { return new URL(candidate.url()).pathname === "/data-control"; }
+    catch { return false; }
+  });
+  assert.ok(dataControlFrame, `${profile.name}: data-control iframe is missing`);
+  await dataControlFrame.waitForSelector(".trust-tabs");
+  const initialLayout = await dataControlFrame.evaluate(() => {
+    const header = document.querySelector(".trust-header");
+    const tabs = document.querySelector(".trust-tabs");
+    const tabsRect = tabs.getBoundingClientRect();
+    return {
+      embedded: document.documentElement.dataset.bdEmbedded,
+      headerDisplay: getComputedStyle(header).display,
+      tabsTop: tabsRect.top,
+      tabsCssTop: getComputedStyle(tabs).top,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+    };
+  });
+  assert.equal(initialLayout.embedded, "true", `${profile.name}: embedded layout contract was not installed`);
+  assert.equal(initialLayout.headerDisplay, "none", `${profile.name}: local data-control header duplicates the app header`);
+  assert.equal(initialLayout.tabsCssTop, "0px", `${profile.name}: hidden header still reserves a sticky offset`);
+  assert.ok(Math.abs(initialLayout.tabsTop) <= 1, `${profile.name}: secondary navigation is not attached to the iframe top`);
+  assert.ok(initialLayout.scrollWidth <= initialLayout.clientWidth + 1, `${profile.name}: data-control iframe has horizontal overflow ${initialLayout.scrollWidth}/${initialLayout.clientWidth}`);
+
+  const safeLabel = `${profile.name}-data-control`.replace(/[^a-z0-9-]+/gi, "-");
+  await page.screenshot({ path: path.join(outputDir, `${safeLabel}-initial.png`), fullPage: false });
+  const scrollStates = [];
+  for (const checkpoint of [0.25, 0.5, 0.75, 1, 0]) {
+    const state = await dataControlFrame.evaluate((ratio) => {
+      const root = document.scrollingElement;
+      root.scrollTop = Math.round((root.scrollHeight - root.clientHeight) * ratio);
+      const tabs = document.querySelector(".trust-tabs");
+      const rect = tabs.getBoundingClientRect();
+      const hit = document.elementFromPoint(Math.max(1, rect.left + rect.width / 2), Math.max(1, rect.top + rect.height / 2));
+      return {
+        ratio,
+        scrollTop: root.scrollTop,
+        maxScroll: root.scrollHeight - root.clientHeight,
+        tabsTop: rect.top,
+        tabsBottom: rect.bottom,
+        tabsOwnsHitTarget: Boolean(hit && (hit === tabs || tabs.contains(hit))),
+      };
+    }, checkpoint);
+    scrollStates.push(state);
+    if (state.maxScroll > 0) assert.ok(Math.abs(state.tabsTop) <= 1, `${profile.name}: sticky tabs moved at ${checkpoint * 100}% scroll`);
+    assert.equal(state.tabsOwnsHitTarget, true, `${profile.name}: content paints above sticky tabs at ${checkpoint * 100}% scroll`);
+    if (checkpoint === 0.5) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-middle.png`), fullPage: false });
+    if (checkpoint === 1) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-bottom.png`), fullPage: false });
+  }
+  if (initialLayout.scrollHeight > initialLayout.clientHeight) {
+    assert.ok(scrollStates.some((state) => state.scrollTop > 0), `${profile.name}: data-control frame did not scroll`);
+    assert.equal(scrollStates.at(-1).scrollTop, 0, `${profile.name}: data-control frame did not return to the top`);
+  }
+
   let frame = page.frameLocator("iframe");
   await frame.locator("[data-tab='journal']").click();
   await page.waitForURL(/tab=journal/);
@@ -909,7 +966,11 @@ async function embeddedModulesFlow(browser, profile) {
   await page.goBack();
   await page.waitForURL(/tab=journal/);
 
-  await mobileAudit(page, profile.name, "embedded-data-control");
+  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "embedded-data-control");
+  else {
+    const desktopOverflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+    assert.ok(desktopOverflow.scrollWidth <= desktopOverflow.clientWidth + 1, `${profile.name}: embedded desktop route has horizontal overflow`);
+  }
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true };
 }
@@ -1099,6 +1160,10 @@ async function runProfile(browser, profile) {
       results.push(...await runProfile(browser, profile));
     }
     if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
+        results.push(await embeddedModulesFlow(browser, desktopProfile));
+      }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
         results.push(await writeoffFlow(browser, desktopProfile));

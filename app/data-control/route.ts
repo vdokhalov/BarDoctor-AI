@@ -2,14 +2,14 @@ import { barDoctorResponse } from "../bar-doctor-response";
 import { canonicalUserShellAssets } from "../../lib/bardoctor/app-shell";
 
 const DATA_CONTROL_HTML = `<!doctype html>
-<html lang="ru">
+<html lang="ru" data-bd-secondary-navigation="true">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="theme-color" content="#f7f7fb" />
     <title>Контроль данных — BarDoctor</title>
-    <link rel="stylesheet" href="/data-control.css?v=20260813-trust-v172" />
+    <link rel="stylesheet" href="/data-control.css?v=20260825-layout-v279" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />

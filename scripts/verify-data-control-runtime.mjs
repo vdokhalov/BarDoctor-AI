@@ -257,7 +257,6 @@ try {
     "bd_finance_gap_reasons",
     "bd_inventory_snapshots",
     "bd_purchase_documents",
-    "bd_stock_movements",
     "bd_sales_documents",
     "bd_payroll_entries",
   ];
@@ -272,6 +271,14 @@ try {
     assert.equal(lockedResult.response.status, 423, `${key}: ${JSON.stringify(lockedResult.body)}`);
     assert.equal(lockedResult.body.code, "MONTH_LOCKED", key);
   }
+
+  const immutableLedger = await putStore(ownerA, "bd_stock_movements", [{
+    id: "closed-bd_stock_movements",
+    date: "2026-07-18",
+    amount: 1,
+  }], "Runtime-проверка неизменяемого складского ledger");
+  assert.equal(immutableLedger.response.status, 409, JSON.stringify(immutableLedger.body));
+  assert.equal(immutableLedger.body.code, "IMMUTABLE_STOCK_LEDGER");
 
   result = await putStore(ownerA, "bd_equipment", [{
     id: "runtime-equipment",
@@ -396,7 +403,7 @@ try {
       close: true,
       monthLockedStatus: 423,
       blockedMutationPreservedData: true,
-      protectedStoreKeys: ["bd_finance_expenses", ...lockedStoreKeys],
+      protectedStoreKeys: ["bd_finance_expenses", ...lockedStoreKeys, "bd_stock_movements"],
       equipmentProtected: true,
       localConnectorProtected: true,
       reopen: true,

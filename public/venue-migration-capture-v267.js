@@ -26,7 +26,7 @@
   }
   function parse(raw) {
     try { return { ok: true, data: JSON.parse(raw) }; }
-    catch (_) { return { ok: false, data: null }; }
+    catch { return { ok: false, data: null }; }
   }
   function sourceKeys(storeKey) {
     var exact = storeKey + "__" + state.actorEmail + "__venue_" + state.venueId;

@@ -24,6 +24,19 @@ html[data-bd-user-shell="v185"] {
   scroll-padding-top: calc(var(--bd-header-total) + 12px);
 }
 
+/*
+ * Shared contract for pages that own a secondary sticky navigation row.
+ * A standalone page includes its local header in --bd-page-header-height;
+ * an embedded page starts at the outer shell content edge, so that offset is 0.
+ */
+html[data-bd-secondary-navigation="true"] {
+  scroll-padding-top: var(--bd-page-scroll-padding-top, calc(var(--bd-page-header-height, 0px) + 12px));
+}
+
+html[data-bd-embedded="true"] {
+  --bd-page-header-height: 0px;
+}
+
 bd-app-header {
   position: sticky;
   z-index: var(--bd-layer-sticky);
