@@ -41,6 +41,10 @@ test("user and venue cards navigate to dedicated fullscreen editors", () => {
   assert.ok(profile.includes('A("/profile/personal")'));
   assert.ok(profile.includes('A("/profile/venue")'));
   assert.ok(profile.includes('data-bd-profile-editor":"personal-v282"'));
+  assert.match(profile, /append\("file",A,bdUploadFileName\(A,"user-avatar\.jpg"\)\)/);
+  assert.match(profile, /append\("file",I,bdUploadFileName\(I,"venue-logo\.jpg"\)\)/);
+  assert.doesNotMatch(profile, /append\("file",[AI]\.file/);
+  assert.match(profile, /function bdProfileReturnV281\(\).*window\.scrollTo/);
   assert.ok(profile.includes('data-bd-profile-editor":"venue-v282"'));
   assert.equal(profile.includes("i.jsx(JCe"), false);
   assert.equal(profile.includes("i.jsx(ZCe"), false);
