@@ -182,7 +182,7 @@
 
   function moveVenueTrigger(header, config) {
     var host = header.querySelector("[data-bd-canonical-venue-host]");
-    if (!host || config.variant === "detail") return;
+    if (!host || (config.variant === "detail" && window.location.pathname !== "/profile")) return;
     var triggers = Array.from(document.querySelectorAll("[data-bd-venue-trigger]")).filter(function (item) { return !item.closest(".bd-venue-sheet"); });
     var trigger = triggers.find(function (item) { return item.closest("bd-app-header"); }) || triggers[triggers.length - 1];
     if (!trigger) return;
@@ -282,7 +282,7 @@
 
       var trailing = document.createElement("div");
       trailing.className = "bd-app-header-trailing";
-      if (config.variant !== "detail") {
+      if (config.variant !== "detail" || window.location.pathname === "/profile") {
         var venue = document.createElement("div");
         venue.className = "bd-app-canonical-venue-host";
         venue.setAttribute("data-bd-canonical-venue-host", "");

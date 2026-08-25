@@ -13,6 +13,7 @@ export const accounts = sqliteTable(
     firstName: text("first_name").notNull().default(""),
     lastName: text("last_name"),
     phone: text("phone"),
+    avatarId: text("avatar_id"),
     accountKind: text("account_kind").notNull().default("user"),
     role: text("role").notNull().default("owner"),
     ownsVenue: integer("owns_venue", { mode: "boolean" }).notNull().default(true),

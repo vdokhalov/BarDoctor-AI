@@ -28,6 +28,7 @@ export async function GET(request: Request): Promise<Response> {
       lastName: account.lastName,
       email: account.appEmail,
       phone: account.phone,
+      avatarId: account.avatarId,
       registeredAt: account.createdAt,
     },
     venueAccess: memberships.map((item) => ({

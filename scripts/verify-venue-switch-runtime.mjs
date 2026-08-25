@@ -40,7 +40,16 @@ async function waitForServer() {
 
 async function ensureLocalSchema() {
   const directory = path.join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
-  const databases = (await readdir(directory)).filter((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite");
+  let databases = (await readdir(directory)).filter((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite");
+  if (databases.length === 0) {
+    await fetch(`${origin}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: "schema-probe@example.test", password }),
+    }).catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    databases = (await readdir(directory)).filter((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite");
+  }
   assert.equal(databases.length, 1);
   const database = new DatabaseSync(path.join(directory, databases[0]));
   try {

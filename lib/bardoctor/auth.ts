@@ -61,6 +61,9 @@ async function initializeAuthSchema(): Promise<void> {
   if (!existing.has("account_kind")) {
     statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN account_kind text DEFAULT 'user' NOT NULL"));
   }
+  if (!existing.has("avatar_id")) {
+    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN avatar_id text"));
+  }
   statements.push(d1.prepare("DROP INDEX IF EXISTS accounts_chatgpt_email_uq"));
 
   await d1.batch(statements);
@@ -459,6 +462,7 @@ export async function authenticateRequest(
     firstName: identitySession.account.firstName,
     lastName: identitySession.account.lastName,
     phone: identitySession.account.phone,
+    avatarId: identitySession.account.avatarId,
     role,
     actorAccountId: identitySession.account.id,
     venueId: context.venue.id,
@@ -520,6 +524,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     firstName: account.firstName,
     lastName: account.lastName,
     phone: account.phone,
+    avatarId: account.avatarId,
     role: activeRole,
     permissions: active?.permissions ?? [],
     activeVenueId: active?.venue.id ?? null,

@@ -297,7 +297,7 @@ html[data-bd-shell-mode="fullscreen-owned"] body > bd-app-header,
 html[data-bd-shell-mode="fullscreen-owned"] body > .bd-venue-trigger,
 html[data-bd-shell-mode="fullscreen-owned"] #bd-canonical-bottom-nav,
 html[data-bd-shell-mode="fullscreen-owned"] nav[data-bd-bottom-nav] {
-  visibility: hidden !important;
+  display: none !important;
   pointer-events: none !important;
 }
 

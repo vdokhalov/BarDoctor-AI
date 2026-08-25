@@ -17,6 +17,8 @@
     "test": "npm run audit:buttons && npm run audit:navigation && npm run audit:headers && npm run audit:modern && npm run typecheck && npm run build && npm run test:artifact && npm run test:unit",
     "test:data-control-runtime": "node scripts/verify-data-control-runtime.mjs",
     "test:venue-runtime": "node scripts/verify-venue-switch-runtime.mjs",
+    "test:avatar-runtime": "node scripts/verify-user-avatar-runtime.mjs",
+    "test:profile-browser": "node scripts/profile-browser-qa-v282.cjs",
     "test:admin-runtime": "node scripts/verify-internal-admin-runtime.mjs",
     "test:notifications-runtime": "node scripts/verify-notifications-runtime.mjs",
     "test:mobile-navigation": "bash scripts/run-mobile-navigation-qa-v269.sh",

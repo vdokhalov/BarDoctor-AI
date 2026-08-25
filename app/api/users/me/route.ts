@@ -24,6 +24,7 @@ export async function GET(request: Request): Promise<Response> {
       lastName: account.lastName,
       email: account.appEmail,
       phone: account.phone,
+      avatarId: account.avatarId,
       auth: {
         method: account.passwordHash ? "password" : "identity",
         canChangePassword: Boolean(account.passwordHash && account.chatgptEmail),
