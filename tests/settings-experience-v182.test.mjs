@@ -105,7 +105,7 @@ test("Settings remains reachable while startup health uses the canonical server 
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /function L7\(e,t,n\)\{if\(typeof e!=="string"\)return!1;/);
   assert.match(bundle, /function BS\(e,t,n\)\{if\(typeof e!=="string"\)return!1;/);
-  assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\).*bdUseBusinessHealthSnapshotV283\(\)/);
+  assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\).*bdUseBusinessHealthSnapshotV284\(\)/);
   assert.doesNotMatch(bundle, /bdHealthRouteActiveV182\?zC\(/);
   assert.doesNotMatch(bundle, /bdHealthRouteActiveV182\?bdHealthLatestClosedMonthV153\(/);
 });

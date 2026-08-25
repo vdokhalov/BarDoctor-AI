@@ -1172,7 +1172,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /Заведение под контролем/);
   assert.match(mainBundle, /data-bd-brand-splash":"v159/);
   assert.match(mainBundle, /data-bd-brand-mark":"cloche-pulse-v159/);
-  assert.match(mainBundle, /"data-bd-health-startup-machine":"v283"/);
+  assert.match(mainBundle, /"data-bd-health-startup-machine":"v284"/);
   assert.match(mainBundle, /setTimeout\(\(\)=>I\(!0\),2700\)/);
   assert.match(
     mainBundle,
@@ -1296,7 +1296,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /bdAIManagementBriefingVersion="management-briefing-v254"/);
   assert.match(mainBundle, /bdAISelfServiceVersion="self-service-v255"/);
   assert.match(mainBundle, /verificationPlanId:e\.verificationPlanId/);
-  assert.match(mainBundle, /data-bd-home-health-index":"business-health-snapshot-v283/);
+  assert.match(mainBundle, /data-bd-home-health-index":"business-health-snapshot-v284/);
   assert.match(mainBundle, /children:"Business Health"/);
   assert.match(mainBundle, /onClick:\(\)=>n\("\/health"\)/);
   assert.match(mainBundle, /IC="bd_ai_diagnosis_v9"/);
@@ -1355,7 +1355,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /qr\(IC,n\)\.finally/);
   assert.match(mainBundle, /bd:business-health-snapshot/);
   assert.match(mainBundle, /bdSavedDiagnosis=WS\(\)/);
-  assert.match(mainBundle, /bdUseBusinessHealthSnapshotV283\(\)/);
+  assert.match(mainBundle, /bdUseBusinessHealthSnapshotV284\(\)/);
   assert.match(mainBundle, /xr\(IC\)/);
   assert.match(mainBundle, /aiGenerated:!0/);
   assert.match(mainBundle, /knownEmployees:/);

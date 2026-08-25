@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   buildBusinessHealthSnapshot,
+  businessHealthSnapshotIdentity,
   businessHealthSnapshotCacheKey,
   BUSINESS_HEALTH_CALCULATION_VERSION,
+  isBusinessHealthSnapshotNewer,
 } from "../lib/bardoctor/business-health-snapshot";
 import {
   buildBusinessIntelligence,
@@ -76,6 +78,71 @@ test("one canonical snapshot carries the same score, confidence and primary fact
   assert.equal(snapshot.statusLabel, "Требует внимания");
   assert.equal(snapshot.calculationVersion, BUSINESS_HEALTH_CALCULATION_VERSION);
   assert.equal(snapshot.source, "server_business_intelligence");
+  assert.match(snapshot.snapshotId, /^business-health-snapshot:/);
+});
+
+test("missing guest data remains unavailable and cannot become a zero-score primary factor", () => {
+  const source = intelligence({ score: 64, confidence: 68, finance: 72, demand: 65 });
+  source.businessHealth.components.push({
+    id: "guests",
+    label: "Гости",
+    score: null,
+    weight: 15,
+    confidence: "low",
+    evidence: [],
+    gaps: ["Нет отзывов"],
+  });
+  const snapshot = buildBusinessHealthSnapshot({ venueId: 3280, intelligence: source, context });
+  const guests = snapshot.factorScores.find((factor) => factor.id === "guests");
+
+  assert.equal(guests?.score, null);
+  assert.equal(guests?.availability, "unavailable");
+  assert.notEqual(snapshot.primaryFactor?.id, "guests");
+  assert.equal(snapshot.score, 64);
+});
+
+test("an explicitly measured guest score of zero remains a real zero", () => {
+  const source = intelligence({ score: 54, confidence: 68, finance: 72, demand: 65 });
+  source.businessHealth.components.push({
+    id: "guests",
+    label: "Гости",
+    score: 0,
+    weight: 15,
+    confidence: "medium",
+    evidence: ["Измеренный гостевой показатель"],
+    gaps: [],
+  });
+  const snapshot = buildBusinessHealthSnapshot({ venueId: 3280, intelligence: source, context });
+  const guests = snapshot.factorScores.find((factor) => factor.id === "guests");
+
+  assert.equal(guests?.score, 0);
+  assert.equal(guests?.availability, "measured");
+  assert.equal(snapshot.primaryFactor?.id, "guests");
+  assert.equal(snapshot.primaryFactor?.score, 0);
+});
+
+test("snapshot identity is stable and an older response cannot replace a newer snapshot", () => {
+  const newer = buildBusinessHealthSnapshot({
+    venueId: 3280,
+    intelligence: intelligence({ score: 64, confidence: 68, finance: 65, demand: 58 }),
+    context,
+  });
+  const olderIntelligence = intelligence({ score: 58, confidence: 77, finance: 41, demand: 63 });
+  olderIntelligence.generatedAt = "2026-08-24T18:41:00.000Z";
+  const older = buildBusinessHealthSnapshot({ venueId: 3280, intelligence: olderIntelligence, context });
+
+  assert.equal(
+    newer.snapshotId,
+    businessHealthSnapshotIdentity({
+      venueId: newer.venueId,
+      generatedAt: newer.generatedAt,
+      calculationVersion: newer.calculationVersion,
+      period: newer.period,
+    }),
+  );
+  assert.equal(isBusinessHealthSnapshotNewer(older, newer), false);
+  assert.equal(isBusinessHealthSnapshotNewer(newer, older), true);
+  assert.equal(isBusinessHealthSnapshotNewer(newer, newer), false);
 });
 
 test("venue, calculation version and reporting period isolate cache identities", () => {

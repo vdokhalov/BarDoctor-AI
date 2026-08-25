@@ -7,7 +7,10 @@ import type { VenueAIContext } from "./venue-ai-context";
 
 export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v3" as const;
 
+export type BusinessHealthFactorAvailability = "measured" | "unavailable";
+
 export type BusinessHealthSnapshot = {
+  snapshotId: string;
   venueId: string;
   score: number | null;
   status: AIDoctorIntelligence["businessHealth"]["label"];
@@ -24,6 +27,7 @@ export type BusinessHealthSnapshot = {
     id: BusinessHealthComponent["id"];
     label: string;
     score: number | null;
+    availability: BusinessHealthFactorAvailability;
     weight: number;
     confidence: BusinessHealthComponent["confidence"];
   }>;
@@ -43,6 +47,36 @@ export type BusinessHealthSnapshot = {
   explanation: string;
   source: "server_business_intelligence";
 };
+
+export function businessHealthSnapshotIdentity(input: {
+  venueId: string | number;
+  generatedAt: string;
+  calculationVersion: string;
+  period: Pick<MetricPeriod, "id" | "startDate" | "endDate">;
+}): string {
+  return [
+    "business-health-snapshot",
+    String(input.venueId),
+    input.calculationVersion,
+    input.period.id,
+    input.period.startDate ?? "none",
+    input.period.endDate ?? "none",
+    input.generatedAt,
+  ].map(encodeURIComponent).join(":");
+}
+
+export function isBusinessHealthSnapshotNewer(
+  candidate: Pick<BusinessHealthSnapshot, "snapshotId" | "generatedAt">,
+  current: Pick<BusinessHealthSnapshot, "snapshotId" | "generatedAt"> | null,
+): boolean {
+  if (!current) return true;
+  if (candidate.snapshotId === current.snapshotId) return false;
+  const candidateTime = Date.parse(candidate.generatedAt);
+  const currentTime = Date.parse(current.generatedAt);
+  if (!Number.isFinite(candidateTime)) return false;
+  if (!Number.isFinite(currentTime)) return true;
+  return candidateTime > currentTime;
+}
 
 function statusLabel(
   status: AIDoctorIntelligence["businessHealth"]["label"],
@@ -93,8 +127,17 @@ export function buildBusinessHealthSnapshot(input: {
   const freshness = { fresh: 0, aging: 0, stale: 0, missing: 0 };
   for (const block of input.context.blocks) freshness[block.freshness] += 1;
   const health = input.intelligence.businessHealth;
+  const period = input.intelligence.periods.demand;
+  const venueId = String(input.venueId);
+  const generatedAt = input.intelligence.generatedAt;
   return {
-    venueId: String(input.venueId),
+    snapshotId: businessHealthSnapshotIdentity({
+      venueId,
+      generatedAt,
+      calculationVersion: BUSINESS_HEALTH_CALCULATION_VERSION,
+      period,
+    }),
+    venueId,
     score: health.score,
     status: health.label,
     statusLabel: statusLabel(health.label),
@@ -105,11 +148,12 @@ export function buildBusinessHealthSnapshot(input: {
       id: component.id,
       label: component.label,
       score: component.score,
+      availability: component.score === null ? "unavailable" : "measured",
       weight: component.weight,
       confidence: component.confidence,
     })),
-    generatedAt: input.intelligence.generatedAt,
-    period: input.intelligence.periods.demand,
+    generatedAt,
+    period,
     periods: input.intelligence.periods,
     calculationVersion: BUSINESS_HEALTH_CALCULATION_VERSION,
     dataFreshness: {

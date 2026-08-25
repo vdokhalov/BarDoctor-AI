@@ -25,7 +25,8 @@ test("Home keeps a prominent Health Index card before the financial result", asy
   const home = bundle.slice(homeStart, homeEnd);
 
   assert.match(bundle, /bdHomeHealthIndexVersion="home-health-v200"/);
-  assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v283/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v284/);
+  assert.match(bundle, /"data-bd-health-snapshot-id":e\?\.snapshotId/);
   assert.match(bundle, /Достоверность диагноза/);
   assert.match(bundle, /children:"Business Health"/);
   assert.ok(home.indexOf("i.jsx(bdHomeHealthIndexV200") < home.indexOf("i.jsx(bdHomeMoneyCard"));
@@ -254,7 +255,7 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.doesNotThrow(() => parse(runtime, { ecmaVersion: "latest", sourceType: "script" }));
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v155"/);
-  assert.match(bundle, /data-bd-health-entry":"v283/);
+  assert.match(bundle, /data-bd-health-entry":"v284/);
   assert.match(bundle, /data-bd-health-score-resting":"v153/);
   assert.match(bundle, /Pt\("bd_health_score_experience_v152"\)/);
   assert.match(bundle, /onClick:\(\)=>t\("\/health"\)/);
@@ -263,12 +264,12 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.match(bundle, /source:"server_business_intelligence"/);
   assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\)/);
   assert.match(bundle, /i\.jsx\(bdHealthStartupGateV155,\{children:i\.jsxs\(bse/);
-  assert.match(bundle, /"data-bd-health-startup-machine":"v283"/);
+  assert.match(bundle, /"data-bd-health-startup-machine":"v284"/);
   assert.match(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
   assert.match(bundle, /q\?"SPLASH_LOADING":"HOME"/);
   assert.match(bundle, /R\.next==="HEALTH_ENTRY"/);
   assert.match(bundle, /U\("HEALTH_ENTRY"\)/);
-  assert.match(bundle, /bdHealthLaunchRenderedV155\(\{score:s,venueName:t\|\|"",confidence:u,calculationVersion:e\?\.calculationVersion,period:e\?\.period\?\.id\}\)/);
+  assert.match(bundle, /bdHealthLaunchRenderedV155\(\{score:s,venueName:t\|\|"",confidence:u,snapshotId:e\?\.snapshotId,calculationVersion:e\?\.calculationVersion,period:e\?\.period\?\.id\}\)/);
   assert.match(bundle, /bdHealthLaunchCompleteV155\(R\|\|"entry-finished"\),U\("HOME"\)/);
   assert.match(bundle, /bdHealthLaunchFallbackV155\(R\.reason,\{score:E,venueReady:n,hasProfile:!!t,cloudReady:r,timeoutMs:5200\}\)/);
   assert.doesNotMatch(runtime, /cached-health-score-ready/);
@@ -292,12 +293,28 @@ test("production artifact has one startup owner and cannot complete before Entry
   const coordinatorStart = bundle.indexOf("function bdHealthStartupGateV155");
   const coordinatorEnd = bundle.indexOf("function cEe(){", coordinatorStart);
   const coordinator = bundle.slice(coordinatorStart, coordinatorEnd);
-  assert.match(coordinator, /bdUseBusinessHealthSnapshotV283\(\)/);
+  assert.match(coordinator, /bdUseBusinessHealthSnapshotV284\(\)/);
   assert.match(coordinator, /snapshot:j,diagnosis:v/);
   assert.match(coordinator, /r&&!!j/);
   assert.doesNotMatch(coordinator, /zC\(/);
   assert.doesNotMatch(coordinator, /bdHealthScoreValueV153/);
   assert.doesNotMatch(coordinator, /lastDailyDate|first-daily-entry|bdHealthExperienceReadV153/);
+
+  const sharedStoreStart = bundle.indexOf("const bdBusinessHealthSnapshotClientVersionV284");
+  const sharedStoreEnd = bundle.indexOf("function WS(){", sharedStoreStart);
+  const sharedStore = bundle.slice(sharedStoreStart, sharedStoreEnd);
+  assert.ok(sharedStoreStart >= 0 && sharedStoreEnd > sharedStoreStart);
+  assert.match(sharedStore, /S\.useSyncExternalStore\(bdBusinessHealthSubscribeV284,bdBusinessHealthGetSharedV284,bdBusinessHealthGetSharedV284\)/);
+  assert.match(sharedStore, /bdBusinessHealthHydrateSharedV284\(!1\)/, "Home synchronously hydrates before its first render");
+  assert.match(sharedStore, /if\(e===null\|\|e===void 0\|\|e===""\)return null/, "missing factor values stay null");
+  assert.match(sharedStore, /availability:f===null\?"unavailable":"measured"/);
+  assert.match(sharedStore, /if\(l&&l\.order>s\)return/, "older responses cannot replace a newer snapshot");
+  assert.doesNotMatch(sharedStore, /Number\(d\?\.score\)/, "null must never be coerced to zero while ranking factors");
+
+  assert.doesNotMatch(homeSource, /fetch\("\/api\/ai\/diagnosis"/, "Home navigation does not request a second diagnosis");
+  assert.match(homeSource, /bdCanonicalSnapshot=g/, "Home renders the shared snapshot without clearing it to loading");
+  assert.doesNotMatch(homeSource, /bdHomeCloudReady\?g:null/);
+  assert.match(bundle, /bdBusinessHealthCommitEnvelopeV284\(n,!0\),qr\(IC,n\)/, "refresh commits atomically before persistence");
 
   const splashStart = bundle.indexOf("function _le(){");
   const splashEnd = bundle.indexOf("const Ele=", splashStart);
