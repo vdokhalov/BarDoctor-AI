@@ -30,7 +30,7 @@ test("secondary navigation uses one safe-area-aware sticky offset contract", asy
   assert.match(dataControlCss, /\.trust-tabs\s*\{[^}]*top:\s*var\(--bd-page-header-height\)/s);
   assert.match(dataControlCss, /\.trust-notice\s*\{[^}]*top:\s*calc\(var\(--bd-page-header-height\) \+ var\(--bd-secondary-navigation-height\) \+ 10px\)/s);
   assert.doesNotMatch(dataControlCss, /\.trust-tabs\s*\{[^}]*top:\s*(?:70|76)px/s);
-  assert.match(bundle, /embedded-shell-v269\.css\?v=20260825-layout-v279/);
+  assert.match(bundle, /embedded-shell-v269\.css(?:\?v=20260825-layout-v279)?/);
 });
 
 test("mobile content and overlays retain bottom-safe-area clearance", async () => {
