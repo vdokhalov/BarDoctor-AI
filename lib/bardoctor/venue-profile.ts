@@ -17,6 +17,7 @@ export type VenueProfile = {
   closeTime: string;
   areas: unknown[];
   competitors: unknown[];
+  logoId: string | null;
   workingDays?: Record<string, unknown>;
 };
 
@@ -27,6 +28,12 @@ function text(value: unknown, maxLength = 180): string {
 function positiveNumber(value: unknown): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function imageId(value: unknown): string | null {
+  return typeof value === "string" && /^[a-zA-Z0-9-]{20,80}$/.test(value)
+    ? value
+    : null;
 }
 
 export function venueProfileFromInput(body: Record<string, unknown>): VenueProfile {
@@ -47,6 +54,7 @@ export function venueProfileFromInput(body: Record<string, unknown>): VenueProfi
     closeTime: text(body.closeTime, 5) || "23:00",
     areas: Array.isArray(body.areas) ? body.areas : [],
     competitors: Array.isArray(body.competitors) ? body.competitors : [],
+    logoId: imageId(body.logoId),
     workingDays:
       body.workingDays && typeof body.workingDays === "object" && !Array.isArray(body.workingDays)
         ? body.workingDays as Record<string, unknown>

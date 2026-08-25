@@ -66,6 +66,9 @@ async function localDatabase() {
   if (!database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ai_usage_events'").get()) {
     database.exec((await readFile(path.join(process.cwd(), "drizzle/0018_gigantic_arachne.sql"), "utf8")).replaceAll("--> statement-breakpoint", ""));
   }
+  if (!database.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='notification_devices'").get()) {
+    database.exec((await readFile(path.join(process.cwd(), "drizzle/0019_whole_the_hand.sql"), "utf8")).replaceAll("--> statement-breakpoint", ""));
+  }
   return database;
 }
 
