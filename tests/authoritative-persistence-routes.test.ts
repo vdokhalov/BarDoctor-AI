@@ -39,6 +39,18 @@ test("purchase posting and inventory finalization stop at a missing authoritativ
   assert.match(counts, /AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED/);
 });
 
+test("confirmed purchases persist the canonical product resolved by the stock receipt", async () => {
+  const route = await readFile(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), "utf8");
+  assert.match(route, /resolvedProductByLine/);
+  assert.match(route, /inventory\.movements\.map/);
+  assert.match(route, /purchaseProductKey: productKey/);
+  assert.match(route, /canonicalProductKey: productKey/);
+  assert.ok(
+    route.indexOf("inventory.summary.unresolvedLines") < route.indexOf("resolvedProductByLine"),
+    "canonical links must be persisted only after ambiguous receipt lines have been rejected",
+  );
+});
+
 test("export candidate preview is owner-only and read-only", async () => {
   const source = await readFile(new URL("../app/api/data-integrity/export/route.ts", import.meta.url), "utf8");
   assert.match(source, /account\.role !== "owner"/);

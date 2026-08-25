@@ -1352,7 +1352,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(bootstrap, /Проверить предложение/);
   assert.match(mainBundle, /bdNextTasks=bdNormalizeTasks/);
   assert.match(mainBundle, /approvalStatus:"pending"/);
-  assert.match(mainBundle, /qr\(IC,n\)\.finally/);
+  assert.match(mainBundle, /bdPersistDiagnosisV294\(n\)\.finally/);
   assert.match(mainBundle, /bd:business-health-snapshot/);
   assert.match(mainBundle, /bdSavedDiagnosis=WS\(\)/);
   assert.match(mainBundle, /bdUseBusinessHealthSnapshotV284\(\)/);

@@ -1446,21 +1446,32 @@ Management briefing формируется сервером. Не смешива
 Верни ТОЛЬКО JSON:
 {"summary":"краткий управленческий вывод, не повтор финансового отчёта","financialAssessment":{"periodKey":"YYYY-MM","evaluation":"оценка результата","comparison":"сравнение с собственной историей или честное отсутствие сравнения","keyDrivers":[{"label":"фактор","fact":"точный факт","implication":"что это означает для управления","evidenceIds":["точный id из evidenceCatalog"]}],"managementConclusion":"что делать с результатом месяца"},"topPriority":{"title":"...","category":"operations|finance|staff|equipment|guests|suppliers|hygiene","urgency":"critical|high|medium|low"},"topThree":[{"text":"...","category":"..."}],"analysis":{"what":"...","why":"...","how":"...","impact":"...","patterns":"..."},"areas":[{"id":"точный id из venueContext.coverage","status":"risk|opportunity|stable|no_data","fact":"конкретный факт с числом и периодом, если они есть","hypothesis":"причина или честная гипотеза","consequence":"последствие","action":"что именно сделать, без общих глаголов","verification":"какой показатель, исходное значение и когда сравнить","evidenceIds":["точный id из evidenceCatalog"]}],"actions":[{"recommendationId":"короткий id","signalClass":"problem|opportunity|data_quality","title":"конкретное действие","priority":"critical|high|medium|low","fact":"точный факт","factPeriod":"период факта","hypothesis":"предполагаемая причина","hypothesisConfidence":"high|medium|low","confidenceReason":"почему такая уверенность","consequence":"финансовое или операционное последствие","action":"точное действие","steps":["шаг 1","шаг 2","шаг 3"],"responsibleRole":"точная роль","deadline":"операционный срок","verificationDate":"YYYY-MM-DD","baselineMetric":{"metricId":"id из разрешённого списка","label":"исходный показатель","value":123.4,"unit":"currency|percent|count|rating"},"targetMetric":{"metricId":"тот же id","label":"цель","value":130,"unit":"currency|percent|count|rating","direction":"increase|decrease|maintain"},"successCriterion":"готово, когда измеримый критерий выполнен","expectedEffect":"ожидаемый эффект без выдуманных чисел","impact":"...","estimatedTime":"...","costTier":"low|medium|high","expectedResult":"...","basisSummary":"почему это действие предлагается","evidenceIds":["точный id из evidenceCatalog"],"equipmentName":"точное имя из входных данных или пустая строка"}]}
 Верни от 0 до 5 кандидатов. Не заполняй список общими советами ради количества: сервер сам объединит сигналы, рассчитает Priority и покажет не более трёх.`;
-    const raw = await aiText({
-      accountId: account.id,
-      observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "ai_doctor" },
-      system,
-      maxTokens: 8_000,
-      responseSchema: {
-        name: "bardoctor_ai_doctor_diagnosis_v2",
-        description: "Typed and server-validated BarDoctor AI Doctor diagnosis candidate set",
-        schema: DIAGNOSIS_RESPONSE_SCHEMA as unknown as Record<string, unknown>,
-      },
-      messages: [{ role: "user", content: `Данные заведения:\n${jsonForPrompt(trustedInput, 95_000)}` }],
-    });
+    let providerCandidate: unknown = {};
+    let providerStatus: { available: boolean; code?: string } = { available: true };
+    try {
+      const raw = await aiText({
+        accountId: account.id,
+        observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "ai_doctor" },
+        system,
+        maxTokens: 8_000,
+        responseSchema: {
+          name: "bardoctor_ai_doctor_diagnosis_v2",
+          description: "Typed and server-validated BarDoctor AI Doctor diagnosis candidate set",
+          schema: DIAGNOSIS_RESPONSE_SCHEMA as unknown as Record<string, unknown>,
+        },
+        messages: [{ role: "user", content: `Данные заведения:\n${jsonForPrompt(trustedInput, 95_000)}` }],
+      });
+      providerCandidate = parseAIJson<unknown>(raw);
+    } catch (error) {
+      if (!(error instanceof AIServiceError)) throw error;
+      // Business Health and the management briefing are calculated from trusted
+      // venue data before the language model is called. A provider outage must
+      // not turn those canonical server facts into an endless loading state.
+      providerStatus = { available: false, code: error.code };
+    }
     const data = normaliseDiagnosis(
       body,
-      parseAIJson<unknown>(raw),
+      providerCandidate,
       evidenceCatalog,
       venueContext,
       memory,
@@ -1475,6 +1486,7 @@ Management briefing формируется сервером. Не смешива
         reviewsIncluded: external.reviews.total,
         confirmedCompetitorsIncluded: external.confirmedCompetitors.length,
         reviewSyncAttempted: external.reviewSync.attempted,
+        provider: providerStatus,
         version: venueContext.version,
         coverage: venueContext.blocks.map((item) => ({
           id: item.id,

@@ -95,6 +95,16 @@ test("diagnosis surfaces the server error and avoids retrying configuration fail
   assert.match(bundle, /q\?\.error\|\|`HTTP \$\{L\.status\}`/);
 });
 
+test("diagnosis keeps canonical Business Health available when the AI provider is down", async () => {
+  const handler = await read("lib/bardoctor/ai-handlers.ts");
+
+  assert.match(handler, /let providerCandidate: unknown = \{\}/);
+  assert.match(handler, /if \(!\(error instanceof AIServiceError\)\) throw error/);
+  assert.match(handler, /providerStatus = \{ available: false, code: error\.code \}/);
+  assert.match(handler, /provider: providerStatus/);
+  assert.match(handler, /normaliseDiagnosis\(\s*body,\s*providerCandidate/);
+});
+
 test("AI Doctor attention UI is linked and responsive on mobile and desktop", async () => {
   const [css, appHtml, response, bundle] = await Promise.all([
     read("public/ai-doctor-attention-v196.css"),

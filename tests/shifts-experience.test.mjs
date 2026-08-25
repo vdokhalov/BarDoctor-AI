@@ -109,6 +109,23 @@ test("coverage copy describes completed scheduled shifts without counting future
   });
 });
 
+test("new venues do not inherit missing shifts from before tracking started", async () => {
+  const [bundle, profileRoute, venuesRoute, venueCreate] = await Promise.all([
+    readFile("public/assets/index-BQGspy0I.js", "utf8"),
+    readFile("app/api/restaurants/route.ts", "utf8"),
+    readFile("app/api/venues/route.ts", "utf8"),
+    readFile("public/venue-create.js", "utf8"),
+  ]);
+  assert.match(bundle, /function bdPlannedShiftDates\(e,t\).*trackingStartDate/);
+  assert.match(bundle, /function _z\(e,t,n\).*trackingStartDate/);
+  assert.match(bundle, /function Jse\(e,t,n\).*trackingStartDate/);
+  assert.match(bundle, /function uoe\(e,t,n,r\).*trackingStartDate/);
+  assert.match(bundle, /function kC\(e,t,n,r,a\).*Rg\(e,new Date\(N\+"T12:00:00"\)\)/);
+  assert.match(profileRoute, /before\?\.trackingStartDate/);
+  assert.match(venuesRoute, /trackingStartDate/);
+  assert.match(venueCreate, /trackingStartDate/);
+});
+
 test("contextual shift action appears only when closing is relevant", async () => {
   const { bdShiftContextModelV156 } = await loadShiftHelpers();
   const dayOff = bdShiftContextModelV156(

@@ -66,6 +66,13 @@ test("sales presentation payload supplies shifts, aliases, frequent items and ze
   assert.match(script, /enterkeyhint="next"/);
 });
 
+test("sales review translates canonical units for venue staff", async () => {
+  const script = await read("public/sales-import.js");
+  assert.match(script, /function unitLabel\(value\)/);
+  assert.match(script, /ml: "мл"/);
+  assert.match(script, /unitLabel\(item\.baseUnit\)/);
+});
+
 test("SalesBatch API keeps RBAC, tenant checks, audit and atomic ledger persistence", async () => {
   const [route, importer, engine] = await Promise.all([
     read("app/api/sales-batches/route.ts"),

@@ -35,6 +35,15 @@ test("accounting currency uses the existing venue profile field as its canonical
   assert.equal(venueProfileFromInput({ currency: "unsupported" }).currency, "");
 });
 
+test("venue profile keeps only a valid tracking start date", () => {
+  assert.equal(
+    venueProfileFromInput({ name: "Venue A", trackingStartDate: "2026-08-26" }).trackingStartDate,
+    "2026-08-26",
+  );
+  assert.equal(venueProfileFromInput({ trackingStartDate: "2026-02-30" }).trackingStartDate, undefined);
+  assert.equal(venueProfileFromInput({ trackingStartDate: "26.08.2026" }).trackingStartDate, undefined);
+});
+
 test("venue API preserves an existing accounting currency for legacy clients and validates explicit changes", async () => {
   const [profileRoute, venuesRoute, profileModel] = await Promise.all([
     read("app/api/restaurants/route.ts"),
@@ -48,6 +57,8 @@ test("venue API preserves an existing accounting currency for legacy clients and
   assert.match(profileRoute, /hasPermission\(account, "settings\.manage"\)/);
   assert.match(profileRoute, /where\(eq\(accounts\.id, account\.id\)\)/);
   assert.match(profileRoute, /Response\.json\(\{ ok: true, restaurant \}\)/);
+  assert.match(profileRoute, /before\?\.trackingStartDate/);
+  assert.match(venuesRoute, /trackingStartDate/);
   assert.match(venuesRoute, /currency: venueCurrency\(item\.dataAccount\.restaurantJson\)/);
   assert.match(profileModel, /normalizeAccountingCurrency\(body\.currency\)/);
 });

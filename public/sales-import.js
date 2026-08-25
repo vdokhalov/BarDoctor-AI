@@ -23,6 +23,10 @@
   function formatQuantity(value) {
     return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(number(value));
   }
+  function unitLabel(value) {
+    var key = String(value || "").toLowerCase();
+    return ({ ml: "мл", l: "л", g: "г", kg: "кг", pcs: "шт.", pc: "шт.", piece: "шт." })[key] || value || "";
+  }
   function plural(value, one, few, many) {
     var n = Math.abs(Number(value)) % 100; var n1 = n % 10;
     return n > 10 && n < 20 ? many : n1 > 1 && n1 < 5 ? few : n1 === 1 ? one : many;
@@ -318,7 +322,7 @@
     editorBody.innerHTML = '<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.map(function (line) {
       var lineStatus = lineState(line); var selected = line.menuItemId || line.suggestedMenuItemId || "";
       var mapping = line.processingStatus === "BLOCKED" && line.errorCode === "NEEDS_MAPPING" && canMap ? '<label class="mapping-select">Сопоставить<select data-map-line="' + h(line.id) + '" data-raw-name="' + h(line.rawName) + '"><option value="">Выберите позицию</option>' + menu.map(function (item) { return '<option value="' + h(item.id) + '"' + (item.id === selected ? " selected" : "") + '>' + h(item.name) + '</option>'; }).join("") + '</select></label>' : '<b>' + h((line.recipeSnapshot && line.recipeSnapshot.menuItem.name) || (menu.find(function (item) { return item.id === line.menuItemId; }) || {}).name || "Не сопоставлено") + '</b>';
-      var details = line.recipeSnapshot ? line.recipeSnapshot.ingredients.map(function (item) { return h(item.name + " · " + item.baseQuantityTotal + " " + item.baseUnit); }).join(" · ") : "";
+      var details = line.recipeSnapshot ? line.recipeSnapshot.ingredients.map(function (item) { return h(item.name + " · " + item.baseQuantityTotal + " " + unitLabel(item.baseUnit)); }).join(" · ") : "";
       return '<article class="preview-line"><div><small>' + h(line.rawName) + '</small>' + mapping + (details ? '<span class="line-details">' + details + '</span>' : '') + '</div><div><b>' + h(formatQuantity(line.quantity)) + '</b></div><div><span class="line-state ' + lineStatus.cls + '"><img src="' + lineStatus.icon + '" alt="">' + h(lineStatus.label) + '</span>' + lineIssueAction(line) + '</div></article>';
     }).join("") + '</div>';
     var caps = state.payload && state.payload.capabilities || {}; var editable = ["DRAFT", "READY", "PARTIALLY_BLOCKED"].includes(batch.status);

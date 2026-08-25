@@ -118,6 +118,11 @@
       employees: Number(data.get("employees")) || 0,
       openTime: String(data.get("openTime") || "10:00"),
       closeTime: String(data.get("closeTime") || "23:00"),
+      trackingStartDate: [
+        new Date().getFullYear(),
+        String(new Date().getMonth() + 1).padStart(2, "0"),
+        String(new Date().getDate()).padStart(2, "0")
+      ].join("-"),
       workingDays: workingDays(data),
       areas: [],
       competitors: []

@@ -157,7 +157,13 @@ test("Finance presentation keeps the established calculation contract and exclud
   assert.match(report, /purchasePayments:bdPurchasePayments/);
   assert.match(report, /cashResult:tt-bdPurchaseCashOutflow/);
   assert.match(report, /costOfGoods:bdInventoryMismatch\?null:V/);
-  assert.match(report, /pe=Z\.filter\(oe=>oe<re\)/);
+  assert.match(report, /pe=\[\.\.\.new Set\(\[\.\.\.Z\.filter\(oe=>oe<re\),\.\.\.d\.map/);
   assert.match(report, /expectedShifts:pe\.length/);
   assert.match(report, /coveragePercent:ne/);
+});
+
+test("an early-closed current shift is counted consistently across finance surfaces", async () => {
+  const { bundle } = await loadFinanceArtifacts();
+  assert.match(bundle, /function bdFinanceWeekContext\(e,t,n,r\).*for\(const m of n\).*u\.push\(h\)/);
+  assert.match(bundle, /bdWeekTrackingStart=typeof e\?\.trackingStartDate/);
 });

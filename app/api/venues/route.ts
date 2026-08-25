@@ -71,7 +71,11 @@ export async function POST(request: Request): Promise<Response> {
     maxBytes: 512 * 1024,
   });
   if (!parsed.ok) return parsed.response;
-  const profile = venueProfileFromInput(parsed.data);
+  const profile = venueProfileFromInput({
+    ...parsed.data,
+    trackingStartDate:
+      parsed.data.trackingStartDate ?? new Date().toISOString().slice(0, 10),
+  });
   if (!profile.name) {
     return Response.json({ ok: false, error: "Укажите название заведения" }, { status: 400 });
   }

@@ -18,7 +18,7 @@ test("profile exposes one persisted venue accounting-currency selector", async (
   assert.match(profile, /S\.useEffect\(\(\)=>\{e&&t&&s\(QCe\(t\)\)\},\[e,t\]\)/);
   assert.match(profile, /Изменить валюту учёта\?/);
   assert.match(profile, /Исходные суммы и валюты документов не изменятся/);
-  assert.match(bundle, /jz\(r\.restaurant\?\?e\)/);
+  assert.match(bundle, /const a=r\.restaurant\?\?e;jz\(a\)/);
 });
 
 test("warehouse links a missing accounting currency to the current venue profile", async () => {
@@ -56,4 +56,90 @@ test("setup and profile require currency while document currencies remain indepe
   assert.match(bundle, /currency:bdAccountingCurrencyV243\(u\.currency\)/);
   assert.match(bundle, /bdProcMoneyV168\(v\.total,v\.currency\|\|"RUB"\)/);
   assert.match(bundle, /bdProcManualDraftV207/);
+  assert.match(bundle, /function bdProcManualDraftV207\(e,t="RUB"\)/);
+  assert.match(bundle, /currency:t\|\|"RUB"/);
+  assert.match(bundle, /bdProcManualDraftV207\(s\.activeVenueId,s\.venues\.find/);
+  assert.match(bundle, /confirmedPurchases\?\.\[0\]\?\.currency\|\|o\.find/);
+  assert.match(bundle, /r\.currency\|\|r\.accountingCurrency\|\|"RUB"/);
+});
+
+test("shift closing labels and totals use the active venue accounting currency", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  const start = bundle.indexOf("function PAe(");
+  const end = bundle.indexOf("function DAe(", start);
+  const shiftClosing = bundle.slice(start, end);
+  assert.match(shiftClosing, /bdShiftCurrency=bdAccountingCurrencyV243\(a\?\.currency\)/);
+  assert.match(shiftClosing, /children:\["Выручка \(",bdShiftCurrency,"\) \*"\]/);
+  assert.match(shiftClosing, /"aria-label":"Выручка, "\+bdShiftCurrency/);
+  assert.match(shiftClosing, /bdShiftMoney\(payrollTotal\)/);
+  assert.doesNotMatch(shiftClosing, /Выручка \(₽\)|Выручка, ₽/);
+});
+
+test("assortment economics uses the active venue currency without menu items", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV287="owner-uat-v287"/);
+  assert.match(bundle, /currency:bdAssortmentCurrency/);
+  assert.match(bundle, /e\.menuItems\?\.\[0\]\?\.currency\|\|bdAssortmentCurrency\|\|"RUB"/);
+  assert.match(bundle, /currency:r\?\.currency\|\|s\.venues\.find/);
+});
+
+test("new menu items default to the active venue currency", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV288="owner-uat-v288"/);
+  assert.match(bundle, /currency:bdMenuVenueCurrency="RUB"/);
+  assert.match(bundle, /currency:bdMenuVenueCurrency\|\|"RUB",portionSize/);
+  assert.match(bundle, /onManageStructure:[^}]+currency:r\?\.currency\|\|s\.venues\.find/);
+  assert.match(bundle, /bdOwnerUATFixesV289="owner-uat-v289"/);
+  assert.match(bundle, /onSave:Ae,onManageStructure:.*?currency:r\?\.currency\|\|s\.venues\.find/s);
+});
+
+test("saved venue catalog remains authoritative while server analytics refreshes", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV290="owner-uat-v290"/);
+  assert.match(bundle, /bdAssortmentLocal=bdAssortmentFallbackAnalyticsV170\(E,m\)/);
+  assert.match(bundle, /bdAssortmentLocal\.menuItems\.length\?\{\.\.\.bdAssortmentLocal,economics:V\?\.economics/);
+});
+
+test("catalog sync captures the server base before updating its local cache", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV291="owner-uat-v291"/);
+  assert.match(bundle, /_\(P\);const c=await qr\(bdCatalogStoreKey,P\);Kse\(bdCatalogStoreKey,P\)/);
+  assert.doesNotMatch(bundle, /_\(P\),Kse\(bdCatalogStoreKey,P\);const c=await qr\(bdCatalogStoreKey,P\)/);
+});
+
+test("assortment prefers the populated server read model and labels confirmed fallback cards correctly", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV292="owner-uat-v292"/);
+  assert.match(bundle, /he=V\?\.menuItems\?\.length\?V:bdAssortmentLocal\.menuItems\.length/);
+  assert.match(bundle, /techCardStatus:h\?h\.reviewStatus==="approved"\|\|h\.status==="confirmed"\?"approved"/);
+});
+
+test("assortment renders canonical base units in owner-facing Russian labels", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV293="owner-uat-v293"/);
+  assert.match(bundle, /function bdAssortmentUnitLabelV293/);
+  assert.match(bundle, /bdAssortmentUnitLabelV293\(v\.unit\)/);
+});
+
+test("AI diagnosis uses authoritative last-write persistence", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV294="owner-uat-v294"/);
+  assert.match(bundle, /function bdPersistDiagnosisV294/);
+  assert.match(bundle, /S0\(IC,t,e,void 0\)/);
+  assert.doesNotMatch(bundle, /function cle\(e,t\).*?qr\(IC,n\)/s);
+});
+
+test("empty venues do not claim completed setup or 100 percent readiness", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /" шаг остался"/);
+  assert.match(bundle, /" шага осталось"/);
+  assert.match(bundle, /Пока нет прошедших смен для оценки готовности/);
+  assert.match(bundle, /Готовность данных пока не рассчитывается/);
+});
+
+test("assortment detail also translates canonical base units", async () => {
+  const bundle = await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /bdOwnerUATFixesV295="owner-uat-v295"/);
+  assert.match(bundle, /bdAssortmentUnitLabelV293\(g\.unit\)/);
+  assert.doesNotMatch(bundle, /g\.quantity!=null\?g\.quantity:"—"," ",g\.unit\|\|""/);
 });

@@ -25,7 +25,14 @@ test("Home keeps a prominent Health Index card before the financial result", asy
   const home = bundle.slice(homeStart, homeEnd);
 
   assert.match(bundle, /bdHomeHealthIndexVersion="home-health-v200"/);
+  assert.match(bundle, /bdOwnerUATFixesV286="owner-uat-v286"/);
+  assert.match(bundle, /function bdHealthShiftCoverage\(e,t,n=new Date\).*trackingStartDate.*for\(const f of t\)/s);
   assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v284/);
+  assert.doesNotMatch(bundle, /"aria-busy":!e/);
+  assert.match(bundle, /a===null\?"Business Health: недостаточно данных/);
+  assert.match(bundle, /y=!e\?"Нет диагностики"/);
+  assert.match(bundle, /Диагностика ещё не запускалась\. Нажмите, чтобы проверить заведение/);
+  assert.doesNotMatch(bundle, /Business Health загружается/);
   assert.match(bundle, /"data-bd-health-snapshot-id":e\?\.snapshotId/);
   assert.match(bundle, /Достоверность диагноза/);
   assert.match(bundle, /children:"Business Health"/);
@@ -314,7 +321,7 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.doesNotMatch(homeSource, /fetch\("\/api\/ai\/diagnosis"/, "Home navigation does not request a second diagnosis");
   assert.match(homeSource, /bdCanonicalSnapshot=g/, "Home renders the shared snapshot without clearing it to loading");
   assert.doesNotMatch(homeSource, /bdHomeCloudReady\?g:null/);
-  assert.match(bundle, /bdBusinessHealthCommitEnvelopeV284\(n,!0\),qr\(IC,n\)/, "refresh commits atomically before persistence");
+  assert.match(bundle, /bdBusinessHealthCommitEnvelopeV284\(n,!0\),bdPersistDiagnosisV294\(n\)/, "refresh commits atomically before authoritative persistence");
 
   const splashStart = bundle.indexOf("function _le(){");
   const splashEnd = bundle.indexOf("const Ele=", splashStart);

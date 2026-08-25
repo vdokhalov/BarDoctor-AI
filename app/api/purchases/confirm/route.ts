@@ -404,7 +404,7 @@ export async function POST(request: Request): Promise<Response> {
   } : null;
   if (payment) expenses.unshift(payment);
 
-  const confirmedDocument = withPurchasePaymentSummary({
+  let confirmedDocument = withPurchasePaymentSummary({
     ...document,
     internalId: document.id,
     venueId: account.venueId,
@@ -446,6 +446,20 @@ export async function POST(request: Request): Promise<Response> {
       },
       { status: 422 },
     );
+  }
+  if (inventory) {
+    const resolvedProductByLine = new Map(
+      inventory.movements.map((movement) => [String(movement.sourceLineId ?? ""), movement.productKey]),
+    );
+    confirmedDocument = {
+      ...confirmedDocument,
+      items: confirmedDocument.items.map((item) => {
+        const productKey = resolvedProductByLine.get(String(item.id));
+        return productKey
+          ? { ...item, purchaseProductKey: productKey, canonicalProductKey: productKey }
+          : item;
+      }),
+    };
   }
   const nextAssortment = inventory?.assortment ?? assortment;
   const nextStockMovements = inventory

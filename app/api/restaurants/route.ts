@@ -41,6 +41,10 @@ export async function POST(request: Request): Promise<Response> {
   const restaurant = venueProfileFromInput({
     ...body,
     currency: requestedCurrency ?? "",
+    trackingStartDate:
+      before?.trackingStartDate
+      ?? body.trackingStartDate
+      ?? new Date().toISOString().slice(0, 10),
   });
   const mutations = compareStoreData(before, restaurant);
   const updatedAt = new Date().toISOString();

@@ -19,6 +19,8 @@ export type VenueProfile = {
   competitors: unknown[];
   logoId: string | null;
   workingDays?: Record<string, unknown>;
+  /** First operating date for which BarDoctor should expect historical records. */
+  trackingStartDate?: string;
 };
 
 function text(value: unknown, maxLength = 180): string {
@@ -34,6 +36,14 @@ function imageId(value: unknown): string | null {
   return typeof value === "string" && /^[a-zA-Z0-9-]{20,80}$/.test(value)
     ? value
     : null;
+}
+
+function dateKey(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const parsed = new Date(`${value}T12:00:00Z`);
+  return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value
+    ? undefined
+    : value;
 }
 
 export function venueProfileFromInput(body: Record<string, unknown>): VenueProfile {
@@ -59,5 +69,6 @@ export function venueProfileFromInput(body: Record<string, unknown>): VenueProfi
       body.workingDays && typeof body.workingDays === "object" && !Array.isArray(body.workingDays)
         ? body.workingDays as Record<string, unknown>
         : undefined,
+    trackingStartDate: dateKey(body.trackingStartDate),
   };
 }
