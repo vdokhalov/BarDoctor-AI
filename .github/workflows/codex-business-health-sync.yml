@@ -12,8 +12,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: codex/business-health-canonical-sync-20260825
-      - name: Apply exact reviewed artifact delta
-        run: git apply .github/codex-business-health-bundle.patch
+      - name: Assemble and apply exact reviewed artifact delta
+        run: |
+          cat .github/codex-business-health-bundle.patch.part-* > /tmp/codex-business-health-bundle.patch
+          test "$(git hash-object /tmp/codex-business-health-bundle.patch)" = "d487450d1f2f73078cf1ff5b5791bfb3e6d2774c"
+          git apply /tmp/codex-business-health-bundle.patch
       - name: Verify reviewed artifact identity
         run: test "$(git hash-object public/assets/index-BQGspy0I.js)" = "bea4899c6930d1b5f5513980cdd02f34b9e46a21"
       - name: Commit exact reviewed tree
@@ -22,6 +25,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/assets/index-BQGspy0I.js
           git rm .github/codex-business-health-bundle.patch
+          git rm .github/codex-business-health-bundle.patch.part-*
           git rm .github/workflows/codex-business-health-sync.yml
           git commit -m "build: finalize canonical business health artifact"
           git push origin HEAD:codex/business-health-canonical-sync-20260825
