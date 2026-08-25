@@ -36,6 +36,7 @@ import {
   buildBusinessIntelligenceFromVenueContext,
   type AIDoctorIntelligence,
 } from "./business-intelligence";
+import { buildBusinessHealthSnapshot } from "./business-health-snapshot";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -894,6 +895,7 @@ function normaliseDiagnosis(
   venueContext: VenueAIContext,
   memory: AIDoctorMemory,
   intelligence: AIDoctorIntelligence,
+  venueId: string | number,
 ): JsonRecord {
   const result = asRecord(rawResult) ?? {};
   const equipment = Array.isArray(body.equipment) ? body.equipment : [];
@@ -1334,6 +1336,11 @@ function normaliseDiagnosis(
     contextVersion: venueContext.version,
     intelligence: managementIntelligence,
     businessHealth: managementIntelligence.businessHealth,
+    businessHealthSnapshot: buildBusinessHealthSnapshot({
+      venueId,
+      intelligence: managementIntelligence,
+      context: venueContext,
+    }),
     financialAssessment,
     summary: briefingDiagnosis?.summary ?? attention.diagnosticSentence,
     topPriority: managementTopPriority,
@@ -1458,6 +1465,7 @@ Management briefing формируется сервером. Не смешива
       venueContext,
       memory,
       intelligence,
+      account.venueId,
     );
     return Response.json({
       success: true,

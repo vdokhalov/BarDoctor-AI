@@ -228,12 +228,12 @@
 
     var hasUsableScore = finiteScore(data.score) !== null;
     var venueReady = Boolean(data.venueReady && data.hasProfile);
-    var healthReady = venueReady && (Boolean(data.cloudReady) || hasUsableScore);
+    var healthReady = venueReady && Boolean(data.cloudReady) && hasUsableScore;
 
     if (healthReady) {
       return {
         next: "HEALTH_ENTRY",
-        reason: data.cloudReady ? "health-data-synced" : "cached-health-score-ready",
+        reason: "health-data-synced",
       };
     }
     if (!data.timedOut) return { next: "SPLASH_LOADING", reason: "health-data-pending" };

@@ -1,0 +1,29 @@
+name: Generate Business Health artifact
+on:
+  push:
+    branches:
+      - codex/business-health-canonical-sync-20260825
+permissions:
+  contents: write
+jobs:
+  patch-artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/business-health-canonical-sync-20260825
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Patch tracked application bundle
+        run: node scripts/patch-business-health-snapshot-v283.mjs
+      - name: Commit generated bundle
+        run: |
+          if git diff --quiet -- public/assets/index-BQGspy0I.js; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/index-BQGspy0I.js
+          git commit -m "build: generate canonical business health artifact"
+          git push origin HEAD:codex/business-health-canonical-sync-20260825

@@ -101,10 +101,11 @@ test("Settings entry is account-level and no longer gated by venue settings perm
   assert.doesNotMatch(hub, /y&&\{key:"settings"/);
 });
 
-test("Settings remains reachable when legacy health records have no date", async () => {
+test("Settings remains reachable while startup health uses the canonical server snapshot", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /function L7\(e,t,n\)\{if\(typeof e!=="string"\)return!1;/);
   assert.match(bundle, /function BS\(e,t,n\)\{if\(typeof e!=="string"\)return!1;/);
-  assert.match(bundle, /bdHealthRouteActiveV182\?zC\(/);
-  assert.match(bundle, /bdHealthRouteActiveV182\?bdHealthLatestClosedMonthV153\(/);
+  assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\).*bdUseBusinessHealthSnapshotV283\(\)/);
+  assert.doesNotMatch(bundle, /bdHealthRouteActiveV182\?zC\(/);
+  assert.doesNotMatch(bundle, /bdHealthRouteActiveV182\?bdHealthLatestClosedMonthV153\(/);
 });

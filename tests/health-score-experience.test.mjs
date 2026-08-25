@@ -25,7 +25,7 @@ test("Home keeps a prominent Health Index card before the financial result", asy
   const home = bundle.slice(homeStart, homeEnd);
 
   assert.match(bundle, /bdHomeHealthIndexVersion="home-health-v200"/);
-  assert.match(bundle, /data-bd-home-health-index":"business-health-v252/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v283/);
   assert.match(bundle, /Достоверность диагноза/);
   assert.match(bundle, /children:"Business Health"/);
   assert.ok(home.indexOf("i.jsx(bdHomeHealthIndexV200") < home.indexOf("i.jsx(bdHomeMoneyCard"));
@@ -99,7 +99,7 @@ test("new session follows Splash -> rendered Health Entry -> Home", async () => 
   assert.equal(runtime.beginLaunch(), false, "Home -> another route -> Home cannot restart Entry");
 });
 
-test("timeout cannot skip an already available Health Score", async () => {
+test("a local score cannot bypass the server-authoritative startup snapshot", async () => {
   const runtime = await freshRuntime("timeout-with-score");
   runtime.beginLaunch();
   const decision = runtime.startupDecision({
@@ -111,9 +111,12 @@ test("timeout cannot skip an already available Health Score", async () => {
     cloudReady: false,
     score: 63,
   });
-  assert.equal(decision.next, "HEALTH_ENTRY");
-  assert.equal(decision.reason, "cached-health-score-ready");
-  assert.equal(runtime.getLaunchStatus(), "pending", "timeout must not complete launch before render");
+  assert.deepEqual(decision, {
+    next: "HOME",
+    reason: "health-data-timeout-no-usable-score",
+    fallback: true,
+  });
+  assert.equal(runtime.getLaunchStatus(), "pending");
 });
 
 test("Skip completes only after Entry has rendered and prevents an internal-route replay", async () => {
@@ -251,23 +254,24 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.doesNotThrow(() => parse(runtime, { ecmaVersion: "latest", sourceType: "script" }));
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v155"/);
-  assert.match(bundle, /data-bd-health-entry":"v155/);
+  assert.match(bundle, /data-bd-health-entry":"v283/);
   assert.match(bundle, /data-bd-health-score-resting":"v153/);
   assert.match(bundle, /Pt\("bd_health_score_experience_v152"\)/);
   assert.match(bundle, /onClick:\(\)=>t\("\/health"\)/);
   assert.match(bundle, /e\?\.stateScore\?\?e\?\.overall/);
-  assert.match(bundle, /e\?\.dataQualityPercent\?\?e\?\.coveragePercent/);
+  assert.match(bundle, /dataQualityPercent:t\.dataQualityPercent/);
+  assert.match(bundle, /source:"server_business_intelligence"/);
   assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\)/);
   assert.match(bundle, /i\.jsx\(bdHealthStartupGateV155,\{children:i\.jsxs\(bse/);
-  assert.match(bundle, /"data-bd-health-startup-machine":"v155"/);
+  assert.match(bundle, /"data-bd-health-startup-machine":"v283"/);
   assert.match(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
   assert.match(bundle, /q\?"SPLASH_LOADING":"HOME"/);
   assert.match(bundle, /R\.next==="HEALTH_ENTRY"/);
   assert.match(bundle, /U\("HEALTH_ENTRY"\)/);
-  assert.match(bundle, /bdHealthLaunchRenderedV155\(\{score:s,venueName:t\|\|"",confidence:u\}\)/);
+  assert.match(bundle, /bdHealthLaunchRenderedV155\(\{score:s,venueName:t\|\|"",confidence:u,calculationVersion:e\?\.calculationVersion,period:e\?\.period\?\.id\}\)/);
   assert.match(bundle, /bdHealthLaunchCompleteV155\(R\|\|"entry-finished"\),U\("HOME"\)/);
   assert.match(bundle, /bdHealthLaunchFallbackV155\(R\.reason,\{score:E,venueReady:n,hasProfile:!!t,cloudReady:r,timeoutMs:5200\}\)/);
-  assert.match(bundle, /cached-health-score-ready/);
+  assert.doesNotMatch(runtime, /cached-health-score-ready/);
   assert.match(bundle, /health-data-timeout-no-usable-score/);
   assert.match(bundle, /setTimeout\(\(\)=>I\(!0\),2700\)/);
   assert.match(bundle, /setTimeout\(\(\)=>F\(!0\),5200\)/);
@@ -288,8 +292,11 @@ test("production artifact has one startup owner and cannot complete before Entry
   const coordinatorStart = bundle.indexOf("function bdHealthStartupGateV155");
   const coordinatorEnd = bundle.indexOf("function cEe(){", coordinatorStart);
   const coordinator = bundle.slice(coordinatorStart, coordinatorEnd);
-  assert.match(coordinator, /zC\(u,d,f,m,h,y,\{profile:t,settings:a,snapshots:s,equipment:l\}\)/);
-  assert.match(coordinator, /bdHealthScoreValueV153\(j\)/);
+  assert.match(coordinator, /bdUseBusinessHealthSnapshotV283\(\)/);
+  assert.match(coordinator, /snapshot:j,diagnosis:v/);
+  assert.match(coordinator, /r&&!!j/);
+  assert.doesNotMatch(coordinator, /zC\(/);
+  assert.doesNotMatch(coordinator, /bdHealthScoreValueV153/);
   assert.doesNotMatch(coordinator, /lastDailyDate|first-daily-entry|bdHealthExperienceReadV153/);
 
   const splashStart = bundle.indexOf("function _le(){");
