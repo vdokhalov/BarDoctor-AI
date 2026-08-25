@@ -94,7 +94,7 @@ export async function runModernUxAudit() {
   ]);
 
   const routeCount = spaRoutes.length + additionalProductionRoutes.length + legacyCompatibilityRoutes.length;
-  assert.equal(routeCount, 59, "Production route inventory changed during UX polish");
+  assert.equal(routeCount, 62, "Production route inventory changed during UX polish");
 
   requireText(response, "/modern-polish.css?v=20260812-modern-v158", "SPA polish stylesheet");
   requireText(response, "/modern-polish.js?v=20260811-modern-v87", "SPA polish runtime");

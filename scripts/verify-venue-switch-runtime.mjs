@@ -146,6 +146,23 @@ try {
   assert.equal(loadedProfileA.body.restaurant.currency, "RUB");
   assert.equal(loadedProfileB.body.restaurant.currency, "MDL");
 
+  const currencyOnly = await json(owner, venueA, "/api/restaurants", "POST", {
+    ...loadedProfileA.body.restaurant,
+    currency: "EUR",
+  });
+  assert.equal(currencyOnly.response.status, 200, JSON.stringify(currencyOnly.body));
+  const currencyReloaded = await json(owner, venueA, "/api/restaurants/me");
+  assert.equal(currencyReloaded.body.restaurant.currency, "EUR");
+  assert.equal(currencyReloaded.body.restaurant.name, "Venue Runtime A");
+  const untouchedVenueB = await json(owner, venueB, "/api/restaurants/me");
+  assert.equal(untouchedVenueB.body.restaurant.currency, "MDL");
+
+  const currencyRestored = await json(owner, venueA, "/api/restaurants", "POST", {
+    ...currencyReloaded.body.restaurant,
+    currency: "RUB",
+  });
+  assert.equal(currencyRestored.response.status, 200, JSON.stringify(currencyRestored.body));
+
   const moduleStores = {
     health: "bd_finance_revenue",
     finance: "bd_finance_expenses",

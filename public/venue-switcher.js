@@ -260,7 +260,8 @@
       if (existing) existing.remove();
       return;
     }
-    if (!appPath() || context.venues.length < 2) {
+    var profileHost = inlineHost && inlineHost.hasAttribute("data-bd-canonical-venue-host");
+    if (!appPath() || (context.venues.length < 2 && !profileHost)) {
       if (existing) existing.remove();
       return;
     }

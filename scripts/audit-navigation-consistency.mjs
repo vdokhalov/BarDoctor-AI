@@ -12,7 +12,7 @@ export const spaRoutes = [
   "/equipment/analytics", "/equipment/catalog", "/events", "/events/:id", "/finance",
   "/finance/settings", "/finance/shift/:id/payroll", "/health", "/home", "/integrations", "/login",
   "/market", "/month-closing", "/more", "/nomenclature", "/notifications", "/opportunities",
-  "/payroll", "/privacy", "/profile", "/register", "/reports", "/reset", "/reviews", "/salaries",
+  "/payroll", "/privacy", "/profile", "/profile/personal", "/profile/venue", "/profile/currency", "/register", "/reports", "/reset", "/reviews", "/salaries",
   "/salaries/:id", "/settings", "/setup", "/shifts", "/smart", "/suppliers", "/tasks",
   "/sales-import", "/supplier-alternatives", "/terms", "/venues/new", "/warehouse",
 ].sort();
@@ -64,7 +64,7 @@ export async function runNavigationAudit() {
 
   const actualSpaRoutes = [...new Set([...bundle.matchAll(/path:"([^"]+)"/g)].map((match) => match[1]))].sort();
   assert.deepEqual(actualSpaRoutes, spaRoutes, "SPA route inventory is stale");
-  assert.equal(spaRoutes.length, 54);
+  assert.equal(spaRoutes.length, 57);
   for (const route of spaRoutes) {
     const resolved = contract.resolve(`https://bardoctor.test${examples[route] || route}`);
     assert.ok(resolved, `Registered route has no metadata: ${route}`);
@@ -153,7 +153,7 @@ export async function runNavigationAudit() {
   }
 
   return {
-    routes: { current: 57, compatibility: 2, admin: 1, total: 60, spa: 54 },
+    routes: { current: 60, compatibility: 2, admin: 1, total: 63, spa: 57 },
     registeredStaticMetadata: Object.keys(contract.routes).length,
     queryScreens: queryCases.length,
     traps: { detected: 0, unresolved: 0 },

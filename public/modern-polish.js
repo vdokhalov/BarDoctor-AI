@@ -76,7 +76,9 @@
     scrollFrame = window.requestAnimationFrame(function () {
       scrollFrame = 0;
       var threshold = Math.max(560, Math.round(window.innerHeight * 0.82));
-      var shouldShow = currentScrollTop() > threshold && !modalIsOpen();
+      var editorOwnsNavigation = document.body.classList.contains("bd-profile-editor-active-v281")
+        || currentRoute().indexOf("/profile/") === 0;
+      var shouldShow = currentScrollTop() > threshold && !modalIsOpen() && !editorOwnsNavigation;
       scrollButton.style.setProperty("--bd-scroll-top-offset", bottomOffset() + "px");
       scrollButton.setAttribute("data-visible", shouldShow ? "true" : "false");
       scrollButton.setAttribute("aria-hidden", shouldShow ? "false" : "true");

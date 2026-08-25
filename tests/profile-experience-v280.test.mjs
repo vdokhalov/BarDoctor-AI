@@ -52,7 +52,7 @@ test("profile preserves real security, sessions, logout and RBAC flows", () => {
 });
 
 test("venue logo has server persistence, fallback and editor controls", () => {
-  assert.ok(profile.includes('/api/venues/logo/${e.logoId}'));
+  assert.ok(profile.includes('/api/venues/logo/"+e.logoId'));
   assert.ok(profile.includes('onError:()=>a(!0)'));
   assert.ok(venueEditor.includes('accept:"image/jpeg,image/png,image/webp"'));
   assert.ok(venueEditor.includes('fetch("/api/venues/logo"'));
@@ -68,4 +68,3 @@ test("profile layout is constrained, touch-safe and bottom-nav safe", () => {
   assert.match(css, /env\(safe-area-inset-bottom\)/);
   assert.match(css, /@media \(max-width: 360px\)/);
 });
-

@@ -31,6 +31,9 @@
 | `/team-access` | Settings | `/employees` | Origin/Back | Yes | Compact Back | Header Back |
 | `/integrations` | List/wizard | `/more` | Origin/Back | Yes | Compact Back | Header Back |
 | `/profile` | Edit | `/settings` | Back + guard | Yes | Compact Back | Header Back |
+| `/profile/personal` | Edit | `/profile` | Back + dirty guard | Yes | Owned fullscreen | Centered editor |
+| `/profile/venue` | Edit | `/profile` | Back + dirty guard | Yes | Owned fullscreen | Centered editor |
+| `/profile/currency` | Edit | `/profile` | Back + dirty guard | Yes | Owned fullscreen | Centered selector |
 | `/employees/:id` | Detail | `/employees` | Origin/Back | Yes | Compact Back | Header Back |
 | `/employees/:id/edit` | Edit | `/employees/:id` | Back/Cancel + guard | Yes | Compact Back | Header Back |
 | `/salaries` | List | `/finance` | Origin/Back | Yes | Compact Back | Header Back |
