@@ -1,4 +1,4 @@
-name: Generate Business Health artifact
+name: Finalize Business Health artifact
 on:
   push:
     branches:
@@ -6,24 +6,22 @@ on:
 permissions:
   contents: write
 jobs:
-  patch-artifact:
+  finalize-artifact:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: codex/business-health-canonical-sync-20260825
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - name: Patch tracked application bundle
-        run: node scripts/patch-business-health-snapshot-v283.mjs
-      - name: Commit generated bundle
+      - name: Apply exact reviewed artifact delta
+        run: git apply .github/codex-business-health-bundle.patch
+      - name: Verify reviewed artifact identity
+        run: test "$(git hash-object public/assets/index-BQGspy0I.js)" = "bea4899c6930d1b5f5513980cdd02f34b9e46a21"
+      - name: Commit exact reviewed tree
         run: |
-          if git diff --quiet -- public/assets/index-BQGspy0I.js; then
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add public/assets/index-BQGspy0I.js
-          git commit -m "build: generate canonical business health artifact"
+          git rm .github/codex-business-health-bundle.patch
+          git rm .github/workflows/codex-business-health-sync.yml
+          git commit -m "build: finalize canonical business health artifact"
           git push origin HEAD:codex/business-health-canonical-sync-20260825
