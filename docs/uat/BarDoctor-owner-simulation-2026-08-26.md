@@ -89,7 +89,7 @@ Production deployment: **не выполнялся**
 - `npm run build` — PASS.
 - `npm run typecheck` — PASS.
 - `npm run lint` — PASS.
-- `npm test` — PASS: 250 artifact/integration + 550 TypeScript unit tests.
+- `npm test` — PASS: 250 artifact/integration + 551 TypeScript unit tests.
 - Targeted owner fixes — PASS.
 - Ручной iPhone-width smoke — PASS: Home, Finance, Shifts, quick add, Warehouse, Sales, Assortment, techcard, Profile/More.
 - Ручной desktop critical smoke — PASS.
