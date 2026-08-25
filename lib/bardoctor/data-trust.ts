@@ -24,6 +24,7 @@ export const MONTH_LOCKED_STORE_KEYS = new Set([
   "bd_purchase_documents",
   "bd_stock_movements",
   "bd_sales_documents",
+  "bd_sales_batches",
   "bd_payroll_entries",
 ]);
 
@@ -46,6 +47,9 @@ const ROLE_WRITE_KEYS: Record<string, Set<string> | "all"> = {
     "bd_assortment_v1",
     "bd_stock_movements",
     "bd_sales_documents",
+    "bd_sales_batches",
+    "bd_sales_mappings",
+    "bd_sales_warehouse_routes",
   ]),
   shift_manager: new Set([
     "bd_finance_revenue",
@@ -64,6 +68,7 @@ const ROLE_WRITE_KEYS: Record<string, Set<string> | "all"> = {
     "bd_assortment_v1",
     "bd_stock_movements",
     "bd_sales_documents",
+    "bd_sales_batches",
   ]),
   employee: new Set(["bd_cases", "bd_events", "bd_tasks", "bd_action_tasks", "bd_decisions"]),
   viewer: new Set(),
@@ -84,6 +89,10 @@ const STORE_ACCESS: Record<string, { read: PermissionKey; write: PermissionKey }
   bd_assortment_v1: { read: "inventory.view", write: "inventory.manage" },
   bd_stock_movements: { read: "inventory.view", write: "inventory.manage" },
   bd_sales_documents: { read: "shifts.view", write: "shifts.manage" },
+  bd_sales_batches: { read: "sales.view", write: "sales.create" },
+  bd_sales_mappings: { read: "sales.view", write: "sales.manage_mapping" },
+  bd_sales_warehouse_routes: { read: "sales.view", write: "sales.manage_mapping" },
+  bd_warehouses: { read: "inventory.view", write: "integrations.manage" },
   bd_finance_settings: { read: "finance.view", write: "settings.manage" },
   bd_equipment: { read: "equipment.view", write: "equipment.manage" },
   bd_equipment_history: { read: "equipment.view", write: "equipment.manage" },

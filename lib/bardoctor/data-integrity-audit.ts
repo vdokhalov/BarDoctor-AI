@@ -1,6 +1,7 @@
 import { inventoryPackageAmount, resolveInventoryProductKey, toInventoryBaseAmount } from "./inventory";
 import { auditCanonicalNomenclature, canonicalSupplierMappings } from "./nomenclature-identity";
 import { reconcileTechCards, validateTechCardVenueIsolation } from "./tech-card-reconciliation";
+import { salesBatches, salesDataQuality } from "./sales-consumption";
 
 type JsonRecord = Record<string, unknown>;
 export type DataIntegrityFinding = {
@@ -73,6 +74,7 @@ export function auditDataIntegrity(input: {
   stockMovements?: unknown[];
   inventorySnapshots?: unknown[];
   writeOffDocuments?: unknown[];
+  salesBatches?: unknown[];
   venueId?: number;
   now?: Date;
 }): DataIntegrityAuditReport {
@@ -84,6 +86,8 @@ export function auditDataIntegrity(input: {
   const movements = (input.stockMovements ?? []).map(record);
   const snapshots = (input.inventorySnapshots ?? array(assortment.inventorySnapshots)).map(record);
   const writeOffs = (input.writeOffDocuments ?? []).map(record).filter((item) => sameVenue(item, input.venueId));
+  const sales = salesBatches(input.salesBatches ?? [], input.venueId ?? 0);
+  const salesQuality = salesDataQuality(sales, input.venueId ?? 0);
   const canonicalAudit = auditCanonicalNomenclature({ assortment, purchaseDocuments: purchases, venueId: input.venueId });
   const techResult = reconcileTechCards({ assortment, purchaseDocuments: purchases, venueId: input.venueId, now: input.now ?? new Date(0) });
   const tech = techResult.report;
@@ -110,6 +114,19 @@ export function auditDataIntegrity(input: {
     .map((document) => text(document.id, "writeoff", 100));
   const orphanWriteOffMovements = activeWriteOffMovements.filter((movement) => !writeOffIds.has(text(movement.sourceDocumentId, "", 100)))
     .map((movement) => text(movement.id, "movement", 100));
+  const saleConsumptionMovements = movements.filter((movement) => sameVenue(movement, input.venueId)
+    && activeMovement(movement) && text(movement.type) === "sale_consumption");
+  const salesBatchIds = new Set(sales.map((batch) => batch.id));
+  const postedSalesWithoutMovements = sales.flatMap((batch) => batch.lines
+    .filter((line) => line.processingStatus === "POSTED" && !saleConsumptionMovements.some((movement) =>
+      text(movement.salesBatchId ?? movement.sourceDocumentId, "", 160) === batch.id
+      && text(movement.salesBatchLineId ?? movement.sourceLineId, "", 160) === line.id
+    ))
+    .map((line) => `${batch.id}:${line.id}`));
+  const orphanSaleMovements = saleConsumptionMovements.filter((movement) =>
+    !salesBatchIds.has(text(movement.salesBatchId ?? movement.sourceDocumentId, "", 160))
+  ).map((movement) => text(movement.id, "sale-movement", 160));
+  const salesIssuesByCode = (code: string) => salesQuality.issues.filter((issue) => issue.code === code).map((issue) => `${issue.batchId}:${issue.lineId ?? "line"}`);
 
   const missingCost = balances.filter((balance) => sameVenue(balance, input.venueId)
     && numeric(balance.current) > 0
@@ -176,6 +193,14 @@ export function auditDataIntegrity(input: {
     finding("WRITE_OFF_COST_BASIS_MISSING", "medium", writeOffMissingCost, "Quantity was posted honestly, but the warehouse cost basis is missing or requires review."),
     finding("WRITE_OFF_UNIT_OR_CONVERSION_INVALID", "high", writeOffInvalidUnit, "A write-off line has no valid base quantity or canonical unit conversion."),
     finding("WRITE_OFF_MOVEMENT_CHAIN_BROKEN", "high", [...writeOffWithoutMovement, ...orphanWriteOffMovements], "Posted write-off documents and stock movements must reference each other without orphan states."),
+    finding("SALES_LINE_UNMAPPED", "high", salesIssuesByCode("NEEDS_MAPPING"), "A raw sales label has no venue- and source-scoped mapping to a canonical menu item."),
+    finding("SALES_MENU_ITEM_WITHOUT_RECIPE", "high", salesIssuesByCode("NO_RECIPE"), "A sold menu item has no approved canonical recipe version."),
+    finding("SALES_RECIPE_INGREDIENT_WITHOUT_NOMENCLATURE", "high", salesIssuesByCode("INGREDIENT_NOMENCLATURE_REQUIRED"), "A recipe ingredient cannot reach canonical nomenclature, so no synthetic stock consumption was created."),
+    finding("SALES_UNIT_OR_CONVERSION_ERROR", "high", salesIssuesByCode("UNIT_ERROR"), "A critical recipe-to-stock unit conversion is missing or incompatible and was not guessed."),
+    finding("SALES_WAREHOUSE_MAPPING_REQUIRED", "high", salesIssuesByCode("WAREHOUSE_MAPPING_REQUIRED"), "Department or sales location cannot be routed safely to one warehouse."),
+    finding("SALES_CONSUMPTION_CALCULATION_FAILED", "high", salesQuality.issues.filter((issue) => !["NEEDS_MAPPING", "NO_RECIPE", "INGREDIENT_NOMENCLATURE_REQUIRED", "UNIT_ERROR", "WAREHOUSE_MAPPING_REQUIRED"].includes(issue.code)).map((issue) => `${issue.batchId}:${issue.lineId ?? "line"}`), "The consumption engine blocked a line instead of creating a false stock movement."),
+    finding("SALES_BATCH_PARTIALLY_POSTED", "high", sales.filter((batch) => batch.status === "PARTIALLY_BLOCKED" && batch.postedLineCount > 0).map((batch) => batch.id), "Only valid lines reached the ledger; unresolved sales remain explicitly visible and the batch is not presented as fully posted."),
+    finding("SALES_MOVEMENT_CHAIN_BROKEN", "high", [...postedSalesWithoutMovements, ...orphanSaleMovements], "SalesBatch lines and immutable SALE_CONSUMPTION movements must retain bidirectional lineage."),
     finding("CROSS_VENUE_RECORD_OR_REFERENCE", "high", [...crossVenueRecords, ...crossVenueReferences], "Legacy null/shared venue data and filtered lookups weakened explicit venue boundaries."),
     finding("STALE_OR_SUPERSEDED_ALIAS", "medium", staleAliases, "Canonical supersession aliases are additive but not uniformly validated by historical readers."),
   ].filter((value): value is DataIntegrityFinding => Boolean(value));
@@ -194,6 +219,10 @@ export function auditDataIntegrity(input: {
       inventorySnapshots: snapshots.filter((item) => sameVenue(item, input.venueId)).length,
       writeOffDocuments: writeOffs.length,
       writeOffItems: writeOffItems.length,
+      salesBatches: sales.length,
+      salesLines: sales.reduce((sum, batch) => sum + batch.lines.length, 0),
+      unresolvedSalesLines: salesQuality.affectedLineCount,
+      unresolvedSalesQuantity: salesQuality.affectedQuantity,
       dataQualityIssues: affectedRecords,
     },
     findings,
@@ -201,7 +230,7 @@ export function auditDataIntegrity(input: {
       affectedRecords, highConfidenceAutomatic, ambiguous,
       stockPositionsPotentiallyAffected: numeric(canonicalAudit.affectedStockPositions),
       valuationRecordsPotentiallyAffected: missingCost.length + numeric(canonicalAudit.affectedStockPositions),
-      historyRecordsPotentiallyAffected: purchaseWithoutMovement.length + orphanMovements.length + snapshotOrphans.length,
+      historyRecordsPotentiallyAffected: purchaseWithoutMovement.length + orphanMovements.length + snapshotOrphans.length + postedSalesWithoutMovements.length + orphanSaleMovements.length,
       writesPerformed: 0,
       rollback: [
         "Export immutable copies of assortment, movements, purchases, snapshots, and supplier mappings.",

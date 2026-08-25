@@ -36,6 +36,10 @@ export const ALLOWED_STORE_KEYS = [
   "bd_assortment_v1",
   "bd_stock_movements",
   "bd_sales_documents",
+  "bd_sales_batches",
+  "bd_sales_mappings",
+  "bd_sales_warehouse_routes",
+  "bd_warehouses",
 ] as const;
 
 export type StoreKey = (typeof ALLOWED_STORE_KEYS)[number];

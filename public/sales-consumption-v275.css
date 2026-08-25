@@ -1,0 +1,35 @@
+.bd-app-header-leading { min-width: 0; }
+body[data-bd-route="/sales-import"] > bd-app-header { display: none; }
+body[data-bd-route="/sales-import"] iframe[title="Продажи и склад"] {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+}
+.bd-warehouse-movement-filters-v275 {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bd-warehouse-movement-filters-v275::-webkit-scrollbar { display: none; }
+.bd-warehouse-movement-filters-v275 button {
+  min-height: 36px;
+  padding: 0 13px;
+  flex: 0 0 auto;
+  border: 1px solid #dfe3ec;
+  border-radius: 999px;
+  background: #fff;
+  color: #626c80;
+  font-size: 12px;
+  font-weight: 750;
+}
+.bd-warehouse-movement-filters-v275 button.active {
+  border-color: #5b57e8;
+  background: #5b57e8;
+  color: #fff;
+}
+@media (max-width: 640px) {
+  .bd-warehouse-movement-filters-v275 { margin-right: -18px; padding-right: 28px; }
+}

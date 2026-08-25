@@ -214,6 +214,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
     <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224" />
     <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259" />
+    <link rel="stylesheet" href="/sales-consumption-v275.css?v=20260824-sales-batch-ledger-v275" />
     <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260" />

@@ -108,9 +108,9 @@ function bucket(): R2Bucket | null {
 export async function POST(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
-  if (!hasPermission(account, "shifts.manage") || !hasPermission(account, "inventory.manage")) {
+  if (!hasPermission(account, "sales.create")) {
     return Response.json(
-      { ok: false, code: "ACCESS_DENIED", error: "Нет права импортировать продажи и менять остатки" },
+      { ok: false, code: "ACCESS_DENIED", error: "Нет права импортировать продажи" },
       { status: 403 },
     );
   }

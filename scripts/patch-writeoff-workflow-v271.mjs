@@ -26,7 +26,7 @@ if (source.includes(oldOverlay)) source = source.replace(oldOverlay, 'i.jsx(i.Fr
 
 const oldTabs = 'onClick:()=>m(B),children:U';
 const newTabs = 'onClick:()=>{m(B),B!=="writeoffs"&&window.bdSyncNavigationQuery({writeoff:null})},children:U';
-if (!source.includes(newTabs)) {
+if (!source.includes(newTabs) && !source.includes('B==="sales"?window.bdNavigate("/sales-import")')) {
   if (!source.includes(oldTabs)) throw new Error("Warehouse tab anchor was not found");
   source = source.replace(oldTabs, newTabs);
 }
@@ -40,14 +40,14 @@ if (!source.includes(newTabStateSync)) {
 
 const oldMovementEnd = 'B.costAmount!==void 0&&i.jsx("small",{children:(bdWarehouseNumber(B.costAmount)>0?"+":"")+bdWarehouseMoney(B.costAmount,B.currency||"MDL")})]})]},B.id)';
 const newMovementEnd = 'B.costAmount!==void 0&&i.jsx("small",{children:(bdWarehouseNumber(B.costAmount)>0?"+":"")+bdWarehouseMoney(B.costAmount,B.currency||"MDL")})]}),B.type==="writeoff"&&B.sourceDocumentId&&i.jsx("button",{type:"button",className:"bd-writeoff-movement-link-v271",onClick:()=>e(bdWarehouseNavigationUrlV247({tab:"writeoffs",writeoff:B.sourceDocumentId})),children:"Документ"})]},B.id)';
-if (!source.includes(newMovementEnd)) {
+if (!source.includes(newMovementEnd) && !source.includes('children:"SalesBatch"')) {
   if (!source.includes(oldMovementEnd)) throw new Error("Warehouse movement link anchor was not found");
   source = source.replace(oldMovementEnd, newMovementEnd);
 }
 
 const oldMovementMeta = 'e==="writeoff"?{label:"Списание",color:"#EA580C",sign:""}:{label:"Движение",color:"#64748B",sign:""}';
 const newMovementMeta = 'e==="writeoff"?{label:"Списание",color:"#EA580C",sign:""}:e==="return"?{label:"Обратное движение",color:"#2563EB",sign:"+"}:{label:"Движение",color:"#64748B",sign:""}';
-if (!source.includes(newMovementMeta)) {
+if (!source.includes(newMovementMeta) && !source.includes('e==="sale_reversal"?{label:"Сторно продажи"')) {
   if (!source.includes(oldMovementMeta)) throw new Error("Warehouse movement meta anchor was not found");
   source = source.replace(oldMovementMeta, newMovementMeta);
 }

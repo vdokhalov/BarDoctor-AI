@@ -26,6 +26,7 @@ node "${script_dir}/patch-shift-writeoffs-v272.mjs"
 node "${script_dir}/patch-navigation-qa-v268.mjs"
 node "${script_dir}/patch-auth-bootstrap-state-v274.mjs"
 node "${script_dir}/patch-auth-bootstrap-profile-ready-v274.mjs"
+node "${script_dir}/patch-sales-consumption-v275.mjs"
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \
@@ -39,4 +40,5 @@ node "${script_dir}/patch-shift-writeoffs-v272.mjs"
 node "${script_dir}/patch-navigation-qa-v268.mjs"
 node "${script_dir}/patch-auth-bootstrap-state-v274.mjs"
 node "${script_dir}/patch-auth-bootstrap-profile-ready-v274.mjs"
+node "${script_dir}/patch-sales-consumption-v275.mjs"
 "${script_dir}/validate-artifact.sh"

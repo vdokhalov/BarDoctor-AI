@@ -18,8 +18,16 @@ export type InventoryDisplayUnit = "auto" | "ml" | "l" | "g" | "kg" | "pcs";
 export type StockMovement = {
   id: string;
   venueId?: number;
-  type: "receipt" | "sale" | "inventory_adjustment" | "writeoff" | "return";
+  type:
+    | "receipt"
+    | "sale"
+    | "sale_consumption"
+    | "sale_reversal"
+    | "inventory_adjustment"
+    | "writeoff"
+    | "return";
   date: string;
+  businessDate?: string;
   productKey: string;
   productName: string;
   amount: number;
@@ -31,8 +39,17 @@ export type StockMovement = {
   exchangeRateToAccounting?: number;
   sourceDocumentId: string;
   sourceLineId: string;
+  salesBatchId?: string;
+  salesBatchLineId?: string;
   menuItemId?: string;
   menuItemName?: string;
+  recipeVersionId?: string;
+  recipeSnapshot?: unknown;
+  warehouseId?: string;
+  actorAccountId?: number;
+  source?: string;
+  idempotencyKey?: string;
+  originalMovementId?: string;
   createdAt: string;
   status?: "active" | "cancelled";
   reversedAt?: string;

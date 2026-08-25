@@ -847,11 +847,11 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /window\.bdNavigate\("\/sales-import"\)/);
   assert.doesNotMatch(mainBundle, /\/sales-import\.html/);
   assert.match(salesImportClient, /\/api\/sales\/scan/);
-  assert.match(salesImportClient, /\/api\/sales\/confirm/);
-  assert.match(salesImportClient, /Сопоставьте продажи с меню/);
-  assert.match(salesImportClient, /bd_assortment_v1/);
-  assert.match(salesImportCss, /\.sales-row\.blocked/);
-  assert.match(salesImportCss, /@media \(max-width: 760px\)/);
+  assert.match(salesImportClient, /\/api\/sales-batches/);
+  assert.match(salesImportClient, /venue-scoped сопоставление/);
+  assert.match(salesImportClient, /SALE_CONSUMPTION/);
+  assert.match(salesImportCss, /\.preview-line/);
+  assert.match(salesImportCss, /@media \(max-width: 700px\)/);
   assert.match(warehouseCss, /\.bd-warehouse-stock-grid/);
   assert.match(warehouseCss, /\.bd-inventory-count-list/);
   assert.match(warehouseCss, /@media \(max-width: 760px\)/);
