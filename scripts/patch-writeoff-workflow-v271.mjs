@@ -40,7 +40,7 @@ if (!source.includes(newTabStateSync)) {
 
 const oldMovementEnd = 'B.costAmount!==void 0&&i.jsx("small",{children:(bdWarehouseNumber(B.costAmount)>0?"+":"")+bdWarehouseMoney(B.costAmount,B.currency||"MDL")})]})]},B.id)';
 const newMovementEnd = 'B.costAmount!==void 0&&i.jsx("small",{children:(bdWarehouseNumber(B.costAmount)>0?"+":"")+bdWarehouseMoney(B.costAmount,B.currency||"MDL")})]}),B.type==="writeoff"&&B.sourceDocumentId&&i.jsx("button",{type:"button",className:"bd-writeoff-movement-link-v271",onClick:()=>e(bdWarehouseNavigationUrlV247({tab:"writeoffs",writeoff:B.sourceDocumentId})),children:"Документ"})]},B.id)';
-if (!source.includes(newMovementEnd) && !source.includes('children:"SalesBatch"')) {
+if (!source.includes(newMovementEnd) && !source.includes('children:"SalesBatch"') && !source.includes('children:"Документ продаж"')) {
   if (!source.includes(oldMovementEnd)) throw new Error("Warehouse movement link anchor was not found");
   source = source.replace(oldMovementEnd, newMovementEnd);
 }

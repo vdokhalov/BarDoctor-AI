@@ -49,8 +49,8 @@ if (!source.includes('bd-warehouse-movement-filters-v275')) {
 }
 
 const writeoffLink = 'B.type==="writeoff"&&B.sourceDocumentId&&i.jsx("button",{type:"button",className:"bd-writeoff-movement-link-v271",onClick:()=>e(bdWarehouseNavigationUrlV247({tab:"writeoffs",writeoff:B.sourceDocumentId})),children:"Документ"})';
-const movementLinks = writeoffLink + ',["sale","sale_consumption","sale_reversal"].includes(B.type)&&B.sourceDocumentId&&i.jsx("button",{type:"button",className:"bd-writeoff-movement-link-v271",onClick:()=>e("/sales-import?batch="+encodeURIComponent(B.salesBatchId||B.sourceDocumentId)),children:"SalesBatch"})';
-if (!source.includes('children:"SalesBatch"')) {
+const movementLinks = writeoffLink + ',["sale","sale_consumption","sale_reversal"].includes(B.type)&&B.sourceDocumentId&&i.jsx("button",{type:"button",className:"bd-writeoff-movement-link-v271",onClick:()=>e("/sales-import?batch="+encodeURIComponent(B.salesBatchId||B.sourceDocumentId)),children:"Документ продаж"})';
+if (!source.includes('children:"Документ продаж"') && !source.includes('children:"SalesBatch"')) {
   if (!source.includes(writeoffLink)) throw new Error("Warehouse movement lineage anchor was not found");
   source = source.replace(writeoffLink, movementLinks);
 }
@@ -61,6 +61,9 @@ if (!source.includes('children:"Продажи смены"')) {
   if (!source.includes(shiftIntro)) throw new Error("Shift closing sales anchor was not found");
   source = source.replace(shiftIntro, shiftSales);
 }
+
+source = source.replaceAll('children:"SalesBatch"', 'children:"Документ продаж"');
+source = source.replaceAll('Открыть canonical SalesBatch — отдельно от списаний', 'Открыть продажи смены — отдельно от списаний');
 
 if (!source.includes(marker)) throw new Error("Sales Consumption v275 marker was not inserted");
 fs.writeFileSync(assetPath, source);

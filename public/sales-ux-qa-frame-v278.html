@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sales UX responsive QA</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, Arial, sans-serif; background: #eef0f8; }
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: start center; padding: 28px; }
+      .qa-toolbar { position: sticky; top: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; margin-bottom: 16px; padding: 8px; border: 1px solid #d8dbea; border-radius: 14px; background: rgba(255,255,255,.94); box-shadow: 0 10px 28px rgba(31,35,70,.1); }
+      button { min-height: 36px; padding: 0 12px; border: 1px solid #d8dbea; border-radius: 10px; background: #fff; color: #24234b; font-weight: 700; cursor: pointer; }
+      button[aria-pressed="true"] { border-color: #5b43e8; background: #5b43e8; color: #fff; }
+      .qa-device { overflow: hidden; border: 1px solid #d9dcec; border-radius: 28px; background: #fff; box-shadow: 0 28px 70px rgba(31,35,70,.2); transition: width .15s ease; }
+      iframe { display: block; width: 100%; height: 844px; border: 0; background: #f8f8fc; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav class="qa-toolbar" aria-label="Ширина экрана">
+        <button type="button" data-width="320">320</button>
+        <button type="button" data-width="375">375</button>
+        <button type="button" data-width="390" aria-pressed="true">390</button>
+        <button type="button" data-width="430">430</button>
+      </nav>
+      <div class="qa-device" data-testid="sales-device" style="width:390px">
+        <iframe title="Продажи — mobile QA" src="/sales-import?embedded=1"></iframe>
+      </div>
+    </main>
+    <script>
+      const device = document.querySelector('[data-testid="sales-device"]');
+      const buttons = [...document.querySelectorAll('[data-width]')];
+      function setWidth(width) {
+        device.style.width = `${width}px`;
+        buttons.forEach((button) => button.setAttribute('aria-pressed', String(button.dataset.width === String(width))));
+      }
+      buttons.forEach((button) => button.addEventListener('click', () => setWidth(Number(button.dataset.width))));
+      const requestedWidth = Number(new URLSearchParams(location.search).get('width'));
+      if ([320, 375, 390, 430].includes(requestedWidth)) setWidth(requestedWidth);
+    </script>
+  </body>
+</html>

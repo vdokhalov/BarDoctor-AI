@@ -26,6 +26,7 @@ import {
 
 const WAREHOUSE_STORE_KEY = "bd_warehouses";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
+const REVENUE_STORE_KEY = "bd_finance_revenue";
 const MAX_BODY_BYTES = 1_000_000;
 
 type JsonRecord = Record<string, unknown>;
@@ -59,7 +60,7 @@ function upsertStore(database: D1Database, accountId: number, key: string, value
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?)
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     accountId,
     SALES_BATCH_STORE_KEY,
@@ -69,6 +70,7 @@ async function readStores(database: D1Database, accountId: number) {
     STOCK_MOVEMENT_STORE_KEY,
     WAREHOUSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY,
+    REVENUE_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   return {
@@ -78,6 +80,7 @@ async function readStores(database: D1Database, accountId: number) {
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
     stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
     warehouses: array(parse(stores.get(WAREHOUSE_STORE_KEY), [])),
+    shifts: array(parse(stores.get(REVENUE_STORE_KEY), [])),
     closedMonths: closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null)),
   };
 }
@@ -135,7 +138,48 @@ function activeMenu(assortment: JsonRecord, venueId: number) {
     category: text(item.category, "Без категории", 120),
     salePrice: numeric(item.salePrice),
     currency: text(item.currency, "", 12).toUpperCase(),
+    aliases: array(item.aliases).map((value) => text(value, "", 160)).filter(Boolean).slice(0, 20),
   }));
+}
+
+function frequentItems(batches: SalesBatch[]) {
+  const totals = new Map<string, { menuItemId: string; rawName: string; quantity: number; appearances: number }>();
+  for (const batch of batches.filter((item) => item.status !== "CANCELLED")) {
+    const seen = new Set<string>();
+    for (const line of batch.lines) {
+      if (!line.menuItemId) continue;
+      const current = totals.get(line.menuItemId) ?? {
+        menuItemId: line.menuItemId,
+        rawName: line.recipeSnapshot?.menuItem.name ?? line.rawName,
+        quantity: 0,
+        appearances: 0,
+      };
+      current.quantity += line.quantity;
+      if (!seen.has(line.menuItemId)) current.appearances += 1;
+      seen.add(line.menuItemId);
+      totals.set(line.menuItemId, current);
+    }
+  }
+  return [...totals.values()]
+    .sort((left, right) => right.appearances - left.appearances || right.quantity - left.quantity || left.rawName.localeCompare(right.rawName, "ru"))
+    .slice(0, 40)
+    .map((item) => ({ ...item, quantity: 0 }));
+}
+
+function availableShifts(values: unknown[], venueId: number) {
+  return values.map(record).filter((item) => {
+    const rowVenueId = numeric(item.venueId);
+    return (!rowVenueId || rowVenueId === venueId) && Boolean(text(item.id, "", 160));
+  }).sort((left, right) => text(right.date).localeCompare(text(left.date)) || text(right.createdAt).localeCompare(text(left.createdAt)))
+    .slice(0, 60)
+    .map((item) => ({
+      id: text(item.id, "", 160),
+      date: text(item.date, "", 10),
+      label: text(item.shiftName ?? item.name ?? item.title, "Смена", 120),
+      startTime: text(item.startTime ?? item.openTime, "", 16) || undefined,
+      endTime: text(item.endTime ?? item.closeTime, "", 16) || undefined,
+      closingStatus: text(item.closingStatus, "", 30) || undefined,
+    }));
 }
 
 function latestTemplate(batches: SalesBatch[]) {
@@ -170,6 +214,8 @@ function responsePayload(stores: Awaited<ReturnType<typeof readStores>>, venueId
     kpis: salesBatchKpis(batches, venueId),
     dataQuality: salesDataQuality(batches, venueId),
     latestTemplate: latestTemplate(batches),
+    frequentItems: frequentItems(batches),
+    shifts: availableShifts(stores.shifts, venueId),
     capabilities: {
       create: permissions.includes("sales.create"),
       post: permissions.includes("sales.post"),
