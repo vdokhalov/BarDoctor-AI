@@ -8,6 +8,7 @@ import {
   unauthorized,
 } from "../../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
+import { venueIdentityFromJson } from "../../../../lib/bardoctor/venue-identity";
 
 export async function GET(request: Request): Promise<Response> {
   const [account, actor] = await Promise.all([
@@ -35,26 +36,19 @@ export async function GET(request: Request): Promise<Response> {
       activeWorkspaceId: memberships.find((item) => item.venue.id === actor.venueId)?.venue.workspaceId ?? null,
       activeVenueIsPrimary: actor.id === account.id,
       canCreateVenues: actor.role === "owner",
-      venues: memberships.map((item) => ({
-        id: item.venue.id,
-        workspaceId: item.venue.workspaceId,
-        role: item.role,
-        permissions: item.permissions,
-        status: item.venue.status,
-        isPrimary: item.venue.dataAccountId === account.id,
-        name: (() => {
-          try {
-            const profile = item.dataAccount.restaurantJson
-              ? JSON.parse(item.dataAccount.restaurantJson) as { name?: unknown }
-              : null;
-            return typeof profile?.name === "string" && profile.name.trim()
-              ? profile.name.trim()
-              : "Новое заведение";
-          } catch {
-            return "Новое заведение";
-          }
-        })(),
-      })),
+      venues: memberships.map((item) => {
+        const identity = venueIdentityFromJson(item.dataAccount.restaurantJson);
+        return {
+          id: item.venue.id,
+          workspaceId: item.venue.workspaceId,
+          role: item.role,
+          permissions: item.permissions,
+          status: item.venue.status,
+          isPrimary: item.venue.dataAccountId === account.id,
+          name: identity.name,
+          logoId: identity.logoId,
+        };
+      }),
     },
   });
 }

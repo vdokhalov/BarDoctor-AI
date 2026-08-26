@@ -52,8 +52,10 @@ test("profile preserves real security, sessions, logout and RBAC flows", () => {
 });
 
 test("venue logo has server persistence, fallback and editor controls", () => {
-  assert.ok(profile.includes('/api/venues/logo/"+e.logoId'));
-  assert.ok(profile.includes('onError:()=>a(!0)'));
+  assert.ok(profile.includes('function bdCanonicalVenueIdentityV297'));
+  assert.match(profile, /"\/api\/venues\/logo\/"\+[a-z]\.logoId/);
+  assert.match(profile, /onError:\(\)=>[a-z]\(!0\)/);
+  assert.ok(profile.includes('decoding:"async"'));
   assert.ok(venueEditor.includes('accept:"image/jpeg,image/png,image/webp"'));
   assert.ok(venueEditor.includes('fetch("/api/venues/logo"'));
   assert.ok(venueEditor.includes('logoId:bdNextLogoId'));

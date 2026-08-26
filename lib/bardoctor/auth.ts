@@ -26,6 +26,7 @@ import {
 import {
   classifyAuthBootstrap,
 } from "./bootstrap-state";
+import { venueIdentityFromJson } from "./venue-identity";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
@@ -305,15 +306,7 @@ export async function authenticateIdentityRequest(request: Request): Promise<Acc
 }
 
 function venueName(account: Account): string {
-  if (!account.restaurantJson) return "Новое заведение";
-  try {
-    const value = JSON.parse(account.restaurantJson) as { name?: unknown };
-    return typeof value.name === "string" && value.name.trim()
-      ? value.name.trim()
-      : "Новое заведение";
-  } catch {
-    return "Новое заведение";
-  }
+  return venueIdentityFromJson(account.restaurantJson).name;
 }
 
 export async function ensureOwnerVenue(account: Account): Promise<void> {
@@ -544,6 +537,7 @@ export async function authResult(account: Account, token: string, request?: Requ
       id: item.venue.id,
       workspaceId: item.venue.workspaceId,
       name: venueName(item.dataAccount),
+      logoId: venueIdentityFromJson(item.dataAccount.restaurantJson).logoId,
       hasProfile: Boolean(item.dataAccount.restaurantJson),
       role: item.role,
       permissions: item.permissions,

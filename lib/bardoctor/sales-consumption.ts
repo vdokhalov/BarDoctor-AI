@@ -5,6 +5,7 @@ import {
   type StockMovement,
 } from "./inventory";
 import { canonicalTechCardForOwner } from "./tech-card-reconciliation";
+import { resolveReadyProductConsumption } from "./menu-sale-size";
 
 export const SALES_BATCH_STORE_KEY = "bd_sales_batches";
 export const SALES_MAPPING_STORE_KEY = "bd_sales_mappings";
@@ -37,7 +38,7 @@ export type SalesMappingStatus =
   | "INVALID_QUANTITY"
   | "UNIT_ERROR";
 export type SalesLineProcessingStatus = "DRAFT" | "READY" | "BLOCKED" | "POSTED" | "REVERSED";
-export type RecipeConsumptionMode = "DIRECT_INGREDIENTS" | "PREPARED_ITEM";
+export type RecipeConsumptionMode = "DIRECT_INGREDIENTS" | "PREPARED_ITEM" | "READY_PRODUCT";
 
 export type SaleLineModifier = {
   id: string;
@@ -474,6 +475,93 @@ function snapshotFor(input: {
   warehouses: JsonRecord[];
   now: string;
 }): { snapshot?: RecipeSnapshot; errorCode?: string; errorMessage?: string; cost: number | null; currency?: string } {
+  const readyProduct = resolveReadyProductConsumption(input.menuItem, input.assortment);
+  if (readyProduct) {
+    const warehouse = resolveWarehouse({ ...input, menuItem: input.menuItem });
+    if (!warehouse.id) {
+      return {
+        errorCode: "WAREHOUSE_MAPPING_REQUIRED",
+        errorMessage: warehouse.error ?? "Не определён склад расхода",
+        cost: null,
+      };
+    }
+    const balance = venueBalances(input.assortment, input.venueId).find((candidate) =>
+      balanceKey(candidate) === readyProduct.productKey
+    );
+    if (!balance) {
+      return {
+        errorCode: "INGREDIENT_NOMENCLATURE_REQUIRED",
+        errorMessage: `Canonical позиция «${readyProduct.productName}» отсутствует на складе этого заведения`,
+        cost: null,
+      };
+    }
+    const balanceUnit = text(balance.unit, "unknown", 20) as BaseInventoryUnit;
+    if (balanceUnit !== readyProduct.baseUnit) {
+      return {
+        errorCode: "UNIT_ERROR",
+        errorMessage: `Фасовка «${readyProduct.productName}» несовместима со складской единицей`,
+        cost: null,
+      };
+    }
+    const warehouseBalances = record(balance.warehouseBalances);
+    if (
+      warehouse.id !== "__venue__"
+      && Object.keys(warehouseBalances).length > 0
+      && !(warehouse.id in warehouseBalances)
+    ) {
+      return {
+        errorCode: "WAREHOUSE_MAPPING_REQUIRED",
+        errorMessage: `Позиция «${readyProduct.productName}» не заведена на выбранном складе`,
+        cost: null,
+      };
+    }
+    const unitCost = balance.costNeedsReview === true || !(numeric(balance.averageUnitCost) > 0)
+      ? null
+      : rounded(numeric(balance.averageUnitCost), 6);
+    const baseQuantityTotal = rounded(readyProduct.quantityPerSale * input.quantity);
+    const currency = unitCost === null
+      ? undefined
+      : text(balance.currency, "", 12).toUpperCase() || undefined;
+    const totalCost = unitCost === null ? null : money(unitCost * baseQuantityTotal);
+    return {
+      snapshot: {
+        recipeId: `ready-product:${text(input.menuItem.id, "", 160)}`,
+        recipeVersion: 1,
+        capturedAt: input.now,
+        consumptionMode: "READY_PRODUCT",
+        menuItem: {
+          id: text(input.menuItem.id, "", 160),
+          name: text(input.menuItem.name, "Позиция меню"),
+          department: text(input.menuItem.department, "", 100) || undefined,
+          category: text(input.menuItem.category, "", 120) || undefined,
+        },
+        ingredients: [{
+          ingredientId: `ready-product:${readyProduct.nomenclatureItemId}`,
+          name: readyProduct.productName,
+          nomenclatureItemId: readyProduct.nomenclatureItemId,
+          productKey: readyProduct.productKey,
+          recipeQuantity: readyProduct.quantityPerSale,
+          recipeUnit: readyProduct.baseUnit,
+          baseQuantityPerPortion: readyProduct.quantityPerSale,
+          baseQuantityTotal,
+          baseUnit: readyProduct.baseUnit,
+          warehouseId: warehouse.id,
+          unitCost,
+          totalCost,
+          currency,
+          conversion: {
+            inputQuantity: 1,
+            inputUnit: "sale",
+            factor: readyProduct.quantityPerSale,
+            outputUnit: readyProduct.baseUnit,
+            source: "canonical_unit_conversion",
+          },
+        }],
+      },
+      cost: totalCost,
+      currency,
+    };
+  }
   const recipe = canonicalTechCardForOwner(input.menuItem.id, input.assortment.recipes);
   if (!recipe || text(recipe.status, "", 30) !== "confirmed" || text(recipe.reviewStatus, "", 40) !== "approved") {
     return { errorCode: "NO_RECIPE", errorMessage: "Нет подтверждённой canonical техкарты", cost: null };

@@ -98,7 +98,7 @@
     stockBalances: [
       { key: "product:aperol", quantity: 4000, unit: "ml", averageUnitCost: 0.81, currency: "RUB" },
       { key: "product:prosecco", quantity: 6500, unit: "ml", averageUnitCost: 0.67, currency: "RUB" },
-      { key: "product:cola", quantity: 8000, unit: "ml", averageUnitCost: 0.086, currency: "RUB" },
+      { key: "product:cola", name: "Coca-Cola 1,25 л", quantity: 8000, unit: "ml", packageSize: "1,25 л", averageUnitCost: 0.086, currency: "RUB" },
       { key: "product:chicken", quantity: 2400, unit: "g", averageUnitCost: 0.42, currency: "RUB" },
     ],
     internalItems: [],
@@ -110,6 +110,18 @@
     ],
     updatedAt: "2026-08-12T12:00:00.000Z",
   };
+  catalog.nomenclature = Array.from({ length: 125 }, function (_, index) {
+    var target = index === 117;
+    return {
+      id: "qa-nom-" + index,
+      productKey: "qa-product-" + index,
+      venueId: venueId,
+      name: target ? "Боржоми 1,25 л" : "QA ингредиент " + String(index).padStart(3, "0"),
+      unit: "ml",
+      packageSize: target ? "1,25 л" : "",
+      active: true,
+    };
+  });
 
   var purchaseProducts = {
     "product:aperol": { name: "Aperol", supplier: "ВПРОК", unit: "ml", current: 0.81 },
@@ -172,6 +184,7 @@
       currency: "RUB",
       recipeId: recipes.find(function (recipe) { return recipe.menuItemId === item.id; }) && recipes.find(function (recipe) { return recipe.menuItemId === item.id; }).id || null,
       recipeStatus: status === "missing_recipe" ? "missing" : status === "review" ? "draft" : "confirmed",
+      techCardStatus: status === "missing_recipe" ? "missing" : status === "review" ? "requires_review" : "approved",
       status: status,
       ingredientCount: 0,
       mappedIngredientCount: 0,
@@ -288,6 +301,28 @@
         }
       } catch { /* use the deterministic default */ }
       return Promise.resolve(new Response(JSON.stringify({ ok: true, venueId: venueId, generatedAt: "2026-08-12T12:00:00.000Z", analytics: analytics }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" } }));
+    }
+    if (url.indexOf("/api/tech-cards/nomenclature") >= 0) {
+      var selectorUrl = new URL(url, window.location.origin);
+      var selectorQuery = (selectorUrl.searchParams.get("q") || "").toLocaleLowerCase("ru-RU")
+        .replace(/ё/g, "е").replace(/(\d)[,.](\d)/g, "$1.$2").trim();
+      var selectorOffset = Number((/^v1:(\d+)$/.exec(selectorUrl.searchParams.get("cursor") || "") || [])[1] || 0);
+      var selectorRows = catalog.nomenclature.filter(function (item) {
+        return !selectorQuery || (item.name + " " + item.packageSize).toLocaleLowerCase("ru-RU")
+          .replace(/ё/g, "е").replace(/(\d)[,.](\d)/g, "$1.$2").includes(selectorQuery);
+      }).sort(function (left, right) { return left.name.localeCompare(right.name, "ru-RU", { numeric: true }); });
+      var selectorItems = selectorRows.slice(selectorOffset, selectorOffset + 50).map(function (item) {
+        return { id: item.id, key: item.productKey, name: item.name, unit: item.unit, packageSize: item.packageSize, category: "", supplierName: "" };
+      });
+      var nextSelectorOffset = selectorOffset + selectorItems.length;
+      return Promise.resolve(new Response(JSON.stringify({
+        ok: true,
+        venueId: venueId,
+        items: selectorItems,
+        nextCursor: nextSelectorOffset < selectorRows.length ? "v1:" + nextSelectorOffset : null,
+        total: selectorRows.length,
+        query: selectorQuery,
+      }), { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "private, no-store" } }));
     }
     if (url.indexOf("/api/access/active-venue") >= 0 && init && init.method === "POST") {
       var body = {};

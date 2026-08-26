@@ -1,4 +1,5 @@
 import { normalizeAccountingCurrency } from "./currency";
+import { canonicalVenueLogoId } from "./venue-identity";
 
 export type VenueProfile = {
   name: string;
@@ -32,12 +33,6 @@ function positiveNumber(value: unknown): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
-function imageId(value: unknown): string | null {
-  return typeof value === "string" && /^[a-zA-Z0-9-]{20,80}$/.test(value)
-    ? value
-    : null;
-}
-
 function dateKey(value: unknown): string | undefined {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
   const parsed = new Date(`${value}T12:00:00Z`);
@@ -64,7 +59,7 @@ export function venueProfileFromInput(body: Record<string, unknown>): VenueProfi
     closeTime: text(body.closeTime, 5) || "23:00",
     areas: Array.isArray(body.areas) ? body.areas : [],
     competitors: Array.isArray(body.competitors) ? body.competitors : [],
-    logoId: imageId(body.logoId),
+    logoId: canonicalVenueLogoId(body.logoId),
     workingDays:
       body.workingDays && typeof body.workingDays === "object" && !Array.isArray(body.workingDays)
         ? body.workingDays as Record<string, unknown>

@@ -21,6 +21,11 @@ import {
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
 import { INVENTORY_SNAPSHOT_STORE_KEY } from "../../../../lib/bardoctor/authoritative-persistence";
+import {
+  INVOICE_MAPPING_STORE_KEY,
+  upsertConfirmedSupplierMappings,
+  type SupplierItemMapping,
+} from "../../../../lib/bardoctor/invoice-recognition-v2";
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 
@@ -171,6 +176,15 @@ export async function POST(request: Request): Promise<Response> {
       { status: 422 },
     );
   }
+  const unresolvedRecognitionLines = document.items.filter((item) => item.requiresReview === true);
+  if (unresolvedRecognitionLines.length && document.documentType !== "price_list") {
+    return Response.json({
+      ok: false,
+      code: "INVOICE_RECOGNITION_REVIEW_REQUIRED",
+      error: "Сопоставьте позиции, отмеченные для проверки, или удалите их из черновика.",
+      unresolvedLines: unresolvedRecognitionLines.map((item) => ({ id: item.id, rawName: item.rawName ?? item.name })),
+    }, { status: 422 });
+  }
   if (document.documentType !== "price_list" && document.total <= 0) {
     return Response.json(
       { ok: false, error: "Укажите итоговую сумму закупки" },
@@ -188,7 +202,7 @@ export async function POST(request: Request): Promise<Response> {
     SELECT store_key, data_json
     FROM domain_data
     WHERE account_id = ?
-      AND store_key IN (?, ?, ?, ?, ?, ?, ?)
+      AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     account.id,
     PURCHASE_STORE_KEY,
@@ -198,6 +212,7 @@ export async function POST(request: Request): Promise<Response> {
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
     INVENTORY_SNAPSHOT_STORE_KEY,
+    INVOICE_MAPPING_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   let documents = array(stores.get(PURCHASE_STORE_KEY));
@@ -205,6 +220,7 @@ export async function POST(request: Request): Promise<Response> {
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const invoiceMappings = array(stores.get(INVOICE_MAPPING_STORE_KEY)) as SupplierItemMapping[];
   const ledgerMigration = migratePurchaseLedger({
     documents,
     expenses,
@@ -467,11 +483,21 @@ export async function POST(request: Request): Promise<Response> {
     : stockMovements;
   documents.unshift(confirmedDocument);
 
+  const nextInvoiceMappings = upsertConfirmedSupplierMappings({
+    current: invoiceMappings,
+    venueId: account.venueId,
+    supplierId: String(supplier.id),
+    actorAccountId: account.actorAccountId,
+    items: confirmedDocument.items,
+    now,
+  });
+
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")
     || account.appEmail;
   const statements = [
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     upsertStore(database, account.id, SUPPLIER_STORE_KEY, suppliers, now),
+    upsertStore(database, account.id, INVOICE_MAPPING_STORE_KEY, nextInvoiceMappings, now),
     audit(database, {
       accountId: account.id,
       storeKey: PURCHASE_STORE_KEY,

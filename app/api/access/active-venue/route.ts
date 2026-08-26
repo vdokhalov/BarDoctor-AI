@@ -5,18 +5,7 @@ import {
   venueContextForAccount,
 } from "../../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
-
-function venueName(value: string | null): string {
-  if (!value) return "Новое заведение";
-  try {
-    const profile = JSON.parse(value) as { name?: unknown };
-    return typeof profile.name === "string" && profile.name.trim()
-      ? profile.name.trim()
-      : "Новое заведение";
-  } catch {
-    return "Новое заведение";
-  }
-}
+import { venueIdentityFromJson } from "../../../../lib/bardoctor/venue-identity";
 
 export async function POST(request: Request): Promise<Response> {
   const account = await authenticateIdentityRequest(request);
@@ -36,12 +25,14 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   await rememberActiveVenueForRequest(request, account.id, venueId);
+  const identity = venueIdentityFromJson(context.dataAccount.restaurantJson);
   return Response.json({
     ok: true,
     activeVenueId: venueId,
     activeWorkspaceId: context.venue.workspaceId,
     activeVenueIsPrimary: context.venue.dataAccountId === account.id,
-    venueName: venueName(context.dataAccount.restaurantJson),
+    venueName: identity.name,
+    logoId: identity.logoId,
     role: context.role,
     permissions: context.permissions,
   });

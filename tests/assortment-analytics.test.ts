@@ -96,6 +96,58 @@ test("current recipe cost preserves weighted inventory valuation before latest p
   assert.match(analytics.valuation.currentCostRule, /Средневзвешенная/);
 });
 
+test("ready product economics use canonical packaging without conflating sale size with a recipe", () => {
+  const analytics = buildAssortmentAnalytics({
+    assortment: assortment({
+      menuItems: [{
+        id: "cola-125",
+        groupId: "bar",
+        department: "bar",
+        category: "Безалкогольные напитки",
+        name: "Кола 1,25 л",
+        type: "ready",
+        salePrice: 90,
+        currency: "RUB",
+        plannedSales: 4,
+        active: true,
+        readyProduct: {
+          nomenclatureItemId: "product:cola-125",
+          productKey: "product:cola-125",
+          packageLabel: "1,25 л",
+          packagesPerSale: 1,
+        },
+      }],
+      recipes: [],
+      nomenclature: [{
+        id: "product:cola-125",
+        productKey: "product:cola-125",
+        name: "Coca-Cola 1,25 л",
+        unit: "pcs",
+        packageSize: "1,25 л",
+      }],
+      stockBalances: [{
+        id: "product:cola-125",
+        key: "product:cola-125",
+        productKey: "product:cola-125",
+        name: "Coca-Cola 1,25 л",
+        current: 12,
+        unit: "pcs",
+        packageSize: "1,25 л",
+        averageUnitCost: 40,
+        currency: "RUB",
+      }],
+    }),
+    now: new Date("2026-08-12T12:00:00.000Z"),
+  });
+  const item = analytics.menuItems[0];
+  assert.equal(item.portionSize, "1,25 л");
+  assert.equal(item.recipeStatus, "confirmed");
+  assert.equal(item.techCardSource, "ready_product");
+  assert.equal(item.recipeCost, 40);
+  assert.equal(item.status, "ready");
+  assert.deepEqual(analytics.saleSizeUnits.map((unit) => unit.code), ["ml", "l", "g", "kg", "pcs"]);
+});
+
 test("draft OCR and unmapped items never become factual ingredient prices", () => {
   const analytics = buildAssortmentAnalytics({
     assortment: assortment({ stockBalances: [] }),

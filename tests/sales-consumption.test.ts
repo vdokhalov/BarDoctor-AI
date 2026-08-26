@@ -71,6 +71,69 @@ test("Mojito quantity explodes through the canonical recipe and snapshots v3", (
   assert.equal(line.theoreticalCost, 13.8);
 });
 
+test("ready product consumes one linked canonical package without a fake recipe", () => {
+  const source = assortment();
+  source.menuItems.push({
+    id: "cola-125",
+    name: "Кола 1,25 л",
+    department: "bar",
+    type: "ready",
+    active: true,
+    venueId: 1,
+    readyProduct: {
+      nomenclatureItemId: "stock-cola-125",
+      productKey: "stock-cola-125",
+      packageLabel: "1,25 л",
+      packagesPerSale: 1,
+    },
+  });
+  source.stockBalances.push({
+    id: "stock-cola-125",
+    key: "stock-cola-125",
+    productKey: "stock-cola-125",
+    name: "Coca-Cola 1,25 л",
+    venueId: 1,
+    current: 12,
+    unit: "pcs",
+    packageSize: "1,25 л",
+    averageUnitCost: 40,
+    inventoryValue: 480,
+    currency: "RUB",
+  });
+  const readyDraft = manualSalesAdapter.parse({
+    businessDate: "2026-08-24",
+    lines: [{ id: "cola-line", rawName: "Кола 1,25 л", menuItemId: "cola-125", quantity: 2 }],
+  });
+  const saved = createOrUpdateSalesBatch({
+    batches: [], draft: readyDraft, assortment: source, mappings: [], warehouseRoutes: [], venueId: 1, actor,
+    now: "2026-08-24T18:00:00.000Z",
+  });
+  assert.equal(saved.ok, true);
+  if (!saved.ok) return;
+  const line = saved.batch.lines[0];
+  assert.equal(line.processingStatus, "READY");
+  assert.equal(line.recipeSnapshot?.consumptionMode, "READY_PRODUCT");
+  assert.equal(line.recipeSnapshot?.ingredients[0].baseQuantityTotal, 2);
+  assert.equal(line.theoreticalCost, 80);
+
+  const posted = postSalesBatch({
+    batches: saved.batches,
+    batchId: saved.batch.id,
+    assortment: source,
+    mappings: [],
+    warehouseRoutes: [],
+    stockMovements: [],
+    venueId: 1,
+    actor,
+  });
+  assert.equal(posted.ok, true);
+  if (!posted.ok) return;
+  const colaBalance = (posted.assortment.stockBalances as Array<Record<string, unknown>>)
+    .find((balance) => balance.productKey === "stock-cola-125");
+  assert.equal(colaBalance?.current, 10);
+  assert.equal(posted.stockMovements.find((movement) => movement.productKey === "stock-cola-125")?.amount, -2);
+});
+
 test("posting updates balances, emits SALE_CONSUMPTION lineage and is idempotent", () => {
   const saved = createOrUpdateSalesBatch({
     batches: [], draft: draft(10), assortment: assortment(), mappings: [], warehouseRoutes: [], venueId: 1, actor,

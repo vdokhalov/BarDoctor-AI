@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { env } from "cloudflare:workers";
+import { getD1 } from "../../../../db";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import {
@@ -13,11 +14,30 @@ import {
   normalizePurchaseDocument,
   PURCHASE_DOCUMENT_SYSTEM_PROMPT,
   purchaseDocumentPrompt,
+  SUPPLIER_STORE_KEY,
 } from "../../../../lib/bardoctor/purchases";
 import {
   loadVenueAIContext,
   venueAIContextForPrompt,
 } from "../../../../lib/bardoctor/venue-ai-context";
+import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
+import {
+  configuredInvoiceOcr,
+  InvoiceOcrError,
+} from "../../../../lib/bardoctor/invoice-ocr";
+import {
+  applyDeterministicMappings,
+  compareRecognitionResults,
+  confidenceLevel,
+  INVOICE_MAPPING_STORE_KEY,
+  invoiceRecognitionMode,
+  nomenclatureCandidates,
+  parseInvoiceOcr,
+  recognitionMetrics,
+  type InvoiceOcrResult,
+  type ParsedInvoiceDocument,
+  type SupplierItemMapping,
+} from "../../../../lib/bardoctor/invoice-recognition-v2";
 
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
@@ -48,6 +68,27 @@ type StoredSourceDocument = {
   id: string;
   document: SourceDocument;
 };
+
+type StoreRow = { store_key: string; data_json: string };
+
+function arrayJson(value: string | undefined): unknown[] {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function objectJson(value: string | undefined): unknown {
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return {};
+  }
+}
 
 function isUploadFile(value: FormDataEntryValue | null): value is File & UploadFile {
   return Boolean(
@@ -304,6 +345,271 @@ ${input.contextHint}`;
   return parseAIJson<unknown>(raw);
 }
 
+function environment(): Record<string, unknown> {
+  return env as unknown as Record<string, unknown>;
+}
+
+async function recognitionStores(accountId: number): Promise<{
+  assortment: unknown;
+  suppliers: Record<string, unknown>[];
+  mappings: SupplierItemMapping[];
+}> {
+  const result = await getD1().prepare(`
+    SELECT store_key, data_json
+    FROM domain_data
+    WHERE account_id = ? AND store_key IN (?, ?, ?)
+  `).bind(accountId, ASSORTMENT_STORE_KEY, SUPPLIER_STORE_KEY, INVOICE_MAPPING_STORE_KEY).all<StoreRow>();
+  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  return {
+    assortment: objectJson(stores.get(ASSORTMENT_STORE_KEY)),
+    suppliers: arrayJson(stores.get(SUPPLIER_STORE_KEY)).map(record),
+    mappings: arrayJson(stores.get(INVOICE_MAPPING_STORE_KEY)) as SupplierItemMapping[],
+  };
+}
+
+function resolveSupplier(document: ParsedInvoiceDocument, suppliers: Record<string, unknown>[]) {
+  const normalize = (value: unknown) => String(value ?? "")
+    .trim()
+    .toLocaleLowerCase("ru-RU")
+    .replace(/ё/g, "е")
+    .replace(/^(?:ооо|оао|зао|ип|srl|s\\.r\\.l\\.)\s+/i, "")
+    .replace(/[«»"'.,]/g, "")
+    .replace(/\s+/g, " ");
+  const normalized = normalize(document.supplierName);
+  const supplier = suppliers.find((item) =>
+    normalize(item.name) === normalized
+  );
+  return supplier ? String(supplier.id ?? "") || undefined : undefined;
+}
+
+function spreadsheetOcr(document: SourceDocument): InvoiceOcrResult {
+  const startedAt = Date.now();
+  const rawText = spreadsheetText(document.bytes);
+  return {
+    rawText,
+    lines: rawText.split(/\r?\n/).map((line) => ({ text: line, confidence: 1 })),
+    confidence: 1,
+    durationMs: Date.now() - startedAt,
+    engine: "deterministic_spreadsheet",
+  };
+}
+
+async function aiResolveUnresolved(input: {
+  accountId: number;
+  actorAccountId: number;
+  venueId: number;
+  jobId: string;
+  document: ParsedInvoiceDocument;
+}): Promise<{
+  document: ParsedInvoiceDocument;
+  aiFallbackLinesCount: number;
+  aiRequestCount: number;
+  aiEstimatedTokenUsage: number;
+  unavailable: boolean;
+}> {
+  const unresolved = input.document.items.filter((item) => item.requiresReview);
+  if (!unresolved.length) {
+    return {
+      document: input.document,
+      aiFallbackLinesCount: 0,
+      aiRequestCount: 0,
+      aiEstimatedTokenUsage: 0,
+      unavailable: false,
+    };
+  }
+  const payload = unresolved.map((item) => ({
+    lineId: item.id,
+    rawName: item.rawName,
+    quantity: item.quantity,
+    unit: item.unit,
+    packageSize: item.packageSize,
+    unitPrice: item.unitPrice,
+    lineTotal: item.lineTotal,
+    candidates: item.mappingCandidates,
+  }));
+  try {
+    const raw = await aiText({
+      accountId: input.accountId,
+      observability: {
+        actorAccountId: input.actorAccountId,
+        venueId: input.venueId,
+        feature: "invoice_recognition_v2." + input.jobId,
+      },
+      system: `Ты проверяешь только неоднозначные строки уже прочитанной накладной. Не создавай номенклатуру. Выбирай nomenclatureId только из переданных candidates. Если уверенности нет, оставь null. Верни только JSON.`,
+      messages: [{
+        role: "user",
+        content: `Необработанные строки:\n${JSON.stringify(payload)}\n\nВерни {"lines":[{"lineId":"...","nomenclatureId":"id из candidates или null","confidence":0.0}]}.`,
+      }],
+      maxTokens: Math.min(2_500, 300 + unresolved.length * 120),
+    });
+    const parsed = record(parseAIJson<unknown>(raw));
+    const suggestions = Array.isArray(parsed.lines) ? parsed.lines.map(record) : [];
+    const byId = new Map(suggestions.map((suggestion) => [String(suggestion.lineId ?? ""), suggestion]));
+    const items = input.document.items.map((item) => {
+      if (!item.requiresReview) return item;
+      const suggestion = byId.get(item.id);
+      const nomenclatureId = String(suggestion?.nomenclatureId ?? "");
+      const selected = item.mappingCandidates?.find((candidate) => candidate.id === nomenclatureId || candidate.key === nomenclatureId);
+      const score = Math.max(0, Math.min(1, Number(suggestion?.confidence) || 0));
+      if (!selected || confidenceLevel(score) === "low") return item;
+      return {
+        ...item,
+        name: selected.name,
+        nomenclatureId: selected.id,
+        purchaseProductKey: selected.key,
+        mappingSource: "ai" as const,
+        confidence: score,
+        confidenceLevel: confidenceLevel(score),
+        requiresReview: confidenceLevel(score) !== "high",
+      };
+    });
+    return {
+      document: { ...input.document, items },
+      aiFallbackLinesCount: unresolved.length,
+      aiRequestCount: 1,
+      aiEstimatedTokenUsage: Math.ceil((JSON.stringify(payload).length + raw.length) / 4),
+      unavailable: false,
+    };
+  } catch (error) {
+    console.warn("INVOICE_RECOGNITION_V2_AI_FALLBACK_UNAVAILABLE", {
+      accountId: input.accountId,
+      unresolvedLines: unresolved.length,
+      code: error instanceof AIServiceError ? error.code : "provider_unavailable",
+    });
+    return {
+      document: {
+        ...input.document,
+        warnings: [
+          ...input.document.warnings,
+          "Автоматическое распознавание части документа временно недоступно. Уже распознанные данные сохранены — проверьте оставшиеся позиции вручную.",
+        ],
+      },
+      aiFallbackLinesCount: unresolved.length,
+      aiRequestCount: 1,
+      aiEstimatedTokenUsage: Math.ceil(JSON.stringify(payload).length / 4),
+      unavailable: true,
+    };
+  }
+}
+
+async function recogniseDocumentV2(input: {
+  accountId: number;
+  actorAccountId: number;
+  venueId: number;
+  jobId: string;
+  documents: SourceDocument[];
+  mode: "primary" | "shadow";
+}): Promise<{
+  document: ParsedInvoiceDocument;
+  metrics: ReturnType<typeof recognitionMetrics>;
+  aiUnavailable: boolean;
+  issues: Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED">;
+}> {
+  const startedAt = Date.now();
+  const stores = await recognitionStores(input.accountId);
+  let ocr: InvoiceOcrResult | null = null;
+  let ocrFailure = false;
+  const issues: Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED"> = [];
+  try {
+    if (input.documents.length === 1 && SHEET_TYPES.has(input.documents[0].mimeType)) {
+      ocr = spreadsheetOcr(input.documents[0]);
+    } else {
+      ocr = await configuredInvoiceOcr({ documents: input.documents, environment: environment() });
+    }
+  } catch (error) {
+    ocrFailure = true;
+    issues.push("OCR_FAILED");
+    console.warn("INVOICE_RECOGNITION_V2_OCR_UNAVAILABLE", {
+      accountId: input.accountId,
+      venueId: input.venueId,
+      fileCount: input.documents.length,
+      code: error instanceof InvoiceOcrError ? error.code : "OCR_PROVIDER_UNAVAILABLE",
+    });
+  }
+  let parsed: ParsedInvoiceDocument;
+  try {
+    parsed = ocr ? parseInvoiceOcr(ocr) : {
+      documentType: "invoice" as const,
+      supplierName: "Новый поставщик",
+      supplierType: "wholesale" as const,
+      currency: "RUB",
+      paymentMethod: "unknown" as const,
+      total: 0,
+      confidence: 0,
+      warnings: ["Документ распознан частично. Повторите фото или продолжите заполнение вручную."],
+      items: [],
+    };
+  } catch (error) {
+    issues.push("PARSER_FAILED");
+    console.warn("INVOICE_RECOGNITION_V2_PARSER_FAILED", {
+      accountId: input.accountId,
+      venueId: input.venueId,
+      code: error instanceof Error ? error.name : "parser_failed",
+    });
+    parsed = {
+    documentType: "invoice" as const,
+    supplierName: "Новый поставщик",
+    supplierType: "wholesale" as const,
+    currency: "RUB",
+    paymentMethod: "unknown" as const,
+    total: 0,
+    confidence: 0,
+    warnings: ["Документ распознан частично. Повторите фото или продолжите заполнение вручную."],
+    items: [],
+    };
+  }
+  const supplierId = resolveSupplier(parsed, stores.suppliers);
+  let mapped = applyDeterministicMappings({
+    document: parsed,
+    supplierId,
+    venueId: input.venueId,
+    mappings: stores.mappings,
+    nomenclature: nomenclatureCandidates(stores.assortment, input.venueId),
+  });
+  const fallbackEnabled = String(environment().INVOICE_RECOGNITION_V2_AI_FALLBACK ?? "on").toLocaleLowerCase("en-US") !== "off";
+  const ai = fallbackEnabled && !ocrFailure
+    ? await aiResolveUnresolved({
+      accountId: input.accountId,
+      actorAccountId: input.actorAccountId,
+      venueId: input.venueId,
+      jobId: input.jobId,
+      document: mapped,
+    })
+    : {
+      document: mapped,
+      aiFallbackLinesCount: 0,
+      aiRequestCount: 0,
+      aiEstimatedTokenUsage: 0,
+      unavailable: false,
+    };
+  if (ai.unavailable) issues.push("AI_FALLBACK_UNAVAILABLE");
+  mapped = ai.document;
+  const resolvedCount = mapped.items.filter((item) => !item.requiresReview).length;
+  const manualCount = mapped.items.length - resolvedCount;
+  if (manualCount > 0 || !mapped.items.length) issues.push("VALIDATION_REQUIRED");
+  if (mapped.items.length) {
+    mapped.warnings = [
+      `Распознано ${resolvedCount} из ${mapped.items.length} строк.${manualCount ? ` ${manualCount} поз. требуют проверки.` : " Все позиции сопоставлены."}`,
+      ...mapped.warnings,
+    ];
+  }
+  const metrics = recognitionMetrics({
+    mode: input.mode,
+    ocr,
+    document: mapped,
+    aiFallbackLinesCount: ai.aiFallbackLinesCount,
+    aiRequestCount: ai.aiRequestCount,
+    aiEstimatedTokenUsage: ai.aiEstimatedTokenUsage ?? 0,
+    startedAt,
+  });
+  console.info("INVOICE_RECOGNITION_V2_COMPLETED", {
+    accountId: input.accountId,
+    venueId: input.venueId,
+    ...metrics,
+  });
+  return { document: mapped, metrics, aiUnavailable: ai.unavailable, issues: [...new Set(issues)] };
+}
+
 function purchaseBucket(): R2Bucket | null {
   return (env as unknown as { BUCKET?: R2Bucket }).BUCKET ?? null;
 }
@@ -405,13 +711,77 @@ export async function POST(request: Request): Promise<Response> {
           : "upload";
     }
 
-    const venueContext = await loadVenueAIContext(account, "purchase");
-    const recognised = await recogniseDocument({
-      accountId: account.id,
-      documents,
-      hint,
-      contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
-    });
+    const mode = invoiceRecognitionMode(environment());
+    let recognised: unknown;
+    let recognition: Record<string, unknown> | undefined;
+    if (mode === "legacy") {
+      const venueContext = await loadVenueAIContext(account, "purchase");
+      recognised = await recogniseDocument({
+        accountId: account.id,
+        documents,
+        hint,
+        contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
+      });
+    } else if (mode === "primary") {
+      const v2 = await recogniseDocumentV2({
+        accountId: account.id,
+        actorAccountId: account.actorAccountId,
+        venueId: account.venueId,
+        jobId: id,
+        documents,
+        mode,
+      });
+      recognised = v2.document;
+      recognition = {
+        version: 2,
+        mode,
+        metrics: v2.metrics,
+        aiUnavailable: v2.aiUnavailable,
+        issues: v2.issues,
+        manualContinuation: true,
+      };
+    } else {
+      const venueContext = await loadVenueAIContext(account, "purchase");
+      const [legacyResult, v2Result] = await Promise.allSettled([
+        recogniseDocument({
+          accountId: account.id,
+          documents,
+          hint,
+          contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
+        }),
+        recogniseDocumentV2({
+          accountId: account.id,
+          actorAccountId: account.actorAccountId,
+          venueId: account.venueId,
+          jobId: id,
+          documents,
+          mode,
+        }),
+      ]);
+      if (v2Result.status === "rejected") throw v2Result.reason;
+      const v2 = v2Result.value;
+      const legacy = legacyResult.status === "fulfilled" ? legacyResult.value : null;
+      recognised = legacy ?? {
+        ...v2.document,
+        warnings: [
+          ...v2.document.warnings,
+          "Сравнение с прежним способом временно недоступно. Черновик V2 сохранён для ручной проверки.",
+        ],
+      };
+      recognition = {
+        version: 2,
+        mode,
+        metrics: v2.metrics,
+        comparison: legacy ? compareRecognitionResults(legacy, v2.document) : null,
+        issues: v2.issues,
+        manualContinuation: true,
+      };
+      console.info("INVOICE_RECOGNITION_V2_SHADOW_COMPARISON", {
+        accountId: account.id,
+        venueId: account.venueId,
+        comparison: recognition.comparison,
+      });
+    }
     const bucket = purchaseBucket();
     if (!bucket) {
       throw new AIServiceError("Хранилище оригиналов документов временно недоступно.", 503);
@@ -460,7 +830,7 @@ export async function POST(request: Request): Promise<Response> {
       source,
       status: "draft",
     }, id);
-    return Response.json({ ok: true, draft });
+    return Response.json({ ok: true, draft, recognition });
   } catch (error) {
     const errorId = crypto.randomUUID().slice(0, 8).toUpperCase();
     const serviceError = error instanceof AIServiceError

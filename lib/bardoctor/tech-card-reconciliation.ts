@@ -132,6 +132,16 @@ function sameVenue(value: JsonRecord, venueId?: number): boolean {
   return number(value.venueId) === venueId;
 }
 
+const APPROVED_STATUS_ALIASES = new Set(["approved", "confirmed", "published", "ready"]);
+
+/** Keep legacy status labels readable while emitting one canonical lifecycle value. */
+export function canonicalTechCardLifecycleStatus(value: unknown): "confirmed" | "draft" | "superseded" {
+  const status = text(value, "draft", 40).toLocaleLowerCase("en-US");
+  if (status === "superseded") return "superseded";
+  if (APPROVED_STATUS_ALIASES.has(status)) return "confirmed";
+  return "draft";
+}
+
 function sourceId(value: JsonRecord): string {
   return text(
     value.sourceId
@@ -467,10 +477,12 @@ function reconcileIngredient(
 
 function reviewState(recipe: JsonRecord, ownerState: TechCardOwnerState): TechCardReviewState {
   if (ownerState === "superseded") return "superseded";
-  if (text(recipe.lifecycleStatus) === "superseded" || text(recipe.status) === "superseded") {
+  if (text(recipe.lifecycleStatus).toLocaleLowerCase("en-US") === "superseded"
+    || canonicalTechCardLifecycleStatus(recipe.status) === "superseded") {
     return "superseded";
   }
-  if (text(recipe.status) === "confirmed" && ["linked", "auto_linked"].includes(ownerState)) {
+  if (canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
+    && ["linked", "auto_linked"].includes(ownerState)) {
     return "approved";
   }
   if (text(recipe.source) === "ai") return "ai_draft";
@@ -601,7 +613,8 @@ export function reconcileTechCards(input: {
           160,
         ),
       };
-      const protectAutoLink = text(recipe.status) === "confirmed" && text(recipe.source, "manual") !== "ai";
+      const protectAutoLink = canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
+        && text(recipe.source, "manual") !== "ai";
       const result = reconcileIngredient(
         identified,
         candidates,
@@ -642,7 +655,8 @@ export function reconcileTechCards(input: {
       && (ingredientNeedsReview || !ingredients.length)
       ? "requires_review"
       : baseReviewState;
-    if (text(recipe.status) === "confirmed" && text(recipe.source, "manual") !== "ai") {
+    if (canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
+      && text(recipe.source, "manual") !== "ai") {
       counters.approvedManualProtected += 1;
     }
     if (finalReviewState === "ai_draft") counters.aiDrafts += 1;
@@ -651,6 +665,7 @@ export function reconcileTechCards(input: {
     const identifiedOwnerId = owner.owner ? text(owner.owner.id, "", 160) : ownerId(recipe);
     const after: JsonRecord = {
       ...recipe,
+      status: canonicalTechCardLifecycleStatus(recipe.status),
       id: text(recipe.id, stableId("recipe", identifiedOwnerId, recipeIndex), 160),
       menuItemId: identifiedOwnerId || undefined,
       ownerId: identifiedOwnerId || undefined,

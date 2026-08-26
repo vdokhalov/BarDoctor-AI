@@ -20,6 +20,9 @@ test("More v166 is a compact permission-aware hub without upsell", async () => {
   assert.match(bundle, /function bdMoreLegacyPageV165\(\)/);
   assert.equal((bundle.match(/function t_e\(\)/g) || []).length, 1);
   assert.match(hub, /data-bd-more-hub/);
+  assert.match(hub, /bdVenueIdentityConsistencyV297="venue-identity-v297"/);
+  assert.match(hub, /i\.jsx\(bdVenueLogoV280,\{profile:t,size:54,className:"bd-more-avatar-v166"\}\)/);
+  assert.doesNotMatch(hub, /l=Use\(a\)/);
   assert.match(hub, /Управление заведением/);
   assert.match(hub, /Данные и система/);
   assert.match(hub, /Быстрые действия/);

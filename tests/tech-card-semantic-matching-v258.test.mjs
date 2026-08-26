@@ -34,9 +34,9 @@ test("manual choice is persisted as a confirmed user alias", () => {
   assert.ok(bundle.includes("bdCatMatchingProductsV258"));
   assert.ok(bundle.includes("nomenclature:bdCatArray(t.nomenclature)"));
   assert.ok(bundle.includes("techCardIngredientAliases:bdCatArray(t.techCardIngredientAliases)"));
-  assert.equal(
-    bundle.split("products:bdCatMatchingProductsV258(E,bdCatPurchaseProducts(C))").length - 1,
-    2,
+  assert.ok(
+    bundle.split("products:bdCatMatchingProductsV258(E,bdCatPurchaseProducts(C))").length - 1 >= 2,
+    "both recipe flows must keep the canonical product matcher",
   );
 });
 

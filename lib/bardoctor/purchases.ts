@@ -66,6 +66,9 @@ export type PurchaseDocumentType = "receipt" | "invoice" | "price_list";
 export type PurchaseItem = {
   id: string;
   purchaseProductKey?: string;
+  nomenclatureId?: string;
+  rawName?: string;
+  normalizedRawName?: string;
   name: string;
   brand?: string;
   quantity: number;
@@ -76,6 +79,10 @@ export type PurchaseItem = {
   lineTotal: number;
   category: string;
   confidence: number;
+  confidenceLevel?: "high" | "medium" | "low";
+  mappingSource?: "history" | "exact_alias" | "fuzzy" | "ai" | "manual";
+  mappingCandidates?: Array<{ id: string; key: string; name: string; score: number }>;
+  requiresReview?: boolean;
 };
 
 export type PurchaseDocument = {
@@ -551,6 +558,9 @@ export function normalizePurchaseItem(
   return {
     id: text(input.id, crypto.randomUUID(), 80),
     purchaseProductKey: text(input.purchaseProductKey ?? input.productKey, "", 300) || undefined,
+    nomenclatureId: text(input.nomenclatureId, "", 300) || undefined,
+    rawName: text(input.rawName, "", 300) || undefined,
+    normalizedRawName: text(input.normalizedRawName, "", 500) || undefined,
     name,
     brand: text(input.brand, "", 120) || undefined,
     quantity: Math.round(quantity * 1_000) / 1_000,
@@ -565,6 +575,28 @@ export function normalizePurchaseItem(
       ? requestedCategory
       : inferredCategory,
     confidence: bounded(input.confidence, 0.5),
+    confidenceLevel: input.confidenceLevel === "high" || input.confidenceLevel === "medium"
+      ? input.confidenceLevel
+      : input.confidenceLevel === "low"
+        ? "low"
+        : undefined,
+    mappingSource: input.mappingSource === "history" || input.mappingSource === "exact_alias"
+      || input.mappingSource === "fuzzy" || input.mappingSource === "ai"
+      || input.mappingSource === "manual"
+      ? input.mappingSource
+      : undefined,
+    mappingCandidates: Array.isArray(input.mappingCandidates)
+      ? input.mappingCandidates.slice(0, 5).map((value) => {
+        const candidate = record(value);
+        return {
+          id: text(candidate.id, "", 300),
+          key: text(candidate.key, "", 300),
+          name: text(candidate.name, "", 300),
+          score: bounded(candidate.score, 0),
+        };
+      }).filter((candidate) => candidate.id && candidate.key && candidate.name)
+      : undefined,
+    requiresReview: input.requiresReview === true,
   };
 }
 

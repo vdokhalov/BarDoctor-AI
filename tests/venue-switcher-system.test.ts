@@ -249,8 +249,8 @@ test("every standalone venue-scoped module mounts the canonical switcher asset",
   ];
   for (const route of routes) {
     const source = await readFile(new URL(`../${route}`, import.meta.url), "utf8");
-    assert.match(source, /venue-switcher\.css\?v=20260813-venue-v174/, route);
-    assert.match(source, /venue-switcher\.js\?v=20260813-venue-v174/, route);
+    assert.match(source, /venue-switcher\.css\?v=20260826-venue-identity-v297/, route);
+    assert.match(source, /venue-switcher\.js\?v=20260826-venue-identity-v297/, route);
     assert.match(source, /data-bd-venue-host/, route);
   }
 });

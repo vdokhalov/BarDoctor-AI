@@ -10,6 +10,12 @@ import {
   canonicalTechCardForOwner,
   reconcileTechCards,
 } from "./tech-card-reconciliation";
+import {
+  formatMenuSaleSize,
+  menuSaleSizeUnitOptions,
+  resolveMenuItemSaleSize,
+  resolveReadyProductConsumption,
+} from "./menu-sale-size";
 
 type JsonRecord = Record<string, unknown>;
 type BaseUnit = "ml" | "g" | "pcs";
@@ -358,8 +364,14 @@ function signedMoney(value: number, currency: string): string {
   return `${sign}${amount} ${currency === "RUB" ? "₽" : currency}`;
 }
 
-function itemStatus(item: JsonRecord, recipe: JsonRecord | undefined, costComplete: boolean) {
+function itemStatus(
+  item: JsonRecord,
+  recipe: JsonRecord | undefined,
+  costComplete: boolean,
+  directReadyProduct = false,
+) {
   if (text(item.type) === "service") return nonNegative(item.salePrice) ? "ready" : "attention";
+  if (directReadyProduct) return costComplete ? "ready" : "attention";
   if (!recipe) return "missing_recipe";
   if (text(recipe.reviewStatus) !== "approved") return "review";
   return costComplete ? "ready" : "attention";
@@ -442,11 +454,27 @@ export function buildAssortmentAnalytics(input: {
   const itemAnalytics = menuItems.map((item) => {
     const id = text(item.id, crypto.randomUUID(), 120);
     const recipe = recipeByMenuId.get(id);
+    const directReadyProduct = resolveReadyProductConsumption(item, assortment);
+    const resolvedSaleSize = resolveMenuItemSaleSize(item, assortment);
     const ownerCards = recipes.filter((candidate) =>
       text(candidate.menuItemId ?? candidate.ownerId, "", 120) === id
     );
     const pendingDraft = ownerCards.find((candidate) => candidate.currentDraft === true);
-    const ingredients = array(recipe?.ingredients).map(record);
+    const ingredients = recipe
+      ? array(recipe.ingredients).map(record)
+      : directReadyProduct
+        ? [{
+            id: `ready-product:${id}`,
+            name: directReadyProduct.productName,
+            quantity: directReadyProduct.quantityPerSale,
+            unit: directReadyProduct.baseUnit,
+            normalizedQuantity: directReadyProduct.quantityPerSale,
+            normalizedUnit: directReadyProduct.baseUnit,
+            unitResolutionStatus: "exact_compatible",
+            purchaseProductKey: directReadyProduct.productKey,
+            nomenclatureItemId: directReadyProduct.nomenclatureItemId,
+          }]
+        : [];
     const ingredientRows = ingredients.map((ingredient) => ({
       id: text(ingredient.id, crypto.randomUUID(), 120),
       name: text(ingredient.name, "Ингредиент", 180),
@@ -454,7 +482,11 @@ export function buildAssortmentAnalytics(input: {
       ...ingredientCost(ingredient, currentPrices, balances),
     }));
     const isService = text(item.type) === "service";
-    const reviewStatus = recipe ? text(recipe.reviewStatus, "requires_review", 40) : "missing";
+    const reviewStatus = recipe
+      ? text(recipe.reviewStatus, "requires_review", 40)
+      : directReadyProduct
+        ? "approved"
+        : "missing";
     const costComplete = !isService
       && reviewStatus === "approved"
       && ingredientRows.length > 0
@@ -506,20 +538,21 @@ export function buildAssortmentAnalytics(input: {
       subgroupId: text(item.subgroupId, "", 120) || null,
       category: text(item.category, "Без подраздела", 120),
       type: text(item.type, "composite", 40),
-      portionSize: text(item.portionSize, "", 80) || null,
+      saleSize: resolvedSaleSize,
+      portionSize: formatMenuSaleSize(resolvedSaleSize) || null,
       salePrice: salePrice && salePrice > 0 ? salePrice : null,
       currency: saleCurrency,
-      recipeId: text(recipe?.id, "", 120) || null,
-      recipeStatus: recipe ? text(recipe.status, "draft", 30) : "missing",
+      recipeId: text(recipe?.id, "", 120) || (directReadyProduct ? `ready-product:${id}` : null),
+      recipeStatus: recipe ? text(recipe.status, "draft", 30) : directReadyProduct ? "confirmed" : "missing",
       techCardStatus: reviewStatus,
-      techCardSource: recipe ? text(recipe.source, "manual", 30) : null,
-      techCardVersion: recipe ? number(recipe.version) ?? 1 : null,
+      techCardSource: recipe ? text(recipe.source, "manual", 30) : directReadyProduct ? "ready_product" : null,
+      techCardVersion: recipe ? number(recipe.version) ?? 1 : directReadyProduct ? 1 : null,
       techCardUpdatedAt: recipe ? latestStamp(recipe) || null : null,
-      ownerLinkStatus: recipe ? text(recipe.ownerLinkStatus, "linked", 40) : "missing",
+      ownerLinkStatus: recipe ? text(recipe.ownerLinkStatus, "linked", 40) : directReadyProduct ? "linked" : "missing",
       hasPendingDraft: Boolean(pendingDraft && pendingDraft.id !== recipe?.id),
       pendingDraftId: pendingDraft ? text(pendingDraft.id, "", 120) || null : null,
       pendingDraftStatus: pendingDraft ? text(pendingDraft.reviewStatus, "requires_review", 40) : null,
-      status: itemStatus(item, recipe, costComplete),
+      status: itemStatus(item, recipe, costComplete, Boolean(directReadyProduct)),
       ingredientCount: ingredients.length,
       mappedIngredientCount: ingredients.filter((ingredient) =>
         Boolean(text(ingredient.purchaseProductKey ?? ingredient.productKey))
@@ -864,6 +897,7 @@ export function buildAssortmentAnalytics(input: {
 
   return {
     version: "assortment-analytics-v1",
+    saleSizeUnits: menuSaleSizeUnitOptions(),
     period,
     summary: {
       menuItems: itemAnalytics.length,

@@ -151,7 +151,7 @@ body[data-bd-route="/more"] [data-bd-app-main="responsive-v54"] {
   transform: scale(0.995);
 }
 
-.bd-more-avatar-v166 {
+.bd-venue-logo-v280.bd-more-avatar-v166 {
   display: grid;
   width: 54px;
   height: 54px;
@@ -552,9 +552,8 @@ body[data-bd-route="/more"] [data-bd-app-main="responsive-v54"] {
     padding: 18px 20px;
   }
 
-  .bd-more-avatar-v166 {
-    width: 60px;
-    height: 60px;
+  .bd-venue-logo-v280.bd-more-avatar-v166 {
+    --bd-venue-logo-size: 60px !important;
     border-radius: 19px;
   }
 

@@ -122,7 +122,7 @@ test("Finance Quick Add, venue switcher, sync status, and scroll control share a
   assert.match(bundle, /new MutationObserver\(/);
   for (const html of [appHtml, response]) {
     assert.match(html, /finance-dashboard-v160\.css\?v=20260812-finance-v161/);
-    assert.match(html, /venue-switcher\.js\?v=20260813-venue-v174/);
+    assert.match(html, /venue-switcher\.js\?v=20260826-venue-identity-v297/);
   }
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
 });

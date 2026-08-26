@@ -87,7 +87,7 @@ test("new menu items default to the active venue currency", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV288="owner-uat-v288"/);
   assert.match(bundle, /currency:bdMenuVenueCurrency="RUB"/);
-  assert.match(bundle, /currency:bdMenuVenueCurrency\|\|"RUB",portionSize/);
+  assert.match(bundle, /currency:bdMenuVenueCurrency\|\|"RUB",saleQuantityInput:"",saleUnit:"ml"/);
   assert.match(bundle, /onManageStructure:[^}]+currency:r\?\.currency\|\|s\.venues\.find/);
   assert.match(bundle, /bdOwnerUATFixesV289="owner-uat-v289"/);
   assert.match(bundle, /onSave:Ae,onManageStructure:.*?currency:r\?\.currency\|\|s\.venues\.find/s);
@@ -103,7 +103,7 @@ test("saved venue catalog remains authoritative while server analytics refreshes
 test("catalog sync captures the server base before updating its local cache", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV291="owner-uat-v291"/);
-  assert.match(bundle, /_\(P\);const c=await qr\(bdCatalogStoreKey,P\);Kse\(bdCatalogStoreKey,P\)/);
+  assert.match(bundle, /_\(P\);const c=await qr\(bdCatalogStoreKey,P\),p=bdCatState\(xr\(bdCatalogStoreKey\)\|\|P\);_\(p\),Kse\(bdCatalogStoreKey,p\)/);
   assert.doesNotMatch(bundle, /_\(P\),Kse\(bdCatalogStoreKey,P\);const c=await qr\(bdCatalogStoreKey,P\)/);
 });
 

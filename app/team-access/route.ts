@@ -10,12 +10,12 @@ const TEAM_ACCESS_HTML = `<!doctype html>
     <meta name="theme-color" content="#f7f7fb" />
     <title>Роли и доступ — BarDoctor</title>
     <link rel="stylesheet" href="/team-access.css?v=20260813-access-v171" />
-    <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
+    <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
-    <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
+    <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/team-access.js?v=20260813-access-v171" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>

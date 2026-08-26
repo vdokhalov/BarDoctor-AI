@@ -15,6 +15,42 @@ export const SALES_DOCUMENT_STORE_KEY = "bd_sales_documents";
 export type BaseInventoryUnit = "ml" | "g" | "pcs" | "unknown";
 export type InventoryDisplayUnit = "auto" | "ml" | "l" | "g" | "kg" | "pcs";
 
+export type InventoryMeasurementDimension = "volume" | "mass" | "count";
+
+export const INVENTORY_UNIT_DEFINITIONS = [
+  { code: "ml", label: "мл", baseUnit: "ml", dimension: "volume", factor: 1 },
+  { code: "l", label: "л", baseUnit: "ml", dimension: "volume", factor: 1_000 },
+  { code: "g", label: "г", baseUnit: "g", dimension: "mass", factor: 1 },
+  { code: "kg", label: "кг", baseUnit: "g", dimension: "mass", factor: 1_000 },
+  { code: "pcs", label: "шт.", baseUnit: "pcs", dimension: "count", factor: 1 },
+] as const satisfies ReadonlyArray<{
+  code: Exclude<InventoryDisplayUnit, "auto">;
+  label: string;
+  baseUnit: Exclude<BaseInventoryUnit, "unknown">;
+  dimension: InventoryMeasurementDimension;
+  factor: number;
+}>;
+
+export type InventoryUnitCode = (typeof INVENTORY_UNIT_DEFINITIONS)[number]["code"];
+
+export function inventoryUnitDefinition(value: unknown) {
+  const normalized = normalizeInventoryText(value);
+  const code: InventoryUnitCode | null = /^(?:мл|ml|миллилитр)/.test(normalized)
+    ? "ml"
+    : /^(?:л|l|литр)/.test(normalized)
+      ? "l"
+      : /^(?:кг|kg|килограмм)/.test(normalized)
+        ? "kg"
+        : /^(?:г|гр|g|грамм)/.test(normalized)
+          ? "g"
+          : /^(?:шт|pcs|piece|порц)/.test(normalized)
+            ? "pcs"
+            : null;
+  return code
+    ? INVENTORY_UNIT_DEFINITIONS.find((definition) => definition.code === code) ?? null
+    : null;
+}
+
 export type StockMovement = {
   id: string;
   venueId?: number;

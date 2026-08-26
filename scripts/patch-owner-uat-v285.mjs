@@ -10,7 +10,7 @@ function replaceOnce(label, before, after) {
   if (
     label === "active venue cache after profile save"
     && source.includes('const a=r.restaurant??e;jz(a)')
-    && source.includes('window.dispatchEvent(new CustomEvent("bd:venue-context-updated"')
+    && source.includes('window.dispatchEvent(new CustomEvent("bd:venue-context"')
   ) return;
   if (
     label === "closed current shift participates in weekly finance"
@@ -27,13 +27,18 @@ function replaceOnce(label, before, after) {
 replaceOnce(
   "active venue cache after profile save",
   'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify(e)})).json();if(!r.ok)throw new Error(r.error??"Ошибка сохранения");jz(r.restaurant??e);const a=window.__bdAuthBootstrapV274||{};window.__bdAuthBootstrapV274={...a,state:"ready",reason:"active_venue_ready"};try{const s="bd_venue_context__"+t,l=JSON.parse(localStorage.getItem(s)||"null"),u=localStorage.getItem("bd_active_venue_id"),d=Array.isArray(l?.venues)?l.venues.map(f=>String(f?.id)===String(u)?{...f,hasProfile:!0}:f):null;d&&(l.venues=d,localStorage.setItem(s,JSON.stringify(l)))}catch{}}',
-  'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify(e)})).json();if(!r.ok)throw new Error(r.error??"Ошибка сохранения");const a=r.restaurant??e;jz(a);const s=window.__bdAuthBootstrapV274||{};window.__bdAuthBootstrapV274={...s,state:"ready",reason:"active_venue_ready"};try{const l="bd_venue_context__"+t,u=JSON.parse(localStorage.getItem(l)||"null"),d=localStorage.getItem("bd_active_venue_id"),f=Array.isArray(u?.venues)?u.venues.map(m=>String(m?.id)===String(d)?{...m,name:a?.name||m.name,currency:a?.currency||m.currency,hasProfile:!0}:m):null;f&&(u.venues=f,localStorage.setItem(l,JSON.stringify(u)),window.dispatchEvent(new CustomEvent("bd:venue-context-updated",{detail:{venueId:d}})))}catch{}}',
+  'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify(e)})).json();if(!r.ok)throw new Error(r.error??"Ошибка сохранения");const a=r.restaurant??e;jz(a);const s=window.__bdAuthBootstrapV274||{};window.__bdAuthBootstrapV274={...s,state:"ready",reason:"active_venue_ready"};try{const l="bd_venue_context__"+t,u=JSON.parse(localStorage.getItem(l)||"null"),d=localStorage.getItem("bd_active_venue_id"),f=Array.isArray(u?.venues)?u.venues.map(m=>String(m?.id)===String(d)?{...m,name:a?.name||m.name,currency:a?.currency||m.currency,logoId:a?.logoId??null,hasProfile:!0}:m):null;f&&(u.venues=f,localStorage.setItem(l,JSON.stringify(u)),window.dispatchEvent(new CustomEvent("bd:venue-context",{detail:u})))}catch{}}',
+);
+
+source = source.replaceAll(
+  "bdHomeTodayState(e,new Date)?.operatingDate",
+  "bdHomeTodayState(e,[],new Date)?.operatingDate",
 );
 
 replaceOnce(
   "primary venue tracking start",
   'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify(e)})).json();',
-  'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify({...e,trackingStartDate:e?.trackingStartDate||bdHomeTodayState(e,new Date)?.operatingDate||bdDateKey(new Date)})})).json();',
+  'async function uM(e){const t=Ot();if(!t)throw new Error("Нет активной сессии");const r=await(await fetch(`${vz}/`,{method:"POST",headers:{"Content-Type":"application/json",...ca(t)},body:JSON.stringify({...e,trackingStartDate:e?.trackingStartDate||bdHomeTodayState(e,[],new Date)?.operatingDate||bdDateKey(new Date)})})).json();',
 );
 
 replaceOnce(

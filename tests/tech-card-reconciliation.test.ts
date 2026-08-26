@@ -2,12 +2,32 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildAssortmentAnalytics } from "../lib/bardoctor/assortment-analytics";
 import {
+  canonicalTechCardLifecycleStatus,
   canonicalTechCardForOwner,
   reconcileTechCards,
   validateTechCardVenueIsolation,
 } from "../lib/bardoctor/tech-card-reconciliation";
 
 const now = new Date("2026-08-23T12:00:00.000Z");
+
+test("legacy approved labels normalize to the canonical confirmed lifecycle", () => {
+  for (const status of ["approved", "APPROVED", "ready", "READY", "published", "confirmed"]) {
+    assert.equal(canonicalTechCardLifecycleStatus(status), "confirmed");
+  }
+});
+
+test("approved legacy cards survive refetch and feed the canonical KPI/filter status", () => {
+  const assortment = baseAssortment();
+  assortment.recipes = [approvedRecipe({ status: "APPROVED" })];
+  const persisted = reconcileTechCards({ assortment, venueId: 1, now }).assortment;
+  const refetched = reconcileTechCards({ assortment: persisted, venueId: 1, now }).assortment;
+  const analytics = buildAssortmentAnalytics({ assortment: refetched, venueId: 1, now });
+  const recipe = (refetched.recipes as Record<string, unknown>[])[0];
+  assert.equal(recipe.status, "confirmed");
+  assert.equal(recipe.reviewStatus, "approved");
+  assert.equal(analytics.counts.confirmedRecipes, 1);
+  assert.equal((analytics.recipes as Record<string, unknown>[])[0].techCardStatus, "approved");
+});
 
 function baseAssortment() {
   return {

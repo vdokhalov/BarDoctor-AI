@@ -35,6 +35,39 @@
     return role === "owner" ? "Владелец" : role === "manager" ? "Управляющий" : "Менеджер";
   }
 
+  function venueInitials(venue) {
+    var parts = String(venue && venue.name || "Заведение").trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return "?";
+    return (parts.length === 1 ? parts[0].slice(0, 2) : parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  function venueLogoUrl(venue) {
+    var logoId = venue && typeof venue.logoId === "string" ? venue.logoId : "";
+    return /^[a-zA-Z0-9-]{20,80}$/.test(logoId) ? "/api/venues/logo/" + logoId : "";
+  }
+
+  function renderVenueAvatar(target, venue) {
+    if (!target) return;
+    var fallback = venueInitials(venue);
+    var logoUrl = venueLogoUrl(venue);
+    target.replaceChildren();
+    target.classList.remove("has-logo");
+    if (!logoUrl) {
+      target.textContent = fallback;
+      return;
+    }
+    var image = document.createElement("img");
+    image.src = logoUrl;
+    image.alt = "";
+    image.decoding = "async";
+    image.addEventListener("load", function () { target.classList.add("has-logo"); }, { once: true });
+    image.addEventListener("error", function () {
+      target.classList.remove("has-logo");
+      target.textContent = fallback;
+    }, { once: true });
+    target.appendChild(image);
+  }
+
   function loadContext() {
     try {
       var stored = JSON.parse(localStorage.getItem(contextKey()) || "null");
@@ -184,6 +217,15 @@
       if (!response.ok || !result.ok) throw new Error(result.error || "Доступ к заведению недоступен");
       context.activeVenueId = Number(result.activeVenueId);
       context.activeWorkspaceId = result.activeWorkspaceId || null;
+      context.venues = context.venues.map(function (item) {
+        return Number(item.id) === Number(result.activeVenueId)
+          ? {
+              ...item,
+              name: result.venueName || item.name,
+              logoId: Object.prototype.hasOwnProperty.call(result, "logoId") ? result.logoId : item.logoId
+            }
+          : item;
+      });
       localStorage.setItem("bd_active_venue_is_primary", result.activeVenueIsPrimary ? "1" : "0");
       localStorage.setItem("bd_active_role", result.role || venue.role || "shift_manager");
       localStorage.setItem("bd_active_permissions", JSON.stringify(result.permissions || venue.permissions || []));
@@ -230,7 +272,7 @@
       button.disabled = selected;
       if (selected) button.setAttribute("aria-current", "true");
       button.innerHTML = '<span class="bd-venue-monogram"></span><span class="bd-venue-row-copy"><strong></strong><small></small></span><b></b>';
-      button.querySelector(".bd-venue-monogram").textContent = String(venue.name || "?").slice(0, 1).toUpperCase();
+      renderVenueAvatar(button.querySelector(".bd-venue-monogram"), venue);
       button.querySelector(".bd-venue-row-copy strong").textContent = venue.name || "Новое заведение";
       button.querySelector(".bd-venue-row-copy small").textContent = roleLabel(venue.role);
       button.querySelector(":scope>b").textContent = selected ? "Текущее" : "Перейти";
@@ -273,7 +315,7 @@
       existing.className = "bd-venue-trigger";
       existing.setAttribute("data-bd-venue-trigger", "");
       existing.setAttribute("aria-label", "Переключить заведение");
-      existing.innerHTML = '<span class="bd-venue-trigger-dot"></span><span class="bd-venue-trigger-copy"><small>ЗАВЕДЕНИЕ</small><strong></strong></span><b>⌄</b>';
+      existing.innerHTML = '<span class="bd-venue-trigger-avatar" aria-hidden="true"></span><span class="bd-venue-trigger-copy"><small>ЗАВЕДЕНИЕ</small><strong></strong></span><b>⌄</b>';
       existing.addEventListener("click", openSheet);
     }
     if (inlineHost) {
@@ -284,6 +326,7 @@
       if (existing.parentElement !== document.body) document.body.appendChild(existing);
     }
     var label = venue.name || "Новое заведение";
+    renderVenueAvatar(existing.querySelector(".bd-venue-trigger-avatar"), venue);
     var labelNode = existing.querySelector("strong");
     if (labelNode && labelNode.textContent !== label) labelNode.textContent = label;
   }
@@ -402,6 +445,10 @@
       saveContext();
       render();
     }
+  });
+  window.addEventListener("bd:venue-context-updated", function () {
+    loadContext();
+    render();
   });
   window.addEventListener("popstate", syncVenueFromLocation);
   window.addEventListener("storage", syncVenueAcrossTabs);

@@ -10,18 +10,7 @@ import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { createVenueForOwner } from "../../../lib/bardoctor/venue-service";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
 import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
-
-function venueName(value: string | null): string {
-  if (!value) return "Новое заведение";
-  try {
-    const profile = JSON.parse(value) as { name?: unknown };
-    return typeof profile.name === "string" && profile.name.trim()
-      ? profile.name.trim()
-      : "Новое заведение";
-  } catch {
-    return "Новое заведение";
-  }
-}
+import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
 
 function venueCurrency(value: string | null): string | null {
   if (!value) return null;
@@ -44,17 +33,21 @@ export async function GET(request: Request): Promise<Response> {
     ok: true,
     activeVenueId: actor.venueId,
     canCreateVenues: actor.role === "owner",
-    venues: memberships.map((item) => ({
-      id: item.venue.id,
-      workspaceId: item.venue.workspaceId,
-      name: venueName(item.dataAccount.restaurantJson),
-      currency: venueCurrency(item.dataAccount.restaurantJson),
-      role: item.role,
-      permissions: item.permissions,
-      status: item.venue.status,
-      isPrimary: item.venue.dataAccountId === identity.id,
-      active: item.venue.id === actor.venueId,
-    })),
+    venues: memberships.map((item) => {
+      const venueIdentity = venueIdentityFromJson(item.dataAccount.restaurantJson);
+      return {
+        id: item.venue.id,
+        workspaceId: item.venue.workspaceId,
+        name: venueIdentity.name,
+        logoId: venueIdentity.logoId,
+        currency: venueCurrency(item.dataAccount.restaurantJson),
+        role: item.role,
+        permissions: item.permissions,
+        status: item.venue.status,
+        isPrimary: item.venue.dataAccountId === identity.id,
+        active: item.venue.id === actor.venueId,
+      };
+    }),
   });
 }
 
@@ -102,6 +95,7 @@ export async function POST(request: Request): Promise<Response> {
         id: created.venue.id,
         workspaceId: created.venue.workspaceId,
         name: profile.name,
+        logoId: profile.logoId,
         role: "owner",
         permissions: permissionsFor("owner"),
         status: created.venue.status,

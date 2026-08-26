@@ -213,17 +213,17 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/market-entry.css?v=20260722-competitors-v28" />
     <link rel="stylesheet" href="/opportunities-entry.css?v=20260722-local-calendar-v61" />
     <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224" />
-    <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259" />
+    <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a" />
     <link rel="stylesheet" href="/sales-consumption-v275.css?v=20260824-sales-batch-ledger-v275" />
     <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
-    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260" />
+    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/ai-action-plan.css?v=20260803-action-plan-v2" />
     <link rel="stylesheet" href="/employee-detail.css?v=20260817-employee-edit-page-v206" />
     <link rel="stylesheet" href="/employee-list.css?v=20260817-employee-edit-page-v206" />
     <link rel="stylesheet" href="/team-dashboard-v163.css?v=20260812-team-v163" />
     <link rel="stylesheet" href="/payroll-dashboard-v164.css?v=20260812-payroll-v164" />
-    <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
+    <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260812-modern-v158" />
     <link rel="stylesheet" href="/home-visual-v151.css?v=20260811-home-v151" />
@@ -234,7 +234,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" />
     <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" />
     <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" />
-    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260" />
+    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260" />
     <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" />
     <link rel="stylesheet" href="/profile-v280.css?v=20260825-profile-v280" />
     <link rel="stylesheet" href="/profile-v281.css?v=20260825-profile-v282" />
@@ -248,8 +248,8 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/nomenclature-qa-v238.js?v=20260821-accounting-currency-v243"></script>
     <script src="/health-score-experience.js?v=20260811-health-v155"></script>
     <script src="/server-migration-discovery-v262.js?v=20260824-controlled-migration-v262" defer></script>
-    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260824-canonical-supplier-v260-20260824-controlled-migration-v262-20260824-owner-rbac-v273-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282"></script>
-    <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
+    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260824-controlled-migration-v262-20260824-owner-rbac-v273-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260826-venue-identity-v297"></script>
+    <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body>

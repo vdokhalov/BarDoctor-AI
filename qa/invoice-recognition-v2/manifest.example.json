@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "id": "good-cyrillic-invoice",
+      "files": [
+        {
+          "path": "./good-cyrillic-invoice.jpg",
+          "mimeType": "image/jpeg"
+        }
+      ],
+      "expected": {
+        "supplierName": "Поставщик",
+        "documentNumber": "42",
+        "date": "2026-08-26",
+        "currency": "RUB",
+        "total": 77,
+        "items": [
+          {
+            "rawName": "КОКА КОЛА ПЭТ 1,25",
+            "quantity": 2,
+            "unitPrice": 38.5,
+            "lineTotal": 77
+          }
+        ]
+      }
+    }
+  ]
+}

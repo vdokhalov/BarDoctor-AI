@@ -31,6 +31,10 @@ import {
   auditCanonicalNomenclature,
   enrichCanonicalSupplierSummary,
 } from "../../../../lib/bardoctor/nomenclature-identity";
+import {
+  normalizeMenuItemSaleSizeRecord,
+  validateMenuItemSaleSize,
+} from "../../../../lib/bardoctor/menu-sale-size";
 
 type RouteContext = { params: Promise<{ key: string }> };
 
@@ -38,6 +42,10 @@ function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
+}
+
+function array(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function hasPurchaseLink(value: unknown): boolean {
@@ -147,6 +155,50 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   let after = merge.data;
   let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
+    if (before != null) {
+      const beforeRoot = record(before);
+      const afterRoot = { ...record(after) };
+      const beforeItems = new Map(array(beforeRoot.menuItems).map((value) => {
+        const item = record(value);
+        return [String(item.id ?? ""), item] as const;
+      }));
+      const issues: Array<{ id: string; name: string; code?: string; error?: string }> = [];
+      afterRoot.menuItems = array(afterRoot.menuItems).map((value) => {
+        const item = record(value);
+        const id = String(item.id ?? "");
+        const previous = beforeItems.get(id);
+        const changed = !previous || JSON.stringify(previous) !== JSON.stringify(item);
+        if (!changed) return item;
+        const normalized = normalizeMenuItemSaleSizeRecord(item, afterRoot);
+        const validation = validateMenuItemSaleSize(normalized, {
+          ...afterRoot,
+          menuItems: array(afterRoot.menuItems).map((candidate) =>
+            String(record(candidate).id ?? "") === id ? normalized : candidate
+          ),
+        });
+        if (!validation.ok) {
+          issues.push({
+            id,
+            name: String(item.name ?? "Позиция меню"),
+            code: validation.code,
+            error: validation.error,
+          });
+        }
+        return normalized;
+      });
+      if (issues.length) {
+        return Response.json(
+          {
+            ok: false,
+            code: "MENU_SALE_SIZE_INVALID",
+            error: "Для изменённых позиций укажите корректное количество и canonical единицу продажи.",
+            issues: issues.slice(0, 50),
+          },
+          { status: 422 },
+        );
+      }
+      after = afterRoot;
+    }
     const venueIssues = validateTechCardVenueIsolation(after, account.venueId);
     if (venueIssues.length) {
       return Response.json(

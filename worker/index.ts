@@ -10,6 +10,14 @@ import {
 interface Env {
   ASSETS: Fetcher;
   BARDOCTOR_PUBLIC_ORIGIN?: string;
+  INVOICE_RECOGNITION_V2_MODE?: string;
+  INVOICE_RECOGNITION_V2_AI_FALLBACK?: string;
+  INVOICE_OCR_PROVIDER?: string;
+  INVOICE_OCR_ENDPOINT?: string;
+  INVOICE_OCR_API_KEY?: string;
+  INVOICE_OCR_TIMEOUT_MS?: string;
+  INVOICE_OCR_API_VERSION?: string;
+  INVOICE_OCR_MODEL?: string;
   DB: D1Database;
   IMAGES: {
     input(stream: ReadableStream): {

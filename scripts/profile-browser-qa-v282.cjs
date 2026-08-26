@@ -11,15 +11,18 @@ const avatarPath = path.resolve(process.cwd(), "public/icons/bardoctor-v159-appl
 fs.mkdirSync(outputDir, { recursive: true });
 
 const permissions = ["settings.manage", "access.manage", "finance.view", "team.view"];
+const venueLogoA = "11111111-1111-4111-8111-111111111111";
+const venueLogoB = "22222222-2222-4222-8222-222222222222";
+const updatedVenueLogo = "33333333-3333-4333-8333-333333333333";
 const venues = [
-  { id: 901, workspaceId: "profile-qa", name: "Кёльн", role: "owner", permissions, status: "active", isPrimary: true },
-  { id: 902, workspaceId: "profile-qa", name: "Длинное название второго заведения", role: "manager", permissions, status: "active", isPrimary: false },
+  { id: 901, workspaceId: "profile-qa", name: "Кёльн", logoId: venueLogoA, role: "owner", permissions, status: "active", isPrimary: true },
+  { id: 902, workspaceId: "profile-qa", name: "Длинное название второго заведения", logoId: venueLogoB, role: "manager", permissions, status: "active", isPrimary: false },
 ];
 
-function venueProfile(id) {
+function venueProfile(id, logoIds) {
   return id === 902
-    ? { id: "secondary", name: "Длинное название второго заведения", businessType: "Кафе", city: "Кишинёв", region: "Центр", country: "Молдова", currency: "MDL", seats: 48, employees: 9, areas: [], workingDays: {} }
-    : { id: "primary", name: "Кёльн", businessType: "Бар", city: "Бендеры", region: "Центр", country: "Молдова", currency: "RUB", seats: 100, employees: 17, areas: [], workingDays: {} };
+    ? { id: "secondary", name: "Длинное название второго заведения", logoId: logoIds[902], businessType: "Кафе", city: "Кишинёв", region: "Центр", country: "Молдова", currency: "MDL", seats: 48, employees: 9, areas: [], workingDays: {} }
+    : { id: "primary", name: "Кёльн", logoId: logoIds[901], businessType: "Бар", city: "Бендеры", region: "Центр", country: "Молдова", currency: "RUB", seats: 100, employees: 17, areas: [], workingDays: {} };
 }
 
 function response(body, status = 200, contentType = "application/json") {
@@ -27,7 +30,13 @@ function response(body, status = 200, contentType = "application/json") {
 }
 
 async function runProfile(browser, label, viewport) {
-  const state = { activeVenueId: 901, avatarId: null, user: { firstName: "Виталий", lastName: "Дохалов", phone: "+373 77822595" } };
+  const state = {
+    activeVenueId: 901,
+    avatarId: null,
+    logoIds: { 901: venueLogoA, 902: venueLogoB },
+    uploadedLogoId: null,
+    user: { firstName: "Виталий", lastName: "Дохалов", phone: "+373 77822595" },
+  };
   const context = await browser.newContext({ viewport, locale: "ru-RU", timezoneId: "Europe/Chisinau", colorScheme: "light", reducedMotion: "reduce", isMobile: viewport.width < 700, hasTouch: viewport.width < 700 });
   const errors = [];
   await context.addInitScript(({ allowed, venueList }) => {
@@ -35,21 +44,33 @@ async function runProfile(browser, label, viewport) {
     localStorage.setItem("bd_session", email);
     localStorage.setItem("bd_session_token", "profile-qa-token");
     localStorage.setItem("bd_session_userid", "profile-qa-user");
-    localStorage.setItem("bd_active_venue_id", "901");
-    localStorage.setItem("bd_active_venue_is_primary", "1");
-    localStorage.setItem("bd_active_role", "owner");
-    localStorage.setItem("bd_active_permissions", JSON.stringify(allowed));
-    localStorage.setItem("bd_venue_context__" + email, JSON.stringify({ activeVenueId: 901, activeWorkspaceId: "profile-qa", canCreateVenues: true, venues: venueList }));
+    if (!localStorage.getItem("bd_active_venue_id")) localStorage.setItem("bd_active_venue_id", "901");
+    if (!localStorage.getItem("bd_active_venue_is_primary")) localStorage.setItem("bd_active_venue_is_primary", "1");
+    if (!localStorage.getItem("bd_active_role")) localStorage.setItem("bd_active_role", "owner");
+    if (!localStorage.getItem("bd_active_permissions")) localStorage.setItem("bd_active_permissions", JSON.stringify(allowed));
+    if (!localStorage.getItem("bd_venue_context__" + email)) localStorage.setItem("bd_venue_context__" + email, JSON.stringify({ activeVenueId: 901, activeWorkspaceId: "profile-qa", canCreateVenues: true, venues: venueList }));
   }, { allowed: permissions, venueList: venues });
   await context.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     const method = request.method();
-    if (url.pathname === "/api/auth/bootstrap") return route.fulfill(response({ ok: true, email: "profile-qa@bardoctor.local", userId: "profile-qa-user", token: "profile-qa-token", firstName: state.user.firstName, lastName: state.user.lastName, phone: state.user.phone, avatarId: state.avatarId, role: state.activeVenueId === 902 ? "manager" : "owner", permissions, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, canCreateVenues: true, venues, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: 2, confirmedOwnedVenueCount: 2, inaccessibleOwnedVenueCount: 0 } }));
-    if (url.pathname === "/api/users/me" && method === "GET") return route.fulfill(response({ ok: true, user: { ...state.user, email: "vitaliy@example.com", avatarId: state.avatarId, role: state.activeVenueId === 902 ? "manager" : "owner", permissions, auth: { method: "password", canChangePassword: true }, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, canCreateVenues: true, venues } }));
+    const currentVenues = venues.map((venue) => ({ ...venue, logoId: state.logoIds[venue.id] }));
+    if (url.pathname === "/api/auth/bootstrap") return route.fulfill(response({ ok: true, email: "profile-qa@bardoctor.local", userId: "profile-qa-user", token: "profile-qa-token", firstName: state.user.firstName, lastName: state.user.lastName, phone: state.user.phone, avatarId: state.avatarId, role: state.activeVenueId === 902 ? "manager" : "owner", permissions, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, canCreateVenues: true, venues: currentVenues, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: 2, confirmedOwnedVenueCount: 2, inaccessibleOwnedVenueCount: 0 } }));
+    if (url.pathname === "/api/users/me" && method === "GET") return route.fulfill(response({ ok: true, user: { ...state.user, email: "vitaliy@example.com", avatarId: state.avatarId, role: state.activeVenueId === 902 ? "manager" : "owner", permissions, auth: { method: "password", canChangePassword: true }, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, canCreateVenues: true, venues: currentVenues } }));
     if (url.pathname === "/api/users/me" && method === "PATCH") { Object.assign(state.user, request.postDataJSON()); return route.fulfill(response({ ok: true })); }
-    if (url.pathname === "/api/restaurants/me") return route.fulfill(response({ ok: true, restaurant: venueProfile(state.activeVenueId) }));
-    if (url.pathname === "/api/access/active-venue" && method === "POST") { state.activeVenueId = Number(request.postDataJSON().venueId); return route.fulfill(response({ ok: true, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, role: state.activeVenueId === 902 ? "manager" : "owner", permissions })); }
+    if (url.pathname === "/api/restaurants/me") return route.fulfill(response({ ok: true, restaurant: venueProfile(state.activeVenueId, state.logoIds) }));
+    if (url.pathname === "/api/restaurants/" && method === "POST") {
+      const restaurant = { ...venueProfile(state.activeVenueId, state.logoIds), ...request.postDataJSON() };
+      state.logoIds[state.activeVenueId] = restaurant.logoId ?? null;
+      return route.fulfill(response({ ok: true, restaurant }));
+    }
+    if (url.pathname === "/api/access/active-venue" && method === "POST") { state.activeVenueId = Number(request.postDataJSON().venueId); return route.fulfill(response({ ok: true, activeVenueId: state.activeVenueId, activeWorkspaceId: "profile-qa", activeVenueIsPrimary: state.activeVenueId === 901, venueName: currentVenues.find((venue) => venue.id === state.activeVenueId)?.name, logoId: state.logoIds[state.activeVenueId], role: state.activeVenueId === 902 ? "manager" : "owner", permissions })); }
+    if (url.pathname === "/api/venues/logo" && method === "POST") {
+      state.uploadedLogoId = updatedVenueLogo;
+      return route.fulfill(response({ ok: true, logo: { id: state.uploadedLogoId, mimeType: "image/png", size: 1024 } }));
+    }
+    if (url.pathname.startsWith("/api/venues/logo/") && method === "GET") return route.fulfill(response(fs.readFileSync(avatarPath), 200, "image/png"));
+    if (url.pathname.startsWith("/api/venues/logo/") && method === "DELETE") return route.fulfill(response({ ok: true }));
     if (url.pathname === "/api/users/avatar" && method === "POST") { state.avatarId = "avatar-profile-qa-1234567890"; return route.fulfill(response({ ok: true, avatar: { id: state.avatarId, mimeType: "image/png", size: 1024 } })); }
     if (url.pathname === `/api/users/avatar/${state.avatarId}` && method === "GET") return route.fulfill(response(fs.readFileSync(avatarPath), 200, "image/png"));
     if (url.pathname.startsWith("/api/users/avatar/") && method === "DELETE") { state.avatarId = null; return route.fulfill(response({ ok: true, avatarId: null })); }
@@ -64,19 +85,38 @@ async function runProfile(browser, label, viewport) {
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   page.on("requestfailed", (request) => errors.push(`requestfailed: ${request.url()} ${request.failure()?.errorText || ""}`));
 
-  await page.goto(`${baseUrl}/profile`, { waitUntil: "networkidle" });
+  await page.goto(`${baseUrl}/profile`, { waitUntil: "domcontentloaded" });
   await page.locator('[data-bd-profile="profile-v282"]').waitFor({ state: "visible" });
+  await page.locator(`.bd-profile-venue-head-v280 .bd-venue-logo-v280 img[src$="/api/venues/logo/${venueLogoA}"]`).waitFor({ state: "visible" });
+  await page.locator(`[data-bd-venue-trigger] .bd-venue-trigger-avatar img[src$="/api/venues/logo/${venueLogoA}"]`).waitFor({ state: "visible" });
   assert.equal(await page.locator('[data-bd-venue-trigger]').count(), 1, `${label}: duplicate venue switcher`);
   assert.equal(await page.locator('text=Конкуренты рядом').count(), 0);
   assert.equal(await page.locator('text=Очистить данные этого устройства').count(), 0);
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, `${label}: profile horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${label}-profile-top.png`), fullPage: true });
 
+  await page.goto(`${baseUrl}/more`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-bd-more-hub]').waitFor({ state: "visible" });
+  await page.locator(`.bd-more-profile-v166 .bd-more-avatar-v166 img[src$="/api/venues/logo/${venueLogoA}"]`).waitFor({ state: "visible" });
+  assert.equal(await page.locator('.bd-more-profile-v166 .bd-more-avatar-v166').innerText(), "", `${label}: More rendered initials while canonical logo exists`);
+  await page.screenshot({ path: path.join(outputDir, `${label}-more-logo-a.png`), fullPage: true });
+  await page.goto(`${baseUrl}/profile`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-bd-profile="profile-v282"]').waitFor({ state: "visible" });
+
   await page.locator('[data-bd-venue-trigger]').click();
   await page.getByText("Длинное название второго заведения", { exact: true }).last().click();
   await page.getByText("MDL", { exact: true }).waitFor();
   assert.ok((await page.locator("body").innerText()).includes("Управляющий · Длинное название второго заведения"));
+  await page.locator(`.bd-profile-venue-head-v280 .bd-venue-logo-v280 img[src$="/api/venues/logo/${venueLogoB}"]`).waitFor({ state: "visible" });
+  await page.locator(`[data-bd-venue-trigger] .bd-venue-trigger-avatar img[src$="/api/venues/logo/${venueLogoB}"]`).waitFor({ state: "visible" });
   await page.screenshot({ path: path.join(outputDir, `${label}-profile-switched.png`), fullPage: true });
+
+  await page.goto(`${baseUrl}/more`, { waitUntil: "domcontentloaded" });
+  await page.locator(`.bd-more-profile-v166 .bd-more-avatar-v166 img[src$="/api/venues/logo/${venueLogoB}"]`).waitFor({ state: "visible" });
+  assert.equal(await page.locator(`.bd-more-profile-v166 .bd-more-avatar-v166 img[src$="/api/venues/logo/${venueLogoA}"]`).count(), 0, `${label}: venue A logo leaked into venue B`);
+  await page.screenshot({ path: path.join(outputDir, `${label}-more-logo-b.png`), fullPage: true });
+  await page.goto(`${baseUrl}/profile`, { waitUntil: "domcontentloaded" });
+  await page.locator('[data-bd-profile="profile-v282"]').waitFor({ state: "visible" });
 
   await page.getByText("Личные данные", { exact: true }).click();
   await page.locator('[data-bd-profile-editor="personal-v282"]').waitFor({ state: "visible" });
@@ -117,6 +157,18 @@ async function runProfile(browser, label, viewport) {
     assert.equal(await page.locator('bd-app-header').isVisible(), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true, `${label}: editor horizontal overflow`);
     await page.screenshot({ path: path.join(outputDir, `${label}-venue-keyboard.png`), fullPage: false });
+
+    await page.setViewportSize(viewport);
+    await page.locator('input[type="file"]').setInputFiles(avatarPath);
+    await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: path.join(outputDir, `${label}-venue-save-result.png`), fullPage: true });
+    await page.locator('[data-bd-profile="profile-v282"]').waitFor({ state: "visible" });
+    await page.locator(`.bd-profile-venue-head-v280 .bd-venue-logo-v280 img[src$="/api/venues/logo/${updatedVenueLogo}"]`).waitFor({ state: "visible" });
+    await page.goto(`${baseUrl}/more`, { waitUntil: "domcontentloaded" });
+    await page.locator(`.bd-more-profile-v166 .bd-more-avatar-v166 img[src$="/api/venues/logo/${updatedVenueLogo}"]`).waitFor({ state: "visible" });
+    assert.equal(await page.locator('.bd-more-profile-v166 .bd-more-avatar-v166').innerText(), "", `${label}: updated logo fell back to initials`);
+    await page.screenshot({ path: path.join(outputDir, `${label}-more-logo-updated.png`), fullPage: true });
   }
 
   assert.deepEqual(errors, [], `${label}: runtime errors\n${errors.join("\n")}`);

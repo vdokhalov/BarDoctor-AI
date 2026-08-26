@@ -18,12 +18,12 @@ function integrationsHtml(request: Request): string {
     <meta name="theme-color" content="#f7f8fc" />
     <title>Интеграции — BarDoctor</title>
     <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
-    <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
+    <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
-    <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
+    <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/integrations.js?v=20260814-connector-download-v187" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>

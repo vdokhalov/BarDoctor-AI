@@ -66,6 +66,16 @@ test("menu import keeps source positions and leaves AI recipes as drafts", () =>
   assert.equal(draft.menuItems.length, 2);
   assert.equal(draft.menuItems[0].department, "bar");
   assert.equal(draft.menuItems[0].salePrice, 180);
+  assert.deepEqual(draft.menuItems[0].saleSize, {
+    version: 1,
+    quantity: 250,
+    unit: "ml",
+    baseQuantity: 250,
+    baseUnit: "ml",
+    source: "manual",
+    status: "confirmed",
+  });
+  assert.equal(draft.menuItems[0].portionSize, undefined);
   assert.equal(draft.menuItems[1].department, "other");
   assert.equal(draft.menuItems[1].type, "service");
   assert.equal(draft.recipes.length, 1);
@@ -194,4 +204,9 @@ test("menu recognition schema is strict at every object level", () => {
     root.properties.menuItems.items.properties.type.enum,
     ["ready", "composite", "service"],
   );
+  assert.deepEqual(
+    MENU_IMPORT_RESPONSE_SCHEMA.properties.menuItems.items.properties.saleQuantity.type,
+    ["number", "null"],
+  );
+  assert.ok(MENU_IMPORT_RESPONSE_SCHEMA.properties.menuItems.items.properties.saleUnit.enum.includes(null));
 });

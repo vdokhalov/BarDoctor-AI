@@ -25,12 +25,12 @@ function notificationsHtml(request: Request): string {
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/bardoctor-v159-apple-180.png" />
     <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
     <link rel="stylesheet" href="/notifications.css?v=20260814-notification-center-v184" />
-    <link rel="stylesheet" href="/venue-switcher.css?v=20260813-venue-v174" />
+    <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
-    <script src="/venue-switcher.js?v=20260813-venue-v174" defer></script>
+    <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/notifications.js?v=20260814-notification-center-v184" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
