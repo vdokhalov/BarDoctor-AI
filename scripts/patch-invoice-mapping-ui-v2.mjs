@@ -6,6 +6,15 @@ let bundle = readFileSync(bundlePath, "utf8");
 
 const component = `function bdInvoiceLineMappingV3({line:e,supplierId:t,supplierName:n,documentId:r,onSelect:a}){const[s,l]=S.useState(()=>!e.purchaseProductKey),[u,d]=S.useState(""),[f,m]=S.useState([]),[h,g]=S.useState(""),[y,j]=S.useState(null),[v,b]=S.useState("idle"),[N,E]=S.useState(0),[_,T]=S.useState("idle"),C=bdCatArray(e.mappingCandidates);S.useEffect(()=>{if(!s)return;const A=setTimeout(()=>E(k=>k+1),250);return()=>clearTimeout(A)},[s,u]);S.useEffect(()=>{if(!s)return;const A=new AbortController,k=new URLSearchParams({q:u,limit:"50"});h&&k.set("cursor",h),b("loading"),fetch("/api/tech-cards/nomenclature?"+k.toString(),{headers:ca(Ot()),cache:"no-store",signal:A.signal}).then(O=>O.json().then(P=>({ok:O.ok,body:P}))).then(({ok:O,body:P})=>{if(!O||!P.ok)throw new Error(P.error||"Не удалось загрузить номенклатуру");const R=bdCatArray(P.items);m(M=>h?[...new Map([...M,...R].map(L=>[L.key,L])).values()]:R),j(P.nextCursor||null),b("loaded")}).catch(O=>{O.name!=="AbortError"&&b("error")});return()=>A.abort()},[s,u,h,N]);function A(k){if(!t||!e.rawName){T("deferred");return}T("saving"),fetch("/api/purchases/mappings",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",...ca(Ot())},body:JSON.stringify({supplierId:t,supplierName:n,documentId:r,lineId:e.id,rawName:e.rawName,unit:e.unit,packageSize:e.packageSize,currency:e.currency,purchaseProductKey:k.key,nomenclatureId:k.id})}).then(O=>O.json().then(P=>({ok:O.ok,body:P}))).then(({ok:O,body:P})=>{if(!O||!P.ok)throw new Error(P.error||"mapping failed");T("saved")}).catch(()=>T("error"))}function O(k){a({purchaseProductKey:k.key,nomenclatureId:k.id,name:k.name,requiresReview:!1,mappingSource:"manual",confidence:1,confidenceLevel:"high"}),l(!1),A(k)}if(!s&&e.purchaseProductKey)return i.jsxs("div",{"data-bd-invoice-mapping-memory":"canonical-v3",className:"bd-invoice-mapping-v2 is-linked",children:[i.jsxs("span",{children:[i.jsx("strong",{children:e.name}),i.jsx("small",{children:e.mappingSource==="history"?"Знакомая позиция поставщика":_==="saved"?"Соответствие поставщика сохранено":_==="saving"?"Сохраняем соответствие…":_==="error"?"Связано; повторное обучение сохранится при подтверждении покупки":"Связано с номенклатурой"})]}),i.jsx("button",{type:"button",onClick:()=>l(!0),children:"Изменить"})]});return i.jsxs("div",{"data-bd-invoice-mapping-memory":"canonical-v3",className:"bd-invoice-mapping-v2 "+(e.requiresReview?"needs-review":""),children:[i.jsx("strong",{children:e.requiresReview?"Нужно сопоставить с номенклатурой":"Номенклатура"}),C.length>0&&i.jsxs("div",{className:"bd-invoice-mapping-suggestions-v3",children:[i.jsx("small",{children:"Предложенные совпадения"}),C.map(k=>i.jsxs("button",{type:"button",onClick:()=>O(k),children:[i.jsx("b",{children:k.name}),i.jsx("small",{children:"Уверенность "+Math.round((Number(k.score)||0)*100)+"%"})]},k.key||k.id))]}),i.jsx("input",{type:"search",value:u,autoFocus:e.requiresReview,onChange:k=>{d(k.target.value),g("")},placeholder:"Найти по всей номенклатуре…","aria-label":"Поиск номенклатуры для строки накладной"}),v==="loading"&&i.jsx("div",{className:"bd-invoice-mapping-state-v2",role:"status",children:u?"Ищем по всей номенклатуре…":"Загружаем номенклатуру…"}),v==="error"&&i.jsxs("div",{className:"bd-invoice-mapping-state-v2 is-error",role:"alert",children:["Не удалось загрузить номенклатуру. ",i.jsx("button",{type:"button",onClick:()=>E(k=>k+1),children:"Повторить"})]}),v==="loaded"&&!f.length&&i.jsx("div",{className:"bd-invoice-mapping-state-v2",children:"Ничего не найдено"}),v==="loaded"&&f.length>0&&i.jsx("div",{className:"bd-invoice-mapping-results-v2",children:f.map(k=>i.jsxs("button",{type:"button",onClick:()=>O(k),children:[i.jsx("b",{children:k.name}),i.jsxs("small",{children:[k.packageSize||k.unit,k.supplierName?" · "+k.supplierName:""]})]},k.key))}),v==="loaded"&&i.jsx("button",{type:"button",className:"bd-invoice-mapping-more-v2",disabled:!y,onClick:()=>g(y||""),children:y?"Показать ещё":"Все позиции загружены"}),!e.requiresReview&&i.jsx("button",{type:"button",className:"bd-invoice-mapping-collapse-v2",onClick:()=>l(!1),children:"Свернуть"})]})}
 `;
+const componentV4 = component
+  .replace(
+    "S.useState(()=>!e.purchaseProductKey)",
+    'S.useState(()=>!e.purchaseProductKey||e.requiresReview||e.mappingSource==="ai")',
+  )
+  .replace(
+    'children:e.requiresReview?"Нужно сопоставить с номенклатурой":"Номенклатура"',
+    'children:e.mappingSource==="ai"?"Подтвердите предложенную номенклатуру":e.requiresReview?"Нужно сопоставить с номенклатурой":"Номенклатура"',
+  );
 
 const oldStart = bundle.indexOf("function bdInvoiceLineMappingV2(");
 const newStart = bundle.indexOf("function bdInvoiceLineMappingV3(");
@@ -13,17 +22,22 @@ if (oldStart >= 0 || newStart >= 0) {
   const start = oldStart >= 0 ? oldStart : newStart;
   const end = bundle.indexOf("function bdPurchaseReview(", start);
   if (end < 0) throw new Error("Purchase review anchor not found after mapping component");
-  bundle = bundle.slice(0, start) + component + bundle.slice(end);
+  bundle = bundle.slice(0, start) + componentV4 + bundle.slice(end);
 } else {
   const anchor = "function bdPurchaseReview(";
   const index = bundle.indexOf(anchor);
   if (index < 0) throw new Error("Purchase review anchor not found");
-  bundle = bundle.slice(0, index) + component + bundle.slice(index);
+  bundle = bundle.slice(0, index) + componentV4 + bundle.slice(index);
 }
 
 bundle = bundle.replace(
   /i\.jsx\(bdInvoiceLineMappingV[23],\{line:g,(?:supplierId:e\.supplierId,supplierName:e\.supplierName,documentId:e\.id,)?onSelect:j=>u\(g\.id,j\)\}\)/g,
   'i.jsx(bdInvoiceLineMappingV3,{line:g,supplierId:e.supplierId,supplierName:e.supplierName,documentId:e.id,onSelect:j=>u(g.id,j)})',
+);
+
+bundle = bundle.replace(
+  "(g.rawName||g.requiresReview)&&i.jsx(bdInvoiceLineMappingV3",
+  "(g.rawName||g.requiresReview||g.mappingSource||bdCatArray(g.mappingCandidates).length>0)&&i.jsx(bdInvoiceLineMappingV3",
 );
 
 if (!bundle.includes("i.jsx(bdInvoiceLineMappingV3,{line:g,supplierId:e.supplierId")) {

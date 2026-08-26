@@ -205,6 +205,67 @@ export function normalizeInvoiceText(value: unknown): string {
     .trim();
 }
 
+function sameShadowCommercialLine(
+  legacy: Record<string, unknown>,
+  shadow: Record<string, unknown>,
+): boolean {
+  return Math.abs(numeric(legacy.quantity) - numeric(shadow.quantity)) <= 0.001
+    && Math.abs(numeric(legacy.unitPrice) - numeric(shadow.unitPrice)) <= 0.01
+    && Math.abs(numeric(legacy.lineTotal) - numeric(shadow.lineTotal)) <= 0.01;
+}
+
+/**
+ * Shadow keeps the legacy document authoritative, but the review UI still needs
+ * V2's canonical matching evidence. Only matching metadata is copied; supplier,
+ * quantities, prices, totals and the displayed legacy names are never replaced.
+ */
+export function mergeShadowMappingMetadata(
+  legacyValue: unknown,
+  shadowDocument: ParsedInvoiceDocument,
+): Record<string, unknown> {
+  const legacy = record(legacyValue);
+  const legacyItems = values(legacy.items).map(record);
+  const shadowItems = shadowDocument.items.map((item) => record(item));
+  const used = new Set<number>();
+  const items = legacyItems.map((legacyItem, index) => {
+    const legacyName = normalizeInvoiceText(legacyItem.rawName ?? legacyItem.name);
+    let shadowIndex = shadowItems.findIndex((shadowItem, candidateIndex) => {
+      if (used.has(candidateIndex)) return false;
+      const names = [shadowItem.normalizedRawName, shadowItem.rawName, shadowItem.name]
+        .map(normalizeInvoiceText)
+        .filter(Boolean);
+      return Boolean(legacyName) && names.includes(legacyName);
+    });
+    if (
+      shadowIndex < 0
+      && shadowItems[index]
+      && !used.has(index)
+      && sameShadowCommercialLine(legacyItem, shadowItems[index])
+    ) {
+      shadowIndex = index;
+    }
+    if (shadowIndex < 0) return legacyItem;
+    used.add(shadowIndex);
+    const shadow = shadowItems[shadowIndex];
+    return {
+      ...legacyItem,
+      rawName: text(shadow.rawName ?? shadow.name, "", 300) || undefined,
+      normalizedRawName: text(shadow.normalizedRawName, "", 500) || undefined,
+      purchaseProductKey: text(shadow.purchaseProductKey, "", 300) || undefined,
+      nomenclatureId: text(shadow.nomenclatureId, "", 300) || undefined,
+      mappingSource: shadow.mappingSource,
+      confidenceLevel: shadow.confidenceLevel,
+      mappingCandidates: values(shadow.mappingCandidates),
+      requiresReview: shadow.requiresReview === true || shadow.mappingSource === "ai",
+    };
+  });
+  return {
+    ...legacy,
+    supplierId: text(legacy.supplierId, "", 300) || shadowDocument.supplierId,
+    items,
+  };
+}
+
 export function packageFingerprint(value: unknown): string {
   const normalized = normalizeInvoiceText(value);
   const match = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg|pcs)\b/);

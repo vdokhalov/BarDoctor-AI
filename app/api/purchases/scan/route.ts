@@ -32,6 +32,7 @@ import {
   confidenceLevel,
   INVOICE_MAPPING_STORE_KEY,
   invoiceRecognitionRequestMode,
+  mergeShadowMappingMetadata,
   nomenclatureCandidates,
   parseInvoiceOcr,
   recognitionMetrics,
@@ -822,7 +823,7 @@ export async function POST(request: Request): Promise<Response> {
       if (v2Result.status === "rejected") throw v2Result.reason;
       const v2 = v2Result.value;
       const legacy = legacyResult.status === "fulfilled" ? legacyResult.value : null;
-      recognised = legacy ?? {
+      recognised = legacy ? mergeShadowMappingMetadata(legacy, v2.document) : {
         ...v2.document,
         warnings: [
           ...v2.document.warnings,

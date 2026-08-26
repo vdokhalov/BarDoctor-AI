@@ -13,6 +13,7 @@ import {
   fuzzyNomenclatureScore,
   invoiceRecognitionMode,
   invoiceRecognitionRequestMode,
+  mergeShadowMappingMetadata,
   nomenclatureCandidates,
   normalizeInvoiceText,
   packageFingerprint,
@@ -672,6 +673,93 @@ test("feature flag provides immediate rollback and shadow comparison is recognit
   assert.equal(comparison.lineCountDelta, -1);
 });
 
+test("shadow review keeps legacy commercial data and exposes V2 canonical mapping metadata", () => {
+  const merged = mergeShadowMappingMetadata(
+    {
+      supplierName: "Рынок",
+      items: [{
+        id: "legacy-1",
+        name: "Капуста пекинская",
+        quantity: 1.09,
+        unit: "кг",
+        unitPrice: 44.95,
+        lineTotal: 49,
+      }],
+    },
+    {
+      documentType: "invoice",
+      supplierId: "supplier-market",
+      supplierName: "Рынок",
+      supplierType: "wholesale",
+      currency: "RUB",
+      paymentMethod: "unknown",
+      total: 49,
+      confidence: 0.98,
+      warnings: [],
+      items: [{
+        id: "v2-1",
+        rawName: "Капуста пекинская",
+        normalizedRawName: "капуста пекинская",
+        name: "Капуста пекинская",
+        quantity: 1.09,
+        unit: "kg",
+        unitPrice: 44.95,
+        lineTotal: 49,
+        confidence: 0.9,
+        confidenceLevel: "medium",
+        purchaseProductKey: "stock:cabbage|kg",
+        nomenclatureId: "cabbage",
+        mappingSource: "ai",
+        mappingCandidates: [{ id: "cabbage", key: "stock:cabbage|kg", name: "Капуста пекинская", score: 0.9 }],
+        requiresReview: false,
+      }],
+    },
+  );
+  assert.equal(merged.supplierId, "supplier-market");
+  const [line] = merged.items as Array<Record<string, unknown>>;
+  assert.equal(line.name, "Капуста пекинская");
+  assert.equal(line.quantity, 1.09);
+  assert.equal(line.unitPrice, 44.95);
+  assert.equal(line.lineTotal, 49);
+  assert.equal(line.rawName, "Капуста пекинская");
+  assert.equal(line.mappingSource, "ai");
+  assert.equal(line.requiresReview, true);
+  assert.deepEqual(line.mappingCandidates, [{ id: "cabbage", key: "stock:cabbage|kg", name: "Капуста пекинская", score: 0.9 }]);
+});
+
+test("shadow review never attaches mapping evidence to a commercially different line", () => {
+  const merged = mergeShadowMappingMetadata(
+    { items: [{ id: "legacy-1", name: "Вода", quantity: 2, unitPrice: 50, lineTotal: 100 }] },
+    {
+      documentType: "invoice",
+      supplierName: "Рынок",
+      supplierType: "wholesale",
+      currency: "RUB",
+      paymentMethod: "unknown",
+      total: 49,
+      confidence: 0.98,
+      warnings: [],
+      items: [{
+        id: "v2-1",
+        rawName: "Капуста пекинская",
+        normalizedRawName: "капуста пекинская",
+        name: "Капуста пекинская",
+        quantity: 1.09,
+        unit: "kg",
+        unitPrice: 44.95,
+        lineTotal: 49,
+        confidence: 0.9,
+        confidenceLevel: "medium",
+        mappingCandidates: [{ id: "cabbage", key: "stock:cabbage|kg", name: "Капуста пекинская", score: 0.9 }],
+        requiresReview: true,
+      }],
+    },
+  );
+  const [line] = merged.items as Array<Record<string, unknown>>;
+  assert.equal(line.rawName, undefined);
+  assert.equal(line.mappingCandidates, undefined);
+});
+
 test("request-scoped QA modes are owner-only and never change the configured legacy flag", () => {
   const environment = { INVOICE_RECOGNITION_V2_MODE: "legacy" };
   assert.deepEqual(invoiceRecognitionRequestMode({ environment, role: "owner", requestedQaMode: "shadow" }), {
@@ -726,6 +814,7 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(route, /jobId: input\.jobId/);
   assert.match(route, /X-Invoice-Recognition-Job-Id/);
   assert.match(route, /shadowResult: v2\.document/);
+  assert.match(route, /mergeShadowMappingMetadata\(legacy, v2\.document\)/);
   assert.match(route, /ocr_purchases\." \+ input\.jobId/);
   assert.match(route, /Документ распознан частично/);
   assert.doesNotMatch(route, /limit:\s*10000/);
@@ -753,4 +842,7 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /fetch\("\/api\/purchases\/mappings"/);
   assert.match(bundle, /Найти по всей номенклатуре…/);
   assert.match(bundle, /mappingSource:"manual"/);
+  assert.match(bundle, /Подтвердите предложенную номенклатуру/);
+  assert.match(bundle, /e\.mappingSource==="ai"/);
+  assert.match(bundle, /g\.mappingSource\|\|bdCatArray\(g\.mappingCandidates\)\.length>0/);
 });
