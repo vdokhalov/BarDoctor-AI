@@ -3,9 +3,10 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium, devices } = require("playwright-core");
+const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4175";
-const browserPath = process.env.BD_QA_BROWSER || chromium.executablePath();
+let browserPath = process.env.BD_QA_BROWSER || chromium.executablePath();
 const outputDir = path.resolve(process.cwd(), "qa-artifacts/mobile-navigation-v269");
 fs.mkdirSync(outputDir, { recursive: true });
 
@@ -92,6 +93,40 @@ function inventoryFixtures() {
   ];
 }
 
+function businessHealthEnvelope(venueId) {
+  const generatedAt = "2026-08-25T18:41:00.000Z";
+  const period = { id: "comparable_shift", label: "Последняя закрытая смена", startDate: "2026-08-24", endDate: "2026-08-24" };
+  const factorScores = [
+    { id: "finance", label: "Финансы", score: 41, availability: "measured", weight: 40, confidence: "medium" },
+    { id: "demand", label: "Спрос", score: 63, availability: "measured", weight: 20, confidence: "medium" },
+    { id: "operations", label: "Операции", score: 80, availability: "measured", weight: 25, confidence: "high" },
+  ];
+  const primaryFactor = { id: "finance", label: "Финансы", score: 41, evidence: "Финансовый результат ниже обычного" };
+  const snapshot = {
+    snapshotId: `business-health-snapshot:${venueId}:mobile-qa`, venueId: String(venueId), score: 58,
+    status: "attention", statusLabel: "Требует внимания", confidence: 77, confidenceLevel: "medium",
+    primaryFactor, factorScores, generatedAt, period, periods: { demand: period, closedFinance: period },
+    calculationVersion: "business-health-engine-v3", dataQualityPercent: 68,
+    explanation: "Финансовый результат требует внимания", source: "server_business_intelligence",
+  };
+  return {
+    data: {
+      businessHealthSnapshot: snapshot,
+      intelligence: {
+        version: "ai-doctor-intelligence-v3", venueId: String(venueId), generatedAt, periods: { demand: period, closedFinance: period },
+        dataQuality: { percent: 68 },
+        businessHealth: {
+          score: 58, label: "attention", confidencePercent: 77, confidence: "medium",
+          components: factorScores.map((factor) => ({ ...factor, evidence: factor.id === "finance" ? [primaryFactor.evidence] : [] })),
+          explanation: snapshot.explanation,
+        },
+      },
+    },
+    generatedAt,
+    cachedAt: Date.parse(generatedAt),
+  };
+}
+
 function storeData(venueId) {
   return {
     bd_assortment_v1: assortmentFor(venueId),
@@ -101,6 +136,7 @@ function storeData(venueId) {
     bd_finance_revenue: [],
     bd_employees: venueId === 901 ? [{ id: "employee-mobile-qa", name: "Тест Бармен", position: "bartender", department: "Бар", status: "active" }] : [],
     bd_payroll_rules: [],
+    bd_ai_diagnosis_v9: businessHealthEnvelope(venueId),
     bd_finance_settings: { inventoryFrequency: "monthly", customFrequencyDays: 30, inventorySections: ["Бар", "Кухня"], taxModel: { mode: "fixed", amount: 0 }, utilityModel: { mode: "fixed", amount: 0 }, updatedAt: "2026-08-24T08:00:00.000Z" },
   };
 }
@@ -679,7 +715,7 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
     throw new Error(`${profile.name}: shift close wizard did not open at ${page.url()}; visible controls=${JSON.stringify(visibleControls)}`);
   }
   await page.getByLabel("Дата смены", { exact: true }).fill("2026-08-24");
-  await page.getByLabel("Выручка, ₽", { exact: true }).fill("10000");
+  await page.getByLabel(`Выручка, ${profileFor(state.activeVenueId).currency}`, { exact: true }).fill("10000");
   await page.getByLabel("Количество чеков", { exact: true }).fill("50");
   await page.getByLabel("Количество гостей", { exact: true }).fill("60");
   await page.getByRole("button", { name: "Далее", exact: true }).click();
@@ -807,7 +843,11 @@ async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
   const { page } = run;
   await goto(page, "/suppliers?qaProcurement=default&venue=401");
-  await page.waitForSelector(".bd-proc-command-v168");
+  try {
+    await page.waitForSelector(".bd-proc-command-v168");
+  } catch {
+    throw new Error(`${profile.name}: procurement workspace did not open; url=${page.url()}; issues=${JSON.stringify(run.issues)}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
+  }
   const procurementTabs = page.locator(".bd-proc-tabs-v168 button");
   const procurementLabels = (await procurementTabs.allTextContents()).map((label) => label.trim());
   assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
@@ -896,13 +936,59 @@ async function moduleSmokeFlow(browser, profile) {
   return { profile: profile.name, scenario: run.label, passed: true, routes: routes.map(([route]) => route) };
 }
 
+async function businessHealthColdStartFlow(browser, profile) {
+  const run = await createRun(browser, profile, "business-health-cold-start");
+  const { page } = run;
+  const response = await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  assert.equal(response?.status(), 200, `${profile.name}: cold start expected HTTP 200`);
+  await page.waitForSelector('[data-bd-health-startup-state="SPLASH_LOADING"]', { timeout: 10_000 });
+  const entry = page.locator('[data-bd-health-entry="v284"]');
+  await entry.waitFor({ timeout: 10_000 });
+  const splash = await entry.evaluate((node) => ({
+    snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
+    score: node.querySelector(".bd-health-entry-score-copy strong")?.textContent?.trim(),
+    status: node.querySelector(".bd-health-entry-status")?.textContent?.trim(),
+    factor: node.querySelector(".bd-health-entry-factor strong")?.textContent?.trim(),
+    confidence: node.querySelector(".bd-health-entry-confidence strong")?.textContent?.trim(),
+  }));
+  assert.deepEqual(splash, {
+    snapshotId: "business-health-snapshot:901:mobile-qa",
+    score: "58", status: "Требует внимания", factor: "Финансы 41/100", confidence: "77%",
+  }, `${profile.name}: Splash did not render the canonical snapshot`);
+  await entry.getByRole("button", { name: "Пропустить Health Score и открыть Главную" }).click();
+  const home = page.locator('[data-bd-home-health-index="business-health-snapshot-v284"]');
+  await home.waitFor({ timeout: 10_000 });
+  const readHome = () => home.evaluate((node) => ({
+    snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
+    score: node.querySelector(".bd-home-health-value strong")?.textContent?.trim(),
+    status: node.querySelector(".bd-home-health-status")?.textContent?.trim(),
+    factor: node.querySelector(".bd-home-health-factor")?.textContent?.trim(),
+    confidence: node.querySelector(".bd-home-health-confidence")?.textContent?.trim(),
+  }));
+  const firstHome = await readHome();
+  assert.equal(firstHome.snapshotId, splash.snapshotId, `${profile.name}: Home replaced the Splash snapshot`);
+  assert.equal(firstHome.score, splash.score, `${profile.name}: Home score differs from Splash`);
+  assert.equal(firstHome.status, splash.status, `${profile.name}: Home status differs from Splash`);
+  assert.match(firstHome.factor || "", /^Финансы: 41\/100/, `${profile.name}: Home primary factor differs from Splash`);
+  assert.match(firstHome.confidence || "", /Достоверность диагноза 77%/, `${profile.name}: Home confidence differs from Splash`);
+  assert.doesNotMatch(await home.textContent(), /Загрузка|Получаем актуальный диагноз/i, `${profile.name}: Home returned to loading after Splash`);
+  await page.waitForTimeout(8_000);
+  assert.deepEqual(await readHome(), firstHome, `${profile.name}: canonical snapshot changed without invalidation`);
+  await mobileAudit(page, profile.name, "business-health-cold-start");
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, snapshot: firstHome };
+}
+
 async function embeddedModulesFlow(browser, profile) {
   const run = await createRun(browser, profile, "embedded-modules");
   const { page } = run;
 
   await goto(page, "/data-control?venue=901");
   const dataControlFrame = page.frames().find((candidate) => {
-    try { return new URL(candidate.url()).pathname === "/data-control"; }
+    try {
+      const url = new URL(candidate.url());
+      return url.pathname === "/data-control" && url.searchParams.get("embedded") === "1";
+    }
     catch { return false; }
   });
   assert.ok(dataControlFrame, `${profile.name}: data-control iframe is missing`);
@@ -987,11 +1073,11 @@ async function formCloseFlow(browser, profile) {
   await employeeClose.waitFor({ state: "detached" });
 
   await goto(page, "/profile?venue=901");
-  await page.getByRole("button", { name: "Редактировать данные заведения", exact: true }).click();
-  const venueClose = page.getByRole("button", { name: "Закрыть редактирование заведения", exact: true });
-  await venueClose.waitFor();
-  await venueClose.click();
-  await venueClose.waitFor({ state: "detached" });
+  await page.locator(".bd-profile-venue-head-v280.is-action").click();
+  const venueEditor = page.locator('[data-bd-profile-editor="venue-v282"]');
+  await venueEditor.waitFor();
+  await page.locator("bd-app-header .bd-app-back").click();
+  await venueEditor.waitFor({ state: "detached" });
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: form Close leaked body scroll lock`);
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true };
@@ -1137,6 +1223,7 @@ async function runProfile(browser, profile) {
     ["embedded-modules", embeddedModulesFlow],
     ["critical-form-close", formCloseFlow],
     ["critical-modules", moduleSmokeFlow],
+    ["business-health-cold-start", businessHealthColdStartFlow],
   ]) {
     if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
     process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
@@ -1146,11 +1233,12 @@ async function runProfile(browser, profile) {
 }
 
 (async () => {
+  browserPath = await resolveBrowserExecutable(browserPath);
   assert.ok(fs.existsSync(browserPath), `Playwright browser executable not found: ${browserPath}`);
   const browser = await chromium.launch({
     executablePath: browserPath,
     headless: true,
-    args: ["--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
+    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
   });
   const results = [];
   const failures = [];

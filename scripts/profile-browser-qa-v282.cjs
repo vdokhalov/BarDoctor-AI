@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
+const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4174";
 const outputDir = process.env.BD_QA_OUTPUT || "/tmp/bardoctor-profile-v282-qa";
@@ -74,7 +75,7 @@ async function runProfile(browser, label, viewport) {
   await page.locator('[data-bd-venue-trigger]').click();
   await page.getByText("Длинное название второго заведения", { exact: true }).last().click();
   await page.getByText("MDL", { exact: true }).waitFor();
-  assert.ok((await page.locator("body").innerText()).includes("Менеджер · Длинное название второго заведения"));
+  assert.ok((await page.locator("body").innerText()).includes("Управляющий · Длинное название второго заведения"));
   await page.screenshot({ path: path.join(outputDir, `${label}-profile-switched.png`), fullPage: true });
 
   await page.getByText("Личные данные", { exact: true }).click();
@@ -123,7 +124,12 @@ async function runProfile(browser, label, viewport) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browserPath = await resolveBrowserExecutable(process.env.BD_QA_BROWSER);
+  const browser = await chromium.launch({
+    executablePath: browserPath,
+    headless: true,
+    args: [...chromiumArgs, "--no-proxy-server", "--disable-dev-shm-usage"],
+  });
   try {
     await runProfile(browser, "mobile-390", { width: 390, height: 844 });
     await runProfile(browser, "mobile-320", { width: 320, height: 700 });

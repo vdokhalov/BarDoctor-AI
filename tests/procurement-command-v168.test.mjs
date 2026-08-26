@@ -284,6 +284,7 @@ test("Procurement browser regression uses only visible user actions for settleme
     "full-payment-one-finance-operation-visible-ui",
     "supplier-and-total-debt-visible-ui",
     "paid-purchase-one-step-delete-visible-ui",
+    "manual-purchase-create-post-stock-visible-ui",
   ]) {
     assert.match(browserQa, new RegExp(scenario));
   }
@@ -303,9 +304,9 @@ test("Procurement browser regression uses only visible user actions for settleme
   assert.match(browserQa, /\.bd-proc-pay-now-v190/);
   assert.match(browserQa, /\.bd-proc-payment-list-v186 article/);
   assert.match(browserQa, /page\.getByRole\("link", \{ name: "Ещё"/);
-  assert.match(browserQa, /page\.getByRole\("button", \{ name: "Поставщики"/);
+  assert.match(browserQa, /page\.locator\("button,a"\)\.filter\(\{ hasText: "Поставщики" \}\)/);
   assert.doesNotMatch(browserQa, /page\.request|fetch\("\/api\/purchases|localStorage\.setItem/);
   assert.match(runner, /\/api\/healthz/);
   assert.match(runner, /procurement-browser-qa-v168\.cjs/);
-  assert.match(packageJson, /"test:procurement-browser": "bash scripts\/run-procurement-browser-qa-v190\.sh"/);
+  assert.match(packageJson, /"test:procurement-browser": "bash scripts\/sites-env\.sh -- bash scripts\/run-procurement-browser-qa-v190\.sh"/);
 });

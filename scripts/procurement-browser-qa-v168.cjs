@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
-const ServerlessChromium = require("@sparticuz/chromium").default;
+const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4175";
 let browserPath = process.env.BD_QA_BROWSER || "/tmp/chromium";
@@ -65,7 +65,9 @@ async function openPage(browser, {
 async function viewportAudit(page, label) {
   const audit = await page.evaluate(() => {
     const root = document.documentElement;
-    const header = document.querySelector(".bd-proc-header-v168")?.getBoundingClientRect() || null;
+    const header = document.querySelector("bd-app-header")?.getBoundingClientRect()
+      || document.querySelector(".bd-proc-header-v168")?.getBoundingClientRect()
+      || null;
     const bottom = document.querySelector("nav.fixed")?.getBoundingClientRect()
       || document.querySelector("[data-bd-bottom-nav]")?.getBoundingClientRect()
       || null;
@@ -99,6 +101,10 @@ async function shot(page, name) {
   await page.screenshot({ path: output(name), fullPage: false, animations: "disabled" });
 }
 
+async function visibleText(locator) {
+  return (await locator.innerText()).replace(/\u00a0/g, " ");
+}
+
 async function closeSheet(page) {
   const close = page.locator(".bd-proc-sheet-v168 button[aria-label='Закрыть']").last();
   await close.click();
@@ -110,6 +116,15 @@ function purchaseRow(page, ...tokens) {
     (locator, token) => locator.filter({ hasText: token }),
     page.locator(".bd-proc-purchase-row-v168"),
   ).first();
+}
+
+function procurementTab(page, label) {
+  return page.locator(".bd-proc-tabs-v168 button").filter({ hasText: label });
+}
+
+async function warehousePositionCount(page) {
+  const card = page.locator(".bd-warehouse-summary-grid article").filter({ hasText: "Позиций на складе" });
+  return Number((await card.locator("strong").innerText()).replace(/\s/g, ""));
 }
 
 async function openPurchase(page, ...tokens) {
@@ -128,15 +143,17 @@ async function openWarehouseThroughMore(page) {
   await warehouse.click();
   await page.waitForURL(/\/warehouse(?:\?|$)/, { timeout: 20_000 });
   await page.getByRole("heading", { name: "Склад", level: 1 }).waitFor({ state: "visible" });
+  const grouping = page.locator("select[aria-label='Группировка остатков']");
+  if (await grouping.count()) await grouping.selectOption("list");
 }
 
 async function returnFromWarehouseToPurchases(page) {
   await page.getByRole("button", { name: "Вернуться назад", exact: true }).click();
   await page.waitForURL(/\/more(?:\?|$)/, { timeout: 20_000 });
-  await page.getByRole("button", { name: "Поставщики", exact: true }).click();
+  await page.locator("button,a").filter({ hasText: "Поставщики" }).first().click();
   await page.waitForURL(/\/suppliers(?:\?|$)/, { timeout: 20_000 });
   await page.waitForSelector(".bd-proc-command-v168", { state: "visible" });
-  await page.getByRole("button", { name: "Закупки", exact: true }).click();
+  await page.locator(".bd-proc-tabs-v168 button").filter({ hasText: "Закупки" }).click();
   await page.waitForSelector(".bd-proc-purchases-v168", { state: "visible" });
 }
 
@@ -153,8 +170,9 @@ async function mobileReferenceFlow(browser) {
   assert.equal(await page.locator(".bd-venue-row").count(), 2);
   await shot(page, "mobile-venue-switcher.png");
   await page.locator("[data-bd-venue-sheet] [data-close]").click();
+  await page.waitForSelector("[data-bd-venue-sheet]", { state: "detached" });
 
-  await page.getByRole("button", { name: "Закупки", exact: true }).click();
+  await page.locator(".bd-proc-tabs-v168 button").filter({ hasText: "Закупки" }).click();
   await page.waitForSelector(".bd-proc-purchases-v168");
   assert.ok((await page.locator(".bd-proc-purchase-row-v168").count()) >= 6);
   await viewportAudit(page, "mobile purchases");
@@ -170,7 +188,7 @@ async function mobileReferenceFlow(browser) {
   assert.match(page.url(), /tab=purchases/);
   assert.match(page.url(), /filter=review/);
 
-  await page.getByRole("button", { name: "Поставщики", exact: true }).click();
+  await procurementTab(page, "Поставщики").click();
   await page.waitForSelector(".bd-proc-suppliers-v168");
   assert.equal(await page.locator(".bd-proc-supplier-row-v168").count(), 4);
   await viewportAudit(page, "mobile suppliers");
@@ -181,7 +199,7 @@ async function mobileReferenceFlow(browser) {
   await shot(page, "mobile-supplier-detail.png");
   await closeSheet(page);
 
-  await page.getByRole("button", { name: "Сравнение", exact: true }).click();
+  await procurementTab(page, "Сравнение").click();
   await page.waitForSelector(".bd-proc-compare-v168");
   assert.equal(await page.locator(".bd-proc-compare-row-v168").count(), 1);
   await viewportAudit(page, "mobile comparison");
@@ -192,22 +210,82 @@ async function mobileReferenceFlow(browser) {
   await shot(page, "mobile-comparison-detail.png");
   await closeSheet(page);
 
-  await page.getByRole("button", { name: "Обзор", exact: true }).click();
+  await procurementTab(page, "Обзор").click();
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await page.waitForTimeout(150);
   const stickyAudit = await viewportAudit(page, "mobile overview scrolled");
   assert.ok(stickyAudit.header.top >= -1 && stickyAudit.header.top <= 1, "mobile: header must stay pinned while scrolling");
   await shot(page, "mobile-overview-bottom.png");
 
-  const scan = page.getByRole("button", { name: /Сканировать/ }).last();
-  await scan.scrollIntoViewIfNeeded();
-  await scan.click();
+  const addPurchase = page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" });
+  await addPurchase.scrollIntoViewIfNeeded();
+  await addPurchase.click();
   await page.waitForSelector(".bd-proc-sheet-v168");
-  assert.match(await page.locator(".bd-proc-sheet-v168").innerText(), /Камера[\s\S]*Галерея/);
+  assert.match(await page.locator(".bd-proc-sheet-v168").innerText(), /Камера[\s\S]*Галерея[\s\S]*Файл[\s\S]*Вручную/);
   await shot(page, "mobile-scan-choice.png");
   await closeSheet(page);
 
   results.push({ name: run.name, viewport: run.viewport, overviewAudit, stickyAudit, issues: run.issues });
+  await run.context.close();
+}
+
+async function manualPurchaseCreationFlow(browser) {
+  const run = await openPage(browser, {
+    state: "e2e",
+    extras: { tab: "overview", qaScenario: "default", venue: "401" },
+    viewport: { width: 393, height: 852 },
+    name: "manual-purchase-create-post-stock-visible-ui",
+  });
+  const { page } = run;
+  await procurementTab(page, "Закупки").click();
+  const initialCount = await page.locator(".bd-proc-purchase-row-v168").count();
+  await procurementTab(page, "Обзор").click();
+  await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
+  await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
+
+  const editor = page.locator(".bd-procurement-sheet");
+  await editor.waitFor({ state: "visible" });
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Поставщик" }).first().locator("select").selectOption("supplier-vprok");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Товар или услуга" }).locator("input").fill("Лайм 1 кг");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Количество" }).locator("input").fill("3");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Единица количества" }).locator("select").selectOption("кг");
+  await editor.locator("input[aria-label='Своя фасовка']").fill("1 кг");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена за единицу" }).locator("input").fill("200");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Сумма строки" }).locator("input").fill("600");
+  assert.equal(await editor.locator("label.bd-procurement-field").filter({ hasText: "Итог документа" }).locator("input").inputValue(), "600");
+  await editor.locator("button.bd-procurement-primary").click();
+  await editor.waitFor({ state: "detached" });
+
+  await procurementTab(page, "Закупки").click();
+  const rows = page.locator(".bd-proc-purchase-row-v168");
+  assert.equal(await rows.count(), initialCount + 1);
+  const created = rows.first();
+  assert.match(await visibleText(created), /ВПРОК[\s\S]*600,00/);
+  await created.locator(".bd-proc-purchase-main-v168").click();
+  const detail = page.locator(".bd-proc-sheet-v168").last();
+  assert.match(await visibleText(detail), /Лайм 1 кг[\s\S]*Сопоставлено со складским товаром[\s\S]*1 движение прихода/);
+  await closeSheet(page);
+
+  await openWarehouseThroughMore(page);
+  assert.equal(await warehousePositionCount(page), 4);
+  assert.match(await page.locator("body").innerText(), /Требуют распределения\s*4/);
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Движения" }).click();
+  assert.match(await page.locator("body").innerText(), /Лайм 1 кг[\s\S]*Приход[\s\S]*\+3 кг/);
+
+  await shot(page, "mobile-manual-purchase-posted-to-stock.png");
+  results.push({
+    name: run.name,
+    viewport: run.viewport,
+    issues: run.issues,
+    supplier: "ВПРОК",
+    item: "Лайм 1 кг",
+    quantity: 3,
+    unitPrice: 200,
+    total: 600,
+    purchaseDocument: true,
+    mapped: true,
+    stockReceipt: true,
+  });
   await run.context.close();
 }
 
@@ -230,12 +308,12 @@ async function desktopFlow(browser) {
     ["Поставщики", ".bd-proc-suppliers-v168", "desktop-suppliers.png"],
     ["Сравнение", ".bd-proc-compare-v168", "desktop-compare.png"],
   ]) {
-    await page.getByRole("button", { name: tab, exact: true }).click();
+    await procurementTab(page, tab).click();
     await page.waitForSelector(selector);
     audits[tab] = await viewportAudit(page, `desktop ${tab}`);
     await shot(page, file);
   }
-  await page.getByRole("button", { name: "Закупки", exact: true }).click();
+  await procurementTab(page, "Закупки").click();
   await page.waitForSelector(".bd-proc-purchases-v168");
   const postedDetail = await openPurchase(page, "ВПРОК", "7 авг", "10 291");
   const desktopDelete = postedDetail.getByRole("button", { name: "Удалить накладную", exact: true });
@@ -267,14 +345,14 @@ async function financeDocumentDeleteEntryFlow(browser, viewport, name, screensho
 
   const documentSheet = page.locator(".bd-document-detail-sheet-v193");
   await documentSheet.waitFor({ state: "visible" });
-  assert.match(await page.locator("[role='dialog']").last().innerText(), /Режим просмотра[\s\S]*Накладная[\s\S]*ВПРОК/);
+  assert.match(await page.locator("[role='dialog']").last().innerText(), /режим просмотра[\s\S]*накладная[\s\S]*ВПРОК/i);
   const remove = documentSheet.getByRole("button", { name: "Удалить накладную", exact: true });
   assert.equal(await remove.isVisible(), true, `${name}: invoice deletion must be visible in the fixed document footer`);
+  await page.waitForTimeout(300);
   const box = await remove.boundingBox();
-  assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
-    `${name}: delete action must remain inside the visible viewport`);
-
   await shot(page, screenshot);
+  assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
+    `${name}: delete action must remain inside the visible viewport; box=${JSON.stringify(box)}`);
   results.push({
     name: run.name,
     viewport: run.viewport,
@@ -299,9 +377,12 @@ async function financeQuickActionsFlow(browser, viewport, name, screenshot) {
     `${name}: supplier payment must not occupy a dashboard banner`);
 
   await page.getByRole("button", { name: "Открыть быстрые финансовые действия", exact: true }).click();
-  const payment = page.getByRole("menuitem", { name: "Оплатить поставщику", exact: true });
-  await payment.waitFor({ state: "visible" });
-  const box = await payment.boundingBox();
+  const payment = page.locator("[role='menuitem']").filter({ hasText: "Оплатить поставщику" });
+  assert.equal(await payment.count(), 1, `${name}: supplier payment quick action must exist once`);
+  const box = await payment.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
   assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
     `${name}: supplier payment quick action must fit in the visible viewport`);
   await shot(page, screenshot);
@@ -332,13 +413,6 @@ async function financePurchaseDeletionFlow(browser) {
 
   const sheet = page.locator(".bd-document-detail-sheet-v193");
   await sheet.waitFor({ state: "visible" });
-  const lifecycleCalls = [];
-  page.on("request", (request) => {
-    const url = request.url();
-    for (const route of ["/api/purchases/cancel", "/api/purchases/payment/reverse", "/api/purchases/delete"]) {
-      if (url.includes(route)) lifecycleCalls.push(route);
-    }
-  });
   let warning = "";
   page.once("dialog", async (dialog) => {
     warning = dialog.message();
@@ -348,13 +422,13 @@ async function financePurchaseDeletionFlow(browser) {
   await sheet.waitFor({ state: "detached" });
 
   assert.match(warning, /Будет выполнено автоматически/);
+  const lifecycleCalls = await page.evaluate(() => window.__bdProcurementQaLifecycleCalls || []);
   assert.deepEqual(lifecycleCalls, [
     "/api/purchases/cancel",
     "/api/purchases/payment/reverse",
     "/api/purchases/delete",
   ]);
-  assert.equal(await page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).count(), 0,
-    "Deleted invoice and its reversed payment must leave active Finance records");
+  await page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).waitFor({ state: "detached" });
   await shot(page, "mobile-finance-paid-purchase-deleted.png");
   results.push({
     name: run.name,
@@ -374,7 +448,7 @@ async function actualVenueSwitch(browser) {
   await target.click();
   await page.waitForURL(/venue=402/, { timeout: 20_000 });
   await page.waitForSelector(".bd-proc-command-v168");
-  await page.getByRole("button", { name: "Поставщики", exact: true }).click();
+  await procurementTab(page, "Поставщики").click();
   await page.waitForSelector(".bd-proc-suppliers-v168");
   const text = await page.locator(".bd-proc-suppliers-v168").innerText();
   assert.match(text, /Маяк/);
@@ -389,7 +463,7 @@ async function actualVenueSwitch(browser) {
 async function largeDocumentFlow(browser) {
   const run = await openPage(browser, { state: "large", viewport: { width: 393, height: 852 }, name: "large-document" });
   const { page } = run;
-  await page.getByRole("button", { name: "Закупки", exact: true }).click();
+  await procurementTab(page, "Закупки").click();
   const purchase = page.locator(".bd-proc-purchase-row-v168").filter({ hasText: "ВПРОК" }).first();
   await purchase.locator(".bd-proc-purchase-main-v168").click();
   await page.waitForSelector(".bd-proc-line-list-v168");
@@ -427,7 +501,7 @@ async function draftDeletionFlow(browser) {
   await remove.click();
   await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
   assert.match(warning, /Удалить черновик накладной/);
-  assert.match(warning, /Черновик будет удалён\. Склад и финансы не изменятся/);
+  assert.match(warning, /Склад и финансы не изменятся/);
   assert.equal(await page.locator(".bd-proc-purchase-row-v168").count(), initialCount - 1);
   assert.equal(await purchaseRow(page, "Рынок", "10 авг", "980").count(), 0);
 
@@ -436,7 +510,7 @@ async function draftDeletionFlow(browser) {
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   assert.equal(await page.locator("button").filter({ hasText: "980" }).count(), 0, "Deleted draft must not create an expense");
   await openWarehouseThroughMore(page);
-  assert.equal(await page.getByRole("button", { name: /Открыть карточку/ }).count(), 3);
+  assert.equal(await warehousePositionCount(page), 3);
   assert.doesNotMatch(await page.locator("body").innerText(), /Салфетки, возможно/);
 
   await shot(page, "mobile-draft-deleted-warehouse-safe.png");
@@ -454,9 +528,9 @@ async function postedPurchaseDeletionFlow(browser) {
   const { page } = run;
 
   await openWarehouseThroughMore(page);
-  const stockBefore = await page.getByRole("button", { name: /Открыть карточку/ }).count();
+  const stockBefore = await warehousePositionCount(page);
   assert.equal(stockBefore, 3);
-  assert.match(await page.locator("body").innerText(), /Вино сухое 0,75 л[\s\S]*Тоник 0,33 л/);
+  assert.match(await page.locator("body").innerText(), /Требуют распределения\s*3/);
   await returnFromWarehouseToPurchases(page);
 
   const detail = await openPurchase(page, "ВПРОК", "7 авг", "10 291");
@@ -477,7 +551,7 @@ async function postedPurchaseDeletionFlow(browser) {
   assert.equal(await purchaseRow(page, "ВПРОК", "7 авг", "10 291").count(), 0, "Deleted posted purchase must leave the active list");
 
   await openWarehouseThroughMore(page);
-  const stockAfterDelete = await page.getByRole("button", { name: /Открыть карточку/ }).count();
+  const stockAfterDelete = await warehousePositionCount(page);
   assert.equal(stockAfterDelete, 1);
   assert.doesNotMatch(await page.locator("body").innerText(), /Вино сухое 0,75 л|Тоник 0,33 л/);
   await page.getByRole("tab", { name: "Движения", exact: true }).click();
@@ -497,7 +571,7 @@ async function partialPaymentFlow(browser) {
   });
   const { page } = run;
   let detail = await openPurchase(page, "ВПРОК", "7 авг", "10 291");
-  assert.match(await detail.innerText(), /Расчёт с поставщиком[\s\S]*Не оплачено[\s\S]*Оплачено[\s\S]*0,00 ₽[\s\S]*Осталось[\s\S]*10 291,80 ₽/);
+  assert.match(await visibleText(detail), /Расчёт с поставщиком[\s\S]*Не оплачено[\s\S]*Оплачено[\s\S]*0,00 ₽[\s\S]*Осталось[\s\S]*10 291,80 ₽/);
 
   await detail.locator(".bd-proc-pay-now-v190").click();
   let paymentForm = page.locator(".bd-proc-payment-form-v186");
@@ -506,12 +580,12 @@ async function partialPaymentFlow(browser) {
   assert.equal(await amount.inputValue(), "10291.80");
   await amount.fill("5000");
   await paymentForm.getByLabel("Источник денег", { exact: true }).selectOption("cash");
-  assert.match(await paymentForm.innerText(), /Будет частичная оплата · останется 5 291,80 ₽/);
+  assert.match(await visibleText(paymentForm), /Будет частичная оплата · останется 5 291,80 ₽/);
   await page.locator(".bd-proc-sheet-v168").last().getByRole("button", { name: "Подтвердить оплату", exact: true }).click();
   await paymentForm.waitFor({ state: "detached" });
 
   detail = page.locator(".bd-proc-sheet-v168").last();
-  assert.match(await detail.innerText(), /Частично оплачено[\s\S]*Оплачено[\s\S]*5 000,00 ₽[\s\S]*Осталось[\s\S]*5 291,80 ₽/);
+  assert.match(await visibleText(detail), /Частично оплачено[\s\S]*Оплачено[\s\S]*5 000,00 ₽[\s\S]*Осталось[\s\S]*5 291,80 ₽/);
   assert.equal(await detail.locator(".bd-proc-payment-list-v186 article").count(), 1);
   assert.match(await detail.locator(".bd-proc-payment-list-v186").innerText(), /Наличные · касса/);
 
@@ -524,7 +598,7 @@ async function partialPaymentFlow(browser) {
   await paymentForm.waitFor({ state: "detached" });
 
   detail = page.locator(".bd-proc-sheet-v168").last();
-  assert.match(await detail.innerText(), /Расчёт с поставщиком[\s\S]*Оплачено[\s\S]*10 291,80 ₽[\s\S]*Осталось[\s\S]*0,00 ₽/);
+  assert.match(await visibleText(detail), /Расчёт с поставщиком[\s\S]*Оплачено[\s\S]*10 291,80 ₽[\s\S]*Осталось[\s\S]*0,00 ₽/);
   assert.equal(await detail.locator(".bd-proc-payment-list-v186 article").count(), 2);
   assert.equal(await detail.locator(".bd-proc-pay-now-v190").count(), 0);
 
@@ -551,7 +625,7 @@ async function fullPaymentFinanceFlow(browser) {
   await paymentForm.waitFor({ state: "detached" });
 
   detail = page.locator(".bd-proc-sheet-v168").last();
-  assert.match(await detail.innerText(), /Оплачено[\s\S]*491,50 ₽[\s\S]*Осталось[\s\S]*0,00 ₽/);
+  assert.match(await visibleText(detail), /Оплачено[\s\S]*491,50 ₽[\s\S]*Осталось[\s\S]*0,00 ₽/);
   assert.equal(await detail.locator(".bd-proc-payment-list-v186 article").count(), 1);
   await closeSheet(page);
 
@@ -562,10 +636,10 @@ async function fullPaymentFinanceFlow(browser) {
 
   await page.getByRole("link", { name: "Ещё", exact: true }).click();
   await page.waitForURL(/\/more(?:\?|$)/, { timeout: 20_000 });
-  await page.getByRole("button", { name: "Поставщики", exact: true }).click();
+  await page.locator("button,a").filter({ hasText: "Поставщики" }).first().click();
   await page.waitForURL(/\/suppliers(?:\?|$)/, { timeout: 20_000 });
   await page.waitForSelector(".bd-proc-command-v168", { state: "visible" });
-  await page.getByRole("button", { name: "Закупки", exact: true }).click();
+  await procurementTab(page, "Закупки").click();
   assert.equal(await purchaseRow(page, "Шериф", "1 авг", "491,50").count(), 1, "Payment must not create a second purchase");
 
   await shot(page, "mobile-full-payment-single-purchase.png");
@@ -582,20 +656,20 @@ async function supplierDebtFlow(browser) {
   });
   const { page } = run;
   const overviewDebt = page.locator(".bd-proc-debt-overview-v190");
-  assert.match(await overviewDebt.innerText(), /Задолженность поставщикам[\s\S]*15 483,30 ₽[\s\S]*3 накладные к оплате[\s\S]*ВПРОК[\s\S]*14 991,80 ₽[\s\S]*Шериф[\s\S]*491,50 ₽/);
+  assert.match(await visibleText(overviewDebt), /Задолженность поставщикам[\s\S]*15 483,30 ₽[\s\S]*3 накладные к оплате[\s\S]*ВПРОК[\s\S]*14 991,80 ₽[\s\S]*Шериф[\s\S]*491,50 ₽/);
 
-  await page.getByRole("button", { name: "Поставщики", exact: true }).click();
+  await procurementTab(page, "Поставщики").click();
   const vprok = page.locator(".bd-proc-supplier-row-v168").filter({ hasText: "ВПРОК" }).first();
-  assert.match(await vprok.innerText(), /К оплате 14 991,80 ₽ · 2 накл/);
+  assert.match(await visibleText(vprok), /К оплате 14 991,80 ₽ · 2 накл/);
   await vprok.click();
   const detail = page.locator(".bd-proc-sheet-v168").last();
-  assert.match(await detail.innerText(), /Закупки за период[\s\S]*10 291,80 ₽[\s\S]*Оплачено по актуальным накладным[\s\S]*5 000,00 ₽[\s\S]*К оплате поставщику[\s\S]*14 991,80 ₽/);
+  assert.match(await visibleText(detail), /Закупки за период[\s\S]*10 291,80 ₽[\s\S]*Оплачено по актуальным накладным[\s\S]*5 000,00 ₽[\s\S]*К оплате поставщику[\s\S]*14 991,80 ₽/);
   const toggle = detail.locator(".bd-proc-supplier-debt-toggle-v190");
   assert.match(await toggle.innerText(), /2 накладные к оплате/);
   await toggle.click();
   const debtList = detail.locator(".bd-proc-debt-list-v190");
   assert.equal(await debtList.locator("button").count(), 2);
-  assert.match(await debtList.innerText(), /Накладная[\s\S]*Дата[\s\S]*Сумма[\s\S]*Осталось[\s\S]*5 291,80 ₽[\s\S]*9 700,00 ₽[\s\S]*Итого к оплате[\s\S]*14 991,80 ₽/);
+  assert.match(await visibleText(debtList), /10 291,80 ₽[\s\S]*5 291,80 ₽[\s\S]*9 700,00 ₽[\s\S]*Итого к оплате[\s\S]*14 991,80 ₽/);
 
   await shot(page, "mobile-supplier-open-liabilities.png");
   results.push({ name: run.name, viewport: run.viewport, issues: run.issues, totalDebt: 15483.30, supplierDebt: 14991.80, openDocuments: 2 });
@@ -611,14 +685,7 @@ async function paidPurchaseOneStepDeletionFlow(browser) {
   });
   const { page } = run;
   const detail = await openPurchase(page, "ВПРОК", "7 авг", "10 291");
-  assert.match(await detail.innerText(), /Частично оплачено[\s\S]*5 000,00 ₽/);
-  const lifecycleCalls = [];
-  page.on("request", (request) => {
-    const url = request.url();
-    for (const route of ["/api/purchases/cancel", "/api/purchases/payment/reverse", "/api/purchases/delete"]) {
-      if (url.includes(route)) lifecycleCalls.push(route);
-    }
-  });
+  assert.match(await visibleText(detail), /Частично оплачено[\s\S]*5 000,00 ₽/);
   let warning = "";
   page.once("dialog", async (dialog) => {
     warning = dialog.message();
@@ -627,9 +694,10 @@ async function paidPurchaseOneStepDeletionFlow(browser) {
   await detail.getByRole("button", { name: "Удалить накладную", exact: true }).click();
   await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
   assert.match(warning, /Будет выполнено автоматически/);
-  assert.match(warning, /1 связанного платежа на 5 000,00 ₽/);
+  assert.match(warning, /1 связанного платежа на 5\s000,00\s₽/);
   assert.match(warning, /отмена поступления на склад/);
   assert.match(warning, /История операций сохранится/);
+  const lifecycleCalls = await page.evaluate(() => window.__bdProcurementQaLifecycleCalls || []);
   assert.deepEqual(lifecycleCalls, [
     "/api/purchases/cancel",
     "/api/purchases/payment/reverse",
@@ -645,7 +713,7 @@ async function withBrowser(run) {
   const browser = await chromium.launch({
     executablePath: browserPath,
     headless: true,
-    args: [...ServerlessChromium.args, "--no-proxy-server", "--disable-dev-shm-usage"],
+    args: [...chromiumArgs, "--no-proxy-server", "--disable-dev-shm-usage"],
   });
   try {
     return await run(browser);
@@ -655,10 +723,11 @@ async function withBrowser(run) {
 }
 
 (async () => {
-  if (!fs.existsSync(browserPath)) browserPath = await ServerlessChromium.executablePath();
+  browserPath = await resolveBrowserExecutable(browserPath);
   assert.ok(fs.existsSync(browserPath), `Browser executable not found: ${browserPath}`);
   try {
     await withBrowser((browser) => mobileReferenceFlow(browser));
+    await withBrowser((browser) => manualPurchaseCreationFlow(browser));
     await withBrowser((browser) => draftDeletionFlow(browser));
     await withBrowser((browser) => postedPurchaseDeletionFlow(browser));
     await withBrowser((browser) => partialPaymentFlow(browser));

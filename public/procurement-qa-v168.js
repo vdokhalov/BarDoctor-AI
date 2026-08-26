@@ -2,9 +2,14 @@
   "use strict";
   if (!["terminal.local", "127.0.0.1", "localhost"].includes(window.location.hostname)) return;
   var params = new URLSearchParams(window.location.search);
-  var state = params.get("qaProcurement");
+  var requestedState = params.get("qaProcurement");
+  if (requestedState) sessionStorage.setItem("bd_procurement_qa_state", requestedState);
+  var state = requestedState || sessionStorage.getItem("bd_procurement_qa_state");
   if (!state) return;
-  var scenario = params.get("qaScenario") || "default";
+  var requestedScenario = params.get("qaScenario");
+  if (requestedScenario) sessionStorage.setItem("bd_procurement_qa_scenario", requestedScenario);
+  var scenario = requestedScenario || sessionStorage.getItem("bd_procurement_qa_scenario") || "default";
+  window.__bdProcurementQaLifecycleCalls = [];
 
   var email = "procurement-v168-qa@bardoctor.local";
   var requestedVenue = Number(params.get("venue"));
@@ -343,7 +348,7 @@
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : input && input.url || "";
     if (url.indexOf("/api/auth/bootstrap") >= 0) {
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-procurement-user", token: "qa-local-token", firstName: "QA", lastName: "Procurement", phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows }), { status: 200, headers: { "Content-Type": "application/json" } }));
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-procurement-user", token: "qa-local-token", firstName: "QA", lastName: "Procurement", phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
     if (url.indexOf("/api/restaurants/me") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, restaurant: profile }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -351,8 +356,18 @@
     if (url.indexOf("/api/users/me") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: "QA", lastName: "Procurement", email: email, phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
+    if (url.indexOf("/api/integration-hub") >= 0) {
+      return Promise.resolve(qaJson({ ok: true, integrations: [], providers: [] }));
+    }
     if (url.indexOf("/api/migrate") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, imported: [], skipped: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    }
+    if (url.indexOf("/api/store/bd_assortment_v1") >= 0) {
+      if (init && init.method === "PUT") {
+        var assortmentBody = qaBody(init);
+        assortment = assortmentBody.data || assortment;
+      }
+      return Promise.resolve(qaJson({ ok: true, data: assortment }));
     }
     if (/\/api\/store(?:\?|$)/.test(url)) {
       var now = "2026-08-12T12:00:00.000Z";
@@ -378,6 +393,12 @@
         syncStatus: "synced",
         confirmedAt: "2026-08-12T12:00:00.000Z",
         updatedAt: "2026-08-12T12:00:00.000Z",
+        items: (incoming.items || []).map(function (line, index) {
+          return Object.assign({}, line, {
+            purchaseProductKey: line.purchaseProductKey || "product:qa-manual-" + index,
+            mappingStatus: line.mappingStatus || "confirmed",
+          });
+        }),
       });
       var confirmIndex = documents.findIndex(function (doc) { return String(doc.id) === String(confirmed.id); });
       if (confirmIndex >= 0) documents[confirmIndex] = confirmed;
@@ -392,6 +413,7 @@
       return Promise.resolve(qaJson(qaLifecyclePayload(updated)));
     }
     if (url.indexOf("/api/purchases/delete") >= 0 && init && init.method === "DELETE") {
+      window.__bdProcurementQaLifecycleCalls.push("/api/purchases/delete");
       var deleteBody = qaBody(init);
       var removed = documents.find(function (doc) { return String(doc.id) === String(deleteBody.documentId); });
       if (!removed) return Promise.resolve(qaJson({ ok: false, error: "Закупка не найдена" }, 404));
@@ -401,6 +423,7 @@
       return Promise.resolve(qaJson(qaLifecyclePayload(null)));
     }
     if (url.indexOf("/api/purchases/cancel") >= 0 && init && init.method === "POST") {
+      window.__bdProcurementQaLifecycleCalls.push("/api/purchases/cancel");
       var cancelBody = qaBody(init);
       var cancelIndex = documents.findIndex(function (doc) { return String(doc.id) === String(cancelBody.documentId); });
       if (cancelIndex < 0) return Promise.resolve(qaJson({ ok: false, error: "Закупка не найдена" }, 404));
@@ -428,6 +451,7 @@
       return Promise.resolve(qaJson(qaLifecyclePayload(documents[repostIndex])));
     }
     if (url.indexOf("/api/purchases/payment/reverse") >= 0 && init && init.method === "POST") {
+      window.__bdProcurementQaLifecycleCalls.push("/api/purchases/payment/reverse");
       var reverseBody = qaBody(init);
       var paymentIndex = expenses.findIndex(function (expense) { return String(expense.id) === String(reverseBody.paymentId); });
       if (paymentIndex < 0) return Promise.resolve(qaJson({ ok: false, error: "Платёж не найден" }, 404));

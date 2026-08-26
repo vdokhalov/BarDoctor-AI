@@ -608,7 +608,9 @@ function parseXml(bytes: Uint8Array): { type: IntegrationEntityType | null; syst
 
 function spreadsheetRows(bytes: Uint8Array, csv = false): unknown[] {
   const workbook = csv
-    ? XLSX.read(new TextDecoder("utf-8").decode(bytes), { type: "string", cellDates: true })
+    // CSV calendar values are already text. Letting SheetJS infer Date objects
+    // makes an ISO date drift to the previous day in negative UTC offsets.
+    ? XLSX.read(new TextDecoder("utf-8").decode(bytes), { type: "string", cellDates: false, raw: true })
     : XLSX.read(bytes, { type: "array", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("В файле нет листов");

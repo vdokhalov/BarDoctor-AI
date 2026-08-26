@@ -162,7 +162,7 @@ test("review importer reuses the universal CSV reader and maps review fields", a
     source: "yandex",
     text: "Очень понравилось",
     rating: "5",
-    publishedAt: "8/13/26",
+    publishedAt: "2026-08-13",
     authorName: "Анна",
     externalId: "A-1",
   });

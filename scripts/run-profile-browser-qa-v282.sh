@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-qa_port="${BD_QA_PORT:-4175}"
-qa_log="$(mktemp /tmp/bardoctor-procurement-qa.XXXXXX.log)"
+qa_port="${BD_QA_PORT:-4174}"
+qa_log="$(mktemp /tmp/bardoctor-profile-qa.XXXXXX.log)"
 
 npm run dev -- --host 127.0.0.1 --port "$qa_port" >"$qa_log" 2>&1 &
 qa_server_pid=$!
@@ -22,10 +22,10 @@ done
 
 if [[ "$qa_ready" != "1" ]]; then
   tail -n 80 "$qa_log"
-  echo "Local procurement QA server did not become ready" >&2
+  echo "Local profile QA server did not become ready" >&2
   exit 1
 fi
 
 BD_QA_BASE_URL="http://127.0.0.1:${qa_port}" \
 TMPDIR="${BD_QA_TMPDIR:-/tmp}" \
-node scripts/procurement-browser-qa-v168.cjs
+node scripts/profile-browser-qa-v282.cjs

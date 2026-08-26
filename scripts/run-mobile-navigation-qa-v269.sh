@@ -27,4 +27,5 @@ if [[ "$qa_ready" != "1" ]]; then
 fi
 
 BD_QA_BASE_URL="http://127.0.0.1:${qa_port}" \
+TMPDIR="${BD_QA_TMPDIR:-/tmp}" \
 node scripts/mobile-navigation-qa-v269.cjs
