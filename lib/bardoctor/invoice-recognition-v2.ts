@@ -84,6 +84,10 @@ export type InvoiceRecognitionMetrics = {
   mode: InvoiceRecognitionMode;
   ocrDurationMs: number;
   ocrSuccess: boolean;
+  ocrDetectedLinesCount: number;
+  ocrDuplicateLinesCount: number;
+  ocrConfidence: number | null;
+  ocrEngine: string | null;
   parsedLinesCount: number;
   exactMappingsCount: number;
   fuzzyMappingsCount: number;
@@ -140,6 +144,30 @@ function numeric(value: unknown, fallback = 0): number {
 export function invoiceRecognitionMode(environment: Record<string, unknown>): InvoiceRecognitionMode {
   const requested = text(environment.INVOICE_RECOGNITION_V2_MODE, "legacy", 20).toLocaleLowerCase("en-US");
   return requested === "primary" || requested === "shadow" ? requested : "legacy";
+}
+
+export function invoiceRecognitionRequestMode(input: {
+  environment: Record<string, unknown>;
+  role: string;
+  requestedQaMode?: string | null;
+}): {
+  configuredMode: InvoiceRecognitionMode;
+  activeMode: InvoiceRecognitionMode;
+  qaMode: "shadow" | "ai-unavailable" | null;
+  simulateAiUnavailable: boolean;
+} {
+  const configuredMode = invoiceRecognitionMode(input.environment);
+  const qaMode = input.role === "owner" && configuredMode === "legacy"
+    ? input.requestedQaMode === "shadow" || input.requestedQaMode === "ai-unavailable"
+      ? input.requestedQaMode
+      : null
+    : null;
+  return {
+    configuredMode,
+    activeMode: qaMode === "shadow" ? "shadow" : qaMode === "ai-unavailable" ? "primary" : configuredMode,
+    qaMode,
+    simulateAiUnavailable: qaMode === "ai-unavailable",
+  };
 }
 
 export function normalizeInvoiceText(value: unknown): string {
@@ -581,11 +609,18 @@ export function recognitionMetrics(input: {
   aiEstimatedTokenUsage?: number;
   startedAt: number;
 }): InvoiceRecognitionMetrics {
+  const normalizedOcrLines = (input.ocr?.lines ?? [])
+    .map((line) => normalizeInvoiceText(line.text))
+    .filter(Boolean);
   return {
     pipeline: "invoice_recognition_v2",
     mode: input.mode,
     ocrDurationMs: input.ocr?.durationMs ?? 0,
     ocrSuccess: Boolean(input.ocr?.rawText || input.ocr?.lines.length),
+    ocrDetectedLinesCount: input.ocr?.lines.length ?? 0,
+    ocrDuplicateLinesCount: normalizedOcrLines.length - new Set(normalizedOcrLines).size,
+    ocrConfidence: input.ocr?.confidence ?? null,
+    ocrEngine: input.ocr?.engine ?? null,
     parsedLinesCount: input.document.items.length,
     exactMappingsCount: input.document.items.filter((item) => item.mappingSource === "history" || item.mappingSource === "exact_alias").length,
     fuzzyMappingsCount: input.document.items.filter((item) => item.mappingSource === "fuzzy").length,

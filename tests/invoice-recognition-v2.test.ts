@@ -11,6 +11,7 @@ import {
   confidenceLevel,
   fuzzyNomenclatureScore,
   invoiceRecognitionMode,
+  invoiceRecognitionRequestMode,
   nomenclatureCandidates,
   normalizeInvoiceText,
   packageFingerprint,
@@ -482,6 +483,24 @@ test("feature flag provides immediate rollback and shadow comparison is recognit
   assert.equal(comparison.lineCountDelta, -1);
 });
 
+test("request-scoped QA modes are owner-only and never change the configured legacy flag", () => {
+  const environment = { INVOICE_RECOGNITION_V2_MODE: "legacy" };
+  assert.deepEqual(invoiceRecognitionRequestMode({ environment, role: "owner", requestedQaMode: "shadow" }), {
+    configuredMode: "legacy",
+    activeMode: "shadow",
+    qaMode: "shadow",
+    simulateAiUnavailable: false,
+  });
+  assert.deepEqual(invoiceRecognitionRequestMode({ environment, role: "owner", requestedQaMode: "ai-unavailable" }), {
+    configuredMode: "legacy",
+    activeMode: "primary",
+    qaMode: "ai-unavailable",
+    simulateAiUnavailable: true,
+  });
+  assert.equal(invoiceRecognitionRequestMode({ environment, role: "manager", requestedQaMode: "shadow" }).activeMode, "legacy");
+  assert.equal(invoiceRecognitionRequestMode({ environment: { INVOICE_RECOGNITION_V2_MODE: "primary" }, role: "owner", requestedQaMode: "shadow" }).activeMode, "primary");
+});
+
 test("quality evaluation measures real-dataset ground truth without logging document contents", () => {
   const document = parseInvoiceOcr({
     rawText: "ВПРОК\nКОКА КОЛА ПЭТ 1,25 2 шт 38,50 77,00\nИтого 77,00",
@@ -511,6 +530,13 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(route, /PARSER_FAILED/);
   assert.match(route, /VALIDATION_REQUIRED/);
   assert.match(route, /manualContinuation: true/);
+  assert.match(route, /invoiceRecognitionRequestMode/);
+  assert.match(route, /simulateAiUnavailable/);
+  assert.match(route, /INVOICE_RECOGNITION_STARTED/);
+  assert.match(route, /jobId: input\.jobId/);
+  assert.match(route, /X-Invoice-Recognition-Job-Id/);
+  assert.match(route, /shadowResult: v2\.document/);
+  assert.match(route, /ocr_purchases\." \+ input\.jobId/);
   assert.match(route, /Документ распознан частично/);
   assert.doesNotMatch(route, /limit:\s*10000/);
   assert.match(confirm, /INVOICE_RECOGNITION_REVIEW_REQUIRED/);
@@ -519,6 +545,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /Сопоставляем позиции…/);
   assert.match(bundle, /bdInvoiceRecognitionPhaseTimer=setTimeout/);
   assert.match(bundle, /clearTimeout\(bdInvoiceRecognitionPhaseTimer\)/);
+  assert.match(bundle, /function bdInvoiceRecognitionQaUrlV2/);
+  assert.match(bundle, /invoiceRecognitionQa/);
+  assert.doesNotMatch(bundle, /fetch\("\/api\/purchases\/scan"/);
   assert.doesNotMatch(bundle, /(?<!bdInvoiceRecognitionPhaseTimer=)setTimeout\(\(\)=>[GE]\("Сопоставляем позиции…"\),650\)/);
   assert.match(bundle, /function bdInvoiceLineMappingV2/);
   assert.match(bundle, /Найти по всей номенклатуре…/);

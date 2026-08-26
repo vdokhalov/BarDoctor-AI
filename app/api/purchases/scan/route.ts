@@ -30,7 +30,7 @@ import {
   compareRecognitionResults,
   confidenceLevel,
   INVOICE_MAPPING_STORE_KEY,
-  invoiceRecognitionMode,
+  invoiceRecognitionRequestMode,
   nomenclatureCandidates,
   parseInvoiceOcr,
   recognitionMetrics,
@@ -228,6 +228,7 @@ function spreadsheetText(bytes: Uint8Array): string {
 
 async function recogniseSingleDocument(input: {
   accountId: number;
+  jobId: string;
   bytes: Uint8Array;
   mimeType: string;
   filename: string;
@@ -243,7 +244,7 @@ ${input.contextHint}`;
   if (IMAGE_TYPES.has(input.mimeType)) {
     raw = await aiText({
       accountId: input.accountId,
-      observability: { feature: "ocr_purchases" },
+      observability: { feature: "ocr_purchases." + input.jobId },
       system: PURCHASE_DOCUMENT_SYSTEM_PROMPT,
       messages: [
         {
@@ -266,7 +267,7 @@ ${input.contextHint}`;
   } else if (input.mimeType === PDF_TYPE) {
     raw = await openAIFileText({
       accountId: input.accountId,
-      observability: { feature: "ocr_purchases" },
+      observability: { feature: "ocr_purchases." + input.jobId },
       system: PURCHASE_DOCUMENT_SYSTEM_PROMPT,
       prompt,
       filename: input.filename,
@@ -279,7 +280,7 @@ ${input.contextHint}`;
     const extracted = spreadsheetText(input.bytes);
     raw = await aiText({
       accountId: input.accountId,
-      observability: { feature: "ocr_purchases" },
+      observability: { feature: "ocr_purchases." + input.jobId },
       system: PURCHASE_DOCUMENT_SYSTEM_PROMPT,
       messages: [
         {
@@ -301,6 +302,7 @@ ${input.contextHint}`;
 
 async function recogniseDocument(input: {
   accountId: number;
+  jobId: string;
   documents: SourceDocument[];
   hint: string;
   contextHint: string;
@@ -309,6 +311,7 @@ async function recogniseDocument(input: {
     const document = input.documents[0];
     return recogniseSingleDocument({
       accountId: input.accountId,
+      jobId: input.jobId,
       bytes: document.bytes,
       mimeType: document.mimeType,
       filename: document.filename,
@@ -337,7 +340,7 @@ ${input.contextHint}`;
   ];
   const raw = await aiText({
     accountId: input.accountId,
-    observability: { feature: "ocr_purchases" },
+    observability: { feature: "ocr_purchases." + input.jobId },
     system: PURCHASE_DOCUMENT_SYSTEM_PROMPT,
     messages: [{ role: "user", content }],
     maxTokens: 12_000,
@@ -499,6 +502,7 @@ async function recogniseDocumentV2(input: {
   jobId: string;
   documents: SourceDocument[];
   mode: "primary" | "shadow";
+  simulateAiUnavailable?: boolean;
 }): Promise<{
   document: ParsedInvoiceDocument;
   metrics: ReturnType<typeof recognitionMetrics>;
@@ -520,6 +524,7 @@ async function recogniseDocumentV2(input: {
     ocrFailure = true;
     issues.push("OCR_FAILED");
     console.warn("INVOICE_RECOGNITION_V2_OCR_UNAVAILABLE", {
+      jobId: input.jobId,
       accountId: input.accountId,
       venueId: input.venueId,
       fileCount: input.documents.length,
@@ -542,6 +547,7 @@ async function recogniseDocumentV2(input: {
   } catch (error) {
     issues.push("PARSER_FAILED");
     console.warn("INVOICE_RECOGNITION_V2_PARSER_FAILED", {
+      jobId: input.jobId,
       accountId: input.accountId,
       venueId: input.venueId,
       code: error instanceof Error ? error.name : "parser_failed",
@@ -567,7 +573,32 @@ async function recogniseDocumentV2(input: {
     nomenclature: nomenclatureCandidates(stores.assortment, input.venueId),
   });
   const fallbackEnabled = String(environment().INVOICE_RECOGNITION_V2_AI_FALLBACK ?? "on").toLocaleLowerCase("en-US") !== "off";
-  const ai = fallbackEnabled && !ocrFailure
+  const unresolvedCount = mapped.items.filter((item) => item.requiresReview).length;
+  const simulatedUnavailable = input.simulateAiUnavailable && unresolvedCount > 0;
+  if (simulatedUnavailable) {
+    console.warn("INVOICE_RECOGNITION_V2_AI_FALLBACK_UNAVAILABLE", {
+      jobId: input.jobId,
+      accountId: input.accountId,
+      venueId: input.venueId,
+      unresolvedLines: unresolvedCount,
+      code: "qa_simulation",
+    });
+  }
+  const ai = simulatedUnavailable
+    ? {
+      document: {
+        ...mapped,
+        warnings: [
+          ...mapped.warnings,
+          "Автоматическое распознавание части документа временно недоступно. Уже распознанные данные сохранены — проверьте оставшиеся позиции вручную.",
+        ],
+      },
+      aiFallbackLinesCount: unresolvedCount,
+      aiRequestCount: 0,
+      aiEstimatedTokenUsage: 0,
+      unavailable: true,
+    }
+    : fallbackEnabled && !ocrFailure
     ? await aiResolveUnresolved({
       accountId: input.accountId,
       actorAccountId: input.actorAccountId,
@@ -603,6 +634,7 @@ async function recogniseDocumentV2(input: {
     startedAt,
   });
   console.info("INVOICE_RECOGNITION_V2_COMPLETED", {
+    jobId: input.jobId,
     accountId: input.accountId,
     venueId: input.venueId,
     ...metrics,
@@ -711,13 +743,29 @@ export async function POST(request: Request): Promise<Response> {
           : "upload";
     }
 
-    const mode = invoiceRecognitionMode(environment());
+    const modeSelection = invoiceRecognitionRequestMode({
+      environment: environment(),
+      role: account.role,
+      requestedQaMode: new URL(request.url).searchParams.get("qa"),
+    });
+    const mode = modeSelection.activeMode;
+    console.info("INVOICE_RECOGNITION_STARTED", {
+      jobId: id,
+      actorAccountId: account.actorAccountId,
+      venueId: account.venueId,
+      configuredMode: modeSelection.configuredMode,
+      activeMode: mode,
+      qaMode: modeSelection.qaMode,
+      source,
+      fileCount: documents.length,
+    });
     let recognised: unknown;
     let recognition: Record<string, unknown> | undefined;
     if (mode === "legacy") {
       const venueContext = await loadVenueAIContext(account, "purchase");
       recognised = await recogniseDocument({
         accountId: account.id,
+        jobId: id,
         documents,
         hint,
         contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
@@ -730,11 +778,16 @@ export async function POST(request: Request): Promise<Response> {
         jobId: id,
         documents,
         mode,
+        simulateAiUnavailable: modeSelection.simulateAiUnavailable,
       });
       recognised = v2.document;
       recognition = {
+        jobId: id,
         version: 2,
         mode,
+        configuredMode: modeSelection.configuredMode,
+        qaMode: modeSelection.qaMode,
+        activePipeline: "v2_primary",
         metrics: v2.metrics,
         aiUnavailable: v2.aiUnavailable,
         issues: v2.issues,
@@ -745,6 +798,7 @@ export async function POST(request: Request): Promise<Response> {
       const [legacyResult, v2Result] = await Promise.allSettled([
         recogniseDocument({
           accountId: account.id,
+          jobId: id,
           documents,
           hint,
           contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
@@ -756,6 +810,7 @@ export async function POST(request: Request): Promise<Response> {
           jobId: id,
           documents,
           mode,
+          simulateAiUnavailable: modeSelection.simulateAiUnavailable,
         }),
       ]);
       if (v2Result.status === "rejected") throw v2Result.reason;
@@ -769,14 +824,21 @@ export async function POST(request: Request): Promise<Response> {
         ],
       };
       recognition = {
+        jobId: id,
         version: 2,
         mode,
+        configuredMode: modeSelection.configuredMode,
+        qaMode: modeSelection.qaMode,
+        activePipeline: legacy ? "legacy_authoritative_v2_shadow" : "v2_shadow_fallback",
+        legacyAvailable: Boolean(legacy),
         metrics: v2.metrics,
         comparison: legacy ? compareRecognitionResults(legacy, v2.document) : null,
+        shadowResult: v2.document,
         issues: v2.issues,
         manualContinuation: true,
       };
       console.info("INVOICE_RECOGNITION_V2_SHADOW_COMPARISON", {
+        jobId: id,
         accountId: account.id,
         venueId: account.venueId,
         comparison: recognition.comparison,
@@ -830,15 +892,19 @@ export async function POST(request: Request): Promise<Response> {
       source,
       status: "draft",
     }, id);
-    return Response.json({ ok: true, draft, recognition });
+    return Response.json({ ok: true, draft, recognition }, {
+      headers: { "X-Invoice-Recognition-Job-Id": id },
+    });
   } catch (error) {
     const errorId = crypto.randomUUID().slice(0, 8).toUpperCase();
     const serviceError = error instanceof AIServiceError
       ? error
       : new AIServiceError("Не удалось распознать закупочный документ.", 502);
     console.error("PURCHASE_SCAN_FAILED", {
+      jobId: id,
       errorId,
       accountId: account.id,
+      venueId: account.venueId,
       code: serviceError.code,
       message: serviceError.message,
       fileCount: documents.length,
@@ -848,11 +914,15 @@ export async function POST(request: Request): Promise<Response> {
       {
         ok: false,
         success: false,
+        jobId: id,
         code: serviceError.code,
         error: `${serviceError.message} Код ошибки: ${errorId}.`,
         errorId,
       },
-      { status: serviceError.status },
+      {
+        status: serviceError.status,
+        headers: { "X-Invoice-Recognition-Job-Id": id },
+      },
     );
   }
 }
