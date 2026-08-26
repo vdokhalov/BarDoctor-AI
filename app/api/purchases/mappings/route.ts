@@ -97,6 +97,51 @@ export async function POST(request: Request): Promise<Response> {
   });
   const previousMappings = array(assortment.supplierProductMappings);
   const existed = previousMappings.map(record).some((value) => text(value.sourceItemKey, "", 500) === resolution.sourceMapping.sourceItemKey);
+  if (body.action === "remove") {
+    assortment.supplierProductMappings = previousMappings.filter((value) =>
+      text(record(value).sourceItemKey, "", 500) !== resolution.sourceMapping.sourceItemKey
+    );
+    assortment.updatedAt = now;
+    await database.batch([
+      database.prepare(`
+        INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(account_id, store_key)
+        DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
+      `).bind(account.id, ASSORTMENT_STORE_KEY, JSON.stringify(assortment), now),
+      database.prepare(`
+        INSERT INTO audit_log (
+          account_id, store_key, action, entity_id, entity_label, month_key,
+          before_json, after_json, changed_fields_json, actor_name, actor_role,
+          reason, created_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?)
+      `).bind(
+        account.id,
+        ASSORTMENT_STORE_KEY,
+        "delete",
+        resolution.sourceMapping.id,
+        `Сопоставление поставщика: ${rawName}`,
+        JSON.stringify({
+          venueId: account.venueId,
+          supplierId,
+          canonicalProductKey: candidate.key,
+          sourceItemKey: resolution.sourceMapping.sourceItemKey,
+        }),
+        JSON.stringify(["supplierProductMappings"]),
+        [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,
+        account.role,
+        "Пользователь отменил ошибочное соответствие строки накладной",
+        now,
+      ),
+    ]);
+    console.info("INVOICE_RECOGNITION_V2_MAPPING_REMOVED", {
+      accountId: account.id,
+      venueId: account.venueId,
+      supplierId,
+      removed: existed,
+    });
+    return Response.json({ ok: true, removed: existed }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   const confirmedMapping = {
     ...resolution.sourceMapping,
     canonicalProductKey: candidate.key,

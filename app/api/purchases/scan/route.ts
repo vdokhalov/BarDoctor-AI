@@ -459,7 +459,7 @@ async function aiResolveUnresolved(input: {
       if (!selected || confidenceLevel(score) === "low") return item;
       return {
         ...item,
-        name: selected.name,
+        nomenclatureName: selected.name,
         nomenclatureId: selected.id,
         purchaseProductKey: selected.key,
         mappingSource: "ai" as const,

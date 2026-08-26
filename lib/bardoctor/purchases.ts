@@ -67,6 +67,7 @@ export type PurchaseItem = {
   id: string;
   purchaseProductKey?: string;
   nomenclatureId?: string;
+  nomenclatureName?: string;
   rawName?: string;
   normalizedRawName?: string;
   name: string;
@@ -559,6 +560,7 @@ export function normalizePurchaseItem(
     id: text(input.id, crypto.randomUUID(), 80),
     purchaseProductKey: text(input.purchaseProductKey ?? input.productKey, "", 300) || undefined,
     nomenclatureId: text(input.nomenclatureId, "", 300) || undefined,
+    nomenclatureName: text(input.nomenclatureName, "", 300) || undefined,
     rawName: text(input.rawName, "", 300) || undefined,
     normalizedRawName: text(input.normalizedRawName, "", 500) || undefined,
     name,

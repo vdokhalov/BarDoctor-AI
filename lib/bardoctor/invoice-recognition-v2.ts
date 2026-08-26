@@ -61,6 +61,7 @@ export type ParsedInvoiceLine = {
   confidenceLevel: RecognitionConfidence;
   purchaseProductKey?: string;
   nomenclatureId?: string;
+  nomenclatureName?: string;
   mappingSource?: "history" | "exact_alias" | "fuzzy" | "ai" | "manual";
   mappingCandidates?: Array<{ id: string; key: string; name: string; score: number }>;
   requiresReview: boolean;
@@ -253,6 +254,12 @@ export function mergeShadowMappingMetadata(
       normalizedRawName: text(shadow.normalizedRawName, "", 500) || undefined,
       purchaseProductKey: text(shadow.purchaseProductKey, "", 300) || undefined,
       nomenclatureId: text(shadow.nomenclatureId, "", 300) || undefined,
+      nomenclatureName: text(shadow.nomenclatureName, "", 300)
+        || values(shadow.mappingCandidates).map(record).find((candidate) =>
+          text(candidate.id, "", 300) === text(shadow.nomenclatureId, "", 300)
+          || text(candidate.key, "", 300) === text(shadow.purchaseProductKey, "", 300)
+        )?.name
+        || undefined,
       mappingSource: shadow.mappingSource,
       confidenceLevel: shadow.confidenceLevel,
       mappingCandidates: values(shadow.mappingCandidates),
@@ -669,7 +676,7 @@ export function matchInvoiceLine(input: {
     const candidate = input.nomenclature.find((item) => item.id === history.nomenclatureId || item.key === history.nomenclatureId);
     if (candidate) return {
       ...input.line,
-      name: candidate.name,
+      nomenclatureName: candidate.name,
       purchaseProductKey: candidate.key,
       nomenclatureId: candidate.id,
       mappingSource: "history",
@@ -683,7 +690,7 @@ export function matchInvoiceLine(input: {
     const candidate = exact[0];
     return {
       ...input.line,
-      name: candidate.name,
+      nomenclatureName: candidate.name,
       purchaseProductKey: candidate.key,
       nomenclatureId: candidate.id,
       mappingSource: "exact_alias",
@@ -704,7 +711,7 @@ export function matchInvoiceLine(input: {
   const candidates = ranked.map(({ candidate, score }) => ({ id: candidate.id, key: candidate.key, name: candidate.name, score }));
   if (best && level === "high" && input.line.confidence >= 0.55) return {
     ...input.line,
-    name: best.candidate.name,
+    nomenclatureName: best.candidate.name,
     purchaseProductKey: best.candidate.key,
     nomenclatureId: best.candidate.id,
     mappingSource: best.score >= 0.97 ? "exact_alias" : "fuzzy",

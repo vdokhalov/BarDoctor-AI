@@ -378,6 +378,9 @@ test("matcher reads the full canonical venue dataset, including stock-only ident
   const matched = applyDeterministicMappings({ document: parsed, supplierId: "market", venueId: 10, mappings: [], nomenclature: candidates });
   assert.equal(matched.items[0].purchaseProductKey, "stock:item-537|g");
   assert.equal(matched.items[0].mappingSource, "exact_alias");
+  assert.equal(matched.items[0].name, "Пекинская капуста");
+  assert.equal(matched.items[0].rawName, "Пекинская капуста");
+  assert.equal(matched.items[0].nomenclatureName, "Капуста пекинская");
 });
 
 test("package identity prevents a high-confidence wrong-size match", () => {
@@ -431,6 +434,8 @@ test("manual confirmation persists in canonical supplier memory and is reused on
   const second = applyDeterministicMappings({ document: firstDocument, supplierId: "market", venueId: 10, mappings, nomenclature: candidates });
   assert.equal(second.items[0].mappingSource, "history");
   assert.equal(second.items[0].purchaseProductKey, "stock:cabbage|g");
+  assert.equal(second.items[0].name, rawName);
+  assert.equal(second.items[0].nomenclatureName, "Капуста пекинская");
   assert.equal(second.items[0].requiresReview, false);
   const metrics = recognitionMetrics({ mode: "shadow", ocr: null, document: second, nomenclatureCandidatesCount: candidates.length, matchingDurationMs: 2, startedAt: Date.now() });
   assert.equal(metrics.historicalMappingsCount, 1);
@@ -827,6 +832,8 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(mappingRoute, /ASSORTMENT_STORE_KEY/);
   assert.match(mappingRoute, /account\.venueId/);
   assert.match(mappingRoute, /INVOICE_RECOGNITION_V2_MAPPING_CONFIRMED/);
+  assert.match(mappingRoute, /body\.action === "remove"/);
+  assert.match(mappingRoute, /INVOICE_RECOGNITION_V2_MAPPING_REMOVED/);
   assert.doesNotMatch(mappingRoute, /INVOICE_MAPPING_STORE_KEY/);
   assert.match(bundle, /Читаем документ…/);
   assert.match(bundle, /Сопоставляем позиции…/);
@@ -844,10 +851,15 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /fetch\("\/api\/purchases\/mappings"/);
   assert.match(bundle, /Найти по всей номенклатуре…/);
   assert.match(bundle, /mappingSource:"manual"/);
+  assert.match(bundle, /nomenclatureName:k\.name,name:e\.rawName\|\|e\.name/);
+  assert.doesNotMatch(bundle, /nomenclatureId:k\.id,name:k\.name/);
+  assert.match(bundle, /children:e\.nomenclatureName\|\|C\.find/);
+  assert.match(bundle, /Оставить без связи/);
+  assert.match(bundle, /action:"remove"/);
   assert.match(bundle, /Подтвердите предложенную номенклатуру/);
   assert.match(bundle, /e\.mappingSource==="ai"/);
   assert.match(bundle, /g\.mappingSource\|\|bdCatArray\(g\.mappingCandidates\)\.length>0/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
-  assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
-  assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
+  assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
+  assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
 });
