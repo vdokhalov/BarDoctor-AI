@@ -7,6 +7,7 @@ import {
 } from "../lib/bardoctor/invoice-ocr";
 import {
   applyDeterministicMappings,
+  canonicalInvoiceSupplierMappings,
   compareRecognitionResults,
   confidenceLevel,
   fuzzyNomenclatureScore,
@@ -24,6 +25,10 @@ import {
 } from "../lib/bardoctor/invoice-recognition-v2";
 import { applyPurchaseToInventory } from "../lib/bardoctor/inventory";
 import { normalizePurchaseDocument } from "../lib/bardoctor/purchases";
+import {
+  resolveCanonicalPurchaseItem,
+  upsertSupplierProductMapping,
+} from "../lib/bardoctor/nomenclature-identity";
 
 const nomenclature = {
   nomenclature: [
@@ -38,6 +43,8 @@ test("invoice text normalization preserves raw semantics and canonicalizes decim
   assert.equal(normalizeInvoiceText("500ml"), "500 ml");
   assert.equal(packageFingerprint("Бутылка 1,25 л"), "ml:1250");
   assert.equal(packageFingerprint("500 ml"), "ml:500");
+  assert.equal(normalizeInvoiceText("  КОКА-КОЛА (ПЭТ) 1,25 Л, бут. "), "кока кола pet 1.25 l bottle");
+  assert.equal(normalizeInvoiceText("Майонез, уп. 500 г"), "майонез pack 500 g");
 });
 
 test("parser extracts quantity, unit price and total with decimal comma", () => {
@@ -335,6 +342,188 @@ test("fuzzy scoring uses aliases and packaging but does not silently select ambi
   assert.equal(confidenceLevel(0.91, 0.2), "high");
 });
 
+test("matcher reads the full canonical venue dataset, including stock-only identities", () => {
+  const assortment = {
+    stockBalances: Array.from({ length: 550 }, (_, index) => ({
+      key: `stock:item-${index}|g`,
+      productKey: `stock:item-${index}|g`,
+      venueId: 10,
+      name: index === 537 ? "Капуста пекинская" : `Товар ${index}`,
+      unit: "g",
+      current: 0,
+      active: true,
+    })),
+    nomenclature: [{
+      id: "canonical-537",
+      key: "stock:item-537|g",
+      productKey: "stock:item-537|g",
+      venueId: 10,
+      name: "Капуста пекинская",
+      unit: "g",
+      aliases: ["Пекинская капуста"],
+      active: true,
+    }],
+  };
+  const candidates = nomenclatureCandidates(assortment, 10);
+  assert.equal(candidates.length, 550);
+  assert.equal(candidates.filter((candidate) => candidate.key === "stock:item-537|g").length, 1);
+  assert.deepEqual(candidates.find((candidate) => candidate.key === "stock:item-537|g")?.aliases, ["Пекинская капуста"]);
+  const parsed = parseInvoiceOcr({
+    rawText: "Рынок\nПекинская капуста 1 кг 44,95 44,95",
+    lines: [{ text: "Пекинская капуста 1 кг 44,95 44,95", confidence: 0.96 }],
+    confidence: 0.96,
+    durationMs: 5,
+  });
+  const matched = applyDeterministicMappings({ document: parsed, supplierId: "market", venueId: 10, mappings: [], nomenclature: candidates });
+  assert.equal(matched.items[0].purchaseProductKey, "stock:item-537|g");
+  assert.equal(matched.items[0].mappingSource, "exact_alias");
+});
+
+test("package identity prevents a high-confidence wrong-size match", () => {
+  const candidates = nomenclatureCandidates({ nomenclature: [
+    { id: "cola-500", key: "stock:cola-500|ml", venueId: 10, name: "Coca-Cola 0,5 л", unit: "ml", packageSize: "0,5 л" },
+    { id: "cola-1250", key: "stock:cola-1250|ml", venueId: 10, name: "Coca-Cola 1,25 л", unit: "ml", packageSize: "1,25 л" },
+  ] }, 10);
+  assert.ok(fuzzyNomenclatureScore("Кока Кола ПЭТ 1,25 л", candidates[1]) > 0.85);
+  assert.ok(fuzzyNomenclatureScore("Кока Кола ПЭТ 1,25 л", candidates[0]) < 0.6);
+});
+
+test("manual confirmation persists in canonical supplier memory and is reused on the second pass", () => {
+  const candidates = nomenclatureCandidates({ stockBalances: [{
+    id: "cabbage",
+    key: "stock:cabbage|g",
+    venueId: 10,
+    name: "Капуста пекинская",
+    unit: "g",
+    active: true,
+  }] }, 10);
+  const rawName = "КАП ПЕКИН ПРЕМИУМ";
+  const firstDocument = {
+    documentType: "invoice" as const,
+    supplierName: "Рынок",
+    supplierType: "wholesale" as const,
+    currency: "RUB",
+    paymentMethod: "unknown" as const,
+    total: 49,
+    confidence: 0.95,
+    warnings: [],
+    items: [{
+      id: "line-1", rawName, normalizedRawName: normalizeInvoiceText(rawName), name: rawName,
+      quantity: 1.09, unit: "кг", unitPrice: 44.95, lineTotal: 49,
+      confidence: 0.95, confidenceLevel: "high" as const, requiresReview: false,
+    }],
+  };
+  const first = applyDeterministicMappings({ document: firstDocument, supplierId: "market", venueId: 10, mappings: [], nomenclature: candidates });
+  assert.equal(first.items[0].requiresReview, true);
+
+  const resolution = resolveCanonicalPurchaseItem({
+    assortment: {},
+    document: { id: "draft-1", venueId: 10, supplierId: "market", supplierName: "Рынок", currency: "RUB" },
+    item: { id: "line-1", name: rawName, purchaseProductKey: "stock:cabbage|g", unit: "g" },
+    canonicalItems: candidates,
+    now: "2026-08-26T12:00:00.000Z",
+  });
+  const assortment = {
+    supplierProductMappings: upsertSupplierProductMapping([], { ...resolution.sourceMapping, status: "confirmed", confidence: 1 }),
+  };
+  const mappings = canonicalInvoiceSupplierMappings(assortment, 10);
+  const second = applyDeterministicMappings({ document: firstDocument, supplierId: "market", venueId: 10, mappings, nomenclature: candidates });
+  assert.equal(second.items[0].mappingSource, "history");
+  assert.equal(second.items[0].purchaseProductKey, "stock:cabbage|g");
+  assert.equal(second.items[0].requiresReview, false);
+  const metrics = recognitionMetrics({ mode: "shadow", ocr: null, document: second, nomenclatureCandidatesCount: candidates.length, matchingDurationMs: 2, startedAt: Date.now() });
+  assert.equal(metrics.historicalMappingsCount, 1);
+  assert.equal(metrics.unresolvedCount, 0);
+  assert.equal(metrics.aiRequestCount, 0);
+});
+
+test("canonical supplier mappings remain supplier-aware and venue-scoped", () => {
+  const makeMapping = (supplierId: string, venueId: number, canonicalProductKey: string) => {
+    const resolution = resolveCanonicalPurchaseItem({
+      assortment: {},
+      document: { venueId, supplierId, supplierName: supplierId },
+      item: { name: "Кола 1.25", purchaseProductKey: canonicalProductKey, unit: "ml" },
+      canonicalItems: [{ key: canonicalProductKey, name: canonicalProductKey, unit: "ml" }],
+    });
+    return { ...resolution.sourceMapping, status: "confirmed" as const, confidence: 1 };
+  };
+  const assortment = { supplierProductMappings: [
+    makeMapping("supplier-a", 10, "stock:cola-a|ml"),
+    makeMapping("supplier-b", 10, "stock:cola-b|ml"),
+    makeMapping("supplier-a", 11, "stock:cola-other-venue|ml"),
+  ] };
+  const venueTen = canonicalInvoiceSupplierMappings(assortment, 10);
+  assert.equal(venueTen.length, 2);
+  assert.equal(venueTen.find((mapping) => mapping.supplierId === "supplier-a")?.nomenclatureId, "stock:cola-a|ml");
+  assert.equal(canonicalInvoiceSupplierMappings(assortment, 11)[0].nomenclatureId, "stock:cola-other-venue|ml");
+});
+
+test("real 15-line market invoice learns once and resolves the second pass without AI", () => {
+  const names = [
+    "Капуста пекинская", "Сыр Российский", "Майонез", "Кетчуп", "Специи в ассортименте",
+    "Апельсины", "Лимоны", "Лаваш", "Шампиньоны", "Яблоки", "Помидоры", "Огурцы",
+    "Зелень пучок", "Лист салата", "Филе куриное",
+  ];
+  const stockBalances = [
+    ...Array.from({ length: 500 }, (_, index) => ({
+      key: `stock:filler-${index}|g`, name: `Служебная позиция ${index}`, unit: "g", venueId: 10, active: true,
+    })),
+    ...names.map((name, index) => ({
+      id: `market-${index}`, key: `stock:market-${index}|g`, name, unit: index === 7 || index === 12 ? "pcs" : "g", venueId: 10, active: true,
+    })),
+  ];
+  const candidates = nomenclatureCandidates({ stockBalances }, 10);
+  const rawNames = names.map((name, index) => `РЫН-${String(index + 1).padStart(3, "0")} ${name.slice(0, Math.max(5, Math.floor(name.length * 0.55)))}`);
+  const document = {
+    documentType: "invoice" as const,
+    supplierName: "Рынок",
+    supplierType: "wholesale" as const,
+    currency: "RUB",
+    paymentMethod: "unknown" as const,
+    total: 587.1,
+    confidence: 0.96,
+    warnings: [],
+    items: rawNames.map((rawName, index) => ({
+      id: `line-${index + 1}`, rawName, normalizedRawName: normalizeInvoiceText(rawName), name: rawName,
+      quantity: 1, unit: index === 7 || index === 12 ? "шт" : "кг", unitPrice: 10 + index,
+      lineTotal: 10 + index, confidence: 0.96, confidenceLevel: "high" as const, requiresReview: false,
+    })),
+  };
+  const first = applyDeterministicMappings({ document, supplierId: "market", venueId: 10, mappings: [], nomenclature: candidates });
+  assert.equal(first.items.length, 15);
+  assert.ok(first.items.every((item) => item.mappingCandidates?.length || item.requiresReview));
+
+  let mappings: unknown[] = [];
+  for (let index = 0; index < rawNames.length; index += 1) {
+    const resolution = resolveCanonicalPurchaseItem({
+      assortment: { supplierProductMappings: mappings },
+      document: { id: "market-invoice-394", venueId: 10, supplierId: "market", supplierName: "Рынок" },
+      item: {
+        id: `line-${index + 1}`,
+        name: rawNames[index],
+        purchaseProductKey: `stock:market-${index}|g`,
+        unit: index === 7 || index === 12 ? "pcs" : "g",
+      },
+      canonicalItems: candidates,
+    });
+    mappings = upsertSupplierProductMapping(mappings, { ...resolution.sourceMapping, status: "confirmed", confidence: 1 });
+  }
+  const second = applyDeterministicMappings({
+    document,
+    supplierId: "market",
+    venueId: 10,
+    mappings: canonicalInvoiceSupplierMappings({ supplierProductMappings: mappings }, 10),
+    nomenclature: candidates,
+  });
+  assert.equal(second.items.filter((item) => item.mappingSource === "history").length, 15);
+  assert.equal(second.items.filter((item) => item.requiresReview).length, 0);
+  const metrics = recognitionMetrics({ mode: "shadow", ocr: null, document: second, nomenclatureCandidatesCount: candidates.length, startedAt: Date.now() });
+  assert.equal(metrics.historicalMappingsCount, 15);
+  assert.equal(metrics.unresolvedCount, 0);
+  assert.equal(metrics.aiRequestCount, 0);
+  assert.equal(metrics.aiEstimatedTokenUsage, 0);
+});
+
 test("20-line partial invoice keeps 18 deterministic results when AI is unavailable", () => {
   const candidates = Array.from({ length: 18 }, (_, index) => ({
     id: "product-" + index,
@@ -522,6 +711,7 @@ test("quality evaluation measures real-dataset ground truth without logging docu
 test("route keeps legacy, limits AI to unresolved lines and returns manual continuation when providers fail", async () => {
   const route = await readFile(new URL("../app/api/purchases/scan/route.ts", import.meta.url), "utf8");
   const confirm = await readFile(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), "utf8");
+  const mappingRoute = await readFile(new URL("../app/api/purchases/mappings/route.ts", import.meta.url), "utf8");
   const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
   assert.match(route, /mode === "legacy"/);
   assert.match(route, /items\.filter\(\(item\) => item\.requiresReview\)/);
@@ -541,6 +731,12 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.doesNotMatch(route, /limit:\s*10000/);
   assert.match(confirm, /INVOICE_RECOGNITION_REVIEW_REQUIRED/);
   assert.match(confirm, /INVOICE_MAPPING_STORE_KEY/);
+  assert.match(mappingRoute, /resolveCanonicalPurchaseItem/);
+  assert.match(mappingRoute, /upsertSupplierProductMapping/);
+  assert.match(mappingRoute, /ASSORTMENT_STORE_KEY/);
+  assert.match(mappingRoute, /account\.venueId/);
+  assert.match(mappingRoute, /INVOICE_RECOGNITION_V2_MAPPING_CONFIRMED/);
+  assert.doesNotMatch(mappingRoute, /INVOICE_MAPPING_STORE_KEY/);
   assert.match(bundle, /Читаем документ…/);
   assert.match(bundle, /Сопоставляем позиции…/);
   assert.match(bundle, /bdInvoiceRecognitionPhaseTimer=setTimeout/);
@@ -552,7 +748,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /sessionStorage\.removeItem\(bdInvoiceRecognitionQaStorageV2/);
   assert.doesNotMatch(bundle, /fetch\("\/api\/purchases\/scan"/);
   assert.doesNotMatch(bundle, /(?<!bdInvoiceRecognitionPhaseTimer=)setTimeout\(\(\)=>[GE]\("Сопоставляем позиции…"\),650\)/);
-  assert.match(bundle, /function bdInvoiceLineMappingV2/);
+  assert.match(bundle, /function bdInvoiceLineMappingV3/);
+  assert.match(bundle, /data-bd-invoice-mapping-memory":"canonical-v3"/);
+  assert.match(bundle, /fetch\("\/api\/purchases\/mappings"/);
   assert.match(bundle, /Найти по всей номенклатуре…/);
   assert.match(bundle, /mappingSource:"manual"/);
 });

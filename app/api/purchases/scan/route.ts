@@ -27,6 +27,7 @@ import {
 } from "../../../../lib/bardoctor/invoice-ocr";
 import {
   applyDeterministicMappings,
+  canonicalInvoiceSupplierMappings,
   compareRecognitionResults,
   confidenceLevel,
   INVOICE_MAPPING_STORE_KEY,
@@ -565,13 +566,16 @@ async function recogniseDocumentV2(input: {
     };
   }
   const supplierId = resolveSupplier(parsed, stores.suppliers);
+  const candidates = nomenclatureCandidates(stores.assortment, input.venueId);
+  const matchingStartedAt = Date.now();
   let mapped = applyDeterministicMappings({
     document: parsed,
     supplierId,
     venueId: input.venueId,
-    mappings: stores.mappings,
-    nomenclature: nomenclatureCandidates(stores.assortment, input.venueId),
+    mappings: [...canonicalInvoiceSupplierMappings(stores.assortment, input.venueId), ...stores.mappings],
+    nomenclature: candidates,
   });
+  const matchingDurationMs = Date.now() - matchingStartedAt;
   const fallbackEnabled = String(environment().INVOICE_RECOGNITION_V2_AI_FALLBACK ?? "on").toLocaleLowerCase("en-US") !== "off";
   const unresolvedCount = mapped.items.filter((item) => item.requiresReview).length;
   const simulatedUnavailable = input.simulateAiUnavailable && unresolvedCount > 0;
@@ -631,6 +635,8 @@ async function recogniseDocumentV2(input: {
     aiFallbackLinesCount: ai.aiFallbackLinesCount,
     aiRequestCount: ai.aiRequestCount,
     aiEstimatedTokenUsage: ai.aiEstimatedTokenUsage ?? 0,
+    nomenclatureCandidatesCount: candidates.length,
+    matchingDurationMs,
     startedAt,
   });
   console.info("INVOICE_RECOGNITION_V2_COMPLETED", {
