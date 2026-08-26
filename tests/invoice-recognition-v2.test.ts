@@ -517,6 +517,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(confirm, /INVOICE_MAPPING_STORE_KEY/);
   assert.match(bundle, /Читаем документ…/);
   assert.match(bundle, /Сопоставляем позиции…/);
+  assert.match(bundle, /bdInvoiceRecognitionPhaseTimer=setTimeout/);
+  assert.match(bundle, /clearTimeout\(bdInvoiceRecognitionPhaseTimer\)/);
+  assert.doesNotMatch(bundle, /(?<!bdInvoiceRecognitionPhaseTimer=)setTimeout\(\(\)=>[GE]\("Сопоставляем позиции…"\),650\)/);
   assert.match(bundle, /function bdInvoiceLineMappingV2/);
   assert.match(bundle, /Найти по всей номенклатуре…/);
   assert.match(bundle, /mappingSource:"manual"/);
