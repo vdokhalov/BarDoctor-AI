@@ -801,6 +801,8 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   const confirm = await readFile(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), "utf8");
   const mappingRoute = await readFile(new URL("../app/api/purchases/mappings/route.ts", import.meta.url), "utf8");
   const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
+  const bootstrap = await readFile(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
+  const appHtml = await readFile(new URL("../public/app.html", import.meta.url), "utf8");
   assert.match(route, /mode === "legacy"/);
   assert.match(route, /items\.filter\(\(item\) => item\.requiresReview\)/);
   assert.match(route, /INVOICE_RECOGNITION_V2_AI_FALLBACK_UNAVAILABLE/);
@@ -845,4 +847,7 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /Подтвердите предложенную номенклатуру/);
   assert.match(bundle, /e\.mappingSource==="ai"/);
   assert.match(bundle, /g\.mappingSource\|\|bdCatArray\(g\.mappingCandidates\)\.length>0/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
+  assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
+  assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-mapping-shadow-v294/);
 });

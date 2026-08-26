@@ -2,6 +2,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const bundlePath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 const cssPath = new URL("../public/catalog.css", import.meta.url);
+const bootstrapPath = new URL("../public/bardoctor-preview.js", import.meta.url);
+const appHtmlPath = new URL("../public/app.html", import.meta.url);
+const cacheToken = "20260826-invoice-mapping-shadow-v294";
 let bundle = readFileSync(bundlePath, "utf8");
 
 const component = `function bdInvoiceLineMappingV3({line:e,supplierId:t,supplierName:n,documentId:r,onSelect:a}){const[s,l]=S.useState(()=>!e.purchaseProductKey),[u,d]=S.useState(""),[f,m]=S.useState([]),[h,g]=S.useState(""),[y,j]=S.useState(null),[v,b]=S.useState("idle"),[N,E]=S.useState(0),[_,T]=S.useState("idle"),C=bdCatArray(e.mappingCandidates);S.useEffect(()=>{if(!s)return;const A=setTimeout(()=>E(k=>k+1),250);return()=>clearTimeout(A)},[s,u]);S.useEffect(()=>{if(!s)return;const A=new AbortController,k=new URLSearchParams({q:u,limit:"50"});h&&k.set("cursor",h),b("loading"),fetch("/api/tech-cards/nomenclature?"+k.toString(),{headers:ca(Ot()),cache:"no-store",signal:A.signal}).then(O=>O.json().then(P=>({ok:O.ok,body:P}))).then(({ok:O,body:P})=>{if(!O||!P.ok)throw new Error(P.error||"Не удалось загрузить номенклатуру");const R=bdCatArray(P.items);m(M=>h?[...new Map([...M,...R].map(L=>[L.key,L])).values()]:R),j(P.nextCursor||null),b("loaded")}).catch(O=>{O.name!=="AbortError"&&b("error")});return()=>A.abort()},[s,u,h,N]);function A(k){if(!t||!e.rawName){T("deferred");return}T("saving"),fetch("/api/purchases/mappings",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json",...ca(Ot())},body:JSON.stringify({supplierId:t,supplierName:n,documentId:r,lineId:e.id,rawName:e.rawName,unit:e.unit,packageSize:e.packageSize,currency:e.currency,purchaseProductKey:k.key,nomenclatureId:k.id})}).then(O=>O.json().then(P=>({ok:O.ok,body:P}))).then(({ok:O,body:P})=>{if(!O||!P.ok)throw new Error(P.error||"mapping failed");T("saved")}).catch(()=>T("error"))}function O(k){a({purchaseProductKey:k.key,nomenclatureId:k.id,name:k.name,requiresReview:!1,mappingSource:"manual",confidence:1,confidenceLevel:"high"}),l(!1),A(k)}if(!s&&e.purchaseProductKey)return i.jsxs("div",{"data-bd-invoice-mapping-memory":"canonical-v3",className:"bd-invoice-mapping-v2 is-linked",children:[i.jsxs("span",{children:[i.jsx("strong",{children:e.name}),i.jsx("small",{children:e.mappingSource==="history"?"Знакомая позиция поставщика":_==="saved"?"Соответствие поставщика сохранено":_==="saving"?"Сохраняем соответствие…":_==="error"?"Связано; повторное обучение сохранится при подтверждении покупки":"Связано с номенклатурой"})]}),i.jsx("button",{type:"button",onClick:()=>l(!0),children:"Изменить"})]});return i.jsxs("div",{"data-bd-invoice-mapping-memory":"canonical-v3",className:"bd-invoice-mapping-v2 "+(e.requiresReview?"needs-review":""),children:[i.jsx("strong",{children:e.requiresReview?"Нужно сопоставить с номенклатурой":"Номенклатура"}),C.length>0&&i.jsxs("div",{className:"bd-invoice-mapping-suggestions-v3",children:[i.jsx("small",{children:"Предложенные совпадения"}),C.map(k=>i.jsxs("button",{type:"button",onClick:()=>O(k),children:[i.jsx("b",{children:k.name}),i.jsx("small",{children:"Уверенность "+Math.round((Number(k.score)||0)*100)+"%"})]},k.key||k.id))]}),i.jsx("input",{type:"search",value:u,autoFocus:e.requiresReview,onChange:k=>{d(k.target.value),g("")},placeholder:"Найти по всей номенклатуре…","aria-label":"Поиск номенклатуры для строки накладной"}),v==="loading"&&i.jsx("div",{className:"bd-invoice-mapping-state-v2",role:"status",children:u?"Ищем по всей номенклатуре…":"Загружаем номенклатуру…"}),v==="error"&&i.jsxs("div",{className:"bd-invoice-mapping-state-v2 is-error",role:"alert",children:["Не удалось загрузить номенклатуру. ",i.jsx("button",{type:"button",onClick:()=>E(k=>k+1),children:"Повторить"})]}),v==="loaded"&&!f.length&&i.jsx("div",{className:"bd-invoice-mapping-state-v2",children:"Ничего не найдено"}),v==="loaded"&&f.length>0&&i.jsx("div",{className:"bd-invoice-mapping-results-v2",children:f.map(k=>i.jsxs("button",{type:"button",onClick:()=>O(k),children:[i.jsx("b",{children:k.name}),i.jsxs("small",{children:[k.packageSize||k.unit,k.supplierName?" · "+k.supplierName:""]})]},k.key))}),v==="loaded"&&i.jsx("button",{type:"button",className:"bd-invoice-mapping-more-v2",disabled:!y,onClick:()=>g(y||""),children:y?"Показать ещё":"Все позиции загружены"}),!e.requiresReview&&i.jsx("button",{type:"button",className:"bd-invoice-mapping-collapse-v2",onClick:()=>l(!1),children:"Свернуть"})]})}
@@ -58,4 +61,28 @@ if (!css.includes(".bd-invoice-mapping-suggestions-v3")) {
 
 writeFileSync(bundlePath, bundle);
 writeFileSync(cssPath, css);
+let bootstrap = readFileSync(bootstrapPath, "utf8");
+bootstrap = bootstrap.replace(`?v=${cacheToken}-`, "?v=");
+if (!new RegExp(`index-BQGspy0I\\.js\\?v=[^\"]*${cacheToken}`).test(bootstrap)) {
+  bootstrap = bootstrap.replace(
+    /(script\.src = "\/assets\/index-BQGspy0I\.js\?v=[^"]+)";/,
+    `$1-${cacheToken}";`,
+  );
+}
+let appHtml = readFileSync(appHtmlPath, "utf8");
+appHtml = appHtml.replaceAll(`?v=${cacheToken}-`, "?v=");
+if (!new RegExp(`catalog\\.css\\?v=[^\"]*${cacheToken}`).test(appHtml)) {
+  appHtml = appHtml.replace(
+    /(href="\/catalog\.css\?v=[^"]+)"/,
+    `$1-${cacheToken}"`,
+  );
+}
+if (!new RegExp(`bardoctor-preview\\.js\\?v=[^\"]*${cacheToken}`).test(appHtml)) {
+  appHtml = appHtml.replace(
+    /(src="\/bardoctor-preview\.js\?v=[^"]+)"/,
+    `$1-${cacheToken}"`,
+  );
+}
+writeFileSync(bootstrapPath, bootstrap);
+writeFileSync(appHtmlPath, appHtml);
 console.log("Applied Invoice Recognition V2 mapping UI.");
