@@ -5,7 +5,8 @@ const bootstrapPath = new URL("../public/bardoctor-preview.js", import.meta.url)
 const appHtmlPath = new URL("../public/app.html", import.meta.url);
 let bundle = readFileSync(bundlePath, "utf8");
 const marker = 'const bdInvoiceRecognitionV2="invoice-recognition-v2";';
-const qaUrlHelper = 'function bdInvoiceRecognitionQaUrlV2(){const e=new URLSearchParams(window.location.search).get("invoiceRecognitionQa");return e==="shadow"?"/api/purchases/scan?qa=shadow":e==="ai-unavailable"?"/api/purchases/scan?qa=ai-unavailable":"/api/purchases/scan"}';
+const previousQaUrlHelper = 'function bdInvoiceRecognitionQaUrlV2(){const e=new URLSearchParams(window.location.search).get("invoiceRecognitionQa");return e==="shadow"?"/api/purchases/scan?qa=shadow":e==="ai-unavailable"?"/api/purchases/scan?qa=ai-unavailable":"/api/purchases/scan"}';
+const qaUrlHelper = 'const bdInvoiceRecognitionQaStorageV2="bd.invoiceRecognitionQa",bdInvoiceRecognitionQaRequestedV2=(()=>{let e=new URLSearchParams(window.location.search).get("invoiceRecognitionQa");try{e==="shadow"||e==="ai-unavailable"?sessionStorage.setItem(bdInvoiceRecognitionQaStorageV2,e):e=sessionStorage.getItem(bdInvoiceRecognitionQaStorageV2)}catch{}return e==="shadow"||e==="ai-unavailable"?e:""})();function bdInvoiceRecognitionQaUrlV2(){const e=bdInvoiceRecognitionQaRequestedV2;try{sessionStorage.removeItem(bdInvoiceRecognitionQaStorageV2)}catch{}return e==="shadow"?"/api/purchases/scan?qa=shadow":e==="ai-unavailable"?"/api/purchases/scan?qa=ai-unavailable":"/api/purchases/scan"}';
 
 function replaceRequired(before, after, label) {
   const count = bundle.split(before).length - 1;
@@ -51,7 +52,9 @@ replacePhaseTimer({
   label: "Supplier procurement",
 });
 
-if (!bundle.includes(qaUrlHelper)) {
+if (bundle.includes(previousQaUrlHelper)) {
+  replaceRequired(previousQaUrlHelper, qaUrlHelper, "Invoice QA URL persistence helper");
+} else if (!bundle.includes(qaUrlHelper)) {
   if (bundle.includes(marker)) bundle = bundle.replace(marker, marker + qaUrlHelper);
   else bundle = `${marker}${qaUrlHelper}${bundle}`;
 }

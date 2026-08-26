@@ -547,6 +547,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /clearTimeout\(bdInvoiceRecognitionPhaseTimer\)/);
   assert.match(bundle, /function bdInvoiceRecognitionQaUrlV2/);
   assert.match(bundle, /invoiceRecognitionQa/);
+  assert.match(bundle, /sessionStorage\.setItem\(bdInvoiceRecognitionQaStorageV2/);
+  assert.match(bundle, /sessionStorage\.getItem\(bdInvoiceRecognitionQaStorageV2/);
+  assert.match(bundle, /sessionStorage\.removeItem\(bdInvoiceRecognitionQaStorageV2/);
   assert.doesNotMatch(bundle, /fetch\("\/api\/purchases\/scan"/);
   assert.doesNotMatch(bundle, /(?<!bdInvoiceRecognitionPhaseTimer=)setTimeout\(\(\)=>[GE]\("Сопоставляем позиции…"\),650\)/);
   assert.match(bundle, /function bdInvoiceLineMappingV2/);
