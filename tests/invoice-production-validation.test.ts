@@ -105,6 +105,23 @@ test("production quality resolves migrated nomenclature ids to canonical keys", 
   assert.equal(quality.criticalHighFalsePositives, 0);
 });
 
+test("production quality classifies unresolved legacy ground truth as unknown instead of incorrect", () => {
+  const expected = purchase("invoice", "supplier", 1);
+  expected.items[0].nomenclatureId = "legacy-unresolved";
+  expected.items[0].purchaseProductKey = "legacy:unresolved";
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "proposal", key: "stock:proposal|pcs", venueId: 1, name: "Товар invoice 0", unit: "pcs", packageSize: "1 шт.",
+  }] }, 1);
+  const document = storedPurchaseAsParsed(expected);
+  document.items[0] = {
+    ...document.items[0], nomenclatureId: "proposal", purchaseProductKey: "stock:proposal|pcs",
+    confidenceLevel: "medium", requiresReview: true,
+  };
+  const quality = productionMatchingQuality({ document, expected, candidates });
+  assert.equal(quality.incorrect, 0);
+  assert.equal(quality.unknownNeedsDecision, 1);
+});
+
 test("production parser quality does not treat a legacy measured-total package as the bottle size", () => {
   const expected = purchase("vprok", "vprok", 1, "379");
   expected.items[0] = { ...expected.items[0], name: "Водка Volk", rawName: "Водка Volk", quantity: 10, unit: "л", packageSize: "10 л", unitPrice: 114.3, lineTotal: 1143 };

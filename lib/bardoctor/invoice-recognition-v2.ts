@@ -295,9 +295,18 @@ export function mergeShadowMappingMetadata(
   };
 }
 
+function repairInvoicePackageMarker(value: string): string {
+  return value.replace(
+    /(^|\s)(л|l|п|p|pet)\s*[.:/-]?\s*!(?=\s|$)/giu,
+    "$1$2.1",
+  );
+}
+
 export function packageFingerprint(value: unknown): string {
-  const source = text(value, "", 500).toLocaleLowerCase("ru-RU").replace(/(\d),(\d)/g, "$1.$2");
-  const normalized = normalizeInvoiceText(value);
+  const source = repairInvoicePackageMarker(text(value, "", 500))
+    .toLocaleLowerCase("ru-RU")
+    .replace(/(\d),(\d)/g, "$1.$2");
+  const normalized = normalizeInvoiceText(source);
   const match = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg|pcs)\b/)
     ?? source.match(/(?:^|\s)(ml|l|g|kg|мл|л|г|кг)\s*[.:/-]?\s*(\d+(?:\.\d+)?)(?=\s|$)/)
     ?? source.match(/(?:^|\s)(?:pet|p|п)\s*[.:/-]?\s*(\d+(?:\.\d+)?)(?=\s|$)/);
@@ -533,7 +542,7 @@ function isHeaderOrTotalLine(value: string): boolean {
 export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine | null {
   const raw = text(value, "", 500);
   if (!raw || isHeaderOrTotalLine(raw)) return null;
-  const cleaned = raw
+  const cleaned = repairInvoicePackageMarker(raw)
     .replace(/[|¦\[\]]/g, " ")
     .replace(/[₽€$]/g, " ")
     .replace(/^\s*\d{1,3}[.)]?\s+(?=\p{L})/u, "")
@@ -545,15 +554,19 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   );
   if (!match) return null;
   const rawNameWithUnits = match[1].trim();
+  const trailingUnit = rawNameWithUnits.match(/(?:^|\s)(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)\s*$/i)?.[1];
+  const parsedUnit = match[3] ?? trailingUnit;
   const barcode = rawNameWithUnits.match(/\b\d{8,14}\b/)?.[0];
   const supplierArticle = rawNameWithUnits.match(/\b(?:арт(?:икул)?|article|sku|код)\s*[:#-]?\s*([a-zа-я0-9][a-zа-я0-9._/-]{2,39})\b/i)?.[1];
   const packageMatch = rawNameWithUnits.match(/(?:^|\s)\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|кг|kg|г|g)(?=\s|$)/i)
     ?? rawNameWithUnits.match(/(?:^|\s)(?:мл|ml|л|l|кг|kg|г|g)\s*[.,:/-]?\s*\d+(?:[.,]\d+)?(?=\s|$)/i)
-    ?? ((canonicalPurchaseUnit(match[3]) === "ml")
+    ?? ((canonicalPurchaseUnit(parsedUnit) === "ml")
       ? rawNameWithUnits.match(/(?:^|\s)(?:п|pet)\s*[.,:/-]?\s*\d+(?:[.,]\d+)?(?=\s|$)/i)
       : null);
   const rawName = rawNameWithUnits
     .replace(/(?:\s+(?:мл|ml|л|l|кг|kg|г|g|шт|pcs)[.!]*){1,2}$/i, "")
+    .replace(/(?:^|\s)(?:л|l|п|p|pet)\s*[.:/-]\s*1(?=\s|$)/giu, " ")
+    .replace(/\s+/g, " ")
     .trim();
   const quantity = numeric(match[2]);
   const unitPrice = numeric(match[4]);
@@ -563,7 +576,7 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   const score = arithmetic ? 0.9 : 0.72;
   const packageSemantics = normalizeInvoicePackageSemantics({
     quantity,
-    unit: text(match[3], "шт.", 20),
+    unit: text(parsedUnit, "шт.", 20),
     packageSize: packageMatch ? packageLabelFromFingerprint(packageFingerprint(packageMatch[0])) : undefined,
     preserveMeasuredUnit: true,
   });

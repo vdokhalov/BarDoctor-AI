@@ -243,8 +243,9 @@ export function productionMatchingQuality(input: {
     if (Math.abs(line.unitPrice - expected.unitPrice) <= 0.01) unitPriceCorrect += 1;
     if (Math.abs(line.lineTotal - expected.lineTotal) <= 0.01) lineTotalCorrect += 1;
     const expectedKey = targetKey(expected, input.candidates);
+    const expectedCandidate = input.candidates.find((candidate) => candidate.key === expectedKey || candidate.id === expectedKey);
     const actualKey = candidateKey(line, input.candidates);
-    if (!expectedKey || !actualKey) {
+    if (!expectedCandidate || !actualKey) {
       unpairedActual += 1;
       continue;
     }
@@ -252,7 +253,7 @@ export function productionMatchingQuality(input: {
     const selected = input.candidates.find((candidate) => candidate.key === actualKey || candidate.id === line.nomenclatureId);
     const selectedPackage = packageFingerprint(`${selected?.name ?? ""} ${selected?.packageSize ?? ""}`);
     if (sourcePackage && selectedPackage && sourcePackage !== selectedPackage) packageConflicts += 1;
-    if (actualKey === expectedKey) correct += 1;
+    if (actualKey === expectedCandidate.key) correct += 1;
     else {
       incorrect += 1;
       if (!line.requiresReview && line.confidenceLevel === "high") criticalHighFalsePositives += 1;

@@ -103,6 +103,22 @@ test("Vprok 379 parser reads reversed one-litre markers without copying measured
   }
 });
 
+test("Vprok 379 parser repairs OCR bang markers and restores measured quantity and unit", () => {
+  const fixtures = [
+    ["Водка Волк л.! л 10 114,30 1143,00", 10],
+    ["Коньяк Нистру л.! л 10 237,70 2377,00", 10],
+    ["Коньяк Сюрпризный л.! л 10 275,20 2752,00", 10],
+    ["Кола л.! л 75 23,74 1780,50", 75],
+  ] as const;
+  for (const [raw, expectedQuantity] of fixtures) {
+    const line = parseInvoiceLine(raw);
+    assert.ok(line, raw);
+    assert.equal(line.quantity, expectedQuantity, raw);
+    assert.equal(line.unit, "л", raw);
+    assert.equal(line.packageSize, "1 л", raw);
+  }
+});
+
 test("Sherif measured litres stay litres when a product name contains a one-litre PET marker", () => {
   const line = parseInvoiceLine("13 | Кола п.1 | л | 15 л | 21,60 | 324,00");
   assert.ok(line);
