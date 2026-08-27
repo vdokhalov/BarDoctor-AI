@@ -25,6 +25,7 @@ export type InvoiceOcrResult = {
 
 export type SupplierItemMapping = {
   id: string;
+  sourceItemKey?: string;
   venueId: number;
   supplierId: string;
   rawName: string;
@@ -900,6 +901,7 @@ export function canonicalInvoiceSupplierMappings(
     )
     .map((mapping) => ({
       id: mapping.id,
+      sourceItemKey: mapping.sourceItemKey,
       venueId,
       supplierId: mapping.supplierId!,
       rawName: mapping.sourceName,

@@ -264,6 +264,8 @@ test("production trace exposes selected versus expected identity without writing
   document.items[0] = { ...document.items[0], nomenclatureId: "wrong", purchaseProductKey: "stock:wrong|pcs", mappingSource: "exact_alias", confidenceLevel: "high", requiresReview: false };
   const [trace] = productionMatchingTrace({ document, expected, candidates });
   assert.equal(trace.rawSupplierLine, "Товар invoice 0");
+  assert.equal(trace.parsed.unitPrice, document.items[0].unitPrice);
+  assert.equal(trace.parsed.lineTotal, document.items[0].lineTotal);
   assert.equal(trace.selectedCandidate?.id, "wrong");
   assert.equal(trace.expectedCandidate?.id, "right");
   assert.equal(trace.correct, false);

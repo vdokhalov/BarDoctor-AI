@@ -20,12 +20,15 @@ import {
   canonicalInvoiceSupplierMappings,
   invoiceRecognitionMode,
   invoiceOcrStageTrace,
+  invoiceIdentityConflicts,
+  matchInvoiceLine,
   nomenclatureCandidates,
   normalizeInvoiceText,
   recognitionQualityAgainstGroundTruth,
   type ParsedInvoiceDocument,
   type SupplierItemMapping,
 } from "../../../../lib/bardoctor/invoice-recognition-v2";
+import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
 import type { PurchaseDocument } from "../../../../lib/bardoctor/purchases";
 
 type StoreRow = { store_key: string; data_json: string };
@@ -43,6 +46,7 @@ type JsonRecord = Record<string, unknown>;
 const VENUE_ID = 1;
 const DATA_ACCOUNT_ID = 1;
 const REQUIRED_INTENT = "validate-koln-hybrid-v2-read-only";
+const PRODUCTION_VERSION = 319;
 const STORE_KEYS = [
   "bd_assortment_v1", "bd_purchase_documents", "bd_suppliers", "bd_invoice_supplier_mappings_v2", "bd_stock_movements",
 ];
@@ -233,7 +237,68 @@ async function usage(jobId: string) {
     outputTokens: rows.reduce((sum, row) => sum + Number(row.output_tokens ?? 0), 0),
     totalTokens: rows.reduce((sum, row) => sum + Number(row.total_tokens ?? 0), 0),
     providerLatencyMs: rows.reduce((sum, row) => sum + Number(row.latency_ms ?? 0), 0),
+    statuses: [...new Set(rows.map((row) => row.status).filter(Boolean))],
     errors: [...new Set(rows.map((row) => row.error_code).filter(Boolean))],
+    providerStatus: rows.some((row) => row.error_code)
+      ? "fallback_unavailable"
+      : rows.length ? "available" : "not_used",
+  };
+}
+
+function historicalMappingTrace(input: {
+  line: ParsedInvoiceDocument["items"][number];
+  supplierId: string;
+  mappings: SupplierItemMapping[];
+  candidates: ReturnType<typeof nomenclatureCandidates>;
+}) {
+  const identityMappings = input.mappings.filter((mapping) =>
+    mapping.venueId === VENUE_ID
+    && mapping.supplierId === input.supplierId
+    && (
+      mapping.normalizedRawName === input.line.normalizedRawName
+      || Boolean(input.line.supplierArticle && mapping.supplierArticle === input.line.supplierArticle)
+      || Boolean(input.line.barcode && mapping.barcode === input.line.barcode)
+    )
+  );
+  if (!identityMappings.length) return {
+    found: false,
+    mappingKey: null,
+    compatible: null,
+    reason: "persisted_mapping_not_found",
+  };
+  const checked = identityMappings.map((mapping) => {
+    const rematched = matchInvoiceLine({
+      line: {
+        ...input.line,
+        purchaseProductKey: undefined,
+        nomenclatureId: undefined,
+        nomenclatureName: undefined,
+        mappingSource: undefined,
+      },
+      supplierId: input.supplierId,
+      venueId: VENUE_ID,
+      mappings: [mapping],
+      nomenclature: input.candidates,
+    });
+    const candidate = input.candidates.find((value) =>
+      value.id === mapping.nomenclatureId || value.key === mapping.nomenclatureId
+    );
+    const conflicts = candidate ? invoiceIdentityConflicts(input.line, candidate) : ["canonical_target_missing"];
+    return {
+      mapping,
+      compatible: rematched.mappingSource === "history",
+      conflicts,
+    };
+  });
+  const selected = checked.find((value) => value.compatible) ?? checked[0];
+  return {
+    found: true,
+    mappingKey: selected.mapping.sourceItemKey ?? selected.mapping.id,
+    compatible: selected.compatible,
+    canonicalTarget: selected.mapping.nomenclatureId,
+    reason: selected.compatible
+      ? "compatible_identity"
+      : selected.conflicts.length ? `identity_conflict:${selected.conflicts.join(",")}` : "mapping_identity_incompatible",
   };
 }
 
@@ -438,6 +503,26 @@ async function validatePersistedDocument(input: {
     }),
   });
   const actualUsage = await usage(jobId);
+  const persistedMappings = [
+    ...canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
+    ...input.standaloneMappings.filter((mapping) => mapping.venueId === VENUE_ID),
+  ];
+  const lineTrace = productionMatchingTrace({
+    document: result.document,
+    expected: canonicalGroundTruthPurchase({
+      document: input.document,
+      supplierId,
+      mappings: canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
+      candidates,
+    }),
+    candidates,
+  }).map((trace) => {
+    const line = result.document.items.find((value) => value.id === trace.lineId);
+    return {
+      ...trace,
+      historicalMapping: line ? historicalMappingTrace({ line, supplierId, mappings: persistedMappings, candidates }) : null,
+    };
+  });
   return {
     correlationId: jobId,
     supplier: input.document.supplierName,
@@ -458,16 +543,7 @@ async function validatePersistedDocument(input: {
       selectedAttempt: ocrResult.selectedAttempt,
       attempts: ocrResult.attempts,
     },
-    lineTrace: productionMatchingTrace({
-      document: result.document,
-      expected: canonicalGroundTruthPurchase({
-        document: input.document,
-        supplierId,
-        mappings: canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
-        candidates,
-      }),
-      candidates,
-    }),
+    lineTrace,
   };
 }
 
@@ -494,6 +570,47 @@ export async function GET(request: Request): Promise<Response> {
   const standaloneMappings = array(parse(rows.get("bd_invoice_supplier_mappings_v2"), [])) as SupplierItemMapping[];
   const candidates = nomenclatureCandidates(assortment, VENUE_ID);
   const selection = selectProductionHybridDocuments(purchases, VENUE_ID);
+  if (url.searchParams.get("stage") === "surface") {
+    const root = record(assortment);
+    const mappings = canonicalInvoiceSupplierMappings(assortment, VENUE_ID);
+    return Response.json({
+      ok: true,
+      stage: "surface",
+      productionContext: {
+        venue: "Кёльн",
+        venueId: account.venueId,
+        dataAccountId: account.id,
+        canonicalSource: "bd_assortment_v1",
+        canonicalPositions: array(root.nomenclature).filter((value) =>
+          Number(record(value).venueId ?? VENUE_ID) === account.venueId
+        ).length,
+        searchableCandidates: candidates.length,
+        suppliers: suppliers.length,
+        purchases: purchases.length,
+        supplierMappings: mappings.length + standaloneMappings.filter((mapping) => mapping.venueId === account.venueId).length,
+        configuredMode,
+        v2Primary: false,
+        productionVersion: PRODUCTION_VERSION,
+        sourceCommit: BARDOCTOR_SOURCE_COMMIT,
+      },
+      documents: selection.selected.map((document) => ({
+        id: document.id,
+        supplierId: supplierIdFor(document, suppliers) ?? null,
+        supplier: document.supplierName,
+        documentNumber: document.documentNumber ?? null,
+        date: document.date ?? null,
+        lineCount: document.items.length,
+        sourceFiles: productionSourceFileIds(document).length,
+      })),
+      safety: {
+        shadowOnly: true,
+        postingAvailable: false,
+        featureFlagMutationAvailable: false,
+        businessWrites: ["supplier_mapping_explicit_confirmation_only"],
+      },
+      writes: { purchases: 0, stockMovements: 0, expenses: 0, supplierDebt: 0, supplierMappings: 0 },
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   if (candidates.length === 0 || selection.selected.length < 3) {
     return Response.json({
       ok: false,
@@ -518,7 +635,8 @@ export async function GET(request: Request): Promise<Response> {
   const requestedDocument = normalizeInvoiceText(url.searchParams.get("document") ?? "");
   const selectedDocuments = requestedDocument
     ? selection.selected.filter((document) =>
-      normalizeInvoiceText(document.supplierName) === requestedDocument
+      normalizeInvoiceText(document.id) === requestedDocument
+      || normalizeInvoiceText(document.supplierName) === requestedDocument
       || normalizeInvoiceText(document.documentNumber) === requestedDocument
     )
     : selection.selected;
@@ -532,6 +650,7 @@ export async function GET(request: Request): Promise<Response> {
       const stored = storedPurchaseAsParsed(document);
       const parsedDocument = ocrResult.parsed ?? stored;
       diagnostics.push({
+        documentId: document.id,
         supplier: document.supplierName,
         documentNumber: document.documentNumber ?? null,
         storedLines: document.items.length,
@@ -540,6 +659,7 @@ export async function GET(request: Request): Promise<Response> {
         selectedAttempt: ocrResult.selectedAttempt,
         attempts: ocrResult.attempts,
         parser: recognitionQualityAgainstGroundTruth(parsedDocument, expected(document)),
+        commercialFields: productionMatchingQuality({ document: parsedDocument, expected: document, candidates }).commercialFields,
         trace: ocrResult.ocr ? invoiceOcrStageTrace(ocrResult.ocr) : null,
       });
     }

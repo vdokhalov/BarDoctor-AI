@@ -54,6 +54,8 @@ export function productionMatchingTrace(input: {
         quantity: line.quantity,
         unit: line.unit,
         package: line.packageSize ?? null,
+        unitPrice: line.unitPrice,
+        lineTotal: line.lineTotal,
         supplierArticle: line.supplierArticle ?? null,
         barcode: line.barcode ?? null,
       },
