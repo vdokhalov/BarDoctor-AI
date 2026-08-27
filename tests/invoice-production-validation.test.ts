@@ -276,6 +276,10 @@ test("production Hybrid QA route is controlled, keeps Primary legacy, and cannot
   assert.match(route, /configuredMode !== "legacy"/);
   assert.match(route, /observabilityOnly: true/);
   assert.match(route, /postingInvoked: false/);
+  assert.match(route, /stage: "ocr_parser"/);
+  assert.match(route, /stage: "persisted_learning"/);
+  assert.match(route, /stage: "canonical_delta"/);
+  assert.match(route, /configuredStableInvoiceOcr/);
   assert.doesNotMatch(route, /INSERT INTO domain_data|UPDATE domain_data|DELETE FROM domain_data/);
   assert.doesNotMatch(route, /applyPurchaseToInventory|createStockMovement|applySupplierDebt|createExpense/);
 });

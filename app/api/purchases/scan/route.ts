@@ -21,10 +21,8 @@ import {
   venueAIContextForPrompt,
 } from "../../../../lib/bardoctor/venue-ai-context";
 import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
-import {
-  configuredInvoiceOcr,
-  InvoiceOcrError,
-} from "../../../../lib/bardoctor/invoice-ocr";
+import { InvoiceOcrError } from "../../../../lib/bardoctor/invoice-ocr";
+import { configuredStableInvoiceOcr } from "../../../../lib/bardoctor/invoice-ocr-stability";
 import {
   applyDeterministicMappings,
   canonicalInvoiceSupplierMappings,
@@ -580,6 +578,7 @@ async function recogniseDocumentV2(input: {
   }
   const stores = await recognitionStores(input.accountId);
   let ocr: InvoiceOcrResult | null = null;
+  let stableParsed: ParsedInvoiceDocument | null = null;
   let ocrFailure = false;
   const issues: Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED"> = [];
   if (input.parsedDocument) {
@@ -595,7 +594,9 @@ async function recogniseDocumentV2(input: {
     if (input.documents.length === 1 && SHEET_TYPES.has(input.documents[0].mimeType)) {
       ocr = spreadsheetOcr(input.documents[0]);
     } else {
-      ocr = await configuredInvoiceOcr({ documents: input.documents, environment: environment() });
+      const stable = await configuredStableInvoiceOcr({ documents: input.documents, environment: environment() });
+      ocr = stable.ocr;
+      stableParsed = stable.parsed;
     }
   } catch (error) {
     ocrFailure = true;
@@ -610,7 +611,7 @@ async function recogniseDocumentV2(input: {
   }
   let parsed: ParsedInvoiceDocument;
   try {
-    parsed = input.parsedDocument ?? (ocr ? parseInvoiceOcr(ocr) : {
+    parsed = input.parsedDocument ?? stableParsed ?? (ocr ? parseInvoiceOcr(ocr) : {
       documentType: "invoice" as const,
       supplierName: "Новый поставщик",
       supplierType: "wholesale" as const,

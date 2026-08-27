@@ -679,7 +679,7 @@ function headerSupplier(lines: OcrLine[], rawText: string): string {
   return "Новый поставщик";
 }
 
-function structuredRowsFromVerticalTable(rawText: string): string[] {
+export function structuredRowsFromVerticalTable(rawText: string): string[] {
   const cells = rawText.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
   const header = cells.findIndex((value, index) =>
     /^(?:№|no)$/i.test(value)
@@ -709,6 +709,56 @@ function structuredRowsFromVerticalTable(rawText: string): string[] {
     index += 6;
   }
   return rows;
+}
+
+function parseRejectionReason(value: string): string | null {
+  if (!value.trim()) return "empty";
+  if (isHeaderOrTotalLine(value)) return "header_or_total";
+  if (!/\p{L}/u.test(value)) return "no_product_text";
+  return parseInvoiceLine(value) ? null : "column_pattern_not_parseable";
+}
+
+export function invoiceOcrStageTrace(ocr: InvoiceOcrResult) {
+  const rawTextLines = ocr.rawText.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+  const verticalRows = structuredRowsFromVerticalTable(ocr.rawText);
+  const parsed = parseInvoiceOcr(ocr);
+  return {
+    engine: ocr.engine ?? null,
+    rawTextLineCount: rawTextLines.length,
+    overlayBlockCount: ocr.lines.length,
+    rawTextLines: rawTextLines.map((value, index) => ({
+      index,
+      text: value,
+      parsed: Boolean(parseInvoiceLine(value, index)),
+      rejectedBecause: parseRejectionReason(value),
+    })),
+    overlayBlocks: ocr.lines.map((line, index) => ({
+      index,
+      page: line.page ?? null,
+      text: line.text,
+      confidence: line.confidence,
+      bounds: line.bounds ?? null,
+      parsed: Boolean(parseInvoiceLine(line.text, index)),
+      rejectedBecause: parseRejectionReason(line.text),
+    })),
+    verticalRows: verticalRows.map((value, index) => ({
+      index,
+      text: value,
+      parsed: Boolean(parseInvoiceLine(value, index)),
+      rejectedBecause: parseRejectionReason(value),
+    })),
+    parsedItems: parsed.items.map((item) => ({
+      id: item.id,
+      rawName: item.rawName,
+      normalizedRawName: item.normalizedRawName,
+      quantity: item.quantity,
+      unit: item.unit,
+      packageSize: item.packageSize ?? null,
+      unitPrice: item.unitPrice,
+      lineTotal: item.lineTotal,
+      requiresReview: item.requiresReview,
+    })),
+  };
 }
 
 export function parseInvoiceOcr(ocr: InvoiceOcrResult): ParsedInvoiceDocument {

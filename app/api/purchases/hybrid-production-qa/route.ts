@@ -1,9 +1,11 @@
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
+import { buildAssortmentMigrationPreview } from "../../../../lib/bardoctor/assortment-migration-preview";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { createOpenAIInvoiceMatchingProvider } from "../../../../lib/bardoctor/invoice-ai-openai-provider";
 import { runInvoiceAIBulkMatching } from "../../../../lib/bardoctor/invoice-ai-matching";
-import { configuredInvoiceOcr } from "../../../../lib/bardoctor/invoice-ocr";
+import { configuredStableInvoiceOcr } from "../../../../lib/bardoctor/invoice-ocr-stability";
+import { buildKolnAssortmentReconciliation } from "../../../../lib/bardoctor/koln-assortment-migration";
 import {
   canonicalGroundTruthPurchase,
   confirmedMemoryFromReviewedGroundTruth,
@@ -17,9 +19,9 @@ import {
   applyDeterministicMappings,
   canonicalInvoiceSupplierMappings,
   invoiceRecognitionMode,
+  invoiceOcrStageTrace,
   nomenclatureCandidates,
   normalizeInvoiceText,
-  parseInvoiceOcr,
   recognitionQualityAgainstGroundTruth,
   type ParsedInvoiceDocument,
   type SupplierItemMapping,
@@ -41,7 +43,9 @@ type JsonRecord = Record<string, unknown>;
 const VENUE_ID = 1;
 const DATA_ACCOUNT_ID = 1;
 const REQUIRED_INTENT = "validate-koln-hybrid-v2-read-only";
-const STORE_KEYS = ["bd_assortment_v1", "bd_purchase_documents", "bd_suppliers", "bd_invoice_supplier_mappings_v2"];
+const STORE_KEYS = [
+  "bd_assortment_v1", "bd_purchase_documents", "bd_suppliers", "bd_invoice_supplier_mappings_v2", "bd_stock_movements",
+];
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
@@ -81,14 +85,97 @@ async function stores(): Promise<Map<string, string>> {
   return new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
 }
 
+async function canonicalMigrationDelta(input: {
+  assortment: unknown;
+  purchases: unknown[];
+  suppliers: unknown[];
+  stockMovements: unknown[];
+}) {
+  const operation = await getD1().prepare(`
+    SELECT operation_id, export_id, created_at, plan_json
+    FROM venue_migration_operations
+    WHERE venue_id = ? AND data_account_id = ? AND status = 'migrated'
+    ORDER BY cutover_at DESC LIMIT 1
+  `).bind(VENUE_ID, DATA_ACCOUNT_ID).first<{
+    operation_id: string; export_id: string; created_at: string; plan_json: string;
+  }>();
+  if (!operation) return { available: false, reason: "migration_operation_not_found" };
+  const migrationExport = await getD1().prepare(`
+    SELECT payload_json FROM venue_migration_exports WHERE export_id = ? LIMIT 1
+  `).bind(operation.export_id).first<{ payload_json: string }>();
+  const payload = record(parse(migrationExport?.payload_json, {}));
+  const affectedStores = record(payload.affectedStores);
+  const beforeAssortment = record(record(affectedStores.bd_assortment_v1).data);
+  const preview = buildAssortmentMigrationPreview({
+    venueId: VENUE_ID,
+    purchases: input.purchases,
+    suppliers: input.suppliers,
+    stockMovements: input.stockMovements,
+    serverAssortmentExists: true,
+    sourceStorePresence: { purchases: true, suppliers: true, stockMovements: true, assortment: true },
+  });
+  const expected = buildKolnAssortmentReconciliation({
+    venueId: VENUE_ID,
+    existingAssortment: beforeAssortment,
+    preview,
+    operationId: operation.operation_id,
+    now: operation.created_at,
+  });
+  const keyOf = (value: unknown) => String(record(value).productKey ?? record(value).key ?? "");
+  const currentRows = array(record(input.assortment).nomenclature);
+  const expectedRows = array(record(expected.assortment).nomenclature);
+  const currentKeys = new Set(currentRows.map(keyOf).filter(Boolean));
+  const aliases = new Map(array(record(input.assortment).inventoryProductAliases).map((value) => {
+    const alias = record(value);
+    return [String(alias.from ?? ""), String(alias.to ?? "")] as const;
+  }));
+  const missing = expectedRows.filter((value) => !currentKeys.has(keyOf(value))).map((value) => {
+    const item = record(value);
+    const key = keyOf(item);
+    const aliasTarget = aliases.get(key) || null;
+    const normalizedName = normalizeInvoiceText(item.name);
+    const sameIdentity = currentRows.find((current) => {
+      const candidate = record(current);
+      return normalizeInvoiceText(candidate.name) === normalizedName
+        && String(candidate.unit ?? candidate.baseUnit ?? "") === String(item.unit ?? item.baseUnit ?? "");
+    });
+    return {
+      key,
+      name: item.name ?? null,
+      unit: item.unit ?? item.baseUnit ?? null,
+      active: item.active !== false && item.status !== "archived",
+      aliasTarget,
+      sameIdentityTarget: sameIdentity ? keyOf(sameIdentity) : null,
+      classification: aliasTarget || sameIdentity ? "duplicate_or_consolidated" : "missing_without_alias",
+    };
+  });
+  const plan = record(parse(operation.plan_json, {}));
+  return {
+    available: true,
+    operationId: operation.operation_id,
+    reported: record(plan.reconciliation),
+    beforePositions: array(beforeAssortment.nomenclature).length,
+    reconstructedExpectedPositions: expectedRows.length,
+    currentPositions: currentRows.length,
+    missingCount: missing.length,
+    missing,
+  };
+}
+
 async function sourceOcr(document: PurchaseDocument) {
   const bucket = (env as unknown as { BUCKET?: R2Bucket }).BUCKET;
   const ids = productionSourceFileIds(document);
-  if (!bucket || !ids.length) return { ocr: null, source: "stored_structured_source" as const, error: "source_unavailable" };
+  if (!bucket || !ids.length) return {
+    ocr: null, parsed: null, attempts: [], selectedAttempt: null,
+    source: "stored_structured_source" as const, error: "source_unavailable",
+  };
   const documents = [] as Array<{ bytes: Uint8Array; filename: string; mimeType: string }>;
   for (const [index, id] of ids.entries()) {
     const object = await bucket.get(`purchases/${DATA_ACCOUNT_ID}/${id}`);
-    if (!object) return { ocr: null, source: "stored_structured_source" as const, error: "source_file_missing" };
+    if (!object) return {
+      ocr: null, parsed: null, attempts: [], selectedAttempt: null,
+      source: "stored_structured_source" as const, error: "source_file_missing",
+    };
     const headers = new Headers();
     object.writeHttpMetadata(headers);
     documents.push({
@@ -99,13 +186,16 @@ async function sourceOcr(document: PurchaseDocument) {
   }
   try {
     return {
-      ocr: await configuredInvoiceOcr({ documents, environment: environment() }),
+      ...await configuredStableInvoiceOcr({ documents, environment: environment() }),
       source: "production_original" as const,
       error: null,
     };
   } catch (error) {
     return {
       ocr: null,
+      parsed: null,
+      attempts: [],
+      selectedAttempt: null,
       source: "stored_structured_source" as const,
       error: error instanceof Error ? error.name : "ocr_unavailable",
     };
@@ -172,7 +262,7 @@ async function validateDocument(input: {
   ];
   const ocrResult = await sourceOcr(input.document);
   const stored = storedPurchaseAsParsed(input.document);
-  const parsed = ocrResult.ocr ? parseInvoiceOcr(ocrResult.ocr) : stored;
+  const parsed = ocrResult.parsed ?? stored;
   const matchingInput: ParsedInvoiceDocument = parsed.items.length ? parsed : stored;
   const parser = recognitionQualityAgainstGroundTruth(parsed, expected(input.document));
 
@@ -250,6 +340,8 @@ async function validateDocument(input: {
       confidence: ocrResult.ocr.confidence,
       detectedLines: ocrResult.ocr.lines.length,
       duplicateLines: ocrResult.ocr.lines.length - new Set(ocrResult.ocr.lines.map((line) => normalizeInvoiceText(line.text))).size,
+      stabilityAttempts: ocrResult.attempts,
+      selectedAttempt: ocrResult.selectedAttempt,
     } : null,
     parser,
     firstArrival: {
@@ -310,6 +402,75 @@ async function validateDocument(input: {
   return result;
 }
 
+async function validatePersistedDocument(input: {
+  document: PurchaseDocument;
+  assortment: unknown;
+  suppliers: JsonRecord[];
+  standaloneMappings: SupplierItemMapping[];
+  actorAccountId: number;
+  runId: string;
+}) {
+  const supplierId = supplierIdFor(input.document, input.suppliers);
+  if (!supplierId) throw new Error("SUPPLIER_ID_REQUIRED");
+  const candidates = nomenclatureCandidates(input.assortment, VENUE_ID);
+  const ocrResult = await sourceOcr(input.document);
+  const stored = storedPurchaseAsParsed(input.document);
+  const parsed = ocrResult.parsed ?? stored;
+  const deterministic = applyDeterministicMappings({
+    document: parsed.items.length ? parsed : stored,
+    supplierId,
+    venueId: VENUE_ID,
+    mappings: [
+      ...canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
+      ...input.standaloneMappings.filter((mapping) => mapping.venueId === VENUE_ID),
+    ],
+    nomenclature: candidates,
+  });
+  const jobId = `prodpersist-${input.runId}-${input.document.id.slice(0, 6)}`;
+  const result = await runInvoiceAIBulkMatching({
+    document: deterministic,
+    jobId,
+    provider: createOpenAIInvoiceMatchingProvider({
+      accountId: DATA_ACCOUNT_ID,
+      actorAccountId: input.actorAccountId,
+      venueId: VENUE_ID,
+      jobId,
+    }),
+  });
+  const actualUsage = await usage(jobId);
+  return {
+    correlationId: jobId,
+    supplier: input.document.supplierName,
+    supplierId,
+    documentNumber: input.document.documentNumber ?? null,
+    totalLines: result.document.items.length,
+    historicalHits: result.document.items.filter((line) => line.mappingSource === "history").length,
+    exact: result.document.items.filter((line) => ["supplier_identifier", "exact_alias"].includes(line.mappingSource ?? "")).length,
+    fuzzy: result.document.items.filter((line) => line.mappingSource === "fuzzy").length,
+    aiLines: result.sentLines,
+    aiRequests: result.requestCount,
+    estimatedInputTokens: result.estimatedInputTokens,
+    estimatedOutputTokens: result.estimatedOutputTokens,
+    actualUsage,
+    manualConfirmation: result.document.items.filter((line) => line.requiresReview && Boolean(line.nomenclatureId)).length,
+    manualSearch: result.document.items.filter((line) => line.requiresReview && !line.nomenclatureId).length,
+    ocr: {
+      selectedAttempt: ocrResult.selectedAttempt,
+      attempts: ocrResult.attempts,
+    },
+    lineTrace: productionMatchingTrace({
+      document: result.document,
+      expected: canonicalGroundTruthPurchase({
+        document: input.document,
+        supplierId,
+        mappings: canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
+        candidates,
+      }),
+      candidates,
+    }),
+  };
+}
+
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
@@ -329,6 +490,7 @@ export async function GET(request: Request): Promise<Response> {
   const assortment = parse(rows.get("bd_assortment_v1"), {});
   const purchases = array(parse(rows.get("bd_purchase_documents"), [])) as PurchaseDocument[];
   const suppliers = array(parse(rows.get("bd_suppliers"), [])).map(record);
+  const stockMovements = array(parse(rows.get("bd_stock_movements"), []));
   const standaloneMappings = array(parse(rows.get("bd_invoice_supplier_mappings_v2"), [])) as SupplierItemMapping[];
   const candidates = nomenclatureCandidates(assortment, VENUE_ID);
   const selection = selectProductionHybridDocuments(purchases, VENUE_ID);
@@ -341,8 +503,86 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const runId = crypto.randomUUID().slice(0, 8);
+  if (url.searchParams.get("stage") === "canonical_delta") {
+    return Response.json({
+      ok: true,
+      runId,
+      stage: "canonical_delta",
+      readOnlyBusinessData: true,
+      delta: await canonicalMigrationDelta({ assortment, purchases, suppliers, stockMovements }),
+      writes: { purchases: 0, stockMovements: 0, expenses: 0, supplierDebt: 0, supplierMappings: 0 },
+      configuredMode,
+      postingInvoked: false,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  }
+  const requestedDocument = normalizeInvoiceText(url.searchParams.get("document") ?? "");
+  const selectedDocuments = requestedDocument
+    ? selection.selected.filter((document) =>
+      normalizeInvoiceText(document.supplierName) === requestedDocument
+      || normalizeInvoiceText(document.documentNumber) === requestedDocument
+    )
+    : selection.selected;
+  if (!selectedDocuments.length) {
+    return Response.json({ ok: false, code: "PRODUCTION_DOCUMENT_NOT_FOUND" }, { status: 404 });
+  }
+  if (url.searchParams.get("stage") === "ocr_parser") {
+    const diagnostics = [];
+    for (const document of selectedDocuments) {
+      const ocrResult = await sourceOcr(document);
+      const stored = storedPurchaseAsParsed(document);
+      const parsedDocument = ocrResult.parsed ?? stored;
+      diagnostics.push({
+        supplier: document.supplierName,
+        documentNumber: document.documentNumber ?? null,
+        storedLines: document.items.length,
+        source: ocrResult.source,
+        ocrError: ocrResult.error,
+        selectedAttempt: ocrResult.selectedAttempt,
+        attempts: ocrResult.attempts,
+        parser: recognitionQualityAgainstGroundTruth(parsedDocument, expected(document)),
+        trace: ocrResult.ocr ? invoiceOcrStageTrace(ocrResult.ocr) : null,
+      });
+    }
+    return Response.json({
+      ok: true,
+      runId,
+      stage: "ocr_parser",
+      readOnlyBusinessData: true,
+      writes: { purchases: 0, stockMovements: 0, expenses: 0, supplierDebt: 0, supplierMappings: 0 },
+      diagnostics,
+      configuredMode,
+      postingInvoked: false,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  }
+  if (url.searchParams.get("stage") === "persisted_learning") {
+    const learning = [];
+    for (const document of selectedDocuments) {
+      learning.push(await validatePersistedDocument({
+        document,
+        assortment,
+        suppliers,
+        standaloneMappings,
+        actorAccountId: account.actorAccountId,
+        runId,
+      }));
+    }
+    return Response.json({
+      ok: true,
+      runId,
+      stage: "persisted_learning",
+      independentRequest: true,
+      persistentSources: ["bd_assortment_v1.supplierProductMappings", "bd_invoice_supplier_mappings_v2"],
+      mappingStoreUpdatedAt: record(assortment).updatedAt ?? null,
+      supplierMappings: canonicalInvoiceSupplierMappings(assortment, VENUE_ID).length
+        + standaloneMappings.filter((mapping) => mapping.venueId === VENUE_ID).length,
+      writes: { purchases: 0, stockMovements: 0, expenses: 0, supplierDebt: 0, supplierMappings: 0 },
+      learning,
+      configuredMode,
+      postingInvoked: false,
+    }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   const results = [];
-  for (const document of selection.selected) {
+  for (const document of selectedDocuments) {
     results.push(await validateDocument({
       document,
       assortment,
