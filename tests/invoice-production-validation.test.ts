@@ -76,6 +76,32 @@ test("production quality reports a wrong High proposal as a critical false posit
   assert.equal(quality.criticalHighFalsePositives, 1);
 });
 
+test("production quality resolves migrated nomenclature ids to canonical keys", () => {
+  const expected = purchase("invoice", "supplier", 1);
+  expected.items[0].nomenclatureId = "right";
+  expected.items[0].purchaseProductKey = "legacy:purchase-key";
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "right",
+    key: "stock:invoice-0|pcs",
+    venueId: 1,
+    name: "Товар invoice 0",
+    unit: "pcs",
+    packageSize: "1 шт.",
+  }] }, 1);
+  const document = storedPurchaseAsParsed(expected);
+  document.items[0] = {
+    ...document.items[0],
+    nomenclatureId: "right",
+    purchaseProductKey: "stock:invoice-0|pcs",
+    confidenceLevel: "high",
+    requiresReview: false,
+  };
+  const quality = productionMatchingQuality({ document, expected, candidates });
+  assert.equal(quality.correct, 1);
+  assert.equal(quality.incorrect, 0);
+  assert.equal(quality.criticalHighFalsePositives, 0);
+});
+
 test("in-memory confirmation survives serialization and removes repeat AI work", () => {
   const expected = purchase("invoice", "supplier", 1);
   const candidates = nomenclatureCandidates({ nomenclature: [{
@@ -91,6 +117,7 @@ test("in-memory confirmation survives serialization and removes repeat AI work",
     supplierId: "supplier",
     actorAccountId: 1,
     document: expected,
+    candidates,
     now: "2026-08-27T00:00:00.000Z",
   });
   const restored = JSON.parse(JSON.stringify(memory));

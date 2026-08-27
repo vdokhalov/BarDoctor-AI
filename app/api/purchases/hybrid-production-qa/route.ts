@@ -199,6 +199,7 @@ async function validateDocument(input: {
     supplierId,
     actorAccountId: input.actorAccountId,
     document: input.document,
+    candidates,
   });
   const restored = JSON.parse(JSON.stringify(confirmed)) as SupplierItemMapping[];
   const repeatDeterministic = applyDeterministicMappings({

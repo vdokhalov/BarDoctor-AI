@@ -18,8 +18,15 @@ function sourceIds(document: PurchaseDocument): string[] {
   ].filter(Boolean))];
 }
 
-function targetKey(item: PurchaseItem): string {
-  return String(item.purchaseProductKey ?? item.nomenclatureId ?? "").trim();
+function targetKey(item: PurchaseItem, candidates: NomenclatureCandidate[] = []): string {
+  const references = [item.nomenclatureId, item.purchaseProductKey]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  for (const reference of references) {
+    const candidate = candidates.find((value) => value.id === reference || value.key === reference);
+    if (candidate) return candidate.key;
+  }
+  return references[0] ?? "";
 }
 
 export function selectProductionHybridDocuments(
@@ -68,8 +75,12 @@ export function storedPurchaseAsParsed(document: PurchaseDocument): ParsedInvoic
 }
 
 function candidateKey(line: ParsedInvoiceLine, candidates: NomenclatureCandidate[]): string {
-  if (line.purchaseProductKey) return line.purchaseProductKey;
-  return candidates.find((candidate) => candidate.id === line.nomenclatureId)?.key ?? line.nomenclatureId ?? "";
+  for (const reference of [line.nomenclatureId, line.purchaseProductKey]) {
+    if (!reference) continue;
+    const candidate = candidates.find((value) => value.id === reference || value.key === reference);
+    if (candidate) return candidate.key;
+  }
+  return line.purchaseProductKey ?? line.nomenclatureId ?? "";
 }
 
 function nameScore(actual: ParsedInvoiceLine, expected: PurchaseItem): number {
@@ -94,7 +105,7 @@ export function productionMatchingQuality(input: {
   let correct = 0;
   let incorrect = 0;
   let criticalHighFalsePositives = 0;
-  let unknownNeedsDecision = 0;
+  let unpairedActual = 0;
   let packageConflicts = 0;
   let pairedLines = 0;
   let quantityCorrect = 0;
@@ -108,7 +119,7 @@ export function productionMatchingQuality(input: {
       .sort((left, right) => right.score - left.score);
     const pair = ranked[0]?.score >= 0.65 ? ranked[0] : null;
     if (!pair) {
-      unknownNeedsDecision += 1;
+      unpairedActual += 1;
       continue;
     }
     unused.delete(pair.index);
@@ -121,10 +132,10 @@ export function productionMatchingQuality(input: {
     if (actualPackage === expectedPackage) packageCorrect += 1;
     if (Math.abs(line.unitPrice - expected.unitPrice) <= 0.01) unitPriceCorrect += 1;
     if (Math.abs(line.lineTotal - expected.lineTotal) <= 0.01) lineTotalCorrect += 1;
-    const expectedKey = targetKey(expected);
+    const expectedKey = targetKey(expected, input.candidates);
     const actualKey = candidateKey(line, input.candidates);
     if (!expectedKey || !actualKey) {
-      unknownNeedsDecision += 1;
+      unpairedActual += 1;
       continue;
     }
     const sourcePackage = packageFingerprint(`${line.rawName} ${line.packageSize ?? ""}`);
@@ -141,7 +152,7 @@ export function productionMatchingQuality(input: {
     correct,
     incorrect,
     criticalHighFalsePositives,
-    unknownNeedsDecision: unknownNeedsDecision + unused.size,
+    unknownNeedsDecision: Math.max(unpairedActual, unused.size),
     packageConflicts,
     accepts: input.document.items.filter((line) => !line.requiresReview && Boolean(candidateKey(line, input.candidates))).length,
     manualConfirmation: input.document.items.filter((line) => line.requiresReview && Boolean(candidateKey(line, input.candidates))).length,
@@ -163,6 +174,7 @@ export function confirmedMemoryFromPurchase(input: {
   supplierId: string;
   actorAccountId: number;
   document: PurchaseDocument;
+  candidates?: NomenclatureCandidate[];
   now?: string;
 }): SupplierItemMapping[] {
   return upsertConfirmedSupplierMappings({
@@ -174,7 +186,7 @@ export function confirmedMemoryFromPurchase(input: {
     items: input.document.items.map((item) => ({
       rawName: item.rawName ?? item.name,
       normalizedRawName: item.normalizedRawName ?? normalizeInvoiceText(item.rawName ?? item.name),
-      nomenclatureId: targetKey(item),
+      nomenclatureId: targetKey(item, input.candidates),
       packageSize: item.packageSize,
       unit: item.unit,
     })),
