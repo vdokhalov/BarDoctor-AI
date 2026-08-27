@@ -296,17 +296,127 @@ export function mergeShadowMappingMetadata(
 }
 
 export function packageFingerprint(value: unknown): string {
+  const source = text(value, "", 500).toLocaleLowerCase("ru-RU").replace(/(\d),(\d)/g, "$1.$2");
   const normalized = normalizeInvoiceText(value);
-  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg|pcs)\b/);
+  const match = normalized.match(/(\d+(?:\.\d+)?)\s*(ml|l|g|kg|pcs)\b/)
+    ?? source.match(/(?:^|\s)(ml|l|g|kg|мл|л|г|кг)\s*[.:/-]?\s*(\d+(?:\.\d+)?)(?=\s|$)/)
+    ?? source.match(/(?:^|\s)(?:pet|p|п)\s*[.:/-]?\s*(\d+(?:\.\d+)?)(?=\s|$)/);
   if (!match) return "";
-  const amount = numeric(match[1]);
-  if (match[2] === "l") return `ml:${Math.round(amount * 1_000)}`;
-  if (match[2] === "kg") return `g:${Math.round(amount * 1_000)}`;
-  return `${match[2]}:${Math.round(amount * 1_000) / 1_000}`;
+  const reversed = ["ml", "l", "g", "kg", "мл", "л", "г", "кг"].includes(match[1]);
+  const rawUnit = reversed ? match[1] : (match[2] ?? "l");
+  const unit = ({ мл: "ml", л: "l", г: "g", кг: "kg" } as Record<string, string>)[rawUnit] ?? rawUnit;
+  const amount = numeric(reversed ? match[2] : match[1]);
+  if (unit === "l") return `ml:${Math.round(amount * 1_000)}`;
+  if (unit === "kg") return `g:${Math.round(amount * 1_000)}`;
+  return `${unit}:${Math.round(amount * 1_000) / 1_000}`;
+}
+
+type InvoiceIdentity = {
+  packageFingerprint: string;
+  packageCount: number | null;
+  packageType: string | null;
+  baseUnit: string;
+  variants: Set<string>;
+};
+
+const VARIANT_GROUPS = [
+  ["gas", "still"],
+  ["light", "dark"],
+  ["dry", "semi_dry", "sweet", "semi_sweet"],
+] as const;
+
+function invoiceIdentity(value: unknown, unit?: unknown, packageSize?: unknown): InvoiceIdentity {
+  const source = `${text(value)} ${text(packageSize)}`.toLocaleLowerCase("ru-RU").replace(/(\d),(\d)/g, "$1.$2");
+  const normalized = normalizeInvoiceText(source);
+  const multiplier = source.match(/(?:^|\s)(\d{1,3})\s*[x×*]\s*\d+(?:\.\d+)?\s*(?:мл|ml|л|l|кг|kg|г|g|шт|pcs)(?=\s|$)/i);
+  const packageType = /(?:^|\s)(?:bottle|but|бутыл\p{L}*)(?:\s|$)/u.test(normalized) ? "bottle"
+    : /(?:^|\s)(?:can|bank|банк\p{L}*)(?:\s|$)/u.test(normalized) ? "can"
+    : /(?:^|\s)(?:box|короб\p{L}*)(?:\s|$)/u.test(normalized) ? "box"
+    : /(?:^|\s)(?:pack|упаков\p{L}*|пачк\p{L}*)(?:\s|$)/u.test(normalized) ? "pack"
+    : null;
+  const variants = new Set<string>();
+  if (/(?:^|\s)(?:негаз\p{L}*|still)(?:\s|$)/u.test(normalized)) variants.add("still");
+  else if (/(?:^|\s)(?:газирован\p{L}*|газ|sparkling)(?:\s|$)/u.test(normalized)) variants.add("gas");
+  if (/(?:^|\s)(?:темн\p{L}*|dark)(?:\s|$)/u.test(normalized)) variants.add("dark");
+  else if (/(?:^|\s)(?:светл\p{L}*|light)(?:\s|$)/u.test(normalized)) variants.add("light");
+  if (/(?:^|\s)(?:полусух\p{L}*|semi dry)(?:\s|$)/u.test(normalized)) variants.add("semi_dry");
+  else if (/(?:^|\s)(?:полуслад\p{L}*|semi sweet)(?:\s|$)/u.test(normalized)) variants.add("semi_sweet");
+  else if (/(?:^|\s)(?:сух\p{L}*|dry)(?:\s|$)/u.test(normalized)) variants.add("dry");
+  else if (/(?:^|\s)(?:слад\p{L}*|sweet)(?:\s|$)/u.test(normalized)) variants.add("sweet");
+  return {
+    packageFingerprint: packageFingerprint(normalized),
+    packageCount: multiplier ? numeric(multiplier[1]) : null,
+    packageType,
+    baseUnit: canonicalPurchaseUnit(unit),
+    variants,
+  };
+}
+
+export function invoiceIdentityConflicts(input: {
+  rawName: unknown;
+  unit?: unknown;
+  packageSize?: unknown;
+  supplierArticle?: unknown;
+  barcode?: unknown;
+}, candidate: NomenclatureCandidate): string[] {
+  const source = invoiceIdentity(input.rawName, input.unit, input.packageSize);
+  const target = invoiceIdentity(candidate.name, candidate.unit, candidate.packageSize);
+  const conflicts: string[] = [];
+  if (source.packageFingerprint && target.packageFingerprint && source.packageFingerprint !== target.packageFingerprint) {
+    conflicts.push(source.packageFingerprint.startsWith("g:") || target.packageFingerprint.startsWith("g:") ? "weight" : "volume");
+  }
+  if (source.packageCount && target.packageCount && source.packageCount !== target.packageCount) conflicts.push("package_quantity");
+  if (source.packageType && target.packageType && source.packageType !== target.packageType) conflicts.push("package_type");
+  if (source.baseUnit && target.baseUnit && source.baseUnit !== target.baseUnit) {
+    const countedPackage = (source.baseUnit === "pcs" || target.baseUnit === "pcs")
+      && Boolean(source.packageFingerprint && target.packageFingerprint && source.packageFingerprint === target.packageFingerprint);
+    if (!countedPackage) conflicts.push("unit");
+  }
+  for (const group of VARIANT_GROUPS) {
+    const sourceVariant = group.find((variant) => source.variants.has(variant));
+    const targetVariant = group.find((variant) => target.variants.has(variant));
+    if (sourceVariant && targetVariant && sourceVariant !== targetVariant) conflicts.push("canonical_variant");
+  }
+  const article = text(input.supplierArticle, "", 160);
+  if (article && candidate.supplierArticles?.length && !candidate.supplierArticles.includes(article)) conflicts.push("supplier_article");
+  const barcode = text(input.barcode, "", 160);
+  if (barcode && candidate.barcodes?.length && !candidate.barcodes.includes(barcode)) conflicts.push("barcode");
+  return [...new Set(conflicts)];
+}
+
+export function hasStrongInvoiceIdentityEvidence(line: ParsedInvoiceLine, candidate: NomenclatureCandidate): boolean {
+  const exactCanonicalName = normalizeInvoiceText(line.rawName) === normalizeInvoiceText(candidate.name);
+  const source = invoiceIdentity(line.rawName, line.unit, line.packageSize);
+  const target = invoiceIdentity(candidate.name, candidate.unit, candidate.packageSize);
+  const packageEvidence = Boolean(source.packageFingerprint && target.packageFingerprint);
+  const identifierEvidence = Boolean(
+    (line.supplierArticle && candidate.supplierArticles?.includes(line.supplierArticle))
+    || (line.barcode && candidate.barcodes?.includes(line.barcode))
+  );
+  const variantsComplete = VARIANT_GROUPS.every((group) => {
+    const sourceVariant = group.find((variant) => source.variants.has(variant));
+    const targetVariant = group.find((variant) => target.variants.has(variant));
+    return !sourceVariant && !targetVariant || sourceVariant === targetVariant;
+  });
+  const packageShapeComplete = source.packageCount === target.packageCount
+    && source.packageType === target.packageType;
+  return identifierEvidence || (variantsComplete && packageShapeComplete && (exactCanonicalName || packageEvidence));
 }
 
 function bounded(value: number): number {
   return Math.max(0, Math.min(1, Math.round(value * 1_000) / 1_000));
+}
+
+function packageLabelFromFingerprint(fingerprint: string): string | undefined {
+  const [unit, amountText] = fingerprint.split(":");
+  const amount = numeric(amountText);
+  if (!unit || amount <= 0) return undefined;
+  if (unit === "ml" && amount % 1_000 === 0) return `${amount / 1_000} л`;
+  if (unit === "g" && amount % 1_000 === 0) return `${amount / 1_000} кг`;
+  if (unit === "ml") return `${amount} мл`;
+  if (unit === "g") return `${amount} г`;
+  if (unit === "pcs") return `${amount} шт.`;
+  return undefined;
 }
 
 function canonicalPurchaseUnit(value: unknown): string {
@@ -329,6 +439,7 @@ export function normalizeInvoicePackageSemantics(input: {
   quantity: unknown;
   unit: unknown;
   packageSize?: unknown;
+  preserveMeasuredUnit?: boolean;
 }): { unit: string; packageSize?: string } {
   const unit = text(input.unit, "шт.", 20);
   const packageSize = text(input.packageSize, "", 80) || undefined;
@@ -351,7 +462,7 @@ export function normalizeInvoicePackageSemantics(input: {
   if (sameAsMeasuredTotal) {
     return { unit, packageSize: baseUnit === "ml" ? "л" : "кг" };
   }
-  if (Number.isInteger(quantity) && quantity >= 1) {
+  if (!input.preserveMeasuredUnit && Number.isInteger(quantity) && quantity >= 1) {
     return { unit: "шт.", packageSize };
   }
   return { unit, packageSize };
@@ -436,7 +547,11 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   const rawNameWithUnits = match[1].trim();
   const barcode = rawNameWithUnits.match(/\b\d{8,14}\b/)?.[0];
   const supplierArticle = rawNameWithUnits.match(/\b(?:арт(?:икул)?|article|sku|код)\s*[:#-]?\s*([a-zа-я0-9][a-zа-я0-9._/-]{2,39})\b/i)?.[1];
-  const packageMatch = rawNameWithUnits.match(/\b\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|кг|kg|г|g)\b/i);
+  const packageMatch = rawNameWithUnits.match(/(?:^|\s)\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|кг|kg|г|g)(?=\s|$)/i)
+    ?? rawNameWithUnits.match(/(?:^|\s)(?:мл|ml|л|l|кг|kg|г|g)\s*[.,:/-]?\s*\d+(?:[.,]\d+)?(?=\s|$)/i)
+    ?? ((canonicalPurchaseUnit(match[3]) === "ml")
+      ? rawNameWithUnits.match(/(?:^|\s)(?:п|pet)\s*[.,:/-]?\s*\d+(?:[.,]\d+)?(?=\s|$)/i)
+      : null);
   const rawName = rawNameWithUnits
     .replace(/(?:\s+(?:мл|ml|л|l|кг|kg|г|g|шт|pcs)[.!]*){1,2}$/i, "")
     .trim();
@@ -449,7 +564,8 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   const packageSemantics = normalizeInvoicePackageSemantics({
     quantity,
     unit: text(match[3], "шт.", 20),
-    packageSize: packageMatch?.[0],
+    packageSize: packageMatch ? packageLabelFromFingerprint(packageFingerprint(packageMatch[0])) : undefined,
+    preserveMeasuredUnit: true,
   });
   return {
     id: `ocr-line-${index + 1}`,
@@ -786,10 +902,8 @@ export function fuzzyNomenclatureScore(rawName: unknown, candidate: Nomenclature
 function exactCandidates(line: ParsedInvoiceLine, candidates: NomenclatureCandidate[]): NomenclatureCandidate[] {
   const source = normalizeInvoiceText(line.rawName);
   const sourceWithPackage = normalizeInvoiceText(`${line.rawName} ${line.packageSize ?? ""}`);
-  const sourcePackage = packageFingerprint(sourceWithPackage);
   return candidates.filter((candidate) => {
-    const candidatePackage = packageFingerprint(`${candidate.name} ${candidate.packageSize}`);
-    if (sourcePackage && candidatePackage && sourcePackage !== candidatePackage) return false;
+    if (invoiceIdentityConflicts(line, candidate).length) return false;
     return [candidate.name, ...candidate.aliases].some((name) => {
       const normalized = normalizeInvoiceText(name);
       return normalized === source || normalized === sourceWithPackage;
@@ -831,7 +945,7 @@ export function matchInvoiceLine(input: {
   ) : undefined);
   if (history) {
     const candidate = input.nomenclature.find((item) => item.id === history.nomenclatureId || item.key === history.nomenclatureId);
-    if (candidate) return {
+    if (candidate && invoiceIdentityConflicts(input.line, candidate).length === 0) return {
       ...input.line,
       nomenclatureName: candidate.name,
       purchaseProductKey: candidate.key,
@@ -845,10 +959,7 @@ export function matchInvoiceLine(input: {
   const identifierMatches = input.nomenclature.filter((candidate) =>
     Boolean(input.line.supplierArticle && candidate.supplierArticles?.includes(input.line.supplierArticle))
     || Boolean(input.line.barcode && candidate.barcodes?.includes(input.line.barcode))
-  ).filter((candidate) => {
-    const candidatePackage = packageFingerprint(`${candidate.name} ${candidate.packageSize}`);
-    return !linePackage || !candidatePackage || linePackage === candidatePackage;
-  });
+  ).filter((candidate) => invoiceIdentityConflicts(input.line, candidate).length === 0);
   if (identifierMatches.length === 1) {
     const candidate = identifierMatches[0];
     return {
@@ -873,19 +984,28 @@ export function matchInvoiceLine(input: {
   const exact = exactCandidates(input.line, input.nomenclature);
   if (exact.length === 1 && input.line.confidence >= 0.55) {
     const candidate = exact[0];
+    const strongIdentity = hasStrongInvoiceIdentityEvidence(input.line, candidate);
     return {
       ...input.line,
       nomenclatureName: candidate.name,
       purchaseProductKey: candidate.key,
       nomenclatureId: candidate.id,
       mappingSource: "exact_alias",
-      mappingCandidates: [{ id: candidate.id, key: candidate.key, name: candidate.name, score: 1 }],
+      mappingCandidates: [{
+        id: candidate.id,
+        key: candidate.key,
+        name: candidate.name,
+        score: 1,
+        unit: candidate.unit,
+        packageSize: candidate.packageSize,
+      }],
       confidence: bounded((input.line.confidence + 1) / 2),
-      confidenceLevel: "high",
-      requiresReview: false,
+      confidenceLevel: strongIdentity ? "high" : "medium",
+      requiresReview: !strongIdentity,
     };
   }
   const ranked = input.nomenclature
+    .filter((candidate) => invoiceIdentityConflicts(input.line, candidate).length === 0)
     .map((candidate) => ({ candidate, score: fuzzyNomenclatureScore(input.line.rawName, candidate) }))
     .filter((entry) => entry.score >= 0.35)
     .sort((left, right) => right.score - left.score || left.candidate.name.localeCompare(right.candidate.name, "ru"))
@@ -901,7 +1021,7 @@ export function matchInvoiceLine(input: {
     unit: candidate.unit,
     packageSize: candidate.packageSize,
   }));
-  if (best && level === "high" && input.line.confidence >= 0.55) return {
+  if (best && level === "high" && input.line.confidence >= 0.55 && hasStrongInvoiceIdentityEvidence(input.line, best.candidate)) return {
     ...input.line,
     nomenclatureName: best.candidate.name,
     purchaseProductKey: best.candidate.key,
@@ -953,38 +1073,55 @@ export function upsertConfirmedSupplierMappings(input: {
     if (!rawName || !normalizedRawName || !nomenclatureId) continue;
     const fingerprint = packageFingerprint(`${rawName} ${text(item.packageSize)}`);
     const purchaseUnit = canonicalPurchaseUnit(item.unit);
-    const existing = mappings.find((mapping) =>
+    const supplierArticle = text(item.supplierArticle, "", 160);
+    const barcode = text(item.barcode, "", 160);
+    const sameSupplierIdentity = (mapping: SupplierItemMapping) =>
       mapping.venueId === input.venueId
       && mapping.supplierId === input.supplierId
-      && mapping.normalizedRawName === normalizedRawName
-      && (mapping.packageFingerprint ?? "") === fingerprint
+      && (
+        Boolean(supplierArticle && mapping.supplierArticle === supplierArticle)
+        || Boolean(barcode && mapping.barcode === barcode)
+        || (mapping.normalizedRawName === normalizedRawName && (mapping.packageFingerprint ?? "") === fingerprint)
+      );
+    const existing = mappings.find((mapping) =>
+      sameSupplierIdentity(mapping)
     );
     if (existing) {
       existing.rawName = rawName;
       existing.nomenclatureId = nomenclatureId;
       existing.purchaseUnit = purchaseUnit || existing.purchaseUnit;
-      existing.supplierArticle = text(item.supplierArticle, "", 160) || existing.supplierArticle;
-      existing.barcode = text(item.barcode, "", 160) || existing.barcode;
+      existing.supplierArticle = supplierArticle || existing.supplierArticle;
+      existing.barcode = barcode || existing.barcode;
       existing.confirmations += 1;
       existing.confirmedByAccountId = input.actorAccountId;
       existing.updatedAt = now;
     } else {
-      mappings.push({
+      const replacement = {
         id: crypto.randomUUID(),
         venueId: input.venueId,
         supplierId: input.supplierId,
         rawName,
         normalizedRawName,
-    packageFingerprint: fingerprint || undefined,
-    purchaseUnit: purchaseUnit || undefined,
-    supplierArticle: text(item.supplierArticle, "", 160) || undefined,
-    barcode: text(item.barcode, "", 160) || undefined,
+        packageFingerprint: fingerprint || undefined,
+        purchaseUnit: purchaseUnit || undefined,
+        supplierArticle: supplierArticle || undefined,
+        barcode: barcode || undefined,
         nomenclatureId,
         confirmedByAccountId: input.actorAccountId,
         confirmations: 1,
         createdAt: now,
         updatedAt: now,
-      });
+      } satisfies SupplierItemMapping;
+      for (let index = mappings.length - 1; index >= 0; index -= 1) {
+        if (sameSupplierIdentity(mappings[index])) mappings.splice(index, 1);
+      }
+      mappings.push(replacement);
+    }
+    const authoritative = existing ?? mappings.at(-1);
+    if (authoritative) {
+      for (let index = mappings.length - 1; index >= 0; index -= 1) {
+        if (mappings[index] !== authoritative && sameSupplierIdentity(mappings[index])) mappings.splice(index, 1);
+      }
     }
   }
   return mappings.slice(-10_000);

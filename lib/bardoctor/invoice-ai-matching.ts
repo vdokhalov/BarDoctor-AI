@@ -1,10 +1,11 @@
 import type {
+  NomenclatureCandidate,
   NomenclatureCandidateReference,
   ParsedInvoiceDocument,
   ParsedInvoiceLine,
   RecognitionConfidence,
 } from "./invoice-recognition-v2";
-import { packageFingerprint } from "./invoice-recognition-v2";
+import { hasStrongInvoiceIdentityEvidence, invoiceIdentityConflicts } from "./invoice-recognition-v2";
 
 export const INVOICE_AI_BATCH_MAX_LINES = 40;
 export const INVOICE_AI_BATCH_MAX_ESTIMATED_TOKENS = 12_000;
@@ -273,13 +274,22 @@ function applyProposals(document: ParsedInvoiceDocument, proposals: InvoiceAIMat
         candidate.id === proposal.nomenclatureId || candidate.key === proposal.nomenclatureId
       );
       if (!selected) return line;
-      const sourcePackage = packageFingerprint(`${line.rawName} ${line.packageSize ?? ""}`);
-      const selectedPackage = packageFingerprint(`${selected.name} ${selected.packageSize ?? ""}`);
+      const identityCandidate: NomenclatureCandidate = {
+        id: selected.id,
+        key: selected.key,
+        name: selected.name,
+        unit: selected.unit ?? "",
+        packageSize: selected.packageSize ?? "",
+        aliases: [],
+      };
       // The provider may only choose from bounded candidates, but candidate
       // membership alone is not enough: a wrong size/pack is a different SKU.
       // Keep it unresolved even when the provider reports high confidence.
-      if (sourcePackage && selectedPackage && sourcePackage !== selectedPackage) return line;
-      const level = confidenceLevel(proposal.confidence);
+      if (invoiceIdentityConflicts(line, identityCandidate).length) return line;
+      const providerLevel = confidenceLevel(proposal.confidence);
+      const level = providerLevel === "high" && !hasStrongInvoiceIdentityEvidence(line, identityCandidate)
+        ? "medium"
+        : providerLevel;
       return {
         ...line,
         nomenclatureName: selected.name,

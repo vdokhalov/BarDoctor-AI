@@ -6,6 +6,7 @@ import {
   confirmedMemoryFromPurchase,
   confirmedMemoryFromReviewedGroundTruth,
   productionMatchingQuality,
+  productionMatchingTrace,
   selectProductionHybridDocuments,
   storedPurchaseAsParsed,
 } from "../lib/bardoctor/invoice-production-validation";
@@ -104,6 +105,20 @@ test("production quality resolves migrated nomenclature ids to canonical keys", 
   assert.equal(quality.criticalHighFalsePositives, 0);
 });
 
+test("production parser quality does not treat a legacy measured-total package as the bottle size", () => {
+  const expected = purchase("vprok", "vprok", 1, "379");
+  expected.items[0] = { ...expected.items[0], name: "Водка Volk", rawName: "Водка Volk", quantity: 10, unit: "л", packageSize: "10 л", unitPrice: 114.3, lineTotal: 1143 };
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "vodka", key: "stock:vodka|ml", venueId: 1, name: "Водка Volk", unit: "ml", packageSize: "1 л",
+  }] }, 1);
+  expected.items[0].nomenclatureId = "vodka";
+  expected.items[0].purchaseProductKey = "stock:vodka|ml";
+  const document = storedPurchaseAsParsed(expected);
+  document.items[0] = { ...document.items[0], rawName: "Водка Volk л.1", normalizedRawName: "водка volk л.1", packageSize: "1 л", nomenclatureId: "vodka", purchaseProductKey: "stock:vodka|ml" };
+  const quality = productionMatchingQuality({ document, expected, candidates });
+  assert.equal(quality.commercialFields.packageCorrect, 1);
+});
+
 test("production ground truth prefers canonical migrated supplier mappings over legacy purchase keys", () => {
   const expected = purchase("invoice", "supplier", 1);
   expected.items[0].nomenclatureId = "legacy-id";
@@ -198,6 +213,43 @@ test("reviewed OCR source text becomes the remembered supplier key", () => {
   });
   assert.equal(repeat.items[0].mappingSource, "history");
   assert.equal(repeat.items[0].purchaseProductKey, "stock:invoice-0|pcs");
+});
+
+test("reviewed confirmation pairs an OCR typo by exact commercial fields and removes repeat AI work", () => {
+  const groundTruth = purchase("invoice", "supplier", 1);
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "right", key: "stock:invoice-0|pcs", venueId: 1, name: "Товар invoice 0", unit: "pcs", packageSize: "1 шт.",
+  }] }, 1);
+  const recognized = storedPurchaseAsParsed(groundTruth);
+  recognized.items[0] = {
+    ...recognized.items[0],
+    rawName: "OCR QXZ UNKNOWN",
+    normalizedRawName: "ocr qxz unknown",
+    requiresReview: true,
+    mappingCandidates: [{ id: "right", key: "stock:invoice-0|pcs", name: "Товар invoice 0", score: 0.7, unit: "pcs", packageSize: "1 шт." }],
+  };
+  const memory = confirmedMemoryFromReviewedGroundTruth({
+    venueId: 1, supplierId: "supplier", actorAccountId: 1, recognized, groundTruth, candidates,
+  });
+  assert.equal(memory.length, 1);
+  const repeat = applyDeterministicMappings({ document: recognized, supplierId: "supplier", venueId: 1, mappings: memory, nomenclature: candidates });
+  assert.equal(repeat.items[0].mappingSource, "history");
+  assert.equal(repeat.items[0].requiresReview, false);
+});
+
+test("production trace exposes selected versus expected identity without writing business data", () => {
+  const expected = purchase("invoice", "supplier", 1);
+  const candidates = nomenclatureCandidates({ nomenclature: [
+    { id: "right", key: "stock:invoice-0|pcs", venueId: 1, name: "Товар invoice 0", unit: "pcs", packageSize: "1 шт." },
+    { id: "wrong", key: "stock:wrong|pcs", venueId: 1, name: "Товар invoice 0", unit: "pcs", packageSize: "1 шт." },
+  ] }, 1);
+  const document = storedPurchaseAsParsed(expected);
+  document.items[0] = { ...document.items[0], nomenclatureId: "wrong", purchaseProductKey: "stock:wrong|pcs", mappingSource: "exact_alias", confidenceLevel: "high", requiresReview: false };
+  const [trace] = productionMatchingTrace({ document, expected, candidates });
+  assert.equal(trace.rawSupplierLine, "Товар invoice 0");
+  assert.equal(trace.selectedCandidate?.id, "wrong");
+  assert.equal(trace.expectedCandidate?.id, "right");
+  assert.equal(trace.correct, false);
 });
 
 test("production Hybrid QA route is controlled, keeps Primary legacy, and cannot post business data", async () => {

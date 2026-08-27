@@ -8,6 +8,7 @@ import {
   canonicalGroundTruthPurchase,
   confirmedMemoryFromReviewedGroundTruth,
   productionMatchingQuality,
+  productionMatchingTrace,
   productionSourceFileIds,
   selectProductionHybridDocuments,
   storedPurchaseAsParsed,
@@ -269,6 +270,7 @@ async function validateDocument(input: {
       deterministicLatencyMs,
       aiLatencyMs,
       totalLatencyMs: firstTotalLatencyMs,
+      lineTrace: productionMatchingTrace({ document: first.document, expected: canonicalGroundTruth, candidates }),
     },
     repeatArrival: {
       historicalHits: historical(repeat.document),
@@ -282,6 +284,7 @@ async function validateDocument(input: {
       actualUsage: repeatUsage,
       latencyMs: repeatLatencyMs,
       ...repeatQuality,
+      lineTrace: productionMatchingTrace({ document: repeat.document, expected: canonicalGroundTruth, candidates }),
     },
   };
   console.info("INVOICE_HYBRID_PRODUCTION_QA_TRACE", JSON.stringify({

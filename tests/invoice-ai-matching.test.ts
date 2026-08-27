@@ -165,6 +165,24 @@ test("server vetoes a high-confidence AI proposal with conflicting package or vo
   assert.ok(result.document.items.every((line) => !line.nomenclatureId && line.requiresReview));
 });
 
+test("AI confidence is downgraded when a canonical variant is more specific than the source identity", async () => {
+  const document = documentWithLines(1);
+  document.items[0] = {
+    ...document.items[0],
+    rawName: "Вино Cricova Шардоне 0.75 л",
+    normalizedRawName: "вино cricova шардоне 0.75 l",
+    packageSize: "0.75 л",
+    mappingCandidates: [{
+      id: "cricova-dry", key: "cricova-dry", name: "Вино Cricova Шардоне сухое", score: 0.9, unit: "ml", packageSize: "0.75 л",
+    }],
+  };
+  const result = await runInvoiceAIBulkMatching({ document, jobId: "variant-incomplete", provider: matchingProvider(0.99) });
+  assert.equal(result.highCount, 0);
+  assert.equal(result.mediumCount, 1);
+  assert.equal(result.document.items[0].nomenclatureId, "cricova-dry");
+  assert.equal(result.document.items[0].requiresReview, true);
+});
+
 test("temporary 429 honors bounded retry and preserves line IDs", async () => {
   let calls = 0;
   const result = await runInvoiceAIBulkMatching({

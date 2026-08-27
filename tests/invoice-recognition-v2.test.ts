@@ -88,6 +88,29 @@ test("parser handles real 1C-style Russian headers, word dates and numbered tabl
   assert.equal(draft.items[0].lineTotal, 49);
 });
 
+test("Vprok 379 parser reads reversed one-litre markers without copying measured totals into package", () => {
+  const fixtures = [
+    ["1 | Водка Волк л.1 | л | 10 л | 114,30 | 1143,00", "1 л", "л"],
+    ["2 | Коньяк Нистру л.1 | л | 10 л | 237,70 | 2377,00", "1 л", "л"],
+    ["3 | Коньяк Сюрпризный л.1 | л | 10 л | 275,20 | 2752,00", "1 л", "л"],
+    ["9 | Кола п.1 | л | 75 л | 23,74 | 1780,50", "1 л", "л"],
+  ] as const;
+  for (const [raw, expectedPackage, expectedUnit] of fixtures) {
+    const line = parseInvoiceLine(raw);
+    assert.ok(line, raw);
+    assert.equal(line.packageSize, expectedPackage, raw);
+    assert.equal(line.unit, expectedUnit, raw);
+  }
+});
+
+test("Sherif measured litres stay litres when a product name contains a one-litre PET marker", () => {
+  const line = parseInvoiceLine("13 | Кола п.1 | л | 15 л | 21,60 | 324,00");
+  assert.ok(line);
+  assert.equal(line.packageSize, "1 л");
+  assert.equal(line.unit, "л");
+  assert.equal(line.quantity, 15);
+});
+
 test("parser uses structured raw table rows when OCR overlay exposes split columns", () => {
   const draft = parseInvoiceOcr({
     rawText: [
@@ -506,6 +529,8 @@ test("matcher reads the full canonical venue dataset, including stock-only ident
   assert.equal(matched.items[0].name, "Пекинская капуста");
   assert.equal(matched.items[0].rawName, "Пекинская капуста");
   assert.equal(matched.items[0].nomenclatureName, "Капуста пекинская");
+  assert.equal(matched.items[0].confidenceLevel, "medium");
+  assert.equal(matched.items[0].requiresReview, true);
 });
 
 test("package identity prevents a high-confidence wrong-size match", () => {
@@ -515,6 +540,38 @@ test("package identity prevents a high-confidence wrong-size match", () => {
   ] }, 10);
   assert.ok(fuzzyNomenclatureScore("Кока Кола ПЭТ 1,25 л", candidates[1]) > 0.85);
   assert.ok(fuzzyNomenclatureScore("Кока Кола ПЭТ 1,25 л", candidates[0]) < 0.6);
+});
+
+test("exact aliases cannot bypass volume, unit, pack or canonical variant conflicts", () => {
+  const base = {
+    documentType: "invoice" as const,
+    supplierName: "Шериф",
+    supplierType: "wholesale" as const,
+    currency: "RUB",
+    paymentMethod: "unknown" as const,
+    total: 1,
+    confidence: 0.95,
+    warnings: [],
+  };
+  const cases = [
+    { rawName: "Моршинская 0.5 л газированная вода", unit: "шт.", packageSize: "0.5 л", candidate: { name: "Моршинская 1.5 л газированная вода", unit: "ml", packageSize: "1.5 л" } },
+    { rawName: "Пиво Kozel светлое", unit: "шт.", packageSize: "1 шт.", candidate: { name: "Пиво Kozel тёмное", unit: "pcs", packageSize: "1 шт." } },
+    { rawName: "Вода бутылка 6×0.5 л", unit: "уп.", packageSize: "6×0.5 л", candidate: { name: "Вода бутылка 1×0.5 л", unit: "pcs", packageSize: "1×0.5 л" } },
+    { rawName: "Сок коробка 1 л", unit: "шт.", packageSize: "1 л", candidate: { name: "Сок бутылка 1 л", unit: "ml", packageSize: "1 л" } },
+  ];
+  for (const [index, value] of cases.entries()) {
+    const line = {
+      id: `conflict-${index}`, rawName: value.rawName, normalizedRawName: normalizeInvoiceText(value.rawName), name: value.rawName,
+      quantity: 1, unit: value.unit, packageSize: value.packageSize, unitPrice: 1, lineTotal: 1,
+      confidence: 0.95, confidenceLevel: "high" as const, requiresReview: false,
+    };
+    const result = applyDeterministicMappings({
+      document: { ...base, items: [line] }, supplierId: "sherif", venueId: 10, mappings: [],
+      nomenclature: [{ id: `candidate-${index}`, key: `candidate-${index}`, aliases: [value.rawName], ...value.candidate }],
+    });
+    assert.equal(result.items[0].nomenclatureId, undefined, value.rawName);
+    assert.equal(result.items[0].requiresReview, true, value.rawName);
+  }
 });
 
 test("manual confirmation persists in canonical supplier memory and is reused on the second pass", () => {
@@ -566,6 +623,22 @@ test("manual confirmation persists in canonical supplier memory and is reused on
   assert.equal(metrics.historicalMappingsCount, 1);
   assert.equal(metrics.unresolvedCount, 0);
   assert.equal(metrics.aiRequestCount, 0);
+});
+
+test("user correction replaces the prior supplier identity instead of leaving a conflicting mapping", () => {
+  const current: SupplierItemMapping[] = [{
+    id: "wrong", venueId: 10, supplierId: "sherif", rawName: "Кола 0.5 л", normalizedRawName: "кола 0.5 l",
+    packageFingerprint: "ml:500", purchaseUnit: "pcs", nomenclatureId: "cola-1250", confirmations: 1,
+    createdAt: "2026-08-01T00:00:00.000Z", updatedAt: "2026-08-01T00:00:00.000Z",
+  }];
+  const corrected = upsertConfirmedSupplierMappings({
+    current, venueId: 10, supplierId: "sherif", actorAccountId: 1,
+    items: [{ rawName: "Кола 0.5 л", packageSize: "0.5 л", unit: "шт.", nomenclatureId: "cola-500" }],
+    now: "2026-08-27T00:00:00.000Z",
+  });
+  assert.equal(corrected.length, 1);
+  assert.equal(corrected[0].nomenclatureId, "cola-500");
+  assert.equal(corrected[0].confirmations, 2);
 });
 
 test("migrated dimensional supplier memory safely matches a counted package", () => {

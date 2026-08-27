@@ -1,6 +1,8 @@
 import type { PurchaseDocument, PurchaseItem } from "./purchases";
 import {
   fuzzyNomenclatureScore,
+  invoiceIdentityConflicts,
+  normalizeInvoicePackageSemantics,
   normalizeInvoiceText,
   packageFingerprint,
   parsedInvoiceDocumentFromLegacy,
@@ -16,6 +18,57 @@ function sourceIds(document: PurchaseDocument): string[] {
     ...(Array.isArray(document.sourceFileIds) ? document.sourceFileIds : []),
     document.sourceFileId ?? "",
   ].filter(Boolean))];
+}
+
+export function productionMatchingTrace(input: {
+  document: ParsedInvoiceDocument;
+  expected: PurchaseDocument;
+  candidates: NomenclatureCandidate[];
+}) {
+  const unused = new Set(input.expected.items.map((_, index) => index));
+  return input.document.items.map((line) => {
+    const pair = [...unused].map((index) => {
+      const expected = input.expected.items[index];
+      const commercialExact = Math.abs(line.quantity - expected.quantity) <= 0.001
+        && Math.abs(line.unitPrice - expected.unitPrice) <= 0.01
+        && Math.abs(line.lineTotal - expected.lineTotal) <= 0.01;
+      const exactName = normalizeInvoiceText(line.rawName) === normalizeInvoiceText(expected.rawName ?? expected.name);
+      return { index, expected, score: nameScore(line, expected), commercialExact, exactName };
+    }).sort((left, right) =>
+      Number(right.exactName) - Number(left.exactName)
+      || Number(right.commercialExact) - Number(left.commercialExact)
+      || right.score - left.score
+    )[0];
+    if (pair) unused.delete(pair.index);
+    const selected = input.candidates.find((candidate) =>
+      candidate.id === line.nomenclatureId || candidate.key === line.purchaseProductKey
+    );
+    const expectedKey = pair ? targetKey(pair.expected, input.candidates) : "";
+    const expectedCandidate = input.candidates.find((candidate) => candidate.key === expectedKey || candidate.id === expectedKey);
+    return {
+      lineId: line.id,
+      rawSupplierLine: line.rawName,
+      parsed: {
+        name: line.name,
+        normalizedIdentity: line.normalizedRawName,
+        quantity: line.quantity,
+        unit: line.unit,
+        package: line.packageSize ?? null,
+        supplierArticle: line.supplierArticle ?? null,
+        barcode: line.barcode ?? null,
+      },
+      selectedCandidate: selected ? { id: selected.id, key: selected.key, name: selected.name, unit: selected.unit, package: selected.packageSize } : null,
+      expectedCandidate: expectedCandidate ? { id: expectedCandidate.id, key: expectedCandidate.key, name: expectedCandidate.name, unit: expectedCandidate.unit, package: expectedCandidate.packageSize } : null,
+      matchMethod: line.mappingSource ?? null,
+      confidence: line.confidence,
+      confidenceLevel: line.confidenceLevel,
+      requiresReview: line.requiresReview,
+      reason: line.matchReason ?? null,
+      identityConflicts: selected ? invoiceIdentityConflicts(line, selected) : [],
+      correct: Boolean(selected && expectedCandidate && selected.key === expectedCandidate.key),
+      topCandidates: (line.mappingCandidates ?? []).slice(0, 5),
+    };
+  });
 }
 
 function targetKey(item: PurchaseItem, candidates: NomenclatureCandidate[] = []): string {
@@ -148,9 +201,15 @@ export function productionMatchingQuality(input: {
   let lineTotalCorrect = 0;
   for (const line of input.document.items) {
     const ranked = [...unused]
-      .map((index) => ({ index, score: nameScore(line, input.expected.items[index]) }))
-      .sort((left, right) => right.score - left.score);
-    const pair = ranked[0]?.score >= 0.65 ? ranked[0] : null;
+      .map((index) => {
+        const expected = input.expected.items[index];
+        const commercialExact = Math.abs(line.quantity - expected.quantity) <= 0.001
+          && Math.abs(line.unitPrice - expected.unitPrice) <= 0.01
+          && Math.abs(line.lineTotal - expected.lineTotal) <= 0.01;
+        return { index, score: nameScore(line, expected), commercialExact };
+      })
+      .sort((left, right) => Number(right.commercialExact) - Number(left.commercialExact) || right.score - left.score);
+    const pair = ranked[0] && (ranked[0].commercialExact || ranked[0].score >= 0.65) ? ranked[0] : null;
     if (!pair) {
       unpairedActual += 1;
       continue;
@@ -161,8 +220,26 @@ export function productionMatchingQuality(input: {
     if (Math.abs(line.quantity - expected.quantity) <= 0.001) quantityCorrect += 1;
     if (normalizeInvoiceText(line.unit) === normalizeInvoiceText(expected.unit)) unitCorrect += 1;
     const actualPackage = packageFingerprint(line.packageSize ?? line.unit);
-    const expectedPackage = packageFingerprint(expected.packageSize ?? expected.unit);
-    if (actualPackage === expectedPackage) packageCorrect += 1;
+    const normalizedExpectedPackage = normalizeInvoicePackageSemantics({
+      quantity: expected.quantity,
+      unit: expected.unit,
+      packageSize: expected.packageSize,
+    });
+    const expectedPackage = packageFingerprint(normalizedExpectedPackage.packageSize ?? normalizedExpectedPackage.unit);
+    const explicitSourcePackage = packageFingerprint(line.rawName);
+    const measuredTotalPackage = packageFingerprint(`${expected.quantity} ${expected.unit}`);
+    const expectedPackageIsLegacyMeasuredTotal = Boolean(
+      expectedPackage
+      && measuredTotalPackage
+      && expectedPackage === measuredTotalPackage
+      && explicitSourcePackage
+      && explicitSourcePackage !== expectedPackage
+    );
+    if (actualPackage === expectedPackage || (
+      (!expectedPackage || expectedPackageIsLegacyMeasuredTotal)
+      && Boolean(actualPackage)
+      && actualPackage === explicitSourcePackage
+    )) packageCorrect += 1;
     if (Math.abs(line.unitPrice - expected.unitPrice) <= 0.01) unitPriceCorrect += 1;
     if (Math.abs(line.lineTotal - expected.lineTotal) <= 0.01) lineTotalCorrect += 1;
     const expectedKey = targetKey(expected, input.candidates);
@@ -213,10 +290,20 @@ export function confirmedMemoryFromReviewedGroundTruth(input: {
 }): SupplierItemMapping[] {
   const unused = new Set(input.groundTruth.items.map((_, index) => index));
   const items = input.recognized.items.flatMap((line) => {
-    const pair = [...unused]
-      .map((index) => ({ index, score: nameScore(line, input.groundTruth.items[index]) }))
-      .sort((left, right) => right.score - left.score)[0];
-    if (!pair || pair.score < 0.65) return [];
+    const ranked = [...unused].map((index) => {
+      const expected = input.groundTruth.items[index];
+      const commercialExact = Math.abs(line.quantity - expected.quantity) <= 0.001
+        && Math.abs(line.unitPrice - expected.unitPrice) <= 0.01
+        && Math.abs(line.lineTotal - expected.lineTotal) <= 0.01;
+      const exactName = normalizeInvoiceText(line.rawName) === normalizeInvoiceText(expected.rawName ?? expected.name);
+      return { index, score: nameScore(line, expected), commercialExact, exactName };
+    }).sort((left, right) =>
+      Number(right.exactName) - Number(left.exactName)
+      || Number(right.commercialExact) - Number(left.commercialExact)
+      || right.score - left.score
+    );
+    const pair = ranked[0];
+    if (!pair || (!pair.exactName && !pair.commercialExact && pair.score < 0.65)) return [];
     unused.delete(pair.index);
     const canonicalKey = targetKey(input.groundTruth.items[pair.index], input.candidates);
     if (!canonicalKey) return [];
