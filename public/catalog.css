@@ -1538,3 +1538,7 @@
 .bd-invoice-mapping-suggestions-v3{display:grid;gap:6px;padding:9px;border-radius:11px;background:#fff4d8}.bd-invoice-mapping-suggestions-v3>small{color:#70520d;font-weight:700}.bd-invoice-mapping-suggestions-v3 button{display:grid;gap:2px;min-height:46px;padding:8px 10px;text-align:left;border:1px solid #efd28a;border-radius:10px;background:#fff}.bd-invoice-mapping-suggestions-v3 button small{color:#786a48}
 
 .bd-invoice-mapping-unlink-v296{min-height:42px;border:1px solid #efb5b8;border-radius:10px;background:#fff;color:#b6333b;font-weight:700}
+
+.bd-invoice-create-canonical-v297{min-height:46px;border:1px solid #655cff;border-radius:11px;background:#655cff;color:#fff;font-weight:800;padding:8px 12px}.bd-invoice-create-canonical-v297:disabled{opacity:.65}
+
+.bd-invoice-review-summary-v4{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid #dfe3ff;border-radius:14px;background:#f7f7ff}.bd-invoice-review-summary-v4>div{display:grid;gap:4px}.bd-invoice-review-summary-v4 strong{font-size:16px;color:#1f2440}.bd-invoice-review-summary-v4 span{font-size:12px;line-height:1.4;color:#5f6578}.bd-invoice-review-summary-v4 button{min-height:42px;border:0;border-radius:11px;padding:8px 12px;background:#5b5ceb;color:#fff;font-weight:800}@media(max-width:560px){.bd-invoice-review-summary-v4{align-items:stretch;flex-direction:column}.bd-invoice-review-summary-v4 button{width:100%}}

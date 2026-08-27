@@ -578,6 +578,25 @@ export async function POST(request: Request): Promise<Response> {
   }
   await database.batch(statements);
 
+  const learnedMappingsCount = confirmedDocument.items.filter((item) => {
+    const value = record(item);
+    return Boolean(value?.rawName && (value.nomenclatureId || value.purchaseProductKey || value.canonicalProductKey));
+  }).length;
+  const manualCorrectionsCount = confirmedDocument.items.filter((item) => {
+    const value = record(item);
+    return value?.mappingSource === "manual" || value?.confirmedByUser === true;
+  }).length;
+  console.info("INVOICE_RECOGNITION_V2_LEARNING_COMPLETED", {
+    accountId: account.id,
+    venueId: account.venueId,
+    purchaseId: confirmedDocument.id,
+    supplierId: String(supplier.id),
+    totalLines: confirmedDocument.items.length,
+    manualCorrectionsCount,
+    learnedMappingsCount,
+    mappingMemorySize: nextInvoiceMappings.length,
+  });
+
   return Response.json({
     ok: true,
     document: confirmedDocument,

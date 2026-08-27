@@ -21,7 +21,7 @@ function page(): string {
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <title>Перенос данных заведения — BarDoctor</title>
   <link rel="stylesheet" href="/venue-migration-capture-v267.css?v=20260824" />
-  <script src="/venue-migration-capture-v267.js?v=20260824" defer></script>
+  <script src="/venue-migration-capture-v267.js?v=20260827" defer></script>
 </head>
 <body>
   <main class="capture-shell">

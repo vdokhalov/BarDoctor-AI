@@ -49,11 +49,12 @@ export async function POST(request: Request): Promise<Response> {
   } catch {
     return Response.json({ ok: false, code: "INVALID_JSON", error: "Не удалось прочитать сопоставление" }, { status: 400 });
   }
-  const supplierId = text(body.supplierId, "", 160);
+  let supplierId = text(body.supplierId, "", 160);
+  const supplierName = text(body.supplierName, "", 180);
   const rawName = text(body.rawName, "", 300);
   const requestedKey = text(body.purchaseProductKey ?? body.nomenclatureId, "", 300);
-  if (!supplierId || !rawName || !requestedKey) {
-    return Response.json({ ok: false, code: "MAPPING_FIELDS_REQUIRED", error: "Выберите поставщика и позицию номенклатуры" }, { status: 400 });
+  if (!rawName || !requestedKey || (!supplierId && !supplierName)) {
+    return Response.json({ ok: false, code: "MAPPING_FIELDS_REQUIRED", error: "Укажите поставщика и позицию номенклатуры" }, { status: 400 });
   }
 
   const database = getD1();
@@ -65,10 +66,33 @@ export async function POST(request: Request): Promise<Response> {
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   const assortment = record(parsed(stores.get(ASSORTMENT_STORE_KEY), {}));
   const suppliers = array(parsed(stores.get(SUPPLIER_STORE_KEY), [])).map(record);
-  const supplier = suppliers.find((value) => text(value.id, "", 160) === supplierId);
+  let supplier = supplierId
+    ? suppliers.find((value) => text(value.id, "", 160) === supplierId)
+    : suppliers.find((value) =>
+      text(value.name, "", 180).toLocaleLowerCase("ru") === supplierName.toLocaleLowerCase("ru")
+    );
+  let supplierCreated = false;
+  if (!supplier && body.ensureSupplier === true && supplierName) {
+    const now = new Date().toISOString();
+    supplier = {
+      id: crypto.randomUUID(),
+      name: supplierName,
+      type: "supplier",
+      categories: [],
+      currency: text(body.currency, "RUB", 12),
+      status: "active",
+      source: "invoice_mapping",
+      venueId: account.venueId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    suppliers.unshift(supplier);
+    supplierCreated = true;
+  }
   if (!supplier || text(supplier.status, "active", 30) === "archived") {
     return Response.json({ ok: false, code: "SUPPLIER_NOT_FOUND", error: "Поставщик недоступен в текущем заведении" }, { status: 404 });
   }
+  supplierId = text(supplier.id, "", 160);
   const candidates = nomenclatureCandidates(assortment, account.venueId);
   const candidate = candidates.find((value) => value.key === requestedKey || value.id === requestedKey);
   if (!candidate) {
@@ -91,6 +115,8 @@ export async function POST(request: Request): Promise<Response> {
       purchaseProductKey: candidate.key,
       unit: text(body.unit, candidate.unit, 30),
       packageSize: text(body.packageSize, candidate.packageSize, 120),
+      supplierSku: text(body.supplierArticle ?? body.supplierSku, "", 160),
+      barcode: text(body.barcode, "", 160),
     },
     canonicalItems: candidates,
     now,
@@ -152,7 +178,7 @@ export async function POST(request: Request): Promise<Response> {
   };
   assortment.supplierProductMappings = upsertSupplierProductMapping(previousMappings, confirmedMapping);
   assortment.updatedAt = now;
-  await database.batch([
+  const statements = [
     database.prepare(`
       INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
       VALUES (?, ?, ?, ?)
@@ -183,7 +209,16 @@ export async function POST(request: Request): Promise<Response> {
       "Пользователь подтвердил соответствие строки накладной канонической номенклатуре",
       now,
     ),
-  ]);
+  ];
+  if (supplierCreated) {
+    statements.push(database.prepare(`
+      INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(account_id, store_key)
+      DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
+    `).bind(account.id, SUPPLIER_STORE_KEY, JSON.stringify(suppliers), now));
+  }
+  await database.batch(statements);
   console.info("INVOICE_RECOGNITION_V2_MAPPING_CONFIRMED", {
     accountId: account.id,
     venueId: account.venueId,
@@ -200,5 +235,7 @@ export async function POST(request: Request): Promise<Response> {
       purchaseProductKey: candidate.key,
       created: !existed,
     },
+    supplierId,
+    supplierCreated,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

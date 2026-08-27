@@ -8,6 +8,7 @@ import {
   consolidateInventoryDuplicates,
   inventoryPackageAmount,
   inventoryProductKey,
+  inventoryUnitDefinition,
   type InventoryDisplayUnit,
   normalizeInventoryDisplayUnit,
   repairInventoryBalanceMetadata,
@@ -297,14 +298,31 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "create") {
     const name = text(body.name, "", 240);
     const kind = text(body.kind, "stock", 20) === "service" ? "service" : "stock";
-    const unit = text(body.unit, kind === "service" ? "service" : "pcs", 20) as BaseInventoryUnit;
+    const sourceUnit = kind === "stock" ? inventoryUnitDefinition(body.sourceUnit ?? body.unit) : null;
+    const unit = text(
+      body.unit,
+      kind === "service" ? "service" : sourceUnit?.baseUnit ?? "pcs",
+      20,
+    ) as BaseInventoryUnit;
+    const defaultPackageSize = kind === "service"
+      ? "1 усл."
+      : sourceUnit?.code === "kg"
+        ? "1 кг"
+        : sourceUnit?.code === "l"
+          ? "1 л"
+          : sourceUnit?.code === "g"
+            ? "1 г"
+            : sourceUnit?.code === "ml"
+              ? "1 мл"
+              : "1 шт.";
+    const requestedPackageSize = text(body.packageSize, "", 120);
     const packageSize = text(
-      body.packageSize,
-      kind === "service" ? "1 усл." : unit === "ml" ? "1 л" : unit === "g" ? "1 кг" : "1 шт.",
+      /\d/.test(requestedPackageSize) ? requestedPackageSize : "",
+      defaultPackageSize,
       120,
     );
     const displayUnit = kind === "stock"
-      ? normalizeInventoryDisplayUnit(body.displayUnit, unit)
+      ? normalizeInventoryDisplayUnit(body.displayUnit ?? sourceUnit?.code, unit)
       : null;
     if (!name || (kind === "stock" && (!["ml", "g", "pcs"].includes(unit) || !displayUnit))) {
       return Response.json(

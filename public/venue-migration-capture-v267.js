@@ -71,8 +71,14 @@
     });
     sourceCard.hidden = false;
     var count = Object.keys(bundle.candidates).length;
-    button.disabled = !state.captureEnabled || count === 0;
-    if (!state.captureEnabled) status.textContent = "Для этого заведения перенос не запланирован. Сначала переключитесь на Плакучую Иву или EazywaY.";
+    var serverCount = storeKeys.filter(function (key) { return Boolean(state.serverStores[key] && state.serverStores[key].exists); }).length;
+    var serverPreviewAvailable = count === 0 && serverCount > 0 && !(state.serverStores.bd_assortment_v1 && state.serverStores.bd_assortment_v1.exists);
+    venueCard.querySelector("small").textContent = "Серверных хранилищ: " + serverCount + " из " + storeKeys.length;
+    button.dataset.action = serverPreviewAvailable ? "server-preview" : "browser-capture";
+    button.textContent = serverPreviewAvailable ? "Проверить серверные данные" : "Сохранить копию и проверить перенос";
+    button.disabled = !state.captureEnabled || (count === 0 && !serverPreviewAvailable);
+    if (!state.captureEnabled) status.textContent = "Для этого заведения перенос не запланирован.";
+    else if (serverPreviewAvailable) status.textContent = "Данные закупок и склада уже на сервере. Preview будет построен без localStorage.";
     else if (!count) status.textContent = "Старые данные этого заведения в этом браузере не найдены.";
     else status.textContent = "Найдено источников: " + count + ". Можно сохранить резервную копию и выполнить проверку.";
   }
@@ -90,6 +96,10 @@
     renderSources();
   }
   button.addEventListener("click", async function () {
+    if (button.dataset.action === "server-preview") {
+      window.location.assign("/migration-preview");
+      return;
+    }
     button.disabled = true;
     status.className = "running";
     status.textContent = "Сохраняю неизменяемую копию и проверяю целостность…";
@@ -122,7 +132,14 @@
       button.disabled = false;
     }
   });
-  initialize().catch(function (error) {
+  initialize().then(function () {
+    var params = new URLSearchParams(window.location.search);
+    if (params.get("autocapture") !== "1" || button.disabled) return;
+    params.delete("autocapture");
+    var query = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (query ? "?" + query : "") + window.location.hash);
+    button.click();
+  }).catch(function (error) {
     venueCard.innerHTML = "<strong>Не удалось открыть перенос</strong><span>" + escapeText(error && error.message) + "</span>";
     status.className = "error";
     status.textContent = "Вернитесь в BarDoctor, войдите в аккаунт и выберите нужное заведение.";

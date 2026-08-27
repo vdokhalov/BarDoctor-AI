@@ -29,17 +29,21 @@ import {
   applyDeterministicMappings,
   canonicalInvoiceSupplierMappings,
   compareRecognitionResults,
-  confidenceLevel,
   INVOICE_MAPPING_STORE_KEY,
   invoiceRecognitionRequestMode,
   mergeShadowMappingMetadata,
   nomenclatureCandidates,
+  parsedInvoiceDocumentFromLegacy,
   parseInvoiceOcr,
   recognitionMetrics,
   type InvoiceOcrResult,
   type ParsedInvoiceDocument,
   type SupplierItemMapping,
 } from "../../../../lib/bardoctor/invoice-recognition-v2";
+import {
+  runInvoiceAIBulkMatching,
+} from "../../../../lib/bardoctor/invoice-ai-matching";
+import { createOpenAIInvoiceMatchingProvider } from "../../../../lib/bardoctor/invoice-ai-openai-provider";
 
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 const MAX_UPLOAD_BYTES = 16 * 1024 * 1024;
@@ -72,6 +76,14 @@ type StoredSourceDocument = {
 };
 
 type StoreRow = { store_key: string; data_json: string };
+type RecognitionJobRow = {
+  job_id: string;
+  status: string;
+  result_json: string | null;
+  metrics_json: string | null;
+  issues_json: string | null;
+  updated_at: string;
+};
 
 function arrayJson(value: string | undefined): unknown[] {
   if (!value) return [];
@@ -108,6 +120,95 @@ function base64(bytes: Uint8Array): string {
     binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
   }
   return btoa(binary);
+}
+
+async function recognitionFingerprint(input: {
+  venueId: number;
+  mode: string;
+  documents: SourceDocument[];
+  inputStrategy?: string;
+}): Promise<string> {
+  const encoder = new TextEncoder();
+  const metadata = encoder.encode(JSON.stringify({
+    venueId: input.venueId,
+    mode: input.mode,
+    inputStrategy: input.inputStrategy ?? "server_ocr_v1",
+    files: input.documents.map((document) => ({
+      filename: document.filename,
+      mimeType: document.mimeType,
+      size: document.bytes.byteLength,
+    })),
+  }));
+  const size = metadata.byteLength + input.documents.reduce((sum, document) => sum + document.bytes.byteLength, 0);
+  const bytes = new Uint8Array(size);
+  bytes.set(metadata, 0);
+  let offset = metadata.byteLength;
+  for (const document of input.documents) {
+    bytes.set(document.bytes, offset);
+    offset += document.bytes.byteLength;
+  }
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function acquireRecognitionJob(input: {
+  accountId: number;
+  venueId: number;
+  jobId: string;
+  fingerprint: string;
+}): Promise<{ acquired: true } | { acquired: false; row: RecognitionJobRow }> {
+  const database = getD1();
+  const now = new Date().toISOString();
+  await database.prepare(`
+    INSERT OR IGNORE INTO invoice_recognition_jobs
+      (account_id, venue_id, fingerprint, job_id, status, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'processing', ?, ?)
+  `).bind(input.accountId, input.venueId, input.fingerprint, input.jobId, now, now).run();
+  let row = await database.prepare(`
+    SELECT job_id, status, result_json, metrics_json, issues_json, updated_at
+    FROM invoice_recognition_jobs
+    WHERE account_id = ? AND venue_id = ? AND fingerprint = ?
+  `).bind(input.accountId, input.venueId, input.fingerprint).first<RecognitionJobRow>();
+  if (!row || row.job_id === input.jobId) return { acquired: true };
+  const stale = Date.now() - Date.parse(row.updated_at) > 5 * 60_000;
+  if (!stale) return { acquired: false, row };
+  await database.prepare(`
+    UPDATE invoice_recognition_jobs
+    SET job_id = ?, status = 'processing', result_json = NULL, metrics_json = NULL,
+        issues_json = NULL, updated_at = ?
+    WHERE account_id = ? AND venue_id = ? AND fingerprint = ? AND job_id = ?
+  `).bind(input.jobId, now, input.accountId, input.venueId, input.fingerprint, row.job_id).run();
+  row = await database.prepare(`
+    SELECT job_id, status, result_json, metrics_json, issues_json, updated_at
+    FROM invoice_recognition_jobs
+    WHERE account_id = ? AND venue_id = ? AND fingerprint = ?
+  `).bind(input.accountId, input.venueId, input.fingerprint).first<RecognitionJobRow>();
+  return row?.job_id === input.jobId ? { acquired: true } : { acquired: false, row: row! };
+}
+
+async function completeRecognitionJob(input: {
+  accountId: number;
+  venueId: number;
+  jobId: string;
+  fingerprint: string;
+  document: ParsedInvoiceDocument;
+  metrics: ReturnType<typeof recognitionMetrics>;
+  issues: string[];
+}): Promise<void> {
+  await getD1().prepare(`
+    UPDATE invoice_recognition_jobs
+    SET status = 'completed', result_json = ?, metrics_json = ?, issues_json = ?, updated_at = ?
+    WHERE account_id = ? AND venue_id = ? AND fingerprint = ? AND job_id = ?
+  `).bind(
+    JSON.stringify(input.document),
+    JSON.stringify(input.metrics),
+    JSON.stringify(input.issues),
+    new Date().toISOString(),
+    input.accountId,
+    input.venueId,
+    input.fingerprint,
+    input.jobId,
+  ).run();
 }
 
 function safeFileName(value: string): string {
@@ -409,92 +510,39 @@ async function aiResolveUnresolved(input: {
   document: ParsedInvoiceDocument;
   aiFallbackLinesCount: number;
   aiRequestCount: number;
+  aiEstimatedInputTokens: number;
+  aiEstimatedOutputTokens: number;
   aiEstimatedTokenUsage: number;
   unavailable: boolean;
 }> {
-  const unresolved = input.document.items.filter((item) => item.requiresReview);
-  if (!unresolved.length) {
-    return {
-      document: input.document,
-      aiFallbackLinesCount: 0,
-      aiRequestCount: 0,
-      aiEstimatedTokenUsage: 0,
-      unavailable: false,
-    };
-  }
-  const payload = unresolved.map((item) => ({
-    lineId: item.id,
-    rawName: item.rawName,
-    quantity: item.quantity,
-    unit: item.unit,
-    packageSize: item.packageSize,
-    unitPrice: item.unitPrice,
-    lineTotal: item.lineTotal,
-    candidates: item.mappingCandidates,
-  }));
-  try {
-    const raw = await aiText({
-      accountId: input.accountId,
-      observability: {
-        actorAccountId: input.actorAccountId,
-        venueId: input.venueId,
-        feature: "invoice_recognition_v2." + input.jobId,
-      },
-      system: `Ты проверяешь только неоднозначные строки уже прочитанной накладной. Не создавай номенклатуру. Выбирай nomenclatureId только из переданных candidates. Если уверенности нет, оставь null. Верни только JSON.`,
-      messages: [{
-        role: "user",
-        content: `Необработанные строки:\n${JSON.stringify(payload)}\n\nВерни {"lines":[{"lineId":"...","nomenclatureId":"id из candidates или null","confidence":0.0}]}.`,
-      }],
-      maxTokens: Math.min(2_500, 300 + unresolved.length * 120),
-    });
-    const parsed = record(parseAIJson<unknown>(raw));
-    const suggestions = Array.isArray(parsed.lines) ? parsed.lines.map(record) : [];
-    const byId = new Map(suggestions.map((suggestion) => [String(suggestion.lineId ?? ""), suggestion]));
-    const items = input.document.items.map((item) => {
-      if (!item.requiresReview) return item;
-      const suggestion = byId.get(item.id);
-      const nomenclatureId = String(suggestion?.nomenclatureId ?? "");
-      const selected = item.mappingCandidates?.find((candidate) => candidate.id === nomenclatureId || candidate.key === nomenclatureId);
-      const score = Math.max(0, Math.min(1, Number(suggestion?.confidence) || 0));
-      if (!selected || confidenceLevel(score) === "low") return item;
-      return {
-        ...item,
-        nomenclatureName: selected.name,
-        nomenclatureId: selected.id,
-        purchaseProductKey: selected.key,
-        mappingSource: "ai" as const,
-        confidence: score,
-        confidenceLevel: confidenceLevel(score),
-        requiresReview: confidenceLevel(score) !== "high",
-      };
-    });
-    return {
-      document: { ...input.document, items },
-      aiFallbackLinesCount: unresolved.length,
-      aiRequestCount: 1,
-      aiEstimatedTokenUsage: Math.ceil((JSON.stringify(payload).length + raw.length) / 4),
-      unavailable: false,
-    };
-  } catch (error) {
+  const result = await runInvoiceAIBulkMatching({
+    document: input.document,
+    jobId: input.jobId,
+    provider: createOpenAIInvoiceMatchingProvider(input),
+  });
+  if (result.unavailable) {
     console.warn("INVOICE_RECOGNITION_V2_AI_FALLBACK_UNAVAILABLE", {
       accountId: input.accountId,
-      unresolvedLines: unresolved.length,
-      code: error instanceof AIServiceError ? error.code : "provider_unavailable",
+      venueId: input.venueId,
+      unresolvedLines: result.sentLines,
+      codes: result.providerErrors,
     });
-    return {
-      document: {
-        ...input.document,
-        warnings: [
-          ...input.document.warnings,
-          "Автоматическое распознавание части документа временно недоступно. Уже распознанные данные сохранены — проверьте оставшиеся позиции вручную.",
-        ],
-      },
-      aiFallbackLinesCount: unresolved.length,
-      aiRequestCount: 1,
-      aiEstimatedTokenUsage: Math.ceil(JSON.stringify(payload).length / 4),
-      unavailable: true,
-    };
   }
+  return {
+    document: result.unavailable ? {
+      ...result.document,
+      warnings: [
+        ...result.document.warnings,
+        "Не удалось автоматически сопоставить часть товаров. Уже обработанные позиции сохранены — проверьте оставшиеся вручную или повторите позже.",
+      ],
+    } : result.document,
+    aiFallbackLinesCount: result.sentLines,
+    aiRequestCount: result.requestCount,
+    aiEstimatedInputTokens: result.estimatedInputTokens,
+    aiEstimatedOutputTokens: result.estimatedOutputTokens,
+    aiEstimatedTokenUsage: result.estimatedInputTokens + result.estimatedOutputTokens,
+    unavailable: result.unavailable,
+  };
 }
 
 async function recogniseDocumentV2(input: {
@@ -504,6 +552,8 @@ async function recogniseDocumentV2(input: {
   jobId: string;
   documents: SourceDocument[];
   mode: "primary" | "shadow";
+  fingerprint: string;
+  parsedDocument?: ParsedInvoiceDocument;
   simulateAiUnavailable?: boolean;
 }): Promise<{
   document: ParsedInvoiceDocument;
@@ -512,11 +562,36 @@ async function recogniseDocumentV2(input: {
   issues: Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED">;
 }> {
   const startedAt = Date.now();
+  const job = await acquireRecognitionJob(input);
+  if (!job.acquired) {
+    if (job.row.status === "completed" && job.row.result_json && job.row.metrics_json) {
+      return {
+        document: objectJson(job.row.result_json) as ParsedInvoiceDocument,
+        metrics: objectJson(job.row.metrics_json) as ReturnType<typeof recognitionMetrics>,
+        aiUnavailable: arrayJson(job.row.issues_json ?? undefined).includes("AI_FALLBACK_UNAVAILABLE"),
+        issues: arrayJson(job.row.issues_json ?? undefined) as Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED">,
+      };
+    }
+    throw new AIServiceError(
+      "Этот документ уже обрабатывается. Результат появится после завершения текущей обработки.",
+      409,
+      "INVOICE_RECOGNITION_IN_PROGRESS",
+    );
+  }
   const stores = await recognitionStores(input.accountId);
   let ocr: InvoiceOcrResult | null = null;
   let ocrFailure = false;
   const issues: Array<"OCR_FAILED" | "PARSER_FAILED" | "AI_FALLBACK_UNAVAILABLE" | "VALIDATION_REQUIRED"> = [];
-  try {
+  if (input.parsedDocument) {
+    ocr = {
+      rawText: "",
+      lines: input.parsedDocument.items.map((item) => ({ text: item.rawName, confidence: item.confidence })),
+      confidence: input.parsedDocument.confidence,
+      durationMs: 0,
+      engine: "legacy_structured_lines",
+      metadata: { provider: "legacy_recognition", matchingOnly: true },
+    };
+  } else try {
     if (input.documents.length === 1 && SHEET_TYPES.has(input.documents[0].mimeType)) {
       ocr = spreadsheetOcr(input.documents[0]);
     } else {
@@ -535,7 +610,7 @@ async function recogniseDocumentV2(input: {
   }
   let parsed: ParsedInvoiceDocument;
   try {
-    parsed = ocr ? parseInvoiceOcr(ocr) : {
+    parsed = input.parsedDocument ?? (ocr ? parseInvoiceOcr(ocr) : {
       documentType: "invoice" as const,
       supplierName: "Новый поставщик",
       supplierType: "wholesale" as const,
@@ -545,7 +620,7 @@ async function recogniseDocumentV2(input: {
       confidence: 0,
       warnings: ["Документ распознан частично. Повторите фото или продолжите заполнение вручную."],
       items: [],
-    };
+    });
   } catch (error) {
     issues.push("PARSER_FAILED");
     console.warn("INVOICE_RECOGNITION_V2_PARSER_FAILED", {
@@ -600,6 +675,8 @@ async function recogniseDocumentV2(input: {
       },
       aiFallbackLinesCount: unresolvedCount,
       aiRequestCount: 0,
+      aiEstimatedInputTokens: 0,
+      aiEstimatedOutputTokens: 0,
       aiEstimatedTokenUsage: 0,
       unavailable: true,
     }
@@ -615,6 +692,8 @@ async function recogniseDocumentV2(input: {
       document: mapped,
       aiFallbackLinesCount: 0,
       aiRequestCount: 0,
+      aiEstimatedInputTokens: 0,
+      aiEstimatedOutputTokens: 0,
       aiEstimatedTokenUsage: 0,
       unavailable: false,
     };
@@ -635,6 +714,8 @@ async function recogniseDocumentV2(input: {
     document: mapped,
     aiFallbackLinesCount: ai.aiFallbackLinesCount,
     aiRequestCount: ai.aiRequestCount,
+    aiEstimatedInputTokens: ai.aiEstimatedInputTokens ?? 0,
+    aiEstimatedOutputTokens: ai.aiEstimatedOutputTokens ?? 0,
     aiEstimatedTokenUsage: ai.aiEstimatedTokenUsage ?? 0,
     nomenclatureCandidatesCount: candidates.length,
     matchingDurationMs,
@@ -646,7 +727,17 @@ async function recogniseDocumentV2(input: {
     venueId: input.venueId,
     ...metrics,
   });
-  return { document: mapped, metrics, aiUnavailable: ai.unavailable, issues: [...new Set(issues)] };
+  const uniqueIssues = [...new Set(issues)];
+  await completeRecognitionJob({
+    accountId: input.accountId,
+    venueId: input.venueId,
+    jobId: input.jobId,
+    fingerprint: input.fingerprint,
+    document: mapped,
+    metrics,
+    issues: uniqueIssues,
+  });
+  return { document: mapped, metrics, aiUnavailable: ai.unavailable, issues: uniqueIssues };
 }
 
 function purchaseBucket(): R2Bucket | null {
@@ -756,6 +847,12 @@ export async function POST(request: Request): Promise<Response> {
       requestedQaMode: new URL(request.url).searchParams.get("qa"),
     });
     const mode = modeSelection.activeMode;
+    const fingerprint = mode === "legacy" ? "" : await recognitionFingerprint({
+      venueId: account.venueId,
+      mode,
+      documents,
+      inputStrategy: mode === "shadow" ? "legacy_structured_lines_v1" : "server_ocr_v1",
+    });
     console.info("INVOICE_RECOGNITION_STARTED", {
       jobId: id,
       actorAccountId: account.actorAccountId,
@@ -783,6 +880,7 @@ export async function POST(request: Request): Promise<Response> {
         actorAccountId: account.actorAccountId,
         venueId: account.venueId,
         jobId: id,
+        fingerprint,
         documents,
         mode,
         simulateAiUnavailable: modeSelection.simulateAiUnavailable,
@@ -802,27 +900,34 @@ export async function POST(request: Request): Promise<Response> {
       };
     } else {
       const venueContext = await loadVenueAIContext(account, "purchase");
-      const [legacyResult, v2Result] = await Promise.allSettled([
-        recogniseDocument({
+      let legacy: unknown = null;
+      try {
+        legacy = await recogniseDocument({
           accountId: account.id,
           jobId: id,
           documents,
           hint,
           contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
-        }),
-        recogniseDocumentV2({
-          accountId: account.id,
-          actorAccountId: account.actorAccountId,
-          venueId: account.venueId,
+        });
+      } catch (error) {
+        console.warn("INVOICE_RECOGNITION_LEGACY_SHADOW_INPUT_UNAVAILABLE", {
           jobId: id,
-          documents,
-          mode,
-          simulateAiUnavailable: modeSelection.simulateAiUnavailable,
-        }),
-      ]);
-      if (v2Result.status === "rejected") throw v2Result.reason;
-      const v2 = v2Result.value;
-      const legacy = legacyResult.status === "fulfilled" ? legacyResult.value : null;
+          accountId: account.id,
+          venueId: account.venueId,
+          code: error instanceof AIServiceError ? error.code : "legacy_provider_unavailable",
+        });
+      }
+      const v2 = await recogniseDocumentV2({
+        accountId: account.id,
+        actorAccountId: account.actorAccountId,
+        venueId: account.venueId,
+        jobId: id,
+        fingerprint,
+        documents,
+        mode,
+        parsedDocument: legacy ? parsedInvoiceDocumentFromLegacy(legacy) : undefined,
+        simulateAiUnavailable: modeSelection.simulateAiUnavailable,
+      });
       recognised = legacy ? mergeShadowMappingMetadata(legacy, v2.document) : {
         ...v2.document,
         warnings: [

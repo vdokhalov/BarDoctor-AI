@@ -340,6 +340,15 @@ async function providerErrorCode(response: Response): Promise<string> {
   }
 }
 
+function retryAfterMs(response: Response): number | null {
+  const raw = response.headers.get("Retry-After")?.trim();
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1_000);
+  const date = Date.parse(raw);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : null;
+}
+
 export async function openAIWebSearch(input: {
   accountId: number;
   system: string;
@@ -539,7 +548,12 @@ export async function openAIText(input: OpenAITextInput): Promise<string> {
     const providerCode = await providerErrorCode(response);
     const message = providerErrorMessage(response.status, providerCode);
     await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model, startedAt, status: "error", errorCode: providerCode || `http_${response.status}` });
-    throw new AIServiceError(message, response.status >= 500 ? 502 : response.status);
+    throw new AIServiceError(
+      message,
+      response.status >= 500 ? 502 : response.status,
+      providerCode || `http_${response.status}`,
+      retryAfterMs(response),
+    );
   }
 
   const payload = await response.json() as OpenAIResponsePayload;

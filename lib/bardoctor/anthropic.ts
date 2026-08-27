@@ -19,6 +19,7 @@ export class AIServiceError extends Error {
     message: string,
     readonly status = 502,
     readonly code = "AI_SERVICE_ERROR",
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message);
   }

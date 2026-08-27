@@ -15,13 +15,16 @@ import {
   invoiceRecognitionRequestMode,
   mergeShadowMappingMetadata,
   nomenclatureCandidates,
+  normalizeInvoicePackageSemantics,
   normalizeInvoiceText,
   packageFingerprint,
+  parsedInvoiceDocumentFromLegacy,
   parseInvoiceLine,
   parseInvoiceOcr,
   recognitionQualityAgainstGroundTruth,
   recognitionMetrics,
   upsertConfirmedSupplierMappings,
+  type ParsedInvoiceDocument,
   type SupplierItemMapping,
 } from "../lib/bardoctor/invoice-recognition-v2";
 import { applyPurchaseToInventory } from "../lib/bardoctor/inventory";
@@ -109,6 +112,73 @@ test("parser uses structured raw table rows when OCR overlay exposes split colum
   assert.equal(draft.items[0].unitPrice, 120.33);
   assert.equal(draft.items[0].lineTotal, 361);
   assert.equal(draft.items[0].rawName, "Коньяк Белый аист");
+});
+
+test("legacy structured lines feed Hybrid matching without trusting legacy canonical IDs", () => {
+  const document = parsedInvoiceDocumentFromLegacy({
+    documentType: "invoice",
+    supplierName: "Рынок",
+    documentNumber: "394",
+    date: "2026-08-26",
+    currency: "RUB",
+    total: 587.1,
+    confidence: 0.91,
+    items: [
+      {
+        id: "legacy-394-1",
+        name: "Молоко 1 л",
+        quantity: 2,
+        unit: "шт.",
+        packageSize: "1 л",
+        unitPrice: 50,
+        lineTotal: 100,
+        confidence: 0.94,
+        nomenclatureId: "hallucinated-id",
+      },
+    ],
+  });
+  assert.equal(document.documentNumber, "394");
+  assert.equal(document.items.length, 1);
+  assert.equal(document.items[0].rawName, "Молоко 1 л");
+  assert.equal(document.items[0].nomenclatureId, undefined);
+  assert.equal(document.items[0].confidenceLevel, "high");
+});
+
+test("legacy package semantics distinguish counted bottles from measured totals", () => {
+  assert.deepEqual(normalizeInvoicePackageSemantics({
+    quantity: 12,
+    unit: "л",
+    packageSize: "0,5 л",
+  }), { unit: "шт.", packageSize: "0,5 л" });
+  assert.deepEqual(normalizeInvoicePackageSemantics({
+    quantity: 10,
+    unit: "л",
+    packageSize: "10 л",
+  }), { unit: "л", packageSize: "л" });
+  assert.deepEqual(normalizeInvoicePackageSemantics({
+    quantity: 1.5,
+    unit: "л",
+    packageSize: "л",
+  }), { unit: "л", packageSize: "л" });
+
+  const document = parsedInvoiceDocumentFromLegacy({
+    supplierName: "Шериф",
+    total: 75.6,
+    confidence: 0.94,
+    items: [{
+      id: "water-line",
+      name: "Моршинская вода 0.5 л",
+      quantity: 12,
+      unit: "л",
+      packageSize: "0.5 л",
+      unitPrice: 6.3,
+      lineTotal: 75.6,
+      confidence: 0.94,
+    }],
+  });
+  assert.equal(document.items[0].unit, "шт.");
+  assert.equal(document.items[0].packageSize, "0.5 л");
+  assert.equal(normalizePurchaseDocument(document).items[0].quantityMode, "count");
 });
 
 test("parser deterministically reconstructs vertical OCR table cells", () => {
@@ -343,6 +413,61 @@ test("fuzzy scoring uses aliases and packaging but does not silently select ambi
   assert.equal(confidenceLevel(0.91, 0.2), "high");
 });
 
+test("supplier article and barcode resolve before name similarity", () => {
+  const source: ParsedInvoiceDocument = {
+    documentType: "invoice",
+    supplierName: "Поставщик",
+    supplierType: "wholesale",
+    currency: "RUB",
+    paymentMethod: "unknown",
+    total: 200,
+    confidence: 0.9,
+    warnings: [],
+    items: [
+      {
+        id: "article-line",
+        rawName: "Неузнаваемая строка арт AB-125",
+        normalizedRawName: "неузнаваемая строка арт ab 125",
+        supplierArticle: "AB-125",
+        name: "Неузнаваемая строка",
+        quantity: 1,
+        unit: "шт.",
+        unitPrice: 100,
+        lineTotal: 100,
+        confidence: 0.9,
+        confidenceLevel: "medium",
+        requiresReview: true,
+      },
+      {
+        id: "barcode-line",
+        rawName: "OCR ошибка 4601234567890",
+        normalizedRawName: "ocr ошибка 4601234567890",
+        barcode: "4601234567890",
+        name: "OCR ошибка",
+        quantity: 1,
+        unit: "шт.",
+        unitPrice: 100,
+        lineTotal: 100,
+        confidence: 0.9,
+        confidenceLevel: "medium",
+        requiresReview: true,
+      },
+    ],
+  };
+  const result = applyDeterministicMappings({
+    document: source,
+    supplierId: "supplier-1",
+    venueId: 10,
+    mappings: [],
+    nomenclature: [
+      { id: "article-product", key: "article-product|pcs", name: "Другой товар", unit: "pcs", packageSize: "1 шт.", aliases: [], supplierArticles: ["AB-125"] },
+      { id: "barcode-product", key: "barcode-product|pcs", name: "Совсем иное", unit: "pcs", packageSize: "1 шт.", aliases: [], barcodes: ["4601234567890"] },
+    ],
+  });
+  assert.deepEqual(result.items.map((item) => item.nomenclatureId), ["article-product", "barcode-product"]);
+  assert.ok(result.items.every((item) => item.mappingSource === "supplier_identifier" && item.requiresReview === false));
+});
+
 test("matcher reads the full canonical venue dataset, including stock-only identities", () => {
   const assortment = {
     stockBalances: Array.from({ length: 550 }, (_, index) => ({
@@ -441,6 +566,54 @@ test("manual confirmation persists in canonical supplier memory and is reused on
   assert.equal(metrics.historicalMappingsCount, 1);
   assert.equal(metrics.unresolvedCount, 0);
   assert.equal(metrics.aiRequestCount, 0);
+});
+
+test("migrated dimensional supplier memory safely matches a counted package", () => {
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "water-500",
+    key: "stock:water-500|ml",
+    venueId: 10,
+    name: "Моршинская вода 0,5 л",
+    unit: "ml",
+    packageSize: "0,5 л",
+  }] }, 10);
+  const document = parsedInvoiceDocumentFromLegacy({
+    supplierName: "Шериф",
+    total: 75.6,
+    confidence: 0.94,
+    items: [{
+      id: "water-line",
+      name: "Моршинская вода 0.5 л",
+      quantity: 12,
+      unit: "л",
+      packageSize: "0.5 л",
+      unitPrice: 6.3,
+      lineTotal: 75.6,
+      confidence: 0.94,
+    }],
+  });
+  const mapped = applyDeterministicMappings({
+    document,
+    supplierId: "sheriff",
+    venueId: 10,
+    mappings: [{
+      id: "migrated-water",
+      venueId: 10,
+      supplierId: "sheriff",
+      rawName: "Моршинская вода 0.5 л",
+      normalizedRawName: normalizeInvoiceText("Моршинская вода 0.5 л"),
+      packageFingerprint: "ml:500",
+      purchaseUnit: "ml",
+      nomenclatureId: "stock:water-500|ml",
+      confirmations: 0,
+      createdAt: "2026-08-27T00:00:00.000Z",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    }],
+    nomenclature: candidates,
+  });
+  assert.equal(mapped.items[0].mappingSource, "history");
+  assert.equal(mapped.items[0].purchaseProductKey, "stock:water-500|ml");
+  assert.equal(mapped.items[0].requiresReview, false);
 });
 
 test("canonical supplier mappings remain supplier-aware and venue-scoped", () => {
@@ -805,6 +978,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   const route = await readFile(new URL("../app/api/purchases/scan/route.ts", import.meta.url), "utf8");
   const confirm = await readFile(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), "utf8");
   const mappingRoute = await readFile(new URL("../app/api/purchases/mappings/route.ts", import.meta.url), "utf8");
+  const aiMatching = await readFile(new URL("../lib/bardoctor/invoice-ai-matching.ts", import.meta.url), "utf8");
+  const aiProvider = await readFile(new URL("../lib/bardoctor/invoice-ai-openai-provider.ts", import.meta.url), "utf8");
+  const jobMigration = await readFile(new URL("../drizzle/0025_hybrid_invoice_matching_jobs.sql", import.meta.url), "utf8");
   const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
   const bootstrap = await readFile(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
   const appHtml = await readFile(new URL("../public/app.html", import.meta.url), "utf8");
@@ -819,12 +995,25 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(route, /simulateAiUnavailable/);
   assert.match(route, /INVOICE_RECOGNITION_STARTED/);
   assert.match(route, /jobId: input\.jobId/);
+  assert.match(route, /recognitionFingerprint/);
+  assert.match(route, /acquireRecognitionJob/);
+  assert.match(route, /completeRecognitionJob/);
+  assert.match(route, /invoice_recognition_jobs/);
   assert.match(route, /X-Invoice-Recognition-Job-Id/);
   assert.match(route, /shadowResult: v2\.document/);
   assert.match(route, /mergeShadowMappingMetadata\(legacy, v2\.document\)/);
+  assert.match(route, /parsedDocument: legacy \? parsedInvoiceDocumentFromLegacy\(legacy\) : undefined/);
+  assert.match(route, /engine: "legacy_structured_lines"/);
+  assert.match(route, /inputStrategy: mode === "shadow" \? "legacy_structured_lines_v1"/);
   assert.match(route, /ocr_purchases\." \+ input\.jobId/);
   assert.match(route, /Документ распознан частично/);
   assert.doesNotMatch(route, /limit:\s*10000/);
+  assert.match(aiMatching, /INVOICE_AI_BATCH_MAX_LINES = 40/);
+  assert.match(aiMatching, /allowed\.has\(requested\)/);
+  assert.match(aiMatching, /insufficient_quota/);
+  assert.match(aiProvider, /responseSchema: INVOICE_AI_RESPONSE_SCHEMA/);
+  assert.match(aiProvider, /Never invent identifiers/);
+  assert.match(jobMigration, /PRIMARY KEY\(`account_id`, `venue_id`, `fingerprint`\)/);
   assert.match(confirm, /INVOICE_RECOGNITION_REVIEW_REQUIRED/);
   assert.match(confirm, /INVOICE_MAPPING_STORE_KEY/);
   assert.match(mappingRoute, /resolveCanonicalPurchaseItem/);
@@ -858,8 +1047,12 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /action:"remove"/);
   assert.match(bundle, /Подтвердите предложенную номенклатуру/);
   assert.match(bundle, /e\.mappingSource==="ai"/);
+  assert.match(bundle, /function bdInvoiceReviewSummaryV4/);
+  assert.match(bundle, /Подтвердить ",s," уверенных соответствий/);
+  assert.match(bundle, /bdInvoiceReviewOrderV4\(e\.items\)\.map/);
+  assert.match(bundle, /e\.source==="manual"\|\|\(!g\.requiresReview/);
   assert.match(bundle, /g\.mappingSource\|\|bdCatArray\(g\.mappingCandidates\)\.length>0/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
-  assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
-  assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-mapping-name-integrity-v296/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);
+  assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-create-canonical-v297/);
+  assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);
 });

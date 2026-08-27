@@ -10,8 +10,8 @@ import {
 const root = new URL("../", import.meta.url);
 const source = (path: string) => readFile(new URL(path, root), "utf8");
 
-test("capture is enabled only for EazywaY and Plakuchaya Iva", () => {
-  assert.deepEqual(CAPTURE_ENABLED_VENUE_IDS, [2088, 3280]);
+test("capture is enabled for Köln, EazywaY, and Plakuchaya Iva", () => {
+  assert.deepEqual(CAPTURE_ENABLED_VENUE_IDS, [1, 2088, 3280]);
 });
 
 test("secondary venue accepts only its exact account-and-venue legacy key", () => {
@@ -57,11 +57,17 @@ test("capture route persists only an immutable backup and performs no business w
   assert.doesNotMatch(route, /update\(domainData\)|insert\(domainData\)|DELETE FROM domain_data|UPDATE domain_data/);
 });
 
-test("browser collector is read-only, venue-aware, and never uploads automatically", async () => {
+test("browser collector is read-only, venue-aware, and one-shot capture requires an explicit query", async () => {
   const client = await source("public/venue-migration-capture-v267.js");
   assert.match(client, /bd_active_venue_id/);
   assert.match(client, /state\.primaryVenue \? \[exact/);
   assert.match(client, /X-Migration-Intent/);
+  assert.match(client, /params\.get\("autocapture"\) !== "1"/);
+  assert.match(client, /params\.delete\("autocapture"\)/);
+  assert.match(client, /button\.click\(\)/);
+  assert.match(client, /serverPreviewAvailable/);
+  assert.match(client, /window\.location\.assign\("\/migration-preview"\)/);
+  assert.match(client, /serverCount \+ " из " \+ storeKeys\.length/);
   const beforeClick = client.slice(0, client.indexOf('button.addEventListener("click"'));
   assert.doesNotMatch(beforeClick, /method: "POST"|removeItem|clear\(\)|deleteDatabase/);
   assert.doesNotMatch(client, /localStorage\.setItem|localStorage\.removeItem|indexedDB\.deleteDatabase/);

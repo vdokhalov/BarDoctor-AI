@@ -3,7 +3,7 @@ import {
   type AuthoritativeStoreKey,
 } from "./authoritative-persistence";
 
-export const CAPTURE_ENABLED_VENUE_IDS = [2088, 3280] as const;
+export const CAPTURE_ENABLED_VENUE_IDS = [1, 2088, 3280] as const;
 
 export type CapturedCandidate = {
   source: "browser_local_storage";

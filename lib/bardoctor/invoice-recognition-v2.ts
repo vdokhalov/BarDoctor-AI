@@ -31,6 +31,8 @@ export type SupplierItemMapping = {
   normalizedRawName: string;
   packageFingerprint?: string;
   purchaseUnit?: string;
+  supplierArticle?: string;
+  barcode?: string;
   nomenclatureId: string;
   confirmedByAccountId?: number;
   confirmations: number;
@@ -45,6 +47,17 @@ export type NomenclatureCandidate = {
   unit: string;
   packageSize: string;
   aliases: string[];
+  supplierArticles?: string[];
+  barcodes?: string[];
+};
+
+export type NomenclatureCandidateReference = {
+  id: string;
+  key: string;
+  name: string;
+  score: number;
+  unit?: string;
+  packageSize?: string;
 };
 
 export type ParsedInvoiceLine = {
@@ -55,6 +68,8 @@ export type ParsedInvoiceLine = {
   quantity: number;
   unit: string;
   packageSize?: string;
+  supplierArticle?: string;
+  barcode?: string;
   unitPrice: number;
   lineTotal: number;
   confidence: number;
@@ -62,8 +77,10 @@ export type ParsedInvoiceLine = {
   purchaseProductKey?: string;
   nomenclatureId?: string;
   nomenclatureName?: string;
-  mappingSource?: "history" | "exact_alias" | "fuzzy" | "ai" | "manual";
-  mappingCandidates?: Array<{ id: string; key: string; name: string; score: number }>;
+  mappingSource?: "history" | "supplier_identifier" | "exact_alias" | "fuzzy" | "ai" | "manual";
+  mappingCandidates?: NomenclatureCandidateReference[];
+  matchReason?: string;
+  alternateNomenclatureId?: string;
   requiresReview: boolean;
 };
 
@@ -106,7 +123,12 @@ export type InvoiceRecognitionMetrics = {
   aiFallbackLinesCount: number;
   aiRequestCount: number;
   aiTokenUsage: number | null;
+  aiEstimatedInputTokens: number;
+  aiEstimatedOutputTokens: number;
   aiEstimatedTokenUsage: number;
+  aiHighCount: number;
+  aiMediumCount: number;
+  aiNoMatchCount: number;
   totalDurationMs: number;
 };
 
@@ -295,6 +317,46 @@ function canonicalPurchaseUnit(value: unknown): string {
   return normalizeInvoiceText(value);
 }
 
+/**
+ * Legacy vision results sometimes used a dimensional unit for a package count
+ * (for example quantity=12, unit="л", packageSize="0.5 л").  Treating that as
+ * 12 measured litres loses the package constraint and doubles the receipt.
+ * Conversely, older drafts also copied the total measured amount into the
+ * package label (quantity=10 l, packageSize="10 l").  That label is metadata,
+ * not ten ten-litre containers.
+ */
+export function normalizeInvoicePackageSemantics(input: {
+  quantity: unknown;
+  unit: unknown;
+  packageSize?: unknown;
+}): { unit: string; packageSize?: string } {
+  const unit = text(input.unit, "шт.", 20);
+  const packageSize = text(input.packageSize, "", 80) || undefined;
+  const packageIdentity = packageFingerprint(packageSize);
+  const baseUnit = canonicalPurchaseUnit(unit);
+  if (!packageSize || !packageIdentity || !["ml", "g"].includes(baseUnit)) {
+    return { unit, packageSize };
+  }
+  const [packageUnit, packageAmountText] = packageIdentity.split(":");
+  const packageAmount = numeric(packageAmountText);
+  if (packageUnit !== baseUnit || packageAmount <= 0) return { unit, packageSize };
+
+  const normalizedUnit = text(unit, "", 20).toLocaleLowerCase("ru-RU").replace(/[.\s]/g, "");
+  const quantity = Math.max(0, numeric(input.quantity));
+  const quantityBase = baseUnit === "ml"
+    ? quantity * (["l", "lt", "л"].includes(normalizedUnit) ? 1_000 : 1)
+    : quantity * (["kg", "кг"].includes(normalizedUnit) ? 1_000 : 1);
+  const sameAsMeasuredTotal = quantityBase > 0
+    && Math.abs(packageAmount - quantityBase) <= Math.max(0.001, quantityBase * 0.0001);
+  if (sameAsMeasuredTotal) {
+    return { unit, packageSize: baseUnit === "ml" ? "л" : "кг" };
+  }
+  if (Number.isInteger(quantity) && quantity >= 1) {
+    return { unit: "шт.", packageSize };
+  }
+  return { unit, packageSize };
+}
+
 const CYRILLIC_TO_LATIN: Record<string, string> = {
   а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z",
   и: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r",
@@ -372,6 +434,8 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   );
   if (!match) return null;
   const rawNameWithUnits = match[1].trim();
+  const barcode = rawNameWithUnits.match(/\b\d{8,14}\b/)?.[0];
+  const supplierArticle = rawNameWithUnits.match(/\b(?:арт(?:икул)?|article|sku|код)\s*[:#-]?\s*([a-zа-я0-9][a-zа-я0-9._/-]{2,39})\b/i)?.[1];
   const packageMatch = rawNameWithUnits.match(/\b\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|кг|kg|г|g)\b/i);
   const rawName = rawNameWithUnits
     .replace(/(?:\s+(?:мл|ml|л|l|кг|kg|г|g|шт|pcs)[.!]*){1,2}$/i, "")
@@ -382,19 +446,85 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   if (!rawName || quantity <= 0 || (unitPrice <= 0 && lineTotal <= 0)) return null;
   const arithmetic = Math.abs(quantity * unitPrice - lineTotal) <= Math.max(0.05, lineTotal * 0.025);
   const score = arithmetic ? 0.9 : 0.72;
+  const packageSemantics = normalizeInvoicePackageSemantics({
+    quantity,
+    unit: text(match[3], "шт.", 20),
+    packageSize: packageMatch?.[0],
+  });
   return {
     id: `ocr-line-${index + 1}`,
     rawName,
     normalizedRawName: normalizeInvoiceText(rawName),
     name: rawName,
     quantity,
-    unit: text(match[3], "шт.", 20),
-    packageSize: packageMatch?.[0],
+    unit: packageSemantics.unit,
+    packageSize: packageSemantics.packageSize,
+    supplierArticle,
+    barcode,
     unitPrice: Math.round(unitPrice * 100) / 100,
     lineTotal: Math.round(lineTotal * 100) / 100,
     confidence: score,
     confidenceLevel: confidenceLevel(score),
     requiresReview: !arithmetic,
+  };
+}
+
+/**
+ * Adapts the already structured legacy recognition result to the Hybrid V2
+ * matching contract. This is intentionally a matching-only bridge: it does
+ * not reinterpret the image, call an OCR provider, or trust canonical IDs
+ * proposed by the legacy vision prompt.
+ */
+export function parsedInvoiceDocumentFromLegacy(value: unknown): ParsedInvoiceDocument {
+  const source = record(value);
+  const documentConfidence = bounded(numeric(source.confidence ?? source.documentConfidence, 0.5));
+  const items = values(source.items).slice(0, 1_000).map((itemValue, index): ParsedInvoiceLine | null => {
+    const item = record(itemValue);
+    const rawName = text(item.rawName ?? item.name, "", 300);
+    const quantity = Math.max(0, numeric(item.quantity));
+    const unitPrice = Math.max(0, numeric(item.unitPrice ?? item.price));
+    const lineTotal = Math.max(0, numeric(item.lineTotal ?? item.total, quantity * unitPrice));
+    if (!rawName || quantity <= 0 || (unitPrice <= 0 && lineTotal <= 0)) return null;
+    const confidence = bounded(numeric(item.confidence, documentConfidence));
+    const packageSemantics = normalizeInvoicePackageSemantics({
+      quantity,
+      unit: text(item.unit, "шт.", 20),
+      packageSize: item.packageSize,
+    });
+    return {
+      id: text(item.id, `legacy-line-${index + 1}`, 160),
+      rawName,
+      normalizedRawName: normalizeInvoiceText(rawName),
+      name: rawName,
+      quantity: Math.round(quantity * 1_000) / 1_000,
+      unit: packageSemantics.unit,
+      packageSize: packageSemantics.packageSize,
+      supplierArticle: text(item.supplierArticle ?? item.article ?? item.sku, "", 80) || undefined,
+      barcode: text(item.barcode, "", 80) || undefined,
+      unitPrice: Math.round(unitPrice * 100) / 100,
+      lineTotal: Math.round(lineTotal * 100) / 100,
+      confidence,
+      confidenceLevel: confidenceLevel(confidence),
+      requiresReview: false,
+    };
+  }).filter((item): item is ParsedInvoiceLine => Boolean(item));
+  const itemTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const requestedTotal = Math.max(0, numeric(source.total));
+  const type = text(source.documentType ?? source.type, "invoice", 30);
+  const payment = text(source.paymentMethod, "unknown", 30);
+  return {
+    documentType: type === "receipt" || type === "price_list" ? type : "invoice",
+    supplierName: text(source.supplierName ?? source.storeName ?? source.vendorName, "Новый поставщик", 180),
+    supplierType: source.supplierType === "retail" || type === "receipt" ? "retail" : "wholesale",
+    date: text(source.date, "", 40) || undefined,
+    documentNumber: text(source.documentNumber ?? source.number, "", 100) || undefined,
+    currency: text(source.currency, "RUB", 8).toUpperCase(),
+    paymentMethod: payment === "cash" || payment === "card" || payment === "transfer" ? payment : "unknown",
+    total: Math.round((requestedTotal || itemTotal) * 100) / 100,
+    vat: numeric(source.vat) > 0 ? Math.round(numeric(source.vat) * 100) / 100 : undefined,
+    confidence: documentConfidence,
+    warnings: values(source.warnings).map((warning) => text(warning, "", 240)).filter(Boolean).slice(0, 12),
+    items,
   };
 }
 
@@ -531,6 +661,10 @@ export function nomenclatureCandidates(assortment: unknown, venueId: number): No
       text(source.preferredDisplayName, "", 240),
       ...packageOptions.map((option) => `${text(source.name ?? source.productName ?? source.canonicalName, "", 240)} ${option}`),
     ].filter(Boolean);
+    const supplierArticles = [source.supplierSku, source.sku, source.article, source.externalId]
+      .map((value) => text(value, "", 160)).filter(Boolean);
+    const barcodes = [source.barcode, ...values(source.barcodes)]
+      .map((value) => text(value, "", 160)).filter(Boolean);
     byKey.set(key, {
       id: text(source.id ?? source.nomenclatureItemId, key, 160),
       key,
@@ -538,6 +672,8 @@ export function nomenclatureCandidates(assortment: unknown, venueId: number): No
       unit: text(source.baseUnit ?? source.unit, "", 40),
       packageSize: text(source.packageSize ?? source.displayPackageSize ?? source.purchasePackageSize, packageOptions[0] ?? "", 120),
       aliases: [...new Set(aliases)],
+      supplierArticles: [...new Set(supplierArticles)],
+      barcodes: [...new Set(barcodes)],
       sourceRank,
     });
   }
@@ -559,6 +695,8 @@ export function nomenclatureCandidates(assortment: unknown, venueId: number): No
     unit: candidate.unit,
     packageSize: candidate.packageSize,
     aliases: candidate.aliases,
+    supplierArticles: candidate.supplierArticles,
+    barcodes: candidate.barcodes,
   }));
 }
 
@@ -580,6 +718,8 @@ export function canonicalInvoiceSupplierMappings(
       normalizedRawName: normalizeInvoiceText(mapping.sourceName),
       packageFingerprint: packageFingerprint(mapping.packageSize) || undefined,
       purchaseUnit: mapping.purchaseUnit,
+      supplierArticle: mapping.supplierSku ?? undefined,
+      barcode: mapping.barcode ?? undefined,
       nomenclatureId: mapping.canonicalProductKey,
       confirmations: mapping.status === "confirmed" ? 1 : 0,
       createdAt: mapping.firstSeenAt,
@@ -665,13 +805,30 @@ export function matchInvoiceLine(input: {
   nomenclature: NomenclatureCandidate[];
 }): ParsedInvoiceLine {
   const linePackage = packageFingerprint(`${input.line.rawName} ${input.line.packageSize ?? ""}`);
-  const history = input.supplierId ? input.mappings.find((mapping) =>
+  const compatiblePurchaseUnit = (mapping: SupplierItemMapping) => {
+    if (!mapping.purchaseUnit || !input.line.unit) return true;
+    const mappingUnit = canonicalPurchaseUnit(mapping.purchaseUnit);
+    const lineUnit = canonicalPurchaseUnit(input.line.unit);
+    if (mappingUnit === lineUnit) return true;
+    return Boolean(linePackage)
+      && ((lineUnit === "pcs" && ["ml", "g"].includes(mappingUnit))
+        || (mappingUnit === "pcs" && ["ml", "g"].includes(lineUnit)));
+  };
+  const compatibleMapping = (mapping: SupplierItemMapping) =>
     mapping.venueId === input.venueId
     && mapping.supplierId === input.supplierId
-    && mapping.normalizedRawName === input.line.normalizedRawName
-    && (!mapping.purchaseUnit || !input.line.unit || mapping.purchaseUnit === canonicalPurchaseUnit(input.line.unit))
-    && (!mapping.packageFingerprint || !linePackage || mapping.packageFingerprint === linePackage)
+    && compatiblePurchaseUnit(mapping)
+    && (!mapping.packageFingerprint || !linePackage || mapping.packageFingerprint === linePackage);
+  const historyByIdentifier = input.supplierId ? input.mappings.find((mapping) =>
+    compatibleMapping(mapping)
+    && (
+      Boolean(input.line.supplierArticle && mapping.supplierArticle === input.line.supplierArticle)
+      || Boolean(input.line.barcode && mapping.barcode === input.line.barcode)
+    )
   ) : undefined;
+  const history = historyByIdentifier ?? (input.supplierId ? input.mappings.find((mapping) =>
+    compatibleMapping(mapping) && mapping.normalizedRawName === input.line.normalizedRawName
+  ) : undefined);
   if (history) {
     const candidate = input.nomenclature.find((item) => item.id === history.nomenclatureId || item.key === history.nomenclatureId);
     if (candidate) return {
@@ -680,6 +837,34 @@ export function matchInvoiceLine(input: {
       purchaseProductKey: candidate.key,
       nomenclatureId: candidate.id,
       mappingSource: "history",
+      confidence: 1,
+      confidenceLevel: "high",
+      requiresReview: false,
+    };
+  }
+  const identifierMatches = input.nomenclature.filter((candidate) =>
+    Boolean(input.line.supplierArticle && candidate.supplierArticles?.includes(input.line.supplierArticle))
+    || Boolean(input.line.barcode && candidate.barcodes?.includes(input.line.barcode))
+  ).filter((candidate) => {
+    const candidatePackage = packageFingerprint(`${candidate.name} ${candidate.packageSize}`);
+    return !linePackage || !candidatePackage || linePackage === candidatePackage;
+  });
+  if (identifierMatches.length === 1) {
+    const candidate = identifierMatches[0];
+    return {
+      ...input.line,
+      nomenclatureName: candidate.name,
+      purchaseProductKey: candidate.key,
+      nomenclatureId: candidate.id,
+      mappingSource: "supplier_identifier",
+      mappingCandidates: [{
+        id: candidate.id,
+        key: candidate.key,
+        name: candidate.name,
+        score: 1,
+        unit: candidate.unit,
+        packageSize: candidate.packageSize,
+      }],
       confidence: 1,
       confidenceLevel: "high",
       requiresReview: false,
@@ -708,7 +893,14 @@ export function matchInvoiceLine(input: {
   const best = ranked[0];
   const margin = best ? best.score - (ranked[1]?.score ?? 0) : 0;
   const level = confidenceLevel(best?.score ?? 0, margin);
-  const candidates = ranked.map(({ candidate, score }) => ({ id: candidate.id, key: candidate.key, name: candidate.name, score }));
+  const candidates = ranked.map(({ candidate, score }) => ({
+    id: candidate.id,
+    key: candidate.key,
+    name: candidate.name,
+    score,
+    unit: candidate.unit,
+    packageSize: candidate.packageSize,
+  }));
   if (best && level === "high" && input.line.confidence >= 0.55) return {
     ...input.line,
     nomenclatureName: best.candidate.name,
@@ -771,6 +963,8 @@ export function upsertConfirmedSupplierMappings(input: {
       existing.rawName = rawName;
       existing.nomenclatureId = nomenclatureId;
       existing.purchaseUnit = purchaseUnit || existing.purchaseUnit;
+      existing.supplierArticle = text(item.supplierArticle, "", 160) || existing.supplierArticle;
+      existing.barcode = text(item.barcode, "", 160) || existing.barcode;
       existing.confirmations += 1;
       existing.confirmedByAccountId = input.actorAccountId;
       existing.updatedAt = now;
@@ -781,8 +975,10 @@ export function upsertConfirmedSupplierMappings(input: {
         supplierId: input.supplierId,
         rawName,
         normalizedRawName,
-        packageFingerprint: fingerprint || undefined,
-        purchaseUnit: purchaseUnit || undefined,
+    packageFingerprint: fingerprint || undefined,
+    purchaseUnit: purchaseUnit || undefined,
+    supplierArticle: text(item.supplierArticle, "", 160) || undefined,
+    barcode: text(item.barcode, "", 160) || undefined,
         nomenclatureId,
         confirmedByAccountId: input.actorAccountId,
         confirmations: 1,
@@ -800,6 +996,8 @@ export function recognitionMetrics(input: {
   document: ParsedInvoiceDocument;
   aiFallbackLinesCount?: number;
   aiRequestCount?: number;
+  aiEstimatedInputTokens?: number;
+  aiEstimatedOutputTokens?: number;
   aiEstimatedTokenUsage?: number;
   nomenclatureCandidatesCount?: number;
   matchingDurationMs?: number;
@@ -822,7 +1020,7 @@ export function recognitionMetrics(input: {
     matchingDurationMs: input.matchingDurationMs ?? 0,
     historicalMappingsCount: input.document.items.filter((item) => item.mappingSource === "history").length,
     exactCanonicalMatchesCount: input.document.items.filter((item) => item.mappingSource === "exact_alias").length,
-    exactMappingsCount: input.document.items.filter((item) => item.mappingSource === "history" || item.mappingSource === "exact_alias").length,
+    exactMappingsCount: input.document.items.filter((item) => ["history", "supplier_identifier", "exact_alias"].includes(item.mappingSource ?? "")).length,
     fuzzyMappingsCount: input.document.items.filter((item) => item.mappingSource === "fuzzy").length,
     fuzzyHighMappingsCount: input.document.items.filter((item) => item.mappingSource === "fuzzy" && !item.requiresReview).length,
     fuzzyMediumCandidatesCount: input.document.items.filter((item) => !item.mappingSource && item.confidenceLevel === "medium" && Boolean(item.mappingCandidates?.length)).length,
@@ -831,7 +1029,12 @@ export function recognitionMetrics(input: {
     aiFallbackLinesCount: input.aiFallbackLinesCount ?? 0,
     aiRequestCount: input.aiRequestCount ?? 0,
     aiTokenUsage: null,
+    aiEstimatedInputTokens: input.aiEstimatedInputTokens ?? 0,
+    aiEstimatedOutputTokens: input.aiEstimatedOutputTokens ?? 0,
     aiEstimatedTokenUsage: input.aiEstimatedTokenUsage ?? 0,
+    aiHighCount: input.document.items.filter((item) => item.mappingSource === "ai" && item.confidenceLevel === "high").length,
+    aiMediumCount: input.document.items.filter((item) => item.mappingSource === "ai" && item.confidenceLevel === "medium").length,
+    aiNoMatchCount: input.document.items.filter((item) => item.requiresReview && !item.nomenclatureId).length,
     totalDurationMs: Math.max(0, Date.now() - input.startedAt),
   };
 }

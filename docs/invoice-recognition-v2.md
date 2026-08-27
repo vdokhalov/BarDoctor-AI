@@ -12,6 +12,9 @@ stock movements, expenses, supplier debt and warehouse accounting remain unchang
   AI sees only unresolved extracted lines.
 - INVOICE_RECOGNITION_V2_AI_FALLBACK=off disables the unresolved-line AI accelerator.
 
+The target cost model is not zero AI on a new supplier's first invoice. The target is:
+`deterministic where known → AI where unknown → human where ambiguous → remember confirmed`.
+
 The configured OCR adapter is server-only:
 
 - INVOICE_OCR_PROVIDER=self_hosted|ocr_space|azure_document_intelligence
@@ -53,6 +56,35 @@ flow.
 7. Send only unresolved extracted lines and their bounded candidates to AI when enabled.
 8. Require manual confirmation for remaining lines.
 9. Emit the existing Purchase Draft and use the unchanged confirmation/posting pipeline.
+
+## Hybrid bulk matching
+
+- Supplier memory, supplier SKU/article, barcode, exact normalized names and package-compatible
+  aliases run before fuzzy candidate generation.
+- Fuzzy matching ranks up to five venue-scoped candidates. It cannot override a conflicting
+  volume, weight or package identity.
+- Only unresolved lines with bounded candidates enter AI. Lines without candidates remain
+  `NO_MATCH` for canonical search or existing create-position flow.
+- Batches contain at most 40 lines and an estimated 12k input tokens. A 500-line document must
+  never create 500 provider requests.
+- The provider returns strict structured output. Backend validation rejects unknown line IDs,
+  duplicate line IDs and any nomenclature ID not supplied in that line's candidate list.
+- High-confidence AI proposals can be confirmed in bulk. Medium, low and no-match lines remain
+  in the exception queue. Problem rows are shown before confident rows.
+- Confirmed or corrected matches update supplier memory; a repeat invoice resolves those rows
+  before AI.
+- Temporary 429/408/5xx/network failures use bounded retry and Retry-After when available.
+  Quota, billing and permission errors are not storm-retried. Deterministic results remain usable.
+- A venue/document fingerprint persists in `invoice_recognition_jobs` to deduplicate concurrent
+  work and retain a short-lived completed partial/result draft. Stale jobs can be safely retried.
+
+The domain layer depends on `InvoiceAIMatchingProvider`, not OpenAI. The current adapter uses the
+Responses API Structured Outputs; another provider/model can replace it without changing Purchase,
+Inventory or Supplier Mapping Memory.
+
+Run the synthetic first/repeat workload with `npm run qa:invoice-hybrid-500`. The report is aggregate
+only and contains no supplier document text. Its first invoice is a new supplier with zero historical
+mappings; its repeat pass runs after all AI proposals and manual corrections have been confirmed.
 
 Provider failures are logged without document contents. Recognition metrics contain durations,
 counts and AI request volume; provider token accounting remains in the existing AI observability
