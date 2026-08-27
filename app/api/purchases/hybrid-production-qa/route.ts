@@ -5,6 +5,7 @@ import { createOpenAIInvoiceMatchingProvider } from "../../../../lib/bardoctor/i
 import { runInvoiceAIBulkMatching } from "../../../../lib/bardoctor/invoice-ai-matching";
 import { configuredInvoiceOcr } from "../../../../lib/bardoctor/invoice-ocr";
 import {
+  canonicalGroundTruthPurchase,
   confirmedMemoryFromPurchase,
   productionMatchingQuality,
   productionSourceFileIds,
@@ -158,6 +159,12 @@ async function validateDocument(input: {
   if (!supplierId) throw new Error("SUPPLIER_ID_REQUIRED");
   const firstAssortment = assortmentWithoutSupplierMappings(input.assortment, supplierId);
   const candidates = nomenclatureCandidates(firstAssortment, VENUE_ID);
+  const canonicalGroundTruth = canonicalGroundTruthPurchase({
+    document: input.document,
+    supplierId,
+    mappings: canonicalInvoiceSupplierMappings(input.assortment, VENUE_ID),
+    candidates,
+  });
   const firstMappings = [
     ...canonicalInvoiceSupplierMappings(firstAssortment, VENUE_ID),
     ...input.standaloneMappings.filter((mapping) => mapping.venueId === VENUE_ID && mapping.supplierId !== supplierId),
@@ -191,14 +198,14 @@ async function validateDocument(input: {
   });
   const aiLatencyMs = Date.now() - aiStartedAt;
   const firstUsage = await usage(firstJobId);
-  const firstQuality = productionMatchingQuality({ document: first.document, expected: input.document, candidates });
+  const firstQuality = productionMatchingQuality({ document: first.document, expected: canonicalGroundTruth, candidates });
   const firstTotalLatencyMs = Date.now() - startedAt;
 
   const confirmed = confirmedMemoryFromPurchase({
     venueId: VENUE_ID,
     supplierId,
     actorAccountId: input.actorAccountId,
-    document: input.document,
+    document: canonicalGroundTruth,
     candidates,
   });
   const restored = JSON.parse(JSON.stringify(confirmed)) as SupplierItemMapping[];
@@ -223,7 +230,7 @@ async function validateDocument(input: {
   });
   const repeatLatencyMs = Date.now() - repeatStartedAt;
   const repeatUsage = await usage(repeatJobId);
-  const repeatQuality = productionMatchingQuality({ document: repeat.document, expected: input.document, candidates });
+  const repeatQuality = productionMatchingQuality({ document: repeat.document, expected: canonicalGroundTruth, candidates });
   const historical = (document: ParsedInvoiceDocument) => document.items.filter((line) => line.mappingSource === "history").length;
   const exact = (document: ParsedInvoiceDocument) => document.items.filter((line) => ["supplier_identifier", "exact_alias"].includes(line.mappingSource ?? "")).length;
   const fuzzy = (document: ParsedInvoiceDocument) => document.items.filter((line) => line.mappingSource === "fuzzy").length;

@@ -74,6 +74,39 @@ export function storedPurchaseAsParsed(document: PurchaseDocument): ParsedInvoic
   return parsedInvoiceDocumentFromLegacy(document);
 }
 
+export function canonicalGroundTruthPurchase(input: {
+  document: PurchaseDocument;
+  supplierId: string;
+  mappings: SupplierItemMapping[];
+  candidates: NomenclatureCandidate[];
+}): PurchaseDocument {
+  return {
+    ...input.document,
+    items: input.document.items.map((item) => {
+      const normalizedName = item.normalizedRawName ?? normalizeInvoiceText(item.rawName ?? item.name);
+      const sourcePackage = packageFingerprint(item.packageSize ?? item.unit);
+      const matchingKeys = new Set(input.mappings
+        .filter((mapping) => {
+          if (mapping.supplierId !== input.supplierId || mapping.normalizedRawName !== normalizedName) return false;
+          const mappingPackage = mapping.packageFingerprint ?? packageFingerprint(mapping.purchaseUnit);
+          return !sourcePackage || !mappingPackage || sourcePackage === mappingPackage;
+        })
+        .map((mapping) => {
+          const candidate = input.candidates.find((value) =>
+            value.id === mapping.nomenclatureId || value.key === mapping.nomenclatureId
+          );
+          return candidate?.key ?? "";
+        })
+        .filter(Boolean));
+      if (matchingKeys.size !== 1) return item;
+      const canonicalKey = [...matchingKeys][0];
+      const candidate = input.candidates.find((value) => value.key === canonicalKey);
+      if (!candidate) return item;
+      return { ...item, nomenclatureId: candidate.id, purchaseProductKey: candidate.key };
+    }),
+  };
+}
+
 function candidateKey(line: ParsedInvoiceLine, candidates: NomenclatureCandidate[]): string {
   for (const reference of [line.nomenclatureId, line.purchaseProductKey]) {
     if (!reference) continue;

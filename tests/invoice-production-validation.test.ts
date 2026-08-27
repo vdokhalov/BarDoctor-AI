@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  canonicalGroundTruthPurchase,
   confirmedMemoryFromPurchase,
   productionMatchingQuality,
   selectProductionHybridDocuments,
@@ -100,6 +101,39 @@ test("production quality resolves migrated nomenclature ids to canonical keys", 
   assert.equal(quality.correct, 1);
   assert.equal(quality.incorrect, 0);
   assert.equal(quality.criticalHighFalsePositives, 0);
+});
+
+test("production ground truth prefers canonical migrated supplier mappings over legacy purchase keys", () => {
+  const expected = purchase("invoice", "supplier", 1);
+  expected.items[0].nomenclatureId = "legacy-id";
+  expected.items[0].purchaseProductKey = "legacy:purchase-key";
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "right",
+    key: "stock:invoice-0|pcs",
+    venueId: 1,
+    name: "Товар invoice 0",
+    unit: "pcs",
+    packageSize: "1 шт.",
+  }] }, 1);
+  const groundTruth = canonicalGroundTruthPurchase({
+    document: expected,
+    supplierId: "supplier",
+    candidates,
+    mappings: [{
+      id: "mapping",
+      venueId: 1,
+      supplierId: "supplier",
+      rawName: "Товар invoice 0",
+      normalizedRawName: "товар invoice 0",
+      packageFingerprint: "pcs:1",
+      nomenclatureId: "stock:invoice-0|pcs",
+      confirmations: 0,
+      createdAt: "2026-08-27T00:00:00.000Z",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    }],
+  });
+  assert.equal(groundTruth.items[0].nomenclatureId, "right");
+  assert.equal(groundTruth.items[0].purchaseProductKey, "stock:invoice-0|pcs");
 });
 
 test("in-memory confirmation survives serialization and removes repeat AI work", () => {
