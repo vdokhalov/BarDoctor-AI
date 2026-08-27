@@ -549,7 +549,16 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
     .replace(/\s+/g, " ")
     .replace(/(?:^|\s)(кг|г|л|мл|шт|pcs)\s+\1\s+(?=\d)/i, " $1 ")
     .trim();
-  const match = cleaned.match(
+  const unitBeforeQuantity = cleaned.match(
+    /^(.{2,}?)\s+(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)\s+(\d+(?:[.,]\d+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)$/i,
+  );
+  const unitBeforeQuantityIsValid = Boolean(unitBeforeQuantity
+    && Math.abs(numeric(unitBeforeQuantity[3]) * numeric(unitBeforeQuantity[4]) - numeric(unitBeforeQuantity[5]))
+      <= Math.max(0.05, numeric(unitBeforeQuantity[5]) * 0.025));
+  const canonicalOrder = unitBeforeQuantityIsValid && unitBeforeQuantity
+    ? `${unitBeforeQuantity[1]} ${unitBeforeQuantity[3]} ${unitBeforeQuantity[2]} ${unitBeforeQuantity[4]} ${unitBeforeQuantity[5]}`
+    : cleaned;
+  const match = canonicalOrder.match(
     /^(.{2,}?)\s+(\d+(?:[.,]\d+)?)\s*(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)?\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)$/i,
   );
   if (!match) return null;
