@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   canonicalGroundTruthPurchase,
   confirmedMemoryFromPurchase,
+  confirmedMemoryFromReviewedGroundTruth,
   productionMatchingQuality,
   selectProductionHybridDocuments,
   storedPurchaseAsParsed,
@@ -164,6 +165,39 @@ test("in-memory confirmation survives serialization and removes repeat AI work",
   });
   assert.equal(repeat.items[0].mappingSource, "history");
   assert.equal(repeat.items[0].requiresReview, false);
+});
+
+test("reviewed OCR source text becomes the remembered supplier key", () => {
+  const groundTruth = purchase("invoice", "supplier", 1);
+  const candidates = nomenclatureCandidates({ nomenclature: [{
+    id: "right",
+    key: "stock:invoice-0|pcs",
+    venueId: 1,
+    name: "Товар invoice 0",
+    unit: "pcs",
+    packageSize: "1 шт.",
+  }] }, 1);
+  const recognized = storedPurchaseAsParsed(groundTruth);
+  recognized.items[0].rawName = "Товар  invoice 0";
+  recognized.items[0].normalizedRawName = "товар invoice 0";
+  const memory = confirmedMemoryFromReviewedGroundTruth({
+    venueId: 1,
+    supplierId: "supplier",
+    actorAccountId: 1,
+    recognized,
+    groundTruth,
+    candidates,
+    now: "2026-08-27T00:00:00.000Z",
+  });
+  const repeat = applyDeterministicMappings({
+    document: recognized,
+    supplierId: "supplier",
+    venueId: 1,
+    mappings: JSON.parse(JSON.stringify(memory)),
+    nomenclature: candidates,
+  });
+  assert.equal(repeat.items[0].mappingSource, "history");
+  assert.equal(repeat.items[0].purchaseProductKey, "stock:invoice-0|pcs");
 });
 
 test("production Hybrid QA route is controlled, keeps Primary legacy, and cannot post business data", async () => {

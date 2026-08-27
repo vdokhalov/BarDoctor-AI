@@ -6,7 +6,7 @@ import { runInvoiceAIBulkMatching } from "../../../../lib/bardoctor/invoice-ai-m
 import { configuredInvoiceOcr } from "../../../../lib/bardoctor/invoice-ocr";
 import {
   canonicalGroundTruthPurchase,
-  confirmedMemoryFromPurchase,
+  confirmedMemoryFromReviewedGroundTruth,
   productionMatchingQuality,
   productionSourceFileIds,
   selectProductionHybridDocuments,
@@ -201,11 +201,12 @@ async function validateDocument(input: {
   const firstQuality = productionMatchingQuality({ document: first.document, expected: canonicalGroundTruth, candidates });
   const firstTotalLatencyMs = Date.now() - startedAt;
 
-  const confirmed = confirmedMemoryFromPurchase({
+  const confirmed = confirmedMemoryFromReviewedGroundTruth({
     venueId: VENUE_ID,
     supplierId,
     actorAccountId: input.actorAccountId,
-    document: canonicalGroundTruth,
+    recognized: first.document,
+    groundTruth: canonicalGroundTruth,
     candidates,
   });
   const restored = JSON.parse(JSON.stringify(confirmed)) as SupplierItemMapping[];
@@ -291,6 +292,16 @@ async function validateDocument(input: {
     deterministic: { historical: result.firstArrival.historical, exact: result.firstArrival.exact, fuzzy: result.firstArrival.fuzzy },
     ai: { batches: first.requestCount, requests: first.requestCount, usage: firstUsage },
     result: firstQuality,
+    repeat: {
+      historical: result.repeatArrival.historicalHits,
+      exact: result.repeatArrival.exact,
+      fuzzy: result.repeatArrival.fuzzy,
+      aiLines: result.repeatArrival.aiLines,
+      requests: result.repeatArrival.aiRequests,
+      usage: repeatUsage,
+      result: repeatQuality,
+      durationMs: result.repeatArrival.latencyMs,
+    },
     durationMs: result.firstArrival.totalLatencyMs,
   }));
   return result;

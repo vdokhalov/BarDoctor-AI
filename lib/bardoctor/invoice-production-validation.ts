@@ -201,6 +201,45 @@ export function productionMatchingQuality(input: {
   };
 }
 
+export function confirmedMemoryFromReviewedGroundTruth(input: {
+  current?: SupplierItemMapping[];
+  venueId: number;
+  supplierId: string;
+  actorAccountId: number;
+  recognized: ParsedInvoiceDocument;
+  groundTruth: PurchaseDocument;
+  candidates: NomenclatureCandidate[];
+  now?: string;
+}): SupplierItemMapping[] {
+  const unused = new Set(input.groundTruth.items.map((_, index) => index));
+  const items = input.recognized.items.flatMap((line) => {
+    const pair = [...unused]
+      .map((index) => ({ index, score: nameScore(line, input.groundTruth.items[index]) }))
+      .sort((left, right) => right.score - left.score)[0];
+    if (!pair || pair.score < 0.65) return [];
+    unused.delete(pair.index);
+    const canonicalKey = targetKey(input.groundTruth.items[pair.index], input.candidates);
+    if (!canonicalKey) return [];
+    return [{
+      rawName: line.rawName,
+      normalizedRawName: line.normalizedRawName,
+      nomenclatureId: canonicalKey,
+      supplierArticle: line.supplierArticle,
+      barcode: line.barcode,
+      packageSize: line.packageSize,
+      unit: line.unit,
+    }];
+  });
+  return upsertConfirmedSupplierMappings({
+    current: input.current ?? [],
+    venueId: input.venueId,
+    supplierId: input.supplierId,
+    actorAccountId: input.actorAccountId,
+    now: input.now,
+    items,
+  });
+}
+
 export function confirmedMemoryFromPurchase(input: {
   current?: SupplierItemMapping[];
   venueId: number;
