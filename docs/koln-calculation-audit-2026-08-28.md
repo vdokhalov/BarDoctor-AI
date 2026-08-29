@@ -463,4 +463,45 @@ The account owner subsequently authorized the bounded production correction. The
 | Expected transformed state | — | `7b20c05175e5032a39b55a23fc520f758342a8dcce16255ed177d397650e521f` |
 | After export | `bdx_koln_currency_after_98bc288d269561ab1ff94d4c` | `98bc288d269561ab1ff94d4c138dc06370bc72fc6fbe07c818fc8e7c88a460aa` |
 
-The after-state checksum was exactly `7b20c05175e5032a39b55a23fc520f758342a8d
+The after-state checksum was exactly `7b20c05175e5032a39b55a23fc520f758342a8dcce16255ed177d397650e521f`. All stores outside the six-row allowlist retained their prepared checksums.
+
+### Applied scope
+
+- Six rows were updated in one D1 batch: `accounts.restaurant_json` and the five named `domain_data` stores.
+- 694 legacy currency-label occurrences were corrected: 681 `RUB` and 13 `MDL` to `PMR_RUB`.
+- No FX conversion, rate, converted amount or numeric scaling was introduced.
+- All 26 purchase totals and all 160 purchase-line source numbers were preserved.
+- «Апельсины» remained `1.124 × 23`, stored total `25.35`.
+- «Пакетики для чая» remained `100 × 0.50`, stored total `60`.
+
+### Production reconciliation
+
+| Domain | Before | After | Result |
+|---|---:|---:|---|
+| Purchases included in accounting | 32,519.25 + 361 excluded | 32,880.25 PMR_RUB | source amounts unchanged; White Stork included |
+| Supplier payments | 32,880.25 across 26 payments | 32,880.25 PMR_RUB | labels/canonical fields only |
+| Supplier debt | 0 | 0 PMR_RUB | unchanged |
+| Warehouse valuation | 28,636.67 | 28,997.67 PMR_RUB | +361 White Stork valuation recovered |
+| White Stork purchase/payment | 361 MDL | 361 PMR_RUB | amount unchanged; no FX |
+| White Stork quantity | 3,000 ml | 3,000 ml | unchanged |
+| White Stork average unit cost | 0 / unresolved | 0.120333 PMR_RUB/ml | derived from 361 / 3,000 |
+| Closed July COGS | 31,383.21 | 31,383.21 PMR_RUB | numeric snapshot untouched |
+| Current White Stork COGS | 0 | 0 | no stock consumption |
+
+The authoritative production `bd_finance_expenses` row contains the 26 purchase payments totaling 32,880.25. The earlier 43,500 figure was a stale client-visible mixed scalar, not an authoritative D1 Finance total; the controlled operation neither created nor removed the 10,619.75 difference.
+
+### Production smoke and closure
+
+| Check | Result |
+|---|---|
+| Account reload state | `accountingCurrency = PMR_RUB` |
+| Operation validation | **PASS — migrated** |
+| Expected vs actual after checksum | **PASS — exact match** |
+| Untouched-store manifest | **PASS** |
+| Rollback | Not invoked; no mismatch |
+| Sites production deployment | **PASS — version 323 active** |
+| Production Worker errors after cutover | **0** |
+| One-time migration credential | Removed; env revision 14 deployed |
+| Git source | `55aec808018e6454af5bed673c4ae19dc8a24f84` |
+
+**CONTROLLED PRODUCTION CURRENCY RELABEL: COMPLETE.**

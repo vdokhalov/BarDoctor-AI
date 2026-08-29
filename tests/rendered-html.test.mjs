@@ -535,47 +535,6 @@ test("catalog resolves menu positions through the canonical nomenclature taxonom
   const editorEnd = bundle.indexOf("function bdCatStructureManager", editorStart);
   assert.ok(groupingStart >= 0 && groupingEnd > groupingStart);
   assert.ok(editorStart >= 0 && editorEnd > editorStart);
-  const grouping =d: `job-${body.pageStart}`,
-            status: "queued",
-          });
-        },
-      };
-    },
-  };
-
-  vm.runInNewContext(
-    `${helperSource}
-globalThis.recognitionPromise = bdCatalogRecogniseImages(
-  files,
-  "gallery",
-  message => progress.push(message),
-);`,
-    context,
-  );
-  const draft = await context.recognitionPromise;
-  const recognitionCalls = calls.filter((call) => call.action === "recognise-batch");
-  const pollCalls = calls.filter((call) => call.action === "poll-recognition");
-  const mergeCall = calls.find((call) => call.action === "merge-batches");
-
-  assert.equal(draft.id, "merged");
-  assert.deepEqual(recognitionCalls.map((call) => call.sourceFileIds.length), [1, 1]);
-  assert.equal(pollCalls.length, 4);
-  assert.equal(mergeCall.parts.length, 2);
-  assert.ok(progress.some((message) => /Распознаю страницу 1 из 2/.test(message)));
-  assert.match(progress.at(-1), /Объединяю 2 страниц/);
-});
-
-test("catalog resolves menu positions through the canonical nomenclature taxonomy", async () => {
-  const bundle = await readFile(
-    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
-    "utf8",
-  );
-  const groupingStart = bundle.indexOf("function bdCatMenuGroups");
-  const groupingEnd = bundle.indexOf("function bdCatReadiness", groupingStart);
-  const editorStart = bundle.indexOf("function bdCatMenuEditor");
-  const editorEnd = bundle.indexOf("function bdCatStructureManager", editorStart);
-  assert.ok(groupingStart >= 0 && groupingEnd > groupingStart);
-  assert.ok(editorStart >= 0 && editorEnd > editorStart);
   const grouping = bundle.slice(groupingStart, groupingEnd);
   const editor = bundle.slice(editorStart, editorEnd);
   assert.match(grouping, /nomenclatureStructure/);
@@ -888,30 +847,6 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /route:\/api\/integration\/v1\/health/);
   assert.match(worker, /route:\/api\/integration\/v1\/heartbeat/);
   assert.match(integrationsClient, /\/api\/integration-hub\/import/);
-  assert.match(integrationsClient, /\/api\/integration-hub\/connections/);
-  assert.match(integrationsClient, /Проверить структуру/);
-  assert.match(integrationsClient, /Повторить после исправления/);
-  assert.match(worker, /market\.js\?v=20260828-competitors-v329/);
-  assert.doesNotMatch(integrationsClient, /AI уже входит в подписку|AI включён в подписку|Push‑уведомления — OneSignal/);
-  assert.match(worker, /ONESIGNAL_REST_API_KEY/);
-  assert.match(worker, /platform_secrets/);
-  assert.match(worker, /gpt-5\.4-mini/);
-  assert.match(worker, /json_schema/);
-  assert.match(worker, /menu_import/);
-  assert.match(worker, /AI временно недоступен из-за технического ограничения нагрузки/);
-  assert.match(worker, /syncGoogleReviewsIfDue/);
-  assert.match(worker, /confirmedCompetitors/);
-  assert.match(worker, /set-competitor-confirmed/);
-  assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
-  assert.match(bootstrap, /\/api\/auth\/bootstrap/);
-  assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
-  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
-  assert.match(bootstrap, /randomUUIDFallback/);
-  assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
-  assert.match(bootstrap, /navigateInApplication/);
-  assert.match(bootstrap, /greetingForCurrentTime/);
-  assert.match(bootstrap, /bd_user_first_name/);
-  asserClient, /\/api\/integration-hub\/import/);
   assert.match(integrationsClient, /\/api\/integration-hub\/connections/);
   assert.match(integrationsClient, /Проверить структуру/);
   assert.match(integrationsClient, /Повторить после исправления/);
@@ -1653,7 +1588,76 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(secretsMigration, /integration_secrets_account_key_uq/);
   assert.match(aiUsageMigration, /CREATE TABLE `ai_usage_limits`/);
   assert.match(aiUsageMigration, /`request_limit` integer DEFAULT 20 NOT NULL/);
-  assert.match(aiSubscriptionMigration, /`request_limit` integer ,
+  assert.match(aiSubscriptionMigration, /`request_limit` integer DEFAULT 250 NOT NULL/);
+  assert.match(aiSubscriptionMigration, /`period_key` text DEFAULT 'legacy' NOT NULL/);
+  assert.match(aiSubscriptionMigration, /SELECT "account_id", "used_requests", "request_limit", 'legacy'/);
+  assert.match(authIsolationMigration, /DROP INDEX `accounts_chatgpt_email_uq`/);
+  assert.match(authIsolationMigration, /ADD `password_hash` text/);
+  assert.match(platformSecretsMigration, /CREATE TABLE `platform_secrets`/);
+  assert.match(platformSecretsMigration, /ON DELETE set null/);
+  assert.match(integrationHubMigration, /CREATE TABLE `integration_connections`/);
+  assert.match(integrationHubMigration, /CREATE UNIQUE INDEX `integration_entity_links_external_uq`/);
+  assert.match(integrationHubMigration, /CREATE TABLE `integration_sync_runs`/);
+  assert.match(integrationHubSourceMigration, /CREATE UNIQUE INDEX `integration_connections_source_uq`/);
+  assert.match(universalIntegrationMigration, /CREATE TABLE `integration_ingress_tokens`/);
+  assert.match(universalIntegrationMigration, /CREATE TABLE `integration_ingress_deliveries`/);
+  assert.match(universalIntegrationMigration, /CREATE TABLE `integration_field_mapping_templates`/);
+  assert.match(universalIntegrationMigration, /INTEGRATION_TENANT_MISMATCH/);
+  assert.match(localConnectorMigration, /CREATE TABLE `integration_connector_agents`/);
+  assert.match(localConnectorMigration, /integration_connector_agents_tenant_guard/);
+  assert.match(deliveryRetryMigration, /ADD `attempt_count` integer DEFAULT 1 NOT NULL/);
+  assert.match(worker, /verifyPassword/);
+  assert.match(worker, /hashPassword/);
+});
+
+function dateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function isWorkingDay(profile, date) {
+  const day = date.getDay() === 0 ? 7 : date.getDay();
+  return (profile.workingDays ?? {})[day] !== false;
+}
+
+function shiftBounds(profile, date) {
+  const [openHour, openMinute] = profile.openTime.split(":").map(Number);
+  const [closeHour, closeMinute] = profile.closeTime.split(":").map(Number);
+  const start = new Date(date);
+  start.setHours(openHour, openMinute, 0, 0);
+  const end = new Date(date);
+  if (closeHour * 60 + closeMinute <= openHour * 60 + openMinute) {
+    end.setDate(end.getDate() + 1);
+  }
+  end.setHours(closeHour, closeMinute, 0, 0);
+  return { operatingDate: dateKey(date), start, end };
+}
+
+function shiftState(profile, date, now) {
+  const bounds = shiftBounds(profile, date);
+  if (!isWorkingDay(profile, date)) {
+    return { status: "non_working", bounds };
+  }
+  if (now < bounds.start) return { status: "upcoming", bounds };
+  if (now < bounds.end) return { status: "active", bounds };
+  return { status: "completed", bounds };
+}
+
+async function productionShiftHelpers() {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("function Cz(");
+  const end = bundle.indexOf("function _z(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const context = { Rg: isWorkingDay };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.helpers = { Ig, $g, wo };`,
     context,
   );
   return context.helpers;
@@ -2129,135 +2133,6 @@ test("finance week compares only the same completed shifts for any venue schedul
     [
       { date: "2026-07-13", revenue: 1_000, receipts: 5 },
       { date: "2026-07-14", revenue: 1_200, receipts: 6 },
-      { date: "2026-0ext = {
-    Rg: isWorkingDay,
-    $g: shiftState,
-    profile,
-    now,
-    revenue,
-  };
-  vm.runInNewContext(
-    `${bundle.slice(start, end)}\nglobalThis.output = bdHealthShiftCoverage(profile, revenue, now);`,
-    context,
-  );
-  return context.output;
-}
-
-test("health index counts completed shifts only in the current month", async () => {
-  const cologne = {
-    openTime: "22:00",
-    closeTime: "06:00",
-    workingDays: {
-      1: false,
-      2: false,
-      3: false,
-      4: false,
-      5: true,
-      6: true,
-      7: true,
-    },
-  };
-  const now = new Date(2026, 6, 16, 17, 34);
-  const revenue = [
-    "2026-07-03",
-    "2026-07-04",
-    "2026-07-05",
-    "2026-07-10",
-    "2026-07-11",
-    "2026-07-12",
-  ].map((date) => ({ date, revenue: 1_000, receipts: 5 }));
-
-  const coverage = await healthShiftCoverage(cologne, now, revenue);
-  assert.deepEqual(
-    {
-      expected: coverage.expected,
-      entered: coverage.entered,
-      percent: coverage.percent,
-    },
-    { expected: 6, entered: 6, percent: 100 },
-  );
-});
-
-async function financeWeekContext(profile, now, revenue, expenses) {
-  const bundle = await readFile(
-    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
-    "utf8",
-  );
-  const start = bundle.indexOf("const bdFinanceDayShort=");
-  const end = bundle.indexOf("function B2(", start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-
-  const context = {
-    profile,
-    now,
-    revenue,
-    expenses,
-    Um: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true },
-    $se: [1, 2, 3, 4, 5, 6, 7],
-    Rg: isWorkingDay,
-    $g: shiftState,
-    LS: dateKey,
-    ec: weekStart,
-    wn: summarize,
-  };
-
-  vm.runInNewContext(
-    `${bundle.slice(start, end)}\nglobalThis.output = bdFinanceWeekContext(profile, now, revenue, expenses);`,
-    context,
-  );
-  return context.output;
-}
-
-test("finance week uses the selected venue schedule and hides unfinished shifts", async () => {
-  const cologne = {
-    workingDays: {
-      1: false,
-      2: false,
-      3: false,
-      4: false,
-      5: true,
-      6: true,
-      7: true,
-    },
-    openTime: "18:00",
-    closeTime: "05:00",
-  };
-  const context = await financeWeekContext(
-    cologne,
-    new Date(2026, 6, 15, 15),
-    [{ date: "2026-07-12", revenue: 4_834, receipts: 16 }],
-    [{ date: "2026-07-15", category: "repairs", amount: 600 }],
-  );
-
-  assert.equal(context.scheduledShifts, 3);
-  assert.equal(context.completedShifts, 0);
-  assert.equal(context.week.hasRevenueData, false);
-  assert.equal(context.week.otherExpenses, 600);
-  assert.match(context.scheduleLabel, /пт, сб, вс/);
-  assert.match(context.nextWorkingLabel, /17/);
-});
-
-test("finance week compares only the same completed shifts for any venue schedule", async () => {
-  const weekdayVenue = {
-    workingDays: {
-      1: true,
-      2: true,
-      3: true,
-      4: true,
-      5: false,
-      6: false,
-      7: false,
-    },
-    openTime: "09:00",
-    closeTime: "14:00",
-  };
-  const context = await financeWeekContext(
-    weekdayVenue,
-    new Date(2026, 6, 15, 15),
-    [
-      { date: "2026-07-13", revenue: 1_000, receipts: 5 },
-      { date: "2026-07-14", revenue: 1_200, receipts: 6 },
       { date: "2026-07-15", revenue: 1_400, receipts: 7 },
       { date: "2026-07-06", revenue: 900, receipts: 5 },
       { date: "2026-07-07", revenue: 1_000, receipts: 5 },
@@ -2487,7 +2362,26 @@ test("monthly report uses monetary inventory totals without double-counting writ
     "2026-06-21",
     "2026-06-26",
     "2026-06-27",
-    "20d", total: 3_000, area: "Кухня" },
+    "2026-06-28",
+  ];
+  const revenue = shiftDates.map((date, index) => ({
+    date,
+    revenue: index === 0 ? 30_000 : 0,
+    receipts: index === 0 ? 100 : 0,
+    payrollBreakdown: index === 0 ? { total: 6_000 } : undefined,
+  }));
+  const expenses = [
+    { id: "pay-alcohol", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-alcohol", date: "2026-06-03", category: "alcohol", area: "Бар", amount: 5_000 },
+    { id: "pay-food", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-food", date: "2026-06-04", category: "food", area: "Кухня", amount: 3_000 },
+    { id: "pay-hookah", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-hookah", date: "2026-06-05", category: "hookah", amount: 1_000 },
+    { date: "2026-06-20", category: "writeoff", area: "Кухня", amount: 500 },
+    { date: "2026-06-22", category: "repairs", amount: 1_000 },
+    { id: "pay-household", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-household", date: "2026-06-23", category: "household", amount: 500 },
+    { id: "legacy-stock", source: "legacy_expense", legacy: true, legacyKind: "unlinked_purchase_expense", date: "2026-06-24", category: "products", amount: 250 },
+  ];
+  setPurchaseDocuments([
+    { id: "purchase-alcohol", status: "confirmed", documentType: "invoice", date: "2026-06-03", expenseCategory: "alcohol", total: 5_000, area: "Бар" },
+    { id: "purchase-food", status: "confirmed", documentType: "invoice", date: "2026-06-04", expenseCategory: "food", total: 3_000, area: "Кухня" },
     { id: "purchase-hookah", status: "confirmed", documentType: "invoice", date: "2026-06-05", expenseCategory: "hookah", total: 1_000 },
     { id: "purchase-household", status: "confirmed", documentType: "invoice", date: "2026-06-23", expenseCategory: "household", total: 500 },
   ]);
@@ -2744,86 +2638,6 @@ test("RC financial mutations update every canonical KPI and restore the 640 MDL 
     assert.equal(report.purchases, state.purchases, label);
     assert.equal(report.purchasePayments, state.purchasePayments, label);
     assert.equal(report.closingInventory, state.closingInventory, label);
-    assert.equal(report.writeoffs, state.writeoffs, labelriteoffs
-        - state.payroll
-        - otherExpenses
-        - state.taxes
-        - state.utilities,
-    };
-  }
-
-  function reportFor(patch = {}) {
-    const state = { ...baseline, ...patch };
-    setPurchaseDocuments([{
-      id: "purchase-mutation",
-      status: "confirmed",
-      documentType: "invoice",
-      date: "2026-06-10",
-      expenseCategory: "products",
-      total: state.purchases,
-      area: "Bar",
-    }]);
-    const expenses = [
-      { id: "payment-mutation", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-mutation", status: "posted", date: "2026-06-10", category: "products", area: "Bar", amount: state.purchasePayments },
-      { date: "2026-06-20", category: "writeoff", area: "Bar", amount: state.writeoffs },
-      { date: "2026-06-22", category: "other", amount: state.otherExpenses },
-      { date: "2026-06-23", category: "taxes", amount: state.taxes },
-      { date: "2026-06-24", category: "utilities", amount: state.utilities },
-    ];
-    if (state.supplierReturn) {
-      expenses.push({
-        date: "2026-06-25",
-        category: "returns",
-        amount: -state.supplierReturn,
-      });
-    }
-    const report = bdBuildMonthlyReport(
-      venue,
-      "2026-06",
-      [{
-        date: "2026-06-15",
-        revenue: state.revenue,
-        receipts: 20,
-        guests: 25,
-        payrollBreakdown: { total: state.payroll },
-      }],
-      expenses,
-      [
-        { date: "2026-06-01", sections: { Bar: 0 }, total: 0 },
-        {
-          date: "2026-06-30",
-          sections: { Bar: state.closingInventory },
-          total: state.closingInventory,
-        },
-      ],
-      settings,
-      resolvedShifts,
-    );
-    return { state, report, expected: independentExpected(state) };
-  }
-
-  const mutations = [
-    ["закупочная цена", { purchases: 220 }, 620],
-    ["количество закупки", { purchases: 220, closingInventory: 180 }, 640],
-    ["продажа и складское списание", { revenue: 1_100, closingInventory: 140 }, 720],
-    ["возврат поставщику", { closingInventory: 140, supplierReturn: 20 }, 640],
-    ["списание", { closingInventory: 150, writeoffs: 20 }, 630],
-    ["фактическая инвентаризация", { closingInventory: 180 }, 660],
-    ["ФОТ", { payroll: 220 }, 620],
-    ["оплата поставщику", { purchasePayments: 140 }, 640],
-    ["аванс или выплата не являются повторным расходом", {}, 640],
-    ["налог", { taxes: 60 }, 630],
-    ["коммунальный расход", { utilities: 50 }, 630],
-    ["прочий расход", { otherExpenses: 40 }, 630],
-  ];
-
-  for (const [label, patch, expectedProfit] of mutations) {
-    const { state, report, expected } = reportFor(patch);
-    assert.equal(report.isClosed, true, label);
-    assert.equal(report.revenue, state.revenue, label);
-    assert.equal(report.purchases, state.purchases, label);
-    assert.equal(report.purchasePayments, state.purchasePayments, label);
-    assert.equal(report.closingInventory, state.closingInventory, label);
     assert.equal(report.writeoffs, state.writeoffs, label);
     assert.equal(report.payroll, state.payroll, label);
     assert.equal(report.otherExpenses, expected.otherExpenses, label);
@@ -2987,7 +2801,53 @@ test("an impossible inventory balance blocks the final monthly profit", async ()
 });
 
 async function payrollLedgerHelpers() {
-  cyroll bonuses without treating payments as a second expense", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf('const bdPayrollConfirmationVersion="approval-v25"');
+  const end = bundle.indexOf("function bdPayrollMonthAudits(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const context = {};
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.helpers = { bdPayrollEntryTotals, bdPayrollApplyLedger };`,
+    context,
+  );
+  return context.helpers;
+}
+
+test("salary ledger separates earnings, deductions, and payments", async () => {
+  const { bdPayrollEntryTotals, bdPayrollApplyLedger } =
+    await payrollLedgerHelpers();
+  const entries = [
+    { type: "bonus", amount: 1_000 },
+    { type: "order", amount: 500 },
+    { type: "fine", amount: 250 },
+    { type: "dishware", amount: 125 },
+    { type: "other_deduction", amount: 75 },
+    { type: "payment", amount: 4_000 },
+  ];
+
+  const totals = bdPayrollEntryTotals(entries);
+  const salary = bdPayrollApplyLedger(10_000, entries);
+
+  assert.equal(totals.deductions, 950);
+  assert.equal(totals.paid, 4_000);
+  assert.equal(salary.gross, 11_000);
+  assert.equal(salary.netAccrued, 10_050);
+  assert.equal(salary.balance, 6_050);
+
+  const approvalTotals = bdPayrollEntryTotals([
+    { type: "fine", amount: 1_000, confirmationStatus: "pending" },
+    { type: "dishware", amount: 500, confirmationStatus: "rejected" },
+    { type: "order", amount: 250, confirmationStatus: "confirmed" },
+  ]);
+  assert.equal(approvalTotals.deductions, 250);
+});
+
+test("monthly financial report includes payroll bonuses without treating payments as a second expense", async () => {
   const bundle = await readFile(
     new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
     "utf8",
@@ -3148,46 +3008,133 @@ test("only an explicit closing record marks a month closed and its snapshot stay
   };
   vm.runInNewContext(
     `${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
-    contexssert.match(onboarding, /await t\(A\),_\.length>0&&n\(_\),m\(!0\)/);
-  assert.doesNotMatch(onboarding, /Failed to save onboarding equipment list/);
-  assert.match(onboarding, /ariaLabel:"Название заведения"/);
-  assert.match(onboarding, /ariaLabel:"Мест в зале"/);
-  assert.match(onboarding, /"aria-label":"Назад"/);
-  assert.match(onboarding, /"aria-label":\(h\.checked\?"Убрать ":"Добавить "\)\+m\.name/);
-  assert.match(onboarding, /"aria-label":"Уменьшить количество: "\+n/);
-  assert.match(onboarding, /"aria-label":"Увеличить количество: "\+n/);
+    context,
+  );
+
+  const build = context.build;
+  const openReport = build({}, "2026-07", [], [], [], { id: "primary" }, []);
+  assert.equal(openReport.isClosed, false);
+  assert.equal(openReport.status, "preliminary");
+
+  closings = [{
+    monthKey: "2026-07",
+    venueId: "primary",
+    status: "closed",
+    closedAt: "2026-08-01T10:00:00.000Z",
+    snapshot: {
+      revenue: 100_000,
+      payroll: 20_000,
+      taxes: 5_000,
+      finalProfit: 31_000,
+      cashResult: 29_000,
+      resultBeforeCost: 45_000,
+    },
+  }];
+  const closedReport = build({}, "2026-07", [], [], [], { id: "primary" }, []);
+  assert.equal(closedReport.isClosed, true);
+  assert.equal(closedReport.status, "closed");
+  assert.equal(closedReport.revenue, 100_000);
+  assert.equal(closedReport.payroll, 20_000);
+  assert.equal(closedReport.taxes, 5_000);
+  assert.equal(closedReport.operatingResult, 31_000);
+  assert.equal(closedReport.cashResult, 29_000);
 });
 
-test("only an explicit closing record marks a month closed and its snapshot stays immutable", async () => {
+test("employee list opens a read-only monthly profile before editing", async () => {
+  const [bundle, css, listCss] = await Promise.all([
+    readFile(
+      new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../public/employee-detail.css", import.meta.url), "utf8"),
+    readFile(new URL("../public/employee-list.css", import.meta.url), "utf8"),
+  ]);
+  const detailStart = bundle.indexOf("function bdEmployeeAttendanceForMonth(");
+  const detailEnd = bundle.indexOf("function vCe()", detailStart);
+  const listEnd = bundle.indexOf("function _Ce(", detailEnd);
+  const rowStart = bundle.indexOf("function bdTeamEmployeeCount(");
+  const rowEnd = bundle.indexOf("function xCe(", rowStart);
+  assert.ok(
+    detailStart >= 0
+      && detailEnd > detailStart
+      && listEnd > detailEnd
+      && rowStart >= 0
+      && rowEnd > rowStart,
+  );
+  const detail = bundle.slice(detailStart, detailEnd);
+  const list = bundle.slice(detailEnd, listEnd);
+  const row = bundle.slice(rowStart, rowEnd);
+
+  assert.match(bundle, /path:"\/employees\/:id",component:\(\)=>i\.jsx\(pt,\{component:bdEmployeeDetailPage\}\)/);
+  assert.match(detail, /data-bd-employee-detail":"career-v204"/);
+  assert.match(detail, /bdHasClientPermission\("team\.manage"\)/);
+  assert.match(detail, /bdHasClientPermission\("payroll\.view"\)/);
+  assert.match(detail, /label:"Отработано смен"/);
+  assert.match(detail, /label:"Отработано часов"/);
+  assert.match(detail, /label:"Выплачено \/ авансы"/);
+  assert.match(detail, /children:"Премии, удержания и выплаты"/);
+  assert.match(detail, /children:"Финансовая информация скрыта"/);
+  assert.match(list, /bdEmployeeNavigate\("\/employees\/"\+encodeURIComponent\(T\.id\)\)/);
+  assert.doesNotMatch(list, /function j\(T\)\{m\(\{mode:"edit",employee:T\}\)\}/);
+  assert.match(list, /data-bd-team-list":"directory-v163"/);
+  assert.match(list, /data-bd-team-module":"v163"/);
+  assert.match(list, /role:"tablist"/);
+  assert.match(list, /className:"bd-team-directory"/);
+  assert.match(row, /className:"bd-team-row"/);
+  assert.match(row, /className:"bd-team-avatar"/);
+  assert.doesNotMatch(row, /dCe,\{name:e\.name,size:48\}/);
+
+  assert.match(css, /grid-template-columns:\s*minmax\(260px, 0\.75fr\) minmax\(0, 1\.5fr\)/);
+  assert.match(css, /@media \(max-width: 860px\)/);
+  assert.match(css, /@media \(max-width: 560px\)/);
+  assert.match(listCss, /bd-professional-employee-directory-v84/);
+  assert.match(listCss, /\.bd-team-directory\s*\{/);
+  assert.match(listCss, /@media \(min-width: 840px\)/);
+});
+
+test("employee monthly attendance counts only that employee and does not invent hours", async () => {
   const bundle = await readFile(
     new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
     "utf8",
   );
-  const start = bundle.indexOf('const bdReleaseCandidateVersion="rc-v163"');
-  const end = bundle.indexOf("function bdShiftsPage(", start);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-
-  let closings = [];
+  const start = bundle.indexOf("function bdEmployeeAttendanceForMonth(");
+  const end = bundle.indexOf("function bdEmployeeHoursLabel(", start);
+  assert.ok(start >= 0 && end > start);
   const context = {
-    bdMonthClosingsKey: "bd_month_closings",
-    bdArrayStore() {
-      return closings;
-    },
-    bdBuildMonthlyReport() {
-      return {
-        status: "closed",
-        isClosed: true,
-        revenue: 999_999,
-        payroll: 88_888,
-        taxes: 77_777,
-        operatingResult: 66_666,
-        cashResult: 55_555,
-        resultBeforeCost: 44_444,
-        sections: [],
-      };
-    },
+    rows: [
+      {
+        id: "shift-1",
+        date: "2026-08-04",
+        staffing: [{ employeeId: "employee-1", hours: 8 }],
+      },
+      {
+        id: "shift-2",
+        date: "2026-08-06",
+        staffing: [{ employeeId: "employee-1" }],
+      },
+      {
+        id: "shift-3",
+        date: "2026-08-08",
+        staffing: [{ employeeId: "employee-2", hours: 12 }],
+      },
+      {
+        id: "shift-old",
+        date: "2026-07-31",
+        staffing: [{ employeeId: "employee-1", hours: 10 }],
+      },
+    ],
   };
   vm.runInNewContext(
-    `${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
-    contex
+    `${bundle.slice(start, end)}\nglobalThis.result=bdEmployeeAttendanceForMonth("employee-1","2026-08",rows);`,
+    context,
+  );
+
+  assert.equal(context.result.shiftCount, 2);
+  assert.equal(context.result.totalHours, 8);
+  assert.equal(context.result.knownHours, 1);
+  assert.equal(context.result.missingHours, 1);
+  assert.deepEqual(
+    Array.from(context.result.rows, (row) => row.id),
+    ["shift-2", "shift-1"],
+  );
+});

@@ -394,43 +394,7 @@
     var button = document.createElement("button");
     button.type = "button";
     button.setAttribute("role", "tab");
-    button.setAttribu("aria-selected", "false");
-    button.setAttribute("data-bd-team-access-entry", "v171");
-    button.textContent = "Роли и доступ";
-    button.addEventListener("click", function (event) {
-      navigateInApplication(event, "/team-access");
-    });
-    tabs.appendChild(button);
-  }
-
-  function injectWarehouseSalesEntry() {
-    var entries = Array.from(document.querySelectorAll("[data-bd-warehouse-sales-entry]"));
-    if (window.location.pathname !== "/warehouse") {
-      entries.forEach(function (entry) { entry.remove(); });
-      return;
-    }
-    if (document.querySelector('[data-bd-warehouse-version="compact-tree-v240"]')) {
-      entries.forEach(function (entry) {
-        if (entry.getAttribute("data-bd-warehouse-sales-entry") === "legacy") entry.remove();
-      });
-      return;
-    }
-    var nativeEntry = document.querySelector('[data-bd-warehouse-sales-entry="native-v79"]');
-    if (nativeEntry) {
-      entries.forEach(function (entry) { if (entry !== nativeEntry) entry.remove(); });
-      return;
-    }
-    var existing = entries[0];
-    if (existing || !hasClientPermission("inventory.manage") || !hasClientPermission("shifts.manage")) return;
-    var main = document.querySelector("main");
-    if (!main) return;
-
-    var entry = document.createElement("section");
-    entry.className = "bd-warehouse-sales-entry";
-    entry.setAttribute("data-bd-warehouse-sales-entry", "legacy");
-    entry.innerHTML = [
-      '<span class="bd-warehouse-sales-icon" aria-hidden="true">↘</span>',
-      '<span class="bd-warehouse-sales-copy"><small>РАСХОД ПО ТЕХКАРТАМ</small>te("aria-selected", "false");
+    button.setAttribute("aria-selected", "false");
     button.setAttribute("data-bd-team-access-entry", "v171");
     button.textContent = "Роли и доступ";
     button.addEventListener("click", function (event) {
@@ -691,7 +655,77 @@
       })
       .catch(function () {
         if (cached && cached.calendar) renderOpportunity(cached, "offline");
-        elseesult, "activeVenueId") && result.activeVenueId) {
+        else renderOpportunity({ calendar: null }, "failed");
+      })
+      .finally(function () { clearTimeout(timeout); });
+  }
+
+  function removeLegacyActionPlanLinks() {
+    document.querySelectorAll('a[href="/decisions"], a[href^="/decisions?"]').forEach(function (link) {
+      link.remove();
+    });
+  }
+
+  function enhanceRecommendationCards() {
+    var section = document.querySelector("[data-bd-ai-recommendations]");
+    if (!section) return;
+
+    var intro = section.firstElementChild;
+    var introLines = intro ? intro.querySelectorAll("p") : [];
+    if (introLines[0] && introLines[0].textContent !== "Рекомендации BarDoctor") {
+      introLines[0].textContent = "Рекомендации BarDoctor";
+    }
+    var desiredCopy = "Агент уже подготовил предложения по этим рекомендациям. Проверьте ответственного и срок, затем утвердите, измените или удалите каждое.";
+    if (introLines[1] && introLines[1].textContent !== desiredCopy) {
+      introLines[1].textContent = desiredCopy;
+    }
+
+    section.querySelectorAll("article").forEach(function (article) {
+      var title = article.querySelector("h3");
+      if (!title) return;
+      if (article.querySelector("[data-bd-review-recommendation-task]")) return;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "bd-recommendation-create";
+      button.setAttribute("data-bd-review-recommendation-task", "");
+      button.innerHTML = "<span>Проверить предложение</span><b aria-hidden=\"true\">→</b>";
+      button.addEventListener("click", function () {
+        navigateInApplication(null, "/tasks?tab=proposed");
+      });
+      article.appendChild(button);
+    });
+
+    var articles = section.querySelectorAll("article");
+    if (!articles.length) {
+      section.remove();
+      return;
+    }
+    Array.from(section.querySelectorAll("button")).forEach(function (button) {
+      if (
+        !button.hasAttribute("data-bd-review-recommendation-task")
+        && (button.textContent || "").trim() === "Открыть поручения"
+        && button.textContent !== "Проверить предложения"
+      ) {
+        button.textContent = "Проверить предложения";
+      }
+    });
+  }
+
+  function rememberAccessContext(result) {
+    if (!result || !result.ok) return;
+    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"
+      ? result.bootstrap
+      : { state: "recovery_required", reason: "bootstrap_contract_missing" };
+    if (Object.prototype.hasOwnProperty.call(result, "role")) {
+      currentRole = typeof result.role === "string" ? result.role : "";
+    }
+    if (Object.prototype.hasOwnProperty.call(result, "permissions")) {
+      currentPermissions = Array.isArray(result.permissions) ? result.permissions : [];
+    }
+    if (currentRole) localStorage.setItem("bd_active_role", currentRole);
+    else localStorage.removeItem("bd_active_role");
+    localStorage.setItem("bd_active_permissions", JSON.stringify(currentPermissions));
+    if (Object.prototype.hasOwnProperty.call(result, "activeVenueId") && result.activeVenueId) {
       localStorage.setItem("bd_active_venue_id", String(result.activeVenueId));
       if (typeof bdEnsureCurrentEntry === "function") bdEnsureCurrentEntry();
       var activeVenueMeta = Array.isArray(result.venues)
@@ -799,73 +833,6 @@
     { prefix: "/payroll", permission: "payroll.view" },
     { prefix: "/reports", permission: "reports.view" },
     { prefix: "/month-closing", permission: "reports.view" },
-    { prefix: "/warehouse", permission: "inventory.view" },
-    { prefix: "/sales-import", permission: "inventory.view" },
-    { prefix: "/suppliers", permission: "inventory.view" },
-    { prefix: "/catalog", permission: "inventory.view" },
-    { prefix: "/employees", permission: "team.view" },
-    { prefix: "/equipment", permission: "equipment.view" },
-    { prefix: "/cases", permission: "incidents.view" },
-    { prefix: "/events", permission: "tasks.view" },
-    { prefix: "/tasks", permission: "tasks.view" },
-    { prefix: "/analysis", permission: "analysis.view" },
-    { prefix: "/health", permission: "analysis.view" },
-    { prefix: "/market", permission: "analysis.view" },
-    { prefix: "/smart", permission: "analysis.view" },
-    { prefix: "/reviews", permission: "reviews.view" },
-    { prefix: "/opportunities", permission: "calendar.view" },
-    { prefix: "/data-control", permission: "audit.view" },
-    { prefix: "/team-access", permission: "access.manage" },
-    { prefix: "/setup", permission: "settings.manage" },
-    { prefix: "/integrations", permission: "integrations.manage" },
-  ];
-
-  function requiredPermissionForPath(pathname) {
-    var entry = PATH_PERMISSIONS.find(function (item) {
-      return pathname === item.prefix || pathname.startsWith(item.prefix + "/");
-    });
-    return entry && entry.permission;
-  }
-
-  function renderAccessDenied(permission) {
-    if (document.querySelector("[data-bd-access-denied]")) return;
-    var overlay = document.createElement("div");
-    overlay.className = "bd-access-denied";
-    overlay.setAttribute("data-bd-access-denied", "");
-    overlay.innerHTML = [
-      '<section><span>ДОСТУП ОГРАНИЧЕН</span><h2>Раздел не входит в ваши права</h2>',
-      '<p>' + (currentRole === "owner"
-        ? 'Права владельца не удалось синхронизировать. Обновите страницу; если ошибка повторится, доступ требует проверки.'
-        : 'Владелец может включить это право в разделе «Команда → Роли и доступ».') + '</p>',
-      '<a href="/home">Вернуться на главную</a><small>' + String(permission) + '</small></section>',
-    ].join("");
-    var homeLink = overlay.querySelector("a");
-    if (homeLink) {
-      homeLink.addEventListener("click", function (event) {
-        overlay.remove();
-        navigateInApplication(event, "/home");
-      });
-    }
-    document.body.appendChild(overlay);
-  }
-
-  function applyAccessUi() {
-    if (!currentRole) {
-      var staleDenial = document.querySelector("[data-bd-access-denied]");
-      if (staleDenial) staleDenial.remove();
-      return;
-    }
-    var required = requiredPermissionForPath(window.location.pathname);
-    var existingDenial = document.querySelector("[data-bd-access-denied]");
-    if (required && !hasClientPermission(required)) {
-      renderAccessDenied(required);
-    } else if (existingDenial) {
-      existingDenial.remove();
-    }
-
-    document.querySelectorAll("a[href]").forEach(function (link) {
-      var path;
-      try { path = new URL(link.href, windsing", permission: "reports.view" },
     { prefix: "/warehouse", permission: "inventory.view" },
     { prefix: "/sales-import", permission: "inventory.view" },
     { prefix: "/suppliers", permission: "inventory.view" },
@@ -1093,7 +1060,92 @@
     }
   }
 
-  function bdNavigationPathname  if (!url) return false;
+  function bdNavigationPathname(value) {
+    try {
+      return new URL(String(value), window.location.href).pathname;
+    } catch {
+      return "";
+    }
+  }
+
+  function bdScrollKey(value) {
+    return "bd_navigation_scroll::" + bdActiveVenueId() + "::" + String(value || "");
+  }
+
+  function bdRememberScroll(value) {
+    try {
+      sessionStorage.setItem(bdScrollKey(value), JSON.stringify({
+        x: Math.max(0, Math.round(window.scrollX || 0)),
+        y: Math.max(0, Math.round(window.scrollY || 0))
+      }));
+    } catch {
+      // Scroll restoration is an enhancement; navigation must still work without storage.
+    }
+  }
+
+  function bdRestoreScroll(value) {
+    var position = null;
+    try {
+      position = JSON.parse(sessionStorage.getItem(bdScrollKey(value)) || "null");
+    } catch {
+      position = null;
+    }
+    if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return;
+    [0, 60, 180].forEach(function (delay) {
+      window.setTimeout(function () { window.scrollTo(position.x, position.y); }, delay);
+    });
+  }
+
+  function bdLogicalParentRoute(pathname) {
+    var path = pathname || window.location.pathname;
+    return window.bdNavigationContract
+      ? window.bdNavigationContract.parent(path)
+      : "/home";
+  }
+
+  function bdQueryParentUrl(value) {
+    var url = bdNavigationUrl(value == null ? window.location.href : value);
+    if (!url || !window.bdNavigationContract) return null;
+    var screen = window.bdNavigationContract.resolve(url);
+    if (!screen || !screen.parent || screen.parent === url) return null;
+    return bdNavigationPathname(screen.parent) === bdNavigationPathname(url)
+      ? screen.parent
+      : null;
+  }
+
+  function bdLogicalParentUrl(value) {
+    return bdQueryParentUrl(value) || bdLogicalParentRoute(bdNavigationPathname(value) || undefined);
+  }
+
+  function bdCanReturnToPreviousContext(state) {
+    if (!state || !state.bdPreviousUrl || !state.bdPreviousEntryId) return false;
+    if (!bdNavigationUrl(state.bdPreviousUrl)) return false;
+    if (window.bdNavigationContract && !window.bdNavigationContract.isSafeInternal(state.bdPreviousUrl)) return false;
+    if (state.bdVenueId && bdActiveVenueId() && String(state.bdVenueId) !== String(bdActiveVenueId())) return false;
+    return true;
+  }
+
+  window.bdReadNavigationQuery = function (name, fallback) {
+    var value = new URLSearchParams(window.location.search).get(String(name));
+    return value == null || value === "" ? fallback : value;
+  };
+
+  window.bdSyncNavigationQuery = function (values) {
+    var url = new URL(window.location.href);
+    Object.keys(values || {}).forEach(function (name) {
+      var value = values[name];
+      if (value == null || value === "" || value === false) url.searchParams.delete(name);
+      else url.searchParams.set(name, String(value));
+    });
+    var next = url.pathname + (url.searchParams.toString() ? "?" + url.searchParams.toString() : "") + url.hash;
+    if (next !== bdCurrentNavigationUrl()) window.history.replaceState(window.history.state, "", next);
+  };
+
+  window.bdLogicalParentRoute = bdLogicalParentRoute;
+  window.bdLogicalParentUrl = bdLogicalParentUrl;
+  window.bdNavigate = function (target, options) {
+    var url = bdNavigationUrl(target);
+    if (!url) return false;
     var replace = Boolean(options && options.replace);
     window.history[replace ? "replaceState" : "pushState"](window.history.state, "", url);
     window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
@@ -1190,110 +1242,6 @@
     return pushResult;
   };
   window.history.replaceState = function (state, title, url) {
-    url = normalizeApplicationHref(url);
-    if (url != null && serverRenderedUrl(url)) {
-      var target = new URL(String(url), window.location.href);
-      window.location.replace(target.pathname + target.search + target.hash);
-      return;
-    }
-    var currentState = bdEnsureCurrentEntry();
-    var nextState = Object.assign({}, currentState, bdHistoryState(state), {
-      bdEntryId: currentState.bdEntryId,
-      bdVenueId: bdActiveVenueId(),
-      bdNavigationVersion: bdNavigationVersion
-    });
-    var replaceResult = nativeReplaceState(nextState, title, url);
-    bdDispatchNavigationChange();
-    return replaceResult;
-  };
-
-  window.addEventListener("popstate", function () {
-    bdDispatchNavigationChange();
-    var restoreTarget = bdPendingScrollRestore || bdCurrentNavigationUrl();
-    bdPendingScrollRestore = "";
-    window.setTimeout(function () { bdRestoreScroll(restoreTarget); }, 0);
-  });
-  window.addEventListener("bd:venue-changed", function () {
-    var state = bdHistoryState(window.history.state);
-    state.bdVenueId = bdActiveVenueId();
-    state.bdPreviousEntryId = "";
-    state.bdPreviousUrl = "";
-    nativeReplaceState(state, "", bdCurrentNavigationUrl());
-    bdDispatchNavigationChange();
-  });
-
-  var nativeFetch = window.fetch.bind(window);
-  window.fetch = function authenticatedFetch(input, init) {
-    var requestUrl = null;
-    var requestVenueId = null;
-    var rejectStaleVenueResponse = false;
-    try {
-      requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
-      if (requestUrl.origin === window.location.origin && requestUrl.pathname.startsWith("/api/")) {
-        var sessionEmail = localStorage.getItem("bd_session");
-        var sessionToken = localStorage.getItem("bd_session_token");
-        var activeVenueId = localStorage.getItem("bd_active_venue_id");
-        if (sessionEmail && sessionToken) {
-          var headers = new Headers(input instanceof Request ? input.headers : undefined);
-          new Headers(init && init.headers ? init.headers : undefined).forEach(function (value, key) {
-            headers.set(key, value);
-          });
-          if (!headers.has("X-Session-Email")) headers.set("X-Session-Email", sessionEmail);
-          if (!headers.has("X-Session-Token")) headers.set("X-Session-Token", sessionToken);
-          if (activeVenueId && !headers.has("X-Venue-Id")) headers.set("X-Venue-Id", activeVenueId);
-          requestVenueId = headers.get("X-Venue-Id");
-          rejectStaleVenueResponse = Boolean(requestVenueId)
-            && !requestUrl.pathname.startsWith("/api/auth/")
-            && requestUrl.pathname !== "/api/access/active-venue"
-            && requestUrl.pathname !== "/api/access/join";
-          init = Object.assign({}, init || {}, { headers: headers });
-        }
-        if (requestUrl.pathname === "/api/auth/register" && init && typeof init.body === "string") {
-          try {
-            var registerBody = JSON.parse(init.body);
-            registerBody.registrationMode = registrationMode;
-            if (registrationMode === "join") registerBody.invitationCode = registrationInviteCode;
-            else delete registerBody.invitationCode;
-            init = Object.assign({}, init, { body: JSON.stringify(registerBody) });
-          } catch {
-            // The registration endpoint will reject malformed JSON itself.
-          }
-        }
-        if (
-          requestUrl.pathname === "/api/store/bd_finance_expenses"
-          && String(init && init.method || "GET").toUpperCase() === "PUT"
-          && hasClientPermission("expenses.create")
-          && !hasClientPermission("finance.manage")
-          && init
-          && typeof init.body === "string"
-        ) {
-          try {
-            var expensePayload = JSON.parse(init.body);
-            var expenseRows = Array.isArray(expensePayload.data) ? expensePayload.data.slice() : [];
-            expenseRows.sort(function (left, right) {
-              return String(right && (right.updatedAt || right.createdAt || right.date) || "")
-                .localeCompare(String(left && (left.updatedAt || left.createdAt || left.date) || ""));
-            });
-            if (expenseRows[0]) {
-              input = "/api/expenses";
-              requestUrl = new URL("/api/expenses", window.location.href);
-              init = Object.assign({}, init, {
-                method: "POST",
-                body: JSON.stringify({ entry: expenseRows[0] })
-              });
-            }
-          } catch {
-            // The normal store request will be rejected safely by the server.
-          }
-        }
-      }
-    } catch {
-      // Preserve the browser's normal fetch behavior for unusual Request objects.
-    }
-    var requestMethod = String(
-      init && init.method
-        ? init.method
-        : (typeof Request !== "un url) {
     url = normalizeApplicationHref(url);
     if (url != null && serverRenderedUrl(url)) {
       var target = new URL(String(url), window.location.href);
@@ -1628,7 +1576,45 @@
 
   function bdSurfaceSignature(surface) {
     if (!surface || !surface.querySelectorAll) return "";
-    retu return true;
+    return Array.from(surface.querySelectorAll("input,select,textarea"))
+      .filter(function (control) {
+        return !control.disabled && !["button", "submit", "reset"].includes((control.type || "").toLowerCase());
+      })
+      .map(function (control, index) {
+        var value = (control.type === "checkbox" || control.type === "radio")
+          ? (control.checked ? "1" : "0")
+          : control.value;
+        return [control.name || control.id || index, control.type || control.tagName, value].join("=");
+      })
+      .join("&");
+  }
+
+  function bdRememberSurfaceBaseline(surface) {
+    if (!surface || bdDirtySurfaces.has(surface)) return;
+    bdDirtySurfaces.set(surface, bdSurfaceSignature(surface));
+  }
+
+  function bdUpdateSurfaceDirty(surface) {
+    if (!surface) return false;
+    bdRememberSurfaceBaseline(surface);
+    var dirty = bdDirtySurfaces.get(surface) !== bdSurfaceSignature(surface);
+    if (dirty) surface.setAttribute("data-bd-unsaved-changes", "true");
+    else surface.removeAttribute("data-bd-unsaved-changes");
+    return dirty;
+  }
+
+  function bdVisibleDirtySurface() {
+    return Array.from(document.querySelectorAll('[data-bd-unsaved-changes="true"]')).find(function (surface) {
+      var style = window.getComputedStyle(surface);
+      return style.display !== "none" && style.visibility !== "hidden";
+    }) || null;
+  }
+
+  function bdConfirmLeavingDirtyState(surface) {
+    var dirtySurface = surface || null;
+    if (dirtySurface && !bdUpdateSurfaceDirty(dirtySurface)) dirtySurface = null;
+    if (!dirtySurface) dirtySurface = bdVisibleDirtySurface();
+    if (!dirtySurface) return true;
     if (!window.confirm("Изменения не сохранены. Выйти без сохранения?")) return false;
     dirtySurface.removeAttribute("data-bd-unsaved-changes");
     bdDirtySurfaces.set(dirtySurface, bdSurfaceSignature(dirtySurface));
@@ -1747,45 +1733,6 @@
       localStorage.setItem("bd_session_userid", String(result.userId));
       if (currentFirstName) localStorage.setItem("bd_user_first_name", currentFirstName);
       else localStorage.removeItem("bd_user_first_name");
-      if (result.migrated) {
-        localStorage.setItem("bd_sites_migration_complete", new Date().toISOString());
-      }
-      if (window.location.pathname === "/setup" && result.role !== "owner") {
-        window.location.replace("/home");
-        return;
-      }
-      await refreshServerInventoryCacheV235();
-    } else if (result.needsLogin) {
-      window.__bdAuthBootstrapV274 = { state: "unauthenticated", reason: "login_required" };
-      localStorage.removeItem("bd_session");
-      localStorage.removeItem("bd_session_token");
-      localStorage.removeItem("bd_session_userid");
-      localStorage.removeItem("bd_active_role");
-      localStorage.removeItem("bd_active_permissions");
-      localStorage.removeItem("bd_active_venue_id");
-      localStorage.removeItem("bd_active_venue_is_primary");
-    } else {
-      window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed" };
-    }
-  } catch {
-    window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_request_failed" };
-  }
-
-  window.__bdBootstrapPending = false;
-  window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
-
-  observePurchaseConfirmation();
-  installProtectedOriginalLinks();
-  installNavigationConsistencyGuards();
-  loadApplication();
-  injectSupplierAlternativesEntry();
-  removeLegacyFinancePurchasePaymentEntryV195();
-  enhanceAiActionPlan();
-  new MutationObserver(enhanceAiActionPlan).observe(document.documentElement, { childList: true, subtree: true });
-  window.addEventListener("popstate", function () { setTimeout(enhanceAiActionPlan, 0); });
-  watchHomeGreeting();
-})();
-;
       if (result.migrated) {
         localStorage.setItem("bd_sites_migration_complete", new Date().toISOString());
       }

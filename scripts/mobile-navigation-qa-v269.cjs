@@ -374,40 +374,6 @@ async function createRun(browser, profile, label, options = {}) {
         closedVia: "canonical-writeoff-v272",
         writeOffDocumentIds: documents.map((document) => document.id),
         writeOffItemCount: (body.writeOffItems || []).length,
-        writeOffTotalCost: do });
-        const totalCost = items.some((item) => item.totalCost === null) ? null : items.reduce((sum, item) => sum + item.totalCost, 0);
-        documents.push({
-          id: `shift-writeoff:${body.shiftCloseId}:${groupIndex}`,
-          internalId: `WO-QA-${groupIndex}`,
-          venueId: state.activeVenueId,
-          number: stores.bd_inventory_writeoffs.length + groupIndex,
-          date: body.revenueRecord.date,
-          location,
-          reasonCode,
-          reasonLabel: reasons.get(reasonCode) || reasonCode,
-          status: "posted",
-          source: "shift_close",
-          shiftId: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
-          shiftCloseId: body.shiftCloseId,
-          items,
-          itemCount: items.length,
-          totalCost,
-          currency: items.find((item) => item.currency)?.currency || "RUB",
-          movementIds: items.map((item) => `shift-movement:${item.id}`),
-          createdAt: "2026-08-24T15:00:00.000Z",
-          postedAt: "2026-08-24T15:00:00.000Z",
-        });
-      }
-      stores.bd_inventory_writeoffs = [...documents, ...stores.bd_inventory_writeoffs];
-      const revenueRecord = {
-        ...body.revenueRecord,
-        id: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
-        venueId: state.activeVenueId,
-        shiftCloseId: body.shiftCloseId,
-        closingStatus: "closed",
-        closedVia: "canonical-writeoff-v272",
-        writeOffDocumentIds: documents.map((document) => document.id),
-        writeOffItemCount: (body.writeOffItems || []).length,
         writeOffTotalCost: documents.some((document) => document.totalCost === null) ? null : documents.reduce((sum, document) => sum + document.totalCost, 0),
       };
       stores.bd_finance_revenue = [revenueRecord, ...stores.bd_finance_revenue.filter((row) => row.shiftCloseId !== body.shiftCloseId)];
@@ -474,7 +440,39 @@ async function createRun(browser, profile, label, options = {}) {
         movementIds: body.action === "save_draft" ? [] : preparedItems.map((item) => `movement-${item.id}`),
         createdBy: { accountId: 1, name: "Mobile QA", role: "owner" },
         createdAt: existing?.createdAt || "2026-08-24T10:00:00.000Z", updatedAt: "2026-08-24T10:00:00.000Z",
-        postedAt: body.action === "pos
+        postedAt: body.action === "post" ? "2026-08-24T10:00:00.000Z" : undefined,
+      };
+      stores.bd_inventory_writeoffs = [document, ...stores.bd_inventory_writeoffs.filter((item) => item.id !== document.id)];
+      if (body.action === "post") {
+        for (const line of preparedItems) {
+          const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
+          balance.current = line.stockAfter;
+          balance.inventoryValue = Math.max(0, Number(balance.inventoryValue || 0) - Number(line.totalCost || 0));
+          stores.bd_stock_movements.unshift({ id: `movement-${line.id}`, type: "writeoff", date: input.date, productKey: line.productKey, productName: line.productName, amount: -line.baseQuantity, unit: line.baseUnit, costAmount: line.totalCost === null ? undefined : -line.totalCost, currency: line.currency, sourceDocumentId: document.id, sourceLineId: line.id, createdAt: "2026-08-24T10:00:00.000Z" });
+        }
+      }
+      return route.fulfill(jsonResponse({ ok: true, writeOff: document, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, stockChanged: body.action === "post" }, body.action === "post" ? 201 : 200));
+    }
+    if (url.pathname === "/api/inventory/counts") {
+      if (method === "POST") {
+        const body = request.postDataJSON();
+        if (body.action === "delete") {
+          const snapshots = state.stores[state.activeVenueId].bd_inventory_snapshots;
+          const index = snapshots.findIndex((item) => item.id === body.id);
+          if (index < 0) return route.fulfill(jsonResponse({ ok: true, deleted: false, idempotent: true, venueId: state.activeVenueId, snapshots, stockChanged: false }));
+          const current = snapshots[index];
+          if (!["draft", "counting", "review"].includes(String(current.status || "")) || (current.adjustmentMovementIds || []).length) {
+            return route.fulfill(jsonResponse({ ok: false, code: "INVENTORY_DELETE_PROTECTED", error: "Инвентаризация уже завершена или повлияла на склад" }, 409));
+          }
+          snapshots.splice(index, 1);
+          return route.fulfill(jsonResponse({ ok: true, deleted: true, deletedInventoryId: body.id, venueId: state.activeVenueId, snapshots, stockChanged: false }));
+        }
+      }
+      const document = state.stores[state.activeVenueId].bd_inventory_snapshots.find((item) => item.id === url.searchParams.get("id"));
+      if (url.searchParams.get("format") === "print") {
+        const returnUrl = `/warehouse?venue=${state.activeVenueId}&tab=counts&inventory=${encodeURIComponent(document?.id || "")}`;
+        return route.fulfill({ status: document ? 200 : 404, contentType: "text/html; charset=utf-8", body: `<!doctype html><html lang="ru"><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Инвентаризация № 17</title></head><body><header style="position:sticky;top:0"><a href="${returnUrl}">← Назад</a><button onclick="window.print()">Печать / PDF</button></header><main><h1>Инвентаризационная ведомость № 17</h1><p>${activeProfile.name}</p></main></body></html>` });
+      }
       if (url.searchParams.get("id")) return route.fulfill(jsonResponse(document ? { ok: true, venueId: state.activeVenueId, inventory: document } : { ok: false, error: "Инвентаризация не найдена" }, document ? 200 : 404));
       return route.fulfill(jsonResponse({ ok: true, venueId: state.activeVenueId, accountingCurrency: activeProfile.currency, scopes: [{ type: "all", label: "Весь активный склад", itemCount: state.activeVenueId === 901 ? 3 : 1 }], inventories: state.stores[state.activeVenueId].bd_inventory_snapshots }));
     }
@@ -565,41 +563,6 @@ async function inventoryFlow(browser, profile) {
   await mobileAudit(page, profile.name, "inventory-open", { fullscreen: true });
   const layer = await page.evaluate(() => {
     const header = document.querySelector(".bd-inventory-head-v245").getBoundingClientRect();
-    const print = document.querySelector(".bd-inventory-head-v245 button[aria-label='Печатная ведомость']").getBoundingClientRect();
-    const close = document.querySelector(".bd-inventory-head-v245 button[aria-label='Закрыть']").getBoundingClientRect();
-    const owner = document.querySelector(".bd-inventory-body-v245");
-    const ownerStyle = getComputedStyle(owner);
-    const appHeader = document.querySelector("bd-app-header");
-    return { header: { top: header.top, bottom: header.bottom }, print: { top: print.top, bottom: print.bottom, right: print.right }, close: { top: close.top, bottom: close.bottom, right: close.right }, ownerOverflow: ownerStyle.overflowY, appHeaderVisible: appHeader ? getComputedStyle(appHeader).display !== "none" : false, bodyOverflow: getComputedStyle(document.body).overflow };
-  });
-  assert.equal(layer.appHeaderVisible, false, `${profile.name}: Warehouse header leaked into inventory`);
-  assert.equal(layer.bodyOverflow, "hidden", `${profile.name}: body must be scroll-locked in inventory`);
-  assert.ok(layer.print.top >= layer.header.top && layer.print.bottom <= layer.header.bottom + 1, `${profile.name}: Print left inventory header`);
-  assert.ok(layer.close.right <= profile.descriptor.viewport.width + 1, `${profile.name}: Close clipped by viewport`);
-  const body = page.locator(".bd-inventory-body-v245");
-  await body.evaluate((node) => { node.scrollTop = Math.max(1, node.scrollHeight - node.clientHeight); });
-  assert.ok(await body.evaluate((node) => node.scrollTop > 0), `${profile.name}: fullscreen inventory does not own scrolling`);
-
-  await page.getByRole("button", { name: "Закрыть", exact: true }).click();
-  await page.waitForSelector(".bd-inventory-layer-v246", { state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.get("inventory"), null);
-  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
-  await page.waitForFunction(() => getComputedStyle(document.body).overflow !== "hidden");
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: body scroll lock leaked after Close`);
-  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("bd-inventory-overlay-open-v246") || document.body.classList.contains("bd-inventory-overlay-open-v246")), false, `${profile.name}: inventory scroll-lock class leaked after Close`);
-
-  await page.getByRole("button", { name: /Инвентаризация № 17/ }).click();
-  await page.waitForSelector(".bd-inventory-layer-v246");
-  await page.goBack();
-  await page.waitForSelector(".bd-inventory-layer-v246", { state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
-
-  await goto(page, "/warehouse?venue=901&tab=counts&inventory=inv-mobile-17");
-  await page.waitForSelector(".bd-inventory-layer-v246");
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForSelector(".bd-inventory-layer-v246");
-  assert.equal(new URL(page.url()).searchParams.get("inventory"), "inv-mobile-17");
-  assert.notEqual(new URL(page.url()).searchParams.get(eader = document.querySelector(".bd-inventory-head-v245").getBoundingClientRect();
     const print = document.querySelector(".bd-inventory-head-v245 button[aria-label='Печатная ведомость']").getBoundingClientRect();
     const close = document.querySelector(".bd-inventory-head-v245 button[aria-label='Закрыть']").getBoundingClientRect();
     const owner = document.querySelector(".bd-inventory-body-v245");
@@ -1292,61 +1255,43 @@ async function writeoffFlow(browser, profile) {
   await page.waitForSelector("[data-bd-writeoff-detail]");
   const documentId = new URL(page.url()).searchParams.get("writeoff");
   assert.ok(documentId && documentId !== "new", `${profile.name}: posting did not replace new deep link with document detail`);
-  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Пиво Mobile A").curreual(state.stores[902].bd_inventory_writeoffs.length, 0, `${profile.name}: Venue A document leaked into Venue B`);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Пиво Mobile A").current, 18);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Coca-Cola Mobile A").current, 11);
+  assert.equal(state.stores[901].bd_stock_movements.filter((item) => item.type === "writeoff").length, 2);
+  assert.match(await page.locator("[data-bd-writeoff-detail]").textContent(), /2 позиций/);
 
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true, documentId };
-}
+  await page.getByRole("button", { name: "Закрыть документ списания", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: detail Close did not return to list`);
+  await page.reload({ waitUntil: "networkidle" });
+  assert.equal(await page.locator(".bd-writeoff-document-list-v271 article").count(), 1, `${profile.name}: server-authoritative document disappeared after refresh`);
 
-async function runProfile(browser, profile) {
-  assert.ok(profile.descriptor.isMobile, `${profile.name}: Playwright descriptor is not mobile`);
-  assert.ok(profile.descriptor.hasTouch, `${profile.name}: Playwright descriptor has no touch`);
-  assert.match(profile.descriptor.userAgent, profile.userAgentPattern);
-  const results = [];
-  for (const [name, flow] of [
-    ["writeoffs", writeoffFlow],
-    ["shift-canonical-writeoffs", shiftCanonicalWriteoffFlow],
-    ["inventory-fullscreen", inventoryFlow],
-    ["inventory-delete", inventoryDeleteFlow],
-    ["warehouse-nomenclature", nomenclatureFlow],
-    ["shifts", shiftsFlow],
-    ["suppliers-purchases", procurementFlow],
-    ["menu-tech-cards", assortmentFlow],
-    ["embedded-modules", embeddedModulesFlow],
-    ["critical-form-close", formCloseFlow],
-    ["critical-modules", moduleSmokeFlow],
-    ["business-health-cold-start", businessHealthColdStartFlow],
-  ]) {
-    if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
-    process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
-    results.push(await flow(browser, profile));
-  }
-  return results;
-}
+  await page.locator(".bd-writeoff-document-list-v271 article > button").first().click();
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.goBack();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
 
-(async () => {
-  browserPath = await resolveBrowserExecutable(browserPath);
-  assert.ok(fs.existsSync(browserPath), `Playwright browser executable not found: ${browserPath}`);
-  const browser = await chromium.launch({
-    executablePath: browserPath,
-    headless: true,
-    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
-  });
-  const results = [];
-  const failures = [];
-  try {
-    for (const profile of profiles) {
-      if (process.env.BD_QA_PROFILE && process.env.BD_QA_PROFILE !== profile.name) continue;
-      results.push(...await runProfile(browser, profile));
-    }
-    if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
-        results.push(await embeddedModulesFlow(browser, desktopProfile));
-      }
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
-        results.push(aRL(page.url()).searchParams.get("writeoff"), documentId);
+  await goto(page, `/warehouse?venue=901&tab=writeoffs&writeoff=${encodeURIComponent(documentId)}`);
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
+  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: deep-link Back escaped Warehouse`);
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: deep-link Back retained stale document state`);
+
+  await goto(page, "/warehouse?venue=901&tab=writeoffs");
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Движения" }).click();
+  const movementLink = page.getByRole("button", { name: "Документ", exact: true }).first();
+  await movementLink.waitFor();
+  await movementLink.click();
+  await page.waitForFunction((expectedId) => {
+    const params = new URLSearchParams(location.search);
+    return params.get("tab") === "writeoffs" && params.get("writeoff") === expectedId;
+  }, documentId);
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), documentId);
   await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
 
   await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Списания" }).click();
@@ -1461,4 +1406,12 @@ async function runProfile(browser, profile) {
     generatedAt: new Date().toISOString(),
     baseUrl,
     browserPath,
-    profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgen
+    profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgent: profile.descriptor.userAgent })),
+    results,
+    failures,
+    passed: failures.length === 0,
+  };
+  fs.writeFileSync(path.join(outputDir, "mobile-navigation-qa.json"), `${JSON.stringify(summary, null, 2)}\n`);
+  console.log(JSON.stringify(summary, null, 2));
+  if (!summary.passed) process.exit(1);
+})();

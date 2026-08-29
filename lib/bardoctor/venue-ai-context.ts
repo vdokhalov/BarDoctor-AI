@@ -481,38 +481,6 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const storedMonthPayrollExpenses = sum(currentMonthExpenses, (value) => {
     const item = record(value);
     if (text(item.category, "", 50) !== "payroll") return 0;
-    return number(item.accountingAmount ??& date >= `${currentMonthKey}-01` && date <= today);
-  });
-  const currentMonthExpenses = expenseRows.filter((value) => {
-    const item = record(value);
-    const date = dateOnly(item.date);
-    const accountingMonth = text(item.accountingMonth, date?.slice(0, 7) ?? "", 7);
-    return accountingMonth === currentMonthKey
-      && (!date || date <= today)
-      && !["cancelled", "void", "draft"].includes(text(item.status, "posted", 30));
-  });
-  const currentMonthPayrollEntries = payrollRows.filter((value) => {
-    const item = record(value);
-    const date = dateOnly(item.date);
-    return Boolean(date && date >= `${currentMonthKey}-01` && date <= today)
-      && !["cancelled", "void", "draft"].includes(text(item.status, "posted", 30));
-  });
-  const storedMonthRevenue = sum(currentMonthRows, revenueOf);
-  const storedMonthReceipts = sum(currentMonthRows, receiptsOf);
-  const storedMonthGuests = sum(currentMonthRows, guestsOf);
-  const storedMonthNonPayrollExpenses = sum(currentMonthExpenses, (value) => {
-    const item = record(value);
-    if (text(item.category, "", 50) === "payroll") return 0;
-    return number(item.accountingAmount ?? item.amount) ?? 0;
-  });
-  const storedMonthPayrollByShift = sum(currentMonthRows, (value) => {
-    const item = record(value);
-    const payroll = record(item.payrollBreakdown);
-    return number(payroll.total ?? payroll.totalPayroll) ?? 0;
-  });
-  const storedMonthPayrollExpenses = sum(currentMonthExpenses, (value) => {
-    const item = record(value);
-    if (text(item.category, "", 50) !== "payroll") return 0;
     return number(item.accountingAmount ?? item.amount) ?? 0;
   });
   const storedMonthPayrollBonuses = sum(currentMonthPayrollEntries, (value) => {
@@ -681,7 +649,45 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     data: {
       groups: groups.length,
       subgroups: subgroups.length,
-      items: m.data).map(record);
+      items: menuItems.length,
+      activeItems: activeItems.length,
+      byDepartment: countsBy(activeItems, (item) => text(item.department, "other", 40)),
+      recipes: recipes.length,
+      confirmedRecipes: confirmedRecipes.length,
+      recipeCoveragePercent: recipeRequiredItems.length
+        ? rounded(confirmedRecipes.length / recipeRequiredItems.length * 100)
+        : 0,
+      priceRange: prices.length ? { min: Math.min(...prices), max: Math.max(...prices) } : null,
+      sample: samples,
+      missingRecipeNames,
+      readiness: analytics.readiness,
+      qualityCounts: analytics.counts,
+      techCardReconciliation: reconciliation.report,
+      economics: analytics.economics,
+      assortmentSignals: analytics.signals,
+      purchaseNeeds: analytics.needs,
+      valuation: analytics.valuation,
+      assortmentAIContext: analytics.aiContext,
+      fullMenuSentToAI: false,
+    },
+  };
+}
+
+function summarisePurchasesAndInventory(
+  sources: VenueAIContextSources,
+  now: Date,
+  accountingCurrency: string | null,
+  timezone: string,
+) {
+  const purchaseStore = store(sources, "bd_purchase_documents");
+  const supplierStore = store(sources, "bd_suppliers");
+  const inventoryStore = store(sources, "bd_inventory_snapshots");
+  const assortmentStore = store(sources, "bd_assortment_v1");
+  const expenseStore = store(sources, "bd_finance_expenses");
+  const stockMovementStore = store(sources, "bd_stock_movements");
+  const supplierAlternativeStore = store(sources, "bd_supplier_alternatives_v1");
+  const writeOffStore = store(sources, "bd_inventory_writeoffs");
+  const documents = array(purchaseStore?.data).map(record);
   const postedDocuments = documents.filter((item) =>
     text(item.status) === "confirmed" && text(item.documentType) !== "price_list"
   );
@@ -996,72 +1002,6 @@ export function buildVenueAIContextFromSources(
   const team = summariseTeam(request, sources);
   const reviews = summariseReviews(sources);
   const seasonality = summariseSeasonality(request, sources, now, timezone);
-  const market = summariseMarket(sources);
-  const profileAt = maxIso(sources.accountUpdatedAt, iso(profile.updatedAt));
-  const hasLocation = Boolean(text(profile.country) || text(profile.region) || text(profile.city) || text(profile.address));
-  const hasFormat = Boolean(text(profile.businessType) || text(profile.venueFormat) || text(profile.concept));
-  const hasSchedule = Boolean(text(profile.openTime) || text(profile.closeTime) || Object.keys(record(profile.workingDays)).length);
-  const priceSegment = text(profile.priceSegment ?? profile.priceTier ?? profile.priceCategory);
-  const menuPriceRange = record(menu.data.priceRange);
-  const hasPrices = priceSegment.length > 0 || number(menuPriceRange.min) !== null;
-  const recipeCoverage = number(menu.data.recipeCoveragePercent) ?? 0;
-  const latestClosedMonth = record(revenue.latestClosedMonth);
-  const latestClosedProfit = number(latestClosedMonth.finalProfit);
-  const latestClosedMargin = number(latestClosedMonth.profitMarginPercent);
-  const latestClosedCost = number(latestClosedMonth.costOfGoods);
-  const assortmentAI = record(menu.data.assortmentAIContext);
-  const hasCost = latestClosedCost !== null
-    || array(assortmentAI.confirmedMenuEconomics).length > 0;
-
-  const blocks = [
-    block({
-      id: "location",
-      label: "Местоположение",
-      available: hasLocation,
-      updatedAt: profileAt,
-      detail: hasLocation
-        ? [text(profile.country), text(profile.region), text(profile.city), text(profile.district ?? profile.address)].filter(Boolean).join(", ")
-        : "Страна, регион, город и район не заполнены",
-      missingAction: "Заполнить страну, город и район в профиле заведения",
-      data: {
-        country: text(profile.country) || null,
-        region: text(profile.region) || null,
-        city: text(profile.city) || null,
-        district: text(profile.district ?? profile.address) || null,
-        lat: number(profile.lat ?? profile.latitude),
-        lng: number(profile.lng ?? profile.longitude),
-      },
-      now,
-      freshDays: 90,
-      agingDays: 365,
-    }),
-    block({
-      id: "format",
-      label: "Формат и концепция",
-      available: hasFormat,
-      updatedAt: profileAt,
-      detail: [text(profile.businessType), text(profile.venueFormat), text(profile.concept)].filter(Boolean).join(" · ") || "Формат и концепция не заполнены",
-      missingAction: "Указать формат и концепцию заведения",
-      data: {
-        name: text(profile.name) || null,
-        businessType: text(profile.businessType) || null,
-        venueFormat: text(profile.venueFormat) || null,
-        concept: text(profile.concept) || null,
-        seats: number(profile.seats),
-        areas: array(profile.areas).slice(0, 12),
-        accountingCurrency,
-      },
-      now,
-      freshDays: 90,
-      agingDays: 365,
-    }),
-    block({
-      id: "pricePosition",
-      label: "Ценовой сегмент",
-      available: hasPrices,
-      updatedAt: maxIso(profileAt, menu.updatedAt),
-      detail: priceSegment
-        ? `У�, sources, now, timezone);
   const market = summariseMarket(sources);
   const profileAt = maxIso(sources.accountUpdatedAt, iso(profile.updatedAt));
   const hasLocation = Boolean(text(profile.country) || text(profile.region) || text(profile.city) || text(profile.address));

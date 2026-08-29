@@ -543,45 +543,6 @@ function demandExplanation(input: {
   traffic: number | null;
   average: number | null;
   revenue: number | null;
-  sampl-CA", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(value);
-    const year = parts.find((part) => part.type === "year")?.value;
-    const month = parts.find((part) => part.type === "month")?.value;
-    const day = parts.find((part) => part.type === "day")?.value;
-    if (year && month && day) return `${year}-${month}-${day}`;
-  } catch {
-    // Invalid legacy timezones fall back to UTC deterministically.
-  }
-  return value.toISOString().slice(0, 10);
-}
-
-function trafficSource(target: DailyBusinessMetric | null, baseline: ComparableBaseline | null) {
-  if ((target?.guests ?? 0) > 0 && (baseline?.guests ?? 0) > 0) return {
-    source: "guest_count" as const,
-    label: "Количество гостей",
-    limitation: null,
-  };
-  if ((target?.checks ?? 0) > 0 || (baseline?.checks ?? 0) > 0) return {
-    source: "checks_proxy" as const,
-    label: "Количество чеков",
-    limitation: "Точных данных по количеству гостей нет, поэтому для оценки динамики трафика используется количество чеков.",
-  };
-  return {
-    source: "unavailable" as const,
-    label: "Трафик не измеряется",
-    limitation: "Нет ни количества гостей, ни количества чеков для оценки трафика.",
-  };
-}
-
-function demandExplanation(input: {
-  source: "guest_count" | "checks_proxy" | "unavailable";
-  traffic: number | null;
-  average: number | null;
-  revenue: number | null;
   sampleSize: number;
 }): string {
   if (input.sampleSize < 3) return "Сопоставимых смен пока меньше трёх: отклонение показано как слабый сигнал, а не как доказанная тенденция.";
@@ -1779,4 +1740,138 @@ export function buildBusinessIntelligence(input: BusinessIntelligenceInput): AID
   const operations = input.operations ?? {};
   const periodContext = financePeriods(input.currentFinancialPeriod ?? {}, input.latestClosedMonth ?? {}, now, today);
   const components = [
-    financeComponent(input.latestClosedMonth ?? {}, input.previousCl
+    financeComponent(input.latestClosedMonth ?? {}, input.previousClosedMonth ?? {}, input.closedMonthComparison ?? {}, periodContext),
+    demandComponent({ target, baseline, trafficChange: trafficChangePercent, averageChange: averageCheckChangePercent, revenueChange: revenueChangePercent, source: traffic.source }),
+    operationsComponent(operations),
+    guestsComponent(input.reviews ?? {}),
+  ];
+  const businessHealth = healthFromComponents(components, {
+    revenueChangePercent,
+    trafficChangePercent,
+    currentFinancialResult: periodContext.currentResult,
+  });
+  const livePeriod = buildLivePeriodAnalysis({
+    daily,
+    current: periodContext,
+    demand,
+    currency,
+    today,
+  });
+  const quality = dataQuality(input.dataBlocks ?? []);
+  const external = externalContext(input);
+  const previousById = new Map(list(input.previousHypotheses).map(record).map((item) => [text(item.id), item]));
+  const hypotheses = external
+    .filter((item) => item.relevance !== "low")
+    .slice(0, 3)
+    .map((context) => hypothesisForExternalRisk({
+      context,
+      demand,
+      phase,
+      previous: previousById.get(`hypothesis:external-traffic:${context.id}`) ?? null,
+    }));
+  const signals = prioritySignals({ health: businessHealth, demand, traffic, operations, hypotheses, phase });
+  const abstained = signals.length === 0;
+  const briefing = managementBriefing({
+    now,
+    demand,
+    traffic,
+    health: businessHealth,
+    quality,
+    signals,
+    hypotheses,
+    external,
+    analytics,
+    currency,
+    phase,
+    venueId: text(input.venueId, "venue", 100),
+    externalProvider: input.externalProvider,
+    previousVerificationPlans: input.previousVerificationPlans ?? [],
+  });
+  return {
+    version: "ai-doctor-intelligence-v3",
+    generatedAt: now.toISOString(),
+    phase,
+    trafficMetric: traffic,
+    demand,
+    livePeriod,
+    businessHealth,
+    dataQuality: quality,
+    externalContext: external,
+    hypotheses,
+    prioritySignals: signals,
+    periods: {
+      currentFinance: periodContext.currentPeriod,
+      closedFinance: periodContext.closedPeriod,
+      demand: demandPeriod,
+    },
+    selfServiceAnalytics: analytics,
+    briefing,
+    abstained,
+    abstentionReason: abstained ? "Критичных отклонений сейчас не обнаружено; AI Doctor не создаёт искусственный TOP-3." : null,
+  };
+}
+
+export function buildBusinessIntelligenceFromVenueContext(input: {
+  venueId?: string | number | null;
+  context: { generatedAt: string; accountingCurrency?: string | null; blocks: Array<{ id: string; label: string; available: boolean; freshness: string; detail: string }>; promptData: Record<string, JsonRecord> };
+  operationalInput?: unknown;
+  previousHypotheses?: unknown[];
+  previousVerificationPlans?: unknown[];
+}): AIDoctorIntelligence {
+  const operational = record(input.operationalInput);
+  const performance = record(input.context.promptData.performanceHistory);
+  const location = record(input.context.promptData.location);
+  const schedule = record(input.context.promptData.schedule);
+  const guestFeedback = record(input.context.promptData.guestFeedback);
+  const seasonality = record(input.context.promptData.seasonalityAndEvents);
+  const market = record(input.context.promptData.market);
+  const calendar = record(operational.operatingCalendar);
+  const equipment = list(operational.equipment).map(record);
+  const cases = list(operational.cases).map(record);
+  const stock = record(input.context.promptData.purchasesAndInventory);
+  const menu = record(input.context.promptData.menuAndRecipes);
+  const reviewsTotal = numeric(guestFeedback.total) ?? 0;
+  return buildBusinessIntelligence({
+    venueId: input.venueId,
+    now: new Date(input.context.generatedAt),
+    profile: {
+      ...location,
+      ...schedule,
+      name: record(operational.profile).name,
+      lat: location.lat,
+      lng: location.lng,
+    },
+    daily: list(performance.recentDaily),
+    hourly: list(performance.hourly),
+    sales: list(performance.salesDocuments),
+    menu: list(menu.sample),
+    operationalSignals: [
+      ...list(operational.events),
+      ...list(operational.cases),
+      ...list(operational.equipment),
+    ],
+    currency: text(input.context.accountingCurrency ?? operational.accountingCurrency ?? record(operational.profile).accountingCurrency, "", 12) || null,
+    externalProvider: record(operational.externalProviderStatus) as BusinessIntelligenceInput["externalProvider"],
+    previousVerificationPlans: input.previousVerificationPlans,
+    currentFinancialPeriod: record(performance.period),
+    latestClosedMonth: record(performance.latestClosedMonth),
+    previousClosedMonth: record(performance.previousClosedMonth),
+    closedMonthComparison: record(performance.closedMonthComparison),
+    operations: {
+      unclosedShifts: list(calendar.unexplainedRevenueGapDates).length,
+      stockAnomalies: list(stock.lowStock).length + (numeric(record(stock.procurementIntegrity).negativeStock) ?? 0),
+      criticalBlockers: cases.filter((item) => text(item.priority) === "critical" && !["closed", "resolved"].includes(text(item.status))).length,
+      recurringEquipmentFailures: equipment.filter((item) => (numeric(item.repairCount) ?? 0) >= 2 || item.maintenanceOverdue === true).length,
+    },
+    reviews: {
+      total: reviewsTotal,
+      averageRating: numeric(guestFeedback.averageRating),
+      negative: numeric(guestFeedback.negative) ?? 0,
+      recurringComplaints: list(guestFeedback.commonTopics).filter((item) => (numeric(record(item).count) ?? 0) >= 2).length,
+    },
+    dataBlocks: input.context.blocks,
+    events: list(seasonality.upcomingEvents60Days),
+    competitors: list(market.confirmedCompetitors),
+    previousHypotheses: input.previousHypotheses,
+  });
+}

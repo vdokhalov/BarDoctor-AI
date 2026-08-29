@@ -414,41 +414,6 @@ function buildEvidenceCatalog(
   }
 
   if (external.reviews.total > 0) {
-   index) => {
-    const item = asRecord(value);
-    if (!item || !text(item.name)) return;
-    const needsAttention = item.maintenanceOverdue === true
-      || ["Неисправно", "В ремонте", "Требует обслуживания", "broken", "under_repair", "needs_maintenance"].includes(text(item.status));
-    if (!needsAttention && number(item.repairCount) === 0) return;
-    push({
-      id: `equipment:${evidenceEntityId(item.id, evidenceEntityId(item.name, `row-${index + 1}`))}`,
-      source: "equipment",
-      label: `Оборудование: ${text(item.name).slice(0, 120)}`,
-      fact: evidenceFact([
-        text(item.status),
-        item.maintenanceOverdue === true ? "ТО просрочено" : null,
-        formatNumber(item.repairCount) ? `ремонтов: ${formatNumber(item.repairCount)}` : null,
-        formatNumber(item.totalRepairCost) ? `затраты на ремонт: ${formatNumber(item.totalRepairCost)}` : null,
-      ]),
-      observedAt: text(item.updatedAt, text(item.lastMaintenanceDate)) || undefined,
-    });
-  });
-
-  const health = asRecord(body.healthIndex);
-  if (health) {
-    push({
-      id: "health:current",
-      source: "health",
-      label: "Диагностика данных",
-      fact: evidenceFact([
-        formatNumber(health.overall) ? `состояние ${formatNumber(health.overall)} из 100` : null,
-        formatNumber(health.coveragePercent) ? `качество данных ${formatNumber(health.coveragePercent)}%` : null,
-        text(health.confidenceNote),
-      ]),
-    });
-  }
-
-  if (external.reviews.total > 0) {
     push({
       id: "reviews:summary",
       source: "review",
@@ -942,7 +907,74 @@ function normaliseDiagnosis(
     "Операционная картина сформирована. Основной приоритет — проверить наиболее рискованные отклонения и назначить ответственных.",
   );
   const rawTop = asRecord(result.topPriority) ?? {};
-  const t�л «${contextBlock.label}» не влияет на итоговый диагноз.`,
+  const topPriority = {
+    title: text(rawTop.title, summary.slice(0, 100)),
+    category: text(rawTop.category, "operations"),
+    urgency: validChoice(rawTop.urgency, PRIORITIES, "medium"),
+  };
+
+  const basedOn = venueContext.blocks
+    .filter((item) => item.available)
+    .map((item) => item.label);
+  if (basedOn.length === 0) basedOn.push("только базовый профиль — операционных данных пока мало");
+  const missingData = venueContext.blocks
+    .filter((item) => !item.available || item.freshness === "stale")
+    .map((item) => item.label);
+  const qualityPoints = venueContext.blocks.reduce((total, item) => {
+    if (!item.available) return total;
+    if (item.freshness === "fresh") return total + 1;
+    if (item.freshness === "aging") return total + 0.7;
+    return total + 0.35;
+  }, 0);
+  const legacyCoveragePercent = Math.max(
+    10,
+    Math.min(98, Math.round(qualityPoints / Math.max(1, venueContext.blocks.length) * 100)),
+  );
+  const percent = intelligence.businessHealth.confidencePercent;
+  const confidence = {
+    label: "Достоверность диагноза",
+    level: intelligence.businessHealth.confidence,
+    percent,
+    snapshotGeneratedAt: intelligence.generatedAt,
+    dataQualityPercent: intelligence.dataQuality.percent || legacyCoveragePercent,
+    missingData,
+    basedOn,
+  };
+
+  const rawAnalysis = asRecord(result.analysis) ?? {};
+  const analysis = {
+    what: text(rawAnalysis.what, summary),
+    why: text(rawAnalysis.why, "Вывод основан на внесённых операционных данных и отмеченных отклонениях."),
+    how: text(rawAnalysis.how, "Начните с проверки фактов, назначения ответственного и контрольной точки."),
+    impact: text(rawAnalysis.impact, "Своевременное действие снижает операционные и репутационные риски."),
+    patterns: text(rawAnalysis.patterns) || undefined,
+  };
+
+  const rawAreas = new Map<string, JsonRecord>();
+  for (const value of Array.isArray(result.areas) ? result.areas : []) {
+    const item = asRecord(value);
+    if (item && text(item.id)) rawAreas.set(text(item.id), item);
+  }
+  const evidenceById = new Map(evidenceCatalog.map((item) => [item.id, item]));
+  const areas = venueContext.blocks.map((contextBlock) => {
+    const rawArea = rawAreas.get(contextBlock.id) ?? {};
+    const contextEvidence = evidenceById.get(`context:${contextBlock.id}`);
+    const selectedEvidence = textArray(rawArea.evidenceIds, 6)
+      .map((id) => evidenceById.get(id))
+      .filter((item): item is RecommendationEvidence => Boolean(item));
+    const evidence = selectedEvidence.length
+      ? selectedEvidence
+      : contextEvidence
+        ? [contextEvidence]
+        : [];
+    if (!contextBlock.available) {
+      return {
+        id: contextBlock.id,
+        label: contextBlock.label,
+        status: "no_data",
+        fact: contextBlock.detail,
+        hypothesis: "Управленческий вывод по этому направлению не формировался.",
+        consequence: `Без данных раздел «${contextBlock.label}» не влияет на итоговый диагноз.`,
         action: contextBlock.missingAction ?? `Обновить данные: ${contextBlock.label}`,
         verification: "После обновления данных повторно запустить диагноз.",
         evidence,
@@ -1117,99 +1149,6 @@ function normaliseDiagnosis(
       })),
       hypothesis: "Причина пока не подтверждена; сначала нужно проверить исходный факт.",
       hypothesisConfidence: "low",
-      confidenceReason: "Недост�NDATION_CONFIDENCE,
-        evidence.length > 1 ? "medium" : "low",
-      );
-      const consequence = text(item.consequence, expectedEffect).slice(0, 500);
-      const dataSources = evidence.map((entry) => ({
-        id: entry.id,
-        source: entry.source,
-        label: entry.label,
-        observedAt: entry.observedAt ?? null,
-        sourceUrl: entry.sourceUrl ?? null,
-      }));
-      const targetValue = number(rawTarget.value);
-      return {
-        recommendationId: text(item.recommendationId, `rec-${index + 1}`).slice(0, 80),
-        signalClass: validChoice(item.signalClass, new Set(["problem", "opportunity", "data_quality"]), "problem"),
-        title: text(item.title).slice(0, 140),
-        priority: validChoice(item.priority, PRIORITIES, "medium"),
-        impact: expectedEffect,
-        estimatedTime: deadline,
-        costTier: validChoice(item.costTier, COST_TIERS, "low"),
-        responsibleRole: text(item.responsibleRole, "управляющий"),
-        expectedResult: successCriterion,
-        steps,
-        deadline,
-        successCriterion,
-        expectedEffect,
-        basisSummary: text(item.basisSummary, evidence.length === 1 ? "Основано на 1 подтверждённом факте" : `Основано на ${evidence.length} подтверждённых фактах`),
-        evidence,
-        fact,
-        factPeriod,
-        dataSources,
-        hypothesis,
-        hypothesisConfidence,
-        confidenceReason: text(
-          item.confidenceReason,
-          evidence.length > 1
-            ? `Гипотеза опирается на ${evidence.length} источника данных.`
-            : "Гипотеза опирается на ограниченный объём данных и требует проверки.",
-        ).slice(0, 300),
-        consequence,
-        action: text(item.action, text(item.title)).slice(0, 300),
-        baselineMetric,
-        targetMetric: {
-          metricId,
-          label: text(rawTarget.label, successCriterion).slice(0, 240),
-          value: targetValue,
-          unit: text(rawTarget.unit, baselineMetric?.unit ?? ""),
-          direction,
-        },
-        verificationDate,
-        actualResult: null,
-        outcomeStatus: "pending",
-        recommendationContractVersion: "result-loop-v1",
-        requiresVerification: !baselineMetric
-          || targetValue === null
-          || evidence.every((entry) => entry.source === "profile"),
-        ...(equipmentName && knownEquipment.has(equipmentName) ? { equipmentName } : {}),
-      };
-    });
-
-  const fallbackEvidence = evidenceCatalog.filter((entry) => entry.source !== "profile").slice(0, 2);
-  const safeFallbackEvidence = fallbackEvidence.length ? fallbackEvidence : evidenceCatalog.slice(0, 1);
-  const fallbackActions = [
-    {
-      recommendationId: "fallback-check-facts",
-      title: `Проверить факты по приоритету «${topPriority.title}»`,
-      priority: topPriority.urgency,
-      impact: "Исключить ошибочные предположения и определить масштаб",
-      estimatedTime: "Сегодня",
-      costTier: "low",
-      responsibleRole: "управляющий",
-      expectedResult: "Подтверждённые факты и понятный владелец задачи",
-      steps: [
-        "Открыть факты, на которых построен приоритет, и сверить их с первичными записями",
-        "Зафиксировать подтверждённое отклонение и его исходное значение",
-        "Назначить владельца следующего действия",
-      ],
-      deadline: "Сегодня, до конца рабочего дня",
-      successCriterion: "Исходный факт подтверждён, значение зафиксировано, ответственный назначен",
-      expectedEffect: "Исключить решение на основании ошибочного предположения",
-      basisSummary: "Проверка исходных данных перед решением",
-      evidence: safeFallbackEvidence,
-      fact: safeFallbackEvidence[0]?.fact ?? topPriority.title,
-      factPeriod: venueContext.generatedAt.slice(0, 10),
-      dataSources: safeFallbackEvidence.map((entry) => ({
-        id: entry.id,
-        source: entry.source,
-        label: entry.label,
-        observedAt: entry.observedAt ?? null,
-        sourceUrl: entry.sourceUrl ?? null,
-      })),
-      hypothesis: "Причина пока не подтверждена; сначала нужно проверить исходный факт.",
-      hypothesisConfidence: "low",
       confidenceReason: "Недостаточно связанных фактов для подтверждения причины.",
       consequence: "Без проверки исходной точки можно принять решение по ошибочному предположению.",
       action: `Проверить факты по приоритету «${topPriority.title}»`,
@@ -1282,69 +1221,44 @@ function normaliseDiagnosis(
       estimatedTime: "После следующей смены",
       costTier: "low",
       responsibleRole: "администратор смены",
-      expectedResult: "Подтверждённое улуч(firstPriority.title, topPriority.title),
-        category: text(firstPriority.issueKey, topPriority.category),
-        urgency: text(firstPriority.priority, topPriority.urgency),
-      }
-    : topPriority;
-  const managementTopThree = managementIntelligence.briefing.todayActions.map((action) => ({
-    text: `${action.title} — ${action.responsibleRole}, ${action.deadlineLabel.toLocaleLowerCase("ru")}: ${action.deadline}`.slice(0, 200),
-    category: action.issueKey,
-  }));
-
-  return {
-    contextVersion: venueContext.version,
-    intelligence: managementIntelligence,
-    businessHealth: managementIntelligence.businessHealth,
-    businessHealthSnapshot: buildBusinessHealthSnapshot({
-      venueId,
-      dataAccountId,
-      intelligence: managementIntelligence,
-      context: venueContext,
-    }),
-    financialAssessment,
-    summary: briefingDiagnosis?.summary ?? attention.diagnosticSentence,
-    topPriority: managementTopPriority,
-    confidence,
-    contextCoverage,
-    areas,
-    topThree: managementTopThree,
-    analysis,
-    actions: managementIntelligence.briefing.todayActions,
-    attention,
-  };
-}
-
-export async function handleDiagnosis(request: Request): Promise<Response> {
-  const account = await requireLocalAccount(request, "analysis.run");
-  if (account instanceof Response) return account;
-
-  try {
-    const body = await requestBody(request, 100_000);
-    if (!asRecord(body.profile)) throw new AIServiceError("Профиль заведения обязателен.", 400);
-    const external = await loadDiagnosisExternalContext(account);
-    const venueContext = await loadVenueAIContext(account, "diagnosis", body, {
-      reviews: external.reviews as unknown as JsonRecord,
-      confirmedCompetitors: external.confirmedCompetitors,
-    });
-    const memory = await loadAIDoctorMemory(account);
-    const memoryItems = [...memory.tasks, ...memory.actionTasks, ...memory.decisions];
-    const intelligence = buildBusinessIntelligenceFromVenueContext({
-      venueId: account.venueId,
-      context: venueContext,
-      operationalInput: {
-        ...body,
-        accountingCurrency: venueContext.accountingCurrency,
-        externalProviderStatus: {
-          attempted: external.reviewSync.attempted,
-          ok: external.reviewSync.ok,
-          coverage: "insufficient",
-        },
+      expectedResult: "Подтверждённое улучшение или скорректированный план",
+      steps: [
+        "До начала следующей смены зафиксировать исходное значение показателя",
+        "После закрытия смены внести фактическое значение",
+        "Сравнить результат с исходной точкой и решить: закрепить действие или скорректировать",
+      ],
+      deadline: "Сразу после закрытия следующей рабочей смены",
+      successCriterion: "В BarDoctor внесено новое значение и зафиксирован вывод по динамике",
+      expectedEffect: "Понять, дало ли действие измеримый результат",
+      basisSummary: "Нужна контрольная точка после действия",
+      evidence: safeFallbackEvidence,
+      fact: safeFallbackEvidence[0]?.fact ?? topPriority.title,
+      factPeriod: venueContext.generatedAt.slice(0, 10),
+      dataSources: safeFallbackEvidence.map((entry) => ({
+        id: entry.id,
+        source: entry.source,
+        label: entry.label,
+        observedAt: entry.observedAt ?? null,
+        sourceUrl: entry.sourceUrl ?? null,
+      })),
+      hypothesis: "Изменение можно оценить только после появления новой сопоставимой точки данных.",
+      hypothesisConfidence: "high",
+      confidenceReason: "Без нового значения невозможно подтвердить или опровергнуть эффект.",
+      consequence: "Без контрольного измерения рекомендация останется непроверенным советом.",
+      action: "Проверить результат после следующей завершённой смены",
+      baselineMetric: null,
+      targetMetric: {
+        metricId: null,
+        label: "Новое сопоставимое значение внесено и сравнено",
+        value: null,
+        unit: "",
+        direction: "increase" as RecommendationDirection,
       },
-      previousHypotheses: memoryItems
-        .map((item) => asRecord(item.hypothesisData) ?? asRecord(item.hypothesis) ?? item)
-        .filter((item) => text(item.id).startsWith("hypothesis:")),
-   tion: true,
+      verificationDate: recommendationVerificationDate("После следующей смены", venueContext.generatedAt),
+      actualResult: null,
+      outcomeStatus: "pending",
+      recommendationContractVersion: "result-loop-v1",
+      requiresVerification: true,
     },
   ];
   // Generic filler recommendations are intentionally not added. A short list is
@@ -1724,49 +1638,18 @@ async function reviewAnalyze(account: AuthenticatedAccount, body: JsonRecord): P
     throw new AIServiceError("Передайте от 1 до 25 отзывов.", 400);
   }
   const venueContext = await loadVenueAIContext(account, "reviews", body);
-  const system =алитик отзывов ресторана. На русском языке выдели улучшения, ухудшения, главные темы, повторяющиеся проблемы и конкретные рекомендации. В implicatedStaff включай только имена, присутствующие во входном staffMentions. Каждая рекомендация обязана ссылаться на 1–3 точных id из evidenceCatalog; если фактов недостаточно, рекомендуй проверку гипотезы. Верни только JSON: {"improved":[],"worsened":[],"topTopics":[],"recurringProblems":[],"implicatedStaff":[],"recommendations":[{"recommendationId":"...","title":"...","basisSummary":"...","evidenceIds":["точный id"]}]}.`;
+  const system = `Проанализируй отзывы гостей ресторана. Для каждого верни sentiment positive|neutral|negative, topics из staff,kitchen,bar,music,hookah,cleanliness,wait_time,price,atmosphere,other, краткое русское summary и mentionedStaff только для явно названных людей. Не выдумывай имена. Верни только JSON: {"results":[{"id":"...","sentiment":"neutral","topics":["other"],"summary":"...","mentionedStaff":[]}]}.`;
   const raw = await aiText({
     accountId: account.id,
     observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
     system,
-    maxTokens: 2_000,
+    maxTokens: 4_000,
     messages: [{
       role: "user",
-      content: jsonForPrompt({
-        reviewInput: body,
-        venueContext: venueAIContextForPrompt(venueContext),
-        evidenceCatalog,
-      }, 36_000),
+      content: jsonForPrompt({ reviews, venueContext: venueAIContextForPrompt(venueContext) }, 55_000),
     }],
   });
-  const result = asRecord(parseAIJson<unknown>(raw)) ?? {};
-  const allowedStaff = new Set(
-    (Array.isArray(body.staffMentions) ? body.staffMentions : [])
-      .map((item) => text(asRecord(item)?.name))
-      .filter(Boolean),
-  );
-  const recommendationDetails = (Array.isArray(result.recommendations) ? result.recommendations : [])
-    .map((value, index) => {
-      const item = asRecord(value);
-      const title = item ? text(item.title) : text(value);
-      if (!title) return null;
-      const evidence = item ? actionEvidence(item, evidenceCatalog) : evidenceCatalog.slice(0, 2);
-      return {
-        recommendationId: item ? text(item.recommendationId, `reviews-${index + 1}`) : `reviews-${index + 1}`,
-        title: title.slice(0, 180),
-        basisSummary: item
-          ? text(item.basisSummary, `Основано на ${evidence.length} фактах из отзывов`)
-          : `Основано на ${evidence.length} фактах из отзывов`,
-        evidence,
-        requiresVerification: evidence.some((entry) => entry.id === "reviews:insufficient"),
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, 8);
-  return Response.json({
-    success: true,
-    data: {
-      improved: textArray(result>(raw)) ?? {};
+  const parsed = asRecord(parseAIJson<unknown>(raw)) ?? {};
   const generated = new Map<string, JsonRecord>();
   for (const item of Array.isArray(parsed.results) ? parsed.results : []) {
     const record = asRecord(item);
@@ -1853,4 +1736,97 @@ async function reviewDoctorSummary(account: AuthenticatedAccount, body: JsonReco
   return Response.json({
     success: true,
     data: {
-      improved: textArray(result
+      improved: textArray(result.improved, 8),
+      worsened: textArray(result.worsened, 8),
+      topTopics: textArray(result.topTopics, 8),
+      recurringProblems: textArray(result.recurringProblems, 8),
+      implicatedStaff: textArray(result.implicatedStaff, 8).filter((name) => allowedStaff.has(name)),
+      recommendations: recommendationDetails.map((item) => `${item.title} — Основание: ${item.basisSummary}`),
+      recommendationDetails,
+    },
+  });
+}
+
+async function reviewReply(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
+  const review = asRecord(body.review);
+  if (!review || !text(review.text)) throw new AIServiceError("Текст отзыва обязателен.", 400);
+  const venueContext = await loadVenueAIContext(account, "reviews", body);
+  const system = `Напиши от лица владельца ресторана живой ответ гостю на русском языке, 2–4 предложения. Обращайся к конкретной сути отзыва. Для негатива извинись за названную проблему, но не обещай компенсацию. Не выдумывай деталей. Верни только JSON {"draft":"..."}.`;
+  const raw = await aiText({
+    accountId: account.id,
+    observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
+    system,
+    maxTokens: 600,
+    messages: [{
+      role: "user",
+      content: jsonForPrompt({ review: body, venueContext: venueAIContextForPrompt(venueContext) }, 16_000),
+    }],
+  });
+  let draft = "";
+  try {
+    draft = text(asRecord(parseAIJson<unknown>(raw))?.draft);
+  } catch {
+    draft = raw.trim();
+  }
+  if (!draft) throw new AIServiceError("Не удалось подготовить ответ.", 422);
+  return Response.json({ success: true, data: { draft } });
+}
+
+async function reviewCorrelate(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
+  if (!asRecord(body.insights)) throw new AIServiceError("Сводка отзывов обязательна.", 400);
+  const venueContext = await loadVenueAIContext(account, "reviews", body);
+  const evidenceCatalog = buildReviewEvidenceCatalog(body, venueContext);
+  const system = `Сопоставь агрегированные отзывы с операционными фактами ресторана. Не выдумывай причин: вывод разрешён только если его подтверждают входные данные. Каждое действие обязано ссылаться на 1–4 точных id из evidenceCatalog. Верни только JSON {"conclusions":["..."],"actions":[{"recommendationId":"...","title":"...","priority":"critical|high|medium|low","impact":"...","estimatedTime":"...","costTier":"low|medium|high","responsibleRole":"...","expectedResult":"...","basisSummary":"...","evidenceIds":["точный id"]}]}.`;
+  const raw = await aiText({
+    accountId: account.id,
+    observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
+    system,
+    maxTokens: 2_500,
+    messages: [{
+      role: "user",
+      content: jsonForPrompt({
+        reviewInput: body,
+        venueContext: venueAIContextForPrompt(venueContext),
+        evidenceCatalog,
+      }, 36_000),
+    }],
+  });
+  const result = asRecord(parseAIJson<unknown>(raw)) ?? {};
+  const actions = (Array.isArray(result.actions) ? result.actions : [])
+    .map(asRecord)
+    .filter((item): item is JsonRecord => Boolean(item && text(item.title)))
+    .slice(0, 8)
+    .map((item, index) => {
+      const evidence = actionEvidence(item, evidenceCatalog);
+      return {
+        recommendationId: text(item.recommendationId, `review-action-${index + 1}`),
+        title: text(item.title),
+        priority: validChoice(item.priority, PRIORITIES, "medium"),
+        impact: text(item.impact, "Влияние требует проверки"),
+        estimatedTime: text(item.estimatedTime, "В течение недели"),
+        costTier: validChoice(item.costTier, COST_TIERS, "low"),
+        responsibleRole: text(item.responsibleRole, "управляющий"),
+        expectedResult: text(item.expectedResult, "Изменение проверено по новым отзывам"),
+        basisSummary: text(item.basisSummary, `Основано на ${evidence.length} подтверждённых фактах`),
+        evidence,
+        requiresVerification: evidence.every((entry) => entry.source === "review"),
+      };
+    });
+  return Response.json({ success: true, data: { conclusions: textArray(result.conclusions, 10), actions } });
+}
+
+export async function handleReviewAI(request: Request, action: string): Promise<Response> {
+  const account = await requireLocalAccount(request, "reviews.manage");
+  if (account instanceof Response) return account;
+  try {
+    const max = action === "analyze" ? 70_000 : 35_000;
+    const body = await requestBody(request, max);
+    if (action === "analyze") return await reviewAnalyze(account, body);
+    if (action === "doctor-summary") return await reviewDoctorSummary(account, body);
+    if (action === "reply") return await reviewReply(account, body);
+    if (action === "correlate") return await reviewCorrelate(account, body);
+    return Response.json({ success: false, error: "Неизвестная AI-функция" }, { status: 404 });
+  } catch (error) {
+    return aiErrorResponse(error);
+  }
+}

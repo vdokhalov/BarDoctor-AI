@@ -540,7 +540,35 @@ test("AI Doctor quality gate · OLD vs NEW on deterministic capabilities", () =>
     businessHealthDataQualitySeparation: 0,
     externalHypothesis: 0,
     abstention: 1,
-    evidenceCoverage.hallucinationRate <= old.hallucinationRate);
+    evidenceCoverage: 0.5,
+    outcomePlanCoverage: 0.5,
+    briefingFirst: 0,
+    periodLabelling: 0,
+    canonicalConfidence: 0,
+  };
+  const sample = buildBusinessIntelligence(base({
+    daily: daily({ targetChecks: 70, targetAverage: 80, targetRevenue: 5_600 }),
+    events: [{ id: "eval", title: "Событие", startDate: "2026-08-22", distanceKm: 0.5, potentialScore: 95 }],
+  }));
+  const stable = buildBusinessIntelligence(base());
+  const next = {
+    factualCorrectness: 1,
+    hallucinationRate: 0,
+    unsupportedClaimRate: sample.hypotheses.every((item) => item.causalStatus !== "supported") ? 0 : 1,
+    comparableBaseline: sample.demand.baseline ? 1 : 0,
+    checksProxy: sample.trafficMetric.source === "checks_proxy" ? 1 : 0,
+    businessHealthDataQualitySeparation: sample.businessHealth.score !== sample.dataQuality.percent ? 1 : 0,
+    externalHypothesis: sample.hypotheses.length ? 1 : 0,
+    abstention: stable.abstained ? 1 : 0,
+    evidenceCoverage: sample.prioritySignals.every((item) => Array.isArray(item.evidence) && item.evidence.length > 0) ? 1 : 0,
+    outcomePlanCoverage: sample.hypotheses.every((item) => Boolean(item.verificationPlan.metric && item.verificationPlan.successCriterion)) ? 1 : 0,
+    briefingFirst: sample.briefing.diagnosis && sample.briefing.actions.length <= 3 ? 1 : 0,
+    periodLabelling: sample.periods.demand.label && sample.periods.demand.comparisonBaseline ? 1 : 0,
+    canonicalConfidence: sample.briefing.diagnosis?.confidencePercent === sample.businessHealth.confidencePercent ? 1 : 0,
+  };
+
+  assert.ok(next.factualCorrectness >= old.factualCorrectness);
+  assert.ok(next.hallucinationRate <= old.hallucinationRate);
   assert.ok(next.unsupportedClaimRate <= old.unsupportedClaimRate);
   assert.ok(next.comparableBaseline > old.comparableBaseline);
   assert.ok(next.checksProxy > old.checksProxy);
@@ -654,41 +682,6 @@ test("live Health falls back to matched completed shifts when previous MTD is un
     currentFinancialPeriod: {
       monthKey: "2026-08",
       startDate: "2026-08-01",
-      endDate: "2026-08-28",
-      revenue: 8_700,
-      expenses: 5_000,
-    },
-  }));
-
-  assert.equal(result.livePeriod.method, "recent_completed_shifts");
-  assert.equal(result.livePeriod.comparison.availability, "available");
-  assert.ok(result.livePeriod.comparison.sampleSize.current >= 2);
-  assert.equal(result.livePeriod.comparison.sampleSize.current, result.livePeriod.comparison.sampleSize.comparison);
-  assert.match(result.livePeriod.comparisonLabel, /завершённых смен/i);
-});
-
-test("open-period finance uses preliminary terminology and never calls it final profit", () => {
-  const result = buildBusinessIntelligence(base({
-    now: new Date("2026-08-28T18:00:00.000Z"),
-    currentFinancialPeriod: { monthKey: "2026-08", revenue: 5_000, expenses: 3_200 },
-  }));
-  const liveCopy = [result.livePeriod.financeSummary, ...result.livePeriod.factors].join(" ");
-  assert.match(liveCopy, /предварительн/i);
-  assert.doesNotMatch(liveCopy, /финальная чистая прибыль/i);
-});
-
-test("live period month boundary follows Europe/Chisinau instead of UTC", () => {
-  const result = buildBusinessIntelligence(base({
-    now: new Date("2026-08-31T21:30:00.000Z"),
-    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
-    daily: [{ date: "2026-09-01", revenue: 500, receipts: 5 }],
-    currentFinancialPeriod: null,
-  }));
-
-  assert.equal(result.livePeriod.current.startDate, "2026-09-01");
-  assert.equal(result.livePeriod.current.endDate, "2026-09-01");
-  assert.match(result.livePeriod.periodLabel, /1–1 сентября/i);
-});
       endDate: "2026-08-28",
       revenue: 8_700,
       expenses: 5_000,
