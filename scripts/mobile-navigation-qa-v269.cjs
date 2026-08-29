@@ -1346,4 +1346,119 @@ async function runProfile(browser, profile) {
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
-        results.push(a
+        results.push(aRL(page.url()).searchParams.get("writeoff"), documentId);
+  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
+
+  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Списания" }).click();
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("breakage");
+  await close.click();
+  const confirm = page.locator(".bd-writeoff-confirm-v271");
+  await confirm.waitFor();
+  await confirm.getByRole("button", { name: "Отмена", exact: true }).click();
+  await confirm.waitFor({ state: "detached" });
+  assert.equal(await shell.count(), 1, `${profile.name}: cancelling unsaved guard closed the form`);
+  await close.click();
+  await confirm.waitFor();
+  await confirm.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await confirm.waitFor({ state: "detached" });
+  try {
+    await page.waitForFunction(() => new URLSearchParams(location.search).get("writeoff") === null, undefined, { timeout: 3_000 });
+  } catch {
+    throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
+  }
+  await shell.waitFor({ state: "detached" });
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
+
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("staff_meal");
+  state.activeVenueId = 902;
+  await page.evaluate(() => {
+    localStorage.setItem("bd_active_venue_id", "902");
+    window.dispatchEvent(new CustomEvent("bd:venue-changed", { detail: { venueId: 902 } }));
+  });
+  await page.waitForSelector("[data-bd-writeoff-flow]", { state: "detached" });
+  await page.waitForTimeout(250);
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: draft leaked across venue switch`);
+  assert.doesNotMatch(await page.locator("body").textContent(), /Пиво Mobile A|Coca-Cola Mobile A/, `${profile.name}: Venue A nomenclature leaked into Venue B`);
+  assert.equal(state.stores[902].bd_inventory_writeoffs.length, 0, `${profile.name}: Venue A document leaked into Venue B`);
+
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, documentId };
+}
+
+async function runProfile(browser, profile) {
+  assert.ok(profile.descriptor.isMobile, `${profile.name}: Playwright descriptor is not mobile`);
+  assert.ok(profile.descriptor.hasTouch, `${profile.name}: Playwright descriptor has no touch`);
+  assert.match(profile.descriptor.userAgent, profile.userAgentPattern);
+  const results = [];
+  for (const [name, flow] of [
+    ["writeoffs", writeoffFlow],
+    ["shift-canonical-writeoffs", shiftCanonicalWriteoffFlow],
+    ["inventory-fullscreen", inventoryFlow],
+    ["inventory-delete", inventoryDeleteFlow],
+    ["warehouse-nomenclature", nomenclatureFlow],
+    ["shifts", shiftsFlow],
+    ["suppliers-purchases", procurementFlow],
+    ["menu-tech-cards", assortmentFlow],
+    ["embedded-modules", embeddedModulesFlow],
+    ["critical-form-close", formCloseFlow],
+    ["critical-modules", moduleSmokeFlow],
+    ["business-health-cold-start", businessHealthColdStartFlow],
+  ]) {
+    if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
+    process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
+    results.push(await flow(browser, profile));
+  }
+  return results;
+}
+
+(async () => {
+  browserPath = await resolveBrowserExecutable(browserPath);
+  assert.ok(fs.existsSync(browserPath), `Playwright browser executable not found: ${browserPath}`);
+  const browser = await chromium.launch({
+    executablePath: browserPath,
+    headless: true,
+    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
+  });
+  const results = [];
+  const failures = [];
+  try {
+    for (const profile of profiles) {
+      if (process.env.BD_QA_PROFILE && process.env.BD_QA_PROFILE !== profile.name) continue;
+      results.push(...await runProfile(browser, profile));
+    }
+    if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
+        results.push(await embeddedModulesFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
+        results.push(await writeoffFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "shift-canonical-writeoffs") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/shift-canonical-writeoffs\n`);
+        results.push(await shiftCanonicalWriteoffFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);
+        results.push(await inventoryDeleteFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "business-health-cold-start") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/business-health-cold-start\n`);
+        results.push(await businessHealthColdStartFlow(browser, desktopProfile));
+      }
+    }
+  } catch (error) {
+    failures.push(error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) });
+    process.stderr.write(`[mobile-qa] failure: ${failures[failures.length - 1].message}\n`);
+  } finally {
+    await browser.close();
+  }
+  const summary = {
+    version: "mobile-navigation-qa-v269",
+    generatedAt: new Date().toISOString(),
+    baseUrl,
+    browserPath,
+    profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgen

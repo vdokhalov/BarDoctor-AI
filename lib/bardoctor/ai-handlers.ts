@@ -1344,6 +1344,133 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
       previousHypotheses: memoryItems
         .map((item) => asRecord(item.hypothesisData) ?? asRecord(item.hypothesis) ?? item)
         .filter((item) => text(item.id).startsWith("hypothesis:")),
+   tion: true,
+    },
+  ];
+  // Generic filler recommendations are intentionally not added. A short list is
+  // more useful than an artificial TOP-3 when the evidence supports fewer actions.
+  void fallbackActions;
+
+  const rawTopThree = (Array.isArray(result.topThree) ? result.topThree : [])
+    .map(asRecord)
+    .filter((item): item is JsonRecord => Boolean(item && text(item.text)))
+    .slice(0, 3);
+  const topThree = actions.slice(0, 3).map((action, index) => ({
+    text: `${action.title} — ${action.responsibleRole}, срок: ${action.deadline}`.slice(0, 200),
+    category: text(rawTopThree[index]?.category, topPriority.category),
+  }));
+  void topThree;
+
+  if (actions[0]?.steps?.length) {
+    analysis.how = [
+      ...actions[0].steps.map((step, index) => `${index + 1}. ${step}`),
+      `Ответственный: ${actions[0].responsibleRole}.`,
+      `Срок: ${actions[0].deadline}.`,
+      `Готово, когда: ${actions[0].successCriterion}.`,
+    ].join(" ");
+  }
+
+  const contextCoverage = venueContext.blocks.map((item) => ({
+    id: item.id,
+    label: item.label,
+    available: item.available,
+    freshness: item.freshness,
+    updatedAt: item.updatedAt,
+    detail: item.detail,
+    missingAction: item.missingAction,
+  }));
+
+  const attention = buildAIDoctorAttention({
+    // Server-derived signals are authoritative. Model candidates can add
+    // explanation and context, while the attention layer deduplicates them.
+    candidates: [...intelligence.prioritySignals, ...actions],
+    context: venueContext,
+    memory,
+    operationalInput: body,
+    evidenceCatalog,
+    areas,
+    dataReliabilityPercent: intelligence.dataQuality.percent,
+    now: new Date(venueContext.generatedAt),
+  });
+  const managementIntelligence: AIDoctorIntelligence = {
+    ...intelligence,
+    briefing: {
+      ...intelligence.briefing,
+      operationalProblems: attention.activeProblems,
+    },
+  };
+  const firstPriority = attention.priorities[0];
+  const briefingDiagnosis = managementIntelligence.briefing.diagnosis;
+  const managementTopPriority = briefingDiagnosis
+    ? {
+        title: briefingDiagnosis.title,
+        category: text(firstPriority?.issueKey, "management"),
+        urgency: briefingDiagnosis.severity,
+      }
+    : firstPriority
+    ? {
+        title: text(firstPriority.title, topPriority.title),
+        category: text(firstPriority.issueKey, topPriority.category),
+        urgency: text(firstPriority.priority, topPriority.urgency),
+      }
+    : topPriority;
+  const managementTopThree = managementIntelligence.briefing.todayActions.map((action) => ({
+    text: `${action.title} — ${action.responsibleRole}, ${action.deadlineLabel.toLocaleLowerCase("ru")}: ${action.deadline}`.slice(0, 200),
+    category: action.issueKey,
+  }));
+
+  return {
+    contextVersion: venueContext.version,
+    intelligence: managementIntelligence,
+    businessHealth: managementIntelligence.businessHealth,
+    businessHealthSnapshot: buildBusinessHealthSnapshot({
+      venueId,
+      dataAccountId,
+      intelligence: managementIntelligence,
+      context: venueContext,
+    }),
+    financialAssessment,
+    summary: briefingDiagnosis?.summary ?? attention.diagnosticSentence,
+    topPriority: managementTopPriority,
+    confidence,
+    contextCoverage,
+    areas,
+    topThree: managementTopThree,
+    analysis,
+    actions: managementIntelligence.briefing.todayActions,
+    attention,
+  };
+}
+
+export async function handleDiagnosis(request: Request): Promise<Response> {
+  const account = await requireLocalAccount(request, "analysis.run");
+  if (account instanceof Response) return account;
+
+  try {
+    const body = await requestBody(request, 100_000);
+    if (!asRecord(body.profile)) throw new AIServiceError("Профиль заведения обязателен.", 400);
+    const external = await loadDiagnosisExternalContext(account);
+    const venueContext = await loadVenueAIContext(account, "diagnosis", body, {
+      reviews: external.reviews as unknown as JsonRecord,
+      confirmedCompetitors: external.confirmedCompetitors,
+    });
+    const memory = await loadAIDoctorMemory(account);
+    const memoryItems = [...memory.tasks, ...memory.actionTasks, ...memory.decisions];
+    const intelligence = buildBusinessIntelligenceFromVenueContext({
+      venueId: account.venueId,
+      context: venueContext,
+      operationalInput: {
+        ...body,
+        accountingCurrency: venueContext.accountingCurrency,
+        externalProviderStatus: {
+          attempted: external.reviewSync.attempted,
+          ok: external.reviewSync.ok,
+          coverage: "insufficient",
+        },
+      },
+      previousHypotheses: memoryItems
+        .map((item) => asRecord(item.hypothesisData) ?? asRecord(item.hypothesis) ?? item)
+        .filter((item) => text(item.id).startsWith("hypothesis:")),
       previousVerificationPlans: memoryItems
         .map((item) => asRecord(item.verificationPlan) ?? item)
         .filter((item) => Boolean(text(item.id) || text(item.verificationPlanId))),
@@ -1598,6 +1725,93 @@ async function reviewAnalyze(account: AuthenticatedAccount, body: JsonRecord): P
   }
   const venueContext = await loadVenueAIContext(account, "reviews", body);
   const system =алитик отзывов ресторана. На русском языке выдели улучшения, ухудшения, главные темы, повторяющиеся проблемы и конкретные рекомендации. В implicatedStaff включай только имена, присутствующие во входном staffMentions. Каждая рекомендация обязана ссылаться на 1–3 точных id из evidenceCatalog; если фактов недостаточно, рекомендуй проверку гипотезы. Верни только JSON: {"improved":[],"worsened":[],"topTopics":[],"recurringProblems":[],"implicatedStaff":[],"recommendations":[{"recommendationId":"...","title":"...","basisSummary":"...","evidenceIds":["точный id"]}]}.`;
+  const raw = await aiText({
+    accountId: account.id,
+    observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
+    system,
+    maxTokens: 2_000,
+    messages: [{
+      role: "user",
+      content: jsonForPrompt({
+        reviewInput: body,
+        venueContext: venueAIContextForPrompt(venueContext),
+        evidenceCatalog,
+      }, 36_000),
+    }],
+  });
+  const result = asRecord(parseAIJson<unknown>(raw)) ?? {};
+  const allowedStaff = new Set(
+    (Array.isArray(body.staffMentions) ? body.staffMentions : [])
+      .map((item) => text(asRecord(item)?.name))
+      .filter(Boolean),
+  );
+  const recommendationDetails = (Array.isArray(result.recommendations) ? result.recommendations : [])
+    .map((value, index) => {
+      const item = asRecord(value);
+      const title = item ? text(item.title) : text(value);
+      if (!title) return null;
+      const evidence = item ? actionEvidence(item, evidenceCatalog) : evidenceCatalog.slice(0, 2);
+      return {
+        recommendationId: item ? text(item.recommendationId, `reviews-${index + 1}`) : `reviews-${index + 1}`,
+        title: title.slice(0, 180),
+        basisSummary: item
+          ? text(item.basisSummary, `Основано на ${evidence.length} фактах из отзывов`)
+          : `Основано на ${evidence.length} фактах из отзывов`,
+        evidence,
+        requiresVerification: evidence.some((entry) => entry.id === "reviews:insufficient"),
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, 8);
+  return Response.json({
+    success: true,
+    data: {
+      improved: textArray(result>(raw)) ?? {};
+  const generated = new Map<string, JsonRecord>();
+  for (const item of Array.isArray(parsed.results) ? parsed.results : []) {
+    const record = asRecord(item);
+    if (record && text(record.id)) generated.set(text(record.id), record);
+  }
+  const results = reviews.map((review) => {
+    const source = asRecord(review) ?? {};
+    const id = text(source.id);
+    const item = generated.get(id) ?? {};
+    const topics = textArray(item.topics, 6).filter((topic) => REVIEW_TOPICS.has(topic));
+    return {
+      id,
+      sentiment: validChoice(item.sentiment, SENTIMENTS, "neutral"),
+      topics: topics.length ? topics : ["other"],
+      summary: text(item.summary, "Отзыв сохранён без подробного резюме."),
+      mentionedStaff: textArray(item.mentionedStaff, 5),
+    };
+  });
+  return Response.json({ success: true, data: { results } });
+}
+
+async function reviewDoctorSummary(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
+  const insights = asRecord(body.insights);
+  if (!insights) throw new AIServiceError("Сводка отзывов обязательна.", 400);
+  const venueContext = await loadVenueAIContext(account, "reviews", body);
+  const evidenceCatalog = buildReviewEvidenceCatalog(body, venueContext);
+  const sentiment = asRecord(insights.sentiment) ?? {};
+  if (Number(sentiment.total ?? 0) < 3) {
+    const basisSummary = evidenceCatalog[0]?.fact ?? "Для устойчивого вывода нужно не менее трёх отзывов";
+    return Response.json({
+      success: true,
+      data: {
+        improved: [], worsened: [], topTopics: [], recurringProblems: [], implicatedStaff: [],
+        recommendations: [`Добавьте больше отзывов, чтобы AI Doctor мог сделать содержательный разбор. — Основание: ${basisSummary}`],
+        recommendationDetails: [{
+          recommendationId: "reviews-more-data",
+          title: "Добавьте больше отзывов, чтобы AI Doctor мог сделать содержательный разбор.",
+          basisSummary,
+          evidence: evidenceCatalog.slice(0, 1),
+          requiresVerification: true,
+        }],
+      },
+    });
+  }
+  const system = `Ты — аналитик отзывов ресторана. На русском языке выдели улучшения, ухудшения, главные темы, повторяющиеся проблемы и конкретные рекомендации. В implicatedStaff включай только имена, присутствующие во входном staffMentions. Каждая рекомендация обязана ссылаться на 1–3 точных id из evidenceCatalog; если фактов недостаточно, рекомендуй проверку гипотезы. Верни только JSON: {"improved":[],"worsened":[],"topTopics":[],"recurringProblems":[],"implicatedStaff":[],"recommendations":[{"recommendationId":"...","title":"...","basisSummary":"...","evidenceIds":["точный id"]}]}.`;
   const raw = await aiText({
     accountId: account.id,
     observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },

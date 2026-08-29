@@ -2129,6 +2129,135 @@ test("finance week compares only the same completed shifts for any venue schedul
     [
       { date: "2026-07-13", revenue: 1_000, receipts: 5 },
       { date: "2026-07-14", revenue: 1_200, receipts: 6 },
+      { date: "2026-0ext = {
+    Rg: isWorkingDay,
+    $g: shiftState,
+    profile,
+    now,
+    revenue,
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = bdHealthShiftCoverage(profile, revenue, now);`,
+    context,
+  );
+  return context.output;
+}
+
+test("health index counts completed shifts only in the current month", async () => {
+  const cologne = {
+    openTime: "22:00",
+    closeTime: "06:00",
+    workingDays: {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: true,
+      6: true,
+      7: true,
+    },
+  };
+  const now = new Date(2026, 6, 16, 17, 34);
+  const revenue = [
+    "2026-07-03",
+    "2026-07-04",
+    "2026-07-05",
+    "2026-07-10",
+    "2026-07-11",
+    "2026-07-12",
+  ].map((date) => ({ date, revenue: 1_000, receipts: 5 }));
+
+  const coverage = await healthShiftCoverage(cologne, now, revenue);
+  assert.deepEqual(
+    {
+      expected: coverage.expected,
+      entered: coverage.entered,
+      percent: coverage.percent,
+    },
+    { expected: 6, entered: 6, percent: 100 },
+  );
+});
+
+async function financeWeekContext(profile, now, revenue, expenses) {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("const bdFinanceDayShort=");
+  const end = bundle.indexOf("function B2(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const context = {
+    profile,
+    now,
+    revenue,
+    expenses,
+    Um: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true },
+    $se: [1, 2, 3, 4, 5, 6, 7],
+    Rg: isWorkingDay,
+    $g: shiftState,
+    LS: dateKey,
+    ec: weekStart,
+    wn: summarize,
+  };
+
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = bdFinanceWeekContext(profile, now, revenue, expenses);`,
+    context,
+  );
+  return context.output;
+}
+
+test("finance week uses the selected venue schedule and hides unfinished shifts", async () => {
+  const cologne = {
+    workingDays: {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: true,
+      6: true,
+      7: true,
+    },
+    openTime: "18:00",
+    closeTime: "05:00",
+  };
+  const context = await financeWeekContext(
+    cologne,
+    new Date(2026, 6, 15, 15),
+    [{ date: "2026-07-12", revenue: 4_834, receipts: 16 }],
+    [{ date: "2026-07-15", category: "repairs", amount: 600 }],
+  );
+
+  assert.equal(context.scheduledShifts, 3);
+  assert.equal(context.completedShifts, 0);
+  assert.equal(context.week.hasRevenueData, false);
+  assert.equal(context.week.otherExpenses, 600);
+  assert.match(context.scheduleLabel, /пт, сб, вс/);
+  assert.match(context.nextWorkingLabel, /17/);
+});
+
+test("finance week compares only the same completed shifts for any venue schedule", async () => {
+  const weekdayVenue = {
+    workingDays: {
+      1: true,
+      2: true,
+      3: true,
+      4: true,
+      5: false,
+      6: false,
+      7: false,
+    },
+    openTime: "09:00",
+    closeTime: "14:00",
+  };
+  const context = await financeWeekContext(
+    weekdayVenue,
+    new Date(2026, 6, 15, 15),
+    [
+      { date: "2026-07-13", revenue: 1_000, receipts: 5 },
+      { date: "2026-07-14", revenue: 1_200, receipts: 6 },
       { date: "2026-07-15", revenue: 1_400, receipts: 7 },
       { date: "2026-07-06", revenue: 900, receipts: 5 },
       { date: "2026-07-07", revenue: 1_000, receipts: 5 },
@@ -2978,6 +3107,48 @@ test("onboarding saves the venue before seeding equipment and exposes its contro
   const onboarding = bundle.slice(start, end);
 
   assert.match(onboarding, /await t\(A\),_\.length>0&&n\(_\),m\(!0\)/);
+  assert.doesNotMatch(onboarding, /Failed to save onboarding equipment list/);
+  assert.match(onboarding, /ariaLabel:"Название заведения"/);
+  assert.match(onboarding, /ariaLabel:"Мест в зале"/);
+  assert.match(onboarding, /"aria-label":"Назад"/);
+  assert.match(onboarding, /"aria-label":\(h\.checked\?"Убрать ":"Добавить "\)\+m\.name/);
+  assert.match(onboarding, /"aria-label":"Уменьшить количество: "\+n/);
+  assert.match(onboarding, /"aria-label":"Увеличить количество: "\+n/);
+});
+
+test("only an explicit closing record marks a month closed and its snapshot stays immutable", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf('const bdReleaseCandidateVersion="rc-v163"');
+  const end = bundle.indexOf("function bdShiftsPage(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  let closings = [];
+  const context = {
+    bdMonthClosingsKey: "bd_month_closings",
+    bdArrayStore() {
+      return closings;
+    },
+    bdBuildMonthlyReport() {
+      return {
+        status: "closed",
+        isClosed: true,
+        revenue: 999_999,
+        payroll: 88_888,
+        taxes: 77_777,
+        operatingResult: 66_666,
+        cashResult: 55_555,
+        resultBeforeCost: 44_444,
+        sections: [],
+      };
+    },
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
+    contexssert.match(onboarding, /await t\(A\),_\.length>0&&n\(_\),m\(!0\)/);
   assert.doesNotMatch(onboarding, /Failed to save onboarding equipment list/);
   assert.match(onboarding, /ariaLabel:"Название заведения"/);
   assert.match(onboarding, /ariaLabel:"Мест в зале"/);

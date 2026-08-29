@@ -689,3 +689,38 @@ test("live period month boundary follows Europe/Chisinau instead of UTC", () => 
   assert.equal(result.livePeriod.current.endDate, "2026-09-01");
   assert.match(result.livePeriod.periodLabel, /1–1 сентября/i);
 });
+      endDate: "2026-08-28",
+      revenue: 8_700,
+      expenses: 5_000,
+    },
+  }));
+
+  assert.equal(result.livePeriod.method, "recent_completed_shifts");
+  assert.equal(result.livePeriod.comparison.availability, "available");
+  assert.ok(result.livePeriod.comparison.sampleSize.current >= 2);
+  assert.equal(result.livePeriod.comparison.sampleSize.current, result.livePeriod.comparison.sampleSize.comparison);
+  assert.match(result.livePeriod.comparisonLabel, /завершённых смен/i);
+});
+
+test("open-period finance uses preliminary terminology and never calls it final profit", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-28T18:00:00.000Z"),
+    currentFinancialPeriod: { monthKey: "2026-08", revenue: 5_000, expenses: 3_200 },
+  }));
+  const liveCopy = [result.livePeriod.financeSummary, ...result.livePeriod.factors].join(" ");
+  assert.match(liveCopy, /предварительн/i);
+  assert.doesNotMatch(liveCopy, /финальная чистая прибыль/i);
+});
+
+test("live period month boundary follows Europe/Chisinau instead of UTC", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-31T21:30:00.000Z"),
+    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
+    daily: [{ date: "2026-09-01", revenue: 500, receipts: 5 }],
+    currentFinancialPeriod: null,
+  }));
+
+  assert.equal(result.livePeriod.current.startDate, "2026-09-01");
+  assert.equal(result.livePeriod.current.endDate, "2026-09-01");
+  assert.match(result.livePeriod.periodLabel, /1–1 сентября/i);
+});

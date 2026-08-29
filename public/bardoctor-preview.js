@@ -1749,3 +1749,42 @@
   window.addEventListener("popstate", function () { setTimeout(enhanceAiActionPlan, 0); });
   watchHomeGreeting();
 })();
+;
+      if (result.migrated) {
+        localStorage.setItem("bd_sites_migration_complete", new Date().toISOString());
+      }
+      if (window.location.pathname === "/setup" && result.role !== "owner") {
+        window.location.replace("/home");
+        return;
+      }
+      await refreshServerInventoryCacheV235();
+    } else if (result.needsLogin) {
+      window.__bdAuthBootstrapV274 = { state: "unauthenticated", reason: "login_required" };
+      localStorage.removeItem("bd_session");
+      localStorage.removeItem("bd_session_token");
+      localStorage.removeItem("bd_session_userid");
+      localStorage.removeItem("bd_active_role");
+      localStorage.removeItem("bd_active_permissions");
+      localStorage.removeItem("bd_active_venue_id");
+      localStorage.removeItem("bd_active_venue_is_primary");
+    } else {
+      window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed" };
+    }
+  } catch {
+    window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_request_failed" };
+  }
+
+  window.__bdBootstrapPending = false;
+  window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+
+  observePurchaseConfirmation();
+  installProtectedOriginalLinks();
+  installNavigationConsistencyGuards();
+  loadApplication();
+  injectSupplierAlternativesEntry();
+  removeLegacyFinancePurchasePaymentEntryV195();
+  enhanceAiActionPlan();
+  new MutationObserver(enhanceAiActionPlan).observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener("popstate", function () { setTimeout(enhanceAiActionPlan, 0); });
+  watchHomeGreeting();
+})();
