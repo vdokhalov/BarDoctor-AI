@@ -1,0 +1,21 @@
+name: Exact BarDoctor tree
+on:
+  push:
+    branches: [codex-canonical-taxonomy-v336-sync]
+permissions:
+  contents: write
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - shell: bash
+        run: |
+          while IFS=$'\t' read -r d target; do mkdir -p "$(dirname "$target")"; cat ".github/bardoctor-final/$d/"*.part | base64 --decode > "$target"; done < .github/bardoctor-final/manifest.tsv
+          rm -rf .github/bardoctor-final .github/workflows/bardoctor-exact-tree.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: materialize exact BarDoctor tree"
+          git push origin HEAD:codex-canonical-taxonomy-v336-sync
