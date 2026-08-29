@@ -394,7 +394,43 @@
     var button = document.createElement("button");
     button.type = "button";
     button.setAttribute("role", "tab");
-    button.setAttribute("aria-selected", "false");
+    button.setAttribu("aria-selected", "false");
+    button.setAttribute("data-bd-team-access-entry", "v171");
+    button.textContent = "Роли и доступ";
+    button.addEventListener("click", function (event) {
+      navigateInApplication(event, "/team-access");
+    });
+    tabs.appendChild(button);
+  }
+
+  function injectWarehouseSalesEntry() {
+    var entries = Array.from(document.querySelectorAll("[data-bd-warehouse-sales-entry]"));
+    if (window.location.pathname !== "/warehouse") {
+      entries.forEach(function (entry) { entry.remove(); });
+      return;
+    }
+    if (document.querySelector('[data-bd-warehouse-version="compact-tree-v240"]')) {
+      entries.forEach(function (entry) {
+        if (entry.getAttribute("data-bd-warehouse-sales-entry") === "legacy") entry.remove();
+      });
+      return;
+    }
+    var nativeEntry = document.querySelector('[data-bd-warehouse-sales-entry="native-v79"]');
+    if (nativeEntry) {
+      entries.forEach(function (entry) { if (entry !== nativeEntry) entry.remove(); });
+      return;
+    }
+    var existing = entries[0];
+    if (existing || !hasClientPermission("inventory.manage") || !hasClientPermission("shifts.manage")) return;
+    var main = document.querySelector("main");
+    if (!main) return;
+
+    var entry = document.createElement("section");
+    entry.className = "bd-warehouse-sales-entry";
+    entry.setAttribute("data-bd-warehouse-sales-entry", "legacy");
+    entry.innerHTML = [
+      '<span class="bd-warehouse-sales-icon" aria-hidden="true">↘</span>',
+      '<span class="bd-warehouse-sales-copy"><small>РАСХОД ПО ТЕХКАРТАМ</small>te("aria-selected", "false");
     button.setAttribute("data-bd-team-access-entry", "v171");
     button.textContent = "Роли и доступ";
     button.addEventListener("click", function (event) {
