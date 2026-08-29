@@ -494,4 +494,2529 @@ test("background page recognition polls until completion without losing the menu
         async text() {
           return JSON.stringify({
             ok: true,
-            jobI
+            jobId: `job-${body.pageStart}`,
+            status: "queued",
+          });
+        },
+      };
+    },
+  };
+
+  vm.runInNewContext(
+    `${helperSource}
+globalThis.recognitionPromise = bdCatalogRecogniseImages(
+  files,
+  "gallery",
+  message => progress.push(message),
+);`,
+    context,
+  );
+  const draft = await context.recognitionPromise;
+  const recognitionCalls = calls.filter((call) => call.action === "recognise-batch");
+  const pollCalls = calls.filter((call) => call.action === "poll-recognition");
+  const mergeCall = calls.find((call) => call.action === "merge-batches");
+
+  assert.equal(draft.id, "merged");
+  assert.deepEqual(recognitionCalls.map((call) => call.sourceFileIds.length), [1, 1]);
+  assert.equal(pollCalls.length, 4);
+  assert.equal(mergeCall.parts.length, 2);
+  assert.ok(progress.some((message) => /Распознаю страницу 1 из 2/.test(message)));
+  assert.match(progress.at(-1), /Объединяю 2 страниц/);
+});
+
+test("catalog resolves menu positions through the canonical nomenclature taxonomy", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const groupingStart = bundle.indexOf("function bdCatMenuGroups");
+  const groupingEnd = bundle.indexOf("function bdCatReadiness", groupingStart);
+  const editorStart = bundle.indexOf("function bdCatMenuEditor");
+  const editorEnd = bundle.indexOf("function bdCatStructureManager", editorStart);
+  assert.ok(groupingStart >= 0 && groupingEnd > groupingStart);
+  assert.ok(editorStart >= 0 && editorEnd > editorStart);
+  const grouping =d: `job-${body.pageStart}`,
+            status: "queued",
+          });
+        },
+      };
+    },
+  };
+
+  vm.runInNewContext(
+    `${helperSource}
+globalThis.recognitionPromise = bdCatalogRecogniseImages(
+  files,
+  "gallery",
+  message => progress.push(message),
+);`,
+    context,
+  );
+  const draft = await context.recognitionPromise;
+  const recognitionCalls = calls.filter((call) => call.action === "recognise-batch");
+  const pollCalls = calls.filter((call) => call.action === "poll-recognition");
+  const mergeCall = calls.find((call) => call.action === "merge-batches");
+
+  assert.equal(draft.id, "merged");
+  assert.deepEqual(recognitionCalls.map((call) => call.sourceFileIds.length), [1, 1]);
+  assert.equal(pollCalls.length, 4);
+  assert.equal(mergeCall.parts.length, 2);
+  assert.ok(progress.some((message) => /Распознаю страницу 1 из 2/.test(message)));
+  assert.match(progress.at(-1), /Объединяю 2 страниц/);
+});
+
+test("catalog resolves menu positions through the canonical nomenclature taxonomy", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const groupingStart = bundle.indexOf("function bdCatMenuGroups");
+  const groupingEnd = bundle.indexOf("function bdCatReadiness", groupingStart);
+  const editorStart = bundle.indexOf("function bdCatMenuEditor");
+  const editorEnd = bundle.indexOf("function bdCatStructureManager", editorStart);
+  assert.ok(groupingStart >= 0 && groupingEnd > groupingStart);
+  assert.ok(editorStart >= 0 && editorEnd > editorStart);
+  const grouping = bundle.slice(groupingStart, groupingEnd);
+  const editor = bundle.slice(editorStart, editorEnd);
+  assert.match(grouping, /nomenclatureStructure/);
+  assert.match(grouping, /sectionId/);
+  assert.match(grouping, /taxonomyCategoryId/);
+  assert.match(grouping, /subcategoryId/);
+  assert.match(grouping, /Без категории/);
+  assert.match(editor, /bdTaxonomySelectorsV336/);
+  assert.doesNotMatch(editor, /label:"Группа"/);
+  assert.doesNotMatch(editor, /label:"Подраздел"/);
+});
+
+test("month closing actions resolve to the working report flow", async () => {
+  const [bundle, dataControlRoute] = await Promise.all([
+    readFile(
+      new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../app/data-control/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.ok(
+    bundle.includes(
+      'path:"/month-closing",component:()=>i.jsx(cS,{to:Ot()?"/reports?closeMonth=1":"/login"})',
+    ),
+  );
+  assert.match(dataControlRoute, /href="\/reports\?closeMonth=1"/);
+  assert.doesNotMatch(dataControlRoute, /href="\/month-closing"/);
+});
+
+test("purchase lifecycle is venue-scoped and preserves stock and payment history", async () => {
+  const [remove, cancel, payment, reversePayment] = await Promise.all([
+    readFile(new URL("../app/api/purchases/delete/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/purchases/cancel/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/purchases/payment/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/purchases/payment/reverse/route.ts", import.meta.url), "utf8"),
+  ]);
+
+  for (const route of [remove, cancel, payment, reversePayment]) {
+    assert.match(route, /WHERE account_id = \?/);
+    assert.match(route, /account\.venueId/);
+  }
+  assert.match(remove, /PURCHASE_MUST_BE_CANCELLED/);
+  assert.match(remove, /PURCHASE_HAS_PAYMENTS/);
+  assert.match(remove, /PURCHASE_HAS_STOCK_MOVEMENTS/);
+  assert.match(remove, /VALUES \(\?, \?, 'delete'/);
+  assert.match(remove, /bucket\.delete/);
+  assert.doesNotMatch(remove, /expenses\.splice/);
+
+  assert.match(cancel, /hasPermission\(account, "finance\.manage"\)/);
+  assert.match(cancel, /removePurchaseFromInventory/);
+  assert.match(cancel, /status: "cancelled"/);
+  assert.match(cancel, /requiresReconciliation: true/);
+  assert.match(cancel, /Складское влияние закупки отменено/);
+  assert.match(payment, /source: "purchase_payment"/);
+  assert.match(payment, /paymentKind: "supplier_payment"/);
+  assert.match(payment, /IDEMPOTENCY_KEY_REQUIRED/);
+  assert.match(reversePayment, /status: "voided"/);
+  assert.match(reversePayment, /reversedAt/);
+});
+
+test("build contains the BarDoctor shell, local APIs, and D1 migrations", async () => {
+  const [
+    worker,
+    bootstrap,
+    integrationsClient,
+    hosting,
+    coreMigration,
+    integrationsMigration,
+    secretsMigration,
+    aiUsageMigration,
+    aiSubscriptionMigration,
+    mainBundle,
+    authCss,
+    authVenueBackground,
+    marketClient,
+    marketCss,
+    marketEntryCss,
+    opportunitiesClient,
+    opportunitiesCss,
+    opportunitiesEntryCss,
+    supplierAlternativesClient,
+    salesImportClient,
+    salesImportCss,
+    warehouseCss,
+    navigationCss,
+    homeVisualCss,
+    auditMigration,
+    dataControlClient,
+    dataControlCss,
+    pushMigration,
+    notificationAutomationMigration,
+    workerConfig,
+    notificationsClient,
+    notificationsCss,
+    oneSignalWorker,
+    runtimeWorkerLoader,
+    appIcon,
+    authIsolationMigration,
+    platformSecretsMigration,
+    integrationHubMigration,
+    integrationHubSourceMigration,
+    universalIntegrationMigration,
+    localConnectorMigration,
+    deliveryRetryMigration,
+  ] = await Promise.all([
+    readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/bardoctor-preview.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/integrations.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(
+      new URL("../dist/.openai/drizzle/0000_skinny_nightshade.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0001_ambitious_klaw.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0002_tan_wendell_rand.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0003_long_grim_reaper.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0005_charming_jazinda.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/client/assets/index-BQGspy0I.js", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/client/assets/index-D0AhgpbR.css", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/client/assets/auth-venue-bg.png", import.meta.url),
+    ),
+    readFile(new URL("../dist/client/market.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/market.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/market-entry.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/opportunities.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/opportunities.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/opportunities-entry.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/supplier-alternatives.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/sales-import.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/sales-import.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/warehouse.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/navigation.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/home-visual-v151.css", import.meta.url), "utf8"),
+    readFile(
+      new URL("../dist/.openai/drizzle/0004_gorgeous_magik.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../dist/client/data-control.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/data-control.css", import.meta.url), "utf8"),
+    readFile(
+      new URL("../dist/.openai/drizzle/0006_panoramic_hiroim.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0007_noisy_madrox.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../dist/server/wrangler.json", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/notifications.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/notifications.css", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/OneSignalSDKWorker.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/runtime-worker.js", import.meta.url), "utf8"),
+    readFile(new URL("../dist/client/icons/icon-192.png", import.meta.url)),
+    readFile(
+      new URL("../dist/.openai/drizzle/0008_misty_gorilla_man.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0009_careful_marvel_apes.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0011_dear_the_santerians.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0012_magenta_quentin_quire.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0013_youthful_dormammu.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0015_green_zaran.sql", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../dist/.openai/drizzle/0016_groovy_major_mapleleaf.sql", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(worker, /<div id="root">[\s\S]*data-bd-static-startup="v201"/);
+  assert.match(worker, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
+  assert.match(worker, /health-score-experience-v152\.css\?v=20260828-business-health-canonical-v335/);
+  assert.match(worker, /health-score-experience\.js\?v=20260828-health-startup-v332/);
+  assert.match(worker, /venue-switcher\.css\?v=20260826-venue-identity-v297/);
+  assert.match(worker, /venue-location-data\.js\?v=20260811-location-selects-v2/);
+  assert.match(worker, /venue-create-selects\.css\?v=20260811-location-selects-v2/);
+  assert.match(worker, /navigation\.css\?v=20260811-navigation-v85/);
+  assert.match(worker, /employee-detail\.css\?v=20260817-employee-edit-page-v206/);
+  assert.match(worker, /employee-list\.css\?v=20260817-employee-edit-page-v206/);
+  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
+  assert.match(bootstrap, /function installProtectedOriginalLinks\(\)/);
+  assert.match(bootstrap, /window\.open\("about:blank", "_blank"\)/);
+  assert.match(bootstrap, /fetch\(targetUrl\.pathname \+ targetUrl\.search/);
+  assert.match(bootstrap, /var blob = await response\.blob\(\)/);
+  assert.match(bootstrap, /Оригинал недоступен/);
+  assert.match(bootstrap, /function removeLegacyFinancePurchasePaymentEntryV195\(\)/);
+  assert.doesNotMatch(bootstrap, /data-bd-purchase-payment-entry[^\n]*v186/);
+  assert.match(mainBundle, /\/suppliers\?tab=purchases&payment=1&returnTo=finance/);
+  assert.match(mainBundle, /children:"Оплатить поставщику"/);
+  assert.doesNotMatch(bootstrap, /function installPurchaseDeletion\(\)/);
+  assert.doesNotMatch(bootstrap, /Связанный расход будет удалён/);
+  assert.match(worker, /route:\/api\/auth\/bootstrap/);
+  assert.match(worker, /route:\/api\/auth\/logout/);
+  assert.match(worker, /route:\/api\/store\/:key/);
+  assert.match(worker, /bd_inventory_snapshots/);
+  assert.match(worker, /bd_finance_settings/);
+  assert.match(worker, /bd_payroll_entries/);
+  assert.match(worker, /bd_month_closings/);
+  assert.match(worker, /route:\/api\/ai\/:action/);
+  assert.match(worker, /route:\/api\/priority\/assess/);
+  assert.match(worker, /route:\/api\/smart\/process/);
+  assert.match(worker, /route:\/api\/reviews\/:action/);
+  assert.match(worker, /route:\/api\/reviews\/sources\/google\/:action/);
+  assert.match(worker, /route:\/api\/purchases\/scan/);
+  assert.match(worker, /route:\/api\/purchases\/confirm/);
+  assert.match(worker, /route:\/api\/purchases\/update/);
+  assert.match(worker, /route:\/api\/purchases\/delete/);
+  assert.match(worker, /route:\/api\/purchases\/payment/);
+  assert.match(worker, /route:\/api\/purchases\/payment\/reverse/);
+  assert.match(worker, /route:\/api\/purchases\/cancel/);
+  assert.match(worker, /route:\/api\/purchases\/repost/);
+  assert.match(worker, /route:\/api\/purchases\/files/);
+  assert.match(worker, /route:\/api\/purchases\/files\/:id/);
+  assert.match(worker, /Оригинал открывается защищённо из карточки документа/);
+  assert.match(worker, /Вернуться к документам/);
+  assert.match(worker, /application\/json; charset=utf-8/);
+  assert.match(worker, /route:\/api\/sales\/scan/);
+  assert.match(worker, /route:\/api\/sales\/confirm/);
+  assert.match(worker, /route:\/api\/sales\/files\/:id/);
+  assert.match(worker, /route:\/api\/inventory\/counts/);
+  assert.match(worker, /route:\/api\/inventory\/scan/);
+  assert.match(worker, /route:\/sales-import/);
+  assert.match(mainBundle, /window\.bdNavigate\("\/sales-import"\)/);
+  assert.doesNotMatch(mainBundle, /\/sales-import\.html/);
+  assert.match(salesImportClient, /\/api\/sales\/scan/);
+  assert.match(salesImportClient, /\/api\/sales-batches/);
+  assert.match(salesImportClient, /Найти позицию/);
+  assert.match(salesImportClient, /Проверка продаж/);
+  assert.doesNotMatch(salesImportClient, /venue-scoped сопоставление/);
+  assert.match(salesImportCss, /\.preview-line/);
+  assert.match(salesImportCss, /@media\(max-width:700px\)/);
+  assert.match(warehouseCss, /\.bd-warehouse-stock-grid/);
+  assert.match(warehouseCss, /\.bd-inventory-count-list/);
+  assert.match(warehouseCss, /@media \(max-width: 760px\)/);
+  assert.match(navigationCss, /grid-template-columns: repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(navigationCss, /data-bd-nav-key="warehouse"/);
+  assert.match(
+    navigationCss,
+    /data-bd-desktop-brand="responsive-v54"[^}]+display: none/s,
+  );
+  assert.match(worker, /route:\/api\/catalog\/import/);
+  assert.match(worker, /route:\/api\/catalog\/files/);
+  assert.match(worker, /route:\/api\/catalog\/files\/:id/);
+  assert.match(worker, /route:\/api\/competitors\/refresh/);
+  assert.match(worker, /route:\/api\/market/);
+  assert.match(worker, /route:\/market/);
+  assert.match(worker, /bd_market_analysis_v1/);
+  assert.match(worker, /route:\/api\/opportunities/);
+  assert.match(worker, /route:\/opportunities/);
+  assert.match(worker, /bd_opportunity_calendar_v1/);
+  assert.match(worker, /BarDoctor Opportunity Intelligence/);
+  assert.match(worker, /День города Бендеры/);
+  assert.match(worker, /День Республики/);
+  assert.match(worker, /Новогодняя ночь/);
+  assert.match(worker, /calendar-core-v3/);
+  assert.match(worker, /ближайшие 365 дней/);
+  assert.match(worker, /не дальше 35 км/);
+  assert.match(worker, /Обязательные уровни проверки для любого указанного региона/);
+  assert.match(worker, /День Республики Башкортостан/);
+  assert.match(worker, /День города Уфы/);
+  assert.match(worker, /send_after/);
+  assert.match(worker, /cancelScheduledPush/);
+  assert.match(worker, /web_search/);
+  assert.match(worker, /web_search_call\.action\.sources/);
+  assert.match(worker, /route:\/api\/integrations/);
+  assert.match(worker, /route:\/integrations/);
+  assert.match(worker, /route:\/settings/);
+  assert.match(worker, /integrations\.js\?v=20260814-connector-download-v187/);
+  assert.match(worker, /route:\/api\/integration-hub\/import/);
+  assert.match(worker, /route:\/api\/integration-hub\/import\/preview/);
+  assert.match(worker, /route:\/api\/integration-hub\/connections/);
+  assert.match(worker, /route:\/api\/integration-hub\/templates/);
+  assert.match(worker, /route:\/api\/integration-hub\/mappings/);
+  assert.match(worker, /route:\/api\/integration-hub\/retry/);
+  assert.match(worker, /route:\/api\/integration\/v1\/ingest/);
+  assert.match(worker, /route:\/api\/integration\/v1\/health/);
+  assert.match(worker, /route:\/api\/integration\/v1\/heartbeat/);
+  assert.match(integrationsClient, /\/api\/integration-hub\/import/);
+  assert.match(integrationsClient, /\/api\/integration-hub\/connections/);
+  assert.match(integrationsClient, /Проверить структуру/);
+  assert.match(integrationsClient, /Повторить после исправления/);
+  assert.match(worker, /market\.js\?v=20260828-competitors-v329/);
+  assert.doesNotMatch(integrationsClient, /AI уже входит в подписку|AI включён в подписку|Push‑уведомления — OneSignal/);
+  assert.match(worker, /ONESIGNAL_REST_API_KEY/);
+  assert.match(worker, /platform_secrets/);
+  assert.match(worker, /gpt-5\.4-mini/);
+  assert.match(worker, /json_schema/);
+  assert.match(worker, /menu_import/);
+  assert.match(worker, /AI временно недоступен из-за технического ограничения нагрузки/);
+  assert.match(worker, /syncGoogleReviewsIfDue/);
+  assert.match(worker, /confirmedCompetitors/);
+  assert.match(worker, /set-competitor-confirmed/);
+  assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
+  assert.match(bootstrap, /\/api\/auth\/bootstrap/);
+  assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
+  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
+  assert.match(bootstrap, /randomUUIDFallback/);
+  assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
+  assert.match(bootstrap, /navigateInApplication/);
+  assert.match(bootstrap, /greetingForCurrentTime/);
+  assert.match(bootstrap, /bd_user_first_name/);
+  asserClient, /\/api\/integration-hub\/import/);
+  assert.match(integrationsClient, /\/api\/integration-hub\/connections/);
+  assert.match(integrationsClient, /Проверить структуру/);
+  assert.match(integrationsClient, /Повторить после исправления/);
+  assert.match(worker, /market\.js\?v=20260828-competitors-v329/);
+  assert.doesNotMatch(integrationsClient, /AI уже входит в подписку|AI включён в подписку|Push‑уведомления — OneSignal/);
+  assert.match(worker, /ONESIGNAL_REST_API_KEY/);
+  assert.match(worker, /platform_secrets/);
+  assert.match(worker, /gpt-5\.4-mini/);
+  assert.match(worker, /json_schema/);
+  assert.match(worker, /menu_import/);
+  assert.match(worker, /AI временно недоступен из-за технического ограничения нагрузки/);
+  assert.match(worker, /syncGoogleReviewsIfDue/);
+  assert.match(worker, /confirmedCompetitors/);
+  assert.match(worker, /set-competitor-confirmed/);
+  assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
+  assert.match(bootstrap, /\/api\/auth\/bootstrap/);
+  assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
+  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
+  assert.match(bootstrap, /randomUUIDFallback/);
+  assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
+  assert.match(bootstrap, /navigateInApplication/);
+  assert.match(bootstrap, /greetingForCurrentTime/);
+  assert.match(bootstrap, /bd_user_first_name/);
+  assert.match(bootstrap, /Заведение:/);
+  assert.match(bootstrap, /injectDataControlEntry/);
+  assert.match(bootstrap, /\/data-control/);
+  assert.match(bootstrap, /injectCompetitorsEntry/);
+  assert.match(bootstrap, /data-bd-competitors-entry/);
+  assert.match(bootstrap, /injectOpportunityEntry/);
+  assert.match(bootstrap, /data-bd-opportunity-entry/);
+  assert.match(bootstrap, /\/api\/opportunities/);
+  assert.match(bootstrap, /bdCompetitorMarketClientV329/);
+  assert.match(bootstrap, /fetch\("\/api\/market"\)/);
+  assert.match(bootstrap, /Открыть конкурентов/);
+  assert.doesNotMatch(bootstrap, /MARKET INTELLIGENCE/);
+  assert.doesNotMatch(bootstrap, /bd-market-entry-v1/);
+  assert.match(worker, /market-entry\.css/);
+  assert.match(worker, /opportunities-entry\.css/);
+  assert.match(worker, /suppliers\.css/);
+  assert.match(worker, /catalog\.css/);
+  assert.match(mainBundle, /bdSupplierWorkspaceVersion="procurement-v35"/);
+  assert.match(mainBundle, /bd:store-updated/);
+  assert.match(mainBundle, /Оплата сохранена/);
+  assert.match(mainBundle, /Финансовая операция связана с накладной/);
+  assert.match(mainBundle, /Удалить накладную/);
+  assert.match(mainBundle, /Будет выполнено автоматически/);
+  assert.match(mainBundle, /История операций сохранится/);
+  assert.match(mainBundle, /Оплата автоматически отменена при удалении накладной/);
+  assert.doesNotMatch(mainBundle, /Сначала отмените связанные платежи в блоке «Платежи»/);
+  assert.match(mainBundle, /bdProcurementDeleteUiV191="v191"/);
+  assert.match(mainBundle, /bdPurchaseDeleteEntryV192="v192"/);
+  assert.match(mainBundle, /bdPurchaseDeleteVisibilityV193="v193"/);
+  assert.match(mainBundle, /bdPurchaseDeleteOneStepV194="v194"/);
+  assert.match(mainBundle, /bdFinancePurchaseDeleteFixV195="v195"/);
+  assert.doesNotMatch(mainBundle, /Закупка и расход учтены/);
+  assert.match(mainBundle, /function bdDocumentDetailSheet/);
+  assert.match(mainBundle, /bd-document-detail-delete-v193/);
+  assert.match(mainBundle, /bd-document-detail-sheet-v193/);
+  assert.match(mainBundle, /bd-finance-document-open-v193/);
+  assert.match(mainBundle, /async function deleteViewedPurchase\(\)/);
+  assert.match(mainBundle, /function applyViewedPurchaseServerResultV195\(/);
+  assert.match(mainBundle, /monthExpenses=S\.useMemo\(\(\)=>bdMonthlyCurrencyPartitionV320\(expenses\.filter\(e=>e\.date\.slice\(0,7\)===monthKey&&e\?\.status!=="voided"&&!e\?\.reversedAt\),"expense",bdFinanceAccountingCurrency\)\.included/);
+  assert.match(mainBundle, /for\(const payment of active\)/);
+  assert.match(mainBundle, /fetch\("\/api\/purchases\/payment\/reverse"/);
+  assert.match(mainBundle, /onDelete:viewedPurchaseDocument&&canManagePurchases\?deleteViewedPurchase:null/);
+  assert.match(mainBundle, /Режим просмотра/);
+  assert.match(mainBundle, /Купленные позиции/);
+  assert.match(mainBundle, /\/api\/purchases\/update/);
+  assert.match(mainBundle, /Редактировать накладную/);
+  assert.match(mainBundle, /bdCanManageFinance/);
+  assert.match(mainBundle, /maxWidth:n\?760:500/);
+  assert.match(mainBundle, /!bdLinkedDocument&&bdCanManageFinance/);
+  assert.match(mainBundle, /returnTo=finance/);
+  assert.match(mainBundle, /bd_assortment_v1/);
+  assert.match(mainBundle, /bd_stock_movements/);
+  assert.match(mainBundle, /bdCatalogWorkspaceVersion="catalog-move-controls-v44"/);
+  assert.match(mainBundle, /function bdCatMenuGroups/);
+  assert.match(mainBundle, /function bdCatStructureManager/);
+  assert.match(mainBundle, /function bdCatStableTaxId/);
+  assert.match(mainBundle, /bd-catalog-department-toggle/);
+  assert.match(mainBundle, /bd-catalog-subsection-toggle/);
+  assert.match(mainBundle, /bdTaxonomySelectorsV336/);
+  assert.match(mainBundle, /taxonomyCategoryId/);
+  assert.match(mainBundle, /Управление общей структурой/);
+  assert.match(mainBundle, /\/nomenclature\?view=taxonomy&returnTo=assortment/);
+  assert.match(mainBundle, /!1&&i\.jsx\(bdCatStructureManager/);
+  assert.match(mainBundle, /Редактировать техкарту/);
+  assert.match(mainBundle, /Изменить позицию/);
+  assert.match(mainBundle, /bdPhotoGalleryVersion="background-menu-v41"/);
+  assert.match(mainBundle, /bdImageUploadVersion="payload-safe-v37"/);
+  assert.match(mainBundle, /bdMenuChunkUploadVersion="background-menu-v41"/);
+  assert.match(mainBundle, /bdMenuRecognitionBatchSize=1/);
+  assert.match(mainBundle, /action:"poll-recognition"/);
+  assert.match(mainBundle, /bdCatalogPollJob/);
+  assert.match(mainBundle, /bdUploadPayloadBudgetBytes=7864320/);
+  assert.match(mainBundle, /bdCatalogStageImages\(I,c,k\)/);
+  assert.match(mainBundle, /action:"recognise-batch"/);
+  assert.match(mainBundle, /action:"merge-batches"/);
+  assert.match(mainBundle, /function bdReadImageDataUrl/);
+  const imagePreparationStart = mainBundle.indexOf("async function bdProcPrepareImage");
+  const imagePreparationEnd = mainBundle.indexOf("function bdSuppliersPage", imagePreparationStart);
+  assert.ok(imagePreparationStart >= 0 && imagePreparationEnd > imagePreparationStart);
+  assert.doesNotMatch(
+    mainBundle.slice(imagePreparationStart, imagePreparationEnd),
+    /URL\.createObjectURL/,
+  );
+  assert.match(mainBundle, /u\.append\("file",l,bdUploadFileName/);
+  assert.match(mainBundle, /Сфотографируйте чек/);
+  assert.match(mainBundle, /Проверьте распознавание/);
+  assert.match(mainBundle, /Сравнение собственных цен/);
+  assert.match(mainBundle, /Ассортимент и техкарты/);
+  assert.match(mainBundle, /Загрузите меню — BarDoctor соберёт ассортимент/);
+  assert.match(mainBundle, /Выбрать несколько фото/);
+  assert.match(mainBundle, /multiple:!0/);
+  assert.match(mainBundle, /Распознать "\+e\.length\+" страниц/);
+  assert.match(worker, /form\.getAll\("files"\)/);
+  assert.match(worker, /poll-recognition/);
+  assert.match(worker, /background:\s*!0|background:\s*true/);
+  assert.match(mainBundle, /Техкарта пока не подтверждена/);
+  assert.match(mainBundle, /Расчёт: план продаж × техкарта \+ резерв/);
+  assert.match(worker, /bd_purchase_documents/);
+  assert.match(worker, /bd_suppliers/);
+  assert.match(worker, /bd_assortment_v1/);
+  assert.match(marketClient, /\/api\/market/);
+  assert.match(marketClient, /navigator\.geolocation/);
+  assert.match(marketClient, /source-link/);
+  assert.match(marketClient, /Данные сохранены/);
+  assert.match(marketClient, /market-quick-add/);
+  assert.match(marketClient, /market-quick-sheet/);
+  assert.match(marketClient, /Подтвердить конкурента/);
+  assert.match(marketClient, /set-competitor-confirmed/);
+  assert.match(marketClient, /delete-competitor/);
+  assert.match(marketClient, /Удалить «/);
+  assert.match(marketClient, /confirmedCount/);
+  assert.match(marketClient, /#competitors-card/);
+  assert.doesNotMatch(marketCss, /\.market-hero/);
+  assert.match(marketCss, /\.market-bottom-nav/);
+  assert.match(marketCss, /\.competitor-item/);
+  assert.match(marketCss, /\.detail-actions/);
+  assert.match(marketCss, /repeat\(6,minmax\(0,1fr\)\)/);
+  assert.match(worker, /Закрыть смену/);
+  assert.match(worker, /Добавить покупку/);
+  assert.match(worker, /Сообщить о происшествии/);
+  assert.match(worker, /Создать поручение/);
+  assert.match(marketCss, /@media\(max-width:390px\)/);
+  assert.match(marketEntryCss, /\.bd-market-entry-v1/);
+  assert.match(marketEntryCss, /bd-market-radar-sweep/);
+  assert.match(marketEntryCss, /\.bd-competitors-entry/);
+  assert.match(marketEntryCss, /\.bd-data-control-entry/);
+  assert.match(opportunitiesClient, /\/api\/opportunities/);
+  assert.match(opportunitiesClient, /set-decision/);
+  assert.match(opportunitiesClient, /delete-event/);
+  assert.match(opportunitiesClient, /Удалить событие/);
+  assert.match(opportunitiesClient, /bdOpportunityCalendarClientV327/);
+  assert.match(opportunitiesClient, /knownGeneratedAt/);
+  assert.match(opportunitiesClient, /сохранённые события остаются доступны/);
+  assert.match(opportunitiesClient, /Запланировать/);
+  assert.match(opportunitiesClient, /Почему такая оценка/);
+  assert.match(opportunitiesClient, /Рекомендации/);
+  assert.match(opportunitiesClient, /Уведомления/);
+  assert.match(opportunitiesClient, /year: "numeric"/);
+  assert.match(opportunitiesClient, /aria-pressed/);
+  assert.doesNotMatch(opportunitiesCss, /\.opportunity-hero/);
+  assert.match(opportunitiesCss, /\.calendar-summary/);
+  assert.match(opportunitiesCss, /safe-area-inset-bottom/);
+  assert.match(opportunitiesCss, /\.event-card/);
+  assert.match(opportunitiesCss, /@media\(max-width:390px\)/);
+  assert.match(opportunitiesEntryCss, /\.bd-opportunity-entry/);
+  assert.match(supplierAlternativesClient, /Открыть ассортимент/);
+  assert.match(supplierAlternativesClient, /Предложения ещё не найдены/);
+  assert.match(supplierAlternativesClient, /По внутренней позиции/);
+  assert.match(supplierAlternativesClient, /Найти товар или поставщика/);
+  assert.match(supplierAlternativesClient, /Ищем предложения/);
+  assert.match(supplierAlternativesClient, /location\.href = "\/catalog"/);
+  assert.doesNotMatch(supplierAlternativesClient, /location\.href = "\/assortment"/);
+  assert.match(worker, /route:\/assortment/);
+  assert.match(worker, /supplier-alternatives\.js\?v=20260828-navigation-v331/);
+  assert.match(worker, /bd_supplier_alternatives_v1/);
+  assert.match(worker, /targetSignature/);
+  assert.doesNotMatch(worker, /maximum-scale=1/);
+  assert.match(worker, /route:\/api\/audit/);
+  assert.match(worker, /route:\/api\/import\/preview/);
+  assert.match(worker, /route:\/data-control/);
+  assert.match(worker, /MONTH_LOCKED/);
+  assert.match(worker, /ACCESS_DENIED/);
+  assert.match(auditMigration, /CREATE TABLE `audit_log`/);
+  assert.match(dataControlClient, /Проверенных проблем нет/);
+  assert.match(dataControlClient, /БЫЛО → СТАЛО/);
+  assert.match(dataControlClient, /BarDoctor-audit-/);
+  assert.match(dataControlClient, /AbortController/);
+  assert.match(dataControlCss, /overflow-wrap:\s*anywhere/);
+  assert.match(worker, /route:\/notifications/);
+  assert.match(worker, /route:\/manifest\.json/);
+  assert.match(worker, /route:\/api\/notifications/);
+  assert.match(worker, /route:\/api\/notifications\/test/);
+  assert.match(worker, /route:\/api\/notifications\/run/);
+  assert.match(worker, /ONESIGNAL_APP_ID/);
+  assert.match(worker, /sendPushToAccount/);
+  assert.match(
+    worker,
+    /script-src 'self' https:\/\/cdn\.onesignal\.com https:\/\/api\.onesignal\.com/,
+  );
+  assert.match(worker, /missing-shift:/);
+  assert.match(worker, /incidentAlerts/);
+  assert.match(worker, /finance-deviation:/);
+  assert.match(worker, /НА ЭТОМ УСТРОЙСТВЕ/);
+  assert.doesNotMatch(worker, /App API Key|dashboard\.onesignal\.com/);
+  assert.match(worker, /async scheduled\(/);
+  assert.match(worker, /searchParams\.get\("token"\)/);
+  assert.deepEqual(JSON.parse(workerConfig).triggers?.crons, ["0 * * * *"]);
+  assert.match(pushMigration, /CREATE TABLE `notification_preferences`/);
+  assert.match(pushMigration, /CREATE TABLE `notification_deliveries`/);
+  assert.match(notificationAutomationMigration, /incident_alerts/);
+  assert.match(notificationAutomationMigration, /last_run_at/);
+  assert.match(notificationsClient, /https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.page\.js/);
+  assert.match(notificationsClient, /id = "onesignal-sdk"/);
+  assert.match(notificationsClient, /45_000/);
+  assert.match(notificationsClient, /safeRequestMessage/);
+  assert.match(notificationsClient, /ONESIGNAL_SCRIPT_LOAD_FAILED/);
+  assert.match(notificationsClient, /isSdkAlreadyInitializedError/);
+  assert.match(notificationsClient, /if \(!initStarted\) fail/);
+  assert.match(notificationsClient, /if \(!isSdkAlreadyInitializedError\(error\)\)/);
+  assert.match(notificationsClient, /Notification\.requestPermission/);
+  const enablePushStart = notificationsClient.indexOf("async function enablePush");
+  const enablePushEnd = notificationsClient.indexOf("async function disablePush", enablePushStart);
+  const enablePushSource = notificationsClient.slice(enablePushStart, enablePushEnd);
+  assert.ok(enablePushStart >= 0 && enablePushEnd > enablePushStart);
+  assert.ok(
+    enablePushSource.indexOf("Notification.requestPermission")
+      < enablePushSource.indexOf("activatePushForAccount"),
+    "the iOS permission request must run before asynchronous account activation",
+  );
+  assert.ok(
+    enablePushSource.indexOf("Notification.requestPermission")
+      < enablePushSource.indexOf("ensureSdk"),
+    "the native iOS permission request must run before OneSignal initialization",
+  );
+  const activateStart = notificationsClient.indexOf("async function activatePushForAccount");
+  const activateEnd = notificationsClient.indexOf("function ensureSdk", activateStart);
+  const activateSource = notificationsClient.slice(activateStart, activateEnd);
+  assert.ok(activateStart >= 0 && activateEnd > activateStart);
+  assert.ok(
+    activateSource.indexOf("OneSignal.login") < activateSource.indexOf("PushSubscription.optIn"),
+    "the account must be identified before opting its push subscription in",
+  );
+  const inspectSdkStart = notificationsClient.indexOf("async function inspectSdkIfAvailable");
+  const inspectSdkEnd = notificationsClient.indexOf("async function enablePush", inspectSdkStart);
+  const inspectSdkSource = notificationsClient.slice(inspectSdkStart, inspectSdkEnd);
+  assert.match(inspectSdkSource, /isIos\(\) && permissionState\(\) === "default"/);
+  assert.match(inspectSdkSource, /shouldResumeConnection/);
+  assert.match(inspectSdkSource, /activatePushForAccount/);
+  assert.match(notificationsClient, /state\.config\.serverConfigured/);
+  assert.match(notificationsClient, /ONESIGNAL_WEB_NOT_CONFIGURED/);
+  assert.match(notificationsClient, /api\.onesignal\.com\/sync/);
+  assert.match(notificationsClient, /display-mode: standalone/);
+  assert.match(notificationsClient, /\/api\/notifications\/test/);
+  assert.match(notificationsClient, /state\.categories/);
+  assert.match(notificationsClient, /lastRunAt/);
+  assert.match(notificationsClient, /OneSignal\.init/);
+  assert.match(notificationsClient, /OneSignalSDKWorker\.js/);
+  assert.match(notificationsCss, /overflow-wrap: anywhere/);
+  assert.match(oneSignalWorker, /cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js/);
+  assert.match(runtimeWorkerLoader, /cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js/);
+  assert.ok(appIcon.byteLength > 5_000);
+  assert.match(mainBundle, /data-bd-root-splash":"ai-pulse/);
+  assert.match(mainBundle, /Заведение под контролем/);
+  assert.match(mainBundle, /"data-bd-health-startup-machine":"v335"/);
+  assert.match(mainBundle, /data-bd-splash":"brand-loading-v332/);
+  assert.match(mainBundle, /data-bd-brand-splash":"v332/);
+  assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function bdHealthStartupGateV155")), /data-bd-health-entry/);
+  assert.match(mainBundle, /\/warehouse\?add=inventory/);
+  assert.match(mainBundle, /data-bd-warehouse-version":"compact-tree-v240/);
+  assert.match(mainBundle, /function bdWarehouseProductSheet/);
+  assert.match(mainBundle, /\/api\/inventory\/products/);
+  assert.match(mainBundle, /Открыть карточку/);
+  assert.match(warehouseCss, /\.bd-warehouse-product-sheet/);
+  assert.match(mainBundle, /Провести инвентаризацию/);
+  assert.match(mainBundle, /Корректировка по факту/);
+  assert.match(mainBundle, /\/finance\/settings\?section=utilities/);
+  assert.match(mainBundle, /children:e\+" — сумма за месяц \(₽\)"/);
+  assert.match(mainBundle, /Фиксированная сумма за месяц/);
+  assert.match(mainBundle, /Внести суммы остатков/);
+  assert.match(mainBundle, /data-bd-health-index":"split-diagnostic-v19/);
+  assert.match(mainBundle, /bdHomeVisualVersion="home-v151"/);
+  assert.match(mainBundle, /data-bd-home-daily":"v151/);
+  assert.match(mainBundle, /data-bd-opportunity-entry":"home-v151/);
+  assert.match(mainBundle, /data-bd-competitors-entry":"home-v151/);
+  assert.doesNotMatch(mainBundle, /data-bd-home-sections":"v18/);
+  assert.match(
+    mainBundle,
+    /bdHealthQualityVersion="split-quality-and-state-v19"/,
+  );
+  assert.match(mainBundle, /children:"Качество данных"/);
+  assert.match(mainBundle, /children:"Состояние заведения"/);
+  assert.doesNotMatch(mainBundle, /Данные отдельно от оценки/);
+  assert.match(mainBundle, /Количество гостей не ведётся — это необязательный показатель/);
+  assert.match(mainBundle, /bdHealthWeights=\{finance:35,staff:20/);
+  assert.match(mainBundle, /catalog-and-attendance-v9/);
+  assert.match(mainBundle, /equipment:pce\(e,t,o\.equipment\)/);
+  assert.match(mainBundle, /guests:hce\(e,t,r\)/);
+  assert.match(mainBundle, /guests:\{label:"Посещаемость",labelShort:"Посещ\."\}/);
+  assert.match(mainBundle, /bdQuickEventsVersion="structured-v10"/);
+  assert.match(
+    mainBundle,
+    /bdQuickEventCategoryIds=\["equipment","complaint","conflict","supplier","inspection","idea"\]/,
+  );
+  assert.match(mainBundle, /Что хотите зафиксировать\?/);
+  assert.match(mainBundle, /Выручка, расходы, закупки и списания/);
+  assert.match(mainBundle, /Ответственный выбирается из сотрудников заведения/);
+  assert.match(mainBundle, /participantIds:T,equipmentId:Y\?\.id/);
+  const quickCategoryStart = mainBundle.indexOf("bdQuickEventCategoryIds=");
+  const quickCategoryEnd = mainBundle.indexOf(",Zle=", quickCategoryStart);
+  assert.ok(quickCategoryStart >= 0 && quickCategoryEnd > quickCategoryStart);
+  assert.doesNotMatch(
+    mainBundle.slice(quickCategoryStart, quickCategoryEnd),
+    /finance|operations|inventory|maintenance|writeoff/,
+  );
+  assert.match(mainBundle, /bdEmployeeSelectorsVersion="team-v11"/);
+  assert.match(mainBundle, /Сотрудники — участники/);
+  assert.match(mainBundle, /Сотрудник заведения/);
+  assert.match(mainBundle, /Нет активных сотрудников для назначения/);
+  assert.doesNotMatch(mainBundle, /placeholder:"Имя сотрудника"/);
+  assert.doesNotMatch(mainBundle, /placeholder:"Имя сотрудника или роль"/);
+  assert.doesNotMatch(mainBundle, /placeholder:"Имя или должность"/);
+  assert.match(mainBundle, /bdWorkflowVersion="daily-close-v17"/);
+  assert.match(mainBundle, /bdWorkflowCopyVersion="daily-close-v17"/);
+  assert.match(mainBundle, /bdTaskPersistenceVersion="cloud-v32"/);
+  assert.match(mainBundle, /bdHomeDailyVersion="daily-v18"/);
+  assert.match(mainBundle, /data-bd-home-daily":"v151/);
+  assert.match(mainBundle, /data-bd-home-header":"v151/);
+  assert.match(mainBundle, /data-bd-home-today":"v151/);
+  assert.match(mainBundle, /label:"График работы"/);
+  assert.match(mainBundle, /label:"Статус заведения"/);
+  assert.match(mainBundle, /label:"Смена"/);
+  assert.match(mainBundle, /label:"Отчёт за смену"/);
+  assert.match(mainBundle, /Закрыть смену/);
+  assert.match(mainBundle, /Проверить смену/);
+  assert.match(mainBundle, /data-bd-home-money":"result-v151/);
+  assert.match(mainBundle, /Финансовый результат/);
+  assert.match(mainBundle, /Закупки \+ начисления/);
+  assert.match(mainBundle, /Результат до себестоимости/);
+  assert.doesNotMatch(mainBundle, /Закупки и расходы/);
+  assert.match(mainBundle, /data-bd-home-attention":"universal-v198/);
+  assert.match(mainBundle, /bdPlanDistributionVersion="distribution-v31"/);
+  assert.match(mainBundle, /Ошибки и риски в данных/);
+  assert.doesNotMatch(mainBundle, /Зафиксируйте первый инцидент/);
+  assert.match(mainBundle, /Не заполнены отчёты по сменам/);
+  assert.match(mainBundle, /h\.length&&C&&j\.push/);
+  assert.match(mainBundle, /Нужно обновить остатки/);
+  assert.match(mainBundle, /!m\.ready&&C&&j\.push/);
+  assert.match(mainBundle, /Оборудование требует внимания/);
+  assert.match(mainBundle, /Есть просроченные поручения/);
+  assert.doesNotMatch(mainBundle, /data-bd-setup-checklist":"open-v31/);
+  assert.doesNotMatch(mainBundle, /data-bd-home-sections":"v18/);
+  assert.doesNotMatch(mainBundle, /Основные разделы/);
+  assert.match(mainBundle, /data-bd-home-ai":"attention-v197/);
+  assert.match(mainBundle, /data-bd-home-context":"v151/);
+  assert.match(mainBundle, /data-bd-opportunity-entry":"home-v151/);
+  assert.match(mainBundle, /data-bd-competitors-entry":"home-v151/);
+  const homeDailyStart = mainBundle.indexOf("function bdHomeDaily(");
+  const homeDailyEnd = mainBundle.indexOf("function Dce()", homeDailyStart);
+  assert.ok(homeDailyStart >= 0 && homeDailyEnd > homeDailyStart);
+  const homeDailySource = mainBundle.slice(homeDailyStart, homeDailyEnd);
+  const homeOrder = [
+    "i.jsx(bdHomeHealthIndexV200",
+    "i.jsx(bdHomeMoneyCard",
+    "i.jsx(bdHomeTodayCard",
+    "i.jsx(bdHomeAttention",
+    "i.jsx(bdHomeFreshAi",
+    "i.jsx(bdHomeContextCardsV151",
+  ].map((token) => homeDailySource.indexOf(token));
+  assert.ok(homeOrder.every((position) => position >= 0));
+  assert.deepEqual([...homeOrder].sort((a, b) => a - b), homeOrder);
+  assert.match(mainBundle, /bdAiEvidenceVersion="evidence-and-proposals-v32"/);
+  assert.match(mainBundle, /bdUnifiedAiContextVersion="venue-ai-context-v45"/);
+  assert.match(mainBundle, /bdDiagnosisSpecificityVersion="diagnosis-specificity-v46"/);
+  assert.match(mainBundle, /bdDiagnosisFinancialCoreVersion="closed-month-management-v48"/);
+  assert.match(mainBundle, /bdDiagnosisFinancialFOTVersion="financial-fot-v49"/);
+  assert.match(mainBundle, /bdRecommendationOutcomeVersion="recommendation-outcomes-v50"/);
+  assert.match(mainBundle, /bdRecommendationConfidenceVersion="confidence-reason-v51"/);
+  assert.match(mainBundle, /bdAIDoctorAttentionVersion="attention-v196"/);
+  assert.match(mainBundle, /bdAIDoctorFollowThroughVersion="attention-v197"/);
+  assert.match(mainBundle, /bdAIDoctorUniversalVersion="attention-v198"/);
+  assert.match(mainBundle, /bdAIDoctorRuntimeVersion="attention-v199"/);
+  assert.match(mainBundle, /bdHomeHealthIndexVersion="home-health-v200"/);
+  assert.match(mainBundle, /bdBusinessHealthUiVersion="business-health-v252"/);
+  assert.match(mainBundle, /bdAIDoctorBriefingVersion="briefing-first-v253"/);
+  assert.match(mainBundle, /bdAIManagementBriefingVersion="management-briefing-v254"/);
+  assert.match(mainBundle, /bdAISelfServiceVersion="self-service-v255"/);
+  assert.match(mainBundle, /verificationPlanId:e\.verificationPlanId/);
+  assert.match(mainBundle, /data-bd-home-health-index":"business-health-snapshot-v334/);
+  assert.match(mainBundle, /children:"Business Health"/);
+  assert.match(mainBundle, /className:"bd-home-health-score-v332",onClick:\(\)=>r\("\/health"\)/);
+  assert.match(mainBundle, /IC="bd_ai_diagnosis_v9"/);
+  assert.match(mainBundle, /data-bd-diagnosis-loading":"guided-v47/);
+  assert.match(mainBundle, /children:"Формируем диагноз"/);
+  assert.match(mainBundle, /children:"Результат откроется автоматически"/);
+  const diagnosisLoaderStart = mainBundle.indexOf("const WM=");
+  const diagnosisLoaderEnd = mainBundle.indexOf("const $h=", diagnosisLoaderStart);
+  assert.ok(diagnosisLoaderStart >= 0 && diagnosisLoaderEnd > diagnosisLoaderStart);
+  const diagnosisLoaderSource = mainBundle.slice(diagnosisLoaderStart, diagnosisLoaderEnd);
+  assert.doesNotMatch(diagnosisLoaderSource, /Analyzing restaurant data/);
+  assert.doesNotMatch(diagnosisLoaderSource, /This usually takes only a few seconds/);
+  assert.doesNotMatch(diagnosisLoaderSource, /bardoctor-logo\.png/);
+  assert.match(diagnosisLoaderSource, /\.bd-sync-indicator\{display:none!important\}/);
+  assert.match(mainBundle, /data-bd-ai-result":"self-service-v255/);
+  assert.match(mainBundle, /data-bd-management-briefing":"self-service-v1/);
+  assert.match(mainBundle, /function bdAIDoctorNormalizeV199\(/);
+  assert.match(mainBundle, /children:"Что происходит"/);
+  assert.match(mainBundle, /children:"Что делать сегодня"/);
+  assert.match(mainBundle, /children:"Что AI уже выяснил"/);
+  assert.match(mainBundle, /children:"Контекст сегодня"/);
+  assert.match(mainBundle, /children:"После смены проверю"/);
+  assert.match(mainBundle, /children:"Операционные проблемы"/);
+  assert.match(mainBundle, /Достоверность диагноза/);
+  assert.match(mainBundle, /C\.message\?\?"Недостаточно внешних данных/);
+  assert.match(mainBundle, /children:c\.deadlineLabel\?\?"Срок действия"/);
+  assert.match(mainBundle, /children:c\.metricToCheck/);
+  assert.match(mainBundle, /title:"Возможности"/);
+  assert.match(mainBundle, /children:"Качество данных"/);
+  assert.match(mainBundle, /children:\["История AI Doctor"/);
+  assert.match(mainBundle, /className:"bd-ai-why"/);
+  assert.match(mainBundle, /children:\["Почему\?"/);
+  assert.match(mainBundle, /children:"Факт: "/);
+  assert.match(mainBundle, /children:"Причина: "/);
+  assert.match(mainBundle, /children:"Подтверждённость: "/);
+  assert.match(mainBundle, /children:"Проверка: "/);
+  assert.match(mainBundle, /"Подготовить задачу"/);
+  assert.match(mainBundle, /className:"bd-ai-compact-action"/);
+  const managementStart = mainBundle.indexOf("function Fce(");
+  const managementEnd = mainBundle.indexOf("function Uce()", managementStart);
+  const managementSource = mainBundle.slice(managementStart, managementEnd);
+  assert.doesNotMatch(managementSource, /bdAIDoctorPriorityCardV196/);
+  assert.match(managementSource, /bd-ai-operational-rows/);
+  assert.match(mainBundle, /u\.fact\?" — "\+u\.fact:""/);
+  assert.match(mainBundle, /data-bd-financial-assessment":"financial-fot-v49/);
+  assert.match(mainBundle, /children:\["ФОТ · "/);
+  assert.match(mainBundle, /Сопоставляем прибыль, ФОТ и расходы/);
+  assert.match(mainBundle, /children:"Итог закрытого месяца"/);
+  assert.match(mainBundle, /children:"Управленческий вывод"/);
+  assert.match(mainBundle, /children:"Открыть отчёт →"/);
+  assert.match(mainBundle, /children:"Обновить анализ"/);
+  assert.match(bootstrap, /data-bd-review-recommendation-task/);
+  assert.match(bootstrap, /Проверить предложение/);
+  assert.match(mainBundle, /bdNextTasks=bdNormalizeTasks/);
+  assert.match(mainBundle, /approvalStatus:"pending"/);
+  assert.match(mainBundle, /bdPersistDiagnosisV294\(n\)\.finally/);
+  assert.match(mainBundle, /bd:business-health-snapshot/);
+  assert.match(mainBundle, /bdSavedDiagnosis=WS\(\)/);
+  assert.match(mainBundle, /bdUseBusinessHealthSnapshotV284\(\)/);
+  assert.match(mainBundle, /xr\(IC\)/);
+  assert.match(mainBundle, /aiGenerated:!0/);
+  assert.match(mainBundle, /knownEmployees:/);
+  assert.match(mainBundle, /"Предложение агента":"Поручение от AI"/);
+  assert.match(mainBundle, /bdReviewEvidenceUiVersion="review-evidence-v27"/);
+  assert.match(mainBundle, /children:\["Основание: ",r\.basisSummary/);
+  assert.match(mainBundle, /t\.hasEnoughData&&t\.coveragePercent>=60/);
+  assert.match(mainBundle, /Number\(e\.cachedAt\|\|0\)>=n/);
+  assert.match(mainBundle, /data-bd-bottom-nav":"responsive-v54/);
+  assert.match(mainBundle, /gridTemplateColumns:"repeat\(6,minmax\(0,1fr\)\)"/);
+  assert.match(
+    homeVisualCss,
+    /linear-gradient\(145deg, #11162f 0%, #1a234d 64%, #262f6a 100%\)/,
+  );
+  assert.match(mainBundle, /name:"Смены",href:"\/shifts"/);
+  assert.match(mainBundle, /name:"Финансы",href:"\/finance"/);
+  assert.match(mainBundle, /name:"Добавить",icon:Vt,action:!0/);
+  assert.doesNotMatch(mainBundle, /name:"Склад",href:"\/warehouse",icon:PA/);
+  assert.doesNotMatch(mainBundle, /m\.key==="warehouse"\?e==="\/warehouse"/);
+  assert.match(mainBundle, /\["\/reports","\/warehouse"\]/);
+  assert.match(
+    mainBundle,
+    /e\.startsWith\("\/salaries"\)&&window\.bdReadNavigationQuery\("return","team"\)==="finance"/,
+  );
+  assert.match(mainBundle, /"data-bd-nav-key":m\.key/);
+  assert.match(mainBundle, /name:"Команда",href:"\/employees"/);
+  assert.match(mainBundle, /name:"Ещё",href:"\/more"/);
+  assert.match(
+    mainBundle,
+    /"aria-label":"Назад",className:"w-11 h-11 rounded-full bg-card/,
+  );
+  assert.match(
+    mainBundle,
+    /className:"bd-finance-quick-add-fab"/,
+  );
+  assert.match(mainBundle, /Открыть быстрые финансовые действия/);
+  assert.doesNotMatch(mainBundle, /"aria-label":"Добавить операцию",className:"fixed bottom-24 right-6/);
+  assert.match(mainBundle, /async function bdLogoutSession\(\)/);
+  assert.match(mainBundle, /fetch\(`\$\{hz\}\/logout`/);
+  assert.match(mainBundle, /path:"\/market".*component:bdMarketPage/);
+  assert.match(mainBundle, /path:"\/opportunities".*component:bdOpportunitiesPage/);
+  assert.match(mainBundle, /path:"\/data-control".*component:bdDataControlPage/);
+  assert.match(mainBundle, /path:"\/integrations".*component:bdIntegrationsPage/);
+  assert.match(mainBundle, /path:"\/notifications".*component:bdNotificationsPage/);
+  assert.doesNotMatch(mainBundle, /path:"\/reset",component:iEe/);
+  assert.doesNotMatch(mainBundle, /path:"\/design-system",component:rEe/);
+  assert.match(mainBundle, /"aria-label":"Записать происшествие"/);
+  assert.match(mainBundle, /"aria-label":"Назад к оборудованию"/);
+  assert.doesNotMatch(mainBundle, /"aria-label":"Назад к диагностике"/);
+  assert.match(worker, /frame-ancestors 'self'/);
+  assert.match(worker, /X-Frame-Options[\s\S]*SAMEORIGIN/);
+  assert.match(mainBundle, /name:"Добавить покупку",description:"Товары, услуги или другие затраты",href:"\/suppliers\?create=1"/);
+  assert.match(mainBundle, /description:"Внести выручку и состав команды",href:"\/shifts\?closeShift=1"/);
+  assert.match(mainBundle, /data-bd-shifts-page":"v158/);
+  assert.match(mainBundle, /path:"\/shifts"/);
+  assert.match(mainBundle, /Закрытие и история рабочих смен/);
+  assert.match(mainBundle, /description:"Назначить задачу сотруднику",href:"\/tasks\?new=1"/);
+  assert.doesNotMatch(mainBundle, /href:"\/decisions"/);
+  assert.doesNotMatch(mainBundle, /path:"\/decisions"/);
+  assert.match(bootstrap, /window\.location\.pathname === "\/decisions"/);
+  assert.doesNotMatch(mainBundle, /children:\["Рынок рядом"/);
+  assert.match(
+    mainBundle,
+    /const QI=\[\{icon:Dn,label:"Оборудование".*label:"Отзывы гостей".*label:"Поставщики"/,
+  );
+  const moreMenuStart = mainBundle.indexOf("const QI=");
+  const moreMenuEnd = mainBundle.indexOf("function JI", moreMenuStart);
+  assert.ok(moreMenuStart >= 0 && moreMenuEnd > moreMenuStart);
+  const moreMenu = mainBundle.slice(moreMenuStart, moreMenuEnd);
+  assert.doesNotMatch(moreMenu, /label:"Зарплаты"|label:"Правила оплаты"|label:"Склад"/);
+  const homePageStart = mainBundle.indexOf("function Dce()");
+  const homePageEnd = mainBundle.indexOf("const q7=", homePageStart);
+  assert.ok(homePageStart >= 0 && homePageEnd > homePageStart);
+  const homePage = mainBundle.slice(homePageStart, homePageEnd);
+  assert.match(homePage, /bdHomeDaily/);
+  assert.doesNotMatch(
+    homePage,
+    /wce|Sce|kce|Mce|Pce|bdHomeCommandCenter/,
+  );
+  assert.match(mainBundle, /Закройте завершённую смену/);
+  assert.match(mainBundle, /Выручка, команда, списания и происшествия/);
+  assert.match(mainBundle, /Сохранить факт в журнале и AI-анализе/);
+  assert.match(mainBundle, /Журнал происшествий/);
+  assert.match(mainBundle, /Создать поручение по этой записи/);
+  assert.match(mainBundle, /bd_tasks:bdLoadTasks\(\)/);
+  assert.match(mainBundle, /bdTaskLifecycleVersion="proposals-v32"/);
+  assert.match(mainBundle, /data-bd-task-actions":"proposal-v32"/);
+  assert.match(mainBundle, /label:"Предложенные"/);
+  assert.match(mainBundle, /children:"Утвердить"/);
+  assert.match(mainBundle, /children:"Редактировать"/);
+  assert.match(mainBundle, /children:"Удалить"/);
+  assert.match(mainBundle, /children:"В работу"/);
+  assert.match(mainBundle, /children:"Выполнить"/);
+  assert.match(mainBundle, /children:"Отменить"/);
+  assert.match(mainBundle, /label:"История"/);
+  assert.match(mainBundle, /actionTaskId:bdActionTask\.id/);
+  assert.match(mainBundle, /bdTaskHydratedRef=S\.useRef\(!1\)/);
+  assert.match(mainBundle, /onInput:b=>g\(b\.currentTarget\.value\)/);
+  assert.match(mainBundle, /style:\{zIndex:75,backdropFilter:/);
+  const taskLifecycleStart = mainBundle.indexOf(
+    'const bdTaskLifecycleVersion="proposals-v32"',
+  );
+  const taskLifecycleEnd = mainBundle.indexOf("function So(", taskLifecycleStart);
+  assert.ok(taskLifecycleStart >= 0 && taskLifecycleEnd > taskLifecycleStart);
+  const taskLifecycle = mainBundle.slice(taskLifecycleStart, taskLifecycleEnd);
+  assert.doesNotMatch(taskLifecycle, /drag:"x"/);
+  assert.match(taskLifecycle, /approvalStatus:"deleted",hidden:!0/);
+  assert.match(mainBundle, /Закройте смену или зафиксируйте отдельное происшествие/);
+  const homeWorkflowStart = mainBundle.indexOf(
+    'const bdWorkflowVersion="daily-close-v17"',
+  );
+  const homeWorkflowEnd = mainBundle.indexOf("function Pce(", homeWorkflowStart);
+  assert.ok(homeWorkflowStart >= 0 && homeWorkflowEnd > homeWorkflowStart);
+  const homeWorkflow = mainBundle.slice(homeWorkflowStart, homeWorkflowEnd);
+  assert.doesNotMatch(homeWorkflow, /label:"Дело"|href:"\/cases\/add"|label:"Задача"/);
+  assert.match(homeWorkflow, /label:"Закрыть смену"/);
+  assert.match(homeWorkflow, /href:"\/shifts\?closeShift=1"/);
+  assert.match(homeWorkflow, /label:"Происшествие"/);
+  assert.doesNotMatch(homeWorkflow, /label:"Поручение"/);
+  assert.match(mainBundle, /bdShiftClosingVersion="guided-v17"/);
+  assert.match(mainBundle, /data-bd-shift-closing":"guided-v17/);
+  assert.match(mainBundle, /Ежедневное закрытие смены/);
+  assert.match(
+    mainBundle,
+    /steps=\["Выручка","Команда","Списания","Происшествия","Проверка"\]/,
+  );
+  assert.match(mainBundle, /ФОТ смены · автоматически/);
+  assert.match(mainBundle, /Происшествий не указано/);
+  assert.match(mainBundle, /Результат смены/);
+  assert.match(mainBundle, /до себестоимости проданного товара/);
+  assert.match(
+    mainBundle,
+    /Закупки и накопительные расходы не привязаны к смене/,
+  );
+  assert.match(
+    mainBundle,
+    /Налоги и коммунальные услуги распределяются автоматически по графику заведения/,
+  );
+  assert.match(mainBundle, /new CustomEvent\("bd:shift-closed"/);
+  assert.match(mainBundle, /bdShiftWriteoffVersionV272="canonical-shift-writeoff-v272"/);
+  assert.match(mainBundle, /bdShiftCloseApiV272/);
+  assert.match(mainBundle, /writeOffItems:writeoffs\.map/);
+  assert.match(mainBundle, /participantIds:\w+\.participantIds/);
+  assert.match(mainBundle, /\.get\("closeShift"\)==="1"/);
+  assert.match(mainBundle, /title:[A-Za-z_$][\w$]*\?"Смена обновлена":"Смена закрыта"/);
+  assert.match(mainBundle, /children:"Что происходит сейчас"/);
+  assert.match(mainBundle, /children:"Зоны Business Health"/);
+  assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function c_e(){"), mainBundle.indexOf("function Ln(")), /Открыть раздел|bd-health-tabs-v332/);
+  assert.match(mainBundle, /Настройка периодичности остатков/);
+  assert.match(mainBundle, /Не внесены остатки на начало текущего месяца/);
+  assert.match(mainBundle, /data-bd-finance-results":"unified-v16/);
+  assert.match(mainBundle, /data-bd-finance-result-card/);
+  assert.match(mainBundle, /Денежный результат после оплат/);
+  assert.match(mainBundle, /Операционный результат до себестоимости/);
+  assert.match(mainBundle, /Финансовый результат месяца/);
+  assert.match(mainBundle, /data-bd-nowrap-money/);
+  assert.doesNotMatch(mainBundle, /Денежный результат · 1 из 3/);
+  assert.doesNotMatch(mainBundle, /[123] · (?:Денежный|Предварительный|Финальная)/);
+  assert.match(mainBundle, /bdMonthClosingVersion="wizard-v20"/);
+  assert.match(mainBundle, /data-bd-month-closing":"wizard-v20/);
+  assert.match(mainBundle, /bd_month_closings/);
+  assert.match(mainBundle, /Мастер закрытия месяца/);
+  assert.match(mainBundle, /Проверка всех смен/);
+  assert.match(mainBundle, /Оплаты и остальные расходы/);
+  assert.match(mainBundle, /Начальные остатки/);
+  assert.match(mainBundle, /Конечные остатки/);
+  assert.match(mainBundle, /ФОТ, налоги и коммунальные услуги/);
+  assert.match(mainBundle, /Подтверждение и закрытие периода/);
+  assert.match(mainBundle, /Денежный результат после оплат/);
+  assert.match(mainBundle, /Результат до себестоимости/);
+  assert.match(mainBundle, /Финальная прибыль месяца/);
+  assert.match(mainBundle, /Показать операции/);
+  assert.match(mainBundle, /Подтвердить и закрыть период/);
+  assert.match(
+    mainBundle,
+    /Выручка − оплаты поставщикам − начисленный ФОТ − списания − остальные расходы − налоги − коммунальные услуги/,
+  );
+  assert.match(
+    mainBundle,
+    /Начальные остатки \+ закупки − конечные остатки − списания/,
+  );
+  assert.match(mainBundle, /cashResult:tt-bdPurchaseCashOutflow/);
+  assert.match(mainBundle, /data-bd-expense-breakdown":"period-v5/);
+  assert.match(mainBundle, /data-bd-shift-result":"period-v4/);
+  const shiftResultStart = mainBundle.indexOf('data-bd-shift-result":"period-v4');
+  const shiftResultEnd = mainBundle.indexOf(",u.note&&i.jsx", shiftResultStart);
+  assert.ok(shiftResultStart >= 0 && shiftResultEnd > shiftResultStart);
+  assert.doesNotMatch(
+    mainBundle.slice(shiftResultStart, shiftResultEnd),
+    /Прочие расходы|Накопительные расходы/,
+  );
+  assert.match(mainBundle, /data-bd-recurring-impact":"current/);
+  assert.match(mainBundle, /Результат смены/);
+  assert.doesNotMatch(mainBundle, /Закупки запасов в расчёт этой смены не входят/);
+  assert.doesNotMatch(mainBundle, /Закупки запасов — справочно/);
+  assert.doesNotMatch(mainBundle, /Закупки — это пополнение общего запаса заведения/);
+  assert.match(mainBundle, /Расходы за период/);
+  assert.match(mainBundle, /function bdPeriodExpenseBreakdown/);
+  assert.match(mainBundle, /function bdExpenseArea/);
+  assert.match(mainBundle, /function bdExpenseArea\(e\).*repairs:"Ремонт"/);
+  assert.match(mainBundle, /rent:"Аренда",repairs:"Ремонт",equipment:"Оборудование"/);
+  assert.match(mainBundle, /household:"Хоз\.товары"/);
+  assert.match(mainBundle, /hookah:"Кальяны"/);
+  assert.match(mainBundle, /"consumables","hookah"/);
+  const financeSummaryStart = mainBundle.indexOf("function B2(");
+  const financeSummaryEnd = mainBundle.indexOf("function kAe(", financeSummaryStart);
+  assert.ok(financeSummaryStart >= 0 && financeSummaryEnd > financeSummaryStart);
+  assert.doesNotMatch(
+    mainBundle.slice(financeSummaryStart, financeSummaryEnd),
+    /Закупки за период/,
+  );
+  assert.match(mainBundle, /Dt=tt-vt-Ct-je/);
+  assert.doesNotMatch(mainBundle, /Dt=tt-vt-Ct-Nt-je/);
+  assert.match(mainBundle, /tt=y-k-q-O-\(ae\?B\+U:\$\)/);
+  assert.match(mainBundle, /JSON\.stringify\(\{data:n,baseData:r\}\)/);
+  assert.match(mainBundle, /Object\.prototype\.hasOwnProperty\.call\(a,"data"\)/);
+  assert.match(mainBundle, /inventoryMismatch:bdInventoryMismatch/);
+  assert.match(mainBundle, /Остатки не сходятся/);
+  assert.match(mainBundle, /"aria-label":"Дата смены"/);
+  assert.match(mainBundle, /"aria-label":"Количество чеков"/);
+  assert.match(mainBundle, /canonical-document-v271/);
+  assert.match(mainBundle, /Провести списание/);
+  assert.match(mainBundle, /"aria-label":"Причина списания"/);
+  assert.doesNotMatch(mainBundle, /Себестоимость списания/);
+  assert.match(mainBundle, /"aria-label":"Дата расхода"/);
+  assert.match(mainBundle, /"aria-label":"Сумма расхода, ₽"/);
+  assert.match(mainBundle, /"aria-label":"Описание расхода"/);
+  assert.doesNotMatch(mainBundle, /"aria-label":d==="writeoff"\?"Причина списания":"Описание расхода"/);
+  assert.match(mainBundle, /В результате завершённого месяца учтена полная сумма/);
+  assert.match(mainBundle, /Операционный результат по сменам/);
+  assert.doesNotMatch(mainBundle, /Ориентир по чистым деньгам смен/);
+  assert.match(mainBundle, /function bdMonthClosingMoney\(e\)\{return bdMoney2\(Number\(e\)\|\|0\)\}/);
+  assert.doesNotMatch(mainBundle, /function bdMonthClosingMoney\(e\)\{return bdMoney2\(Number\(e\)\|\|0\)\+" ₽"\}/);
+  assert.match(mainBundle, /Открыть закрытый месяц\? После этого данные периода снова можно будет изменять\./);
+  assert.match(mainBundle, /\+ Создать правило оплаты/);
+  assert.match(mainBundle, /"aria-label":"Дата инвентаризации"/);
+  assert.match(mainBundle, /"aria-label":"Сумма зарплатной операции, ₽"/);
+  assert.match(mainBundle, /"aria-label":"Правило оплаты сотрудника"/);
+  assert.match(mainBundle, /s\?"button":"div"/);
+  assert.match(
+    mainBundle,
+    /e==="final"\|\|t\.periodPast\?t\.taxes:t\.allocatedTaxes/,
+  );
+  assert.match(
+    mainBundle,
+    /Себестоимость проданного товара ещё не вычтена/,
+  );
+  assert.doesNotMatch(mainBundle, /Общий балл — среднее по категориям, где есть данные/);
+  assert.doesNotMatch(mainBundle, /r\.length<8/);
+  assert.match(mainBundle, /Все завершённые смены текущего месяца учтены/);
+  assert.doesNotMatch(mainBundle, /коммуналка/i);
+  assert.doesNotMatch(mainBundle, /Diagnose\. Improve\. Grow\./);
+  assert.match(mainBundle, /data-bd-auth":"split-v1/);
+  assert.match(mainBundle, /function bdAuthField/);
+  assert.match(mainBundle, /className:"bd-auth-trailing"/);
+  assert.match(mainBundle, /Войдите в BarDoctor/);
+  assert.match(mainBundle, /Создайте аккаунт/);
+  const loginStart = mainBundle.indexOf("function kle()");
+  const loginEnd = mainBundle.indexOf("function Gd(", loginStart);
+  const registerStart = mainBundle.indexOf("function Dle()");
+  const registerEnd = mainBundle.indexOf("const N7=", registerStart);
+  assert.ok(loginStart >= 0 && loginEnd > loginStart);
+  assert.ok(registerStart >= 0 && registerEnd > registerStart);
+  assert.doesNotMatch(mainBundle.slice(loginStart, loginEnd), /leftIcon/);
+  assert.doesNotMatch(mainBundle.slice(loginStart, loginEnd), /bdAuthBack/);
+  assert.doesNotMatch(mainBundle.slice(registerStart, registerEnd), /leftIcon/);
+  assert.match(authCss, /bd-auth-split-v1/);
+  assert.match(authCss, /grid-template-columns:minmax\(520px,42%\)/);
+  assert.match(authCss, /@media \(max-width:899px\)/);
+  assert.match(authCss, /\.bd-auth-showcase\{display:block;order:-1/);
+  assert.match(authCss, /\.bd-auth-form-panel\{min-height:calc\(100dvh - 200px\);margin-top:-28px/);
+  assert.doesNotMatch(authCss, /\.bd-auth-showcase\{display:none\}/);
+  assert.ok(authVenueBackground.byteLength > 100_000);
+  assert.match(integrationsClient, /\/api\/integration-hub/);
+  assert.match(integrationsClient, /\/api\/reviews\/sources/);
+  assert.doesNotMatch(integrationsClient, /input\[type="password"\]/);
+  assert.doesNotMatch(integrationsClient, /Включено в подписку/);
+  assert.doesNotMatch(integrationsClient, /В этом месяце использовано|Осталось:|data\.aiUsage/);
+  assert.doesNotMatch(integrationsClient, /Сохранить OneSignal/);
+  assert.equal(JSON.parse(hosting).d1, "DB");
+  assert.equal(JSON.parse(hosting).r2, "BUCKET");
+  assert.match(coreMigration, /CREATE TABLE `accounts`/);
+  assert.match(coreMigration, /CREATE TABLE `domain_data`/);
+  assert.match(coreMigration, /CREATE TABLE `sessions`/);
+  assert.match(integrationsMigration, /CREATE TABLE `google_connections`/);
+  assert.match(integrationsMigration, /CREATE TABLE `oauth_states`/);
+  assert.match(integrationsMigration, /CREATE TABLE `review_source_events`/);
+  assert.match(secretsMigration, /CREATE TABLE `integration_secrets`/);
+  assert.match(secretsMigration, /integration_secrets_account_key_uq/);
+  assert.match(aiUsageMigration, /CREATE TABLE `ai_usage_limits`/);
+  assert.match(aiUsageMigration, /`request_limit` integer DEFAULT 20 NOT NULL/);
+  assert.match(aiSubscriptionMigration, /`request_limit` integer ,
+    context,
+  );
+  return context.helpers;
+}
+
+test("an overnight shift keeps its opening business date through 06:00", async () => {
+  const { Ig, $g, wo } = await productionShiftHelpers();
+  const venue = {
+    openTime: "22:00",
+    closeTime: "06:00",
+    workingDays: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true },
+  };
+  const businessDay = new Date(2026, 5, 30, 12, 0, 0);
+  const duringShift = new Date(2026, 6, 1, 2, 0, 0);
+  const afterShift = new Date(2026, 6, 1, 6, 1, 0);
+  const bounds = Ig(venue, businessDay);
+
+  assert.equal(bounds.operatingDate, "2026-06-30");
+  assert.equal(bounds.overnight, true);
+  assert.equal(bounds.start.getDate(), 30);
+  assert.equal(bounds.start.getHours(), 22);
+  assert.equal(bounds.end.getDate(), 1);
+  assert.equal(bounds.end.getHours(), 6);
+  assert.equal($g(venue, businessDay, duringShift).status, "active");
+  assert.equal($g(venue, businessDay, afterShift).status, "completed");
+
+  const junePeriod = wo(venue, afterShift, 2026, 6);
+  assert.equal(junePeriod.periodEnd.getMonth(), 6);
+  assert.equal(junePeriod.periodEnd.getDate(), 1);
+  assert.equal(junePeriod.periodEnd.getHours(), 6);
+});
+
+function weekStart(date) {
+  const result = new Date(date);
+  const offset = (date.getDay() + 6) % 7;
+  result.setHours(0, 0, 0, 0);
+  result.setDate(date.getDate() - offset);
+  return result;
+}
+
+function inRange(value, start, end) {
+  const key = value.slice(0, 10);
+  return key >= dateKey(start) && key <= dateKey(end);
+}
+
+function summarize(revenue, expenses, start, end) {
+  const revenueRows = revenue.filter((row) => inRange(row.date, start, end));
+  const expenseRows = expenses.filter((row) => inRange(row.date, start, end));
+  const revenueTotal = revenueRows.reduce((sum, row) => sum + row.revenue, 0);
+  const receipts = revenueRows.reduce((sum, row) => sum + row.receipts, 0);
+  const inventoryPurchases = expenseRows
+    .filter((row) => ["products", "alcohol", "food", "consumables"].includes(row.category))
+    .reduce((sum, row) => sum + row.amount, 0);
+  const otherExpenses = expenseRows
+    .filter((row) => !["products", "alcohol", "food", "consumables"].includes(row.category))
+    .reduce((sum, row) => sum + row.amount, 0);
+
+  return {
+    revenue: revenueTotal,
+    receipts,
+    inventoryPurchases,
+    otherExpenses,
+    avgReceipt: receipts > 0 ? Math.round(revenueTotal / receipts) : null,
+    cashMovement: revenueTotal - inventoryPurchases - otherExpenses,
+    operatingDiff: revenueTotal - inventoryPurchases - otherExpenses,
+    guests: null,
+    daysWithData: revenueRows.length,
+    hasRevenueData: revenueRows.length > 0,
+  };
+}
+
+async function healthIndexReport(scores, context = {}) {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("const jce=");
+  const end = bundle.indexOf("function fc(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  function category(id) {
+    const score = scores[id] ?? null;
+    return {
+      id,
+      hasData: score !== null,
+      score,
+      openCount: 0,
+      resolvedCount: 0,
+      factors: [],
+    };
+  }
+
+  const sandbox = {
+    dc(value) {
+      return Math.round(Math.max(0, Math.min(100, value)));
+    },
+    ql(value) {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : null;
+    },
+    Rg() {
+      return false;
+    },
+    $g() {
+      return { status: "non_working", bounds: { operatingDate: "" } };
+    },
+    pce() {
+      return category("equipment");
+    },
+    hce() {
+      return category("guests");
+    },
+    bce() {
+      return category("guestExperience");
+    },
+    yce() {
+      return category("staff");
+    },
+    mce() {
+      return category("operations");
+    },
+    vce() {
+      return category("finance");
+    },
+    xce() {
+      return category("maintenance");
+    },
+    gce() {
+      return category("tasks");
+    },
+    bdAccountingMoneyV243(value) {
+      return `${Math.round(Number(value) || 0).toLocaleString("ru-RU")} RUB`;
+    },
+  };
+
+  const {
+    events = [],
+    cases = [],
+    employees = [],
+    revenue = [],
+    expenses = [],
+    reviews = [],
+    ...inputContext
+  } = context;
+  const evaluationContext = {
+    ...sandbox,
+    inputContext,
+    inputEvents: events,
+    inputCases: cases,
+    inputEmployees: employees,
+    inputRevenue: revenue,
+    inputExpenses: expenses,
+    inputReviews: reviews,
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = zC(inputEvents, inputCases, inputEmployees, inputRevenue, inputExpenses, inputReviews, inputContext);`,
+    evaluationContext,
+  );
+  return evaluationContext.output;
+}
+
+test("data quality is independent from the venue state", async () => {
+  const report = await healthIndexReport(
+    { finance: 97, staff: 97 },
+    {
+      employees: [{ id: "employee-1" }],
+      revenue: [
+        {
+          date: "2026-07-18",
+          revenue: 1_000,
+          receipts: 10,
+          staffing: [{ employeeId: "employee-1" }],
+        },
+      ],
+    },
+  );
+  assert.equal(report.dataQualityPercent, 58);
+  assert.equal(report.coveragePercent, 58);
+  assert.equal(report.stateScore, null);
+  assert.equal(report.overall, null);
+  assert.equal(report.hasEnoughData, false);
+  assert.match(report.confidenceNote, /качества данных/i);
+});
+
+test("missing categories receive no neutral score", async () => {
+  const report = await healthIndexReport(
+    {
+      finance: 90,
+      staff: 80,
+      operations: 70,
+      tasks: 60,
+    },
+    {
+      events: [{ category: "operations" }],
+      cases: [{ id: "task-1" }],
+      employees: [{ id: "employee-1" }],
+      revenue: [
+        {
+          date: "2026-07-18",
+          revenue: 1_000,
+          receipts: 10,
+          staffing: [{ employeeId: "employee-1" }],
+        },
+      ],
+    },
+  );
+  assert.equal(report.dataQualityPercent, 73);
+  assert.equal(report.stateScore, 81);
+  assert.equal(report.overall, 81);
+  assert.equal(report.isPreliminary, true);
+  assert.equal(report.stateDomainsCount, 3);
+});
+
+test("missing scheduled inventory lowers only data quality", async () => {
+  const base = {
+    events: [{ category: "operations" }],
+    cases: [{ id: "task-1" }],
+    employees: [{ id: "employee-1" }],
+    revenue: [
+      {
+        date: "2026-07-18",
+        revenue: 1_000,
+        receipts: 10,
+        staffing: [{ employeeId: "employee-1" }],
+      },
+    ],
+  };
+  const missingInventory = await healthIndexReport(
+    {
+      finance: 80,
+      staff: 75,
+      operations: 70,
+      tasks: 65,
+    },
+    {
+      ...base,
+      settings: { inventoryFrequency: "monthly" },
+      snapshots: [],
+    },
+  );
+  const readyInventory = await healthIndexReport(
+    {
+      finance: 80,
+      staff: 75,
+      operations: 70,
+      tasks: 65,
+    },
+    {
+      ...base,
+      settings: { inventoryFrequency: "monthly" },
+      snapshots: [{ date: `${new Date().toISOString().slice(0, 7)}-01` }],
+    },
+  );
+  assert.equal(missingInventory.inventoryReady, false);
+  assert.equal(
+    readyInventory.dataQualityPercent - missingInventory.dataQualityPercent,
+    5,
+  );
+  assert.equal(readyInventory.stateScore, missingInventory.stateScore);
+  assert.match(
+    missingInventory.dataDomains.find((domain) => domain.id === "finance").missing.join(" "),
+    /остатки/i,
+  );
+});
+
+async function healthOperationalEvidence(equipment, revenue) {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf(
+    'const bdHealthEvidenceVersion="catalog-and-attendance-v9"',
+  );
+  const end = bundle.indexOf("function mce(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const context = {
+    equipment,
+    revenue,
+    ZS: 30 * 24 * 60 * 60 * 1_000,
+    dc(value) {
+      return Math.round(Math.max(0, Math.min(100, value)));
+    },
+    Kg() {
+      return 70;
+    },
+    Yg(items) {
+      return { openCount: items.length, resolvedCount: 0 };
+    },
+    ql(value) {
+      return typeof value === "number" && Number.isFinite(value) ? value : null;
+    },
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = { equipment: pce([], [], equipment), attendance: hce([], [], revenue) };`,
+    context,
+  );
+  return context.output;
+}
+
+test("health index counts catalog equipment without requiring a maintenance date", async () => {
+  const date = dateKey(new Date());
+  const evidence = await healthOperationalEvidence(
+    [
+      {
+        id: "speaker-1",
+        name: "Аудио колонка",
+        status: "working",
+        archived: false,
+        nextMaintenance: null,
+      },
+    ],
+    [{ date, revenue: 4_834, receipts: 16 }],
+  );
+
+  assert.equal(evidence.equipment.hasData, true);
+  assert.equal(evidence.equipment.equipmentCount, 1);
+  assert.ok(evidence.equipment.score > 0);
+  assert.match(evidence.equipment.factors[0].text, /исправное/i);
+});
+
+test("health index uses receipts as an attendance estimate when guest count is absent", async () => {
+  const date = dateKey(new Date());
+  const evidence = await healthOperationalEvidence(
+    [],
+    [{ date, revenue: 4_834, receipts: 16 }],
+  );
+
+  assert.equal(evidence.attendance.hasData, true);
+  assert.equal(evidence.attendance.attendanceSource, "receipts");
+  assert.equal(evidence.attendance.receiptCount, 16);
+  assert.match(evidence.attendance.factors[0].text, /по 16 чекам/i);
+});
+
+async function healthShiftCoverage(profile, now, revenue) {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("function bdHealthDateKey");
+  const end = bundle.indexOf("function bdHealthInventoryStatus", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const context = {
+    Rg: isWorkingDay,
+    $g: shiftState,
+    profile,
+    now,
+    revenue,
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = bdHealthShiftCoverage(profile, revenue, now);`,
+    context,
+  );
+  return context.output;
+}
+
+test("health index counts completed shifts only in the current month", async () => {
+  const cologne = {
+    openTime: "22:00",
+    closeTime: "06:00",
+    workingDays: {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: true,
+      6: true,
+      7: true,
+    },
+  };
+  const now = new Date(2026, 6, 16, 17, 34);
+  const revenue = [
+    "2026-07-03",
+    "2026-07-04",
+    "2026-07-05",
+    "2026-07-10",
+    "2026-07-11",
+    "2026-07-12",
+  ].map((date) => ({ date, revenue: 1_000, receipts: 5 }));
+
+  const coverage = await healthShiftCoverage(cologne, now, revenue);
+  assert.deepEqual(
+    {
+      expected: coverage.expected,
+      entered: coverage.entered,
+      percent: coverage.percent,
+    },
+    { expected: 6, entered: 6, percent: 100 },
+  );
+});
+
+async function financeWeekContext(profile, now, revenue, expenses) {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("const bdFinanceDayShort=");
+  const end = bundle.indexOf("function B2(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const context = {
+    profile,
+    now,
+    revenue,
+    expenses,
+    Um: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true },
+    $se: [1, 2, 3, 4, 5, 6, 7],
+    Rg: isWorkingDay,
+    $g: shiftState,
+    LS: dateKey,
+    ec: weekStart,
+    wn: summarize,
+  };
+
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.output = bdFinanceWeekContext(profile, now, revenue, expenses);`,
+    context,
+  );
+  return context.output;
+}
+
+test("finance week uses the selected venue schedule and hides unfinished shifts", async () => {
+  const cologne = {
+    workingDays: {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: true,
+      6: true,
+      7: true,
+    },
+    openTime: "18:00",
+    closeTime: "05:00",
+  };
+  const context = await financeWeekContext(
+    cologne,
+    new Date(2026, 6, 15, 15),
+    [{ date: "2026-07-12", revenue: 4_834, receipts: 16 }],
+    [{ date: "2026-07-15", category: "repairs", amount: 600 }],
+  );
+
+  assert.equal(context.scheduledShifts, 3);
+  assert.equal(context.completedShifts, 0);
+  assert.equal(context.week.hasRevenueData, false);
+  assert.equal(context.week.otherExpenses, 600);
+  assert.match(context.scheduleLabel, /пт, сб, вс/);
+  assert.match(context.nextWorkingLabel, /17/);
+});
+
+test("finance week compares only the same completed shifts for any venue schedule", async () => {
+  const weekdayVenue = {
+    workingDays: {
+      1: true,
+      2: true,
+      3: true,
+      4: true,
+      5: false,
+      6: false,
+      7: false,
+    },
+    openTime: "09:00",
+    closeTime: "14:00",
+  };
+  const context = await financeWeekContext(
+    weekdayVenue,
+    new Date(2026, 6, 15, 15),
+    [
+      { date: "2026-07-13", revenue: 1_000, receipts: 5 },
+      { date: "2026-07-14", revenue: 1_200, receipts: 6 },
+      { date: "2026-07-15", revenue: 1_400, receipts: 7 },
+      { date: "2026-07-06", revenue: 900, receipts: 5 },
+      { date: "2026-07-07", revenue: 1_000, receipts: 5 },
+      { date: "2026-07-08", revenue: 1_100, receipts: 5 },
+      { date: "2026-07-09", revenue: 99_000, receipts: 99 },
+    ],
+    [],
+  );
+
+  assert.equal(context.scheduledShifts, 4);
+  assert.equal(context.completedShifts, 3);
+  assert.equal(context.week.revenue, 3_600);
+  assert.equal(context.prevWeek.revenue, 3_000);
+  assert.doesNotMatch(context.scheduleLabel, /пт|сб|вс/);
+});
+
+async function inventoryAccountingHelpers() {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const helperStart = bundle.indexOf('const bdCalculationAuditClientV320="calculation-audit-v320"');
+  const helperEnd = bundle.indexOf("function wn(", helperStart);
+  const start = bundle.indexOf('const bdInventorySnapshotsKey="bd_inventory_snapshots"');
+  const end = bundle.indexOf("function bdUseAccountingStore(", start);
+  assert.notEqual(helperStart, -1);
+  assert.notEqual(helperEnd, -1);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const purchaseDocuments = [];
+  const context = {
+    Gm(category) {
+      return ["products", "alcohol", "food", "consumables", "hookah", "household"].includes(category)
+        ? "inventory"
+        : "operating";
+    },
+    bdProcArray(key) {
+      return key === "bd_purchase_documents" ? purchaseDocuments : [];
+    },
+    Rg: isWorkingDay,
+    Jl(year, month) {
+      return `${year}-${month}`;
+    },
+  };
+
+  vm.runInNewContext(
+    `${bundle.slice(helperStart, helperEnd)}\n${bundle.slice(start, end)}\nglobalThis.helpers = { bdBuildMonthlyReport, bdDefaultFinanceSettings };`,
+    context,
+  );
+  return {
+    ...context.helpers,
+    setPurchaseDocuments(values) {
+      purchaseDocuments.splice(0, purchaseDocuments.length, ...values);
+    },
+  };
+}
+
+test("monthly report excludes unconverted foreign currency and uses stored historical FX only", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings, setPurchaseDocuments } =
+    await inventoryAccountingHelpers();
+  const venue = {
+    name: "Кёльн",
+    accountingCurrency: "RUB",
+    areas: ["Бар"],
+    workingDays: { 1: true, 2: false, 3: false, 4: false, 5: false, 6: false, 7: false },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(venue),
+    inventorySections: ["Бар"],
+    taxModel: { mode: "manual", amount: 0, percent: 0 },
+    utilityModel: { mode: "manual", amount: 0, percent: 0 },
+  };
+  setPurchaseDocuments([
+    { id: "rub", status: "confirmed", documentType: "invoice", date: "2026-06-10", expenseCategory: "alcohol", currency: "RUB", total: 1_000, area: "Бар" },
+    { id: "mdl-unvalued", status: "confirmed", documentType: "invoice", date: "2026-06-11", expenseCategory: "alcohol", currency: "MDL", total: 361, area: "Бар" },
+    { id: "mdl-converted", status: "confirmed", documentType: "invoice", date: "2026-06-12", expenseCategory: "alcohol", currency: "MDL", total: 100, exchangeRateToAccounting: 4.5, area: "Бар" },
+  ]);
+  const report = bdBuildMonthlyReport(
+    venue,
+    "2026-06",
+    [
+      { id: "revenue-rub", date: "2026-06-15", currency: "RUB", revenue: 5_000, receipts: 10 },
+      { id: "revenue-mdl", date: "2026-06-16", currency: "MDL", revenue: 200, receipts: 1 },
+    ],
+    [
+      { id: "expense-rub", date: "2026-06-20", currency: "RUB", category: "other", amount: 300 },
+      { id: "expense-mdl", date: "2026-06-21", currency: "MDL", category: "other", amount: 50 },
+      { id: "expense-eur-normalized", date: "2026-06-22", currency: "EUR", category: "other", amount: 10, accountingAmount: 900, accountingCurrency: "RUB" },
+    ],
+    [
+      { date: "2026-06-01", currency: "RUB", sections: { Бар: 0 }, total: 0 },
+      { date: "2026-06-30", currency: "RUB", sections: { Бар: 0 }, total: 0 },
+    ],
+    settings,
+    [],
+  );
+
+  assert.equal(report.accountingCurrency, "RUB");
+  assert.equal(report.revenue, 5_000);
+  assert.equal(report.purchases, 1_450);
+  assert.equal(report.otherExpenses, 1_200);
+  assert.equal(report.unconvertedForeignCurrencyCount, 3);
+  assert.deepEqual(
+    Array.from(report.excludedForeignCurrencyTotals, (row) => ({ ...row })),
+    [
+      { kind: "revenue", currency: "MDL", amount: 200 },
+      { kind: "expense", currency: "MDL", amount: 50 },
+      { kind: "purchase", currency: "MDL", amount: 361 },
+    ],
+  );
+  assert.deepEqual(
+    Array.from(report.excludedForeignCurrencyEntries, (entry) => entry.id).sort(),
+    ["expense-mdl", "mdl-unvalued", "revenue-mdl"],
+  );
+  assert.equal(report.currencyBoundaryStatus, "unconverted_foreign_excluded");
+});
+
+test("purchase review exposes explicit historical FX fields and PMR currency", async () => {
+  const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
+  assert.match(bundle, /data-bd-accounting-fx":"v321/);
+  assert.match(bundle, /Исторический курс \(1 /);
+  assert.match(bundle, /Дата курса/);
+  assert.match(bundle, /Источник курса/);
+  assert.match(bundle, /PMR_RUB/);
+  assert.match(bundle, /руб\. ПМР/);
+});
+
+test("action plans expire from current recommendations when evidence is older than the canonical window", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf('const bdActionPlanFreshnessV320="evidence-window-v320"');
+  const end = bundle.indexOf("const f7=", start);
+  assert.ok(start >= 0 && end > start);
+  const context = { Voe: 14 };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.helpers={bdActionPlanIsStaleV320,d7};`,
+    context,
+  );
+  const oldPlan = {
+    id: "plan_1783892352555_ju1g",
+    status: "active",
+    diagnosisDate: "2026-07-12",
+    createdAt: "2026-07-12T12:00:00.000Z",
+    taskIds: ["old-task"],
+  };
+  const oldTask = {
+    id: "old-task",
+    status: "proposed",
+    factPeriod: "2026-07-01 — 2026-07-12",
+    evidence: [{ observedAt: "2026-07-12T10:00:00.000Z" }],
+  };
+  assert.equal(
+    context.helpers.bdActionPlanIsStaleV320(oldPlan, [oldTask], new Date("2026-08-28T00:00:00.000Z")),
+    true,
+  );
+  const projected = context.helpers.d7([oldPlan], [oldTask]).plans[0];
+  assert.equal(projected.status, "stale");
+  assert.equal(projected.freshnessStatus, "expired");
+  assert.equal(projected.staleReason, "evidence_window_expired");
+  const recentPlan = { ...oldPlan, id: "recent", diagnosisDate: new Date().toISOString().slice(0, 10), taskIds: [] };
+  assert.equal(context.helpers.d7([recentPlan], []).plans[0].status, "active");
+});
+
+test("supplier price comparisons never rank offers across different currencies", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("function bdProcComparisons(");
+  const end = bundle.indexOf("function bdProcField(", start);
+  assert.ok(start >= 0 && end > start);
+  const context = {
+    bdProcProductKey: (line) => line.name.toLocaleLowerCase("ru"),
+    bdMonthlyCurrencyCodeV320: (value, fallback) => String(value || fallback).toUpperCase(),
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.compare=bdProcComparisons;`,
+    context,
+  );
+  const base = { status: "confirmed", date: "2026-08-01", items: [{ name: "Чай", unitPrice: 10, quantity: 1 }] };
+  const crossCurrency = context.compare([
+    { ...base, supplierId: "rub-supplier", currency: "RUB" },
+    { ...base, supplierId: "mdl-supplier", currency: "MDL", items: [{ name: "Чай", unitPrice: 1, quantity: 1 }] },
+  ]);
+  assert.equal(crossCurrency.length, 0);
+  const sameCurrency = context.compare([
+    { ...base, supplierId: "rub-a", currency: "RUB" },
+    { ...base, supplierId: "rub-b", currency: "RUB", items: [{ name: "Чай", unitPrice: 12, quantity: 1 }] },
+  ]);
+  assert.equal(sameCurrency.length, 1);
+  assert.equal(sameCurrency[0].best.currency, "RUB");
+});
+
+test("monthly report uses monetary inventory totals without double-counting writeoffs", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings, setPurchaseDocuments } =
+    await inventoryAccountingHelpers();
+  const cologne = {
+    name: "Кёльн",
+    areas: ["Бар", "Кухня", "Кальяны"],
+    workingDays: {
+      1: false,
+      2: false,
+      3: false,
+      4: false,
+      5: true,
+      6: true,
+      7: true,
+    },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(cologne),
+    taxModel: { mode: "fixed", amount: 3_000, percent: 0 },
+    utilityModel: { mode: "fixed", amount: 1_500, percent: 0 },
+  };
+  const shiftDates = [
+    "2026-06-05",
+    "2026-06-06",
+    "2026-06-07",
+    "2026-06-12",
+    "2026-06-13",
+    "2026-06-14",
+    "2026-06-19",
+    "2026-06-20",
+    "2026-06-21",
+    "2026-06-26",
+    "2026-06-27",
+    "20d", total: 3_000, area: "Кухня" },
+    { id: "purchase-hookah", status: "confirmed", documentType: "invoice", date: "2026-06-05", expenseCategory: "hookah", total: 1_000 },
+    { id: "purchase-household", status: "confirmed", documentType: "invoice", date: "2026-06-23", expenseCategory: "household", total: 500 },
+  ]);
+  const snapshots = [
+    {
+      date: "2026-06-01",
+      sections: { Бар: 10_000, Кухня: 5_000, Кальяны: 2_000 },
+    },
+    {
+      date: "2026-07-01",
+      sections: { Бар: 8_000, Кухня: 4_000, Кальяны: 1_500 },
+    },
+  ];
+
+  const report = bdBuildMonthlyReport(
+    cologne,
+    "2026-06",
+    revenue,
+    expenses,
+    snapshots,
+    settings,
+    [],
+  );
+
+  assert.equal(report.isClosed, true);
+  assert.equal(report.plannedShifts, 12);
+  assert.equal(report.openingInventory, 17_000);
+  assert.equal(report.closingInventory, 13_500);
+  assert.equal(report.purchases, 9_500);
+  assert.equal(report.purchasePayments, 9_500);
+  assert.equal(report.legacyPurchaseExpenses, 250);
+  assert.equal(report.periodExpenses, 10_750);
+  assert.deepEqual(
+    Array.from(report.expenseBreakdown, ({ label, amount }) => [label, amount]),
+    [
+      ["Бар", 5_000],
+      ["Кухня", 3_000],
+      ["Кальяны", 1_000],
+      ["Ремонт", 1_000],
+      ["Хоз.товары", 500],
+      ["Продукты", 250],
+    ],
+  );
+  assert.equal(report.writeoffs, 500);
+  assert.equal(report.costOfGoods, 12_500);
+  assert.equal(report.operatingResult, 5_500);
+  assert.equal(report.resultBeforeCost, 18_000);
+  assert.equal(report.cashResult, 8_250);
+  assert.equal(Math.round(report.recurringPerShift * 100) / 100, 375);
+  assert.equal(report.allocatedRecurring, 4_500);
+  assert.equal(report.shiftEstimates.length, 12);
+  assert.equal(
+    report.shiftEstimates.reduce((sum, shift) => sum + shift.recurringAllocation, 0),
+    4_500,
+  );
+});
+
+test("RC controlled month matches the independent stock and net-profit calculation", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings, setPurchaseDocuments } =
+    await inventoryAccountingHelpers();
+  const venue = {
+    name: "RC control",
+    areas: ["Bar"],
+    workingDays: {
+      1: true,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+      6: false,
+      7: false,
+    },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(venue),
+    inventorySections: ["Bar"],
+    taxModel: { mode: "manual", amount: 0, percent: 0 },
+    utilityModel: { mode: "manual", amount: 0, percent: 0 },
+  };
+  setPurchaseDocuments([{
+    id: "purchase-control",
+    status: "confirmed",
+    documentType: "invoice",
+    date: "2026-06-10",
+    expenseCategory: "products",
+    total: 200,
+    area: "Bar",
+  }]);
+  const report = bdBuildMonthlyReport(
+    venue,
+    "2026-06",
+    [{
+      date: "2026-06-15",
+      revenue: 1_000,
+      receipts: 20,
+      guests: 25,
+      payrollBreakdown: { total: 200 },
+    }],
+    [
+      { id: "payment-control", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-control", status: "posted", date: "2026-06-10", category: "products", area: "Bar", amount: 120 },
+      { date: "2026-06-20", category: "writeoff", area: "Bar", amount: 10 },
+      { date: "2026-06-22", category: "other", amount: 30 },
+      { date: "2026-06-23", category: "taxes", amount: 50 },
+      { date: "2026-06-24", category: "utilities", amount: 40 },
+    ],
+    [
+      { date: "2026-06-01", sections: { Bar: 0 }, total: 0 },
+      { date: "2026-06-30", sections: { Bar: 160 }, total: 160 },
+    ],
+    settings,
+    ["2026-06-01", "2026-06-08", "2026-06-22", "2026-06-29"].map(
+      (date) => ({ date, resolved: true, reason: "Заведение было закрыто" }),
+    ),
+  );
+
+  assert.equal(report.isClosed, true);
+  assert.equal(report.revenue, 1_000);
+  assert.equal(report.purchases, 200);
+  assert.equal(report.purchasePayments, 120);
+  assert.equal(report.closingInventory, 160);
+  assert.equal(report.writeoffs, 10);
+  assert.equal(report.costOfGoods, 30);
+  assert.equal(report.payroll, 200);
+  assert.equal(report.otherExpenses, 30);
+  assert.equal(report.taxes, 50);
+  assert.equal(report.utilities, 40);
+  assert.equal(report.resultBeforeCost, 670);
+  assert.equal(report.cashResult, 550);
+  assert.equal(report.operatingResult, 640);
+});
+
+test("RC financial mutations update every canonical KPI and restore the 640 MDL baseline", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings, setPurchaseDocuments } =
+    await inventoryAccountingHelpers();
+  const venue = {
+    name: "RC mutation control",
+    areas: ["Bar"],
+    workingDays: {
+      1: true,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+      6: false,
+      7: false,
+    },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(venue),
+    inventorySections: ["Bar"],
+    taxModel: { mode: "manual", amount: 0, percent: 0 },
+    utilityModel: { mode: "manual", amount: 0, percent: 0 },
+  };
+  const resolvedShifts = ["2026-06-01", "2026-06-08", "2026-06-22", "2026-06-29"]
+    .map((date) => ({ date, resolved: true, reason: "Заведение было закрыто" }));
+  const baseline = {
+    revenue: 1_000,
+    purchases: 200,
+    purchasePayments: 120,
+    closingInventory: 160,
+    writeoffs: 10,
+    payroll: 200,
+    otherExpenses: 30,
+    taxes: 50,
+    utilities: 40,
+    supplierReturn: 0,
+  };
+
+  function independentExpected(state) {
+    const costOfGoods = state.purchases - state.closingInventory - state.writeoffs;
+    const otherExpenses = state.otherExpenses - state.supplierReturn;
+    return {
+      costOfGoods,
+      otherExpenses,
+      operatingResult: state.revenue
+        - costOfGoods
+        - state.writeoffs
+        - state.payroll
+        - otherExpenses
+        - state.taxes
+        - state.utilities,
+    };
+  }
+
+  function reportFor(patch = {}) {
+    const state = { ...baseline, ...patch };
+    setPurchaseDocuments([{
+      id: "purchase-mutation",
+      status: "confirmed",
+      documentType: "invoice",
+      date: "2026-06-10",
+      expenseCategory: "products",
+      total: state.purchases,
+      area: "Bar",
+    }]);
+    const expenses = [
+      { id: "payment-mutation", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-mutation", status: "posted", date: "2026-06-10", category: "products", area: "Bar", amount: state.purchasePayments },
+      { date: "2026-06-20", category: "writeoff", area: "Bar", amount: state.writeoffs },
+      { date: "2026-06-22", category: "other", amount: state.otherExpenses },
+      { date: "2026-06-23", category: "taxes", amount: state.taxes },
+      { date: "2026-06-24", category: "utilities", amount: state.utilities },
+    ];
+    if (state.supplierReturn) {
+      expenses.push({
+        date: "2026-06-25",
+        category: "returns",
+        amount: -state.supplierReturn,
+      });
+    }
+    const report = bdBuildMonthlyReport(
+      venue,
+      "2026-06",
+      [{
+        date: "2026-06-15",
+        revenue: state.revenue,
+        receipts: 20,
+        guests: 25,
+        payrollBreakdown: { total: state.payroll },
+      }],
+      expenses,
+      [
+        { date: "2026-06-01", sections: { Bar: 0 }, total: 0 },
+        {
+          date: "2026-06-30",
+          sections: { Bar: state.closingInventory },
+          total: state.closingInventory,
+        },
+      ],
+      settings,
+      resolvedShifts,
+    );
+    return { state, report, expected: independentExpected(state) };
+  }
+
+  const mutations = [
+    ["закупочная цена", { purchases: 220 }, 620],
+    ["количество закупки", { purchases: 220, closingInventory: 180 }, 640],
+    ["продажа и складское списание", { revenue: 1_100, closingInventory: 140 }, 720],
+    ["возврат поставщику", { closingInventory: 140, supplierReturn: 20 }, 640],
+    ["списание", { closingInventory: 150, writeoffs: 20 }, 630],
+    ["фактическая инвентаризация", { closingInventory: 180 }, 660],
+    ["ФОТ", { payroll: 220 }, 620],
+    ["оплата поставщику", { purchasePayments: 140 }, 640],
+    ["аванс или выплата не являются повторным расходом", {}, 640],
+    ["налог", { taxes: 60 }, 630],
+    ["коммунальный расход", { utilities: 50 }, 630],
+    ["прочий расход", { otherExpenses: 40 }, 630],
+  ];
+
+  for (const [label, patch, expectedProfit] of mutations) {
+    const { state, report, expected } = reportFor(patch);
+    assert.equal(report.isClosed, true, label);
+    assert.equal(report.revenue, state.revenue, label);
+    assert.equal(report.purchases, state.purchases, label);
+    assert.equal(report.purchasePayments, state.purchasePayments, label);
+    assert.equal(report.closingInventory, state.closingInventory, label);
+    assert.equal(report.writeoffs, state.writeoffs, labelriteoffs
+        - state.payroll
+        - otherExpenses
+        - state.taxes
+        - state.utilities,
+    };
+  }
+
+  function reportFor(patch = {}) {
+    const state = { ...baseline, ...patch };
+    setPurchaseDocuments([{
+      id: "purchase-mutation",
+      status: "confirmed",
+      documentType: "invoice",
+      date: "2026-06-10",
+      expenseCategory: "products",
+      total: state.purchases,
+      area: "Bar",
+    }]);
+    const expenses = [
+      { id: "payment-mutation", source: "purchase_payment", paymentKind: "supplier_payment", sourceDocumentId: "purchase-mutation", status: "posted", date: "2026-06-10", category: "products", area: "Bar", amount: state.purchasePayments },
+      { date: "2026-06-20", category: "writeoff", area: "Bar", amount: state.writeoffs },
+      { date: "2026-06-22", category: "other", amount: state.otherExpenses },
+      { date: "2026-06-23", category: "taxes", amount: state.taxes },
+      { date: "2026-06-24", category: "utilities", amount: state.utilities },
+    ];
+    if (state.supplierReturn) {
+      expenses.push({
+        date: "2026-06-25",
+        category: "returns",
+        amount: -state.supplierReturn,
+      });
+    }
+    const report = bdBuildMonthlyReport(
+      venue,
+      "2026-06",
+      [{
+        date: "2026-06-15",
+        revenue: state.revenue,
+        receipts: 20,
+        guests: 25,
+        payrollBreakdown: { total: state.payroll },
+      }],
+      expenses,
+      [
+        { date: "2026-06-01", sections: { Bar: 0 }, total: 0 },
+        {
+          date: "2026-06-30",
+          sections: { Bar: state.closingInventory },
+          total: state.closingInventory,
+        },
+      ],
+      settings,
+      resolvedShifts,
+    );
+    return { state, report, expected: independentExpected(state) };
+  }
+
+  const mutations = [
+    ["закупочная цена", { purchases: 220 }, 620],
+    ["количество закупки", { purchases: 220, closingInventory: 180 }, 640],
+    ["продажа и складское списание", { revenue: 1_100, closingInventory: 140 }, 720],
+    ["возврат поставщику", { closingInventory: 140, supplierReturn: 20 }, 640],
+    ["списание", { closingInventory: 150, writeoffs: 20 }, 630],
+    ["фактическая инвентаризация", { closingInventory: 180 }, 660],
+    ["ФОТ", { payroll: 220 }, 620],
+    ["оплата поставщику", { purchasePayments: 140 }, 640],
+    ["аванс или выплата не являются повторным расходом", {}, 640],
+    ["налог", { taxes: 60 }, 630],
+    ["коммунальный расход", { utilities: 50 }, 630],
+    ["прочий расход", { otherExpenses: 40 }, 630],
+  ];
+
+  for (const [label, patch, expectedProfit] of mutations) {
+    const { state, report, expected } = reportFor(patch);
+    assert.equal(report.isClosed, true, label);
+    assert.equal(report.revenue, state.revenue, label);
+    assert.equal(report.purchases, state.purchases, label);
+    assert.equal(report.purchasePayments, state.purchasePayments, label);
+    assert.equal(report.closingInventory, state.closingInventory, label);
+    assert.equal(report.writeoffs, state.writeoffs, label);
+    assert.equal(report.payroll, state.payroll, label);
+    assert.equal(report.otherExpenses, expected.otherExpenses, label);
+    assert.equal(report.taxes, state.taxes, label);
+    assert.equal(report.utilities, state.utilities, label);
+    assert.equal(report.costOfGoods, expected.costOfGoods, label);
+    assert.equal(report.operatingResult, expected.operatingResult, label);
+    assert.equal(report.operatingResult, expectedProfit, label);
+  }
+
+  const restored = reportFor().report;
+  assert.equal(restored.costOfGoods, 30);
+  assert.equal(restored.cashResult, 550);
+  assert.equal(restored.operatingResult, 640);
+});
+
+test("current month stays preliminary until the closing inventory is entered", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings, setPurchaseDocuments } =
+    await inventoryAccountingHelpers();
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const firstDay = `${monthKey}-01`;
+  const venue = {
+    name: "Другое заведение",
+    areas: ["Kitchen", "Bar", "Hookah"],
+    workingDays: { 1: true, 2: true, 3: true, 4: true, 5: false, 6: false, 7: false },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(venue),
+    taxModel: { mode: "fixed", amount: 3_000, percent: 0 },
+    utilityModel: { mode: "fixed", amount: 1_500, percent: 0 },
+  };
+  setPurchaseDocuments([{
+    id: "purchase-current",
+    status: "confirmed",
+    documentType: "invoice",
+    date: firstDay,
+    expenseCategory: "food",
+    total: 2_000,
+    area: "Кухня",
+  }]);
+  const report = bdBuildMonthlyReport(
+    venue,
+    monthKey,
+    [{ date: firstDay, revenue: 10_000, receipts: 20 }],
+    [{ date: firstDay, category: "food", area: "Кухня", amount: 2_000 }],
+    [{ date: firstDay, sections: { Бар: 1_000, Кухня: 1_000, Кальяны: 500 } }],
+    settings,
+    [],
+  );
+
+  const expectedRecurringPerShift = 4_500 / report.plannedShifts;
+
+  assert.deepEqual([...settings.inventorySections], ["Кухня", "Бар", "Кальяны"]);
+  assert.equal(report.status, "preliminary");
+  assert.equal(report.closingInventory, null);
+  assert.equal(report.costOfGoods, null);
+  assert.equal(report.operatingResult, null);
+  assert.ok(report.plannedShifts >= 16 && report.plannedShifts <= 19);
+  assert.equal(report.recurringPerShift, expectedRecurringPerShift);
+  assert.equal(report.allocatedRecurring, expectedRecurringPerShift);
+  assert.ok(
+    Math.abs(report.resultBeforeCost - (10_000 - expectedRecurringPerShift)) < 1e-9,
+  );
+  assert.ok(Math.abs(report.cashResult - (8_000 - expectedRecurringPerShift)) < 1e-9);
+  assert.equal(report.shiftEstimates.length, 1);
+  assert.ok(
+    Math.abs(
+      report.shiftEstimates[0].resultBeforeCost -
+        (10_000 - expectedRecurringPerShift),
+    ) < 1e-9,
+  );
+  assert.equal(report.shiftEstimates[0].estimatedCost, null);
+  assert.equal(report.shiftEstimates[0].estimatedResult, null);
+});
+
+test("completed months include all recurring costs even when zero-revenue shifts are explained", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings } =
+    await inventoryAccountingHelpers();
+  const venue = {
+    name: "Пять смен",
+    areas: ["Бар"],
+    workingDays: {
+      1: true,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+      6: false,
+      7: false,
+    },
+  };
+  const settings = {
+    ...bdDefaultFinanceSettings(venue),
+    taxModel: { mode: "fixed", amount: 3_000, percent: 0 },
+    utilityModel: { mode: "fixed", amount: 1_500, percent: 0 },
+  };
+  const report = bdBuildMonthlyReport(
+    venue,
+    "2026-06",
+    [{ date: "2026-06-01", revenue: 10_000, receipts: 20 }],
+    [],
+    [
+      { date: "2026-06-01", sections: { Бар: 5_000 } },
+      { date: "2026-07-01", sections: { Бар: 5_000 } },
+    ],
+    settings,
+    ["2026-06-08", "2026-06-15", "2026-06-22", "2026-06-29"].map(
+      (date) => ({ date, resolved: true, reason: "Заведение было закрыто" }),
+    ),
+  );
+
+  assert.equal(report.periodPast, true);
+  assert.equal(report.coveragePercent, 100);
+  assert.equal(report.plannedShifts, 5);
+  assert.equal(report.allocatedRecurring, 900);
+  assert.equal(report.unallocatedRecurring, 3_600);
+  assert.equal(report.resultBeforeCost, 5_500);
+  assert.equal(report.cashResult, 5_500);
+  assert.equal(report.operatingResult, 5_500);
+});
+
+test("an impossible inventory balance blocks the final monthly profit", async () => {
+  const { bdBuildMonthlyReport, bdDefaultFinanceSettings } =
+    await inventoryAccountingHelpers();
+  const venue = {
+    name: "Проверка остатков",
+    areas: ["Бар", "Кухня"],
+    workingDays: {
+      1: true,
+      2: false,
+      3: false,
+      4: false,
+      5: false,
+      6: false,
+      7: false,
+    },
+  };
+  const report = bdBuildMonthlyReport(
+    venue,
+    "2026-06",
+    [{ date: "2026-06-01", revenue: 20_000, receipts: 40 }],
+    [],
+    [
+      { date: "2026-06-01", sections: { Бар: 1_000, Кухня: 10_000 } },
+      { date: "2026-07-01", sections: { Бар: 2_000, Кухня: 0 } },
+    ],
+    bdDefaultFinanceSettings(venue),
+    ["2026-06-08", "2026-06-15", "2026-06-22", "2026-06-29"].map(
+      (date) => ({ date, resolved: true, reason: "Заведение было закрыто" }),
+    ),
+  );
+
+  assert.equal(report.rawCostOfGoods, 9_000);
+  assert.equal(report.inventoryMismatch, true);
+  assert.equal(report.costOfGoods, null);
+  assert.equal(report.operatingResult, null);
+  assert.equal(report.status, "preliminary");
+  assert.equal(report.isClosed, false);
+  assert.equal(report.sections.find((row) => row.section === "Бар").cost, -1_000);
+});
+
+async function payrollLedgerHelpers() {
+  cyroll bonuses without treating payments as a second expense", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf(
+    "const bdBuildMonthlyReportBeforePayroll=bdBuildMonthlyReport",
+  );
+  const end = bundle.indexOf("function BAe(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  const entries = [
+    { date: "2026-07-12", type: "bonus", amount: 1_000 },
+    { date: "2026-07-12", type: "order", amount: 500 },
+    { date: "2026-07-12", type: "payment", amount: 3_000 },
+  ];
+  const context = {
+    bdMonthClosingsKey: "bd_month_closings",
+    bdBuildMonthlyReport() {
+      return {
+        payroll: 10_000,
+        operatingResult: 50_000,
+        resultBeforeCost: 60_000,
+        cashResult: 40_000,
+        shiftEstimates: [
+          {
+            date: "2026-07-12",
+            payroll: 10_000,
+            resultBeforeCost: 60_000,
+            estimatedResult: 50_000,
+          },
+        ],
+      };
+    },
+    bdPayrollEntriesForVenue(_profile, rows) {
+      return rows;
+    },
+    bdPayrollArrayStore() {
+      return entries;
+    },
+    bdArrayStore() {
+      return [];
+    },
+    bdPayrollEntryTotals(rows) {
+      const bonus = rows
+        .filter((row) => row.type === "bonus")
+        .reduce((sum, row) => sum + row.amount, 0);
+      const deductions = rows
+        .filter((row) => ["order", "fine", "dishware", "other_deduction"].includes(row.type))
+        .reduce((sum, row) => sum + row.amount, 0);
+      const paid = rows
+        .filter((row) => row.type === "payment")
+        .reduce((sum, row) => sum + row.amount, 0);
+      return { bonus, deductions, paid };
+    },
+  };
+
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.result = bdBuildMonthlyReport(
+      {},
+      "2026-07",
+      [{ date: "2026-07-12", payrollBreakdown: { total: 10000 } }],
+      [],
+      [],
+      {},
+      []
+    );`,
+    context,
+  );
+
+  assert.equal(context.result.payroll, 11_000);
+  assert.equal(context.result.payrollDeductions, 500);
+  assert.equal(context.result.payrollNet, 10_500);
+  assert.equal(context.result.payrollPaid, 3_000);
+  assert.equal(context.result.payrollBalance, 7_500);
+  assert.equal(context.result.operatingResult, 49_000);
+  assert.equal(context.result.resultBeforeCost, 59_000);
+  assert.equal(context.result.cashResult, 39_000);
+  assert.equal(context.result.shiftEstimates[0].payroll, 11_000);
+  assert.equal(context.result.shiftEstimates[0].resultBeforeCost, 59_000);
+  assert.equal(context.result.shiftEstimates[0].estimatedResult, 49_000);
+});
+
+test("registration clearly separates required and optional identity fields", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("function Dle()");
+  const end = bundle.indexOf("const N7=", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const registration = bundle.slice(start, end);
+
+  assert.match(registration, /label:"Имя \*"/);
+  assert.match(registration, /label:"Фамилия \(необязательно\)"/);
+  assert.match(registration, /children:"Телефон \(необязательно\)"/);
+  assert.match(registration, /label:"Email \*"/);
+  assert.match(registration, /id:"bd-register-password",label:"Пароль \*"/);
+  assert.match(registration, /id:"bd-register-repeat",label:"Повторите пароль \*"/);
+  assert.match(registration, /type:"submit",className:"bd-auth-primary",disabled:y/);
+  assert.doesNotMatch(
+    registration,
+    /disabled:y\|\|!t\.name\.trim\(\)\|\|!t\.surname\.trim\(\)/,
+  );
+});
+
+test("onboarding saves the venue before seeding equipment and exposes its controls", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf("function Rle(");
+  const end = bundle.indexOf("function Wg(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+  const onboarding = bundle.slice(start, end);
+
+  assert.match(onboarding, /await t\(A\),_\.length>0&&n\(_\),m\(!0\)/);
+  assert.doesNotMatch(onboarding, /Failed to save onboarding equipment list/);
+  assert.match(onboarding, /ariaLabel:"Название заведения"/);
+  assert.match(onboarding, /ariaLabel:"Мест в зале"/);
+  assert.match(onboarding, /"aria-label":"Назад"/);
+  assert.match(onboarding, /"aria-label":\(h\.checked\?"Убрать ":"Добавить "\)\+m\.name/);
+  assert.match(onboarding, /"aria-label":"Уменьшить количество: "\+n/);
+  assert.match(onboarding, /"aria-label":"Увеличить количество: "\+n/);
+});
+
+test("only an explicit closing record marks a month closed and its snapshot stays immutable", async () => {
+  const bundle = await readFile(
+    new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
+    "utf8",
+  );
+  const start = bundle.indexOf('const bdReleaseCandidateVersion="rc-v163"');
+  const end = bundle.indexOf("function bdShiftsPage(", start);
+  assert.notEqual(start, -1);
+  assert.notEqual(end, -1);
+
+  let closings = [];
+  const context = {
+    bdMonthClosingsKey: "bd_month_closings",
+    bdArrayStore() {
+      return closings;
+    },
+    bdBuildMonthlyReport() {
+      return {
+        status: "closed",
+        isClosed: true,
+        revenue: 999_999,
+        payroll: 88_888,
+        taxes: 77_777,
+        operatingResult: 66_666,
+        cashResult: 55_555,
+        resultBeforeCost: 44_444,
+        sections: [],
+      };
+    },
+  };
+  vm.runInNewContext(
+    `${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
+    contex

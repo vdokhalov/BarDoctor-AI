@@ -407,4 +407,354 @@ export function auditCanonicalNomenclature(input: {
   purchaseDocuments?: unknown[];
   venueId?: number;
 }): JsonRecord {
-  const assortment = record(input.assortme
+  const assortment = record(input.assortment);
+  const venueId = input.venueId ?? null;
+  const items = array(assortment.nomenclature).map(record).filter((item) => belongsToVenue(item, venueId));
+  const mappings = canonicalSupplierMappings(assortment).filter((mapping) =>
+    venueId === null || mapping.venueId === null || mapping.venueId === venueId
+  );
+  const groups = new Map<string, JsonRecord[]>();
+  for (const item of items) {
+    const key = `${identityTokens(item.name).join(" ")}|${unit(item)}`;
+    const values = groups.get(key) ?? [];
+    values.push(item);
+    groups.set(key, values);
+  }
+  const candidates: CanonicalDuplicateCandidate[] = [];
+  for (const values of groups.values()) {
+    if (values.length < 2) continue;
+    const names = values.map((item) => text(item.name, "Товар", 240));
+    const keys = values.map((item) => text(item.productKey ?? item.key, "", 300)).filter(Boolean);
+    const compatible = values.every((item) => variantsCompatible(values[0].name, item.name));
+    candidates.push({
+      classification: compatible ? "safe_merge" : "variant",
+      primaryProductKey: keys[0],
+      secondaryProductKeys: keys.slice(1),
+      names,
+      reason: compatible
+        ? "совпадают нормализованная товарная сущность и базовая единица"
+        : "названия похожи, но различаются значимые характеристики",
+    });
+  }
+  for (const item of items) {
+    const key = text(item.productKey ?? item.key, "", 300);
+    const supplier = mappings.find((mapping) =>
+      mapping.canonicalProductKey !== key
+      && normalizeCanonicalText(item.name).endsWith(normalizeCanonicalText(mapping.supplierName))
+      && lexicalScore(
+        canonicalPurchaseName(item.name, mapping.supplierName),
+        canonicalPurchaseName(mapping.sourceName, mapping.supplierName),
+      ) >= 0.9
+    );
+    if (!supplier) continue;
+    candidates.push({
+      classification: "source_masquerading",
+      primaryProductKey: supplier.canonicalProductKey,
+      secondaryProductKeys: [key],
+      names: [text(item.name), supplier.sourceName],
+      reason: "supplier/source representation попало в canonical list",
+    });
+  }
+  const referencedKeys = new Set(items.map((item) => text(item.productKey ?? item.key, "", 300)).filter(Boolean));
+  const orphanMappings = mappings.filter((mapping) => !referencedKeys.has(mapping.canonicalProductKey));
+  const supplierKeyCounts = new Map<string, number>();
+  for (const mapping of mappings) supplierKeyCounts.set(mapping.sourceItemKey, (supplierKeyCounts.get(mapping.sourceItemKey) ?? 0) + 1);
+  const duplicateSupplierMappings = [...supplierKeyCounts.values()].filter((count) => count > 1).reduce((sum, count) => sum + count - 1, 0);
+  const safeMergeCandidates = candidates.filter((candidate) => candidate.classification === "safe_merge");
+  const ambiguousCandidates = candidates.filter((candidate) => candidate.classification === "ambiguous" || candidate.classification === "variant");
+  const affectedKeys = new Set(candidates.flatMap((candidate) => [candidate.primaryProductKey, ...candidate.secondaryProductKeys]));
+  const recipes = array(assortment.recipes).map(record);
+  const affectedTechCardLinks = recipes.reduce((total, recipe) => total + array(recipe.ingredients).map(record)
+    .filter((ingredient) => affectedKeys.has(text(ingredient.purchaseProductKey, "", 300))).length, 0);
+  const packagingDuplicationCases = items.filter((item) => array(item.packageOptions).length > 1 && item.multiplePackageSizes !== true).length;
+  return {
+    version: "canonical-supplier-v260",
+    venueId,
+    contract: "one_real_venue_product_one_canonical_item",
+    totalCanonicalItems: items.length,
+    supplierSourceItems: mappings.length,
+    suspectedCanonicalDuplicates: candidates.length,
+    safeMergeCandidates: safeMergeCandidates.length,
+    ambiguousCandidates: ambiguousCandidates.length,
+    sourceRowsMasqueradingAsProducts: candidates.filter((candidate) => candidate.classification === "source_masquerading").length,
+    orphanSupplierItems: orphanMappings.length,
+    supplierItemsWithoutCanonicalMapping: orphanMappings.length,
+    duplicateSupplierMappings,
+    packagingDuplicationCases,
+    affectedStockPositions: array(assortment.stockBalances).map(record)
+      .filter((balance) => affectedKeys.has(text(balance.productKey ?? balance.key, "", 300))).length,
+    affectedTechCardLinks,
+    candidates,
+  };
+}
+
+export function manualCanonicalDuplicateSuggestions(input: {
+  assortment: unknown;
+  name: string;
+  unit: string;
+  venueId?: number;
+  purchaseDocuments?: unknown[];
+}): CanonicalIdentitySuggestion[] {
+  const venueId = input.venueId ?? null;
+  const mappings = canonicalSupplierMappings(input.assortment)
+    .filter((mapping) => belongsToVenue(mapping, venueId) && mapping.status !== "orphan");
+  const purchaseLines = array(input.purchaseDocuments).map(record)
+    .filter((document) => belongsToVenue(document, venueId))
+    .flatMap((document) => array(document.items).map(record));
+  return array(record(input.assortment).nomenclature).map(record)
+    .filter((item) => belongsToVenue(item, venueId))
+    .map((item) => {
+      const name = text(item.name, "Товар", 240);
+      const productKey = text(item.productKey ?? item.key, "", 300);
+      const evidence = [
+        { name, unit: unit(item), reason: "canonical-позиция" },
+        ...mappings.filter((mapping) => mapping.canonicalProductKey === productKey).map((mapping) => ({
+          name: `${mapping.sourceName} ${mapping.packageSize}`.trim(),
+          unit: mapping.purchaseUnit,
+          reason: "известное наименование поставщика",
+        })),
+        ...purchaseLines.filter((line) => text(line.purchaseProductKey ?? line.canonicalProductKey, "", 300) === productKey).map((line) => ({
+          name: `${text(line.rawName ?? line.name, "", 240)} ${text(line.packageSize, "", 120)}`.trim(),
+          unit: text(line.unit, "unknown", 20),
+          reason: "история закупок",
+        })),
+      ];
+      const best = evidence.map((candidate) => {
+        const compatible = variantsCompatible(input.name, candidate.name);
+        const candidateUnit = unit({ unit: candidate.unit, packageSize: candidate.name });
+        const score = lexicalScore(input.name, candidate.name)
+          + (candidateUnit === input.unit ? 0.08 : -0.25)
+          + (compatible ? 0 : -0.5);
+        return { ...candidate, compatible, score };
+      }).sort((left, right) => right.score - left.score)[0];
+      const score = Math.round(Math.max(0, Math.min(1,
+        best?.score ?? 0,
+      )) * 100);
+      return {
+        productKey,
+        name,
+        score,
+        reason: best?.compatible ? best.reason : "похожее название, но другая характеристика",
+        ...(item.active === false || item.archived === true ? { archived: true } : {}),
+      };
+    })
+    .filter((candidate) => candidate.productKey && candidate.score >= 62)
+    .sort((left, right) => right.score - left.score || left.name.localeCompare(right.name, "ru"))
+    .slice(0, 5);
+}
+
+function clone(value: unknown): unknown {
+  return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function stockValue(value: JsonRecord): number {
+  const explicit = numeric(value.inventoryValue);
+  if (explicit !== null) return Math.max(0, explicit);
+  return Math.max(0, numeric(value.current) ?? 0) * Math.max(0, numeric(value.averageUnitCost) ?? 0);
+}
+
+/**
+ * Explicit preview/non-production reconciliation. It is intentionally not
+ * called from normal production writes: a mass canonical merge requires a
+ * separate approval and a reviewed report.
+ */
+export function reconcileCanonicalNomenclaturePreview(input: {
+  assortment: unknown;
+  stockMovements?: unknown[];
+  purchaseDocuments?: unknown[];
+  venueId?: number;
+  now?: string;
+}): {
+  assortment: JsonRecord;
+  stockMovements: JsonRecord[];
+  purchaseDocuments: JsonRecord[];
+  report: JsonRecord;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const assortment = clone(input.assortment) as JsonRecord;
+  const stockMovements = clone(input.stockMovements ?? []) as JsonRecord[];
+  const purchaseDocuments = clone(input.purchaseDocuments ?? []) as JsonRecord[];
+  const initialAudit = auditCanonicalNomenclature({
+    assortment,
+    purchaseDocuments,
+    venueId: input.venueId,
+  });
+  const safeCandidates = array(initialAudit.candidates).map(record)
+    .filter((candidate) => candidate.classification === "safe_merge");
+  const nomenclature = array(assortment.nomenclature).map(record);
+  const balances = array(assortment.stockBalances).map(record);
+  const recipes = array(assortment.recipes).map(record);
+  let mappings = canonicalSupplierMappings(assortment);
+  const aliases = array(assortment.canonicalProductAliases).map(record);
+  const supersessions = array(assortment.canonicalSupersessions).map(record);
+  const invariants: JsonRecord[] = [];
+  let mergedCanonicalItems = 0;
+  let remappedMovements = 0;
+  let remappedTechCardLinks = 0;
+  let skippedConflicts = 0;
+
+  for (const candidate of safeCandidates) {
+    const keys = [
+      text(candidate.primaryProductKey, "", 300),
+      ...array(candidate.secondaryProductKeys).map((value) => text(value, "", 300)),
+    ].filter(Boolean);
+    const rows = nomenclature.filter((item) => keys.includes(text(item.productKey ?? item.key, "", 300)));
+    if (rows.length < 2) continue;
+    const rowVenues = new Set(rows.map((row) => numeric(row.venueId)).filter((value) => value !== null));
+    if (rowVenues.size > 1 || (input.venueId && [...rowVenues].some((value) => value !== input.venueId))) {
+      skippedConflicts += 1;
+      continue;
+    }
+    const relatedBalances = balances.filter((balance) => keys.includes(text(balance.productKey ?? balance.key, "", 300)));
+    const currencies = new Set(relatedBalances.map((balance) => text(balance.currency, "", 12).toUpperCase()).filter(Boolean));
+    const units = new Set(relatedBalances.map(unit).filter((value) => value !== "unknown"));
+    if (currencies.size > 1 || units.size > 1) {
+      skippedConflicts += 1;
+      continue;
+    }
+    const requestedPrimaryKey = text(candidate.primaryProductKey, "", 300);
+    const primary = rows.find((row) =>
+      text(row.productKey ?? row.key, "", 300) === requestedPrimaryKey
+    ) ?? [...rows].sort((left, right) => {
+      const leftKey = text(left.productKey ?? left.key, "", 300);
+      const rightKey = text(right.productKey ?? right.key, "", 300);
+      const leftBalance = relatedBalances.find((balance) => text(balance.productKey ?? balance.key, "", 300) === leftKey);
+      const rightBalance = relatedBalances.find((balance) => text(balance.productKey ?? balance.key, "", 300) === rightKey);
+      return Number(Boolean(right.preferredDisplayName)) - Number(Boolean(left.preferredDisplayName))
+        || (numeric(rightBalance?.current) ?? 0) - (numeric(leftBalance?.current) ?? 0)
+        || text(left.name).localeCompare(text(right.name), "ru");
+    })[0];
+    const primaryKey = text(primary.productKey ?? primary.key, "", 300);
+    const secondaryKeys = keys.filter((key) => key !== primaryKey);
+    const beforeQuantity = relatedBalances.reduce((sum, balance) => sum + (numeric(balance.current) ?? 0), 0);
+    const beforeValuation = relatedBalances.reduce((sum, balance) => sum + stockValue(balance), 0);
+
+    const primaryIndex = nomenclature.findIndex((item) => text(item.productKey ?? item.key, "", 300) === primaryKey);
+    nomenclature[primaryIndex] = {
+      ...primary,
+      mergedFromCanonicalKeys: [...new Set([
+        ...array(primary.mergedFromCanonicalKeys).map((value) => text(value, "", 300)),
+        ...secondaryKeys,
+      ].filter(Boolean))],
+      supplierProductIdentityVersion: "v260",
+      updatedAt: now,
+    };
+    for (let index = nomenclature.length - 1; index >= 0; index -= 1) {
+      const key = text(nomenclature[index].productKey ?? nomenclature[index].key, "", 300);
+      if (secondaryKeys.includes(key)) nomenclature.splice(index, 1);
+    }
+
+    if (relatedBalances.length) {
+      const primaryBalanceIndex = balances.findIndex((balance) => text(balance.productKey ?? balance.key, "", 300) === primaryKey);
+      const base = primaryBalanceIndex >= 0 ? balances[primaryBalanceIndex] : relatedBalances[0];
+      const mergedBalance = {
+        ...base,
+        id: primaryKey,
+        key: primaryKey,
+        productKey: primaryKey,
+        name: text(primary.name, text(base.name, "Товар", 240), 240),
+        current: beforeQuantity,
+        inventoryValue: beforeValuation,
+        averageUnitCost: beforeQuantity > 0 ? beforeValuation / beforeQuantity : 0,
+        mergedFromProductKeys: [...new Set([
+          ...array(base.mergedFromProductKeys).map((value) => text(value, "", 300)),
+          ...secondaryKeys,
+        ].filter(Boolean))],
+        updatedAt: now,
+      };
+      for (let index = balances.length - 1; index >= 0; index -= 1) {
+        const key = text(balances[index].productKey ?? balances[index].key, "", 300);
+        if (keys.includes(key)) balances.splice(index, 1);
+      }
+      balances.unshift(mergedBalance);
+    }
+
+    mappings = mappings.map((mapping) => secondaryKeys.includes(mapping.canonicalProductKey)
+      ? { ...mapping, canonicalProductKey: primaryKey, updatedAt: now }
+      : mapping);
+    for (const recipe of recipes) {
+      recipe.ingredients = array(recipe.ingredients).map((value) => {
+        const ingredient = { ...record(value) };
+        const previous = text(ingredient.purchaseProductKey, "", 300);
+        if (!secondaryKeys.includes(previous)) return ingredient;
+        remappedTechCardLinks += 1;
+        return {
+          ...ingredient,
+          purchaseProductKey: primaryKey,
+          canonicalProductKey: primaryKey,
+          previousCanonicalProductKey: previous,
+          updatedAt: now,
+        };
+      });
+    }
+    for (const movement of stockMovements) {
+      const previous = text(movement.productKey, "", 300);
+      if (!secondaryKeys.includes(previous)) continue;
+      movement.originalProductKey = movement.originalProductKey ?? previous;
+      movement.productKey = primaryKey;
+      movement.updatedAt = now;
+      remappedMovements += 1;
+    }
+    for (const secondaryKey of secondaryKeys) {
+      if (!aliases.some((alias) => text(alias.from, "", 300) === secondaryKey)) {
+        aliases.push({ from: secondaryKey, to: primaryKey, reason: "canonical-merge-v260", createdAt: now });
+      }
+      if (!supersessions.some((entry) => text(entry.secondaryProductKey, "", 300) === secondaryKey)) {
+        supersessions.push({
+          id: `canonical-supersession:${secondaryKey}`,
+          venueId: input.venueId ?? numeric(primary.venueId),
+          primaryProductKey: primaryKey,
+          secondaryProductKey: secondaryKey,
+          secondaryName: text(rows.find((row) => text(row.productKey ?? row.key, "", 300) === secondaryKey)?.name, "", 240),
+          reason: "safe_canonical_identity_merge",
+          createdAt: now,
+        });
+      }
+    }
+    const afterBalance = balances.find((balance) => text(balance.productKey ?? balance.key, "", 300) === primaryKey);
+    invariants.push({
+      primaryProductKey: primaryKey,
+      secondaryProductKeys: secondaryKeys,
+      quantityBefore: beforeQuantity,
+      quantityAfter: numeric(afterBalance?.current) ?? 0,
+      valuationBefore: beforeValuation,
+      valuationAfter: stockValue(afterBalance ?? {}),
+      quantityPreserved: Math.abs(beforeQuantity - (numeric(afterBalance?.current) ?? 0)) < 0.000001,
+      valuationPreserved: Math.abs(beforeValuation - stockValue(afterBalance ?? {})) < 0.005,
+    });
+    mergedCanonicalItems += secondaryKeys.length;
+  }
+
+  assortment.nomenclature = nomenclature;
+  assortment.stockBalances = balances;
+  assortment.recipes = recipes;
+  assortment.supplierProductMappings = mappings;
+  assortment.canonicalProductAliases = aliases;
+  assortment.canonicalSupersessions = supersessions;
+  assortment.updatedAt = mergedCanonicalItems ? now : assortment.updatedAt;
+  const enriched = enrichCanonicalSupplierSummary(assortment);
+  const finalAudit = auditCanonicalNomenclature({
+    assortment: enriched,
+    purchaseDocuments,
+    venueId: input.venueId,
+  });
+  enriched.nomenclatureIdentityReport = finalAudit;
+  return {
+    assortment: enriched,
+    stockMovements,
+    purchaseDocuments,
+    report: {
+      version: "canonical-reconciliation-v260",
+      changed: mergedCanonicalItems > 0,
+      mergedCanonicalItems,
+      remappedMovements,
+      remappedTechCardLinks,
+      skippedConflicts,
+      historicalPurchaseDocumentsRewritten: 0,
+      historicalInventorySnapshotsRewritten: 0,
+      invariants,
+      before: initialAudit,
+      after: finalAudit,
+    },
+  };
+}

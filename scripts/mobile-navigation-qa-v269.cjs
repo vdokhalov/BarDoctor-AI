@@ -374,6 +374,40 @@ async function createRun(browser, profile, label, options = {}) {
         closedVia: "canonical-writeoff-v272",
         writeOffDocumentIds: documents.map((document) => document.id),
         writeOffItemCount: (body.writeOffItems || []).length,
+        writeOffTotalCost: do });
+        const totalCost = items.some((item) => item.totalCost === null) ? null : items.reduce((sum, item) => sum + item.totalCost, 0);
+        documents.push({
+          id: `shift-writeoff:${body.shiftCloseId}:${groupIndex}`,
+          internalId: `WO-QA-${groupIndex}`,
+          venueId: state.activeVenueId,
+          number: stores.bd_inventory_writeoffs.length + groupIndex,
+          date: body.revenueRecord.date,
+          location,
+          reasonCode,
+          reasonLabel: reasons.get(reasonCode) || reasonCode,
+          status: "posted",
+          source: "shift_close",
+          shiftId: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
+          shiftCloseId: body.shiftCloseId,
+          items,
+          itemCount: items.length,
+          totalCost,
+          currency: items.find((item) => item.currency)?.currency || "RUB",
+          movementIds: items.map((item) => `shift-movement:${item.id}`),
+          createdAt: "2026-08-24T15:00:00.000Z",
+          postedAt: "2026-08-24T15:00:00.000Z",
+        });
+      }
+      stores.bd_inventory_writeoffs = [...documents, ...stores.bd_inventory_writeoffs];
+      const revenueRecord = {
+        ...body.revenueRecord,
+        id: body.shiftId || body.revenueRecord.id || `shift:${body.shiftCloseId}`,
+        venueId: state.activeVenueId,
+        shiftCloseId: body.shiftCloseId,
+        closingStatus: "closed",
+        closedVia: "canonical-writeoff-v272",
+        writeOffDocumentIds: documents.map((document) => document.id),
+        writeOffItemCount: (body.writeOffItems || []).length,
         writeOffTotalCost: documents.some((document) => document.totalCost === null) ? null : documents.reduce((sum, document) => sum + document.totalCost, 0),
       };
       stores.bd_finance_revenue = [revenueRecord, ...stores.bd_finance_revenue.filter((row) => row.shiftCloseId !== body.shiftCloseId)];
@@ -440,39 +474,7 @@ async function createRun(browser, profile, label, options = {}) {
         movementIds: body.action === "save_draft" ? [] : preparedItems.map((item) => `movement-${item.id}`),
         createdBy: { accountId: 1, name: "Mobile QA", role: "owner" },
         createdAt: existing?.createdAt || "2026-08-24T10:00:00.000Z", updatedAt: "2026-08-24T10:00:00.000Z",
-        postedAt: body.action === "post" ? "2026-08-24T10:00:00.000Z" : undefined,
-      };
-      stores.bd_inventory_writeoffs = [document, ...stores.bd_inventory_writeoffs.filter((item) => item.id !== document.id)];
-      if (body.action === "post") {
-        for (const line of preparedItems) {
-          const balance = assortment.stockBalances.find((item) => item.productKey === line.productKey);
-          balance.current = line.stockAfter;
-          balance.inventoryValue = Math.max(0, Number(balance.inventoryValue || 0) - Number(line.totalCost || 0));
-          stores.bd_stock_movements.unshift({ id: `movement-${line.id}`, type: "writeoff", date: input.date, productKey: line.productKey, productName: line.productName, amount: -line.baseQuantity, unit: line.baseUnit, costAmount: line.totalCost === null ? undefined : -line.totalCost, currency: line.currency, sourceDocumentId: document.id, sourceLineId: line.id, createdAt: "2026-08-24T10:00:00.000Z" });
-        }
-      }
-      return route.fulfill(jsonResponse({ ok: true, writeOff: document, writeOffs: stores.bd_inventory_writeoffs, assortment, stockMovements: stores.bd_stock_movements, stockChanged: body.action === "post" }, body.action === "post" ? 201 : 200));
-    }
-    if (url.pathname === "/api/inventory/counts") {
-      if (method === "POST") {
-        const body = request.postDataJSON();
-        if (body.action === "delete") {
-          const snapshots = state.stores[state.activeVenueId].bd_inventory_snapshots;
-          const index = snapshots.findIndex((item) => item.id === body.id);
-          if (index < 0) return route.fulfill(jsonResponse({ ok: true, deleted: false, idempotent: true, venueId: state.activeVenueId, snapshots, stockChanged: false }));
-          const current = snapshots[index];
-          if (!["draft", "counting", "review"].includes(String(current.status || "")) || (current.adjustmentMovementIds || []).length) {
-            return route.fulfill(jsonResponse({ ok: false, code: "INVENTORY_DELETE_PROTECTED", error: "Инвентаризация уже завершена или повлияла на склад" }, 409));
-          }
-          snapshots.splice(index, 1);
-          return route.fulfill(jsonResponse({ ok: true, deleted: true, deletedInventoryId: body.id, venueId: state.activeVenueId, snapshots, stockChanged: false }));
-        }
-      }
-      const document = state.stores[state.activeVenueId].bd_inventory_snapshots.find((item) => item.id === url.searchParams.get("id"));
-      if (url.searchParams.get("format") === "print") {
-        const returnUrl = `/warehouse?venue=${state.activeVenueId}&tab=counts&inventory=${encodeURIComponent(document?.id || "")}`;
-        return route.fulfill({ status: document ? 200 : 404, contentType: "text/html; charset=utf-8", body: `<!doctype html><html lang="ru"><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Инвентаризация № 17</title></head><body><header style="position:sticky;top:0"><a href="${returnUrl}">← Назад</a><button onclick="window.print()">Печать / PDF</button></header><main><h1>Инвентаризационная ведомость № 17</h1><p>${activeProfile.name}</p></main></body></html>` });
-      }
+        postedAt: body.action === "pos
       if (url.searchParams.get("id")) return route.fulfill(jsonResponse(document ? { ok: true, venueId: state.activeVenueId, inventory: document } : { ok: false, error: "Инвентаризация не найдена" }, document ? 200 : 404));
       return route.fulfill(jsonResponse({ ok: true, venueId: state.activeVenueId, accountingCurrency: activeProfile.currency, scopes: [{ type: "all", label: "Весь активный склад", itemCount: state.activeVenueId === 901 ? 3 : 1 }], inventories: state.stores[state.activeVenueId].bd_inventory_snapshots }));
     }
@@ -563,6 +565,41 @@ async function inventoryFlow(browser, profile) {
   await mobileAudit(page, profile.name, "inventory-open", { fullscreen: true });
   const layer = await page.evaluate(() => {
     const header = document.querySelector(".bd-inventory-head-v245").getBoundingClientRect();
+    const print = document.querySelector(".bd-inventory-head-v245 button[aria-label='Печатная ведомость']").getBoundingClientRect();
+    const close = document.querySelector(".bd-inventory-head-v245 button[aria-label='Закрыть']").getBoundingClientRect();
+    const owner = document.querySelector(".bd-inventory-body-v245");
+    const ownerStyle = getComputedStyle(owner);
+    const appHeader = document.querySelector("bd-app-header");
+    return { header: { top: header.top, bottom: header.bottom }, print: { top: print.top, bottom: print.bottom, right: print.right }, close: { top: close.top, bottom: close.bottom, right: close.right }, ownerOverflow: ownerStyle.overflowY, appHeaderVisible: appHeader ? getComputedStyle(appHeader).display !== "none" : false, bodyOverflow: getComputedStyle(document.body).overflow };
+  });
+  assert.equal(layer.appHeaderVisible, false, `${profile.name}: Warehouse header leaked into inventory`);
+  assert.equal(layer.bodyOverflow, "hidden", `${profile.name}: body must be scroll-locked in inventory`);
+  assert.ok(layer.print.top >= layer.header.top && layer.print.bottom <= layer.header.bottom + 1, `${profile.name}: Print left inventory header`);
+  assert.ok(layer.close.right <= profile.descriptor.viewport.width + 1, `${profile.name}: Close clipped by viewport`);
+  const body = page.locator(".bd-inventory-body-v245");
+  await body.evaluate((node) => { node.scrollTop = Math.max(1, node.scrollHeight - node.clientHeight); });
+  assert.ok(await body.evaluate((node) => node.scrollTop > 0), `${profile.name}: fullscreen inventory does not own scrolling`);
+
+  await page.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await page.waitForSelector(".bd-inventory-layer-v246", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("inventory"), null);
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
+  await page.waitForFunction(() => getComputedStyle(document.body).overflow !== "hidden");
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: body scroll lock leaked after Close`);
+  assert.equal(await page.evaluate(() => document.documentElement.classList.contains("bd-inventory-overlay-open-v246") || document.body.classList.contains("bd-inventory-overlay-open-v246")), false, `${profile.name}: inventory scroll-lock class leaked after Close`);
+
+  await page.getByRole("button", { name: /Инвентаризация № 17/ }).click();
+  await page.waitForSelector(".bd-inventory-layer-v246");
+  await page.goBack();
+  await page.waitForSelector(".bd-inventory-layer-v246", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "counts");
+
+  await goto(page, "/warehouse?venue=901&tab=counts&inventory=inv-mobile-17");
+  await page.waitForSelector(".bd-inventory-layer-v246");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector(".bd-inventory-layer-v246");
+  assert.equal(new URL(page.url()).searchParams.get("inventory"), "inv-mobile-17");
+  assert.notEqual(new URL(page.url()).searchParams.get(eader = document.querySelector(".bd-inventory-head-v245").getBoundingClientRect();
     const print = document.querySelector(".bd-inventory-head-v245 button[aria-label='Печатная ведомость']").getBoundingClientRect();
     const close = document.querySelector(".bd-inventory-head-v245 button[aria-label='Закрыть']").getBoundingClientRect();
     const owner = document.querySelector(".bd-inventory-body-v245");
@@ -869,4 +906,444 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 
   await goto(page, "/finance?venue=901");
   const financeWriteoffEntry = page.locator(".bd-finance-actions-v160 button").filter({ hasText: "Создать списание" });
-  assert.equal(await financeWriteoffEntry.count(), 1, `${profile.name}
+  assert.equal(await financeWriteoffEntry.count(), 1, `${profile.name}: Finance canonical write-off quick action is missing`);
+  await financeWriteoffEntry.click();
+  await page.waitForURL(/\/warehouse\?.*tab=writeoffs/);
+  try {
+    await page.waitForSelector('[data-bd-writeoff-flow="canonical-v271"]', { timeout: 8_000 });
+  } catch {
+    throw new Error(`${profile.name}: Finance canonical entry did not open the write-off form; url=${page.url()}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
+  }
+  assert.match(page.url(), /writeoff=new/);
+  assert.doesNotMatch(await page.locator('[data-bd-writeoff-flow="canonical-v271"]').textContent(), /Что списано и почему|Сумма/);
+
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, documents: 2, movements: 2 };
+}
+
+async function procurementFlow(browser, profile) {
+  const run = await createRun(browser, profile, "suppliers-purchases");
+  const { page } = run;
+  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  try {
+    await page.waitForSelector(".bd-proc-command-v168");
+  } catch {
+    throw new Error(`${profile.name}: procurement workspace did not open; url=${page.url()}; issues=${JSON.stringify(run.issues)}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
+  }
+  const procurementTabs = page.locator(".bd-proc-tabs-v168 button");
+  const procurementLabels = (await procurementTabs.allTextContents()).map((label) => label.trim());
+  assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
+  await procurementTabs.filter({ hasText: "Закупки" }).click();
+  const row = page.locator(".bd-proc-purchase-row-v168").first();
+  await row.locator(".bd-proc-purchase-main-v168").click();
+  await page.waitForSelector(".bd-proc-sheet-v168");
+  assert.ok(new URL(page.url()).searchParams.has("documentId"));
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector(".bd-proc-sheet-v168");
+  await page.locator(".bd-proc-sheet-v168 button[aria-label='Закрыть']").last().click();
+  await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.has("documentId"), false);
+  await procurementTabs.filter({ hasText: "Поставщики" }).click();
+  await page.locator(".bd-proc-supplier-row-v168").first().click();
+  assert.ok(new URL(page.url()).searchParams.has("supplierId"));
+  await page.goBack();
+  await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
+  await mobileAudit(page, profile.name, "procurement");
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true };
+}
+
+async function assortmentFlow(browser, profile) {
+  const run = await createRun(browser, profile, "menu-tech-cards");
+  const { page } = run;
+  await goto(page, "/catalog?qaAssortment=default");
+  await page.waitForSelector(".bd-assortment-command-v170");
+  const assortmentTabs = page.locator(".bd-assortment-tabs-v170 button");
+  const assortmentLabels = (await assortmentTabs.allTextContents()).map((label) => label.trim());
+  assert.ok(assortmentLabels.includes("Меню") && assortmentLabels.includes("Техкарты"), `${profile.name}: assortment tabs missing: ${JSON.stringify(assortmentLabels)}`);
+  if (process.env.BD_QA_DEBUG) {
+    const rects = await assortmentTabs.evaluateAll((nodes) => nodes.map((node) => ({ text: node.textContent.trim(), rect: node.getBoundingClientRect().toJSON(), header: node.closest("header")?.getBoundingClientRect().toJSON() })));
+    process.stderr.write(`[mobile-qa] assortment rects ${JSON.stringify(rects)}\n`);
+  }
+  await assortmentTabs.filter({ hasText: "Меню" }).click();
+  const section = page.locator(".bd-assortment-section-toggle-v171").first();
+  await section.click();
+  const subgroup = page.locator(".bd-assortment-subgroup-toggle-v171").first();
+  await subgroup.click();
+  const item = page.locator(".bd-assortment-menu-row-v170").first();
+  await item.click();
+  await page.waitForSelector(".bd-assortment-sheet-v170.detail");
+  assert.ok(new URL(page.url()).searchParams.has("itemId"));
+  await page.goBack();
+  await page.waitForSelector(".bd-assortment-sheet-v170", { state: "detached" });
+  await assortmentTabs.filter({ hasText: "Техкарты" }).click();
+  await mobileAudit(page, profile.name, "menu-tech-cards");
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true };
+}
+
+async function moduleSmokeFlow(browser, profile) {
+  const run = await createRun(browser, profile, "critical-modules");
+  const { page } = run;
+  const routes = [
+    ["/home?venue=901", /Заведение под контролем|Главная|AI/i],
+    ["/analysis?venue=901", /AI Доктор|Анализ/i],
+    ["/opportunities?venue=901", /возможност/i],
+    ["/finance?venue=901", /Финанс/i],
+    ["/employees?venue=901", /Команда/i],
+    ["/equipment?qaEquipment=default", /Оборудован/i],
+    ["/reports?qaReport=closed&month=2026-07", /Отч[её]т|Июль/i],
+    ["/data-control?venue=901", /Контроль данных/i],
+    ["/integrations?venue=901", /Интеграц/i],
+    ["/notifications?venue=901", /Уведомлен/i],
+    ["/settings?venue=901", /Настройк/i],
+    ["/profile?venue=901", /Профиль|заведени/i],
+  ];
+  for (const [route, expected] of routes) {
+    await goto(page, route);
+    assert.match(await page.locator("body").textContent(), expected, `${profile.name}/${route}: expected module content missing`);
+    if (process.env.BD_QA_DEBUG) {
+      const controls = await page.locator("button,a,input,select").evaluateAll((nodes) => nodes.filter((node) => {
+        const rect = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+      }).map((node) => ({ tag: node.tagName, text: (node.getAttribute("aria-label") || node.textContent || node.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 70), className: String(node.className).slice(0, 80) })).slice(0, 35));
+      process.stderr.write(`[mobile-qa] controls ${route} ${JSON.stringify(controls)}\n`);
+    }
+    await mobileAudit(page, profile.name, route);
+    await page.reload({ waitUntil: "networkidle" });
+    assert.notEqual(new URL(page.url()).pathname, "/login", `${profile.name}/${route}: refresh lost session`);
+  }
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, routes: routes.map(([route]) => route) };
+}
+
+async function businessHealthColdStartFlow(browser, profile) {
+  const run = await createRun(browser, profile, "business-health-cold-start");
+  const { page } = run;
+  await page.addInitScript(() => {
+    window.__bdHealthRenderedSnapshotIds = [];
+    const originalSetAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function(name, value) {
+      if (name === "data-bd-health-snapshot-id" && value && !window.__bdHealthRenderedSnapshotIds.includes(String(value))) {
+        window.__bdHealthRenderedSnapshotIds.push(String(value));
+      }
+      return originalSetAttribute.call(this, name, value);
+    };
+  });
+  const response = await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  assert.equal(response?.status(), 200, `${profile.name}: cold start expected HTTP 200`);
+  const splash = page.locator('[data-bd-splash="brand-loading-v332"]');
+  const splashObserved = await splash.waitFor({ timeout: 2_500 }).then(() => true, () => false);
+  if (splashObserved) {
+    const splashText = await splash.textContent();
+    assert.match(splashText || "", /BarDoctor.*AI-управляющий/s, `${profile.name}: branding splash is incomplete`);
+    assert.doesNotMatch(splashText || "", /\/100|Достоверность|Финансы|Операции/, `${profile.name}: splash leaked Health data`);
+    await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-splash.png`), fullPage: false });
+  }
+
+  const home = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
+  try {
+    await home.waitFor({ timeout: 10_000 });
+  } catch {
+    throw new Error(`${profile.name}: Business Health Home did not render: ${JSON.stringify({ url: page.url(), issues: run.issues, body: (await page.locator("body").textContent())?.replace(/\s+/g, " ").slice(0, 1200) })}`);
+  }
+  const readHome = () => home.evaluate((node) => ({
+    snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
+    score: node.querySelector(".bd-home-health-score-number-v332 strong")?.textContent?.trim(),
+    status: node.querySelector(".bd-home-health-score-status-v332")?.textContent?.trim(),
+    zones: [...node.querySelectorAll(".bd-home-health-zone-v332")].map((zone) => zone.textContent.replace(/\s+/g, " ").trim()),
+    priority: node.querySelector(".bd-home-health-priority-v332")?.textContent?.replace(/\s+/g, " ").trim(),
+    confidence: node.querySelector(".bd-home-health-confidence")?.textContent?.trim(),
+  }));
+  const firstHome = await readHome();
+  assert.equal(firstHome.snapshotId, "business-health-snapshot:901:mobile-qa-fresh", `${profile.name}: Home did not use the canonical snapshot`);
+  assert.deepEqual(await page.evaluate(() => window.__bdHealthRenderedSnapshotIds), ["business-health-snapshot:901:mobile-qa-fresh"], `${profile.name}: stale Health flashed before the canonical response`);
+  assert.equal(firstHome.score, "83");
+  assert.equal(firstHome.status, "Хорошее состояние");
+  assert.deepEqual(firstHome.zones, ["Финансы86хорошо", "Спрос94хорошо", "Операции70внимание", "Данные91хорошо"]);
+  assert.match(firstHome.priority || "", /Главный приоритет.*Проверить 6 аномалий остатков.*Проверить остатки/);
+  assert.equal(firstHome.confidence, undefined, `${profile.name}: Home exposes confidence as a score`);
+  assert.doesNotMatch(await home.textContent(), /Загрузка|Достоверность диагноза/i, `${profile.name}: Home returned to loading or exposed confidence`);
+  const homeLayout = await page.evaluate(() => {
+    const card = document.querySelector('[data-bd-home-health-index="business-health-snapshot-v334"]');
+    const money = document.querySelector(".bd-home-money");
+    const cardRect = card?.getBoundingClientRect();
+    const moneyRect = money?.getBoundingClientRect();
+    return {
+      cardHeight: cardRect?.height ?? null,
+      moneyTop: moneyRect?.top ?? null,
+      viewportHeight: innerHeight,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
+  assert.ok((homeLayout.moneyTop ?? Infinity) < homeLayout.viewportHeight, `${profile.name}: financial result is not visible on the first screen`);
+  assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
+  await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
+
+  await home.getByRole("button", { name: /Проверить остатки/ }).click();
+  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: anomaly CTA did not open warehouse`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await home.waitFor({ timeout: 10_000 });
+
+  await page.locator(".bd-home-health-score-v332").click();
+  const detail = page.locator(".bd-health-detail-v332");
+  await detail.waitFor({ timeout: 10_000 });
+  assert.equal(await detail.locator(".bd-health-detail-score-v332 strong").textContent(), firstHome.score, `${profile.name}: Home/detail scores diverged`);
+  assert.match(await detail.textContent(), /Что происходит сейчас.*Зоны Business Health.*Главный приоритет.*Качество данных/s);
+  assert.doesNotMatch(await detail.textContent(), /Обзор.*Финансы.*Спрос.*Операции|Почему такой score|Открыть раздел/s);
+  assert.doesNotMatch(await detail.textContent(), /Достоверность диагноза 77%/);
+  assert.equal(await detail.getByRole("button", { name: "Подробнее о состоянии", exact: true }).count(), 0, `${profile.name}: detail contains a self-navigation CTA`);
+  const zoneCopies = await detail.locator(".bd-health-zone-copy-v332 small").evaluateAll((nodes) => nodes.map((node) => ({
+    text: node.textContent?.trim() || "",
+    clipped: node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1,
+  })));
+  assert.equal(zoneCopies.some((zone) => zone.clipped), false, `${profile.name}: a zone interpretation is clipped: ${JSON.stringify(zoneCopies)}`);
+  await detail.getByRole("button", { name: /Финансы/ }).click();
+  await detail.getByRole("button", { name: /Посмотреть финансы/ }).click();
+  assert.equal(new URL(page.url()).pathname, "/finance", `${profile.name}: Finance deep link is dead`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await detail.waitFor({ timeout: 10_000 });
+  await detail.getByRole("button", { name: /Спрос/ }).click();
+  await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Спрос" }).getByRole("button", { name: /Посмотреть динамику/ }).click();
+  assert.equal(new URL(page.url()).pathname, "/reports", `${profile.name}: Demand deep link is dead`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await detail.waitFor({ timeout: 10_000 });
+  await detail.getByRole("button", { name: /Операции/ }).click();
+  await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Операции" }).getByRole("button", { name: /Проверить остатки/ }).click();
+  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: Operations deep link is dead`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await detail.waitFor({ timeout: 10_000 });
+  await detail.getByRole("button", { name: /Данные/ }).first().click();
+  await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Данные" }).getByRole("button", { name: /Проверить данные/ }).click();
+  assert.equal(new URL(page.url()).pathname, "/data-control", `${profile.name}: Data Quality deep link is dead`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await detail.waitFor({ timeout: 10_000 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-detail.png`), fullPage: false });
+  await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-detail-full.png`), fullPage: true });
+  await page.evaluate(() => window.bdNavigateBack("/home"));
+  await home.waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(8_000);
+  assert.deepEqual(await readHome(), firstHome, `${profile.name}: canonical snapshot changed without invalidation`);
+
+  run.state.healthMode = "healthy";
+  await page.reload({ waitUntil: "networkidle" });
+  await home.waitFor({ timeout: 10_000 });
+  await home.getByRole("button", { name: /Подробнее о состоянии/ }).click();
+  await detail.waitFor({ timeout: 10_000 });
+  assert.equal(new URL(page.url()).pathname, "/health", `${profile.name}: Home detail CTA is dead`);
+  await page.goBack({ waitUntil: "networkidle" });
+  await home.waitFor({ timeout: 10_000 });
+  assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return from Health to Home`);
+  await mobileAudit(page, profile.name, "business-health-cold-start", { requireTouch: false });
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, splashObserved, layout: homeLayout, snapshot: firstHome };
+}
+
+async function embeddedModulesFlow(browser, profile) {
+  const run = await createRun(browser, profile, "embedded-modules");
+  const { page } = run;
+
+  await goto(page, "/data-control?venue=901");
+  const dataControlFrame = page.frames().find((candidate) => {
+    try {
+      const url = new URL(candidate.url());
+      return url.pathname === "/data-control" && url.searchParams.get("embedded") === "1";
+    }
+    catch { return false; }
+  });
+  assert.ok(dataControlFrame, `${profile.name}: data-control iframe is missing`);
+  await dataControlFrame.waitForSelector(".trust-tabs");
+  const initialLayout = await dataControlFrame.evaluate(() => {
+    const header = document.querySelector(".trust-header");
+    const tabs = document.querySelector(".trust-tabs");
+    const tabsRect = tabs.getBoundingClientRect();
+    return {
+      embedded: document.documentElement.dataset.bdEmbedded,
+      headerDisplay: getComputedStyle(header).display,
+      tabsTop: tabsRect.top,
+      tabsCssTop: getComputedStyle(tabs).top,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      scrollHeight: document.documentElement.scrollHeight,
+      clientHeight: document.documentElement.clientHeight,
+    };
+  });
+  assert.equal(initialLayout.embedded, "true", `${profile.name}: embedded layout contract was not installed`);
+  assert.equal(initialLayout.headerDisplay, "none", `${profile.name}: local data-control header duplicates the app header`);
+  assert.equal(initialLayout.tabsCssTop, "0px", `${profile.name}: hidden header still reserves a sticky offset`);
+  assert.ok(Math.abs(initialLayout.tabsTop) <= 1, `${profile.name}: secondary navigation is not attached to the iframe top`);
+  assert.ok(initialLayout.scrollWidth <= initialLayout.clientWidth + 1, `${profile.name}: data-control iframe has horizontal overflow ${initialLayout.scrollWidth}/${initialLayout.clientWidth}`);
+
+  const safeLabel = `${profile.name}-data-control`.replace(/[^a-z0-9-]+/gi, "-");
+  await page.screenshot({ path: path.join(outputDir, `${safeLabel}-initial.png`), fullPage: false });
+  const scrollStates = [];
+  for (const checkpoint of [0.25, 0.5, 0.75, 1, 0]) {
+    const state = await dataControlFrame.evaluate((ratio) => {
+      const root = document.scrollingElement;
+      root.scrollTop = Math.round((root.scrollHeight - root.clientHeight) * ratio);
+      const tabs = document.querySelector(".trust-tabs");
+      const rect = tabs.getBoundingClientRect();
+      const hit = document.elementFromPoint(Math.max(1, rect.left + rect.width / 2), Math.max(1, rect.top + rect.height / 2));
+      return {
+        ratio,
+        scrollTop: root.scrollTop,
+        maxScroll: root.scrollHeight - root.clientHeight,
+        tabsTop: rect.top,
+        tabsBottom: rect.bottom,
+        tabsOwnsHitTarget: Boolean(hit && (hit === tabs || tabs.contains(hit))),
+      };
+    }, checkpoint);
+    scrollStates.push(state);
+    if (state.maxScroll > 0) assert.ok(Math.abs(state.tabsTop) <= 1, `${profile.name}: sticky tabs moved at ${checkpoint * 100}% scroll`);
+    assert.equal(state.tabsOwnsHitTarget, true, `${profile.name}: content paints above sticky tabs at ${checkpoint * 100}% scroll`);
+    if (checkpoint === 0.5) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-middle.png`), fullPage: false });
+    if (checkpoint === 1) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-bottom.png`), fullPage: false });
+  }
+  if (initialLayout.scrollHeight > initialLayout.clientHeight) {
+    assert.ok(scrollStates.some((state) => state.scrollTop > 0), `${profile.name}: data-control frame did not scroll`);
+    assert.equal(scrollStates.at(-1).scrollTop, 0, `${profile.name}: data-control frame did not return to the top`);
+  }
+
+  let frame = page.frameLocator("iframe");
+  await frame.locator("[data-tab='journal']").click();
+  await page.waitForURL(/tab=journal/);
+  await frame.locator("[data-tab='periods']").click();
+  await page.waitForURL(/tab=periods/);
+  await page.goBack();
+  await page.waitForURL(/tab=journal/);
+
+  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "embedded-data-control");
+  else {
+    const desktopOverflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
+    assert.ok(desktopOverflow.scrollWidth <= desktopOverflow.clientWidth + 1, `${profile.name}: embedded desktop route has horizontal overflow`);
+  }
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true };
+}
+
+async function formCloseFlow(browser, profile) {
+  const run = await createRun(browser, profile, "critical-form-close");
+  const { page } = run;
+
+  await goto(page, "/employees?venue=901");
+  await page.getByRole("button", { name: "Добавить сотрудника", exact: true }).first().click();
+  const employeeClose = page.getByRole("button", { name: "Закрыть форму", exact: true });
+  await employeeClose.waitFor();
+  await employeeClose.click();
+  await employeeClose.waitFor({ state: "detached" });
+
+  await goto(page, "/profile?venue=901");
+  await page.locator(".bd-profile-venue-head-v280.is-action").click();
+  const venueEditor = page.locator('[data-bd-profile-editor="venue-v282"]');
+  await venueEditor.waitFor();
+  await page.locator("bd-app-header .bd-app-back").click();
+  await venueEditor.waitFor({ state: "detached" });
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: form Close leaked body scroll lock`);
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true };
+}
+
+async function writeoffFlow(browser, profile) {
+  const run = await createRun(browser, profile, "writeoffs");
+  const { page, state } = run;
+  await goto(page, "/warehouse?venue=901&tab=writeoffs");
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-flow]");
+
+  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "writeoff-new", { fullscreen: true });
+  const shell = page.locator(".bd-writeoff-fullscreen-v271");
+  const close = page.getByRole("button", { name: "Закрыть списание", exact: true });
+  const closeBox = await close.boundingBox();
+  assert.ok(closeBox.width >= 44 && closeBox.height >= 44, `${profile.name}: write-off Close target is smaller than 44px`);
+  const viewport = page.viewportSize();
+  const shellBox = await shell.boundingBox();
+  assert.ok(shellBox.x >= 0 && shellBox.y >= 0 && shellBox.x + shellBox.width <= viewport.width + 1 && shellBox.y + shellBox.height <= viewport.height + 1, `${profile.name}: write-off fullscreen is clipped`);
+  assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: write-off did not own scrolling`);
+
+  await close.click();
+  await shell.waitFor({ state: "detached" });
+  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null);
+  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: Close leaked body scroll lock`);
+
+  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
+  await page.getByLabel("Причина списания").selectOption("spoilage");
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  await page.waitForSelector(".bd-writeoff-picker-v271");
+  await page.locator(".bd-writeoff-picker-row-v271").filter({ hasText: "Пиво Mobile A" }).click();
+  await page.getByLabel("Количество Пиво Mobile A").fill("2");
+
+  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
+  const search = page.getByLabel("Поиск по номенклатуре");
+  await search.fill("Кола");
+  assert.equal(await page.locator(".bd-writeoff-picker-row-v271").count(), 1, `${profile.name}: canonical alias search did not narrow the catalog`);
+  await page.locator(".bd-writeoff-picker-row-v271").click();
+  await page.getByLabel("Количество Coca-Cola Mobile A").fill("1");
+
+  const main = page.locator(".bd-writeoff-flow-v271");
+  await main.evaluate((node) => { node.scrollTop = Math.max(1, node.scrollHeight - node.clientHeight); });
+  if (await main.evaluate((node) => node.scrollHeight > node.clientHeight)) {
+    assert.ok(await main.evaluate((node) => node.scrollTop > 0), `${profile.name}: long write-off form does not own scrolling`);
+  }
+  await page.getByRole("button", { name: "Провести списание", exact: true }).click();
+  await page.waitForSelector("[data-bd-writeoff-detail]");
+  const documentId = new URL(page.url()).searchParams.get("writeoff");
+  assert.ok(documentId && documentId !== "new", `${profile.name}: posting did not replace new deep link with document detail`);
+  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Пиво Mobile A").curreual(state.stores[902].bd_inventory_writeoffs.length, 0, `${profile.name}: Venue A document leaked into Venue B`);
+
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, documentId };
+}
+
+async function runProfile(browser, profile) {
+  assert.ok(profile.descriptor.isMobile, `${profile.name}: Playwright descriptor is not mobile`);
+  assert.ok(profile.descriptor.hasTouch, `${profile.name}: Playwright descriptor has no touch`);
+  assert.match(profile.descriptor.userAgent, profile.userAgentPattern);
+  const results = [];
+  for (const [name, flow] of [
+    ["writeoffs", writeoffFlow],
+    ["shift-canonical-writeoffs", shiftCanonicalWriteoffFlow],
+    ["inventory-fullscreen", inventoryFlow],
+    ["inventory-delete", inventoryDeleteFlow],
+    ["warehouse-nomenclature", nomenclatureFlow],
+    ["shifts", shiftsFlow],
+    ["suppliers-purchases", procurementFlow],
+    ["menu-tech-cards", assortmentFlow],
+    ["embedded-modules", embeddedModulesFlow],
+    ["critical-form-close", formCloseFlow],
+    ["critical-modules", moduleSmokeFlow],
+    ["business-health-cold-start", businessHealthColdStartFlow],
+  ]) {
+    if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
+    process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
+    results.push(await flow(browser, profile));
+  }
+  return results;
+}
+
+(async () => {
+  browserPath = await resolveBrowserExecutable(browserPath);
+  assert.ok(fs.existsSync(browserPath), `Playwright browser executable not found: ${browserPath}`);
+  const browser = await chromium.launch({
+    executablePath: browserPath,
+    headless: true,
+    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
+  });
+  const results = [];
+  const failures = [];
+  try {
+    for (const profile of profiles) {
+      if (process.env.BD_QA_PROFILE && process.env.BD_QA_PROFILE !== profile.name) continue;
+      results.push(...await runProfile(browser, profile));
+    }
+    if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
+        results.push(await embeddedModulesFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
+        results.push(a

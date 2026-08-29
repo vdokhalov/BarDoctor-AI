@@ -362,4 +362,330 @@ const cases: EvalCase[] = [
     verify: (result) => {
       const signal = result.prioritySignals.find((item) => String(item.issueKey).includes("demand"));
       assert.ok(signal?.deadline);
-      assert.ok(signal?.suc
+      assert.ok(signal?.successCriterion);
+    },
+  },
+  {
+    name: "37 responsible is not invented for technical work",
+    input: base({ operations: { criticalBlockers: 1 } }),
+    verify: (result) => assert.equal(result.prioritySignals.find((item) => item.issueKey === "operational-blocker")?.responsibleRole, "Не назначен"),
+  },
+  {
+    name: "38 venue A input cannot contain venue B event",
+    input: base({ venueId: "venue-a", events: [{ id: "a-event", title: "A", startDate: "2026-08-22", distanceKm: 1 }] }),
+    verify: (result) => assert.deepEqual(result.externalContext.map((item) => item.id), ["a-event"]),
+  },
+  {
+    name: "39 venue switch produces a completely separate result",
+    input: { ...base({ venueId: "venue-b" }), daily: daily({ targetChecks: 50, targetAverage: 50, targetRevenue: 2_500 }), events: [{ id: "b-event", title: "B", startDate: "2026-08-22", distanceKm: 2 }] },
+    verify: (result) => {
+      assert.deepEqual(result.externalContext.map((item) => item.id), ["b-event"]);
+      assert.ok((result.demand.trafficChangePercent ?? 0) < 0);
+    },
+  },
+  {
+    name: "40 canonical result never exceeds three hypotheses",
+    input: base({ events: Array.from({ length: 8 }, (_, index) => ({ id: `event-${index}`, title: `Event ${index}`, startDate: "2026-08-22", distanceKm: 0.5, potentialScore: 95 })) }),
+    verify: (result) => assert.ok(result.hypotheses.length <= 3),
+  },
+  {
+    name: "41 corrective commercial decline outranks equipment and caps health",
+    input: base({
+      daily: daily({ targetChecks: 55, targetAverage: 80, targetRevenue: 4_400 }),
+      currentFinancialPeriod: { monthKey: "2026-08", periodLabel: "Текущий месяц · август 2026", revenue: 40_000, expenses: 52_000 },
+      operations: { recurringEquipmentFailures: 3 },
+    }),
+    verify: (result) => {
+      assert.notEqual(result.prioritySignals[0]?.issueKey, "equipment-recurring");
+      assert.ok((result.businessHealth.score ?? 100) < 55);
+      assert.ok(result.businessHealth.adjustments.length > 0);
+    },
+  },
+  {
+    name: "42 corrective checks and average check contribution is quantified",
+    input: base({ daily: daily({ targetChecks: 70, targetAverage: 60, targetRevenue: 4_200 }) }),
+    verify: (result) => {
+      assert.notEqual(result.demand.decomposition.checksEffect, null);
+      assert.notEqual(result.demand.decomposition.averageCheckEffect, null);
+      assert.notEqual(result.demand.decomposition.dominantFactor, "unavailable");
+      assert.match(result.demand.decomposition.explanation, /вклад/i);
+    },
+  },
+  {
+    name: "43 corrective financial and demand periods are explicit",
+    input: base({ currentFinancialPeriod: { monthKey: "2026-08", periodLabel: "Текущий месяц · август 2026", revenue: 40_000, expenses: 45_000 } }),
+    verify: (result) => {
+      assert.equal(result.periods.currentFinance?.status, "open");
+      assert.equal(result.periods.closedFinance?.status, "closed");
+      assert.match(result.periods.demand.comparisonBaseline, /сопоставим/i);
+      assert.notEqual(result.periods.currentFinance?.label, result.periods.closedFinance?.label);
+    },
+  },
+  {
+    name: "44 corrective confidence is canonical for one snapshot",
+    input: base({ daily: daily({ targetChecks: 65, targetAverage: 75, targetRevenue: 4_875 }) }),
+    verify: (result) => {
+      assert.equal(result.briefing.diagnosis?.confidencePercent, result.businessHealth.confidencePercent);
+      assert.equal(result.briefing.diagnosis?.confidenceLabel, "Достоверность диагноза");
+    },
+  },
+  {
+    name: "45 corrective relevant external event surfaces in briefing",
+    input: base({
+      daily: daily({ targetChecks: 60, targetAverage: 80, targetRevenue: 4_800 }),
+      events: [{ id: "near-briefing", title: "Крупное мероприятие", startDate: "2026-08-22", startTime: "21:00", endTime: "01:00", distanceKm: 0.5, potentialScore: 95 }],
+      competitors: [{ name: "Ближайший конкурент", eventDistanceKm: 0.2 }],
+    }),
+    verify: (result) => assert.equal(result.briefing.context[0]?.status, "hypothesis"),
+  },
+  {
+    name: "46 corrective irrelevant external event stays out of briefing",
+    input: base({ events: [{ id: "far-briefing", title: "Далёкое событие", startDate: "2026-08-22", distanceKm: 150 }] }),
+    verify: (result) => assert.equal(result.briefing.context.length, 0),
+  },
+  {
+    name: "47 corrective unsupported external cause is never called fact",
+    input: base({
+      daily: daily({ targetChecks: 60, targetAverage: 80, targetRevenue: 4_800 }),
+      events: [{ id: "hypothesis-only", title: "Событие рядом", startDate: "2026-08-22", distanceKm: 0.4, potentialScore: 95 }],
+    }),
+    verify: (result) => {
+      assert.ok(result.hypotheses.every((item) => item.causalStatus !== "supported" || item.missingEvidence.length > 0));
+      assert.ok(result.briefing.context.every((item) => item.status === "hypothesis"));
+    },
+  },
+  {
+    name: "48 corrective stable business does not invent briefing actions",
+    input: base(),
+    verify: (result) => {
+      assert.equal(result.briefing.actions.length, 0);
+      assert.equal(result.briefing.diagnosis, null);
+    },
+  },
+  {
+    name: "49 management briefing contract closes diagnosis to verification loop",
+    input: base({ daily: daily({ targetChecks: 60, targetAverage: 75, targetRevenue: 4_500 }), ...selfServiceData() }),
+    verify: (result) => {
+      assert.equal(result.briefing.version, "management-briefing-v2");
+      assert.ok(result.briefing.diagnosis?.summary);
+      assert.ok(result.briefing.keyDrivers.length >= 3);
+      assert.ok(result.briefing.todayActions.length >= 2);
+      assert.ok(result.briefing.afterShiftChecks.length >= 3);
+      assert.ok(result.briefing.findings.length >= 2);
+      assert.equal(result.briefing.verificationPlan.status, "scheduled");
+      assert.equal(result.briefing.confidence.percent, result.businessHealth.confidencePercent);
+    },
+  },
+  {
+    name: "50 management actions follow commercial diagnosis instead of equipment signal count",
+    input: base({
+      daily: daily({ targetChecks: 55, targetAverage: 70, targetRevenue: 3_850 }),
+      operations: { recurringEquipmentFailures: 7 },
+      ...selfServiceData(),
+    }),
+    verify: (result) => {
+      assert.ok(result.briefing.todayActions.some((item) => item.issueKey === "traffic"));
+      assert.ok(result.briefing.todayActions.some((item) => item.issueKey === "average-check"));
+      assert.ok(result.briefing.todayActions.every((item) => item.issueKey !== "equipment-recurring"));
+    },
+  },
+  {
+    name: "51 management external context is a hypothesis with an after-shift watch",
+    input: base({
+      daily: daily({ targetChecks: 55, targetAverage: 75, targetRevenue: 4_125 }),
+      events: [{ id: "management-event", title: "Большое событие", startDate: "2026-08-22", startTime: "21:00", endTime: "02:00", distanceKm: 0.4, potentialScore: 98 }],
+      competitors: [{ name: "Конкурент", eventDistanceKm: 0.1 }],
+    }),
+    verify: (result) => {
+      assert.equal(result.briefing.externalContext[0]?.factOrHypothesis, "hypothesis");
+      assert.ok(result.briefing.externalContext[0]?.whatToWatch);
+      assert.ok(result.briefing.afterShiftChecks.some((item) => item.id === "external-context-after-shift"));
+    },
+  },
+  {
+    name: "52 management irrelevant context is not padded into the top briefing",
+    input: base({
+      daily: daily({ targetChecks: 55, targetAverage: 75, targetRevenue: 4_125 }),
+      events: [{ id: "irrelevant-management-event", title: "Далёкое событие", startDate: "2026-08-22", distanceKm: 200 }],
+    }),
+    verify: (result) => assert.deepEqual(result.briefing.externalContext, []),
+  },
+  {
+    name: "53 management today action has one explicit deadline meaning and dynamic CTA",
+    input: base({ daily: daily({ targetChecks: 55, targetAverage: 75, targetRevenue: 4_125 }), ...selfServiceData() }),
+    verify: (result) => {
+      assert.ok(result.briefing.todayActions.every((item) => item.deadlineLabel === "Срок действия"));
+      assert.ok(result.briefing.todayActions.every((item) => item.ctaLabel !== "Открыть предложение"));
+      assert.ok(result.briefing.todayActions.every((item) => item.metricToCheck && item.targetOrVerification));
+    },
+  },
+];
+
+assert.equal(cases.length, 53);
+
+for (const scenario of cases) {
+  test(`AI Doctor eval · ${scenario.name}`, () => {
+    const result = buildBusinessIntelligence(scenario.input);
+    scenario.verify(result);
+  });
+}
+
+test("AI Doctor quality gate · OLD vs NEW on deterministic capabilities", () => {
+  const old = {
+    factualCorrectness: 1,
+    hallucinationRate: 0,
+    unsupportedClaimRate: 0,
+    comparableBaseline: 0,
+    checksProxy: 0,
+    businessHealthDataQualitySeparation: 0,
+    externalHypothesis: 0,
+    abstention: 1,
+    evidenceCoverage.hallucinationRate <= old.hallucinationRate);
+  assert.ok(next.unsupportedClaimRate <= old.unsupportedClaimRate);
+  assert.ok(next.comparableBaseline > old.comparableBaseline);
+  assert.ok(next.checksProxy > old.checksProxy);
+  assert.ok(next.businessHealthDataQualitySeparation > old.businessHealthDataQualitySeparation);
+  assert.ok(next.externalHypothesis > old.externalHypothesis);
+  assert.ok(next.abstention >= old.abstention);
+  assert.ok(next.evidenceCoverage > old.evidenceCoverage);
+  assert.ok(next.outcomePlanCoverage > old.outcomePlanCoverage);
+  assert.ok(next.briefingFirst > old.briefingFirst);
+  assert.ok(next.periodLabelling > old.periodLabelling);
+  assert.ok(next.canonicalConfidence > old.canonicalConfidence);
+});
+
+test("comparable baseline median is resistant to a single outlier", () => {
+  const rows = normaliseDailyMetrics([
+    { date: "2026-07-18", revenue: 10_000, receipts: 100 },
+    { date: "2026-07-25", revenue: 10_100, receipts: 101 },
+    { date: "2026-08-01", revenue: 999_999, receipts: 1 },
+    { date: "2026-08-08", revenue: 9_900, receipts: 99 },
+  ]);
+  const baseline = comparableWeekdayBaseline(rows, "2026-08-22");
+  assert.equal(baseline?.revenue, 10_050);
+  assert.equal(baseline?.checks, 99.5);
+});
+
+test("AI Doctor current period and target day follow Europe/Chisinau at UTC midnight", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-31T21:30:00.000Z"),
+    phase: undefined,
+    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
+    daily: [
+      { date: "2026-08-31", revenue: 100, receipts: 1 },
+      { date: "2026-09-01", revenue: 200, receipts: 2 },
+    ],
+    currentFinancialPeriod: { revenue: 200, expenses: 50 },
+  }));
+  assert.equal(result.demand.target?.date, "2026-09-01");
+  assert.equal(result.periods.currentFinance?.startDate, "2026-09-01");
+  assert.equal(result.periods.currentFinance?.endDate, "2026-09-01");
+});
+
+test("live Health compares an open month only with the same elapsed days of the previous month", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-28T18:00:00.000Z"),
+    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
+    daily: [
+      { date: "2026-07-01", revenue: 1_000, receipts: 10 },
+      { date: "2026-07-15", revenue: 1_000, receipts: 10 },
+      { date: "2026-07-31", revenue: 99_000, receipts: 1 },
+      { date: "2026-08-01", revenue: 1_300, receipts: 12 },
+      { date: "2026-08-15", revenue: 1_300, receipts: 12 },
+    ],
+    currentFinancialPeriod: {
+      monthKey: "2026-08",
+      periodLabel: "Текущий месяц · август",
+      startDate: "2026-08-01",
+      endDate: "2026-08-28",
+      revenue: 2_600,
+      expenses: 1_500,
+      result: 1_100,
+    },
+  }));
+
+  assert.equal(result.livePeriod.method, "current_mtd_vs_previous_mtd");
+  assert.equal(result.livePeriod.baseline?.endDate, "2026-07-28");
+  assert.equal(result.livePeriod.baseline?.revenue, 2_000, "31 July is outside the equal elapsed baseline");
+  assert.equal(result.livePeriod.changes.revenuePercent, 30);
+  assert.equal(result.livePeriod.direction, "better");
+  assert.match(result.livePeriod.periodLabel, /1–28 августа.*предварительно/i);
+  assert.match(result.livePeriod.financeSummary, /сильнее сопоставимого/i);
+  assert.ok(result.livePeriod.factors.some((item) => /Предварительный денежный результат/.test(item)));
+});
+
+test("live Health keeps current analysis while comparable dynamics are honestly unavailable", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-28T18:00:00.000Z"),
+    daily: [{ date: "2026-08-28", revenue: 1_200, receipts: 12 }],
+    currentFinancialPeriod: {
+      monthKey: "2026-08",
+      startDate: "2026-08-01",
+      endDate: "2026-08-28",
+      revenue: 1_200,
+      expenses: 900,
+      result: 300,
+    },
+  }));
+
+  assert.equal(result.livePeriod.method, "insufficient");
+  assert.equal(result.livePeriod.direction, "insufficient");
+  assert.match(result.livePeriod.headline, /Недостаточно сопоставимых данных/i);
+  assert.equal(result.livePeriod.current.preliminaryResult, 300);
+  assert.equal(result.livePeriod.comparison.availability, "unavailable");
+  assert.match(result.livePeriod.comparison.reasonUnavailable ?? "", /сопоставимых смен/i);
+  assert.ok(result.livePeriod.factors.some((item) => /Предварительный денежный результат/.test(item)));
+});
+
+test("live Health falls back to matched completed shifts when previous MTD is unavailable", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-28T18:00:00.000Z"),
+    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
+    daily: [
+      { date: "2026-08-01", revenue: 1_000, receipts: 10 },
+      { date: "2026-08-08", revenue: 1_100, receipts: 11 },
+      { date: "2026-08-15", revenue: 1_300, receipts: 12 },
+      { date: "2026-08-22", revenue: 1_400, receipts: 13 },
+      { date: "2026-08-02", revenue: 800, receipts: 8 },
+      { date: "2026-08-09", revenue: 900, receipts: 9 },
+      { date: "2026-08-16", revenue: 1_000, receipts: 10 },
+      { date: "2026-08-23", revenue: 1_200, receipts: 11 },
+    ],
+    currentFinancialPeriod: {
+      monthKey: "2026-08",
+      startDate: "2026-08-01",
+      endDate: "2026-08-28",
+      revenue: 8_700,
+      expenses: 5_000,
+    },
+  }));
+
+  assert.equal(result.livePeriod.method, "recent_completed_shifts");
+  assert.equal(result.livePeriod.comparison.availability, "available");
+  assert.ok(result.livePeriod.comparison.sampleSize.current >= 2);
+  assert.equal(result.livePeriod.comparison.sampleSize.current, result.livePeriod.comparison.sampleSize.comparison);
+  assert.match(result.livePeriod.comparisonLabel, /завершённых смен/i);
+});
+
+test("open-period finance uses preliminary terminology and never calls it final profit", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-28T18:00:00.000Z"),
+    currentFinancialPeriod: { monthKey: "2026-08", revenue: 5_000, expenses: 3_200 },
+  }));
+  const liveCopy = [result.livePeriod.financeSummary, ...result.livePeriod.factors].join(" ");
+  assert.match(liveCopy, /предварительн/i);
+  assert.doesNotMatch(liveCopy, /финальная чистая прибыль/i);
+});
+
+test("live period month boundary follows Europe/Chisinau instead of UTC", () => {
+  const result = buildBusinessIntelligence(base({
+    now: new Date("2026-08-31T21:30:00.000Z"),
+    profile: { timezone: "Europe/Chisinau", openTime: "22:00", closeTime: "06:00" },
+    daily: [{ date: "2026-09-01", revenue: 500, receipts: 5 }],
+    currentFinancialPeriod: null,
+  }));
+
+  assert.equal(result.livePeriod.current.startDate, "2026-09-01");
+  assert.equal(result.livePeriod.current.endDate, "2026-09-01");
+  assert.match(result.livePeriod.periodLabel, /1–1 сентября/i);
+});

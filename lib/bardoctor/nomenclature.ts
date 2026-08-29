@@ -255,4 +255,67 @@ export function ensureNomenclatureHierarchy(assortment: unknown, now = new Date(
         createdAt: text(balance.createdAt, now),
         updatedAt: text(balance.updatedAt, now),
       };
-   
+      itemsByKey.set(key, item);
+      return [item];
+    });
+  const sourceItems = [...existingItems, ...migratedFromBalances];
+  const items = sourceItems.map((raw) => {
+    const item = { ...record(raw) };
+    const sectionId = text(item.sectionId);
+    const categoryId = text(item.taxonomyCategoryId);
+    const subcategoryId = text(item.subcategoryId);
+    const status = text(item.classificationStatus);
+    const hasUsablePath = sectionId
+      && categoryId
+      && subcategoryId
+      && sectionId !== "unassigned"
+      && categoryId !== "unassigned-category"
+      && subcategoryId !== "unassigned-subcategory"
+      && ["confirmed", "auto"].includes(status);
+    if (hasUsablePath) {
+      if (status === "suggested") suggested += 1;
+      return item;
+    }
+    const result = classifyNomenclatureItemWithRules(item, rules);
+    if (result.classificationStatus === "auto") classified += 1;
+    if (result.classificationStatus === "suggested") suggested += 1;
+    if (result.classificationStatus === "unassigned") unassigned += 1;
+    return { ...item, ...result, classifiedAt: now, updatedAt: text(item.updatedAt, now) };
+  });
+  const byKey = new Map(items.map((item) => [text(item.productKey ?? item.key), item]));
+  const balances = (Array.isArray(root.stockBalances) ? root.stockBalances : []).map((raw) => {
+    const balance = { ...record(raw) };
+    const linked = byKey.get(text(balance.productKey ?? balance.key));
+    return linked ? {
+      ...balance,
+      sectionId: linked.sectionId,
+      taxonomyCategoryId: linked.taxonomyCategoryId,
+      subcategoryId: linked.subcategoryId,
+      storageLocationId: linked.storageLocationId,
+      classificationStatus: linked.classificationStatus,
+      classificationConfidence: linked.classificationConfidence,
+    } : balance;
+  });
+  root.nomenclature = items;
+  root.stockBalances = balances;
+  root.updatedAt = now;
+  return { assortment: root, classified, suggested, unassigned };
+}
+
+export function manualClassification(input: unknown): Partial<Classification> {
+  const value = record(input);
+  const sectionId = text(value.sectionId);
+  const taxonomyCategoryId = text(value.taxonomyCategoryId);
+  const subcategoryId = text(value.subcategoryId);
+  const storageLocationId = text(value.storageLocationId);
+  if (!sectionId || !taxonomyCategoryId || !subcategoryId) return {};
+  return {
+    sectionId,
+    taxonomyCategoryId,
+    subcategoryId,
+    storageLocationId,
+    classificationStatus: "confirmed",
+    classificationConfidence: 1,
+    classificationSource: "manual",
+  };
+}

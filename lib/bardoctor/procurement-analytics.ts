@@ -414,4 +414,360 @@ function previousMonthKey(monthKey: string): string {
 
 function comparablePeriodDates(monthKey: string, now: Date) {
   const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const currentIsPartial = monthKey === currentM
+  const currentIsPartial = monthKey === currentMonth;
+  const previousKey = previousMonthKey(monthKey);
+  const endDay = currentIsPartial ? now.getUTCDate() : 31;
+  return { previousKey, endDay, comparisonBasis: currentIsPartial ? "same_elapsed_days" : "full_months" as const };
+}
+
+export function buildProcurementAnalytics(input: {
+  documents?: unknown[];
+  suppliers?: unknown[];
+  expenses?: unknown[];
+  stockMovements?: unknown[];
+  supplierAlternatives?: unknown;
+  assortment?: unknown;
+  period?: string;
+  venueId?: number;
+  accountingCurrency?: string | null;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const monthKey = /^\d{4}-\d{2}$/.test(input.period ?? "")
+    ? input.period as string
+    : `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const allDocuments = deduplicatedDocuments(input.documents ?? [], input.venueId);
+  const confirmed = confirmedProcurementDocuments(allDocuments, input.venueId);
+  const purchases = confirmed.filter((document) => text(document.documentType) !== "price_list");
+  const priceLists = confirmed.filter((document) => text(document.documentType) === "price_list");
+  const accountingCurrency = text(input.accountingCurrency, "", 12).toUpperCase();
+  const resolvedPurchases = accountingCurrency
+    ? purchases.map((document) => ({
+      document,
+      money: resolveAccountingMoney({ value: document, accountingCurrency }),
+    }))
+    : purchases.map((document) => ({ document, money: null }));
+  const accountingPurchases = accountingCurrency
+    ? resolvedPurchases
+      .filter((entry) => entry.money?.accountingAmount != null)
+      .map((entry) => ({
+        ...entry.document,
+        originalAmount: entry.money?.originalAmount,
+        originalCurrency: entry.money?.originalCurrency,
+        accountingAmount: entry.money?.accountingAmount,
+        accountingCurrency,
+        total: entry.money?.accountingAmount ?? 0,
+      } as JsonRecord))
+    : purchases;
+  const excludedPurchases = accountingCurrency
+    ? resolvedPurchases.filter((entry) => entry.money?.accountingAmount == null).map((entry) => entry.document)
+    : [];
+  const periodPurchases = accountingPurchases.filter((document) => isoDate(document.date).startsWith(monthKey));
+  const comparisonPeriod = comparablePeriodDates(monthKey, now);
+  const currentComparable = periodPurchases.filter((document) =>
+    number(isoDate(document.date).slice(8, 10), 99) <= comparisonPeriod.endDay
+  );
+  const previousComparable = accountingPurchases.filter((document) => {
+    const date = isoDate(document.date);
+    return date.startsWith(comparisonPeriod.previousKey)
+      && number(date.slice(8, 10), 99) <= comparisonPeriod.endDay;
+  });
+  const currentTotal = rounded(periodPurchases.reduce((sum, document) => sum + number(document.total), 0), 2);
+  const currentComparableTotal = rounded(currentComparable.reduce((sum, document) => sum + number(document.total), 0), 2);
+  const previousTotal = rounded(previousComparable.reduce((sum, document) => sum + number(document.total), 0), 2);
+  const activeSuppliers = (input.suppliers ?? []).map(record).filter((supplier) =>
+    text(supplier.status, "active") !== "archived"
+  );
+
+  const aliases = record(input.assortment).canonicalProductAliases;
+  const priceChanges = procurementPriceChanges(allDocuments, input.venueId, aliases);
+  const comparisons = procurementComparisons(allDocuments, input.suppliers ?? [], {
+    venueId: input.venueId,
+    now,
+    productAliases: aliases,
+  });
+  const points = procurementPricePoints(allDocuments, { venueId: input.venueId, productAliases: aliases });
+  const actualPoints = points.filter((point) => point.sourceKind === "purchase");
+  const expenses = (input.expenses ?? []).map(record).filter((expense) => {
+    const expenseVenueId = number(expense.venueId, 0);
+    return !input.venueId || !expenseVenueId || expenseVenueId === input.venueId;
+  });
+  const liabilities = supplierDebtSummary(accountingPurchases, expenses, input.venueId, accountingCurrency);
+  const movementDocumentIds = new Set((input.stockMovements ?? []).map(record)
+    .filter((movement) =>
+      text(movement.type) === "receipt"
+      && text(movement.status, "active") !== "cancelled"
+      && !movement.reversedAt
+    )
+    .map((movement) => text(movement.sourceDocumentId, "", 100))
+    .filter(Boolean));
+  const paymentMismatch = purchases.filter((document) => {
+    const documentId = text(document.id, "", 100);
+    const summary = purchasePaymentSummary(document, expenses.filter((expense) =>
+      isPurchasePayment(expense, documentId)
+    ), accountingCurrency);
+    const storedPaid = document.paidAmount == null ? null : rounded(number(document.paidAmount), 2);
+    const storedBalance = document.balanceDue == null ? null : rounded(number(document.balanceDue), 2);
+    const storedStatus = text(document.paymentStatus, "", 30);
+    return summary.overpaidAmount > 0
+      || (storedPaid !== null && Math.abs(storedPaid - summary.paidAmount) > 0.01)
+      || (storedBalance !== null && Math.abs(storedBalance - summary.balanceDue) > 0.01)
+      || (Boolean(storedStatus) && storedStatus !== summary.paymentStatus);
+  });
+  const stockMissing = purchases.filter((document) =>
+    purchaseAffectsInventory(document)
+    && !movementDocumentIds.has(text(document.id, "", 100))
+  );
+  const unmappedItems = confirmed.flatMap((document) => array(document.items).map(record).map((item) => {
+    const packageInfo = inventoryPackageAmount(item.packageSize, item.unit);
+    const productKey = text(item.purchaseProductKey ?? item.productKey, "", 300);
+    return productKey && packageInfo.unit !== "unknown"
+      ? null
+      : {
+          documentId: text(document.id, "", 100),
+          itemId: text(item.id, "", 100),
+          name: text(item.name, "Позиция", 240),
+          reason: productKey ? "unit_not_normalized" as const : "mapping_unconfirmed" as const,
+        };
+  })).filter((item): item is NonNullable<typeof item> => Boolean(item));
+  const reviewDocuments = allDocuments.filter((document) =>
+    ["review", "error"].includes(procurementDocumentState(document))
+  );
+  const periodPurchaseIds = new Set(
+    periodPurchases.map((document) => text(document.id, "", 100)).filter(Boolean),
+  );
+  const periodReviewDocuments = reviewDocuments.filter((document) =>
+    isoDate(document.date).startsWith(monthKey)
+  );
+  const periodPriceRises = priceChanges.filter((change) =>
+    change.direction === "up" && periodPurchaseIds.has(change.currentDocumentId)
+  );
+  const periodUnmappedItems = unmappedItems.filter((item) =>
+    periodPurchaseIds.has(item.documentId)
+  );
+  const integrationIssues = [...new Map(
+    [...paymentMismatch, ...stockMissing].map((document) => [text(document.id), document]),
+  ).values()];
+  const periodIntegrationIssues = integrationIssues.filter((document) =>
+    periodPurchaseIds.has(text(document.id, "", 100))
+  );
+  const periodReviewPurchaseIds = new Set(
+    periodReviewDocuments
+      .map((document) => text(document.id, "", 100))
+      .filter((id) => periodPurchaseIds.has(id)),
+  );
+  const attentionPurchaseIds = new Set([
+    ...periodPriceRises.map((change) => change.currentDocumentId),
+    ...periodUnmappedItems.map((item) => item.documentId),
+    ...periodIntegrationIssues.map((document) => text(document.id, "", 100)),
+  ].filter((id) => id && !periodReviewPurchaseIds.has(id)));
+  const normalPurchases = Math.max(
+    0,
+    periodPurchases.length - attentionPurchaseIds.size - periodReviewPurchaseIds.size,
+  );
+
+  const signals: Array<{
+    id: string;
+    type: "price_change" | "document_review" | "mapping" | "integration";
+    tone: "orange" | "red";
+    title: string;
+    detail: string;
+    documentId?: string;
+  }> = [];
+  if (periodPriceRises.length) {
+    signals.push({
+      id: "price-rise",
+      type: "price_change",
+      tone: "orange",
+      title: `${periodPriceRises.length} ${plural(periodPriceRises.length, "товар подорожал", "товара подорожали", "товаров подорожали")}`,
+      detail: `Максимальное подтверждённое изменение +${decimalLabel(periodPriceRises[0].percent)}%`,
+      documentId: periodPriceRises[0].currentDocumentId,
+    });
+  }
+  if (periodReviewDocuments.length) {
+    signals.push({
+      id: "document-review",
+      type: "document_review",
+      tone: periodReviewDocuments.some((document) => procurementDocumentState(document) === "error") ? "red" : "orange",
+      title: `${periodReviewDocuments.length} ${plural(periodReviewDocuments.length, "документ требует", "документа требуют", "документов требуют")} проверки`,
+      detail: "Откройте конкретные поля и позиции, которые нужно сверить",
+      documentId: text(periodReviewDocuments[0].id, "", 100) || undefined,
+    });
+  }
+  if (periodUnmappedItems.length) {
+    signals.push({
+      id: "unmapped-items",
+      type: "mapping",
+      tone: "orange",
+      title: `${periodUnmappedItems.length} ${plural(periodUnmappedItems.length, "позиция не участвует", "позиции не участвуют", "позиций не участвуют")} в сравнении`,
+      detail: "Нужно подтвердить товар и нормализованную единицу",
+      documentId: periodUnmappedItems[0].documentId,
+    });
+  }
+  if (periodIntegrationIssues.length) {
+    signals.push({
+      id: "integration-result",
+      type: "integration",
+      tone: "red",
+      title: `${periodIntegrationIssues.length} ${plural(periodIntegrationIssues.length, "закупка требует", "закупки требуют", "закупок требуют")} проверки проведения`,
+      detail: "Проверьте складской приход и сверку связанных платежей",
+      documentId: text(periodIntegrationIssues[0].id, "", 100) || undefined,
+    });
+  }
+
+  const chartMap = new Map<string, number>();
+  for (const document of accountingPurchases) {
+    const key = isoDate(document.date).slice(0, 7);
+    if (key) chartMap.set(key, rounded((chartMap.get(key) ?? 0) + number(document.total), 2));
+  }
+  const chart = [...chartMap.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0]))
+    .slice(-12)
+    .map(([period, total]) => ({ period, total }));
+
+  const supplierMetrics = activeSuppliers.map((supplier) => {
+    const id = text(supplier.id, "", 100);
+    const name = text(supplier.name, "Поставщик", 180);
+    const nameKey = normalizedName(name);
+    const matchingDocuments = accountingPurchases.filter((document) =>
+      text(document.supplierId) === id
+      || normalizedName(document.supplierName) === nameKey
+    );
+    const periodDocuments = matchingDocuments.filter((document) => isoDate(document.date).startsWith(monthKey));
+    const periodTotal = rounded(periodDocuments.reduce((sum, document) => sum + number(document.total), 0), 2);
+    const linkedProducts = new Set(actualPoints.filter((point) =>
+      point.supplierId === id || normalizedName(point.supplierName) === nameKey
+    ).map((point) => point.productKey));
+    const supplierChanges = priceChanges.filter((change) =>
+      change.supplierId === id || normalizedName(change.supplierName) === nameKey
+    );
+    const sortedChanges = supplierChanges.map((change) => change.percent).sort((left, right) => left - right);
+    const medianChange = sortedChanges.length
+      ? sortedChanges[Math.floor(sortedChanges.length / 2)]
+      : null;
+    const debt = liabilities.suppliers.find((value) =>
+      value.supplierId === id
+      || normalizedName(value.supplierName) === nameKey
+    );
+    return {
+      id,
+      name,
+      categories: array(supplier.categories).map((value) => text(value)).filter(Boolean),
+      linkedProducts: linkedProducts.size,
+      periodTotal,
+      sharePercent: currentTotal > 0 ? rounded(periodTotal / currentTotal * 100, 1) : null,
+      lastPurchaseDate: matchingDocuments.map((document) => isoDate(document.date)).sort().at(-1) ?? null,
+      medianPriceChangePercent: medianChange,
+      conditions: supplierConditions(supplier),
+      contacts: {
+        contactPerson: text(supplier.contactPerson, "", 120) || null,
+        phone: text(supplier.phone, "", 80) || null,
+        email: text(supplier.email, "", 160) || null,
+        address: text(supplier.address, "", 240) || null,
+      },
+      notes: text(supplier.notes, "", 500) || null,
+      purchaseDocuments: matchingDocuments.length,
+      paidAmount: debt?.paidAmount ?? 0,
+      outstandingAmount: debt?.balanceDue ?? 0,
+      openDocumentCount: debt?.openDocumentCount ?? 0,
+    };
+  }).sort((left, right) => right.periodTotal - left.periodTotal || left.name.localeCompare(right.name, "ru"));
+
+  const externalRoot = record(input.supplierAlternatives);
+  const externalAlternatives = array(externalRoot.alternatives).map(record)
+    .filter((alternative) => text(alternative.decision, "new") !== "dismissed")
+    .slice(0, 40)
+    .map((alternative) => ({
+      id: text(alternative.id, "", 600),
+      supplierName: text(alternative.supplierName, "Поставщик", 160),
+      product: text(alternative.product, "Товар", 180),
+      matchedTo: text(alternative.matchedTo, "", 180),
+      candidatePrice: number(alternative.candidatePrice) || null,
+      currency: text(alternative.currency, "", 12) || null,
+      unit: text(alternative.unit, "", 50) || null,
+      packageSize: text(alternative.packageSize, "", 80) || null,
+      verifiedAt: isoDate(alternative.verifiedAt) || null,
+      decision: text(alternative.decision, "new", 40),
+      sourceUrls: array(alternative.sourceUrls).map((value) => text(value, "", 1_500)).filter(Boolean).slice(0, 5),
+      note: "Опубликованное предложение; не считается фактической закупочной ценой",
+    }));
+
+  return {
+    version: "procurement-analytics-v1" as const,
+    period: {
+      key: monthKey,
+      previousKey: comparisonPeriod.previousKey,
+      comparisonBasis: comparisonPeriod.comparisonBasis,
+    },
+    kpi: {
+      purchaseTotal: currentTotal,
+      purchaseCount: periodPurchases.length,
+      activeSupplierCount: activeSuppliers.length,
+      comparableCurrentTotal: currentComparableTotal,
+      comparablePreviousTotal: previousTotal,
+      changePercent: previousTotal > 0
+        ? rounded((currentComparableTotal / previousTotal - 1) * 100, 1)
+        : null,
+    },
+    counts: {
+      allDocuments: allDocuments.length,
+      confirmedPurchases: purchases.length,
+      confirmedPriceLists: priceLists.length,
+      reviewDocuments: reviewDocuments.length,
+      periodReviewDocuments: periodReviewDocuments.length,
+      normalPurchases,
+      attentionPurchases: attentionPurchaseIds.size,
+      unmappedItems: unmappedItems.length,
+      financeMissing: paymentMismatch.length,
+      paymentMismatch: paymentMismatch.length,
+      stockMissing: stockMissing.length,
+      excludedForeignCurrencyPurchases: excludedPurchases.length,
+    },
+    signals,
+    priceChanges,
+    comparisons,
+    opportunities: comparisons.filter((comparison) => comparison.opportunity && comparison.alternative),
+    chart,
+    liabilities,
+    supplierMetrics,
+    unmappedItems,
+    integrity: {
+      financeMissingDocumentIds: paymentMismatch.map((document) => text(document.id)).filter(Boolean),
+      paymentMismatchDocumentIds: paymentMismatch.map((document) => text(document.id)).filter(Boolean),
+      stockMissingDocumentIds: stockMissing.map((document) => text(document.id)).filter(Boolean),
+      excludedForeignCurrencyDocumentIds: excludedPurchases.map((document) => text(document.id)).filter(Boolean),
+      excludedForeignCurrencyTotals: Object.fromEntries([...excludedPurchases.reduce((totals, document) => {
+        const currency = text(document.currency, "RUB", 12).toUpperCase();
+        totals.set(currency, rounded((totals.get(currency) ?? 0) + number(document.total), 2));
+        return totals;
+      }, new Map<string, number>())]),
+    },
+    externalAlternatives,
+    aiContext: {
+      confirmedPurchases: actualPoints.slice(0, 120),
+      supplierConditions: supplierMetrics.slice(0, 40).map((supplier) => ({
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        conditions: supplier.conditions,
+      })),
+      priceChanges: priceChanges.slice(0, 40),
+      comparableOffers: comparisons.slice(0, 40),
+      supplierLiabilities: liabilities,
+      mappingStatus: {
+        comparableItems: new Set(points.map((point) => point.productKey)).size,
+        unconfirmedItems: unmappedItems.length,
+      },
+      externalAlternatives,
+      freshness: {
+        latestConfirmedPurchaseAt: purchases.map((document) => isoDate(document.date)).sort().at(-1) ?? null,
+        generatedAt: now.toISOString(),
+      },
+      guardrails: [
+        "Неподтверждённый OCR не является фактом закупки",
+        "Неподтверждённое сопоставление не используется для сравнения цен",
+        "Прайс-лист является предложением, но не фактической закупочной ценой",
+        "Разные валюты и ненормализованные единицы не сравниваются",
+      ],
+    },
+  };
+}

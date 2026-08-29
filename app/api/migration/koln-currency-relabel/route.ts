@@ -417,4 +417,117 @@ async function validate(operationId: string): Promise<Response> {
       restaurant_json: record(beforeStatePayload.account).restaurantJson as string | null,
       updated_at: String(record(beforeStatePayload.account).updatedAt ?? ""),
       first_name: "",
-      la
+      last_name: null,
+      app_email: "",
+      role: "owner",
+    },
+    stores: Object.fromEntries(KOLN_CURRENCY_STORE_KEYS.map((key) => {
+      const row = record(record(beforeStatePayload.stores)[key]);
+      return [key, { store_key: key, data_json: String(row.dataJson ?? ""), updated_at: String(row.updatedAt ?? "") }];
+    })),
+    untouchedManifest: record(beforeStatePayload.untouchedManifest) as RawState["untouchedManifest"],
+  } as RawState;
+  const plan = record(parse(currentOperation.plan_json, {}));
+  const expectedAfter = await transformedState(syntheticBeforeState, String(plan.preparedAt ?? ""));
+  const state = await readState();
+  const actualAfter = await transformedState(syntheticBeforeState, String(plan.preparedAt ?? ""));
+  const currentRawChecksum = await sha256(stableJson({
+    restaurantJson: state.account.restaurant_json,
+    storeJson: Object.fromEntries(KOLN_CURRENCY_STORE_KEYS.map((key) => [key, state.stores[key].data_json])),
+    untouchedManifest: state.untouchedManifest,
+  }));
+  const untouchedPreserved = stableJson(state.untouchedManifest) === stableJson(syntheticBeforeState.untouchedManifest);
+  if (currentRawChecksum !== currentOperation.after_checksum || actualAfter.checksum !== currentOperation.after_checksum || !untouchedPreserved) {
+    const rollback = await rollbackFromBefore({
+      operation: currentOperation,
+      expectedAfter,
+      reason: `POST_MIGRATION_INVARIANT_FAILED:checksum=${currentRawChecksum}:untouched=${untouchedPreserved}`,
+    });
+    return Response.json({ ok: false, code: "POST_MIGRATION_INVARIANT_FAILED", rollback }, { status: 500 });
+  }
+  const now = new Date().toISOString();
+  const afterCore = {
+    schemaVersion: KOLN_CURRENCY_RELABEL_VERSION,
+    phase: "after",
+    venue: { id: KOLN_VENUE_ID, name: "Кёльн", dataAccountId: KOLN_DATA_ACCOUNT_ID },
+    sourceCommit: BARDOCTOR_SOURCE_COMMIT,
+    generatedAt: now,
+    state: statePayload(state),
+    stateChecksum: currentRawChecksum,
+    reconciliation: publicSummary(expectedAfter.result),
+    beforeExportId: currentOperation.export_id,
+  };
+  const afterExportChecksum = await sha256(stableJson(afterCore));
+  const afterExportId = `bdx_koln_currency_after_${afterExportChecksum.slice(0, 24)}`;
+  const afterExportStatement = await insertImmutableExport({
+    exportId: afterExportId,
+    checksum: afterExportChecksum,
+    payload: afterCore,
+    counts: expectedAfter.result.counts,
+    now,
+  });
+  const actorName = [state.account.first_name, state.account.last_name].filter(Boolean).join(" ") || state.account.app_email;
+  await getD1().batch([
+    afterExportStatement,
+    getD1().prepare(`
+      UPDATE venue_migration_operations
+      SET status = 'migrated', cutover_at = ?, updated_at = ?, plan_json = ?
+      WHERE operation_id = ? AND status = 'applied'
+    `).bind(
+      now,
+      now,
+      stableJson({ ...plan, afterExportId, validatedAt: now, summary: publicSummary(expectedAfter.result) }),
+      operationId,
+    ),
+    getD1().prepare(`
+      INSERT INTO audit_log
+        (account_id, store_key, action, entity_id, entity_label, before_json, after_json,
+         changed_fields_json, actor_name, actor_role, reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      KOLN_DATA_ACCOUNT_ID,
+      "koln_currency_relabel",
+      "controlled_currency_relabel",
+      operationId,
+      "Кёльн · RUB/MDL → PMR_RUB",
+      stableJson({ exportId: currentOperation.export_id, checksum: currentOperation.before_checksum }),
+      stableJson({ exportId: afterExportId, checksum: currentRawChecksum, summary: publicSummary(expectedAfter.result) }),
+      stableJson(["currency_labels", "accounting_money_fields", "white_stork_valuation"]),
+      actorName,
+      state.account.role,
+      "User-authorized label correction only; all historical RUB/MDL mean PMR_RUB; no FX and no source amount changes",
+      now,
+    ),
+  ]);
+  return Response.json({
+    ok: true,
+    operationId,
+    status: "migrated",
+    beforeExportId: currentOperation.export_id,
+    afterExportId,
+    beforeChecksum: currentOperation.before_checksum,
+    afterChecksum: currentRawChecksum,
+    afterExportChecksum,
+    untouchedStoresPreserved: untouchedPreserved,
+    summary: publicSummary(expectedAfter.result),
+  }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  if (!await authorized(request)) {
+    return Response.json({ ok: false, code: "MIGRATION_AUTHORIZATION_REQUIRED" }, { status: 403 });
+  }
+  const url = new URL(request.url);
+  const phase = url.searchParams.get("phase") || "prepare";
+  const operationId = url.searchParams.get("operationId") || "";
+  try {
+    if (phase === "prepare") return await prepare();
+    if (!operationId) return Response.json({ ok: false, code: "OPERATION_ID_REQUIRED" }, { status: 400 });
+    if (phase === "apply") return await apply(operationId);
+    if (phase === "validate") return await validate(operationId);
+    return Response.json({ ok: false, code: "UNKNOWN_PHASE" }, { status: 400 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "UNKNOWN_MIGRATION_ERROR";
+    return Response.json({ ok: false, code: message.split(":")[0], error: message }, { status: 409 });
+  }
+}

@@ -222,4 +222,32 @@ export async function POST(request: Request): Promise<Response> {
     const assortment = record(await loadStore(account.id, "bd_assortment_v1")) ?? {};
     const documents = Array.isArray(await loadStore(account.id, "bd_purchase_documents")) ? await loadStore(account.id, "bd_purchase_documents") as unknown[] : [];
     const menuItems = (Array.isArray(assortment.menuItems) ? assortment.menuItems : []).map(record).filter(Boolean).filter(item => item?.active !== false).slice(0, 180).map(item => ({ name: text(item?.name, "", 160), category: text(item?.category, "", 100), department: text(item?.department, "other", 40), type: text(item?.type, "composite", 30), salePrice: numeric(item?.salePrice), plannedSales: numeric(item?.plannedSales) }));
-    const purchases = documents.map(record).filter(Boolean).flatMap(doc => (Array.isArray(doc?.items) ? doc.items : []).map(record).filter(Boolean).map(item => ({ name: text(item?.name, "", 160), brand: text(item?.brand, "", 100), packageSize: text(item?.packageSize, "", 80), unitPri
+    const purchases = documents.map(record).filter(Boolean).flatMap(doc => (Array.isArray(doc?.items) ? doc.items : []).map(record).filter(Boolean).map(item => ({ name: text(item?.name, "", 160), brand: text(item?.brand, "", 100), packageSize: text(item?.packageSize, "", 80), unitPrice: numeric(item?.unitPrice), supplier: text(doc?.supplierName, "", 160), currency: text(doc?.currency, "", 12), date: text(doc?.date, "", 20) }))).slice(-120);
+    const city = text(restaurant.city, "", 120), region = text(restaurant.region, "", 120), country = text(restaurant.country, "", 120);
+    const stored = record(await loadStore(account.id, STORE_KEY));
+    const procurementMenuItems = menuItems.filter(item => isPackagedProcurementItem(`${item.name} ${item.category}`)).map(item => item.name);
+    const targetNames = [...new Set(procurementMenuItems.filter(Boolean))].slice(0, 180);
+    const previous = body.reset === true || text(stored?.targetSignature, "", 20_000) !== supplierTargetSignature(targetNames)
+      ? { deletedIds: stored?.deletedIds ?? [] }
+      : stored;
+    if (!targetNames.length) throw new AIServiceError("В активном меню не распознаны точные товарные позиции напитков.", 400);
+    const plan = searchPlan(targetNames);
+    const requestedSegment = text(body.segment, plan[0]?.id ?? "batch-0", 40);
+    const batchIndex = Math.max(0, Math.min(plan.length - 1, Number(requestedSegment.replace(/^batch-/, "")) || 0));
+    const segment = plan[batchIndex] ?? plan[0];
+    const segmentTargets = targetNames.slice(batchIndex * SEARCH_BATCH_SIZE, batchIndex * SEARCH_BATCH_SIZE + SEARCH_BATCH_SIZE);
+    if (!segmentTargets.length) {
+      const data = normalise({ summary: "В этом поисковом проходе нет позиций активного меню.", alternatives: [] }, [], previous, segment.id, targetNames, plan.length);
+      await saveStore(account.id, data);
+      return noStore(Response.json({ ok: true, data }));
+    }
+    const venueContext = JSON.stringify({ name: text(restaurant.name), city, region, country, businessType: text(restaurant.businessType), venueFormat: text(restaurant.venueFormat) });
+    const searchSystem = `Ты — закупочный аналитик BarDoctor. Ищи закупочные предложения только для точных брендированных товаров активного меню. Разрешённые продавцы: manufacturer, distributor, wholesaler, horeca_supplier, retailer. Запрещены ночные клубы, бары, рестораны, кафе, караоке, гостиничные меню, сервисы бронирования и цены порции/бокала. Одна запись — один товар у одного продавца. matchedTo обязан быть дословной копией строки из «Целей текущего прохода». product обязан быть тем же брендом и той же продуктовой линейкой, что matchedTo; другая марка или просто аналог категории запрещены. Русское и латинское написание одного бренда считается совпадением. matchType всегда "exact_product" только при точном товарном совпадении. Допускается другая фасовка того же продукта, если она явно указана. Обязательны публичная цена за товар/упаковку, валюта и прямая URL-страница. Ищи отдельно по каждому товару: сначала молдавские интернет-магазины и дистрибьюторы, затем импортёров/оптовиков, затем магазины с доставкой по Молдове. Не выдумывай данные и не возвращай «цену по запросу». Верни только JSON: {"summary":"...","alternatives":[{"supplierName":"...","sellerType":"manufacturer|distributor|wholesaler|horeca_supplier|retailer","sellerTypeEvidence":"...","product":"точное название на странице продавца","matchedTo":"дословная позиция меню","matchType":"exact_product","matchEvidence":"совпавшие бренд и линейка","offer":"...","currentPrice":null,"candidatePrice":123.45,"currency":"MDL","unit":"за упаковку","packageSize":"1 л","minimumOrder":"...","delivery":"...","paymentTerms":"...","verifiedAt":"YYYY-MM-DD","phone":"...","email":"...","address":"...","contactName":"...","caveats":["..."],"sourceUrls":["https://прямая-страница-товара","https://страница-контактов"]}]}.`;
+    const relevantPurchases = purchases.filter(purchase => segmentTargets.some(target => isSameSupplierMenuProduct(target, `${purchase.name} ${purchase.brand} ${purchase.packageSize}`))).slice(-20);
+    const commonPrompt = `Заведение: ${venueContext}\nВ этом запросе разрешены только эти точные позиции активного меню: ${JSON.stringify(segmentTargets)}\nЗакупочные документы используются только для справки о текущей цене, но не создают новые цели: ${JSON.stringify(relevantPurchases)}`;
+    const web = await openAIWebSearch({ accountId: account.id, observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "supplier_alternatives" }, maxTokens: 9_000, location: { city: city || undefined, region: region || undefined }, system: searchSystem, prompt: `${commonPrompt}\nТекущий точечный проход: ${segment.label}.\nЦели именно этого прохода: ${JSON.stringify(segmentTargets)}\nДля КАЖДОЙ из этих ${segmentTargets.length} целей сделай несколько отдельных поисковых запросов с точным брендом и линейкой на русском, румынском и латинице. Проверь минимум: интернет-магазины Молдовы, каталоги дистрибьюторов/импортёров, HoReCa-поставщиков и крупные магазины с доставкой в ${city || region || country || "регион заведения"}. Верни до 5 разных продавцов на каждую цель, если есть подтверждённые страницы с ценой. Сначала покрой все цели хотя бы одним предложением, затем добавляй альтернативных продавцов.` });
+    const data = normalise(parseAIJson(web.text), web.sources, previous, segment.id, targetNames, plan.length);
+    await saveStore(account.id, data);
+    return noStore(Response.json({ ok: true, data }));
+  } catch (error) { return noStore(aiErrorResponse(error)); }
+}
