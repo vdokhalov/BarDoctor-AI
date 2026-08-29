@@ -16,7 +16,8 @@ import {
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("accounting currency uses the existing venue profile field as its canonical source", () => {
-  assert.deepEqual([...ACCOUNTING_CURRENCIES], ["MDL", "RUB", "EUR", "USD", "UAH", "RON"]);
+  assert.deepEqual([...ACCOUNTING_CURRENCIES], ["MDL", "PMR_RUB", "RUB", "EUR", "USD", "UAH", "RON"]);
+  assert.equal(normalizeAccountingCurrency("pmr_rub"), "PMR_RUB");
   assert.equal(normalizeAccountingCurrency(" rub "), "RUB");
   assert.equal(normalizeAccountingCurrency("btc"), null);
   assert.equal(accountingCurrencyFromProfile({ currency: "mdl" }), "MDL");
@@ -87,7 +88,38 @@ test("new venue creation requires an explicit accounting currency without a sile
   assert.match(page, /Валюта учёта \*/);
   assert.match(page, /<option value="">Выберите валюту<\/option>/);
   assert.match(page, /value="RON"/);
+  assert.match(page, /value="PMR_RUB"/);
   assert.match(client, /currency: String\(data\.get\("currency"\) \|\| ""\)/);
   assert.doesNotMatch(client, /data\.get\("currency"\) \|\| "MDL"/);
   assert.match(route, /Укажите валюту учёта/);
+});
+
+test("accounting currency change with financial history requires a controlled transition", async () => {
+  const route = await read("app/api/restaurants/route.ts");
+  assert.match(route, /ACCOUNTING_CURRENCY_CHANGE_REQUIRES_PLAN/);
+  assert.match(route, /previousCurrency !== requestedCurrency/);
+  assert.match(route, /bd_purchase_documents/);
+});
+
+test("assortment writes derive currency from the venue profile", async () => {
+  const route = await read("app/api/store/[key]/route.ts");
+  assert.match(route, /accountingCurrencyFromRestaurantJson\(account\.restaurantJson\)/);
+  assert.match(route, /normalizeAssortmentMenuCurrencyUpdates\([\s\S]*?accountingCurrency/);
+  assert.match(route, /ACCOUNTING_CURRENCY_REQUIRED/);
+  assert.match(route, /after = currencyNormalization\.data/);
+});
+
+test("manual expense API overwrites client currency with the venue accounting currency", async () => {
+  const route = await read("app/api/expenses/route.ts");
+  assert.match(route, /accountingCurrencyFromRestaurantJson\(account\.restaurantJson\)/);
+  assert.match(route, /currency: accountingCurrency/);
+  assert.match(route, /ACCOUNTING_CURRENCY_REQUIRED/);
+});
+
+test("purchase confirmation overwrites recognized or stale client currency", async () => {
+  const route = await read("app/api/purchases/confirm/route.ts");
+  assert.match(route, /accountingCurrencyFromRestaurantJson\(account\.restaurantJson\)/);
+  assert.match(route, /document = \{[\s\S]*?currency: accountingCurrency/);
+  assert.match(route, /originalCurrency: undefined/);
+  assert.match(route, /ACCOUNTING_CURRENCY_REQUIRED/);
 });

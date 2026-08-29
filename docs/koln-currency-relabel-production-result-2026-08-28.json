@@ -1,0 +1,93 @@
+{
+  "account": "Кёльн",
+  "executedAt": "2026-08-28",
+  "status": "migrated",
+  "rollbackInvoked": false,
+  "operationId": "bdm_koln_currency_d165267e28f0401d7b0e9e22",
+  "immutableExports": {
+    "before": {
+      "id": "bdx_koln_currency_before_688d6c7bc27af3603dff0d6a",
+      "checksum": "0e90ba2c6faf4d1c736d0b20f1bdc29901f4adf49537c1b7b28354ce88a30d20"
+    },
+    "after": {
+      "id": "bdx_koln_currency_after_98bc288d269561ab1ff94d4c",
+      "checksum": "98bc288d269561ab1ff94d4c138dc06370bc72fc6fbe07c818fc8e7c88a460aa"
+    }
+  },
+  "stateChecksums": {
+    "expectedAfter": "7b20c05175e5032a39b55a23fc520f758342a8dcce16255ed177d397650e521f",
+    "actualAfter": "7b20c05175e5032a39b55a23fc520f758342a8dcce16255ed177d397650e521f",
+    "untouchedStoresPreserved": true
+  },
+  "scope": {
+    "atomicRowsChanged": 6,
+    "purchaseDocuments": 26,
+    "purchaseLines": 160,
+    "legacyRubLabels": 681,
+    "legacyMdlLabels": 13,
+    "labelsChanged": 694,
+    "fxOperations": 0
+  },
+  "reconciliation": {
+    "purchases": {
+      "beforeIncluded": 32519.25,
+      "beforeExcluded": 361,
+      "afterIncluded": 32880.25
+    },
+    "supplierPayments": {
+      "beforeNumericTotal": 32880.25,
+      "afterNumericTotal": 32880.25
+    },
+    "supplierDebt": {
+      "before": 0,
+      "after": 0
+    },
+    "warehouseValuation": {
+      "before": 28636.67,
+      "after": 28997.67
+    },
+    "closedJulyCogs": {
+      "before": 31383.21,
+      "after": 31383.21
+    },
+    "whiteStork": {
+      "purchaseId": "b54e2f38-a4df-49b0-8510-12904fbe183e",
+      "amountBefore": 361,
+      "currencyBefore": "MDL",
+      "amountAfter": 361,
+      "currencyAfter": "PMR_RUB",
+      "fx": null,
+      "quantityBefore": 3000,
+      "quantityAfter": 3000,
+      "valuationBefore": 0,
+      "valuationAfter": 361,
+      "averageUnitCostAfter": 0.120333
+    }
+  },
+  "protectedSourceRecords": {
+    "oranges": {
+      "lineId": "17b0346d-a394-4ff3-ae0b-35f2f0f2397e",
+      "quantity": 1.124,
+      "unitPrice": 23,
+      "storedTotal": 25.35,
+      "changed": false
+    },
+    "teaBags": {
+      "lineId": "eb0fdcc0-5cff-41f5-a6e4-9fb05185fb1e",
+      "quantity": 100,
+      "unitPrice": 0.5,
+      "storedTotal": 60,
+      "changed": false
+    }
+  },
+  "verification": {
+    "fullTests": "671/671 PASS",
+    "typecheck": "PASS",
+    "lint": "PASS with one pre-existing unrelated warning",
+    "build": "PASS",
+    "productionWorkerErrorsAfterCutover": 0,
+    "migrationCredentialRemoved": true,
+    "productionVersion": 323,
+    "sourceCommit": "55aec808018e6454af5bed673c4ae19dc8a24f84"
+  }
+}

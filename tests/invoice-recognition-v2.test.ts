@@ -11,10 +11,12 @@ import {
   compareRecognitionResults,
   confidenceLevel,
   fuzzyNomenclatureScore,
+  invoiceCommercialArithmeticIsValid,
   invoiceRecognitionMode,
   invoiceRecognitionRequestMode,
   mergeShadowMappingMetadata,
   nomenclatureCandidates,
+  normalizeInvoiceNumericToken,
   normalizeInvoicePackageSemantics,
   normalizeInvoiceText,
   packageFingerprint,
@@ -59,6 +61,122 @@ test("parser extracts quantity, unit price and total with decimal comma", () => 
   assert.equal(line.unitPrice, 38.5);
   assert.equal(line.lineTotal, 77);
   assert.equal(line.requiresReview, false);
+});
+
+test("numeric normalization handles decimal commas, thousands separators and invoice whitespace", () => {
+  assert.equal(normalizeInvoiceNumericToken("0,15"), "0.15");
+  assert.equal(normalizeInvoiceNumericToken("3 666,67"), "3666.67");
+  assert.equal(normalizeInvoiceNumericToken("3\u00a0666,67"), "3666.67");
+  assert.equal(normalizeInvoiceNumericToken("3\u202f666,67"), "3666.67");
+  assert.equal(normalizeInvoiceNumericToken("3.666,67"), "3666.67");
+  assert.equal(normalizeInvoiceNumericToken("3,666.67"), "3666.67");
+});
+
+test("commercial parser selects the arithmetic-safe quantity, price and total combination", () => {
+  const cases = [
+    ["Премиум табак 0,15 кг 3 666,67 550,00", 0.15, 3666.67, 550],
+    ["Премиум табак 0.15 кг 3 666.67 550.00", 0.15, 3666.67, 550],
+    ["Сыр 1,5 кг 250,00 375,00", 1.5, 250, 375],
+    ["Сахар 10 кг 125,50 1 255,00", 10, 125.5, 1255],
+    ["Специи 0,250 кг 1 200,00 300,00", 0.25, 1200, 300],
+    ["Премиум табак 0,15 кг 3\u00a0666,67 550,00", 0.15, 3666.67, 550],
+    ["Премиум табак   0,15 кг   3   666,67   550,00", 0.15, 3666.67, 550],
+    ["Премиум табак 0,15 кг 3.666,67 550,00", 0.15, 3666.67, 550],
+    ["Премиум табак 0.15 кг 3,666.67 550.00", 0.15, 3666.67, 550],
+  ] as const;
+  for (const [raw, quantity, unitPrice, lineTotal] of cases) {
+    const line = parseInvoiceLine(raw);
+    assert.ok(line, raw);
+    assert.equal(line.quantity, quantity, raw);
+    assert.equal(line.unitPrice, unitPrice, raw);
+    assert.equal(line.lineTotal, lineTotal, raw);
+    assert.equal(line.requiresReview, false, raw);
+    assert.equal(invoiceCommercialArithmeticIsValid(line.quantity, line.unitPrice, line.lineTotal), true, raw);
+  }
+});
+
+test("production premium tobacco row keeps persisted history and zero AI work after commercial parsing fix", () => {
+  const line = parseInvoiceLine("| 1. Премиум табак кг. | | кг | 0,15 кг | 3 666,67 | 550,00 |");
+  assert.ok(line);
+  assert.equal(line.rawName, "Премиум табак");
+  assert.equal(line.quantity, 0.15);
+  assert.equal(line.unit, "кг");
+  assert.equal(line.unitPrice, 3666.67);
+  assert.equal(line.lineTotal, 550);
+  assert.equal(line.requiresReview, false);
+
+  const candidate = {
+    id: "premium-tobacco",
+    key: "stock:премиум табак|g",
+    name: "Премиум табак",
+    unit: "g",
+    packageSize: "Несколько фасовок",
+    aliases: [],
+  };
+  const document: ParsedInvoiceDocument = {
+    documentType: "invoice",
+    supplierName: "Рынок",
+    supplierType: "wholesale",
+    currency: "RUB",
+    paymentMethod: "unknown",
+    total: 550,
+    confidence: 0.9,
+    warnings: [],
+    items: [line],
+  };
+  const mapped = applyDeterministicMappings({
+    document,
+    supplierId: "market",
+    venueId: 1,
+    mappings: [{
+      id: "persisted-premium-tobacco",
+      venueId: 1,
+      supplierId: "market",
+      rawName: "Премиум табак кг. 0,15",
+      normalizedRawName: normalizeInvoiceText("Премиум табак кг. 0,15"),
+      packageFingerprint: "g:150",
+      purchaseUnit: "g",
+      nomenclatureId: candidate.key,
+      confirmations: 1,
+      createdAt: "2026-08-27T00:00:00.000Z",
+      updatedAt: "2026-08-27T00:00:00.000Z",
+    }],
+    nomenclature: [candidate],
+  });
+  assert.equal(mapped.items[0].mappingSource, "history");
+  assert.equal(mapped.items[0].purchaseProductKey, candidate.key);
+  assert.equal(mapped.items[0].requiresReview, false);
+  const metrics = recognitionMetrics({ mode: "shadow", ocr: null, document: mapped, startedAt: Date.now() });
+  assert.equal(metrics.historicalMappingsCount, 1);
+  assert.equal(metrics.aiRequestCount, 0);
+  assert.equal(metrics.aiEstimatedTokenUsage, 0);
+});
+
+test("canonical matching cannot clear an arithmetic anomaly", () => {
+  const parsed = parseInvoiceLine("Премиум табак 3 кг 666,67 550,00");
+  assert.ok(parsed);
+  assert.equal(parsed.requiresReview, true);
+  const mapped = applyDeterministicMappings({
+    document: {
+      documentType: "invoice", supplierName: "Рынок", supplierType: "wholesale", currency: "RUB",
+      paymentMethod: "unknown", total: 550, confidence: 0.72, warnings: [], items: [parsed],
+    },
+    supplierId: "market",
+    venueId: 1,
+    mappings: [{
+      id: "mapping", venueId: 1, supplierId: "market", rawName: "Премиум табак",
+      normalizedRawName: normalizeInvoiceText("Премиум табак"), purchaseUnit: "g",
+      nomenclatureId: "stock:премиум табак|g", confirmations: 1,
+      createdAt: "2026-08-27T00:00:00.000Z", updatedAt: "2026-08-27T00:00:00.000Z",
+    }],
+    nomenclature: [{
+      id: "premium-tobacco", key: "stock:премиум табак|g", name: "Премиум табак",
+      unit: "g", packageSize: "Несколько фасовок", aliases: [],
+    }],
+  });
+  assert.equal(mapped.items[0].mappingSource, "history");
+  assert.equal(mapped.items[0].requiresReview, true);
+  assert.notEqual(mapped.items[0].confidenceLevel, "high");
 });
 
 test("parser handles real 1C-style Russian headers, word dates and numbered table rows", () => {
@@ -1157,7 +1275,9 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /Подтвердить ",s," уверенных соответствий/);
   assert.match(bundle, /bdInvoiceReviewOrderV4\(e\.items\)\.map/);
   assert.match(bundle, /e\.source==="manual"\|\|\(!g\.requiresReview/);
-  assert.match(bundle, /g\.mappingSource\|\|bdCatArray\(g\.mappingCandidates\)\.length>0/);
+  assert.match(bundle, /C=bdCatArray\(e\.mappingCandidates\)/);
+  assert.match(bundle, /context:"receipt"/);
+  assert.match(bundle, /onCreated:k=>\{O\(k\),bdSetQuickOpenV336\(!1\)\}/);
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);

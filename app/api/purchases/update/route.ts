@@ -8,7 +8,9 @@ import {
   hasMeaningfulPurchaseItems,
   isPurchasePayment,
   migratePurchaseLedger,
+  normalizePurchaseAccounting,
   normalizePurchaseDocument,
+  purchaseCommercialArithmeticIssues,
   purchaseAffectsInventory,
   purchasePaymentSummary,
   PURCHASE_STORE_KEY,
@@ -139,7 +141,7 @@ export async function POST(request: Request): Promise<Response> {
   const updateReason = typeof body.updateReason === "string" && body.updateReason.trim()
     ? body.updateReason.trim().slice(0, 240)
     : "Подтверждённый закупочный документ исправлен пользователем";
-  const document = normalizePurchaseDocument(body.document, "");
+  let document = normalizePurchaseDocument(body.document, "");
   if (!document.id) {
     return Response.json({ ok: false, error: "Не найден идентификатор накладной" }, { status: 422 });
   }
@@ -151,6 +153,15 @@ export async function POST(request: Request): Promise<Response> {
   }
   if (!document.items.length && document.documentType !== "price_list") {
     return Response.json({ ok: false, error: "Добавьте хотя бы одну позицию" }, { status: 422 });
+  }
+  const commercialArithmeticIssues = purchaseCommercialArithmeticIssues(body.document);
+  if (commercialArithmeticIssues.length) {
+    return Response.json({
+      ok: false,
+      code: "PURCHASE_COMMERCIAL_ARITHMETIC_INVALID",
+      error: "Проверьте количество, цену, сумму строки и итог документа перед проведением.",
+      issues: commercialArithmeticIssues,
+    }, { status: 422 });
   }
   if (document.documentType !== "price_list" && document.total <= 0) {
     return Response.json({ ok: false, error: "Укажите итоговую сумму закупки" }, { status: 422 });
@@ -207,6 +218,23 @@ export async function POST(request: Request): Promise<Response> {
       { ok: false, error: "Тип подтверждённого документа менять нельзя" },
       { status: 409 },
     );
+  }
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  if (document.documentType !== "price_list") {
+    const normalizedAccounting = normalizePurchaseAccounting({
+      document: { ...previousDocument, ...document, items: document.items } as typeof document,
+      accountingCurrency,
+      now,
+    });
+    if (!normalizedAccounting.ok) {
+      return Response.json({
+        ok: false,
+        code: normalizedAccounting.code,
+        postingBlocked: true,
+        error: "Для проведённой закупки требуется зафиксированная учётная сумма либо исторический курс с датой и источником.",
+      }, { status: 422 });
+    }
+    document = normalizedAccounting.document;
   }
 
   const linkedPayments = expenses.filter((value) => isPurchasePayment(value, document.id));
@@ -281,8 +309,8 @@ export async function POST(request: Request): Promise<Response> {
     cancelledAt: previousDocument.cancelledAt,
     cancellationReason: previousDocument.cancellationReason,
     cancelledByAccountId: previousDocument.cancelledByAccountId,
-  }, expenses);
-  const paymentState = purchasePaymentSummary(updatedDocument, expenses);
+  }, expenses, accountingCurrency);
+  const paymentState = purchasePaymentSummary(updatedDocument, expenses, accountingCurrency);
   if (paymentState.overpaidAmount > 0) {
     return Response.json(
       {
@@ -314,7 +342,7 @@ export async function POST(request: Request): Promise<Response> {
       const nomenclatureOnly = applyPurchaseToInventory({
         assortment,
         document: updatedDocument,
-        accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+        accountingCurrency,
         now,
       });
       return {

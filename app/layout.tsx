@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="ru">
       <body>
         {children}
-        <script src="/health-score-experience.js?v=20260811-health-v155" defer />
+        <script src="/health-score-experience.js?v=20260828-health-startup-v332" defer />
         <script src="/modern-polish.js?v=20260811-modern-v87" defer />
       </body>
     </html>

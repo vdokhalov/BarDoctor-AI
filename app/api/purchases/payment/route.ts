@@ -2,6 +2,8 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import { accountingMoneyFields, lockAccountingMoney } from "../../../../lib/bardoctor/accounting-money";
 import {
   EXPENSE_STORE_KEY,
   isPurchasePayment,
@@ -192,6 +194,26 @@ export async function POST(request: Request): Promise<Response> {
       { status: 409 },
     );
   }
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  const paymentMoney = lockAccountingMoney({
+    value: {
+      ...body,
+      amount,
+      originalAmount: amount,
+      originalCurrency: text(body.originalCurrency ?? body.currency, text(purchase.currency, "", 16), 16),
+    },
+    accountingCurrency,
+    now,
+  });
+  if (!paymentMoney || paymentMoney.accountingAmount == null) {
+    return Response.json({
+      ok: false,
+      code: "PAYMENT_ACCOUNTING_CONVERSION_REQUIRED",
+      postingBlocked: true,
+      error: "Для оплаты в другой валюте укажите исторический курс, дату и источник курса.",
+      accountingCurrency,
+    }, { status: 422 });
+  }
 
   const closed = closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY)));
   const monthKey = date.slice(0, 7);
@@ -251,8 +273,8 @@ export async function POST(request: Request): Promise<Response> {
     });
   }
 
-  const beforeSummary = purchasePaymentSummary(purchase, expenses);
-  if (amount > beforeSummary.balanceDue + 0.005) {
+  const beforeSummary = purchasePaymentSummary(purchase, expenses, accountingCurrency);
+  if (paymentMoney.accountingAmount > beforeSummary.balanceDue + 0.005) {
     return Response.json(
       {
         ok: false,
@@ -284,7 +306,8 @@ export async function POST(request: Request): Promise<Response> {
     accountingMonth: monthKey,
     category: text(purchase.expenseCategory, "products", 32),
     amount,
-    currency: text(purchase.currency, "RUB", 12),
+    currency: paymentMoney.originalCurrency,
+    ...accountingMoneyFields(paymentMoney),
     description: `Оплата поставщику · ${text(purchase.supplierName, "Поставщик", 180)}${purchase.documentNumber ? ` · №${text(purchase.documentNumber, "", 100)}` : ""}`,
     supplierId: purchase.supplierId,
     supplierName: purchase.supplierName,
@@ -309,7 +332,7 @@ export async function POST(request: Request): Promise<Response> {
     ...purchase,
     updatedAt: now,
     updatedByAccountId: account.actorAccountId,
-  }, expenses);
+  }, expenses, accountingCurrency);
   documents[purchaseIndex] = updatedPurchase;
 
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")

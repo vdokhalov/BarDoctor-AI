@@ -1,0 +1,168 @@
+.bd-tax-manager-v336,
+.bd-tax-manager-v336 * ,
+.bd-quick-create-sheet-v336,
+.bd-quick-create-sheet-v336 * { box-sizing: border-box; }
+
+.bd-tax-manager-v336 {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bd-tax-manager-v336 > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7ef;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.bd-tax-manager-v336 h3 { margin: 0; color: #171a34; font-size: 17px; }
+.bd-tax-manager-v336 header p { margin: 5px 0 0; color: #73798d; font-size: 12px; line-height: 1.45; }
+.bd-tax-manager-v336 button,
+.bd-quick-create-sheet-v336 button {
+  min-height: 36px;
+  border: 1px solid #dedff0;
+  border-radius: 11px;
+  padding: 0 11px;
+  background: #fff;
+  color: #343852;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+}
+.bd-tax-manager-v336 button:disabled,
+.bd-quick-create-sheet-v336 button:disabled { opacity: .45; }
+.bd-tax-manager-v336 > header > button,
+.bd-quick-create-sheet-v336 .primary { border-color: #5b5ceb; background: #5b5ceb; color: #fff; }
+
+.bd-tax-tree-v336,
+.bd-tax-children-v336 { display: flex; flex-direction: column; gap: 8px; }
+.bd-tax-node-v336 {
+  padding: 10px;
+  border: 1px solid #e4e6ef;
+  border-radius: 15px;
+  background: #fff;
+}
+.bd-tax-node-v336.level-category { margin-left: 14px; background: #fafaff; }
+.bd-tax-node-v336.level-subcategory { margin-left: 14px; background: #f7f8fc; }
+.bd-tax-node-v336.archived { opacity: .62; }
+.bd-tax-node-main-v336 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.bd-tax-node-main-v336 > span { min-width: 0; }
+.bd-tax-node-main-v336 strong,
+.bd-tax-node-main-v336 small { display: block; }
+.bd-tax-node-main-v336 strong { color: #20233a; font-size: 13px; overflow-wrap: anywhere; }
+.bd-tax-node-main-v336 small { margin-top: 3px; color: #858a9b; font-size: 11px; }
+.bd-tax-node-actions-v336 { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.bd-tax-node-actions-v336 button { min-height: 30px; padding: 0 8px; font-size: 10.5px; }
+.bd-tax-node-actions-v336 .danger,
+.bd-duplicate-warning-v336 .danger { border-color: #fecaca; color: #b42318; }
+.bd-tax-move-v336 { display: grid; grid-template-columns: 80px 1fr; align-items: center; gap: 8px; margin-top: 8px; color: #777d90; font-size: 11px; }
+.bd-tax-move-v336 select,
+.bd-tax-conflict-v336 select { min-height: 36px; border: 1px solid #dedff0; border-radius: 10px; padding: 0 9px; background: #fff; }
+.bd-tax-add-child-v336 { align-self: flex-start; margin: 2px 0 0 14px; }
+.bd-tax-conflict-v336,
+.bd-tax-error-v336,
+.bd-tax-note-v336,
+.bd-tax-status-v336 { border-radius: 13px; padding: 11px 12px; font-size: 12px; line-height: 1.45; }
+.bd-tax-conflict-v336 { display: grid; gap: 9px; border: 1px solid #f6cf76; background: #fff9e8; color: #714c00; }
+.bd-tax-conflict-v336 > div { display: flex; flex-wrap: wrap; gap: 7px; }
+.bd-bulk-taxonomy-v337 { margin-top: 10px; padding: 18px 14px; border: 1px solid #e5e7ef; border-radius: 18px; background: #fff; display: grid; gap: 12px; }
+.bd-bulk-taxonomy-v337 > header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.bd-bulk-taxonomy-v337 > header h3 { margin: 0 0 4px; }
+.bd-bulk-taxonomy-v337 > header p { margin: 0; color: #73798d; font-size: 12px; }
+.bd-bulk-taxonomy-v337 > header strong { white-space: nowrap; color: #5754d8; }
+.bd-bulk-taxonomy-v337 > input[type="search"] { min-height: 42px; border: 1px solid #dedff0; border-radius: 12px; background: #fff; color: #20233a; padding: 0 12px; }
+.bd-bulk-items-v337 { max-height: 330px; overflow: auto; display: grid; gap: 6px; padding-right: 4px; }
+.bd-bulk-items-v337 label { display: flex; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px; background: #f7f8fc; cursor: pointer; }
+.bd-bulk-items-v337 label span { display: grid; min-width: 0; }
+.bd-bulk-items-v337 label b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-bulk-items-v337 label small { color: #858a9b; }
+.bd-bulk-taxonomy-v337 > footer { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.bd-bulk-taxonomy-v337 > footer button { min-height: 42px; border-color: #5b5ceb; background: #5b5ceb; color: #fff; }
+.bd-bulk-taxonomy-v337 > footer span { color: #687083; font-size: 12px; }
+.bd-tax-error-v336 { border: 1px solid #fecaca; background: #fff1f2; color: #a31d2d; }
+.bd-tax-note-v336,
+.bd-tax-status-v336 { margin: 0; background: #f3f4f8; color: #687083; }
+.bd-tax-loading-v336 { padding: 28px 14px; text-align: center; color: #747b8e; }
+
+.bd-quick-create-backdrop-v336 {
+  position: fixed;
+  z-index: 2147482500;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(17 20 37 / 48%);
+  backdrop-filter: blur(2px);
+}
+.bd-quick-create-sheet-v336 {
+  display: flex;
+  width: min(680px, 100%);
+  max-height: min(90dvh, 850px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 80px rgb(18 20 42 / 28%);
+}
+.bd-quick-create-sheet-v336 > header,
+.bd-quick-create-sheet-v336 > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; }
+.bd-quick-create-sheet-v336 > header { border-bottom: 1px solid #ececf3; }
+.bd-quick-create-sheet-v336 > footer { justify-content: flex-end; border-top: 1px solid #ececf3; }
+.bd-quick-create-sheet-v336 header small { display: block; color: #6a70d8; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; }
+.bd-quick-create-sheet-v336 h2 { margin: 3px 0 0; color: #171a34; font-size: 21px; }
+.bd-quick-create-sheet-v336 > main { display: flex; flex-direction: column; gap: 13px; overflow-y: auto; padding: 16px 18px 24px; }
+.bd-quick-create-sheet-v336 label { display: flex; flex-direction: column; gap: 6px; color: #5f6578; font-size: 11px; font-weight: 750; }
+.bd-quick-create-sheet-v336 input,
+.bd-quick-create-sheet-v336 select {
+  width: 100%; min-height: 44px; border: 1px solid #dcdeea; border-radius: 12px;
+  padding: 0 12px; background: #fff; color: #20233a; font: inherit; font-size: 14px;
+}
+.bd-tax-selectors-v336 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.bd-tax-selectors-v336 label > div { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 5px; }
+.bd-tax-selectors-v336 label button { min-height: 44px; padding: 0; color: #5754d8; font-size: 18px; }
+.bd-quick-grid-v336 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bd-quick-suggestions-v336,
+.bd-duplicate-warning-v336 { display: flex; flex-direction: column; gap: 6px; padding: 11px; border: 1px solid #f1d489; border-radius: 14px; background: #fffbeb; }
+.bd-quick-suggestions-v336.purchase { border-color: #c7d2fe; background: #f5f6ff; }
+.bd-quick-suggestions-v336 > strong,
+.bd-duplicate-warning-v336 > strong { color: #6d5010; font-size: 12px; }
+.bd-quick-suggestions-v336 button,
+.bd-duplicate-warning-v336 button { display: flex; height: auto; min-height: 42px; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.bd-quick-suggestions-v336 button span { min-width: 0; }
+.bd-quick-suggestions-v336 button b,
+.bd-quick-suggestions-v336 button small { display: block; }
+.bd-quick-suggestions-v336 button small { margin-top: 2px; color: #7d8292; font-weight: 500; overflow-wrap: anywhere; }
+.bd-quick-suggestions-v336 button em,
+.bd-duplicate-warning-v336 button em { color: #5754d8; font-size: 10px; font-style: normal; white-space: nowrap; }
+.bd-ingredient-create-v336 { width: 100%; border: 1px dashed #7674e7 !important; color: #5754d8 !important; background: #f7f7ff !important; }
+.bd-purchase-classification-note-v336 { padding: 9px 11px; border-radius: 11px; background: #f4f5f8; color: #687083; font-size: 11px; }
+
+@media (min-width: 760px) {
+  .bd-quick-create-backdrop-v336 { align-items: center; }
+}
+
+@media (max-width: 620px) {
+  .bd-quick-create-backdrop-v336 { padding: 0; }
+  .bd-quick-create-sheet-v336 { width: 100%; max-height: calc(100dvh - 10px); border-radius: 24px 24px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+  .bd-tax-selectors-v336,
+  .bd-quick-grid-v336 { grid-template-columns: 1fr; }
+  .bd-tax-node-main-v336 { align-items: flex-start; flex-direction: column; }
+  .bd-tax-node-actions-v336 { justify-content: flex-start; }
+  .bd-tax-manager-v336 > header { flex-direction: column; }
+  .bd-tax-manager-v336 > header > button { width: 100%; }
+  .bd-bulk-taxonomy-v337 > header { display: grid; }
+  .bd-bulk-items-v337 { max-height: 44vh; }
+  .bd-tax-node-v336.level-category,
+  .bd-tax-node-v336.level-subcategory { margin-left: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-quick-create-backdrop-v336,
+  .bd-quick-create-sheet-v336 { scroll-behavior: auto; }
+}

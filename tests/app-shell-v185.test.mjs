@@ -26,6 +26,8 @@ test("embedded modules bridge real detail history into the canonical Back contra
   assert.match(bundle, /typeof window\.bdNavigate==="function"/);
   assert.match(bundle, /window\.history\.back\(\)/);
   assert.match(shell, /embeddedFrame && config\.parent && typeof window\.bdNavigate/);
+  assert.match(shell, /typeof embeddedFrame\.contentWindow\.bdHandleEmbeddedBack === "function"/);
+  assert.match(shell, /embeddedFrame\.contentWindow\.bdHandleEmbeddedBack\(\)/);
   assert.match(shell, /window\.bdNavigate\(config\.parent, \{ replace: true \}\)/);
   assert.match(shell, /searchParams\(window\.location\.search\)\.get\("embedded"\) === "1"/i);
   assert.doesNotMatch(shell, /window\.top !== window\.self/);
@@ -49,11 +51,11 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
     assert.match(document, /document\.documentElement\.setAttribute\("data-bd-startup-pending", "v201"\)/);
     assert.match(document, /data-bd-static-startup="v201"/);
     assert.match(document, /bd-static-startup-brand-v201">Bar<span>Doctor<\/span>/);
-    assert.match(document, /Заведение под контролем/);
+    assert.match(document, /AI-управляющий для вашего заведения/);
     assert.match(document, /background: radial-gradient\(circle at 50% 42%/);
     assert.match(document, /bd-static-startup-content-v202/);
     assert.match(document, /font-size: 38px/);
-    assert.match(document, /border-radius: 28px/);
+    assert.match(document, /border-radius: 25px/);
     assert.match(document, /bd-static-startup-dots-v202/);
     assert.ok(
       document.indexOf("data-bd-startup-pending") < document.indexOf("bardoctor-preview.js"),
@@ -71,9 +73,10 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
   assert.match(bundle, /bdStartupFirstPaintVersion="startup-v201"/);
   assert.match(bundle, /bdSeamlessStartupVersion="seamless-v202"/);
   assert.match(bundle, /function bdStartupFirstPaintCompleteV201\(\)/);
-  assert.match(bundle, /S\.useLayoutEffect\(\(\)=>\{\(!q\|\|B==="HOME"\)&&bdStartupFirstPaintCompleteV201\(\)\}/);
+  assert.match(bundle, /S\.useLayoutEffect\(\(\)=>\{\(!v\|\|E==="HOME"\)&&bdStartupFirstPaintCompleteV201\(\)\}/);
   assert.match(bundle, /new CustomEvent\("bd:startup-complete"/);
-  assert.match(bundle, /initial:!1,animate:\{opacity:1,y:0,scale:1\},transition:\{duration:\.65/);
+  assert.match(bundle, /"data-bd-splash":"brand-loading-v332"/);
+  assert.match(bundle, /initial:\{opacity:0,y:8\},animate:\{opacity:1,y:0\},transition:\{duration:\.42/);
   assert.doesNotMatch(bundle, /initial:\{opacity:0,y:12,scale:\.97\},animate:\{opacity:1,y:0,scale:1\}/);
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
 });

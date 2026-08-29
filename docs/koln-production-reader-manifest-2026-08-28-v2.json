@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "bardoctor.audit-reader-manifest.v2",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "mode": "read_only",
+  "scope": { "venueId": 1, "venueName": "Кёльн", "dataAccountId": 1 },
+  "writesPerformed": 0,
+  "productionDeploymentPerformed": false,
+  "baselineCommit": "d86d6abe07ca40e02678884606d51caea36389e5",
+  "authoritativeExport": {
+    "exportId": "bdx_5093fecafdf522f4134a79a8",
+    "stableSnapshotChecksum": "5093fecafdf522f4134a79a821d74c92483566f47883bdb92c4d58685e430bb1",
+    "physicalFileSha256": "02e84482e95876673b9a7598c865cfc5275b6050aa96a4cd8c90059cf95fa73f",
+    "complete": false,
+    "purchaseDocuments": 26,
+    "purchaseLines": 160,
+    "stockMovements": 171,
+    "stockBalances": 116
+  },
+  "productionSettingsEvidence": {
+    "accountingCurrencyStoredCode": "RUB",
+    "currentProductDisplayMeaning": "RUB — российский рубль",
+    "businessSemanticStatus": "AMBIGUOUS_ISO_RUB_VS_PMR_RUB",
+    "automaticLegacyRemapAllowed": false
+  },
+  "migrationPreview": {
+    "path": "docs/koln-accounting-money-migration-preview-2026-08-28.json",
+    "recordsTotal": 26,
+    "legacyRubSemanticAmbiguous": 25,
+    "requiresHistoricalFxUnderStoredSetting": 1,
+    "strictSourceVerificationDocuments": 4,
+    "safeAutoNormalization": 0,
+    "writesPerformed": 0
+  },
+  "readerCapability": {
+    "provider": "Sites live D1 read-only connector",
+    "rowPagination": true,
+    "longCellSubstringPagination": false,
+    "longJsonValuesTruncated": true,
+    "fullPayloadRecovered": false
+  },
+  "unavailableAuthoritativeInputs": [
+    "full bd_finance_revenue payload",
+    "full bd_finance_expenses and payment ledger payload",
+    "full bd_payroll_entries payload",
+    "full Health Score factor payload",
+    "full bd_ai_diagnosis_v4 evidence payload",
+    "source bytes for c6495d8d-7703-437c-a5ee-e77fb60f0977",
+    "source bytes for ad2ac9fe-8e48-415b-a960-05125342737c"
+  ],
+  "conclusion": "PARTIAL_AUTHORITATIVE_INPUT_ONLY"
+}

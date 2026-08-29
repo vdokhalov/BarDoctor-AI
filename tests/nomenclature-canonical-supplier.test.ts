@@ -305,6 +305,37 @@ test("manual create returns similar canonical suggestions without using UNIQUE(n
   assert.equal(distinct.length, 0);
 });
 
+test("duplicate detection uses supplier aliases, purchase history and archived canonical items", () => {
+  const root = assortment();
+  (root.nomenclature as JsonRecord[])[0] = { ...canonical(), active: false, archived: true };
+  root.supplierProductMappings = [{
+    id: "mapping:market:suluguni",
+    venueId: 501,
+    supplierId: "market",
+    supplierName: "Рынок",
+    sourceItemKey: "market:sku-45",
+    sourceName: "Сулугун сыр 45%",
+    normalizedSourceName: "сулугун сыр 45",
+    purchaseUnit: "кг",
+    packageSize: "1 кг",
+    canonicalProductKey: "cheese:suluguni",
+    status: "confirmed",
+  }];
+  const suggestions = manualCanonicalDuplicateSuggestions({
+    assortment: root,
+    purchaseDocuments: [{
+      venueId: 501,
+      items: [{ name: "Сулугун сыр 45%", unit: "кг", packageSize: "1 кг", purchaseProductKey: "cheese:suluguni" }],
+    }],
+    name: "Сулугун сыр 45% 1 кг",
+    unit: "g",
+    venueId: 501,
+  });
+  assert.equal(suggestions[0]?.productKey, "cheese:suluguni");
+  assert.equal(suggestions[0]?.archived, true);
+  assert.match(suggestions[0]?.reason ?? "", /поставщика|закупок/);
+});
+
 test("cross-venue items and mappings are never reused or merged", () => {
   const root = assortment();
   root.nomenclature = [canonical("venue-501", 501), { ...canonical("venue-502", 502), name: "Сулугуни сыр" }];

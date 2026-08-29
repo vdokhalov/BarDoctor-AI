@@ -9,6 +9,8 @@ import {
   hasMeaningfulPurchaseItems,
   migratePurchaseLedger,
   normalizePurchaseDocument,
+  normalizePurchaseAccounting,
+  purchaseCommercialArithmeticIssues,
   purchaseIdempotencyKey,
   PURCHASE_STORE_KEY,
   SUPPLIER_STORE_KEY,
@@ -163,7 +165,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 422 },
     );
   }
-  const document = normalizePurchaseDocument(body.document, crypto.randomUUID());
+  let document = normalizePurchaseDocument(body.document, crypto.randomUUID());
   if (document.documentType !== "price_list" && !hasMeaningfulPurchaseItems(requestedDocument)) {
     return Response.json(
       { ok: false, error: "Заполните название, количество и стоимость каждой позиции" },
@@ -175,6 +177,15 @@ export async function POST(request: Request): Promise<Response> {
       { ok: false, error: "Добавьте хотя бы одну позицию перед сохранением" },
       { status: 422 },
     );
+  }
+  const commercialArithmeticIssues = purchaseCommercialArithmeticIssues(requestedDocument);
+  if (commercialArithmeticIssues.length) {
+    return Response.json({
+      ok: false,
+      code: "PURCHASE_COMMERCIAL_ARITHMETIC_INVALID",
+      error: "Проверьте количество, цену, сумму строки и итог документа перед проведением.",
+      issues: commercialArithmeticIssues,
+    }, { status: 422 });
   }
   const unresolvedRecognitionLines = document.items.filter((item) => item.requiresReview === true);
   if (unresolvedRecognitionLines.length && document.documentType !== "price_list") {
@@ -190,6 +201,44 @@ export async function POST(request: Request): Promise<Response> {
       { ok: false, error: "Укажите итоговую сумму закупки" },
       { status: 422 },
     );
+  }
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  if (!accountingCurrency) {
+    return Response.json({
+      ok: false,
+      code: "ACCOUNTING_CURRENCY_REQUIRED",
+      error: "Сначала выберите валюту управленческого учёта в настройках заведения.",
+    }, { status: 422 });
+  }
+  document = {
+    ...document,
+    currency: accountingCurrency,
+    originalAmount: undefined,
+    originalCurrency: undefined,
+    accountingAmount: undefined,
+    accountingCurrency: undefined,
+    fxRate: undefined,
+    fxRateDirection: undefined,
+    fxEffectiveDate: undefined,
+    fxSource: undefined,
+    fxLockedAt: undefined,
+  };
+  if (document.documentType !== "price_list") {
+    const normalizedAccounting = normalizePurchaseAccounting({ document, accountingCurrency, now });
+    if (!normalizedAccounting.ok) {
+      return Response.json({
+        ok: false,
+        code: normalizedAccounting.code,
+        error: normalizedAccounting.code === "ACCOUNTING_CURRENCY_REQUIRED"
+          ? "Сначала выберите валюту управленческого учёта в настройках заведения."
+          : "Документ сохраните как черновик: перед проведением укажите исторический курс, дату и источник курса.",
+        originalAmount: normalizedAccounting.money?.originalAmount ?? document.total,
+        originalCurrency: normalizedAccounting.money?.originalCurrency ?? document.currency,
+        accountingCurrency,
+        postingBlocked: true,
+      }, { status: 422 });
+    }
+    document = normalizedAccounting.document;
   }
   const idempotencyKey = purchaseIdempotencyKey({
     document,
@@ -397,6 +446,15 @@ export async function POST(request: Request): Promise<Response> {
     category: document.expenseCategory,
     amount: document.total,
     currency: document.currency,
+    originalAmount: document.originalAmount ?? document.total,
+    originalCurrency: document.originalCurrency ?? document.currency,
+    accountingAmount: document.accountingAmount,
+    accountingCurrency: document.accountingCurrency,
+    fxRate: document.fxRate,
+    fxRateDirection: document.fxRateDirection,
+    fxEffectiveDate: document.fxEffectiveDate,
+    fxSource: document.fxSource,
+    fxLockedAt: document.fxLockedAt,
     description: `Оплата поставщику · ${String(supplier.name)}`,
     supplierId: String(supplier.id),
     supplierName: String(supplier.name),
@@ -439,12 +497,12 @@ export async function POST(request: Request): Promise<Response> {
     updatedAt: now,
     createdByAccountId: document.createdByAccountId ?? account.actorAccountId,
     updatedByAccountId: account.actorAccountId,
-  }, expenses);
+  }, expenses, accountingCurrency);
   const inventory = confirmedDocument.documentType !== "price_list"
     ? applyPurchaseToInventory({
       assortment,
       document: confirmedDocument,
-      accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+      accountingCurrency,
       now,
     })
     : null;

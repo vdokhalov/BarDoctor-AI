@@ -29,6 +29,8 @@ import {
   enrichCanonicalSupplierSummary,
   manualCanonicalDuplicateSuggestions,
 } from "../../../../lib/bardoctor/nomenclature-identity";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import { normalizeCanonicalTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -134,7 +136,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Некорректные данные товара" }, { status: 400 });
   }
   const action = text(body.action, "repair", 20);
-  if (!new Set(["repair", "classify", "create", "update", "archive"]).has(action)) {
+  if (!new Set(["repair", "classify", "create", "update", "archive", "restore"]).has(action)) {
     return Response.json({ ok: false, error: "Неизвестное действие" }, { status: 400 });
   }
 
@@ -150,6 +152,44 @@ export async function POST(request: Request): Promise<Response> {
   const purchaseDocuments = array(stores.get(PURCHASE_STORE_KEY));
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
+
+  if (action === "restore") {
+    const productKey = text(body.productKey, "", 300);
+    const root = record(assortment);
+    const restore = (value: unknown): JsonRecord[] => (Array.isArray(value) ? value : []).map(record).map((item) => {
+      if (text(item.productKey ?? item.key ?? item.id, "", 300) !== productKey) return item;
+      const next: JsonRecord = { ...item, active: true, archived: false, restoredAt: now, updatedAt: now };
+      delete next.archivedAt;
+      return next;
+    });
+    const before = [...(Array.isArray(root.nomenclature) ? root.nomenclature : []), ...(Array.isArray(root.stockBalances) ? root.stockBalances : [])]
+      .map(record)
+      .find((item) => text(item.productKey ?? item.key ?? item.id, "", 300) === productKey);
+    root.nomenclature = restore(root.nomenclature);
+    root.stockBalances = restore(root.stockBalances);
+    const restoredProduct = [...(Array.isArray(root.nomenclature) ? root.nomenclature : []), ...(Array.isArray(root.stockBalances) ? root.stockBalances : [])]
+      .map(record)
+      .find((item) => text(item.productKey ?? item.key ?? item.id, "", 300) === productKey);
+    if (!restoredProduct) {
+      return Response.json({ ok: false, code: "PRODUCT_NOT_FOUND", error: "Позиция не найдена" }, { status: 404 });
+    }
+    root.updatedAt = now;
+    await database.batch([
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
+      auditUpdate(database, {
+        accountId: account.id,
+        entityId: productKey,
+        entityLabel: text(restoredProduct.name, "Складская позиция", 240),
+        before,
+        after: restoredProduct,
+        actorName,
+        actorRole: account.role,
+        reason: "Восстановление canonical-позиции из архива",
+        createdAt: now,
+      }),
+    ]);
+    return Response.json({ ok: true, assortment: root, product: restoredProduct, restored: true });
+  }
 
   if (action === "archive") {
     const productKey = text(body.productKey, "", 300);
@@ -334,6 +374,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!record(root.nomenclatureStructure).version) {
       root.nomenclatureStructure = defaultNomenclatureStructure();
     }
+    const taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, defaultNomenclatureStructure());
     const balances = Array.isArray(root.stockBalances) ? root.stockBalances.map(record) : [];
     const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
     const productKey = inventoryProductKey({ name, unit, packageSize });
@@ -342,7 +383,19 @@ export async function POST(request: Request): Promise<Response> {
       name,
       unit,
       venueId: account.venueId,
+      purchaseDocuments,
     });
+    if (possibleDuplicates.length && body.confirmSimilar !== true) {
+      return Response.json(
+        {
+          ok: false,
+          code: "PRODUCT_SIMILAR",
+          error: "Возможно, позиция уже существует",
+          possibleDuplicates,
+        },
+        { status: 409 },
+      );
+    }
     const duplicate = [...balances, ...nomenclature].find((value) =>
       inventoryProductKey(value) === productKey
     );
@@ -406,9 +459,43 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const manual = manualClassification(body);
+    if (Object.keys(manual).length) {
+      const section = taxonomy.sections.find((node) => node.id === manual.sectionId && node.active);
+      const category = taxonomy.categories.find((node) => node.id === manual.taxonomyCategoryId
+        && node.parentId === section?.id && node.active);
+      const subcategory = taxonomy.subcategories.find((node) => node.id === manual.subcategoryId
+        && node.parentId === category?.id && node.active);
+      if (!section || !category || !subcategory) {
+        return Response.json(
+          { ok: false, code: "TAXONOMY_PATH_INVALID", error: "Выберите действующий раздел, категорию и подкатегорию" },
+          { status: 422 },
+        );
+      }
+    }
+    const inferred = classifyNomenclatureItem({ name, category: body.category, kind });
+    const inferredPathExists = taxonomy.sections.some((node) => node.id === inferred.sectionId && node.active)
+      && taxonomy.categories.some((node) => node.id === inferred.taxonomyCategoryId && node.parentId === inferred.sectionId && node.active)
+      && taxonomy.subcategories.some((node) => node.id === inferred.subcategoryId && node.parentId === inferred.taxonomyCategoryId && node.active);
     const classification = Object.keys(manual).length
       ? manual
-      : classifyNomenclatureItem({ name, category: body.category, kind });
+      : inferredPathExists
+        ? inferred
+        : {
+          sectionId: "",
+          taxonomyCategoryId: "",
+          subcategoryId: "",
+          storageLocationId: "",
+          classificationStatus: "unassigned",
+          classificationConfidence: 0,
+          classificationSource: "fallback",
+        };
+    const itemTypeValue = text(body.itemType, "", 30);
+    const itemType = new Set(["product", "ingredient", "semi_finished", "finished_dish", "consumable", "other"])
+      .has(itemTypeValue)
+      ? itemTypeValue
+      : kind === "service" ? "other" : "product";
+    const purchasePrice = Number(body.purchasePrice);
+    const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
     const product: JsonRecord = {
       id: productKey,
       key: productKey,
@@ -419,6 +506,7 @@ export async function POST(request: Request): Promise<Response> {
       preferredDisplayNameUpdatedAt: now,
       category: text(body.category, kind === "service" ? "other" : "products", 80),
       kind,
+      itemType,
       unit,
       ...(displayUnit ? { displayUnit } : {}),
       ...(usesPackageAsDisplayUnit
@@ -440,6 +528,9 @@ export async function POST(request: Request): Promise<Response> {
       onOrder: 0,
       averageUnitCost: 0,
       inventoryValue: 0,
+      ...(Number.isFinite(purchasePrice) && purchasePrice >= 0
+        ? { lastPurchasePrice: purchasePrice, ...(accountingCurrency ? { currency: accountingCurrency } : {}) }
+        : {}),
       active: true,
       metadataSource: "manual",
       ...classification,

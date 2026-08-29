@@ -52,6 +52,10 @@ function venueIdOf(value: unknown): number | null {
   const parsed = Number(valueVenue);
   return Number.isFinite(parsed) ? parsed : null;
 }
+function activeMovement(value: unknown): boolean {
+  const movement = record(value);
+  return text(movement.status, "active", 30) !== "cancelled" && !text(movement.reversedAt, "", 50);
+}
 function stableValue(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stableValue);
   if (!value || typeof value !== "object") return value;
@@ -160,7 +164,7 @@ export async function buildImmutableVenueExport(input: {
     const source = text(line.sourceItemKey ?? line.supplierItemKey);
     return !canonical && !source && text(line.status) !== "unresolved";
   }).map((line) => `${text(line.purchaseDocumentId, "purchase")}:${text(line.id, "line")}`);
-  const invalidMovements = movements.filter((value) => {
+  const invalidMovements = movements.filter((value) => activeMovement(value)).filter((value) => {
     const movement = record(value);
     const sourceDocumentId = text(movement.sourceDocumentId);
     return !productKey(movement) || !balanceKeys.has(resolveInventoryProductKey(assortment, productKey(movement)))
@@ -175,7 +179,8 @@ export async function buildImmutableVenueExport(input: {
   });
   const invalidMappings = mappings.filter((value) => {
     const mapping = record(value);
-    return !text(mapping.sourceItemKey) || !canonicalKeys.has(text(mapping.canonicalProductKey));
+    const target = resolveInventoryProductKey(assortment, text(mapping.canonicalProductKey));
+    return !text(mapping.sourceItemKey) || (!canonicalKeys.has(target) && !balanceKeys.has(target));
   }).map((value) => text(record(value).id, text(record(value).sourceItemKey, "mapping")));
   const stockWithoutCost = balances.filter((value) => {
     const balance = record(value);

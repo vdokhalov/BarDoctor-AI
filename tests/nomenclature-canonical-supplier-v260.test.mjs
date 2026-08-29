@@ -7,18 +7,19 @@ const cssPath = new URL("../public/nomenclature-v208.css", import.meta.url);
 const appPath = new URL("../public/app.html", import.meta.url);
 const bootstrapPath = new URL("../public/bardoctor-preview.js", import.meta.url);
 
-test("tech-card picker v260 renders canonical items and supplier evidence separately", async () => {
+test("tech-card picker renders canonical items and supplier evidence separately", async () => {
   const bundle = await readFile(bundlePath, "utf8");
-  const start = bundle.indexOf("function bdCatMatchingProductsV258");
-  const end = bundle.indexOf("function bdCatRecipePriorityV257", start);
+  const start = bundle.indexOf("function bdCatIngredientMatchV299");
+  const end = bundle.indexOf("function bdCatRecipeEditor", start);
   const matching = bundle.slice(start, end);
   assert.ok(start > 0 && end > start);
-  assert.match(matching, /supplierProductMappings/);
-  assert.match(matching, /canonicalProductKey/);
-  assert.doesNotMatch(matching, /for\(const a of bdCatArray\(t\)\)r\(a,1\)/);
+  assert.match(bundle, /supplierProductMappings/);
+  assert.match(matching, /\/api\/tech-cards\/nomenclature/);
+  assert.match(matching, /supplierName/);
   assert.match(bundle, /Поиск по номенклатуре…/);
   assert.match(bundle, /Поставщики: /);
   assert.match(bundle, /aria-label":"Поиск canonical-товара для ингредиента/);
+  assert.match(matching, /bdNomenclatureQuickCreateV336/);
 });
 
 test("v260 client assets use a fresh cache identity", async () => {

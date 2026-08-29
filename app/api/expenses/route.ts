@@ -5,6 +5,7 @@ import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
 import { PURCHASE_STOCK_CATEGORIES } from "../../../lib/bardoctor/purchases";
+import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
 
 const STORE_KEY = "bd_finance_expenses";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
@@ -71,6 +72,17 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   const now = new Date().toISOString();
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  if (!accountingCurrency) {
+    return Response.json(
+      {
+        ok: false,
+        code: "ACCOUNTING_CURRENCY_REQUIRED",
+        error: "Сначала выберите валюту учёта в профиле заведения.",
+      },
+      { status: 422 },
+    );
+  }
   const idempotencyKey = typeof entry.idempotencyKey === "string" && entry.idempotencyKey.trim()
     ? entry.idempotencyKey.trim().slice(0, 240)
     : request.headers.get("idempotency-key")?.trim().slice(0, 240) || null;
@@ -81,6 +93,7 @@ export async function POST(request: Request): Promise<Response> {
     category,
     id: typeof entry.id === "string" && entry.id.trim() ? entry.id : crypto.randomUUID(),
     amount,
+    currency: accountingCurrency,
     source: typeof entry.source === "string" && entry.source.trim() ? entry.source : "manual_expense",
     idempotencyKey: idempotencyKey ?? undefined,
     createdAt: typeof entry.createdAt === "string" ? entry.createdAt : now,

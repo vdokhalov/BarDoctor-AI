@@ -11,6 +11,47 @@ test("mobile assortment header remains inside the touch viewport", async () => {
   assert.doesNotMatch(css, /@media \(max-width: 767px\)[\s\S]*?\.bd-assortment-header-v170\s*\{[^}]*left: 50%;[^}]*translateX\(-50%\)/);
 });
 
+test("assortment create action stays available and clears the bottom navigation", async () => {
+  const [bundle, css] = await Promise.all([
+    readFile(bundleUrl, "utf8"),
+    readFile(cssUrl, "utf8"),
+  ]);
+  const fragment = sliceBetween(
+    bundle,
+    "/* bd-assortment-command-v170:start */",
+    "/* bd-assortment-command-v170:end */",
+  );
+
+  assert.match(fragment, /bd-assortment-add-fab-v325/);
+  assert.match(fragment, /children:"Добавить позицию"/);
+  assert.match(fragment, /me&&d==="menu"/);
+  assert.doesNotMatch(fragment, /onClick:d,children:\[i\.jsx\(Vt,\{size:16\}\),"Позиция"\]/);
+  assert.match(css, /\.bd-assortment-add-fab-v325\s*\{[\s\S]*?position: fixed;/);
+  assert.match(css, /bottom: calc\(92px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.bd-assortment-content-v170:has\(\.bd-assortment-menu-v170\)[\s\S]*?padding-bottom: 82px/);
+  assert.match(css, /@media \(min-width: 1024px\)[\s\S]*?\.bd-assortment-add-fab-v325/);
+});
+
+test("operational forms lock currency to the venue profile", async () => {
+  const bundle = await readFile(bundleUrl, "utf8");
+
+  assert.match(bundle, /bdVenueCurrencyLockVersionV326="venue-currency-lock-v326"/);
+  assert.match(bundle, /t==="PMR_RUB"\?"руб\. ПМР"/);
+  assert.match(bundle, /t==="RUB"\?"RUB — российский рубль"/);
+  assert.match(bundle, /Задаётся в настройках профиля/);
+  assert.doesNotMatch(bundle, /\["RUB","MDL","EUR","USD","UAH","RON"\]/);
+  assert.match(bundle, /currency:bdMenuVenueCurrency\|\|"RUB"/);
+  assert.match(bundle, /currency:bdAccountingCurrencyV243\(bdMenuVenueCurrency\)\|\|"RUB"/);
+  assert.doesNotMatch(bundle, /bdCurrencySelectOptionsV325/);
+  assert.doesNotMatch(bundle, /label:"Валюта",children:i\.jsx\("select"/);
+  assert.equal((bundle.match(/sheetTitle:"Валюта учёта"/g) || []).length, 2);
+});
+
+test("Köln QA fixture exercises the PMR accounting-currency default", async () => {
+  const fixture = await readFile(new URL("../public/assortment-qa-v170.js", import.meta.url), "utf8");
+  assert.match(fixture, /currency: venueId === 501 \? "PMR_RUB" : "MDL"/);
+});
+
 function sliceBetween(source, startMarker, endMarker) {
   const start = source.indexOf(startMarker);
   const end = source.indexOf(endMarker, start);

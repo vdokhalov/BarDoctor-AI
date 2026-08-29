@@ -16,6 +16,12 @@ import {
   loadVenueAIContext,
   venueAIContextForPrompt,
 } from "../../../lib/bardoctor/venue-ai-context";
+import {
+  deriveMarketChanges,
+  marketAnalysisIsStale,
+  marketLocationSignature,
+  shouldRunAutomaticMarketRefresh,
+} from "../../../lib/bardoctor/market-analysis-state";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -262,10 +268,13 @@ export async function GET(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const analysis = record(await cachedAnalysis(account.id));
   return noStore(Response.json({
     ok: true,
     restaurant: account.restaurantJson ? JSON.parse(account.restaurantJson) : null,
-    analysis: await cachedAnalysis(account.id),
+    analysis,
+    stale: marketAnalysisIsStale(analysis),
+    refreshIntervalDays: 7,
   }));
 }
 
@@ -284,7 +293,62 @@ export async function PATCH(request: Request): Promise<Response> {
       throw new AIServiceError("Слишком большой запрос.", 413);
     }
     const body = record(JSON.parse(rawBody)) ?? {};
-    if (!["set-competitor-confirmed", "delete-competitor"].includes(text(body.action))) {
+    const action = text(body.action);
+    if (action === "set-location") {
+      const restaurant = account.restaurantJson
+        ? record(JSON.parse(account.restaurantJson)) ?? {}
+        : {};
+      const current = record(await cachedAnalysis(account.id));
+      const address = text(body.address, text(restaurant.address), 240);
+      const latitude = number(body.latitude) ?? number(restaurant.lat);
+      const longitude = number(body.longitude) ?? number(restaurant.lng);
+      const focus = text(body.focus, text(current?.focus), 500);
+      if (!address && (latitude === null || longitude === null)) {
+        throw new AIServiceError("Укажите адрес или используйте геолокацию.", 400);
+      }
+      const previousSignature = marketLocationSignature({
+        address: restaurant.address,
+        city: restaurant.city,
+        region: restaurant.region,
+        country: restaurant.country,
+        latitude: restaurant.lat,
+        longitude: restaurant.lng,
+        focus: current?.focus,
+      });
+      const nextSignature = marketLocationSignature({
+        address,
+        city: restaurant.city,
+        region: restaurant.region,
+        country: restaurant.country,
+        latitude,
+        longitude,
+        focus,
+      });
+      const changed = previousSignature !== nextSignature;
+      const nextRestaurant = changed
+        ? {
+            ...restaurant,
+            address,
+            ...(latitude !== null ? { lat: latitude } : {}),
+            ...(longitude !== null ? { lng: longitude } : {}),
+          }
+        : restaurant;
+      if (changed) {
+        const updatedAt = new Date().toISOString();
+        await getDb().update(accounts).set({
+          restaurantJson: JSON.stringify(nextRestaurant),
+          updatedAt,
+        }).where(eq(accounts.id, account.id));
+        if (current) {
+          current.focus = focus;
+          current.locationChangePending = true;
+          current.pendingLocation = { address, latitude, longitude, focus, updatedAt };
+          await saveAnalysis(account.id, current);
+        }
+      }
+      return noStore(Response.json({ ok: true, changed, restaurant: nextRestaurant, focus, analysis: current }));
+    }
+    if (!["set-competitor-confirmed", "delete-competitor"].includes(action)) {
       throw new AIServiceError("Неизвестное действие.", 400);
     }
     const key = text(body.competitorKey, "", 400);
@@ -357,6 +421,18 @@ export async function POST(request: Request): Promise<Response> {
     if (!text(restaurant.name)) {
       throw new AIServiceError("Сначала заполните профиль заведения.", 400);
     }
+    const previousAnalysis = record(await cachedAnalysis(account.id));
+    if (body.automatic === true && !shouldRunAutomaticMarketRefresh({
+      analysis: previousAnalysis,
+      knownGeneratedAt: text(body.knownGeneratedAt, "", 60),
+    })) {
+      return noStore(Response.json({
+        ok: true,
+        data: previousAnalysis,
+        skipped: true,
+        stale: marketAnalysisIsStale(previousAnalysis),
+      }));
+    }
     const venueContext = await loadVenueAIContext(account, "market", body);
 
     const address = text(body.address, text(restaurant.address), 240);
@@ -424,7 +500,6 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         timezone: text(body.timezone, "", 80) || undefined,
       },
     });
-    const previousAnalysis = record(await cachedAnalysis(account.id));
     const deletedCompetitorKeys = new Set(textList(previousAnalysis?.deletedCompetitorKeys, 100));
     const deletedCompetitorNames = new Set(textList(previousAnalysis?.deletedCompetitorNames, 100));
     const previousConfirmed = new Map<string, JsonRecord>();
@@ -453,6 +528,21 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
       };
     });
     const generatedAt = new Date().toISOString();
+    const detectedChanges = deriveMarketChanges({
+      previous: previousAnalysis,
+      nextCompetitors: Array.isArray(analysis.competitors) ? analysis.competitors : [],
+      detectedAt: generatedAt,
+    });
+    const changesByCompetitor = new Map<string, JsonRecord[]>();
+    for (const change of detectedChanges) {
+      const name = text(change.competitorName).toLocaleLowerCase("ru");
+      if (!name) continue;
+      changesByCompetitor.set(name, [...(changesByCompetitor.get(name) ?? []), change]);
+    }
+    analysis.competitors = (Array.isArray(analysis.competitors) ? analysis.competitors : []).map((value) => {
+      const item = record(value) ?? {};
+      return { ...item, changes: changesByCompetitor.get(text(item.name).toLocaleLowerCase("ru")) ?? [] };
+    });
     const payload = {
       version: 1,
       venueName: text(restaurant.name),
@@ -461,8 +551,10 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
       longitude,
       focus,
       generatedAt,
+      locationSignature: marketLocationSignature({ address, city, region, country, latitude, longitude, focus }),
       model: web.model,
       ...analysis,
+      detectedChanges,
       sources: web.sources,
       deletedCompetitorKeys: [...deletedCompetitorKeys],
       deletedCompetitorNames: [...deletedCompetitorNames],
@@ -483,7 +575,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         .where(eq(accounts.id, account.id));
     }
 
-    return noStore(Response.json({ ok: true, data: payload }));
+    return noStore(Response.json({ ok: true, data: payload, stale: false }));
   } catch (error) {
     return noStore(aiErrorResponse(error));
   }

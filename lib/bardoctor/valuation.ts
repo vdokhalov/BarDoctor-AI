@@ -1,4 +1,5 @@
 import { normalizeAccountingCurrency, type AccountingCurrency } from "./currency";
+import { resolveAccountingMoney } from "./accounting-money";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -265,6 +266,31 @@ export function resolvePurchaseLineAccountingCost(input: {
       transactionCurrency,
       source: "same_currency",
       reason: transactionAmount > 0 ? undefined : "missing_cost_basis",
+    };
+  }
+  const canonical = resolveAccountingMoney({
+    value: {
+      ...document,
+      ...line,
+      originalAmount: line.originalLineTotal ?? line.lineTotal ?? line.total
+        ?? positive(line.unitPrice ?? line.price) * quantity,
+      originalCurrency: line.originalCurrency ?? document.originalCurrency ?? transactionCurrency,
+      accountingAmount: line.accountingLineTotal,
+      accountingCurrency: line.accountingCurrency ?? document.accountingCurrency,
+      fxRate: line.fxRate ?? line.exchangeRateToAccounting ?? document.fxRate ?? document.exchangeRateToAccounting,
+    },
+    accountingCurrency,
+  });
+  if (canonical?.accountingAmount != null) {
+    return {
+      known: canonical.accountingAmount > 0,
+      amount: canonical.accountingAmount,
+      accountingCurrency,
+      transactionAmount,
+      transactionCurrency,
+      exchangeRate: canonical.fxRate,
+      source: line.accountingLineTotal != null ? "stored_normalized_amount" : "stored_historical_rate",
+      reason: canonical.accountingAmount > 0 ? undefined : "missing_cost_basis",
     };
   }
   const normalizedCandidates: Array<[unknown, unknown]> = [

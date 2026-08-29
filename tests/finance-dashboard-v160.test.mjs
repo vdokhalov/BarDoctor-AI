@@ -142,7 +142,7 @@ test("Finance purchase deletion applies server state in Finance scope and hides 
   assert.match(deletion, /applyViewedPurchaseServerResultV195\(lastPaymentResult\)/);
   assert.match(deletion, /applyViewedPurchaseServerResultV195\(result\)/);
   assert.doesNotMatch(deletion, /bdProcApplyServerResultV186\(/);
-  assert.match(page, /monthExpenses=S\.useMemo\(\(\)=>expenses\.filter\(e=>e\.date\.slice\(0,7\)===monthKey&&e\?\.status!=="voided"&&!e\?\.reversedAt\)/);
+  assert.match(page, /monthExpenses=S\.useMemo\(\(\)=>bdMonthlyCurrencyPartitionV320\(expenses\.filter\(e=>e\.date\.slice\(0,7\)===monthKey&&e\?\.status!=="voided"&&!e\?\.reversedAt\),"expense",bdFinanceAccountingCurrency\)\.included/);
 });
 
 test("Finance presentation keeps the established calculation contract and excludes future shifts", async () => {

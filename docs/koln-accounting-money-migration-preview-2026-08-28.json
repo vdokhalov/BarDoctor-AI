@@ -1,0 +1,84 @@
+{
+  "schemaVersion": "bardoctor.accounting-money-migration-preview.v1",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "mode": "read_only",
+  "scope": {
+    "venueId": 1,
+    "dataAccountId": 1,
+    "venue": "Кёльн"
+  },
+  "currentStoredAccountingCurrency": "RUB",
+  "rubSemanticStatus": "AMBIGUOUS_ISO_RUB_VS_PMR_RUB",
+  "source": {
+    "exportId": "bdx_5093fecafdf522f4134a79a8",
+    "stableChecksum": "5093fecafdf522f4134a79a821d74c92483566f47883bdb92c4d58685e430bb1",
+    "physicalSha256": "02e84482e95876673b9a7598c865cfc5275b6050aa96a4cd8c90059cf95fa73f"
+  },
+  "preview": {
+    "recordsTotal": 26,
+    "noActionRequired": [],
+    "safeAutoNormalization": [],
+    "requiresFx": [
+      "b54e2f38-a4df-49b0-8510-12904fbe183e"
+    ],
+    "requiresSourceVerification": [
+      {
+        "documentId": "e1707650-e919-4bd0-9447-8286eebe8257",
+        "lineIds": [
+          "267e29c1-0baf-4094-b783-e19481ea9a93",
+          "17b0346d-a394-4ff3-ae0b-35f2f0f2397e"
+        ]
+      },
+      {
+        "documentId": "eee36fe1-b2a6-4b8d-b2ba-4f49dbf37585",
+        "lineIds": [
+          "9f973c83-f6f2-42d1-8378-b8b4f69d1e2f"
+        ]
+      },
+      {
+        "documentId": "1cc8af12-c79b-454f-9be8-0ec43db6dcf1",
+        "lineIds": [
+          "4b14ab0c-e982-495a-8f3d-6963028400a7"
+        ]
+      },
+      {
+        "documentId": "5213dae2-5f69-4cc8-aa87-fe4debe2d12b",
+        "lineIds": [
+          "eb0fdcc0-5cff-41f5-a6e4-9fb05185fb1e"
+        ]
+      }
+    ],
+    "ambiguous": [
+      "11d8306f-8403-44ef-b1d4-fdb81dc42aa3",
+      "02cef927-7d9c-4f5c-b82a-236ca7fc1eab",
+      "e2617e2b-bf56-4f98-aebb-f96fe9bd62f9",
+      "20155e30-e2ed-4890-9686-7f0ec62b5091",
+      "35f900ea-ea31-4b62-99cb-d6a8d66bb259",
+      "17e0747c-e158-4022-b591-3fdf1b8d007d",
+      "fad30498-fa86-49eb-baca-67109de79029",
+      "4e865595-572b-49d3-b050-38167ae9b2e5",
+      "3e58abe7-2a06-4781-a123-d34b92b73ab6",
+      "4051c7f1-e647-4cf8-90a0-78f63d097be1",
+      "e1707650-e919-4bd0-9447-8286eebe8257",
+      "719b5ce4-d2cd-41af-b999-7ced703b78c4",
+      "916ecf9e-4f09-4fd9-a46c-672cadc959e1",
+      "eee36fe1-b2a6-4b8d-b2ba-4f49dbf37585",
+      "1cc8af12-c79b-454f-9be8-0ec43db6dcf1",
+      "3b58a546-5fd4-40a6-986f-2a2b1e9294f6",
+      "f53cf58b-58c8-47ad-a9b4-509849b18df2",
+      "3b1a22f9-c7e1-424b-a849-7a2bf16008dc",
+      "43a5b067-2250-4f43-81ec-eafd5634aa1f",
+      "5213dae2-5f69-4cc8-aa87-fe4debe2d12b",
+      "3b4c80ac-70b9-49af-b277-45eee0173e67",
+      "d884a7c4-1a5e-4273-863f-6d6ddc7ed38b",
+      "a6835dd4-f275-4cf9-81e0-f91ee0c7d016",
+      "16a807e6-146a-4c0b-b78b-3c5ed1f00984",
+      "5bac9800-7ab9-4e71-b928-de57bfb79235"
+    ],
+    "explanation": [
+      "Legacy RUB must be confirmed as ISO RUB or PMR_RUB before migration; no automatic semantic rewrite is safe.",
+      "requiresFx records need an authoritative historical conversion; current rates and implicit 1:1 are forbidden."
+    ]
+  },
+  "writesPerformed": 0
+}

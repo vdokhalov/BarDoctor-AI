@@ -301,6 +301,16 @@ function bdMonthlyReadinessV165({ report, navigate }) {
   ] });
 }
 
+function bdMonthlyCurrencyBoundaryNoticeV320({ report }) {
+  const totals = (report?.excludedForeignCurrencyTotals || []).filter((row) => Number(row.amount) !== 0);
+  if (!totals.length) return null;
+  const labels = { purchase: "Закупки", expense: "Платежи/расходы", revenue: "Выручка", snapshot: "Остатки" };
+  return i.jsxs("section", { "data-bd-currency-boundary": "v320", className: "bd-monthly-currency-boundary-v320", role: "status", children: [
+    i.jsx("strong", { children: "Иностранная валюта не включена в " + report.accountingCurrency }),
+    i.jsx("p", { children: totals.map((row) => (labels[row.kind] || row.kind) + ": " + new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(Number(row.amount)) + " " + row.currency).join(" · ") + " — нет сохранённого исторического курса." }),
+  ] });
+}
+
 function bdMonthlyReportPage() {
   const [, navigate] = bt();
   const { profile } = Un();
@@ -320,13 +330,14 @@ function bdMonthlyReportPage() {
     }
     return null;
   }, [profile, period, revenue, expenses, snapshots, settings, gapReasons, months]);
-  const hasFinancialData = report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0;
+  const hasFinancialData = report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0;
   return i.jsx(nt, { showBottomNav: true, className: "pb-32", children: i.jsxs($e, { className: "pt-0", children: [
     i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance", right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
       i.jsx("nav", { className: "bd-monthly-period-v165", "aria-label": "Выбор месяца", children: months.map((month) => i.jsx("button", { type: "button", onClick: () => setPeriod(month), className: period === month ? "is-active" : "", children: bdMonthDisplay(month) }, month)) }),
       hasFinancialData ? i.jsxs(i.Fragment, { children: [
         i.jsx(bdMonthlyHeroV165, { report, previous }),
+        i.jsx(bdMonthlyCurrencyBoundaryNoticeV320, { report }),
         i.jsx(bdMonthlyReadinessV165, { report, navigate }),
         i.jsx(bdMonthlyExecutiveV165, { report }),
         i.jsx(bdMonthlyComparisonV165, { report, previous }),

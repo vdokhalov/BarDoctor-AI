@@ -45,7 +45,9 @@ test("monthly report separates goods purchases from supplier payments", async ()
     "function bdNextInventoryDate(",
   );
 
-  assert.match(calculation, /bdCanonicalPurchases=bdProcArray\("bd_purchase_documents"\)/);
+  assert.match(calculation, /bdCanonicalPurchaseSource=bdProcArray\("bd_purchase_documents"\)/);
+  assert.match(calculation, /bdPurchaseCurrency=bdMonthlyCurrencyPartitionV320\(bdCanonicalPurchaseSource,"purchase",bdAccountingCurrency\)/);
+  assert.match(calculation, /bdCanonicalPurchases=bdPurchaseCurrency\.included/);
   assert.match(calculation, /v=bdCanonicalPurchases/);
   assert.match(calculation, /bdPurchasePaymentRows=f\.filter\(bdIsPurchasePaymentRow\)/);
   assert.match(calculation, /purchasePayments:bdPurchasePayments/);

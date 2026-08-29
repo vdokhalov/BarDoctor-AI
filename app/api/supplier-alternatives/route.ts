@@ -13,6 +13,11 @@ import {
   normalSupplierTargetKey,
   supplierTargetSignature,
 } from "../../../lib/bardoctor/supplier-alternative-rules";
+import {
+  canonicalSupplierOfferUrl,
+  deduplicateSupplierOffers,
+  groupSupplierOffers,
+} from "../../../lib/bardoctor/supplier-alternative-view";
 
 type JsonRecord = Record<string, unknown>;
 const STORE_KEY = "bd_supplier_alternatives_v1";
@@ -68,7 +73,7 @@ function rebuildCoverage(data: JsonRecord, targetNames: string[], totalPasses: n
     url: text(source?.url, "", 1_500),
   })).filter((source): source is OpenAIWebSource => Boolean(source.url));
   const sameTargets = text(data.targetSignature, "", 20_000) === supplierTargetSignature(targetNames);
-  const alternatives = (Array.isArray(data.alternatives) ? data.alternatives : []).map(record).filter(Boolean).filter(item => {
+  const alternatives = deduplicateSupplierOffers((Array.isArray(data.alternatives) ? data.alternatives : []).map(record).filter((item): item is JsonRecord => Boolean(item)).filter(item => {
     const matchedTo = text(item?.matchedTo, "", 180);
     const urls = list(item?.sourceUrls, 5);
     const candidatePrice = numeric(item?.candidatePrice);
@@ -82,7 +87,7 @@ function rebuildCoverage(data: JsonRecord, targetNames: string[], totalPasses: n
       && candidatePrice > 0
       && Boolean(text(item?.currency, "", 12))
       && !deleted.has(text(item?.id, "", 600));
-  }).map(item => ({ ...item, decision: ["new", "checking", "dismissed"].includes(text(item?.decision)) ? text(item?.decision) : "new" }));
+  }).map(item => ({ ...item, decision: ["new", "checking", "confirmed", "dismissed"].includes(text(item?.decision)) ? text(item?.decision) : "new" })));
   const visibleAlternatives = alternatives.filter(item => text(record(item)?.decision) !== "dismissed");
   const covered = new Set(visibleAlternatives.map(item => normalSupplierTargetKey(text(record(item)?.matchedTo))).filter(Boolean));
   const uncoveredTargets = targetNames.filter(name => !covered.has(normalSupplierTargetKey(name))).slice(0, 180);
@@ -92,6 +97,7 @@ function rebuildCoverage(data: JsonRecord, targetNames: string[], totalPasses: n
     version: STORE_VERSION,
     targetSignature: supplierTargetSignature(targetNames),
     alternatives,
+    positionGroups: groupSupplierOffers(alternatives),
     sources,
     scannedSegments: sameTargets ? list(data.scannedSegments, 200) : [],
     totalSegments: totalPasses,
@@ -110,7 +116,7 @@ function normalise(raw: unknown, sources: OpenAIWebSource[], previous: JsonRecor
     const supplierName = text(item?.supplierName, "Поставщик", 160);
     const product = text(item?.product, "Товар", 180);
     const url = sourceUrls(item?.sourceUrls, sources)[0] ?? "";
-    const id = `${supplierName}|${product}|${url}`.toLocaleLowerCase("ru").slice(0, 600);
+    const id = `${supplierName}|${product}|${canonicalSupplierOfferUrl(url)}`.toLocaleLowerCase("ru").slice(0, 600);
     const currentPrice = numeric(item?.currentPrice);
     const candidatePrice = numeric(item?.candidatePrice);
     const matchedTo = targetMap.get(normalSupplierTargetKey(text(item?.matchedTo, "", 180))) ?? "";
@@ -131,6 +137,8 @@ function normalise(raw: unknown, sources: OpenAIWebSource[], previous: JsonRecor
       savingPercent, monthlySaving: null,
       minimumOrder: text(item?.minimumOrder, "Не указано", 160), delivery: text(item?.delivery, "Требует проверки", 240),
       paymentTerms: text(item?.paymentTerms, "Требует проверки", 240), verifiedAt: text(item?.verifiedAt, new Date().toISOString().slice(0, 10), 20),
+      availability: text(item?.availability, "Уточнить", 80), offerType: text(item?.offerType, "Публичная цена", 80),
+      sku: text(item?.sku, "", 120), barcode: text(item?.barcode, "", 120), imageUrl: text(item?.imageUrl, "", 1_500),
       phone: text(item?.phone, "", 80), email: text(item?.email, "", 160),
       address: text(item?.address, "", 240), contactName: text(item?.contactName, "", 120),
       caveats: list(item?.caveats, 6), sourceUrls: urls, decision: decisions.get(id) ?? "new",
@@ -193,7 +201,7 @@ export async function PATCH(request: Request): Promise<Response> {
     if (body.action === "delete") {
       current.alternatives = alternatives.filter(value => text(record(value)?.id, "", 600) !== id);
       current.deletedIds = [...new Set([...list(current.deletedIds, 200), id])].slice(-200);
-    } else if (body.action === "decision" && ["new", "checking", "dismissed"].includes(text(body.decision))) {
+    } else if (body.action === "decision" && ["new", "checking", "confirmed", "dismissed"].includes(text(body.decision))) {
       current.alternatives = alternatives.map(value => text(record(value)?.id, "", 600) === id ? { ...record(value), decision: text(body.decision) } : value);
     } else throw new AIServiceError("Неизвестное действие.", 400);
     const updated = rebuildCoverage(current, targetNames, plan.length);
@@ -214,32 +222,4 @@ export async function POST(request: Request): Promise<Response> {
     const assortment = record(await loadStore(account.id, "bd_assortment_v1")) ?? {};
     const documents = Array.isArray(await loadStore(account.id, "bd_purchase_documents")) ? await loadStore(account.id, "bd_purchase_documents") as unknown[] : [];
     const menuItems = (Array.isArray(assortment.menuItems) ? assortment.menuItems : []).map(record).filter(Boolean).filter(item => item?.active !== false).slice(0, 180).map(item => ({ name: text(item?.name, "", 160), category: text(item?.category, "", 100), department: text(item?.department, "other", 40), type: text(item?.type, "composite", 30), salePrice: numeric(item?.salePrice), plannedSales: numeric(item?.plannedSales) }));
-    const purchases = documents.map(record).filter(Boolean).flatMap(doc => (Array.isArray(doc?.items) ? doc.items : []).map(record).filter(Boolean).map(item => ({ name: text(item?.name, "", 160), brand: text(item?.brand, "", 100), packageSize: text(item?.packageSize, "", 80), unitPrice: numeric(item?.unitPrice), supplier: text(doc?.supplierName, "", 160), currency: text(doc?.currency, "", 12), date: text(doc?.date, "", 20) }))).slice(-120);
-    const city = text(restaurant.city, "", 120), region = text(restaurant.region, "", 120), country = text(restaurant.country, "", 120);
-    const stored = record(await loadStore(account.id, STORE_KEY));
-    const procurementMenuItems = menuItems.filter(item => isPackagedProcurementItem(`${item.name} ${item.category}`)).map(item => item.name);
-    const targetNames = [...new Set(procurementMenuItems.filter(Boolean))].slice(0, 180);
-    const previous = body.reset === true || text(stored?.targetSignature, "", 20_000) !== supplierTargetSignature(targetNames)
-      ? { deletedIds: stored?.deletedIds ?? [] }
-      : stored;
-    if (!targetNames.length) throw new AIServiceError("В активном меню не распознаны точные товарные позиции напитков.", 400);
-    const plan = searchPlan(targetNames);
-    const requestedSegment = text(body.segment, plan[0]?.id ?? "batch-0", 40);
-    const batchIndex = Math.max(0, Math.min(plan.length - 1, Number(requestedSegment.replace(/^batch-/, "")) || 0));
-    const segment = plan[batchIndex] ?? plan[0];
-    const segmentTargets = targetNames.slice(batchIndex * SEARCH_BATCH_SIZE, batchIndex * SEARCH_BATCH_SIZE + SEARCH_BATCH_SIZE);
-    if (!segmentTargets.length) {
-      const data = normalise({ summary: "В этом поисковом проходе нет позиций активного меню.", alternatives: [] }, [], previous, segment.id, targetNames, plan.length);
-      await saveStore(account.id, data);
-      return noStore(Response.json({ ok: true, data }));
-    }
-    const venueContext = JSON.stringify({ name: text(restaurant.name), city, region, country, businessType: text(restaurant.businessType), venueFormat: text(restaurant.venueFormat) });
-    const searchSystem = `Ты — закупочный аналитик BarDoctor. Ищи закупочные предложения только для точных брендированных товаров активного меню. Разрешённые продавцы: manufacturer, distributor, wholesaler, horeca_supplier, retailer. Запрещены ночные клубы, бары, рестораны, кафе, караоке, гостиничные меню, сервисы бронирования и цены порции/бокала. Одна запись — один товар у одного продавца. matchedTo обязан быть дословной копией строки из «Целей текущего прохода». product обязан быть тем же брендом и той же продуктовой линейкой, что matchedTo; другая марка или просто аналог категории запрещены. Русское и латинское написание одного бренда считается совпадением. matchType всегда "exact_product" только при точном товарном совпадении. Допускается другая фасовка того же продукта, если она явно указана. Обязательны публичная цена за товар/упаковку, валюта и прямая URL-страница. Ищи отдельно по каждому товару: сначала молдавские интернет-магазины и дистрибьюторы, затем импортёров/оптовиков, затем магазины с доставкой по Молдове. Не выдумывай данные и не возвращай «цену по запросу». Верни только JSON: {"summary":"...","alternatives":[{"supplierName":"...","sellerType":"manufacturer|distributor|wholesaler|horeca_supplier|retailer","sellerTypeEvidence":"...","product":"точное название на странице продавца","matchedTo":"дословная позиция меню","matchType":"exact_product","matchEvidence":"совпавшие бренд и линейка","offer":"...","currentPrice":null,"candidatePrice":123.45,"currency":"MDL","unit":"за упаковку","packageSize":"1 л","minimumOrder":"...","delivery":"...","paymentTerms":"...","verifiedAt":"YYYY-MM-DD","phone":"...","email":"...","address":"...","contactName":"...","caveats":["..."],"sourceUrls":["https://прямая-страница-товара","https://страница-контактов"]}]}.`;
-    const relevantPurchases = purchases.filter(purchase => segmentTargets.some(target => isSameSupplierMenuProduct(target, `${purchase.name} ${purchase.brand} ${purchase.packageSize}`))).slice(-20);
-    const commonPrompt = `Заведение: ${venueContext}\nВ этом запросе разрешены только эти точные позиции активного меню: ${JSON.stringify(segmentTargets)}\nЗакупочные документы используются только для справки о текущей цене, но не создают новые цели: ${JSON.stringify(relevantPurchases)}`;
-    const web = await openAIWebSearch({ accountId: account.id, observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "supplier_alternatives" }, maxTokens: 9_000, location: { city: city || undefined, region: region || undefined }, system: searchSystem, prompt: `${commonPrompt}\nТекущий точечный проход: ${segment.label}.\nЦели именно этого прохода: ${JSON.stringify(segmentTargets)}\nДля КАЖДОЙ из этих ${segmentTargets.length} целей сделай несколько отдельных поисковых запросов с точным брендом и линейкой на русском, румынском и латинице. Проверь минимум: интернет-магазины Молдовы, каталоги дистрибьюторов/импортёров, HoReCa-поставщиков и крупные магазины с доставкой в ${city || region || country || "регион заведения"}. Верни до 5 разных продавцов на каждую цель, если есть подтверждённые страницы с ценой. Сначала покрой все цели хотя бы одним предложением, затем добавляй альтернативных продавцов.` });
-    const data = normalise(parseAIJson(web.text), web.sources, previous, segment.id, targetNames, plan.length);
-    await saveStore(account.id, data);
-    return noStore(Response.json({ ok: true, data }));
-  } catch (error) { return noStore(aiErrorResponse(error)); }
-}
+    const purchases = documents.map(record).filter(Boolean).flatMap(doc => (Array.isArray(doc?.items) ? doc.items : []).map(record).filter(Boolean).map(item => ({ name: text(item?.name, "", 160), brand: text(item?.brand, "", 100), packageSize: text(item?.packageSize, "", 80), unitPri

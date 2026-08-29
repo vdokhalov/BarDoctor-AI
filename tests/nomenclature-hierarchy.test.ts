@@ -10,7 +10,7 @@ import {
 
 test("default nomenclature tree separates sections, categories, subcategories and locations", () => {
   const tree = defaultNomenclatureStructure();
-  assert.equal(tree.version, "v209");
+  assert.equal(tree.version, "v336");
   assert.ok(tree.sections.some((item) => item.id === "bar"));
   assert.ok(tree.sections.some((item) => item.id === "kitchen"));
   assert.ok(tree.sections.some((item) => item.id === "household"));
@@ -83,7 +83,7 @@ test("legacy stock balances become nomenclature items before classification", ()
   assert.equal(balances.find((item) => item.name === "Белизна")?.sectionId, "household");
 });
 
-test("existing v209 structure receives new built-in nodes without losing custom nodes", () => {
+test("an existing editable structure is preserved without re-inserting preset nodes", () => {
   const result = ensureNomenclatureHierarchy({
     nomenclatureStructure: {
       version: "v209",
@@ -99,8 +99,8 @@ test("existing v209 structure receives new built-in nodes without losing custom 
   const sections = structure.sections as Array<Record<string, unknown>>;
   const subcategories = structure.subcategories as Array<Record<string, unknown>>;
   assert.ok(sections.some((item) => item.id === "custom"));
-  assert.ok(sections.some((item) => item.id === "kitchen"));
-  assert.ok(subcategories.some((item) => item.id === "canned"));
+  assert.ok(!sections.some((item) => item.id === "kitchen"));
+  assert.equal(subcategories.length, 0);
 });
 
 test("unknown items are visible in requires distribution instead of being silently guessed", () => {

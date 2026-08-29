@@ -1,0 +1,310 @@
+{
+  "schemaVersion": "bardoctor.currency-relabel-preview.v1",
+  "createdAt": "2026-08-28T00:00:00.000Z",
+  "mode": "read_only",
+  "scope": {
+    "venueId": 1,
+    "dataAccountId": 1,
+    "venue": "Кёльн"
+  },
+  "authoritativeBusinessMeaning": {
+    "accountingCurrency": "PMR_RUB",
+    "legacyLabels": [
+      "RUB",
+      "MDL"
+    ],
+    "operation": "currency_label_correction",
+    "fxAllowed": false,
+    "numericAmountsMayChange": false
+  },
+  "source": {
+    "exportId": "bdx_5093fecafdf522f4134a79a8",
+    "stableChecksum": "5093fecafdf522f4134a79a821d74c92483566f47883bdb92c4d58685e430bb1",
+    "productionReader": "Sites live D1 read-only connector",
+    "writesPerformed": 0
+  },
+  "simpleUiScenario": {
+    "sufficient": false,
+    "reasons": [
+      "The venue profile API blocks an accounting-currency change when financial history exists.",
+      "A confirmed purchase update does not relabel its linked payment.",
+      "If only White Stork is changed to PMR_RUB, the PMR accounting engine excludes the still-MDL payment and computes paidAmount=0 and balanceDue=361.",
+      "Legacy RUB remains ISO Russian RUB in implementation semantics; switching the venue to PMR_RUB makes unrelabelled RUB records foreign and unresolved.",
+      "Historical currency labels are also stored in stock movements, assortment valuation metadata, supplier metadata, menu prices and price history."
+    ]
+  },
+  "confirmedMdlRecords": [
+    {
+      "recordId": "b54e2f38-a4df-49b0-8510-12904fbe183e",
+      "domain": "purchase",
+      "amount": 361,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 361,
+      "amountAfter": 361,
+      "dependentRecords": [
+        "purchase-payment:b54e2f38-a4df-49b0-8510-12904fbe183e",
+        "1b8c1746-35de-4729-a5c5-dac69c0b1d0d",
+        "fa7bded3-8aa3-475d-bc82-373477ed1c3c",
+        "stock:коньяк белый аист|ml"
+      ]
+    },
+    {
+      "recordId": "purchase-payment:b54e2f38-a4df-49b0-8510-12904fbe183e",
+      "domain": "supplier_payment",
+      "amount": 361,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 361,
+      "amountAfter": 361,
+      "dependentRecords": [
+        "b54e2f38-a4df-49b0-8510-12904fbe183e"
+      ]
+    },
+    {
+      "recordId": "1b8c1746-35de-4729-a5c5-dac69c0b1d0d",
+      "domain": "active_stock_receipt",
+      "amount": 361,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 361,
+      "amountAfter": 361,
+      "dependentRecords": [
+        "stock:коньяк белый аист|ml"
+      ]
+    },
+    {
+      "recordId": "fa7bded3-8aa3-475d-bc82-373477ed1c3c",
+      "domain": "cancelled_stock_receipt_history",
+      "amount": 361,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 361,
+      "amountAfter": 361,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "stock:коньяк белый аист|ml",
+      "domain": "stock_balance",
+      "amount": 0,
+      "currentCurrency": "RUB; lastTransactionCurrency=MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 0,
+      "amountAfter": 361,
+      "dependentRecords": [
+        "warehouse_valuation",
+        "cogs"
+      ],
+      "note": "The 361 inventory value becomes available from the unchanged receipt cost; this is valuation recovery, not an amount or FX change."
+    },
+    {
+      "recordId": "stock:коньяк белый аист|ml",
+      "domain": "nomenclature_valuation_metadata",
+      "amount": 120.33,
+      "currentCurrency": "RUB; lastTransactionCurrency=MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 120.33,
+      "amountAfter": 120.33,
+      "dependentRecords": [
+        "stock:коньяк белый аист|ml"
+      ]
+    },
+    {
+      "recordId": "supplier-item:1:806ed11a-ea40-448c-8828-bcbb208bb17a:name:коньяк белый аист|ml",
+      "domain": "supplier_product_mapping",
+      "amount": 120.33,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 120.33,
+      "amountAfter": 120.33,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "supplier-item:1:aaf270dd-75cc-4347-be82-a782bd1e7bec:name:коньяк белый аист|ml",
+      "domain": "supplier_product_mapping",
+      "amount": 120.33,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 120.33,
+      "amountAfter": 120.33,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "aaf270dd-75cc-4347-be82-a782bd1e7bec",
+      "domain": "supplier_default_currency",
+      "amount": null,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": null,
+      "amountAfter": null,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "806ed11a-ea40-448c-8828-bcbb208bb17a",
+      "domain": "supplier_default_currency",
+      "amount": null,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": null,
+      "amountAfter": null,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "76008781-38a7-4afe-a87a-bd4c4f38ee1b",
+      "domain": "menu_item",
+      "amount": 95,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 95,
+      "amountAfter": 95,
+      "dependentRecords": []
+    },
+    {
+      "recordId": "d2e778b2-fe1f-437d-a4db-406d754d800b",
+      "domain": "menu_item",
+      "amount": 95,
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": 95,
+      "amountAfter": 95,
+      "dependentRecords": [
+        "e6057837-2d33-4be5-9b34-641a979775a6"
+      ]
+    },
+    {
+      "recordId": "e6057837-2d33-4be5-9b34-641a979775a6",
+      "domain": "menu_price_history",
+      "amount": {
+        "oldPrice": 45,
+        "newPrice": 95
+      },
+      "currentCurrency": "MDL",
+      "proposedCurrency": "PMR_RUB",
+      "amountBefore": {
+        "oldPrice": 45,
+        "newPrice": 95
+      },
+      "amountAfter": {
+        "oldPrice": 45,
+        "newPrice": 95
+      },
+      "dependentRecords": []
+    }
+  ],
+  "confirmedMdlRecordCount": 13,
+  "legacyRubSemantics": {
+    "implementationMeaning": "ISO Russian RUB",
+    "safeAccountLevelAlias": false,
+    "purchaseDocumentsToRelabel": 25,
+    "reason": "RUB and PMR_RUB are distinct canonical codes and the accounting engine treats them as different currencies."
+  },
+  "currencyCopiesInAuthoritativeExport": {
+    "purchaseDocuments": 26,
+    "stockMovements": 171,
+    "menuItems": 184,
+    "menuPriceHistory": 1,
+    "nomenclatureRecordsWithCurrency": 112,
+    "stockBalancesWithCurrency": 112,
+    "supplierProductMappingsWithCurrency": 2,
+    "suppliers": 5,
+    "linkedWhiteStorkPaymentConfirmedSeparately": 1
+  },
+  "beforeAfter": {
+    "purchaseAccountingTotal": {
+      "before": {
+        "included": 32519.25,
+        "currency": "RUB",
+        "excluded": 361,
+        "excludedCurrency": "MDL"
+      },
+      "after": {
+        "included": 32880.25,
+        "currency": "PMR_RUB",
+        "excluded": 0
+      }
+    },
+    "whiteStork": {
+      "purchaseTotal": {
+        "before": 361,
+        "after": 361
+      },
+      "payment": {
+        "before": 361,
+        "after": 361
+      },
+      "supplierDebt": {
+        "before": 0,
+        "after": 0
+      },
+      "stockQuantityMl": {
+        "before": 3000,
+        "after": 3000
+      },
+      "inventoryValue": {
+        "before": 0,
+        "after": 361
+      },
+      "averageUnitCostPerMl": {
+        "before": 0,
+        "after": 0.120333
+      }
+    },
+    "warehouseValuation": {
+      "before": 28636.67,
+      "after": 28997.67,
+      "delta": 361,
+      "reason": "White Stork's existing 361 receipt cost becomes valued in PMR_RUB."
+    },
+    "supplierDebt": {
+      "before": 0,
+      "after": 0
+    },
+    "financeDashboardAugust": {
+      "legacyVisibleMixedScalarBefore": 43500,
+      "protectedIncludedBefore": 43139,
+      "protectedExcludedBefore": 361,
+      "after": 43500,
+      "currencyAfter": "PMR_RUB",
+      "derivation": "43139 = prior visible 43500 minus the one confirmed 361 foreign payment; the controlled operation must reproduce this from the untruncated Finance row before writing."
+    },
+    "closedJulyCogs": {
+      "before": 31383.21,
+      "after": 31383.21,
+      "delta": 0
+    }
+  },
+  "minimumControlledOperation": {
+    "required": true,
+    "storageRows": [
+      "accounts.restaurant_json",
+      "domain_data:bd_purchase_documents",
+      "domain_data:bd_finance_expenses",
+      "domain_data:bd_stock_movements",
+      "domain_data:bd_assortment_v1",
+      "domain_data:bd_suppliers"
+    ],
+    "steps": [
+      "Create an immutable before export and verify its checksum.",
+      "Atomically relabel all Köln RUB and MDL monetary currency fields to PMR_RUB without changing numeric amounts.",
+      "Lock same-currency accounting fields for the 26 purchases and their linked payments; do not create FX fields.",
+      "Rebuild White Stork's active receipt valuation from the unchanged 361 line cost and 3000 ml quantity.",
+      "Preserve cancelled/reversed history while correcting its currency labels.",
+      "Reconcile purchases, payments, supplier debt, warehouse valuation, Finance, Dashboard, Reports and AI context, then create an immutable after export."
+    ],
+    "manualDocumentEditingAloneIsInsufficient": true
+  },
+  "nonCurrencyFindingsUnchanged": [
+    {
+      "documentId": "e1707650-e919-4bd0-9447-8286eebe8257",
+      "item": "Апельсины",
+      "status": "SOURCE VERIFICATION REQUIRED"
+    },
+    {
+      "documentId": "5213dae2-5f69-4cc8-aa87-fe4debe2d12b",
+      "item": "Пакетики для чая",
+      "status": "SOURCE VERIFICATION REQUIRED"
+    }
+  ],
+  "writesPerformed": 0,
+  "productionDeploymentPerformed": false
+}

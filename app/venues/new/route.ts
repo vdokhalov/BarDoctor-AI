@@ -84,6 +84,7 @@ const VENUE_CREATE_HTML = `<!doctype html>
             <select name="currency" required>
               <option value="">Выберите валюту</option>
               <option value="MDL">MDL — молдавский лей</option>
+              <option value="PMR_RUB">руб. ПМР — приднестровский рубль</option>
               <option value="RUB">RUB — российский рубль</option>
               <option value="EUR">EUR — евро</option>
               <option value="USD">USD — доллар</option>

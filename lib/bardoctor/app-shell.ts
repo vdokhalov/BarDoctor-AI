@@ -1,4 +1,4 @@
-export const APP_SHELL_VERSION = "20260825-profile-v282";
+export const APP_SHELL_VERSION = "20260828-embedded-back-v331";
 export const CATALOG_ACCOUNTING_VERSION = "20260820-catalog-v208";
 
 /**

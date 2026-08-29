@@ -1,0 +1,69 @@
+{
+  "schemaVersion": "bardoctor.audit-reader-manifest.v1",
+  "createdAt": "2026-08-28T06:06:22.561Z",
+  "mode": "read_only",
+  "scope": {
+    "venueId": 1,
+    "venueName": "Кёльн",
+    "dataAccountId": 1
+  },
+  "writesPerformed": 0,
+  "authoritativeExport": {
+    "exportId": "bdx_5093fecafdf522f4134a79a8",
+    "exportedAt": "2026-08-28T05:03:09.368Z",
+    "stableSnapshotChecksum": "5093fecafdf522f4134a79a821d74c92483566f47883bdb92c4d58685e430bb1",
+    "physicalFileSha256": "02e84482e95876673b9a7598c865cfc5275b6050aa96a4cd8c90059cf95fa73f",
+    "complete": false,
+    "stores": [
+      "bd_assortment_v1",
+      "bd_stock_movements",
+      "bd_purchase_documents",
+      "bd_inventory_snapshots",
+      "bd_suppliers"
+    ]
+  },
+  "productionReader": {
+    "provider": "Sites live D1 read-only connector",
+    "table": "domain_data",
+    "accountRowsObserved": [
+      "bd_employees",
+      "bd_finance_revenue",
+      "bd_finance_expenses",
+      "bd_finance_gap_reasons",
+      "bd_equipment",
+      "bd_equipment_history",
+      "bd_payroll_rules",
+      "bd_cases",
+      "bd_events",
+      "bd_action_plans",
+      "bd_action_tasks",
+      "bd_decisions",
+      "bd_inventory_snapshots",
+      "bd_finance_settings",
+      "bd_payroll_entries",
+      "bd_market_analysis_v1",
+      "bd_month_closings",
+      "bd_opportunity_calendar_v1",
+      "bd_tasks",
+      "bd_ai_diagnosis_v4"
+    ],
+    "rowLimit": 25,
+    "valueProjection": "bounded",
+    "longJsonValuesTruncated": true,
+    "supportsSqlOrSubstringRead": false,
+    "fullPayloadRecovered": false
+  },
+  "rejectedDataset": {
+    "filename": "koln-local-uat-rejected-not-production.json",
+    "sha256": "d84d9651472fd157079c76b6849703a8a547b4e8c623d1f0682683aba1d6723e",
+    "reason": "Local preview D1 contained MDL UAT/Metro fixtures rather than production venue 1 data and was excluded from every reconciliation."
+  },
+  "unavailableAuthoritativeInputs": [
+    "full bd_finance_revenue payload",
+    "full bd_finance_expenses/payment ledger payload",
+    "full bd_payroll_entries payload",
+    "full bd_ai_diagnosis_v4 factor/evidence payload",
+    "untruncated bd_action_plans and bd_action_tasks payloads"
+  ],
+  "conclusion": "PARTIAL_AUTHORITATIVE_INPUT_ONLY"
+}

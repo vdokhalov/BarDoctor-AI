@@ -367,6 +367,25 @@ test("venue filtering prevents mixed-store data from leaking into analytics", ()
   assert.equal(analytics.counts.confirmedPurchases, 1);
 });
 
+test("accounting totals exclude unconverted foreign-currency purchases instead of adding currencies", () => {
+  const analytics = buildProcurementAnalytics({
+    documents: [
+      document({ id: "rub", currency: "RUB", total: 100 }),
+      document({ id: "mdl", currency: "MDL", total: 361 }),
+    ],
+    suppliers: [],
+    period: "2026-08",
+    venueId: 10,
+    accountingCurrency: "RUB",
+    now: new Date("2026-08-12T12:00:00Z"),
+  });
+
+  assert.equal(analytics.kpi.purchaseTotal, 100);
+  assert.equal(analytics.counts.excludedForeignCurrencyPurchases, 1);
+  assert.deepEqual(analytics.integrity.excludedForeignCurrencyDocumentIds, ["mdl"]);
+  assert.deepEqual(analytics.integrity.excludedForeignCurrencyTotals, { MDL: 361 });
+});
+
 test("legacy purchase documents without supplier ids remain attached by exact supplier name", () => {
   const legacy = document({ id: "legacy", supplierId: undefined, supplierName: "Поставщик A" });
   const analytics = buildProcurementAnalytics({

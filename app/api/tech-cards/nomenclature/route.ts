@@ -23,6 +23,7 @@ export async function GET(request: Request): Promise<Response> {
     query: url.searchParams.get("q"),
     cursor: url.searchParams.get("cursor"),
     limit: url.searchParams.get("limit"),
+    includeArchived: url.searchParams.get("includeArchived") === "1",
   });
   return Response.json({ ok: true, venueId: account.venueId, ...page }, {
     headers: { "Cache-Control": "private, no-store" },

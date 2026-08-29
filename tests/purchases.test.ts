@@ -10,6 +10,7 @@ import {
   purchaseAffectsInventory,
   purchaseUnitForPackage,
   purchasePaymentSummary,
+  purchaseCommercialArithmeticIssues,
   supplierDebtSummary,
   withPurchasePaymentSummary,
 } from "../lib/bardoctor/purchases";
@@ -137,6 +138,36 @@ test("purchase requires complete item lines and classifies mixed content per ite
       { name: "Кофе", quantity: 2, lineTotal: 300, category: "food" },
     ],
   }), true);
+});
+
+test("purchase posting arithmetic accepts decimal quantities and blocks contradictory totals", () => {
+  const safe = purchaseCommercialArithmeticIssues({
+    documentType: "invoice",
+    total: "550,00",
+    items: [{ id: "tobacco", name: "Премиум табак", quantity: "0,15", unitPrice: "3666,67", lineTotal: "550,00" }],
+  });
+  assert.deepEqual(safe, []);
+
+  const unsafe = purchaseCommercialArithmeticIssues({
+    documentType: "invoice",
+    total: 60,
+    items: [{ id: "tea-bags", name: "Пакетики для чая", quantity: 100, unitPrice: 0.5, lineTotal: 60 }],
+  });
+  assert.deepEqual(unsafe, [{
+    code: "LINE_ARITHMETIC_MISMATCH",
+    itemId: "tea-bags",
+    itemName: "Пакетики для чая",
+    expected: 50,
+    actual: 60,
+    delta: 10,
+  }]);
+
+  const documentMismatch = purchaseCommercialArithmeticIssues({
+    documentType: "invoice",
+    total: 90,
+    items: [{ id: "coffee", name: "Кофе", quantity: 1, unitPrice: 100, lineTotal: 100 }],
+  });
+  assert.equal(documentMismatch[0]?.code, "DOCUMENT_TOTAL_MISMATCH");
 });
 
 test("service documents become expenses without creating warehouse stock", () => {

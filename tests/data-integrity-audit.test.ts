@@ -93,6 +93,39 @@ test("data-integrity audit resolves historical snapshot aliases without rewritin
   assert.equal(JSON.stringify(snapshot), before);
 });
 
+test("data-integrity audit resolves receipt and supplier mapping aliases without false blockers", () => {
+  const report = auditDataIntegrity({
+    assortment: {
+      nomenclature: [{ productKey: "new", name: "New", venueId: 1 }],
+      stockBalances: [{ productKey: "new", name: "New", current: 1, averageUnitCost: 5, venueId: 1, externalProductKeys: ["external-old"] }],
+      inventoryProductAliases: [{ from: "old", to: "new" }],
+      supplierProductMappings: [{
+        id: "mapping", sourceItemKey: "source", canonicalProductKey: "old", status: "confirmed",
+        supplierName: "Supplier", sourceName: "New", venueId: 1,
+      }],
+      recipes: [], menuItems: [],
+    },
+    purchaseDocuments: [{ id: "purchase", venueId: 1, status: "confirmed", documentType: "invoice" }],
+    stockMovements: [{ id: "receipt", venueId: 1, type: "receipt", status: "active", sourceDocumentId: "purchase", sourceLineId: "line", productKey: "external-old" }],
+    venueId: 1,
+  });
+  const codes = new Set(report.findings.map((item) => item.code));
+  assert.equal(codes.has("SUPPLIER_MAPPING_STALE_OR_ORPHAN"), false);
+  assert.equal(codes.has("PURCHASE_MOVEMENT_CHAIN_BROKEN"), false);
+});
+
+test("data-integrity audit does not require warehouse movements for service purchases", () => {
+  const report = auditDataIntegrity({
+    assortment: { nomenclature: [], stockBalances: [], supplierProductMappings: [], recipes: [], menuItems: [] },
+    purchaseDocuments: [{
+      id: "service", venueId: 1, status: "confirmed", documentType: "invoice",
+      items: [{ name: "Ремонт кофемашины", quantity: 1, lineTotal: 500, category: "repairs", unit: "усл." }],
+    }],
+    stockMovements: [], venueId: 1,
+  });
+  assert.equal(report.findings.some((item) => item.code === "PURCHASE_MOVEMENT_CHAIN_BROKEN"), false);
+});
+
 test("data-integrity audit reports broken structured write-off chains and missing cost", () => {
   const report = auditDataIntegrity({
     assortment: { stockBalances: [{ productKey: "known", name: "Лимон", unit: "g", current: 10, averageUnitCost: 1 }] },

@@ -1,5 +1,6 @@
 export const ACCOUNTING_CURRENCIES = [
   "MDL",
+  "PMR_RUB",
   "RUB",
   "EUR",
   "USD",
@@ -8,6 +9,16 @@ export const ACCOUNTING_CURRENCIES = [
 ] as const;
 
 export type AccountingCurrency = (typeof ACCOUNTING_CURRENCIES)[number];
+
+export const ACCOUNTING_CURRENCY_LABELS: Record<AccountingCurrency, string> = {
+  MDL: "MDL",
+  PMR_RUB: "руб. ПМР",
+  RUB: "RUB (российский рубль)",
+  EUR: "EUR",
+  USD: "USD",
+  UAH: "UAH",
+  RON: "RON",
+};
 
 const ACCOUNTING_CURRENCY_SET = new Set<string>(ACCOUNTING_CURRENCIES);
 
@@ -19,6 +30,11 @@ export function normalizeAccountingCurrency(value: unknown): AccountingCurrency 
 
 export function isAccountingCurrency(value: unknown): value is AccountingCurrency {
   return normalizeAccountingCurrency(value) !== null;
+}
+
+export function accountingCurrencyLabel(value: unknown): string {
+  const currency = normalizeAccountingCurrency(value);
+  return currency ? ACCOUNTING_CURRENCY_LABELS[currency] : "";
 }
 
 export function accountingCurrencyFromProfile(value: unknown): AccountingCurrency | null {

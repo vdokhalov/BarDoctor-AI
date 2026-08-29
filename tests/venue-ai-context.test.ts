@@ -158,6 +158,53 @@ test("diagnosis context covers every requested management direction without send
   assert.equal((context.promptData.salesAndCost.closedMonthProfitability as Record<string, unknown>).costOfGoods, 70_000);
 });
 
+test("current finance period follows Europe/Chisinau rather than UTC at midnight", () => {
+  const context = buildVenueAIContextFromSources("diagnosis", {
+    accountProfile: { name: "Кёльн", timezone: "Europe/Chisinau", currency: "PMR_RUB" },
+    now: new Date("2026-08-31T21:30:00.000Z"),
+    stores: new Map([
+      ["bd_finance_revenue", stored([
+        { date: "2026-08-31", revenue: 100 },
+        { date: "2026-09-01", revenue: 200 },
+      ])],
+    ]),
+  });
+  const finance = context.promptData.performanceHistory as Record<string, unknown>;
+  const period = finance.period as Record<string, unknown>;
+  assert.equal(period.monthKey, "2026-09");
+  assert.equal(period.endDate, "2026-09-01");
+});
+
+test("current open month aggregates authoritative revenue and expenses without a closed month", () => {
+  const context = buildVenueAIContextFromSources("diagnosis", {
+    accountProfile: { name: "Кёльн", timezone: "Europe/Chisinau", accountingCurrency: "PMR_RUB" },
+    now: new Date("2026-08-28T12:00:00.000Z"),
+    stores: new Map([
+      ["bd_finance_revenue", stored([
+        { date: "2026-07-28", revenue: 9_999, receipts: 99 },
+        { date: "2026-08-01", revenue: 1_000, receipts: 10, payrollBreakdown: { total: 200 } },
+        { date: "2026-08-28", revenue: 2_000, receipts: 20 },
+      ], "2026-08-28T10:00:00.000Z")],
+      ["bd_finance_expenses", stored([
+        { date: "2026-07-28", accountingMonth: "2026-07", accountingAmount: 4_000, status: "posted" },
+        { date: "2026-08-02", accountingMonth: "2026-08", accountingAmount: 500, status: "posted" },
+        { date: "2026-08-28", accountingMonth: "2026-08", accountingAmount: 700, status: "posted" },
+        { date: "2026-08-28", accountingMonth: "2026-08", accountingAmount: 8_000, status: "cancelled" },
+      ], "2026-08-28T11:00:00.000Z")],
+    ]),
+  });
+  const performance = context.promptData.performanceHistory as Record<string, unknown>;
+  const period = performance.period as Record<string, unknown>;
+
+  assert.equal(period.monthKey, "2026-08");
+  assert.equal(period.revenue, 3_000);
+  assert.equal(period.payroll, 200);
+  assert.equal(period.expenses, 1_400);
+  assert.equal(period.result, 1_600);
+  assert.equal(period.sampleSize, 2);
+  assert.equal(period.updatedAt, "2026-08-28T11:00:00.000Z");
+});
+
 test("each AI purpose receives only its relevant slice", () => {
   const context = buildVenueAIContextFromSources("incident", {
     accountProfile: { name: "Кёльн", businessType: "Бар", openTime: "22:00", closeTime: "06:00" },

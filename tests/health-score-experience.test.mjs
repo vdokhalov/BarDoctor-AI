@@ -11,11 +11,11 @@ async function freshRuntime(label) {
   return globalThis.bdHealthScoreExperience;
 }
 
-test("Health Score runtime exposes the v155 startup state machine", () => {
-  assert.equal(model.version, "health-score-v155");
+test("Health Score runtime exposes the v332 canonical startup state machine", () => {
+  assert.equal(model.version, "health-score-v332");
 });
 
-test("Home keeps a prominent Health Index card before the financial result", async () => {
+test("Home keeps the compact canonical Business Health card before the financial result", async () => {
   const [bundle, css] = await Promise.all([
     readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8"),
     readFile(new URL("../public/health-score-experience-v152.css", import.meta.url), "utf8"),
@@ -23,27 +23,64 @@ test("Home keeps a prominent Health Index card before the financial result", asy
   const homeStart = bundle.indexOf("function bdHomeDaily(");
   const homeEnd = bundle.indexOf("function Dce()", homeStart);
   const home = bundle.slice(homeStart, homeEnd);
+  const cardStart = bundle.indexOf("function bdHomeHealthIndexV200");
+  const card = bundle.slice(cardStart, homeStart);
 
   assert.match(bundle, /bdHomeHealthIndexVersion="home-health-v200"/);
   assert.match(bundle, /bdOwnerUATFixesV286="owner-uat-v286"/);
   assert.match(bundle, /function bdHealthShiftCoverage\(e,t,n=new Date\).*trackingStartDate.*for\(const f of t\)/s);
-  assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v284/);
-  assert.doesNotMatch(bundle, /"aria-busy":!e/);
-  assert.match(bundle, /a===null\?"Business Health: недостаточно данных/);
-  assert.match(bundle, /y=!e\?"Нет диагностики"/);
-  assert.match(bundle, /Диагностика ещё не запускалась\. Нажмите, чтобы проверить заведение/);
-  assert.doesNotMatch(bundle, /Business Health загружается/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v334/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-v334-loading/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-v334-unavailable/);
   assert.match(bundle, /"data-bd-health-snapshot-id":e\?\.snapshotId/);
-  assert.match(bundle, /Достоверность диагноза/);
   assert.match(bundle, /children:"Business Health"/);
+  assert.match(card, /children:u\.hasIssue\?"Главный приоритет":"Состояние"/);
+  assert.match(bundle, /bdHealthHomeZonesV332\(e\).*"Финансы".*"Спрос".*"Операции".*"Данные"/s);
+  assert.match(card, /bdHealthLivePeriodV334\(e\)/);
+  assert.doesNotMatch(card, /Достоверность диагноза|confidence/i);
   assert.ok(home.indexOf("i.jsx(bdHomeHealthIndexV200") < home.indexOf("i.jsx(bdHomeMoneyCard"));
-  assert.match(css, /\.bd-home-health-index\s*\{/);
-  assert.match(css, /grid-template-columns:\s*100px minmax\(0, 1fr\) 24px/);
-  assert.match(css, /@media \(max-width: 390px\)/);
+  assert.match(css, /\.bd-home-health-card-v332\s*\{/);
+  assert.match(css, /\.bd-home-health-zones-v332\s*\{/);
+  assert.match(css, /grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.doesNotMatch(card, /bd-home-health-zone-track-v332/, "Home zones stay compact without progress bars");
+  assert.match(card, /children:u\.hasIssue\?"Главный приоритет":"Состояние"/);
+  assert.match(bundle, /target:l\?\.target&&l\.target\.path/);
+  assert.match(css, /\.bd-home-health-priority-body-v332\s*\{[^}]*min-height:\s*42px/s);
+  assert.match(css, /\.bd-home-health-priority-action-v332\s*\{/);
+  assert.match(css, /\.bd-home-health-card-v332\.is-loading\s*\{[^}]*min-height:\s*226px/s);
+  assert.match(css, /@media \(max-width: 374px\)/);
   assert.match(css, /@media \(min-width: 1024px\)/);
-  assert.match(css, /\.bd-home-health-index\s*\{[^}]*grid-column:\s*1 !important/s);
+  assert.match(css, /\.bd-home-daily > \.bd-home-health-card-v332\s*\{[^}]*grid-column:\s*1 !important/s);
   assert.match(css, /\.bd-home-daily > \.bd-home-money\s*\{[^}]*grid-column:\s*2 !important/s);
   assert.match(css, /touch-action:\s*manipulation/);
+});
+
+test("Business Health presents every supported state without inventing an action or trend", async () => {
+  const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
+  const statusStart = bundle.indexOf("function bdHealthUiStatusV332");
+  const statusEnd = bundle.indexOf("function bdHealthLivePeriodV334", statusStart);
+  const status = bundle.slice(statusStart, statusEnd);
+  const priorityStart = bundle.indexOf("function bdHealthPriorityV332");
+  const priorityEnd = bundle.indexOf("function bdHealthZoneV332", priorityStart);
+  const priority = bundle.slice(priorityStart, priorityEnd);
+
+  assert.match(status, /e<45.*critical.*e<=70.*attention/s);
+  assert.match(status, /Требует внимания.*внимание/s);
+  assert.match(status, /Хорошее состояние.*хорошо/s);
+  assert.match(status, /Недостаточно данных.*нет данных/s);
+  assert.match(priority, /Всё под контролем/);
+  assert.match(priority, /Подробнее о состоянии/);
+  assert.match(priority, /Текущий анализ ограничен/);
+  assert.match(priority, /1 зона требует внимания/);
+  assert.match(bundle, /const t=e\?\.trend;if\(!t\|\|Number\(t\.periodDays\)!==7/);
+  assert.match(bundle, /current_mtd_vs_previous_mtd|livePeriod/);
+  assert.doesNotMatch(bundle, /Текущий анализ формируется/);
+  assert.match(bundle, /fetch\("\/api\/business-health"/);
+  assert.match(bundle, /n\.calculationVersion!==bdBusinessHealthCalculationVersionV284\|\|!n\.livePeriod/);
+  const detail = bundle.slice(bundle.indexOf("function bdHealthDetailPriorityV332"), bundle.indexOf("function Ln("));
+  assert.match(detail, /r\.path&&r\.path!=="\/health"/);
+  assert.doesNotMatch(detail, /children:\["Подробнее о состоянии"/);
+  assert.doesNotMatch(bundle.slice(bundle.indexOf("function c_e(){"), bundle.indexOf("function Ln(")), /bd-health-tabs-v332|Открыть раздел/);
 });
 
 test("daily history remains available for trend data but does not gate session startup", () => {
@@ -65,7 +102,7 @@ test("daily history remains available for trend data but does not gate session s
   assert.equal(repeat.show, false);
 });
 
-test("new session follows Splash -> rendered Health Entry -> Home", async () => {
+test("new session follows branding Splash -> server bootstrap -> Home", async () => {
   const runtime = await freshRuntime("startup-success");
   assert.equal(runtime.getLaunchStatus(), "new");
   assert.equal(runtime.beginLaunch(), true);
@@ -91,20 +128,15 @@ test("new session follows Splash -> rendered Health Entry -> Home", async () => 
     cloudReady: true,
     score: 63,
   });
-  assert.equal(ready.next, "HEALTH_ENTRY");
-  assert.equal(runtime.transitionStartup("SPLASH_LOADING", "HEALTH_READY"), "HEALTH_ENTRY");
-  assert.equal(runtime.getStartupSnapshot().entryRendered, false, "flag is not set before render");
+  assert.deepEqual(ready, { next: "HOME", reason: "server-bootstrap-ready" });
+  assert.equal(runtime.transitionStartup("SPLASH_LOADING", "HEALTH_READY"), "HOME");
+  assert.equal(runtime.getStartupSnapshot().entryRendered, false);
 
-  runtime.markEntryRendered({ score: 63 });
-  assert.equal(runtime.getLaunchStatus(), "shown");
-  assert.equal(runtime.getStartupSnapshot().phase, "HEALTH_ENTRY");
-  assert.equal(runtime.getStartupSnapshot().entryRendered, true);
-
-  runtime.completeLaunch("timer");
-  assert.equal(runtime.transitionStartup("HEALTH_ENTRY", "ENTRY_FINISHED"), "HOME");
+  runtime.completeLaunch("server-bootstrap-ready");
   assert.equal(runtime.getLaunchStatus(), "complete");
   assert.equal(runtime.getStartupSnapshot().phase, "HOME");
-  assert.equal(runtime.beginLaunch(), false, "Home -> another route -> Home cannot restart Entry");
+  assert.equal(runtime.getStartupSnapshot().entryRendered, false, "splash never renders Health score");
+  assert.equal(runtime.beginLaunch(), false, "Home -> another route -> Home cannot restart splash");
 });
 
 test("a local score cannot bypass the server-authoritative startup snapshot", async () => {
@@ -121,22 +153,21 @@ test("a local score cannot bypass the server-authoritative startup snapshot", as
   });
   assert.deepEqual(decision, {
     next: "HOME",
-    reason: "health-data-timeout-no-usable-score",
+    reason: "server-bootstrap-timeout",
     fallback: true,
   });
   assert.equal(runtime.getLaunchStatus(), "pending");
 });
 
-test("Skip completes only after Entry has rendered and prevents an internal-route replay", async () => {
-  const runtime = await freshRuntime("startup-skip");
+test("branding splash completion prevents an internal-route replay", async () => {
+  const runtime = await freshRuntime("startup-complete");
   runtime.beginLaunch();
   assert.equal(runtime.getStartupSnapshot().entryRendered, false);
-  runtime.markEntryRendered({ score: 63 });
-  runtime.completeLaunch("skip");
+  runtime.completeLaunch("server-bootstrap-ready");
   const snapshot = runtime.getStartupSnapshot();
   assert.equal(snapshot.phase, "HOME");
-  assert.equal(snapshot.entryRendered, true);
-  assert.equal(snapshot.diagnostics.at(-1).details.reason, "skip");
+  assert.equal(snapshot.entryRendered, false);
+  assert.equal(snapshot.diagnostics.at(-1).details.reason, "server-bootstrap-ready");
   assert.equal(runtime.beginLaunch(), false);
 });
 
@@ -154,7 +185,7 @@ test("health data error or timeout without usable data falls back to Home with a
   });
   assert.deepEqual(decision, {
     next: "HOME",
-    reason: "health-data-timeout-no-usable-score",
+    reason: "server-bootstrap-timeout",
     fallback: true,
   });
   runtime.fallbackLaunch(decision.reason, { cloudReady: false });
@@ -251,7 +282,7 @@ test("main factor is selected from existing diagnostic domains", () => {
   }), { id: "finance", label: "Финансы", score: 48 });
 });
 
-test("production artifact has one startup owner and cannot complete before Entry render", async () => {
+test("production artifact has one score-free startup owner and server-authoritative Health", async () => {
   const [bundle, css, runtime, response, manifest] = await Promise.all([
     readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8"),
     readFile(new URL("../public/health-score-experience-v152.css", import.meta.url), "utf8"),
@@ -261,8 +292,8 @@ test("production artifact has one startup owner and cannot complete before Entry
   ]);
   assert.doesNotThrow(() => parse(runtime, { ecmaVersion: "latest", sourceType: "script" }));
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
-  assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v155"/);
-  assert.match(bundle, /data-bd-health-entry":"v284/);
+  assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v334"/);
+  assert.match(bundle, /data-bd-splash":"brand-loading-v332/);
   assert.match(bundle, /data-bd-health-score-resting":"v153/);
   assert.match(bundle, /Pt\("bd_health_score_experience_v152"\)/);
   assert.match(bundle, /onClick:\(\)=>t\("\/health"\)/);
@@ -271,19 +302,18 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.match(bundle, /source:"server_business_intelligence"/);
   assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\)/);
   assert.match(bundle, /i\.jsx\(bdHealthStartupGateV155,\{children:i\.jsxs\(bse/);
-  assert.match(bundle, /"data-bd-health-startup-machine":"v284"/);
+  assert.match(bundle, /"data-bd-health-startup-machine":"v335"/);
   assert.match(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
-  assert.match(bundle, /q\?"SPLASH_LOADING":"HOME"/);
-  assert.match(bundle, /R\.next==="HEALTH_ENTRY"/);
-  assert.match(bundle, /U\("HEALTH_ENTRY"\)/);
-  assert.match(bundle, /bdHealthLaunchRenderedV155\(\{score:s,venueName:t\|\|"",confidence:u,snapshotId:e\?\.snapshotId,calculationVersion:e\?\.calculationVersion,period:e\?\.period\?\.id\}\)/);
-  assert.match(bundle, /bdHealthLaunchCompleteV155\(R\|\|"entry-finished"\),U\("HOME"\)/);
-  assert.match(bundle, /bdHealthLaunchFallbackV155\(R\.reason,\{score:E,venueReady:n,hasProfile:!!t,cloudReady:r,timeoutMs:5200\}\)/);
+  assert.match(bundle, /\?"SPLASH_LOADING":"HOME"/);
+  assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdHealthStartupGateV155")), /bdHealthLaunchRenderedV155|HEALTH_ENTRY/);
+  assert.match(bundle, /bdHealthLaunchCompleteV155\("server-bootstrap-ready"\)/);
+  assert.match(bundle, /bdHealthLaunchFallbackV155\("server-bootstrap-timeout",\{score:null,venueReady:n,hasProfile:!!t,cloudReady:r,timeoutMs:5200\}\)/);
   assert.doesNotMatch(runtime, /cached-health-score-ready/);
-  assert.match(bundle, /health-data-timeout-no-usable-score/);
-  assert.match(bundle, /setTimeout\(\(\)=>I\(!0\),2700\)/);
-  assert.match(bundle, /setTimeout\(\(\)=>F\(!0\),5200\)/);
-  assert.match(bundle, /B==="\/"\?Cle\(\):B/);
+  assert.match(runtime, /server-bootstrap-timeout/);
+  assert.match(bundle, /setTimeout\(\(\)=>U\(!0\),900\)/);
+  assert.match(bundle, /setTimeout\(\(\)=>I\(!0\),5200\)/);
+  assert.match(bundle, /window\.location\.pathname/);
+  assert.match(bundle, /===\"\/\"\?Cle\(\)/);
   assert.match(bundle, /window\.history\.replaceState\(window\.history\.state,"","\/home"\)/);
   assert.doesNotMatch(
     bundle,
@@ -301,10 +331,11 @@ test("production artifact has one startup owner and cannot complete before Entry
   const coordinatorEnd = bundle.indexOf("function cEe(){", coordinatorStart);
   const coordinator = bundle.slice(coordinatorStart, coordinatorEnd);
   assert.match(coordinator, /bdUseBusinessHealthSnapshotV284\(\)/);
-  assert.match(coordinator, /snapshot:j,diagnosis:v/);
-  assert.match(coordinator, /r&&!!j/);
+  assert.match(coordinator, /snapshot:j/);
+  assert.match(coordinator, /n&&!!t&&r/);
   assert.doesNotMatch(coordinator, /zC\(/);
   assert.doesNotMatch(coordinator, /bdHealthScoreValueV153/);
+  assert.doesNotMatch(coordinator, /bdHealthScoreEntryV153|HEALTH_ENTRY|confidence/);
   assert.doesNotMatch(coordinator, /lastDailyDate|first-daily-entry|bdHealthExperienceReadV153/);
 
   const sharedStoreStart = bundle.indexOf("const bdBusinessHealthSnapshotClientVersionV284");
@@ -319,8 +350,9 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.doesNotMatch(sharedStore, /Number\(d\?\.score\)/, "null must never be coerced to zero while ranking factors");
 
   assert.doesNotMatch(homeSource, /fetch\("\/api\/ai\/diagnosis"/, "Home navigation does not request a second diagnosis");
-  assert.match(homeSource, /bdCanonicalSnapshot=g/, "Home renders the shared snapshot without clearing it to loading");
-  assert.doesNotMatch(homeSource, /bdHomeCloudReady\?g:null/);
+  assert.match(bundle, /fetch\("\/api\/business-health"/, "Home uses the deterministic canonical Health endpoint");
+  assert.match(homeSource, /bdCanonicalSnapshot=bdHomeCloudReady\?g:null/, "Home waits for the authoritative server bootstrap");
+  assert.match(homeSource, /bdHealthLoading=!bdHomeCloudReady\|\|!g&&bdLiveHealthStatus!=="error"/);
   assert.match(bundle, /bdBusinessHealthCommitEnvelopeV284\(n,!0\),bdPersistDiagnosisV294\(n\)/, "refresh commits atomically before authoritative persistence");
 
   const splashStart = bundle.indexOf("function _le(){");
@@ -328,6 +360,7 @@ test("production artifact has one startup owner and cannot complete before Entry
   const rootSplash = bundle.slice(splashStart, splashEnd);
   assert.match(rootSplash, /setTimeout\(\(\)=>n\(!0\),2700\)/);
   assert.doesNotMatch(rootSplash, /Ai\(|HealthLaunch|5200/);
+  assert.doesNotMatch(rootSplash, /\/100|confidence|Диагноз/);
 
   assert.match(bundle, /onPointerUp:/);
   assert.match(bundle, /pointerType==="touch"/);
@@ -337,8 +370,8 @@ test("production artifact has one startup owner and cannot complete before Entry
   assert.match(css, /prefers-reduced-motion:\s*reduce/);
   assert.match(css, /\.bd-health-startup-home\.is-concealed\s*\{[^}]*visibility:\s*hidden/s);
   assert.match(css, /touch-action:\s*manipulation/);
-  assert.match(response, /health-score-experience-v152\.css\?v=20260815-home-health-v200/);
-  assert.match(response, /health-score-experience\.js\?v=20260811-health-v155/);
+  assert.match(response, /health-score-experience-v152\.css\?v=20260828-business-health-canonical-v335/);
+  assert.match(response, /health-score-experience\.js\?v=20260828-health-startup-v332/);
   assert.match(response, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   assert.match(manifest, /start_url:\s*"\/home\?source=pwa"/);
 });

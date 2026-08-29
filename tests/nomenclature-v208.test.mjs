@@ -48,7 +48,7 @@ test("nomenclature exposes one explicit hierarchy, a consistent attention queue 
   assert.match(bundle, /function bdNomenclatureDefaultStructure/);
   assert.match(bundle, /function bdNomenclatureStructureView/);
   assert.match(bundle, /function bdNomenclatureNeedsAttention/);
-  assert.match(bundle, /action:"classify"/);
+  assert.doesNotMatch(bundle, /action:"classify"/);
   assert.match(bundle, /headers:\{"Content-Type":"application\/json",\.\.\.ca\(Ot\(\)\)\}/);
   assert.match(bundle, /classificationStatus/);
   assert.match(bundle, /Место хранения/);

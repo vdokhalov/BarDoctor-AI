@@ -1,7 +1,7 @@
 (function (root) {
   "use strict";
 
-  var VERSION = "health-score-v155";
+  var VERSION = "health-score-v332";
   var SCORE_CHANGE_THRESHOLD = 4;
   var HISTORY_DAYS = 60;
   var launchStatus = "new";
@@ -226,20 +226,19 @@
     if (!data.launchRequested) return { next: "HOME", reason: "not-a-startup-launch" };
     if (!data.minimumSplashElapsed) return { next: "SPLASH_LOADING", reason: "minimum-splash" };
 
-    var hasUsableScore = finiteScore(data.score) !== null;
     var venueReady = Boolean(data.venueReady && data.hasProfile);
-    var healthReady = venueReady && Boolean(data.cloudReady) && hasUsableScore;
+    var serverReady = venueReady && Boolean(data.cloudReady);
 
-    if (healthReady) {
+    if (serverReady) {
       return {
-        next: "HEALTH_ENTRY",
-        reason: "health-data-synced",
+        next: "HOME",
+        reason: "server-bootstrap-ready",
       };
     }
-    if (!data.timedOut) return { next: "SPLASH_LOADING", reason: "health-data-pending" };
+    if (!data.timedOut) return { next: "SPLASH_LOADING", reason: "server-bootstrap-pending" };
     return {
       next: "HOME",
-      reason: "health-data-timeout-no-usable-score",
+      reason: "server-bootstrap-timeout",
       fallback: true,
     };
   }
@@ -247,7 +246,7 @@
   function transitionStartup(phase, event) {
     var current = String(phase || "SPLASH_LOADING");
     var action = String(event || "");
-    if (current === "SPLASH_LOADING" && action === "HEALTH_READY") return "HEALTH_ENTRY";
+    if (current === "SPLASH_LOADING" && action === "HEALTH_READY") return "HOME";
     if (current === "SPLASH_LOADING" && action === "FALLBACK") return "HOME";
     if (current === "HEALTH_ENTRY" && action === "ENTRY_FINISHED") return "HOME";
     return current;

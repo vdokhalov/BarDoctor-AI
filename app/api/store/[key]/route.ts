@@ -35,6 +35,12 @@ import {
   normalizeMenuItemSaleSizeRecord,
   validateMenuItemSaleSize,
 } from "../../../../lib/bardoctor/menu-sale-size";
+import { normalizeAssortmentMenuCurrencyUpdates } from "../../../../lib/bardoctor/assortment-currency";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import {
+  normalizeVenueCurrencyArrayUpdates,
+  VENUE_CURRENCY_ARRAY_STORE_KEYS,
+} from "../../../../lib/bardoctor/venue-currency-policy";
 
 type RouteContext = { params: Promise<{ key: string }> };
 
@@ -153,8 +159,44 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     ? mergeConcurrentStoreData(body.baseData ?? null, body.data ?? null, before)
     : { data: body.data ?? null, conflicts: 0 };
   let after = merge.data;
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  if (VENUE_CURRENCY_ARRAY_STORE_KEYS.has(key)) {
+    const currencyNormalization = normalizeVenueCurrencyArrayUpdates({
+      before,
+      after,
+      accountingCurrency,
+    });
+    if (currencyNormalization.issues.length) {
+      return Response.json(
+        {
+          ok: false,
+          code: "ACCOUNTING_CURRENCY_REQUIRED",
+          error: "Сначала выберите валюту учёта в профиле заведения.",
+        },
+        { status: 422 },
+      );
+    }
+    after = currencyNormalization.data;
+  }
   let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
+    const currencyNormalization = normalizeAssortmentMenuCurrencyUpdates(
+      before,
+      after,
+      accountingCurrency,
+    );
+    if (currencyNormalization.issues.length) {
+      return Response.json(
+        {
+          ok: false,
+          code: "ACCOUNTING_CURRENCY_REQUIRED",
+          error: "Сначала выберите валюту учёта в профиле заведения.",
+          issues: currencyNormalization.issues.slice(0, 50),
+        },
+        { status: 422 },
+      );
+    }
+    after = currencyNormalization.data;
     if (before != null) {
       const beforeRoot = record(before);
       const afterRoot = { ...record(after) };

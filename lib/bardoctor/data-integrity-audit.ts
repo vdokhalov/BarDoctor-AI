@@ -1,5 +1,6 @@
 import { inventoryPackageAmount, resolveInventoryProductKey, toInventoryBaseAmount } from "./inventory";
 import { auditCanonicalNomenclature, canonicalSupplierMappings } from "./nomenclature-identity";
+import { purchaseAffectsInventory } from "./purchases";
 import { reconcileTechCards, validateTechCardVenueIsolation } from "./tech-card-reconciliation";
 import { salesBatches, salesDataQuality } from "./sales-consumption";
 
@@ -94,6 +95,8 @@ export function auditDataIntegrity(input: {
   const mappings = canonicalSupplierMappings(assortment);
   const canonicalKeys = new Set(nomenclature.filter((item) => sameVenue(item, input.venueId)).map(keyOf).filter(Boolean));
   const balanceKeys = new Set(balances.filter((item) => sameVenue(item, input.venueId)).map(keyOf).filter(Boolean));
+  const liveResolvedKeys = new Set([...canonicalKeys, ...balanceKeys]);
+  const resolvedKey = (value: JsonRecord): string => resolveInventoryProductKey(assortment, keyOf(value));
   const purchaseIds = new Set(purchases.filter((item) => sameVenue(item, input.venueId)).map((item) => text(item.id, "", 100)).filter(Boolean));
   const activeReceipts = movements.filter((movement) => sameVenue(movement, input.venueId) && activeMovement(movement) && text(movement.type) === "receipt");
   const activeWriteOffMovements = movements.filter((movement) => sameVenue(movement, input.venueId) && activeMovement(movement) && text(movement.type) === "writeoff");
@@ -144,15 +147,15 @@ export function auditDataIntegrity(input: {
   });
   const confirmedPurchases = purchases.filter((purchase) => sameVenue(purchase, input.venueId)
     && text(purchase.status) === "confirmed" && text(purchase.documentType) !== "price_list");
-  const purchaseWithoutMovement = confirmedPurchases.filter((purchase) =>
+  const purchaseWithoutMovement = confirmedPurchases.filter((purchase) => purchaseAffectsInventory(purchase) &&
     !activeReceipts.some((movement) => text(movement.sourceDocumentId, "", 100) === text(purchase.id, "", 100)))
     .map((purchase) => text(purchase.id, "unknown", 100));
   const orphanMovements = activeReceipts.filter((movement) =>
-    !purchaseIds.has(text(movement.sourceDocumentId, "", 100)) || !balanceKeys.has(keyOf(movement)))
+    !purchaseIds.has(text(movement.sourceDocumentId, "", 100)) || !balanceKeys.has(resolvedKey(movement)))
     .map((movement) => text(movement.id, "unknown", 100));
   const movementIdentity = new Map<string, number>();
   for (const movement of activeReceipts) {
-    const identity = [text(movement.sourceDocumentId), text(movement.sourceLineId), keyOf(movement)].join("|");
+    const identity = [text(movement.sourceDocumentId), text(movement.sourceLineId), resolvedKey(movement)].join("|");
     movementIdentity.set(identity, (movementIdentity.get(identity) ?? 0) + 1);
   }
   const duplicateReceipts = [...movementIdentity].filter(([, count]) => count > 1).map(([identity]) => identity);
@@ -173,7 +176,8 @@ export function auditDataIntegrity(input: {
     .filter((ingredient) => text(ingredient.matchTier) === "high" && !keyOf(ingredient))
     .map((ingredient) => text(ingredient.id, text(ingredient.name, "unknown"), 120));
   const staleMappings = mappings.filter((mapping) => mapping.status === "orphan" || mapping.status === "review"
-    || !canonicalKeys.has(mapping.canonicalProductKey)).map((mapping) => mapping.sourceItemKey);
+    || !liveResolvedKeys.has(resolveInventoryProductKey(assortment, mapping.canonicalProductKey)))
+    .map((mapping) => mapping.sourceItemKey);
   const staleAliases = array(assortment.canonicalProductAliases).map(record).filter((alias) => {
     const from = text(alias.from); const to = text(alias.to);
     return !from || !to || from === to || !canonicalKeys.has(to);

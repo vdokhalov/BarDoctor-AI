@@ -194,6 +194,11 @@
   function navigateBack(config) {
     var embeddedFrame = document.querySelector("main[data-bd-app-main] > iframe");
     var embeddedParent = null;
+    if (embeddedFrame && embeddedFrame.contentWindow) {
+      try {
+        if (typeof embeddedFrame.contentWindow.bdHandleEmbeddedBack === "function" && embeddedFrame.contentWindow.bdHandleEmbeddedBack()) return;
+      } catch { /* Cross-origin or unavailable embedded state falls through to the canonical route parent. */ }
+    }
     if (embeddedFrame && config.parent) {
       try {
         var parentUrl = new URL(config.parent, window.location.href);

@@ -161,18 +161,38 @@ function text(value: unknown, fallback = "", max = 400): string {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
 }
 
-function numeric(value: unknown, fallback = 0): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value !== "string") return fallback;
-  const compact = value.trim().replace(/\s+/g, "");
-  if (!compact) return fallback;
-  const normalized = compact.includes(",") && compact.includes(".")
+export function normalizeInvoiceNumericToken(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value !== "string") return "";
+  const compact = value.trim().replace(/[\s\u00a0\u202f]+/g, "").replace(/[^0-9+.,-]/g, "");
+  if (!compact) return "";
+  return compact.includes(",") && compact.includes(".")
     ? compact.lastIndexOf(",") > compact.lastIndexOf(".")
       ? compact.replace(/\./g, "").replace(",", ".")
       : compact.replace(/,/g, "")
     : compact.replace(",", ".");
-  const parsed = Number(normalized.replace(/[^0-9+.-]/g, ""));
+}
+
+function numeric(value: unknown, fallback = 0): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(normalizeInvoiceNumericToken(value));
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function currency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+export function invoiceCommercialArithmeticIsValid(
+  quantityValue: unknown,
+  unitPriceValue: unknown,
+  lineTotalValue: unknown,
+): boolean {
+  const quantity = numeric(quantityValue);
+  const unitPrice = numeric(unitPriceValue);
+  const lineTotal = numeric(lineTotalValue);
+  if (quantity <= 0 || unitPrice <= 0 || lineTotal <= 0) return false;
+  return Math.abs(currency(quantity * unitPrice) - currency(lineTotal)) <= 0.011;
 }
 
 export function invoiceRecognitionMode(environment: Record<string, unknown>): InvoiceRecognitionMode {
@@ -286,7 +306,9 @@ export function mergeShadowMappingMetadata(
       mappingSource: shadow.mappingSource,
       confidenceLevel: shadow.confidenceLevel,
       mappingCandidates: values(shadow.mappingCandidates),
-      requiresReview: shadow.requiresReview === true || shadow.mappingSource === "ai",
+      requiresReview: shadow.requiresReview === true
+        || shadow.mappingSource === "ai"
+        || !invoiceCommercialArithmeticIsValid(legacyItem.quantity, legacyItem.unitPrice, legacyItem.lineTotal),
     };
   });
   return {
@@ -551,16 +573,15 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
     .replace(/(?:^|\s)(кг|г|л|мл|шт|pcs)\s+\1\s+(?=\d)/i, " $1 ")
     .trim();
   const unitBeforeQuantity = cleaned.match(
-    /^(.{2,}?)\s+(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)\s+(\d+(?:[.,]\d+)?)\s+([0-9]+(?:[.,][0-9]+)?)\s+([0-9]+(?:[.,][0-9]+)?)$/i,
+    /^(.{2,}?)\s+(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)$/i,
   );
   const unitBeforeQuantityIsValid = Boolean(unitBeforeQuantity
-    && Math.abs(numeric(unitBeforeQuantity[3]) * numeric(unitBeforeQuantity[4]) - numeric(unitBeforeQuantity[5]))
-      <= Math.max(0.05, numeric(unitBeforeQuantity[5]) * 0.025));
+    && invoiceCommercialArithmeticIsValid(unitBeforeQuantity[3], unitBeforeQuantity[4], unitBeforeQuantity[5]));
   const canonicalOrder = unitBeforeQuantityIsValid && unitBeforeQuantity
     ? `${unitBeforeQuantity[1]} ${unitBeforeQuantity[3]} ${unitBeforeQuantity[2]} ${unitBeforeQuantity[4]} ${unitBeforeQuantity[5]}`
     : cleaned;
   const match = canonicalOrder.match(
-    /^(.{2,}?)\s+(\d+(?:[.,]\d+)?)\s*(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)?\s+(\d+(?:[.,]\d+)?)\s+(\d+(?:[.,]\d+)?)$/i,
+    /^(.{2,}?)\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)\s*(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)?\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)\s+(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)$/i,
   );
   if (!match) return null;
   const rawNameWithUnits = match[1].trim();
@@ -582,7 +603,7 @@ export function parseInvoiceLine(value: unknown, index = 0): ParsedInvoiceLine |
   const unitPrice = numeric(match[4]);
   const lineTotal = numeric(match[5]);
   if (!rawName || quantity <= 0 || (unitPrice <= 0 && lineTotal <= 0)) return null;
-  const arithmetic = Math.abs(quantity * unitPrice - lineTotal) <= Math.max(0.05, lineTotal * 0.025);
+  const arithmetic = invoiceCommercialArithmeticIsValid(quantity, unitPrice, lineTotal);
   const score = arithmetic ? 0.9 : 0.72;
   const packageSemantics = normalizeInvoicePackageSemantics({
     quantity,
@@ -640,11 +661,11 @@ export function parsedInvoiceDocumentFromLegacy(value: unknown): ParsedInvoiceDo
       packageSize: packageSemantics.packageSize,
       supplierArticle: text(item.supplierArticle ?? item.article ?? item.sku, "", 80) || undefined,
       barcode: text(item.barcode, "", 80) || undefined,
-      unitPrice: Math.round(unitPrice * 100) / 100,
-      lineTotal: Math.round(lineTotal * 100) / 100,
+      unitPrice: currency(unitPrice),
+      lineTotal: currency(lineTotal),
       confidence,
       confidenceLevel: confidenceLevel(confidence),
-      requiresReview: false,
+      requiresReview: !invoiceCommercialArithmeticIsValid(quantity, unitPrice, lineTotal),
     };
   }).filter((item): item is ParsedInvoiceLine => Boolean(item));
   const itemTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
@@ -696,15 +717,14 @@ export function structuredRowsFromVerticalTable(rawText: string): string[] {
     const rowNumber = cells[index].match(/^(\d{1,3})[.)]?$/)?.[1];
     if (!rowNumber || /^(?:итого|всего|total)\b/i.test(cells[index])) break;
     const [name, unit, quantityText, priceText, totalText] = cells.slice(index + 1, index + 6);
-    const quantityMatch = quantityText?.match(/^(\d+(?:[.,]\d+)?)\s*(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)?$/i);
+    const quantityMatch = quantityText?.match(/^(\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)\s*(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)?$/i);
     const unitMatch = unit?.match(/^(шт\.?|pcs|ед\.?|уп\.?|бут\.?|л|мл|кг|г)$/i);
-    const priceMatch = priceText?.match(/^\d+(?:[.,]\d+)?$/);
-    const totalMatch = totalText?.match(/^\d+(?:[.,]\d+)?$/);
+    const priceMatch = priceText?.match(/^(?:\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)$/);
+    const totalMatch = totalText?.match(/^(?:\d{1,3}(?:\s+\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)*)$/);
     const quantity = numeric(quantityMatch?.[1]);
     const price = numeric(priceMatch?.[0]);
     const total = numeric(totalMatch?.[0]);
-    const arithmetic = quantity > 0 && price > 0 && total > 0
-      && Math.abs(quantity * price - total) <= Math.max(0.05, total * 0.025);
+    const arithmetic = invoiceCommercialArithmeticIsValid(quantity, price, total);
     if (!name || !/\p{L}/u.test(name) || !unitMatch || !quantityMatch || !priceMatch || !totalMatch || !arithmetic) break;
     rows.push(`${rowNumber} | ${name} | ${unit} | ${quantityText} | ${priceText} | ${totalText}`);
     index += 6;
@@ -985,6 +1005,16 @@ function exactCandidates(line: ParsedInvoiceLine, candidates: NomenclatureCandid
   });
 }
 
+function supplierHistoryNameMatches(mapping: SupplierItemMapping, line: ParsedInvoiceLine): boolean {
+  const mappingName = normalizeInvoiceText(mapping.rawName || mapping.normalizedRawName);
+  const lineName = normalizeInvoiceText(line.rawName || line.normalizedRawName);
+  if (!mappingName || !lineName) return false;
+  if (mappingName === lineName) return true;
+  if (!mappingName.startsWith(`${lineName} `)) return false;
+  const legacyCommercialSuffix = mappingName.slice(lineName.length).trim();
+  return /^(?:kg|кг|g|г|ml|мл|l|л|pcs|шт)\s+\d+(?:\.\d+)?$/.test(legacyCommercialSuffix);
+}
+
 export function matchInvoiceLine(input: {
   line: ParsedInvoiceLine;
   supplierId?: string;
@@ -1015,19 +1045,24 @@ export function matchInvoiceLine(input: {
     )
   ) : undefined;
   const history = historyByIdentifier ?? (input.supplierId ? input.mappings.find((mapping) =>
-    compatibleMapping(mapping) && mapping.normalizedRawName === input.line.normalizedRawName
+    compatibleMapping(mapping) && supplierHistoryNameMatches(mapping, input.line)
   ) : undefined);
   if (history) {
     const candidate = input.nomenclature.find((item) => item.id === history.nomenclatureId || item.key === history.nomenclatureId);
+    const arithmeticValid = invoiceCommercialArithmeticIsValid(
+      input.line.quantity,
+      input.line.unitPrice,
+      input.line.lineTotal,
+    );
     if (candidate && invoiceIdentityConflicts(input.line, candidate).length === 0) return {
       ...input.line,
       nomenclatureName: candidate.name,
       purchaseProductKey: candidate.key,
       nomenclatureId: candidate.id,
       mappingSource: "history",
-      confidence: 1,
-      confidenceLevel: "high",
-      requiresReview: false,
+      confidence: arithmeticValid ? 1 : input.line.confidence,
+      confidenceLevel: arithmeticValid ? "high" : input.line.confidenceLevel,
+      requiresReview: !arithmeticValid,
     };
   }
   const identifierMatches = input.nomenclature.filter((candidate) =>
@@ -1036,6 +1071,11 @@ export function matchInvoiceLine(input: {
   ).filter((candidate) => invoiceIdentityConflicts(input.line, candidate).length === 0);
   if (identifierMatches.length === 1) {
     const candidate = identifierMatches[0];
+    const arithmeticValid = invoiceCommercialArithmeticIsValid(
+      input.line.quantity,
+      input.line.unitPrice,
+      input.line.lineTotal,
+    );
     return {
       ...input.line,
       nomenclatureName: candidate.name,
@@ -1050,15 +1090,20 @@ export function matchInvoiceLine(input: {
         unit: candidate.unit,
         packageSize: candidate.packageSize,
       }],
-      confidence: 1,
-      confidenceLevel: "high",
-      requiresReview: false,
+      confidence: arithmeticValid ? 1 : input.line.confidence,
+      confidenceLevel: arithmeticValid ? "high" : input.line.confidenceLevel,
+      requiresReview: !arithmeticValid,
     };
   }
   const exact = exactCandidates(input.line, input.nomenclature);
   if (exact.length === 1 && input.line.confidence >= 0.55) {
     const candidate = exact[0];
     const strongIdentity = hasStrongInvoiceIdentityEvidence(input.line, candidate);
+    const arithmeticValid = invoiceCommercialArithmeticIsValid(
+      input.line.quantity,
+      input.line.unitPrice,
+      input.line.lineTotal,
+    );
     return {
       ...input.line,
       nomenclatureName: candidate.name,
@@ -1066,290 +1111,4 @@ export function matchInvoiceLine(input: {
       nomenclatureId: candidate.id,
       mappingSource: "exact_alias",
       mappingCandidates: [{
-        id: candidate.id,
-        key: candidate.key,
-        name: candidate.name,
-        score: 1,
-        unit: candidate.unit,
-        packageSize: candidate.packageSize,
-      }],
-      confidence: bounded((input.line.confidence + 1) / 2),
-      confidenceLevel: strongIdentity ? "high" : "medium",
-      requiresReview: !strongIdentity,
-    };
-  }
-  const ranked = input.nomenclature
-    .filter((candidate) => invoiceIdentityConflicts(input.line, candidate).length === 0)
-    .map((candidate) => ({ candidate, score: fuzzyNomenclatureScore(input.line.rawName, candidate) }))
-    .filter((entry) => entry.score >= 0.35)
-    .sort((left, right) => right.score - left.score || left.candidate.name.localeCompare(right.candidate.name, "ru"))
-    .slice(0, 5);
-  const best = ranked[0];
-  const margin = best ? best.score - (ranked[1]?.score ?? 0) : 0;
-  const level = confidenceLevel(best?.score ?? 0, margin);
-  const candidates = ranked.map(({ candidate, score }) => ({
-    id: candidate.id,
-    key: candidate.key,
-    name: candidate.name,
-    score,
-    unit: candidate.unit,
-    packageSize: candidate.packageSize,
-  }));
-  if (best && level === "high" && input.line.confidence >= 0.55 && hasStrongInvoiceIdentityEvidence(input.line, best.candidate)) return {
-    ...input.line,
-    nomenclatureName: best.candidate.name,
-    purchaseProductKey: best.candidate.key,
-    nomenclatureId: best.candidate.id,
-    mappingSource: best.score >= 0.97 ? "exact_alias" : "fuzzy",
-    mappingCandidates: candidates,
-    confidence: bounded((input.line.confidence + best.score) / 2),
-    confidenceLevel: "high",
-    requiresReview: false,
-  };
-  return {
-    ...input.line,
-    mappingCandidates: candidates,
-    confidence: bounded((input.line.confidence + (best?.score ?? 0)) / 2),
-    confidenceLevel: level,
-    requiresReview: true,
-  };
-}
-
-export function applyDeterministicMappings(input: {
-  document: ParsedInvoiceDocument;
-  supplierId?: string;
-  venueId: number;
-  mappings: SupplierItemMapping[];
-  nomenclature: NomenclatureCandidate[];
-}): ParsedInvoiceDocument {
-  return {
-    ...input.document,
-    supplierId: input.supplierId,
-    items: input.document.items.map((line) => matchInvoiceLine({ ...input, line })),
-  };
-}
-
-export function upsertConfirmedSupplierMappings(input: {
-  current: SupplierItemMapping[];
-  venueId: number;
-  supplierId: string;
-  actorAccountId?: number;
-  items: unknown[];
-  now?: string;
-}): SupplierItemMapping[] {
-  const now = input.now ?? new Date().toISOString();
-  const mappings = input.current.filter((mapping) => mapping.venueId !== input.venueId || Boolean(mapping.supplierId));
-  for (const value of input.items) {
-    const item = record(value);
-    const rawName = text(item.rawName, "", 300);
-    const normalizedRawName = normalizeInvoiceText(item.normalizedRawName ?? rawName);
-    const nomenclatureId = text(item.nomenclatureId ?? item.purchaseProductKey ?? item.canonicalProductKey, "", 300);
-    if (!rawName || !normalizedRawName || !nomenclatureId) continue;
-    const fingerprint = packageFingerprint(`${rawName} ${text(item.packageSize)}`);
-    const purchaseUnit = canonicalPurchaseUnit(item.unit);
-    const supplierArticle = text(item.supplierArticle, "", 160);
-    const barcode = text(item.barcode, "", 160);
-    const sameSupplierIdentity = (mapping: SupplierItemMapping) =>
-      mapping.venueId === input.venueId
-      && mapping.supplierId === input.supplierId
-      && (
-        Boolean(supplierArticle && mapping.supplierArticle === supplierArticle)
-        || Boolean(barcode && mapping.barcode === barcode)
-        || (mapping.normalizedRawName === normalizedRawName && (mapping.packageFingerprint ?? "") === fingerprint)
-      );
-    const existing = mappings.find((mapping) =>
-      sameSupplierIdentity(mapping)
-    );
-    if (existing) {
-      existing.rawName = rawName;
-      existing.nomenclatureId = nomenclatureId;
-      existing.purchaseUnit = purchaseUnit || existing.purchaseUnit;
-      existing.supplierArticle = supplierArticle || existing.supplierArticle;
-      existing.barcode = barcode || existing.barcode;
-      existing.confirmations += 1;
-      existing.confirmedByAccountId = input.actorAccountId;
-      existing.updatedAt = now;
-    } else {
-      const replacement = {
-        id: crypto.randomUUID(),
-        venueId: input.venueId,
-        supplierId: input.supplierId,
-        rawName,
-        normalizedRawName,
-        packageFingerprint: fingerprint || undefined,
-        purchaseUnit: purchaseUnit || undefined,
-        supplierArticle: supplierArticle || undefined,
-        barcode: barcode || undefined,
-        nomenclatureId,
-        confirmedByAccountId: input.actorAccountId,
-        confirmations: 1,
-        createdAt: now,
-        updatedAt: now,
-      } satisfies SupplierItemMapping;
-      for (let index = mappings.length - 1; index >= 0; index -= 1) {
-        if (sameSupplierIdentity(mappings[index])) mappings.splice(index, 1);
-      }
-      mappings.push(replacement);
-    }
-    const authoritative = existing ?? mappings.at(-1);
-    if (authoritative) {
-      for (let index = mappings.length - 1; index >= 0; index -= 1) {
-        if (mappings[index] !== authoritative && sameSupplierIdentity(mappings[index])) mappings.splice(index, 1);
-      }
-    }
-  }
-  return mappings.slice(-10_000);
-}
-
-export function recognitionMetrics(input: {
-  mode: InvoiceRecognitionMode;
-  ocr: InvoiceOcrResult | null;
-  document: ParsedInvoiceDocument;
-  aiFallbackLinesCount?: number;
-  aiRequestCount?: number;
-  aiEstimatedInputTokens?: number;
-  aiEstimatedOutputTokens?: number;
-  aiEstimatedTokenUsage?: number;
-  nomenclatureCandidatesCount?: number;
-  matchingDurationMs?: number;
-  startedAt: number;
-}): InvoiceRecognitionMetrics {
-  const normalizedOcrLines = (input.ocr?.lines ?? [])
-    .map((line) => normalizeInvoiceText(line.text))
-    .filter(Boolean);
-  return {
-    pipeline: "invoice_recognition_v2",
-    mode: input.mode,
-    ocrDurationMs: input.ocr?.durationMs ?? 0,
-    ocrSuccess: Boolean(input.ocr?.rawText || input.ocr?.lines.length),
-    ocrDetectedLinesCount: input.ocr?.lines.length ?? 0,
-    ocrDuplicateLinesCount: normalizedOcrLines.length - new Set(normalizedOcrLines).size,
-    ocrConfidence: input.ocr?.confidence ?? null,
-    ocrEngine: input.ocr?.engine ?? null,
-    parsedLinesCount: input.document.items.length,
-    nomenclatureCandidatesCount: input.nomenclatureCandidatesCount ?? 0,
-    matchingDurationMs: input.matchingDurationMs ?? 0,
-    historicalMappingsCount: input.document.items.filter((item) => item.mappingSource === "history").length,
-    exactCanonicalMatchesCount: input.document.items.filter((item) => item.mappingSource === "exact_alias").length,
-    exactMappingsCount: input.document.items.filter((item) => ["history", "supplier_identifier", "exact_alias"].includes(item.mappingSource ?? "")).length,
-    fuzzyMappingsCount: input.document.items.filter((item) => item.mappingSource === "fuzzy").length,
-    fuzzyHighMappingsCount: input.document.items.filter((item) => item.mappingSource === "fuzzy" && !item.requiresReview).length,
-    fuzzyMediumCandidatesCount: input.document.items.filter((item) => !item.mappingSource && item.confidenceLevel === "medium" && Boolean(item.mappingCandidates?.length)).length,
-    unresolvedCount: input.document.items.filter((item) => item.requiresReview).length,
-    manualRequiredCount: input.document.items.filter((item) => item.requiresReview).length,
-    aiFallbackLinesCount: input.aiFallbackLinesCount ?? 0,
-    aiRequestCount: input.aiRequestCount ?? 0,
-    aiTokenUsage: null,
-    aiEstimatedInputTokens: input.aiEstimatedInputTokens ?? 0,
-    aiEstimatedOutputTokens: input.aiEstimatedOutputTokens ?? 0,
-    aiEstimatedTokenUsage: input.aiEstimatedTokenUsage ?? 0,
-    aiHighCount: input.document.items.filter((item) => item.mappingSource === "ai" && item.confidenceLevel === "high").length,
-    aiMediumCount: input.document.items.filter((item) => item.mappingSource === "ai" && item.confidenceLevel === "medium").length,
-    aiNoMatchCount: input.document.items.filter((item) => item.requiresReview && !item.nomenclatureId).length,
-    totalDurationMs: Math.max(0, Date.now() - input.startedAt),
-  };
-}
-
-export function compareRecognitionResults(legacy: unknown, v2: ParsedInvoiceDocument) {
-  const left = record(legacy);
-  const legacyItems = values(left.items).map(record);
-  const normalizedLegacy = legacyItems.map((item) => ({
-    name: normalizeInvoiceText(item.rawName ?? item.name),
-    quantity: numeric(item.quantity),
-    unitPrice: numeric(item.unitPrice ?? item.price),
-    lineTotal: numeric(item.lineTotal ?? item.total),
-    nomenclatureId: text(item.nomenclatureId ?? item.purchaseProductKey),
-  }));
-  const pairs = v2.items.map((item) => {
-    const name = normalizeInvoiceText(item.rawName ?? item.name);
-    const match = normalizedLegacy.find((candidate) => candidate.name === name)
-      ?? normalizedLegacy.find((candidate) => fuzzyTextAgreement(candidate.name, name) >= 0.75);
-    return { item, match };
-  });
-  const comparable = pairs.filter((pair) => Boolean(pair.match));
-  const numericMatches = (
-    selector: (item: ParsedInvoiceLine) => number,
-    legacySelector: (item: (typeof normalizedLegacy)[number]) => number,
-  ) => comparable.filter(({ item, match }) =>
-    Math.abs(selector(item) - legacySelector(match!)) <= 0.01
-  ).length;
-  return {
-    supplierMatch: normalizeInvoiceText(left.supplierName) === normalizeInvoiceText(v2.supplierName),
-    documentNumberMatch: text(left.documentNumber) === text(v2.documentNumber),
-    dateMatch: text(left.date) === text(v2.date),
-    currencyMatch: text(left.currency, "RUB") === v2.currency,
-    lineCountDelta: v2.items.length - legacyItems.length,
-    totalDelta: Math.round((v2.total - numeric(left.total)) * 100) / 100,
-    comparableLines: comparable.length,
-    nameMatches: comparable.filter(({ item, match }) =>
-      normalizeInvoiceText(item.rawName ?? item.name) === match?.name
-    ).length,
-    quantityMatches: numericMatches((item) => item.quantity, (item) => item.quantity),
-    unitPriceMatches: numericMatches((item) => item.unitPrice, (item) => item.unitPrice),
-    lineTotalMatches: numericMatches((item) => item.lineTotal, (item) => item.lineTotal),
-    nomenclatureMatches: comparable.filter(({ item, match }) =>
-      !match?.nomenclatureId || match.nomenclatureId === (item.nomenclatureId ?? item.purchaseProductKey)
-    ).length,
-    mappedLines: v2.items.filter((item) => Boolean(item.purchaseProductKey)).length,
-    manualRequired: v2.items.filter((item) => item.requiresReview).length,
-  };
-}
-
-function fuzzyTextAgreement(left: string, right: string): number {
-  if (!left || !right) return 0;
-  return Math.max(...[[left, right], [phonetic(left), phonetic(right)]].map(([a, b]) =>
-    Math.max(
-      tokenSimilarity(a, b),
-      1 - levenshtein(a, b) / Math.max(a.length, b.length, 1),
-    )
-  ));
-}
-
-export function recognitionQualityAgainstGroundTruth(
-  document: ParsedInvoiceDocument,
-  expected: InvoiceRecognitionGroundTruth,
-) {
-  const matches = expected.items.map((expectedLine) => {
-    const expectedName = normalizeInvoiceText(expectedLine.rawName);
-    const ranked = document.items
-      .map((actual) => ({
-        actual,
-        score: fuzzyTextAgreement(expectedName, normalizeInvoiceText(actual.rawName ?? actual.name)),
-      }))
-      .sort((left, right) => right.score - left.score);
-    return ranked[0] && ranked[0].score >= 0.7 ? { expected: expectedLine, actual: ranked[0].actual } : null;
-  });
-  const paired = matches.filter((match): match is NonNullable<typeof match> => Boolean(match));
-  const accuracy = (
-    selector: (value: InvoiceRecognitionGroundTruth["items"][number]) => number | undefined,
-    actualSelector: (value: ParsedInvoiceLine) => number,
-  ) => {
-    const comparable = paired.filter(({ expected: value }) => selector(value) != null);
-    if (!comparable.length) return null;
-    return comparable.filter(({ expected: value, actual }) =>
-      Math.abs((selector(value) ?? 0) - actualSelector(actual)) <= 0.01
-    ).length / comparable.length;
-  };
-  return {
-    supplierMatch: expected.supplierName
-      ? fuzzyTextAgreement(normalizeInvoiceText(expected.supplierName), normalizeInvoiceText(document.supplierName)) >= 0.8
-      : null,
-    documentNumberMatch: expected.documentNumber ? expected.documentNumber === document.documentNumber : null,
-    dateMatch: expected.date ? expected.date === document.date : null,
-    currencyMatch: expected.currency ? expected.currency === document.currency : null,
-    documentTotalMatch: expected.total != null ? Math.abs(expected.total - document.total) <= 0.01 : null,
-    expectedLines: expected.items.length,
-    detectedLines: document.items.length,
-    matchedLines: paired.length,
-    lineRecall: expected.items.length ? paired.length / expected.items.length : 1,
-    quantityAccuracy: accuracy((value) => value.quantity, (value) => value.quantity),
-    unitPriceAccuracy: accuracy((value) => value.unitPrice, (value) => value.unitPrice),
-    lineTotalAccuracy: accuracy((value) => value.lineTotal, (value) => value.lineTotal),
-    resolvedWithoutAiRate: document.items.length
-      ? document.items.filter((item) => !item.requiresReview && item.mappingSource !== "ai").length / document.items.length
-      : 0,
-    requiresReviewRate: document.items.length
-      ? document.items.filter((item) => item.requiresReview).length / document.items.length
-      : 1,
-  };
-}
+        id: can

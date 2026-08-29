@@ -9,7 +9,7 @@ export type NomenclatureNode = {
 };
 
 export type NomenclatureStructure = {
-  version: "v209";
+  version: "v336";
   sections: NomenclatureNode[];
   categories: NomenclatureNode[];
   subcategories: NomenclatureNode[];
@@ -40,7 +40,7 @@ function node(id: string, name: string, order: number, parentId?: string): Nomen
 
 export function defaultNomenclatureStructure(): NomenclatureStructure {
   return {
-    version: "v209",
+    version: "v336",
     sections: [
       node("bar", "Бар", 10),
       node("kitchen", "Кухня", 20),
@@ -210,8 +210,13 @@ export function ensureNomenclatureHierarchy(assortment: unknown, now = new Date(
   const root = { ...record(assortment) };
   const currentStructure = record(root.nomenclatureStructure);
   const defaultStructure = defaultNomenclatureStructure();
+  const hasCanonicalStructure = [currentStructure.sections, currentStructure.categories, currentStructure.subcategories]
+    .some((value) => Array.isArray(value));
   const mergeNodes = (current: unknown, defaults: NomenclatureNode[]): NomenclatureNode[] => {
     const currentNodes = (Array.isArray(current) ? current : []).map(record);
+    // A preset is bootstrap data, not a mandatory enum. Once a venue owns a
+    // structure, never reinsert a user-removed or renamed business category.
+    if (hasCanonicalStructure) return currentNodes as NomenclatureNode[];
     const byId = new Map(currentNodes.map((value) => [text(value.id), value]));
     const builtIns = defaults.map((value) => ({ ...value, ...record(byId.get(value.id)) })) as NomenclatureNode[];
     const builtInIds = new Set(defaults.map((value) => value.id));
@@ -221,7 +226,7 @@ export function ensureNomenclatureHierarchy(assortment: unknown, now = new Date(
     ];
   };
   root.nomenclatureStructure = {
-    version: "v209",
+    version: "v336",
     sections: mergeNodes(currentStructure.sections, defaultStructure.sections),
     categories: mergeNodes(currentStructure.categories, defaultStructure.categories),
     subcategories: mergeNodes(currentStructure.subcategories, defaultStructure.subcategories),
@@ -250,67 +255,4 @@ export function ensureNomenclatureHierarchy(assortment: unknown, now = new Date(
         createdAt: text(balance.createdAt, now),
         updatedAt: text(balance.updatedAt, now),
       };
-      itemsByKey.set(key, item);
-      return [item];
-    });
-  const sourceItems = [...existingItems, ...migratedFromBalances];
-  const items = sourceItems.map((raw) => {
-    const item = { ...record(raw) };
-    const sectionId = text(item.sectionId);
-    const categoryId = text(item.taxonomyCategoryId);
-    const subcategoryId = text(item.subcategoryId);
-    const status = text(item.classificationStatus);
-    const hasUsablePath = sectionId
-      && categoryId
-      && subcategoryId
-      && sectionId !== "unassigned"
-      && categoryId !== "unassigned-category"
-      && subcategoryId !== "unassigned-subcategory"
-      && ["confirmed", "auto"].includes(status);
-    if (hasUsablePath) {
-      if (status === "suggested") suggested += 1;
-      return item;
-    }
-    const result = classifyNomenclatureItemWithRules(item, rules);
-    if (result.classificationStatus === "auto") classified += 1;
-    if (result.classificationStatus === "suggested") suggested += 1;
-    if (result.classificationStatus === "unassigned") unassigned += 1;
-    return { ...item, ...result, classifiedAt: now, updatedAt: text(item.updatedAt, now) };
-  });
-  const byKey = new Map(items.map((item) => [text(item.productKey ?? item.key), item]));
-  const balances = (Array.isArray(root.stockBalances) ? root.stockBalances : []).map((raw) => {
-    const balance = { ...record(raw) };
-    const linked = byKey.get(text(balance.productKey ?? balance.key));
-    return linked ? {
-      ...balance,
-      sectionId: linked.sectionId,
-      taxonomyCategoryId: linked.taxonomyCategoryId,
-      subcategoryId: linked.subcategoryId,
-      storageLocationId: linked.storageLocationId,
-      classificationStatus: linked.classificationStatus,
-      classificationConfidence: linked.classificationConfidence,
-    } : balance;
-  });
-  root.nomenclature = items;
-  root.stockBalances = balances;
-  root.updatedAt = now;
-  return { assortment: root, classified, suggested, unassigned };
-}
-
-export function manualClassification(input: unknown): Partial<Classification> {
-  const value = record(input);
-  const sectionId = text(value.sectionId);
-  const taxonomyCategoryId = text(value.taxonomyCategoryId);
-  const subcategoryId = text(value.subcategoryId);
-  const storageLocationId = text(value.storageLocationId);
-  if (!sectionId || !taxonomyCategoryId || !subcategoryId) return {};
-  return {
-    sectionId,
-    taxonomyCategoryId,
-    subcategoryId,
-    storageLocationId,
-    classificationStatus: "confirmed",
-    classificationConfidence: 1,
-    classificationSource: "manual",
-  };
-}
+   

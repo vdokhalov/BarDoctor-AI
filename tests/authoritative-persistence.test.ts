@@ -89,6 +89,35 @@ test("historical snapshot keys resolve through additive aliases", async () => {
   assert.equal(snapshot.invariants.some((item) => item.code === "SNAPSHOT_KEY_UNRESOLVED"), false);
 });
 
+test("export invariants resolve movement and mapping targets through inventory aliases", async () => {
+  const stores = authoritativeStores();
+  stores.bd_assortment_v1.data = {
+    venueId: 1,
+    nomenclature: [{ productKey: "new", name: "New", venueId: 1 }],
+    stockBalances: [{ productKey: "new", current: 1, averageUnitCost: 5, venueId: 1, externalProductKeys: ["external-old"] }],
+    inventoryProductAliases: [{ from: "old", to: "new" }],
+    supplierProductMappings: [{ id: "map", sourceItemKey: "src", canonicalProductKey: "old", status: "confirmed", venueId: 1 }],
+    recipes: [],
+  };
+  stores.bd_purchase_documents.data = [{ id: "d", venueId: 1, status: "confirmed", items: [{ id: "l", productKey: "old" }] }];
+  stores.bd_stock_movements.data = [{ id: "m", venueId: 1, type: "receipt", productKey: "external-old", sourceDocumentId: "d", sourceLineId: "l" }];
+  const snapshot = await buildImmutableVenueExport({ venue: { id: 1 }, serverStores: stores });
+  assert.equal(snapshot.invariants.some((item) => item.code === "MOVEMENT_CHAIN_INVALID"), false);
+  assert.equal(snapshot.invariants.some((item) => item.code === "SUPPLIER_MAPPING_TARGET_INVALID"), false);
+  assert.equal(snapshot.invariants.some((item) => item.code === "AUDIT_PURCHASE_MOVEMENT_CHAIN_BROKEN"), false);
+  assert.equal(snapshot.invariants.some((item) => item.code === "AUDIT_SUPPLIER_MAPPING_STALE_OR_ORPHAN"), false);
+});
+
+test("cancelled historical movements do not block the active movement chain", async () => {
+  const stores = authoritativeStores();
+  stores.bd_stock_movements.data = [{
+    id: "cancelled", venueId: 1, type: "receipt", status: "cancelled",
+    productKey: "retired", sourceDocumentId: "retired-document", reversedAt: "2026-08-01T00:00:00Z",
+  }];
+  const snapshot = await buildImmutableVenueExport({ venue: { id: 1 }, serverStores: stores });
+  assert.equal(snapshot.invariants.some((item) => item.code === "MOVEMENT_CHAIN_INVALID"), false);
+});
+
 test("invalid supplier mapping target blocks reconciliation", async () => {
   const stores = authoritativeStores();
   stores.bd_assortment_v1.data = { venueId: 1, nomenclature: [], stockBalances: [], recipes: [], supplierProductMappings: [{ id: "map", sourceItemKey: "src", canonicalProductKey: "missing", venueId: 1 }] };

@@ -12,6 +12,10 @@ if (!bootstrap.includes("20260825-business-health-v284")) {
 }
 
 let source = fs.readFileSync(bundlePath, "utf8");
+if (/data-bd-home-health-index":"business-health-snapshot-v33[234]/.test(source)) {
+  console.log("Business Health canonical snapshot v284 already superseded by v332");
+  process.exit(0);
+}
 
 function replaceBetween(startAnchor, endAnchor, replacement) {
   const start = source.indexOf(startAnchor);

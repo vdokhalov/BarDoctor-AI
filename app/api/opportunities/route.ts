@@ -13,6 +13,7 @@ import {
   type OpportunityCalendar,
   type OpportunitySource,
 } from "../../../lib/bardoctor/opportunity-calendar";
+import { opportunityCalendarNeedsPersistence } from "../../../lib/bardoctor/opportunity-calendar-state";
 import {
   OPPORTUNITY_CALENDAR_VERSION,
   OPPORTUNITY_HORIZON_DAYS,
@@ -187,6 +188,18 @@ function publicCalendar(calendar: OpportunityCalendar | null) {
   return calendar;
 }
 
+function opportunityCalendarIsStale(
+  calendar: OpportunityCalendar | null,
+  storedMatchesProfile: boolean,
+  today: string,
+  now = Date.now(),
+): boolean {
+  const age = calendar ? now - new Date(calendar.generatedAt).getTime() : Number.POSITIVE_INFINITY;
+  return !calendar || !storedMatchesProfile || calendar.model.startsWith("calendar-core-")
+    || !Number.isFinite(age) || age > 7 * 86_400_000
+    || calendar.windowEnd < today;
+}
+
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
@@ -215,7 +228,7 @@ export async function GET(request: Request): Promise<Response> {
     && storedCalendar.version === OPPORTUNITY_CALENDAR_VERSION
     && storedCalendar.profileSignature === expectedSignature,
   );
-  let calendar = venueName && label && storedMatchesProfile
+  const calendar = venueName && label && storedMatchesProfile
     ? storedCalendar
     : venueName && label
       ? baselineCalendar({
@@ -227,23 +240,13 @@ export async function GET(request: Request): Promise<Response> {
           previous: storedCalendar,
         })
       : null;
-  if (calendar) {
-    const before = JSON.stringify(calendar);
-    calendar = await reconcileOpportunityNotifications({
-      accountId: account.id,
-      venueId: account.venueId,
-      origin: new URL(request.url).origin,
-      previous: storedCalendar,
-      next: JSON.parse(JSON.stringify(calendar)) as OpportunityCalendar,
-    });
-    if (JSON.stringify(calendar) !== before) {
-      await saveOpportunityCalendar(account.id, calendar);
-    }
+  // Keep the read path fast: notification reconciliation performs writes and
+  // provider work and belongs to refresh/decision mutations below. A newly
+  // built canonical baseline is persisted immediately before it is returned.
+  if (calendar && opportunityCalendarNeedsPersistence(storedCalendar, calendar)) {
+    await saveOpportunityCalendar(account.id, calendar);
   }
-  const age = calendar ? Date.now() - new Date(calendar.generatedAt).getTime() : Number.POSITIVE_INFINITY;
-  const stale = !calendar || !storedMatchesProfile || calendar.model.startsWith("calendar-core-")
-    || !Number.isFinite(age) || age > 7 * 86_400_000
-    || calendar.windowEnd < today;
+  const stale = opportunityCalendarIsStale(calendar, storedMatchesProfile, today);
   return noStore(Response.json({
     ok: true,
     restaurant,
@@ -284,7 +287,28 @@ export async function POST(request: Request): Promise<Response> {
       throw new AIServiceError("В профиле заведения не указан город или адрес.", 400);
     }
 
+    const previous = await loadOpportunityCalendar(account.id);
+    const expectedSignature = opportunityVenueProfileSignature(context);
+    const previousMatchesProfile = Boolean(
+      previous
+      && previous.version === OPPORTUNITY_CALENDAR_VERSION
+      && previous.profileSignature === expectedSignature,
+    );
+    const automatic = body.automatic === true;
+    const knownGeneratedAt = text(body.knownGeneratedAt, "", 80);
     const today = new Date().toISOString().slice(0, 10);
+    if (automatic && previous && (
+      (knownGeneratedAt && previous.generatedAt !== knownGeneratedAt)
+      || !opportunityCalendarIsStale(previous, previousMatchesProfile, today)
+    )) {
+      return noStore(Response.json({
+        ok: true,
+        calendar: publicCalendar(previous),
+        skipped: true,
+        message: "Календарь уже актуален.",
+      }));
+    }
+
     const windowEnd = addDays(today, OPPORTUNITY_HORIZON_DAYS);
     const baseline = buildOpportunityBaseline({ context, windowStart: today, windowEnd });
     const hasCountryCalendar = opportunityBaselineHasCountryCalendar(context);
@@ -373,7 +397,6 @@ ${baseline.searchHints.map((hint) => `- ${hint}`).join("\n")}
 
 Верни все недостающие подтверждённые официальные и региональные даты из периода и от 0 до 8 сильных локальных событий. Общий максимум — 16 событий. Сначала точный город, затем ближайшая зона до ${OPPORTUNITY_SEARCH_RADIUS_KM} км, затем только действительно активируемые внутри заведения национальные поводы.`;
 
-    const previous = await loadOpportunityCalendar(account.id);
     const generatedAt = new Date().toISOString();
     let discovered: unknown = { summary: baseline.raw.summary, events: [] };
     let webSources: OpportunitySource[] = [];

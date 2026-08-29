@@ -11,7 +11,8 @@ test("profile exposes one persisted venue accounting-currency selector", async (
   const profileEnd = bundle.indexOf("function JCe", profileStart);
   const profile = bundle.slice(profileStart, profileEnd);
   assert.match(bundle, /bdAccountingCurrencyVersionV243="accounting-currency-v243"/);
-  assert.match(bundle, /bdAccountingCurrenciesV243=\["MDL","RUB","EUR","USD","UAH","RON"\]/);
+  assert.match(bundle, /bdAccountingCurrenciesV243=\["MDL","PMR_RUB","RUB","EUR","USD","UAH","RON"\]/);
+  assert.match(bundle, /PMR_RUB:"руб\. ПМР — приднестровский рубль"/);
   assert.match(profile, /data-bd-accounting-currency/);
   assert.match(profile, /Валюта учёта \*/);
   assert.match(profile, /currency:bdAccountingCurrencyV243\(a\.currency\)/);
@@ -47,7 +48,7 @@ test("venue accounting currency is reused by core aggregated monetary formatters
   assert.match(bundle, /function bdAccountingCurrencySuffixV243\(e=""\)/);
 });
 
-test("setup and profile require currency while document currencies remain independent", async () => {
+test("setup and profile own the selector while new documents inherit the venue currency", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   const setupStart = bundle.indexOf("function Fle");
   const setupEnd = bundle.indexOf("function Ule", setupStart);
@@ -59,6 +60,8 @@ test("setup and profile require currency while document currencies remain indepe
   assert.match(bundle, /function bdProcManualDraftV207\(e,t="RUB"\)/);
   assert.match(bundle, /currency:t\|\|"RUB"/);
   assert.match(bundle, /bdProcManualDraftV207\(s\.activeVenueId,s\.venues\.find/);
+  assert.match(bundle, /bdVenueCurrencyLockVersionV326="venue-currency-lock-v326"/);
+  assert.doesNotMatch(bundle, /bdCurrencySelectOptionsV325/);
   assert.match(bundle, /confirmedPurchases\?\.\[0\]\?\.currency\|\|o\.find/);
   assert.match(bundle, /r\.currency\|\|r\.accountingCurrency\|\|"RUB"/);
 });

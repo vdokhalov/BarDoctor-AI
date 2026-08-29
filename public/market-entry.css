@@ -353,6 +353,40 @@
   .bd-competitors-entry-stats > span { padding: 9px 10px; }
 }
 
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] {
+  width: 100%;
+  padding: 18px;
+  border: 1px solid #efdfe4;
+  border-radius: 24px;
+  background: #fffafb;
+  box-shadow: 0 12px 30px rgba(58, 41, 52, .06);
+}
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"]::after { display: none; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-icon {
+  display: grid; width: 42px; height: 42px; place-items: center; border: 0; border-radius: 14px;
+  background: #ffebf0; box-shadow: none; color: #d94368; font-size: 22px; font-weight: 900;
+}
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-icon::before,
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-icon::after { display: none; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-title small { color: #b55c72; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-status {
+  display: flex; align-items: center; gap: 7px; margin-top: 12px; color: #747c90;
+}
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-status i {
+  width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: #20b985;
+}
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-status.warning i { background: #dc861c; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-stats > span { background: #fff; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-stats > span.attention strong,
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-stats > span.attention small { color: #d9435f; }
+.bd-competitors-entry-latest { display: flex; flex-direction: column; gap: 3px; margin-top: 14px; }
+.bd-competitors-entry-latest small { color: #9298a8; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.bd-competitors-entry-latest strong { color: #23283b; font-size: 12px; line-height: 1.4; }
+.bd-competitors-entry-latest time { color: #9a9fad; font-size: 9px; }
+.bd-competitors-entry[data-bd-competitors-entry="canonical-v329"] .bd-competitors-entry-action {
+  padding: 0; background: transparent; box-shadow: none; color: #5b55e7;
+}
+
 .bd-data-control-entry {
   display: grid;
   grid-template-columns: 54px minmax(0, 1fr) 28px;

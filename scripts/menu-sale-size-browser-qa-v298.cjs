@@ -90,7 +90,9 @@ async function mobileFlow(browser) {
   assert.deepEqual(mojito.saleSize, { version: 1, quantity: 350, unit: "ml", baseQuantity: 350, baseUnit: "ml", source: "manual", status: "confirmed" });
   assert.equal("portionSize" in mojito, false);
 
-  await page.getByRole("button", { name: "Позиция", exact: true }).click();
+  await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
+  assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"]').count(), 1);
+  assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"] select').count(), 0);
   await page.locator('.bd-catalog-field:has-text("Название") input').fill("Консультация бармена");
   await page.locator('.bd-catalog-field:has-text("Тип позиции") select').selectOption("service");
   assert.equal(await page.getByLabel("Количество продажи").count(), 0, "service must not require a fake physical size");
@@ -107,7 +109,9 @@ async function mobileFlow(browser) {
 
 async function desktopFlow(browser) {
   const { context, page, errors } = await openCatalog(browser, { width: 1440, height: 900 }, "desktop");
-  await page.getByRole("button", { name: "Позиция", exact: true }).click();
+  await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
+  assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"]').count(), 1);
+  assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"] select').count(), 0);
   await page.locator('.bd-catalog-field:has-text("Название") input').fill("Кола 1,25 л");
   await page.locator('.bd-catalog-field:has-text("Тип позиции") select').selectOption("ready");
   const readyProduct = page.locator('.bd-catalog-field:has-text("Связанный готовый товар") select');
@@ -128,7 +132,7 @@ async function desktopFlow(browser) {
   assert.equal(cola.saleSize.source, "packaging");
   assert.deepEqual(cola.readyProduct, { nomenclatureItemId: "product:cola", productKey: "product:cola", packageLabel: "1,25 л", packagesPerSale: 1 });
 
-  await page.getByRole("button", { name: "Позиция", exact: true }).click();
+  await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
   await page.locator('.bd-catalog-field:has-text("Название") input').fill("Лимонад на розлив");
   await page.getByLabel("Количество продажи").fill("1,25");
   await page.getByLabel("Единица продажи").selectOption("l");

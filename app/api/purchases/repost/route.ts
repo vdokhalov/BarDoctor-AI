@@ -12,6 +12,7 @@ import {
   EXPENSE_STORE_KEY,
   isPurchasePayment,
   migratePurchaseLedger,
+  normalizePurchaseAccounting,
   purchaseAffectsInventory,
   PURCHASE_STORE_KEY,
   withPurchasePaymentSummary,
@@ -162,6 +163,21 @@ export async function POST(request: Request): Promise<Response> {
       { status: 409 },
     );
   }
+  const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+  const accounting = normalizePurchaseAccounting({
+    document: previous as never,
+    accountingCurrency,
+    now,
+  });
+  if (!accounting.ok) {
+    return Response.json({
+      ok: false,
+      code: accounting.code,
+      postingBlocked: true,
+      error: "Повторное проведение заблокировано: сначала зафиксируйте историческую конвертацию в валюту учёта.",
+    }, { status: 422 });
+  }
+  const repostDocument = accounting.document;
 
   const linkedPayments = expenses.filter((expense) => isPurchasePayment(expense, documentId));
   if (linkedPayments.length && !hasPermission(account, "finance.manage")) {
@@ -194,11 +210,11 @@ export async function POST(request: Request): Promise<Response> {
 
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
-  const inventory = purchaseAffectsInventory(previous)
+  const inventory = purchaseAffectsInventory(repostDocument)
     ? applyPurchaseToInventory({
       assortment,
-      document: previous,
-      accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
+      document: repostDocument,
+      accountingCurrency,
       now,
     })
     : null;
@@ -226,7 +242,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     : expense);
   const reposted = withPurchasePaymentSummary({
-    ...previous,
+    ...repostDocument,
     status: "confirmed",
     cancelledAt: undefined,
     cancellationReason: undefined,
@@ -236,7 +252,7 @@ export async function POST(request: Request): Promise<Response> {
     repostedAt: now,
     updatedAt: now,
     updatedByAccountId: account.actorAccountId,
-  }, expenses);
+  }, expenses, accountingCurrency);
   documents[index] = reposted;
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")
     || account.appEmail;

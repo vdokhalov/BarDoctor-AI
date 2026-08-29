@@ -2,6 +2,7 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { buildProcurementAnalytics } from "../../../../lib/bardoctor/procurement-analytics";
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import { migratePurchaseLedger } from "../../../../lib/bardoctor/purchases";
 
 const STORE_KEYS = [
@@ -71,6 +72,7 @@ export async function GET(request: Request): Promise<Response> {
     assortment: parsed(stores.get("bd_assortment_v1"), {}),
     period,
     venueId: account.venueId,
+    accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
   });
 
   return noStore({

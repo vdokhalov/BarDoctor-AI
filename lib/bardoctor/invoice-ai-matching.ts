@@ -5,7 +5,11 @@ import type {
   ParsedInvoiceLine,
   RecognitionConfidence,
 } from "./invoice-recognition-v2";
-import { hasStrongInvoiceIdentityEvidence, invoiceIdentityConflicts } from "./invoice-recognition-v2";
+import {
+  hasStrongInvoiceIdentityEvidence,
+  invoiceCommercialArithmeticIsValid,
+  invoiceIdentityConflicts,
+} from "./invoice-recognition-v2";
 
 export const INVOICE_AI_BATCH_MAX_LINES = 40;
 export const INVOICE_AI_BATCH_MAX_ESTIMATED_TOKENS = 12_000;
@@ -290,6 +294,7 @@ function applyProposals(document: ParsedInvoiceDocument, proposals: InvoiceAIMat
       const level = providerLevel === "high" && !hasStrongInvoiceIdentityEvidence(line, identityCandidate)
         ? "medium"
         : providerLevel;
+      const arithmeticValid = invoiceCommercialArithmeticIsValid(line.quantity, line.unitPrice, line.lineTotal);
       return {
         ...line,
         nomenclatureName: selected.name,
@@ -299,8 +304,8 @@ function applyProposals(document: ParsedInvoiceDocument, proposals: InvoiceAIMat
         matchReason: proposal.reason,
         alternateNomenclatureId: proposal.alternateNomenclatureId ?? undefined,
         confidence: proposal.confidence,
-        confidenceLevel: level,
-        requiresReview: level !== "high" || proposal.unresolved,
+        confidenceLevel: arithmeticValid ? level : line.confidenceLevel,
+        requiresReview: !arithmeticValid || level !== "high" || proposal.unresolved,
       };
     }),
   };

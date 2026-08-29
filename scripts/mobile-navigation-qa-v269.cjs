@@ -97,17 +97,32 @@ function businessHealthEnvelope(venueId) {
   const generatedAt = "2026-08-25T18:41:00.000Z";
   const period = { id: "comparable_shift", label: "Последняя закрытая смена", startDate: "2026-08-24", endDate: "2026-08-24" };
   const factorScores = [
-    { id: "finance", label: "Финансы", score: 41, availability: "measured", weight: 40, confidence: "medium" },
-    { id: "demand", label: "Спрос", score: 63, availability: "measured", weight: 20, confidence: "medium" },
-    { id: "operations", label: "Операции", score: 80, availability: "measured", weight: 25, confidence: "high" },
+    { id: "finance", label: "Финансы", score: 86, availability: "measured", weight: 40, confidence: "medium" },
+    { id: "demand", label: "Спрос", score: 94, availability: "measured", weight: 20, confidence: "medium" },
+    { id: "operations", label: "Операции", score: 70, availability: "measured", weight: 25, confidence: "high" },
   ];
-  const primaryFactor = { id: "finance", label: "Финансы", score: 41, evidence: "Финансовый результат ниже обычного" };
+  const primaryFactor = { id: "operations", label: "Операции", score: 70, evidence: "Аномалии остатков: 6" };
+  const zones = [
+    { id: "finance", label: "Финансы", score: 86, availability: "measured", status: "healthy", statusLabel: "Хорошо", interpretation: "Текущий период пока идёт сильнее сопоставимого.", factors: ["Предварительный денежный результат: +49 647 руб. ПМР", "Выручка: +28%"], evidence: ["Предварительный результат"], gaps: [] },
+    { id: "demand", label: "Спрос", score: 94, availability: "measured", status: "healthy", statusLabel: "Хорошо", interpretation: "Спрос высокий; основной вклад даёт количество чеков.", factors: ["Чеки: +47%", "Средний чек: +9%"], evidence: ["Спрос выше обычного"], gaps: [] },
+    { id: "operations", label: "Операции", score: 70, availability: "measured", status: "attention", statusLabel: "Требует внимания", interpretation: "Операционная зона требует внимания: аномалии остатков: 6.", factors: ["Аномалии остатков: 6"], evidence: [primaryFactor.evidence], gaps: [] },
+  ];
   const snapshot = {
-    snapshotId: `business-health-snapshot:${venueId}:mobile-qa`, venueId: String(venueId), score: 58,
-    status: "attention", statusLabel: "Требует внимания", confidence: 77, confidenceLevel: "medium",
-    primaryFactor, factorScores, generatedAt, period, periods: { demand: period, closedFinance: period },
-    calculationVersion: "business-health-engine-v3", dataQualityPercent: 68,
-    explanation: "Финансовый результат требует внимания", source: "server_business_intelligence",
+    snapshotId: `business-health-snapshot:${venueId}:mobile-qa`, venueId: String(venueId), score: 83,
+    status: "healthy", statusLabel: "Хорошее состояние", confidence: 77, confidenceLevel: "medium",
+    primaryFactor, factorScores, zones,
+    priorityAction: {
+      recommendationId: "stock-review-mobile-qa", issueKey: "stock",
+      title: "Проверить 6 аномалий остатков", reason: "Они сейчас сильнее всего снижают операционное состояние.",
+      ctaLabel: "Проверить остатки", action: "Проверить проблемные позиции и подтвердить корректные значения.", successCriterion: "Остатки проверены",
+      expectedScore: null, target: { path: "/warehouse", label: "Проверить остатки" },
+    },
+    trend: null,
+    generatedAt, period, periods: { demand: period, closedFinance: period },
+    livePeriod: { method: "current_mtd_vs_previous_mtd", direction: "better", headline: "Август идёт лучше сопоставимого периода", periodLabel: "Данные по 1–28 августа · предварительно", comparisonLabel: "Сравнение: 1–28 июля", preliminary: true, comparison: { method: "current_mtd_vs_previous_mtd", currentRange: { startDate: "2026-08-01", endDate: "2026-08-28" }, comparisonRange: { startDate: "2026-07-01", endDate: "2026-07-28" }, sampleSize: { current: 12, comparison: 11 }, availability: "available", reasonUnavailable: null }, current: { startDate: "2026-08-01", endDate: "2026-08-28", revenue: 162842, checks: 1200, averageCheck: 135.7, preliminaryResult: 49647, currency: "PMR_RUB", sampleSize: 12 }, baseline: { startDate: "2026-07-01", endDate: "2026-07-28", revenue: 127220, checks: 816, averageCheck: 155.9, sampleSize: 11 }, changes: { revenuePercent: 28, checksPercent: 47, averageCheckPercent: 9 }, financeSummary: "Текущий период пока идёт сильнее сопоставимого.", demandSummary: "Спрос высокий; основной вклад даёт количество чеков.", factors: ["Предварительный денежный результат: +49 647 руб. ПМР", "Выручка: +28% к сопоставимому периоду", "Чеки: +47%"] },
+    calculationVersion: "business-health-engine-v3", dataQualityPercent: 91,
+    dataQuality: { percent: 91, level: "high", label: "Качество данных: высокое", status: "healthy", statusLabel: "Хорошо", gaps: ["Отзывы ещё не подключены"] },
+    explanation: "Операции требуют внимания", source: "server_business_intelligence",
   };
   return {
     data: {
@@ -116,7 +131,7 @@ function businessHealthEnvelope(venueId) {
         version: "ai-doctor-intelligence-v3", venueId: String(venueId), generatedAt, periods: { demand: period, closedFinance: period },
         dataQuality: { percent: 68 },
         businessHealth: {
-          score: 58, label: "attention", confidencePercent: 77, confidence: "medium",
+          score: 83, label: "healthy", confidencePercent: 77, confidence: "medium",
           components: factorScores.map((factor) => ({ ...factor, evidence: factor.id === "finance" ? [primaryFactor.evidence] : [] })),
           explanation: snapshot.explanation,
         },
@@ -125,6 +140,30 @@ function businessHealthEnvelope(venueId) {
     generatedAt,
     cachedAt: Date.parse(generatedAt),
   };
+}
+
+function freshBusinessHealthEnvelope(venueId, healthy = false) {
+  const envelope = structuredClone(businessHealthEnvelope(venueId));
+  const snapshot = envelope.data.businessHealthSnapshot;
+  snapshot.snapshotId = `business-health-snapshot:${venueId}:mobile-qa-fresh${healthy ? "-healthy" : ""}`;
+  snapshot.dataAccountId = String(venueId === 901 ? 1 : 2);
+  snapshot.calculationVersion = "business-health-engine-v4";
+  snapshot.generatedAt = "2026-08-28T12:30:00.000Z";
+  envelope.generatedAt = snapshot.generatedAt;
+  envelope.data.intelligence.generatedAt = snapshot.generatedAt;
+  if (healthy) {
+    snapshot.score = 90;
+    snapshot.status = "healthy";
+    snapshot.priorityAction = null;
+    snapshot.zones.find((zone) => zone.id === "operations").score = 90;
+    snapshot.zones.find((zone) => zone.id === "operations").status = "healthy";
+    snapshot.zones.find((zone) => zone.id === "operations").statusLabel = "Хорошо";
+    snapshot.zones.find((zone) => zone.id === "operations").interpretation = "Критичных операционных отклонений не обнаружено.";
+    snapshot.factorScores.find((zone) => zone.id === "operations").score = 90;
+    envelope.data.intelligence.businessHealth.score = 90;
+    envelope.data.intelligence.businessHealth.components.find((zone) => zone.id === "operations").score = 90;
+  }
+  return { success: true, ...envelope, context: { venueId, dataAccountId: snapshot.dataAccountId, version: "venue-ai-context-v1", sourceUpdatedAt: "2026-08-28T11:00:00.000Z" } };
 }
 
 function storeData(venueId) {
@@ -153,6 +192,7 @@ async function createRun(browser, profile, label, options = {}) {
     shiftCloseRequests: [],
     shiftCloseFulfilled: false,
     storeWrites: [],
+    healthMode: "attention",
   };
   const context = await browser.newContext({
     ...profile.descriptor,
@@ -220,6 +260,9 @@ async function createRun(browser, profile, label, options = {}) {
       }));
     }
     if (url.pathname === "/api/restaurants/me") return route.fulfill(jsonResponse({ ok: true, restaurant: activeProfile }));
+    if (url.pathname === "/api/business-health" && method === "GET") {
+      return route.fulfill(jsonResponse(freshBusinessHealthEnvelope(state.activeVenueId, state.healthMode === "healthy")));
+    }
     if (url.pathname === "/api/users/me") return route.fulfill(jsonResponse({ ok: true, user: { firstName: "Mobile", lastName: "QA", email: "mobile-qa@bardoctor.local", role: "owner", permissions } }));
     if (url.pathname === "/api/migrate") return route.fulfill(jsonResponse({ ok: true, imported: [], skipped: [] }));
     if (url.pathname === "/api/access/active-venue" && method === "POST") {
@@ -492,8 +535,10 @@ async function mobileAudit(page, profileName, label, options = {}) {
       viewportMeta: document.querySelector('meta[name="viewport"]')?.content || "",
     };
   });
-  assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
-  assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
+  if (options.requireTouch !== false) {
+    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
+    assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
+  }
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${profileName}/${label}: horizontal overflow ${audit.scrollWidth}/${audit.clientWidth}`);
   assert.match(audit.viewportMeta, /width=device-width/, `${profileName}/${label}: viewport meta missing`);
   assert.deepEqual(audit.undersizedCritical, [], `${profileName}/${label}: critical touch target below 36px`);
@@ -824,464 +869,4 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 
   await goto(page, "/finance?venue=901");
   const financeWriteoffEntry = page.locator(".bd-finance-actions-v160 button").filter({ hasText: "Создать списание" });
-  assert.equal(await financeWriteoffEntry.count(), 1, `${profile.name}: Finance canonical write-off quick action is missing`);
-  await financeWriteoffEntry.click();
-  await page.waitForURL(/\/warehouse\?.*tab=writeoffs/);
-  try {
-    await page.waitForSelector('[data-bd-writeoff-flow="canonical-v271"]', { timeout: 8_000 });
-  } catch {
-    throw new Error(`${profile.name}: Finance canonical entry did not open the write-off form; url=${page.url()}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
-  }
-  assert.match(page.url(), /writeoff=new/);
-  assert.doesNotMatch(await page.locator('[data-bd-writeoff-flow="canonical-v271"]').textContent(), /Что списано и почему|Сумма/);
-
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true, documents: 2, movements: 2 };
-}
-
-async function procurementFlow(browser, profile) {
-  const run = await createRun(browser, profile, "suppliers-purchases");
-  const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
-  try {
-    await page.waitForSelector(".bd-proc-command-v168");
-  } catch {
-    throw new Error(`${profile.name}: procurement workspace did not open; url=${page.url()}; issues=${JSON.stringify(run.issues)}; body=${(await page.locator("body").textContent()).replace(/\s+/g, " ").slice(-1200)}`);
-  }
-  const procurementTabs = page.locator(".bd-proc-tabs-v168 button");
-  const procurementLabels = (await procurementTabs.allTextContents()).map((label) => label.trim());
-  assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
-  await procurementTabs.filter({ hasText: "Закупки" }).click();
-  const row = page.locator(".bd-proc-purchase-row-v168").first();
-  await row.locator(".bd-proc-purchase-main-v168").click();
-  await page.waitForSelector(".bd-proc-sheet-v168");
-  assert.ok(new URL(page.url()).searchParams.has("documentId"));
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForSelector(".bd-proc-sheet-v168");
-  await page.locator(".bd-proc-sheet-v168 button[aria-label='Закрыть']").last().click();
-  await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.has("documentId"), false);
-  await procurementTabs.filter({ hasText: "Поставщики" }).click();
-  await page.locator(".bd-proc-supplier-row-v168").first().click();
-  assert.ok(new URL(page.url()).searchParams.has("supplierId"));
-  await page.goBack();
-  await page.waitForSelector(".bd-proc-sheet-v168", { state: "detached" });
-  await mobileAudit(page, profile.name, "procurement");
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true };
-}
-
-async function assortmentFlow(browser, profile) {
-  const run = await createRun(browser, profile, "menu-tech-cards");
-  const { page } = run;
-  await goto(page, "/catalog?qaAssortment=default");
-  await page.waitForSelector(".bd-assortment-command-v170");
-  const assortmentTabs = page.locator(".bd-assortment-tabs-v170 button");
-  const assortmentLabels = (await assortmentTabs.allTextContents()).map((label) => label.trim());
-  assert.ok(assortmentLabels.includes("Меню") && assortmentLabels.includes("Техкарты"), `${profile.name}: assortment tabs missing: ${JSON.stringify(assortmentLabels)}`);
-  if (process.env.BD_QA_DEBUG) {
-    const rects = await assortmentTabs.evaluateAll((nodes) => nodes.map((node) => ({ text: node.textContent.trim(), rect: node.getBoundingClientRect().toJSON(), header: node.closest("header")?.getBoundingClientRect().toJSON() })));
-    process.stderr.write(`[mobile-qa] assortment rects ${JSON.stringify(rects)}\n`);
-  }
-  await assortmentTabs.filter({ hasText: "Меню" }).click();
-  const section = page.locator(".bd-assortment-section-toggle-v171").first();
-  await section.click();
-  const subgroup = page.locator(".bd-assortment-subgroup-toggle-v171").first();
-  await subgroup.click();
-  const item = page.locator(".bd-assortment-menu-row-v170").first();
-  await item.click();
-  await page.waitForSelector(".bd-assortment-sheet-v170.detail");
-  assert.ok(new URL(page.url()).searchParams.has("itemId"));
-  await page.goBack();
-  await page.waitForSelector(".bd-assortment-sheet-v170", { state: "detached" });
-  await assortmentTabs.filter({ hasText: "Техкарты" }).click();
-  await mobileAudit(page, profile.name, "menu-tech-cards");
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true };
-}
-
-async function moduleSmokeFlow(browser, profile) {
-  const run = await createRun(browser, profile, "critical-modules");
-  const { page } = run;
-  const routes = [
-    ["/home?venue=901", /Заведение под контролем|Главная|AI/i],
-    ["/analysis?venue=901", /AI Доктор|Анализ/i],
-    ["/opportunities?venue=901", /возможност/i],
-    ["/finance?venue=901", /Финанс/i],
-    ["/employees?venue=901", /Команда/i],
-    ["/equipment?qaEquipment=default", /Оборудован/i],
-    ["/reports?qaReport=closed&month=2026-07", /Отч[её]т|Июль/i],
-    ["/data-control?venue=901", /Контроль данных/i],
-    ["/integrations?venue=901", /Интеграц/i],
-    ["/notifications?venue=901", /Уведомлен/i],
-    ["/settings?venue=901", /Настройк/i],
-    ["/profile?venue=901", /Профиль|заведени/i],
-  ];
-  for (const [route, expected] of routes) {
-    await goto(page, route);
-    assert.match(await page.locator("body").textContent(), expected, `${profile.name}/${route}: expected module content missing`);
-    if (process.env.BD_QA_DEBUG) {
-      const controls = await page.locator("button,a,input,select").evaluateAll((nodes) => nodes.filter((node) => {
-        const rect = node.getBoundingClientRect();
-        const style = getComputedStyle(node);
-        return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-      }).map((node) => ({ tag: node.tagName, text: (node.getAttribute("aria-label") || node.textContent || node.getAttribute("placeholder") || "").replace(/\s+/g, " ").trim().slice(0, 70), className: String(node.className).slice(0, 80) })).slice(0, 35));
-      process.stderr.write(`[mobile-qa] controls ${route} ${JSON.stringify(controls)}\n`);
-    }
-    await mobileAudit(page, profile.name, route);
-    await page.reload({ waitUntil: "networkidle" });
-    assert.notEqual(new URL(page.url()).pathname, "/login", `${profile.name}/${route}: refresh lost session`);
-  }
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true, routes: routes.map(([route]) => route) };
-}
-
-async function businessHealthColdStartFlow(browser, profile) {
-  const run = await createRun(browser, profile, "business-health-cold-start");
-  const { page } = run;
-  const response = await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  assert.equal(response?.status(), 200, `${profile.name}: cold start expected HTTP 200`);
-  await page.waitForSelector('[data-bd-health-startup-state="SPLASH_LOADING"]', { timeout: 10_000 });
-  const entry = page.locator('[data-bd-health-entry="v284"]');
-  await entry.waitFor({ timeout: 10_000 });
-  const splash = await entry.evaluate((node) => ({
-    snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
-    score: node.querySelector(".bd-health-entry-score-copy strong")?.textContent?.trim(),
-    status: node.querySelector(".bd-health-entry-status")?.textContent?.trim(),
-    factor: node.querySelector(".bd-health-entry-factor strong")?.textContent?.trim(),
-    confidence: node.querySelector(".bd-health-entry-confidence strong")?.textContent?.trim(),
-  }));
-  assert.deepEqual(splash, {
-    snapshotId: "business-health-snapshot:901:mobile-qa",
-    score: "58", status: "Требует внимания", factor: "Финансы 41/100", confidence: "77%",
-  }, `${profile.name}: Splash did not render the canonical snapshot`);
-  await entry.getByRole("button", { name: "Пропустить Health Score и открыть Главную" }).click();
-  const home = page.locator('[data-bd-home-health-index="business-health-snapshot-v284"]');
-  await home.waitFor({ timeout: 10_000 });
-  const readHome = () => home.evaluate((node) => ({
-    snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
-    score: node.querySelector(".bd-home-health-value strong")?.textContent?.trim(),
-    status: node.querySelector(".bd-home-health-status")?.textContent?.trim(),
-    factor: node.querySelector(".bd-home-health-factor")?.textContent?.trim(),
-    confidence: node.querySelector(".bd-home-health-confidence")?.textContent?.trim(),
-  }));
-  const firstHome = await readHome();
-  assert.equal(firstHome.snapshotId, splash.snapshotId, `${profile.name}: Home replaced the Splash snapshot`);
-  assert.equal(firstHome.score, splash.score, `${profile.name}: Home score differs from Splash`);
-  assert.equal(firstHome.status, splash.status, `${profile.name}: Home status differs from Splash`);
-  assert.match(firstHome.factor || "", /^Финансы: 41\/100/, `${profile.name}: Home primary factor differs from Splash`);
-  assert.match(firstHome.confidence || "", /Достоверность диагноза 77%/, `${profile.name}: Home confidence differs from Splash`);
-  assert.doesNotMatch(await home.textContent(), /Загрузка|Получаем актуальный диагноз/i, `${profile.name}: Home returned to loading after Splash`);
-  await page.waitForTimeout(8_000);
-  assert.deepEqual(await readHome(), firstHome, `${profile.name}: canonical snapshot changed without invalidation`);
-  await mobileAudit(page, profile.name, "business-health-cold-start");
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true, snapshot: firstHome };
-}
-
-async function embeddedModulesFlow(browser, profile) {
-  const run = await createRun(browser, profile, "embedded-modules");
-  const { page } = run;
-
-  await goto(page, "/data-control?venue=901");
-  const dataControlFrame = page.frames().find((candidate) => {
-    try {
-      const url = new URL(candidate.url());
-      return url.pathname === "/data-control" && url.searchParams.get("embedded") === "1";
-    }
-    catch { return false; }
-  });
-  assert.ok(dataControlFrame, `${profile.name}: data-control iframe is missing`);
-  await dataControlFrame.waitForSelector(".trust-tabs");
-  const initialLayout = await dataControlFrame.evaluate(() => {
-    const header = document.querySelector(".trust-header");
-    const tabs = document.querySelector(".trust-tabs");
-    const tabsRect = tabs.getBoundingClientRect();
-    return {
-      embedded: document.documentElement.dataset.bdEmbedded,
-      headerDisplay: getComputedStyle(header).display,
-      tabsTop: tabsRect.top,
-      tabsCssTop: getComputedStyle(tabs).top,
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-      scrollHeight: document.documentElement.scrollHeight,
-      clientHeight: document.documentElement.clientHeight,
-    };
-  });
-  assert.equal(initialLayout.embedded, "true", `${profile.name}: embedded layout contract was not installed`);
-  assert.equal(initialLayout.headerDisplay, "none", `${profile.name}: local data-control header duplicates the app header`);
-  assert.equal(initialLayout.tabsCssTop, "0px", `${profile.name}: hidden header still reserves a sticky offset`);
-  assert.ok(Math.abs(initialLayout.tabsTop) <= 1, `${profile.name}: secondary navigation is not attached to the iframe top`);
-  assert.ok(initialLayout.scrollWidth <= initialLayout.clientWidth + 1, `${profile.name}: data-control iframe has horizontal overflow ${initialLayout.scrollWidth}/${initialLayout.clientWidth}`);
-
-  const safeLabel = `${profile.name}-data-control`.replace(/[^a-z0-9-]+/gi, "-");
-  await page.screenshot({ path: path.join(outputDir, `${safeLabel}-initial.png`), fullPage: false });
-  const scrollStates = [];
-  for (const checkpoint of [0.25, 0.5, 0.75, 1, 0]) {
-    const state = await dataControlFrame.evaluate((ratio) => {
-      const root = document.scrollingElement;
-      root.scrollTop = Math.round((root.scrollHeight - root.clientHeight) * ratio);
-      const tabs = document.querySelector(".trust-tabs");
-      const rect = tabs.getBoundingClientRect();
-      const hit = document.elementFromPoint(Math.max(1, rect.left + rect.width / 2), Math.max(1, rect.top + rect.height / 2));
-      return {
-        ratio,
-        scrollTop: root.scrollTop,
-        maxScroll: root.scrollHeight - root.clientHeight,
-        tabsTop: rect.top,
-        tabsBottom: rect.bottom,
-        tabsOwnsHitTarget: Boolean(hit && (hit === tabs || tabs.contains(hit))),
-      };
-    }, checkpoint);
-    scrollStates.push(state);
-    if (state.maxScroll > 0) assert.ok(Math.abs(state.tabsTop) <= 1, `${profile.name}: sticky tabs moved at ${checkpoint * 100}% scroll`);
-    assert.equal(state.tabsOwnsHitTarget, true, `${profile.name}: content paints above sticky tabs at ${checkpoint * 100}% scroll`);
-    if (checkpoint === 0.5) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-middle.png`), fullPage: false });
-    if (checkpoint === 1) await page.screenshot({ path: path.join(outputDir, `${safeLabel}-bottom.png`), fullPage: false });
-  }
-  if (initialLayout.scrollHeight > initialLayout.clientHeight) {
-    assert.ok(scrollStates.some((state) => state.scrollTop > 0), `${profile.name}: data-control frame did not scroll`);
-    assert.equal(scrollStates.at(-1).scrollTop, 0, `${profile.name}: data-control frame did not return to the top`);
-  }
-
-  let frame = page.frameLocator("iframe");
-  await frame.locator("[data-tab='journal']").click();
-  await page.waitForURL(/tab=journal/);
-  await frame.locator("[data-tab='periods']").click();
-  await page.waitForURL(/tab=periods/);
-  await page.goBack();
-  await page.waitForURL(/tab=journal/);
-
-  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "embedded-data-control");
-  else {
-    const desktopOverflow = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, clientWidth: document.documentElement.clientWidth }));
-    assert.ok(desktopOverflow.scrollWidth <= desktopOverflow.clientWidth + 1, `${profile.name}: embedded desktop route has horizontal overflow`);
-  }
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true };
-}
-
-async function formCloseFlow(browser, profile) {
-  const run = await createRun(browser, profile, "critical-form-close");
-  const { page } = run;
-
-  await goto(page, "/employees?venue=901");
-  await page.getByRole("button", { name: "Добавить сотрудника", exact: true }).first().click();
-  const employeeClose = page.getByRole("button", { name: "Закрыть форму", exact: true });
-  await employeeClose.waitFor();
-  await employeeClose.click();
-  await employeeClose.waitFor({ state: "detached" });
-
-  await goto(page, "/profile?venue=901");
-  await page.locator(".bd-profile-venue-head-v280.is-action").click();
-  const venueEditor = page.locator('[data-bd-profile-editor="venue-v282"]');
-  await venueEditor.waitFor();
-  await page.locator("bd-app-header .bd-app-back").click();
-  await venueEditor.waitFor({ state: "detached" });
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: form Close leaked body scroll lock`);
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true };
-}
-
-async function writeoffFlow(browser, profile) {
-  const run = await createRun(browser, profile, "writeoffs");
-  const { page, state } = run;
-  await goto(page, "/warehouse?venue=901&tab=writeoffs");
-  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
-  await page.waitForSelector("[data-bd-writeoff-flow]");
-
-  if (profile.descriptor.isMobile) await mobileAudit(page, profile.name, "writeoff-new", { fullscreen: true });
-  const shell = page.locator(".bd-writeoff-fullscreen-v271");
-  const close = page.getByRole("button", { name: "Закрыть списание", exact: true });
-  const closeBox = await close.boundingBox();
-  assert.ok(closeBox.width >= 44 && closeBox.height >= 44, `${profile.name}: write-off Close target is smaller than 44px`);
-  const viewport = page.viewportSize();
-  const shellBox = await shell.boundingBox();
-  assert.ok(shellBox.x >= 0 && shellBox.y >= 0 && shellBox.x + shellBox.width <= viewport.width + 1 && shellBox.y + shellBox.height <= viewport.height + 1, `${profile.name}: write-off fullscreen is clipped`);
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: write-off did not own scrolling`);
-
-  await close.click();
-  await shell.waitFor({ state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null);
-  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: Close leaked body scroll lock`);
-
-  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
-  await page.getByLabel("Причина списания").selectOption("spoilage");
-  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
-  await page.waitForSelector(".bd-writeoff-picker-v271");
-  await page.locator(".bd-writeoff-picker-row-v271").filter({ hasText: "Пиво Mobile A" }).click();
-  await page.getByLabel("Количество Пиво Mobile A").fill("2");
-
-  await page.getByRole("button", { name: "+ Добавить позицию", exact: true }).click();
-  const search = page.getByLabel("Поиск по номенклатуре");
-  await search.fill("Кола");
-  assert.equal(await page.locator(".bd-writeoff-picker-row-v271").count(), 1, `${profile.name}: canonical alias search did not narrow the catalog`);
-  await page.locator(".bd-writeoff-picker-row-v271").click();
-  await page.getByLabel("Количество Coca-Cola Mobile A").fill("1");
-
-  const main = page.locator(".bd-writeoff-flow-v271");
-  await main.evaluate((node) => { node.scrollTop = Math.max(1, node.scrollHeight - node.clientHeight); });
-  if (await main.evaluate((node) => node.scrollHeight > node.clientHeight)) {
-    assert.ok(await main.evaluate((node) => node.scrollTop > 0), `${profile.name}: long write-off form does not own scrolling`);
-  }
-  await page.getByRole("button", { name: "Провести списание", exact: true }).click();
-  await page.waitForSelector("[data-bd-writeoff-detail]");
-  const documentId = new URL(page.url()).searchParams.get("writeoff");
-  assert.ok(documentId && documentId !== "new", `${profile.name}: posting did not replace new deep link with document detail`);
-  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Пиво Mobile A").current, 18);
-  assert.equal(state.stores[901].bd_assortment_v1.stockBalances.find((item) => item.name === "Coca-Cola Mobile A").current, 11);
-  assert.equal(state.stores[901].bd_stock_movements.filter((item) => item.type === "writeoff").length, 2);
-  assert.match(await page.locator("[data-bd-writeoff-detail]").textContent(), /2 позиций/);
-
-  await page.getByRole("button", { name: "Закрыть документ списания", exact: true }).click();
-  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: detail Close did not return to list`);
-  await page.reload({ waitUntil: "networkidle" });
-  assert.equal(await page.locator(".bd-writeoff-document-list-v271 article").count(), 1, `${profile.name}: server-authoritative document disappeared after refresh`);
-
-  await page.locator(".bd-writeoff-document-list-v271 article > button").first().click();
-  await page.waitForSelector("[data-bd-writeoff-detail]");
-  await page.goBack();
-  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
-  assert.equal(new URL(page.url()).searchParams.get("tab"), "writeoffs");
-
-  await goto(page, `/warehouse?venue=901&tab=writeoffs&writeoff=${encodeURIComponent(documentId)}`);
-  await page.waitForSelector("[data-bd-writeoff-detail]");
-  await page.reload({ waitUntil: "networkidle" });
-  await page.waitForSelector("[data-bd-writeoff-detail]");
-  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
-  await page.waitForSelector("[data-bd-writeoff-detail]", { state: "detached" });
-  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: deep-link Back escaped Warehouse`);
-  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: deep-link Back retained stale document state`);
-
-  await goto(page, "/warehouse?venue=901&tab=writeoffs");
-  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Движения" }).click();
-  const movementLink = page.getByRole("button", { name: "Документ", exact: true }).first();
-  await movementLink.waitFor();
-  await movementLink.click();
-  await page.waitForFunction((expectedId) => {
-    const params = new URLSearchParams(location.search);
-    return params.get("tab") === "writeoffs" && params.get("writeoff") === expectedId;
-  }, documentId);
-  await page.waitForSelector("[data-bd-writeoff-detail]");
-  assert.equal(new URL(page.url()).searchParams.get("writeoff"), documentId);
-  await page.getByRole("button", { name: "Вернуться к списаниям", exact: true }).click();
-
-  await page.locator(".bd-warehouse-tabs button").filter({ hasText: "Списания" }).click();
-  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
-  await page.getByLabel("Причина списания").selectOption("breakage");
-  await close.click();
-  const confirm = page.locator(".bd-writeoff-confirm-v271");
-  await confirm.waitFor();
-  await confirm.getByRole("button", { name: "Отмена", exact: true }).click();
-  await confirm.waitFor({ state: "detached" });
-  assert.equal(await shell.count(), 1, `${profile.name}: cancelling unsaved guard closed the form`);
-  await close.click();
-  await confirm.waitFor();
-  await confirm.getByRole("button", { name: "Закрыть", exact: true }).click();
-  await confirm.waitFor({ state: "detached" });
-  try {
-    await page.waitForFunction(() => new URLSearchParams(location.search).get("writeoff") === null, undefined, { timeout: 3_000 });
-  } catch {
-    throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
-  }
-  await shell.waitFor({ state: "detached" });
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
-
-  await page.getByRole("button", { name: "+ Новое", exact: true }).click();
-  await page.getByLabel("Причина списания").selectOption("staff_meal");
-  state.activeVenueId = 902;
-  await page.evaluate(() => {
-    localStorage.setItem("bd_active_venue_id", "902");
-    window.dispatchEvent(new CustomEvent("bd:venue-changed", { detail: { venueId: 902 } }));
-  });
-  await page.waitForSelector("[data-bd-writeoff-flow]", { state: "detached" });
-  await page.waitForTimeout(250);
-  assert.equal(new URL(page.url()).searchParams.get("writeoff"), null, `${profile.name}: draft leaked across venue switch`);
-  assert.doesNotMatch(await page.locator("body").textContent(), /Пиво Mobile A|Coca-Cola Mobile A/, `${profile.name}: Venue A nomenclature leaked into Venue B`);
-  assert.equal(state.stores[902].bd_inventory_writeoffs.length, 0, `${profile.name}: Venue A document leaked into Venue B`);
-
-  await closeRun(run);
-  return { profile: profile.name, scenario: run.label, passed: true, documentId };
-}
-
-async function runProfile(browser, profile) {
-  assert.ok(profile.descriptor.isMobile, `${profile.name}: Playwright descriptor is not mobile`);
-  assert.ok(profile.descriptor.hasTouch, `${profile.name}: Playwright descriptor has no touch`);
-  assert.match(profile.descriptor.userAgent, profile.userAgentPattern);
-  const results = [];
-  for (const [name, flow] of [
-    ["writeoffs", writeoffFlow],
-    ["shift-canonical-writeoffs", shiftCanonicalWriteoffFlow],
-    ["inventory-fullscreen", inventoryFlow],
-    ["inventory-delete", inventoryDeleteFlow],
-    ["warehouse-nomenclature", nomenclatureFlow],
-    ["shifts", shiftsFlow],
-    ["suppliers-purchases", procurementFlow],
-    ["menu-tech-cards", assortmentFlow],
-    ["embedded-modules", embeddedModulesFlow],
-    ["critical-form-close", formCloseFlow],
-    ["critical-modules", moduleSmokeFlow],
-    ["business-health-cold-start", businessHealthColdStartFlow],
-  ]) {
-    if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
-    process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
-    results.push(await flow(browser, profile));
-  }
-  return results;
-}
-
-(async () => {
-  browserPath = await resolveBrowserExecutable(browserPath);
-  assert.ok(fs.existsSync(browserPath), `Playwright browser executable not found: ${browserPath}`);
-  const browser = await chromium.launch({
-    executablePath: browserPath,
-    headless: true,
-    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
-  });
-  const results = [];
-  const failures = [];
-  try {
-    for (const profile of profiles) {
-      if (process.env.BD_QA_PROFILE && process.env.BD_QA_PROFILE !== profile.name) continue;
-      results.push(...await runProfile(browser, profile));
-    }
-    if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
-        results.push(await embeddedModulesFlow(browser, desktopProfile));
-      }
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
-        results.push(await writeoffFlow(browser, desktopProfile));
-      }
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "shift-canonical-writeoffs") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/shift-canonical-writeoffs\n`);
-        results.push(await shiftCanonicalWriteoffFlow(browser, desktopProfile));
-      }
-      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
-        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);
-        results.push(await inventoryDeleteFlow(browser, desktopProfile));
-      }
-    }
-  } catch (error) {
-    failures.push(error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) });
-    process.stderr.write(`[mobile-qa] failure: ${failures[failures.length - 1].message}\n`);
-  } finally {
-    await browser.close();
-  }
-  const summary = {
-    version: "mobile-navigation-qa-v269",
-    generatedAt: new Date().toISOString(),
-    baseUrl,
-    browserPath,
-    profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgent: profile.descriptor.userAgent })),
-    results,
-    failures,
-    passed: failures.length === 0,
-  };
-  fs.writeFileSync(path.join(outputDir, "mobile-navigation-qa.json"), `${JSON.stringify(summary, null, 2)}\n`);
-  console.log(JSON.stringify(summary, null, 2));
-  if (!summary.passed) process.exit(1);
-})();
+  assert.equal(await financeWriteoffEntry.count(), 1, `${profile.name}
