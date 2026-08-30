@@ -27,7 +27,10 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         overflow: hidden !important;
         background: #070911 !important;
       }
-      html[data-bd-startup-pending="v201"] #root { min-height: 100dvh; }
+      html[data-bd-startup-pending="v201"] #root {
+        min-height: 100dvh;
+        background: #070911;
+      }
       html[data-bd-startup-pending="v201"] .bd-static-startup-v201 {
         position: fixed;
         z-index: 2147483000;
@@ -40,11 +43,23 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         justify-content: center;
         overflow: hidden;
         color: #fff;
-        background: radial-gradient(circle at 50% 42%, #171b3d 0%, #0d1022 42%, #070911 100%);
+        padding-top: env(safe-area-inset-top);
+        padding-right: env(safe-area-inset-right);
+        padding-bottom: env(safe-area-inset-bottom);
+        padding-left: env(safe-area-inset-left);
+        opacity: 1;
+        background: #070911;
         font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         text-align: center;
+        transition: opacity 180ms ease;
+        will-change: opacity;
+      }
+      html[data-bd-startup-pending="v201"] .bd-static-startup-v201.bd-static-startup-leaving-v341 {
+        opacity: 0;
+        pointer-events: none;
       }
       html[data-bd-startup-pending="v201"] .bd-static-startup-v201::before {
+        display: none;
         position: absolute;
         top: 22%;
         left: 50%;
@@ -59,6 +74,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         pointer-events: none;
       }
       html[data-bd-startup-pending="v201"] .bd-static-startup-v201::after {
+        display: none;
         position: absolute;
         right: -18%;
         bottom: 8%;
@@ -256,8 +272,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body>
-    <div id="root">
-      <div class="bd-static-startup-v201" data-bd-static-startup="v201" role="status" aria-label="BarDoctor загружается">
+    <div class="bd-static-startup-v201" data-bd-static-startup="v201" role="status" aria-label="BarDoctor загружается">
         <div class="bd-static-startup-content-v202">
           <div class="bd-static-startup-mark-v201" aria-hidden="true">
             <img src="/icons/bardoctor-mark-v159.svg" alt="" width="112" height="112" />
@@ -269,8 +284,8 @@ const BAR_DOCTOR_HTML = `<!doctype html>
             <span class="bd-static-startup-dots-v202" aria-hidden="true"><span></span><span></span><span></span></span>
           </p>
         </div>
-      </div>
     </div>
+    <div id="root"></div>
   </body>
 </html>`;
 

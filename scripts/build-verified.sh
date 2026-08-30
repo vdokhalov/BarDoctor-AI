@@ -48,6 +48,7 @@ node "${script_dir}/patch-canonical-taxonomy-integrations-v337.mjs"
 node "${script_dir}/patch-canonical-taxonomy-reuse-v338.mjs"
 node "${script_dir}/patch-canonical-taxonomy-freshness-v339.mjs"
 node "${script_dir}/patch-canonical-taxonomy-postbuild-v340.mjs"
+node "${script_dir}/patch-seamless-startup-v341.mjs"
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \
@@ -83,4 +84,5 @@ node "${script_dir}/patch-canonical-taxonomy-integrations-v337.mjs"
 node "${script_dir}/patch-canonical-taxonomy-reuse-v338.mjs"
 node "${script_dir}/patch-canonical-taxonomy-freshness-v339.mjs"
 node "${script_dir}/patch-canonical-taxonomy-postbuild-v340.mjs"
+node "${script_dir}/patch-seamless-startup-v341.mjs"
 "${script_dir}/validate-artifact.sh"

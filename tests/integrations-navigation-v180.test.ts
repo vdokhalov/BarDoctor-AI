@@ -16,7 +16,7 @@ test("direct integrations enters the canonical SPA shell", async () => {
   assert.equal(response.status, 200);
   assert.equal(count(html, /data-bd-bottom-nav=/g), 0);
   assert.equal(count(html, /id="bd-canonical-bottom-nav"/g), 0);
-  assert.match(html, /<div id="root">[\s\S]*data-bd-static-startup="v201"/);
+  assert.match(html, /data-bd-static-startup="v201"[\s\S]*<div id="root"><\/div>/);
   assert.match(html, /app-shell-v185\.js/);
   assert.doesNotMatch(html, /data-bd-embedded="true"/);
 });
@@ -38,7 +38,7 @@ test("settings serves the SPA shell and resolves to the existing user settings s
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("location"), null);
-  assert.match(html, /<div id="root">[\s\S]*data-bd-static-startup="v201"/);
+  assert.match(html, /data-bd-static-startup="v201"[\s\S]*<div id="root"><\/div>/);
 
   const bootstrap = await readFile(
     new URL("../public/bardoctor-preview.js", import.meta.url),

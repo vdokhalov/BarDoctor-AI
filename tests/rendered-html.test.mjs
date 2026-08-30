@@ -738,7 +738,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
     ),
   ]);
 
-  assert.match(worker, /<div id="root">[\s\S]*data-bd-static-startup="v201"/);
+  assert.match(worker, /data-bd-static-startup="v201"[\s\S]*<div id="root"><\/div>/);
   assert.match(worker, /bardoctor-preview\.js\?v=20260821-inventory-cache-reconciliation-v235/);
   assert.match(worker, /health-score-experience-v152\.css\?v=20260828-business-health-canonical-v335/);
   assert.match(worker, /health-score-experience\.js\?v=20260828-health-startup-v332/);
@@ -1114,6 +1114,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /data-bd-root-splash":"ai-pulse/);
   assert.match(mainBundle, /Заведение под контролем/);
   assert.match(mainBundle, /"data-bd-health-startup-machine":"v335"/);
+  assert.match(mainBundle, /data-bd-root-splash":"seamless-startup-v341/);
   assert.match(mainBundle, /data-bd-splash":"brand-loading-v332/);
   assert.match(mainBundle, /data-bd-brand-splash":"v332/);
   assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function bdHealthStartupGateV155")), /data-bd-health-entry/);

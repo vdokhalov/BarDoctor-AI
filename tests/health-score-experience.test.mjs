@@ -307,11 +307,17 @@ test("production artifact has one score-free startup owner and server-authoritat
   assert.match(bundle, /\?"SPLASH_LOADING":"HOME"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdHealthStartupGateV155")), /bdHealthLaunchRenderedV155|HEALTH_ENTRY/);
   assert.match(bundle, /bdHealthLaunchCompleteV155\("server-bootstrap-ready"\)/);
-  assert.match(bundle, /bdHealthLaunchFallbackV155\("server-bootstrap-timeout",\{score:null,venueReady:n,hasProfile:!!t,cloudReady:r,timeoutMs:5200\}\)/);
+  assert.doesNotMatch(
+    bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
+    /bdHealthLaunchFallbackV155|server-bootstrap-timeout/,
+  );
   assert.doesNotMatch(runtime, /cached-health-score-ready/);
   assert.match(runtime, /server-bootstrap-timeout/);
   assert.match(bundle, /setTimeout\(\(\)=>U\(!0\),900\)/);
-  assert.match(bundle, /setTimeout\(\(\)=>I\(!0\),5200\)/);
+  assert.doesNotMatch(
+    bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
+    /5200/,
+  );
   assert.match(bundle, /window\.location\.pathname/);
   assert.match(bundle, /===\"\/\"\?Cle\(\)/);
   assert.match(bundle, /window\.history\.replaceState\(window\.history\.state,"","\/home"\)/);
@@ -332,7 +338,9 @@ test("production artifact has one score-free startup owner and server-authoritat
   const coordinator = bundle.slice(coordinatorStart, coordinatorEnd);
   assert.match(coordinator, /bdUseBusinessHealthSnapshotV284\(\)/);
   assert.match(coordinator, /snapshot:j/);
-  assert.match(coordinator, /n&&!!t&&r/);
+  assert.match(coordinator, /!n\|\|!r/);
+  assert.match(coordinator, /data-bd-root-splash":"seamless-startup-v341/);
+  assert.doesNotMatch(coordinator, /children:i\.jsx\(ble/);
   assert.doesNotMatch(coordinator, /zC\(/);
   assert.doesNotMatch(coordinator, /bdHealthScoreValueV153/);
   assert.doesNotMatch(coordinator, /bdHealthScoreEntryV153|HEALTH_ENTRY|confidence/);

@@ -52,7 +52,8 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
     assert.match(document, /data-bd-static-startup="v201"/);
     assert.match(document, /bd-static-startup-brand-v201">Bar<span>Doctor<\/span>/);
     assert.match(document, /AI-управляющий для вашего заведения/);
-    assert.match(document, /background: radial-gradient\(circle at 50% 42%/);
+    assert.match(document, /background: #070911/);
+    assert.match(document, /bd-static-startup-leaving-v341/);
     assert.match(document, /bd-static-startup-content-v202/);
     assert.match(document, /font-size: 38px/);
     assert.match(document, /border-radius: 25px/);
@@ -62,6 +63,10 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
       "the dark first-paint contract must run before application bootstrap",
     );
     assert.doesNotMatch(document, />Главная</);
+    assert.ok(
+      document.indexOf('data-bd-static-startup="v201"') < document.indexOf('<div id="root"><\/div>'),
+      "the startup overlay must stay outside React's root",
+    );
   }
 
   assert.match(shell, /function startupPending\(\)/);
@@ -75,6 +80,12 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
   assert.match(bundle, /function bdStartupFirstPaintCompleteV201\(\)/);
   assert.match(bundle, /S\.useLayoutEffect\(\(\)=>\{\(!v\|\|E==="HOME"\)&&bdStartupFirstPaintCompleteV201\(\)\}/);
   assert.match(bundle, /new CustomEvent\("bd:startup-complete"/);
+  assert.match(bundle, /data-bd-root-splash":"seamless-startup-v341/);
+  assert.match(bundle, /window\.setTimeout\(n,180\)/);
+  assert.doesNotMatch(
+    bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
+    /5200|server-bootstrap-timeout|children:i\.jsx\(ble/,
+  );
   assert.match(bundle, /"data-bd-splash":"brand-loading-v332"/);
   assert.match(bundle, /initial:\{opacity:0,y:8\},animate:\{opacity:1,y:0\},transition:\{duration:\.42/);
   assert.doesNotMatch(bundle, /initial:\{opacity:0,y:12,scale:\.97\},animate:\{opacity:1,y:0,scale:1\}/);
