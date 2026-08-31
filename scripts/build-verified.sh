@@ -74,6 +74,7 @@ node "${script_dir}/patch-nomenclature-catalog-route-v366.mjs"
 node "${script_dir}/patch-purchase-category-options-v367.mjs"
 node "${script_dir}/patch-tech-card-catalog-picker-v368.mjs"
 node "${script_dir}/patch-nomenclature-uat-v369.mjs"
+node "${script_dir}/patch-quick-add-purchase-v372.mjs"
 timeout \
   --signal=TERM \
   --kill-after="${SITES_BUILD_KILL_AFTER:-10s}" \
@@ -135,4 +136,5 @@ node "${script_dir}/patch-nomenclature-catalog-route-v366.mjs"
 node "${script_dir}/patch-purchase-category-options-v367.mjs"
 node "${script_dir}/patch-tech-card-catalog-picker-v368.mjs"
 node "${script_dir}/patch-nomenclature-uat-v369.mjs"
+node "${script_dir}/patch-quick-add-purchase-v372.mjs"
 "${script_dir}/validate-artifact.sh"
