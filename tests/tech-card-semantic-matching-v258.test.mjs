@@ -21,7 +21,7 @@ test("recipe editor exposes confidence-aware matching states", () => {
     "возможных соответствия",
     "Показать все",
     "Товар не найден",
-    "Поиск по номенклатуре…",
+    "Название, поставщик или фасовка…",
   ]) {
     assert.ok(bundle.includes(marker), `missing matching UI marker: ${marker}`);
   }

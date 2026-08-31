@@ -425,8 +425,47 @@
     main.innerHTML = sectionHead("Состояние системы", "Статусы основаны на проверяемых сигналах без вымышленного времени доступности")
       + '<div class="admin-grid"><section class="admin-card"><div class="admin-card-header"><div><h3>Компоненты</h3><p>Состояние и основание</p></div></div><div class="admin-health-list">' + components + '</div></section><section class="admin-card"><div class="admin-card-header"><div><h3>Требует внимания</h3><p>' + countPhrase(data.issues.length, "реальный сигнал", "реальных сигнала", "реальных сигналов") + '</p></div></div><div class="admin-card-body admin-issues">'
       + (issues || '<div class="admin-honest">В отслеживаемых подсистемах проблем нет. Общее время доступности приложения не измеряется.</div>') + "</div></section></div><br>"
+      + '<section class="admin-card"><div class="admin-card-header"><div><h3>Связи разделов</h3><p>Номенклатура, склад, техкарты, меню и поставщики · только Internal Admin</p></div><button id="admin-run-relationship-integrity" class="admin-primary" type="button">Проверить связи</button></div><div id="admin-relationship-integrity" class="admin-card-body"><div class="admin-honest">Проверка запускается вручную и не изменяет пользовательские данные.</div></div></section><br>'
       + '<div class="admin-honest">' + esc(data.coverageNote) + "</div>";
     bindNavigation(main);
+    bindRelationshipIntegrity();
+  }
+
+  function renderRelationshipIntegrity(data) {
+    var root = document.getElementById("admin-relationship-integrity");
+    if (!root) return;
+    var summary = data.summary || {};
+    var venues = (data.venues || []).map(function (item) {
+      var findingCount = (item.findings || []).length;
+      return '<div class="admin-health-row"><span class="admin-health-dot ' + (findingCount ? "attention" : "working") + '"></span><div><strong>'
+        + esc(item.venue && item.venue.name) + '</strong><small>'
+        + (findingCount ? countPhrase(findingCount, "тип проблемы", "типа проблемы", "типов проблем") + " · " + countPhrase(item.affectedRecords, "запись", "записи", "записей") : "Разрывов не обнаружено")
+        + '</small></div><b>' + (findingCount ? esc(findingCount) : "✓") + "</b></div>";
+    }).join("");
+    root.innerHTML = '<div class="admin-breakdowns"><div class="admin-breakdown"><strong>Заведений проверено</strong><span>' + esc(number(summary.venuesChecked))
+      + '</span></div><div class="admin-breakdown"><strong>С проблемами</strong><span>' + esc(number(summary.venuesWithFindings))
+      + '</span></div><div class="admin-breakdown"><strong>Затронуто записей</strong><span>' + esc(number(summary.affectedRecords))
+      + '</span></div></div><br><div class="admin-health-list">' + (venues || '<div class="admin-honest">Заведений для проверки нет.</div>')
+      + '</div><p class="admin-integrity-note">Только чтение · изменений: ' + esc(number(data.writesPerformed)) + " · " + esc(date(data.generatedAt)) + "</p>";
+  }
+
+  function bindRelationshipIntegrity() {
+    var button = document.getElementById("admin-run-relationship-integrity");
+    if (!button) return;
+    button.addEventListener("click", async function () {
+      var root = document.getElementById("admin-relationship-integrity");
+      button.disabled = true;
+      button.textContent = "Проверяю…";
+      root.innerHTML = '<div class="admin-honest">Выполняется read-only проверка связей по всем заведениям…</div>';
+      try {
+        renderRelationshipIntegrity(await api("relationship-integrity"));
+      } catch (error) {
+        root.innerHTML = '<div class="admin-honest">' + esc(error.message || "Проверка не выполнена") + "</div>";
+      } finally {
+        button.disabled = false;
+        button.textContent = "Проверить связи";
+      }
+    });
   }
 
   function renderAudit(data) {

@@ -63,8 +63,8 @@ function adminHtml(): string {
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="theme-color" content="#111827" />
     <title>Internal Admin — BarDoctor</title>
-    <link rel="stylesheet" href="/admin-v175.css?v=20260813-admin-v179" />
-    <script src="/admin-v175.js?v=20260813-admin-v179" defer></script>
+    <link rel="stylesheet" href="/admin-v175.css?v=20260831-admin-integrity-v370" />
+    <script src="/admin-v175.js?v=20260831-admin-integrity-v370" defer></script>
   </head>
   <body>
     <div class="admin-shell">

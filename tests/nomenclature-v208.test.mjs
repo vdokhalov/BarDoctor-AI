@@ -42,8 +42,8 @@ test("nomenclature exposes one explicit hierarchy, a consistent attention queue 
   assert.match(bundle, /data-bd-nomenclature-version":"v213"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdNomenclatureStructureView"), bundle.indexOf("function bdWarehouseStockCard")), /i\.jsxs\("details"/);
   assert.match(bundle, /action:[a-z]\?"update":"create"/);
-  assert.match(bundle, /Услуга — без склада/);
-  assert.match(bundle, /Товар — учитывать на складе/);
+  assert.match(bundle, /Без склада — услуга или имущество/);
+  assert.match(bundle, /Товар — поступает на склад/);
   assert.match(bundle, /returnTo=nomenclature/);
   assert.match(bundle, /function bdNomenclatureDefaultStructure/);
   assert.match(bundle, /function bdNomenclatureStructureView/);

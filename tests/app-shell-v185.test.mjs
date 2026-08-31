@@ -37,7 +37,7 @@ test("embedded modules bridge real detail history into the canonical Back contra
   assert.doesNotMatch(css, /grid-template-columns: auto minmax\(0, 1fr\) auto/);
 });
 
-test("cold Home launch paints the BarDoctor splash before the authenticated shell", async () => {
+test("cold Home launch keeps one splash until authoritative Home is ready", async () => {
   const [response, appHtml, shell, css, bundle, bootstrap] = await Promise.all([
     readFile(new URL("../app/bar-doctor-response.ts", import.meta.url), "utf8"),
     readFile(new URL("../public/app.html", import.meta.url), "utf8"),
@@ -53,7 +53,7 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
     assert.match(document, /bd-static-startup-brand-v201">Bar<span>Doctor<\/span>/);
     assert.match(document, /AI-управляющий для вашего заведения/);
     assert.match(document, /background: #070911/);
-    assert.match(document, /bd-static-startup-leaving-v341/);
+    assert.match(document, /bd-static-startup-leaving-v356/);
     assert.match(document, /bd-static-startup-content-v202/);
     assert.match(document, /font-size: 38px/);
     assert.match(document, /border-radius: 25px/);
@@ -62,10 +62,10 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
       document.indexOf("data-bd-startup-pending") < document.indexOf("bardoctor-preview.js"),
       "the dark first-paint contract must run before application bootstrap",
     );
-    assert.doesNotMatch(document, />Главная</);
+    assert.doesNotMatch(document, /data-bd-authenticated-home-shell="v345"/);
     assert.ok(
-      document.indexOf('data-bd-static-startup="v201"') < document.indexOf('<div id="root"><\/div>'),
-      "the startup overlay must stay outside React's root",
+      document.indexOf('data-bd-static-startup="v201"') < document.indexOf('<div id="root"></div>'),
+      "React cannot remove the launch surface before Home is ready",
     );
   }
 
@@ -78,16 +78,20 @@ test("cold Home launch paints the BarDoctor splash before the authenticated shel
   assert.match(bundle, /bdStartupFirstPaintVersion="startup-v201"/);
   assert.match(bundle, /bdSeamlessStartupVersion="seamless-v202"/);
   assert.match(bundle, /function bdStartupFirstPaintCompleteV201\(\)/);
-  assert.match(bundle, /S\.useLayoutEffect\(\(\)=>\{\(!v\|\|E==="HOME"\)&&bdStartupFirstPaintCompleteV201\(\)\}/);
+  assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\).*bounded-home-handoff.*return e/s);
   assert.match(bundle, /new CustomEvent\("bd:startup-complete"/);
-  assert.match(bundle, /data-bd-root-splash":"seamless-startup-v341/);
   assert.match(bundle, /window\.setTimeout\(n,180\)/);
   assert.doesNotMatch(
     bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
-    /5200|server-bootstrap-timeout|children:i\.jsx\(ble/,
+    /5200|server-bootstrap-timeout|children:i\.jsx\(ble|data-bd-root-splash/,
   );
-  assert.match(bundle, /"data-bd-splash":"brand-loading-v332"/);
+  assert.match(bundle, /"data-bd-splash":"brand-loading-v347"/);
   assert.match(bundle, /initial:\{opacity:0,y:8\},animate:\{opacity:1,y:0\},transition:\{duration:\.42/);
   assert.doesNotMatch(bundle, /initial:\{opacity:0,y:12,scale:\.97\},animate:\{opacity:1,y:0,scale:1\}/);
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
+  assert.match(bootstrap, /startup-performance-v343/);
+  for (const document of [response, appHtml]) {
+    assert.match(document, /rel="modulepreload" href="\/assets\/index-BQGspy0I\.js\?[^\"]*startup-performance-v343/);
+    assert.match(document, /bardoctor-preview\.js[^>]*defer/);
+  }
 });

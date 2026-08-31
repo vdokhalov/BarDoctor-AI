@@ -25,8 +25,8 @@ test("nomenclature exposes one editable canonical taxonomy without an automatic 
 
 test("tech cards, receipts and write-offs share quick create and preserve their active workflow", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
-  const ingredientStart = bundle.indexOf("function bdCatIngredientMatchV299");
-  const ingredientEnd = bundle.indexOf("const bdCatIngredientMatchV259", ingredientStart);
+  const ingredientStart = bundle.indexOf("function bdCatIngredientMatchV368");
+  const ingredientEnd = bundle.indexOf("const bdCatIngredientMatchV299=bdCatIngredientMatchV368", ingredientStart);
   const receiptStart = bundle.indexOf("function bdInvoiceLineMappingV3");
   const receiptEnd = bundle.indexOf("function bdPurchaseReview", receiptStart);
   const writeoffStart = bundle.indexOf("function bdWriteoffPickerV271");
@@ -53,7 +53,7 @@ test("menu and purchase lines consume taxonomy IDs instead of a separate busines
   assert.match(bundle.slice(menuStart, menuEnd), /taxonomyCategoryId/);
   assert.match(bundle.slice(editorStart, editorEnd), /bdTaxonomySelectorsV336/);
   assert.match(bundle.slice(editorStart, editorEnd), /Управление общей структурой/);
-  assert.match(bundle.slice(purchaseStart, purchaseEnd), /Классификация берётся из canonical Номенклатуры/);
+  assert.match(bundle.slice(purchaseStart, purchaseEnd), /line\.purchaseProductKey\|\|line\.nomenclatureId/);
   assert.doesNotMatch(bundle.slice(purchaseStart, purchaseEnd), /label:"Категория",children:i\.jsx\("select",\{value:[a-z]\.category/);
 });
 

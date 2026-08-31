@@ -74,20 +74,22 @@ replaceOnce(
   "menu currency lock",
 );
 
-replaceInSection(
-  "function bdPurchaseReview(",
-  "function bdUploadFileName(",
-  'bdAccountingCurrency=bdCurrentAccountingCurrencyV243(),bdFxNeeded=e.documentType!=="price_list"&&!!bdAccountingCurrency&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency,h=',
-  'bdAccountingCurrency=bdCurrentAccountingCurrencyV243()||"RUB";S.useEffect(()=>{e.status!=="confirmed"&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency&&n({...e,currency:bdAccountingCurrency,originalCurrency:void 0,originalAmount:void 0,accountingCurrency:void 0,accountingAmount:void 0,fxRate:void 0,fxEffectiveDate:void 0,fxSource:void 0,fxLockedAt:void 0})},[e.currency,e.status,bdAccountingCurrency]);const bdFxNeeded=e.status==="confirmed"&&e.documentType!=="price_list"&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency,h=',
-  "draft purchases follow venue currency while historical FX remains readable",
-);
-replaceInSection(
-  "function bdPurchaseReview(",
-  "function bdUploadFileName(",
-  'currency:y.currency||e.currency',
-  'currency:e.status==="confirmed"?e.currency:bdAccountingCurrency||e.currency||"RUB"',
-  "supplier choice cannot override venue currency",
-);
+if (!source.includes('const bdPurchaseReviewUxVersion="v356"')) {
+  replaceInSection(
+    "function bdPurchaseReview(",
+    "function bdUploadFileName(",
+    'bdAccountingCurrency=bdCurrentAccountingCurrencyV243(),bdFxNeeded=e.documentType!=="price_list"&&!!bdAccountingCurrency&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency,h=',
+    'bdAccountingCurrency=bdCurrentAccountingCurrencyV243()||"RUB";S.useEffect(()=>{e.status!=="confirmed"&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency&&n({...e,currency:bdAccountingCurrency,originalCurrency:void 0,originalAmount:void 0,accountingCurrency:void 0,accountingAmount:void 0,fxRate:void 0,fxEffectiveDate:void 0,fxSource:void 0,fxLockedAt:void 0})},[e.currency,e.status,bdAccountingCurrency]);const bdFxNeeded=e.status==="confirmed"&&e.documentType!=="price_list"&&String(e.currency||"").toUpperCase()!==bdAccountingCurrency,h=',
+    "draft purchases follow venue currency while historical FX remains readable",
+  );
+  replaceInSection(
+    "function bdPurchaseReview(",
+    "function bdUploadFileName(",
+    'currency:y.currency||e.currency',
+    'currency:e.status==="confirmed"?e.currency:bdAccountingCurrency||e.currency||"RUB"',
+    "supplier choice cannot override venue currency",
+  );
+}
 replaceInSection(
   "function bdCatMenuEditor(",
   "function bdCatRecipeEditor(",

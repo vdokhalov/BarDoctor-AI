@@ -267,7 +267,6 @@ export function ensureNomenclatureHierarchy(assortment: unknown, now = new Date(
     const status = text(item.classificationStatus);
     const hasUsablePath = sectionId
       && categoryId
-      && subcategoryId
       && sectionId !== "unassigned"
       && categoryId !== "unassigned-category"
       && subcategoryId !== "unassigned-subcategory"
@@ -308,7 +307,7 @@ export function manualClassification(input: unknown): Partial<Classification> {
   const taxonomyCategoryId = text(value.taxonomyCategoryId);
   const subcategoryId = text(value.subcategoryId);
   const storageLocationId = text(value.storageLocationId);
-  if (!sectionId || !taxonomyCategoryId || !subcategoryId) return {};
+  if (!sectionId || !taxonomyCategoryId) return {};
   return {
     sectionId,
     taxonomyCategoryId,

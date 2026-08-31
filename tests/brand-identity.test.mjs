@@ -102,7 +102,7 @@ test("splash and interface brand marks use the same symbol without BD letters", 
   ]);
 
   assert.match(bundle, /data-bd-brand-splash":"v332/);
-  assert.match(bundle, /data-bd-splash":"brand-loading-v332/);
+  assert.match(bundle, /data-bd-splash":"brand-loading-v347/);
   assert.match(bundle, /src:"\/icons\/bardoctor-mark-v159\.svg"/);
   assert.match(bundle, /function Wle\(\{onStart:e\}\).*data-bd-brand-mark":"cloche-pulse-v159/s);
   assert.match(bundle, /children:"Bar"/);

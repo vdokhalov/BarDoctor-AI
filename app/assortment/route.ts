@@ -1,3 +1,5 @@
 export function GET(request: Request): Response {
-  return Response.redirect(new URL("/catalog", request.url), 307);
+  const url = new URL(request.url);
+  url.pathname = "/catalog";
+  return Response.redirect(url, 307);
 }

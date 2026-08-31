@@ -118,6 +118,7 @@ async function setProfile(session, name) {
     businessType: "Бар",
     country: "DE",
     city: "Köln",
+    currency: "EUR",
   });
   assert.equal(result.response.status, 200, JSON.stringify(result.body));
 }
@@ -186,6 +187,10 @@ try {
     externalSystem: "1С:Общепит",
   }], "Local Connector применил изменение из 1С");
   assert.equal(result.response.status, 200, JSON.stringify(result.body));
+
+  const diagnostic = await request("/api/admin/relationship-integrity", { headers: sessionHeaders(ownerA) });
+  assert.equal(diagnostic.response.status, 403, JSON.stringify(diagnostic.body));
+  assert.equal(diagnostic.body.code, "PLATFORM_ADMIN_REQUIRED");
 
   result = await putStore(ownerB, "bd_finance_expenses", [{
     id: "shared-expense",
@@ -409,6 +414,7 @@ try {
       reopen: true,
     },
     security: { auditImmutable: true, financialDiffRedacted: true, venueTamperingDenied: true },
+    relationshipDiagnostic: { platformAdminOnly: true, venueUserStatus: diagnostic.response.status },
     multiVenue: { sameEntityIdIsolated: true, authorizedVenueSwitchIsolated: true, exportIsolated: true },
   }, null, 2)}\n`);
 } catch (error) {

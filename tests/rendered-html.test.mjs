@@ -1113,9 +1113,11 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.ok(appIcon.byteLength > 5_000);
   assert.match(mainBundle, /data-bd-root-splash":"ai-pulse/);
   assert.match(mainBundle, /Заведение под контролем/);
-  assert.match(mainBundle, /"data-bd-health-startup-machine":"v335"/);
-  assert.match(mainBundle, /data-bd-root-splash":"seamless-startup-v341/);
-  assert.match(mainBundle, /data-bd-splash":"brand-loading-v332/);
+  assert.match(mainBundle, /bdStartupPerformanceVersionV343="v343"/);
+  assert.doesNotMatch(mainBundle, /"data-bd-health-startup-machine":"v335"/);
+  assert.doesNotMatch(mainBundle, /"data-bd-health-startup-machine":"v356"/);
+  assert.match(mainBundle, /bdBoundedStartupHandoffVersionV357="v357"/);
+  assert.match(mainBundle, /data-bd-splash":"brand-loading-v347/);
   assert.match(mainBundle, /data-bd-brand-splash":"v332/);
   assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function bdHealthStartupGateV155")), /data-bd-health-entry/);
   assert.match(mainBundle, /\/warehouse\?add=inventory/);

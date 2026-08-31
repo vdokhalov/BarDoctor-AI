@@ -193,6 +193,7 @@ async function createRun(browser, profile, label, options = {}) {
     shiftCloseFulfilled: false,
     storeWrites: [],
     healthMode: "attention",
+    bootstrapDelayMs: options.bootstrapDelayMs || 0,
   };
   const context = await browser.newContext({
     ...profile.descriptor,
@@ -233,6 +234,7 @@ async function createRun(browser, profile, label, options = {}) {
     const method = request.method();
     const activeProfile = profileFor(state.activeVenueId);
     if (url.pathname === "/api/auth/bootstrap") {
+      if (state.bootstrapDelayMs) await new Promise((resolve) => setTimeout(resolve, state.bootstrapDelayMs));
       return route.fulfill(jsonResponse({
         ok: true,
         email: "mobile-qa@bardoctor.local",
@@ -982,7 +984,7 @@ async function moduleSmokeFlow(browser, profile) {
 }
 
 async function businessHealthColdStartFlow(browser, profile) {
-  const run = await createRun(browser, profile, "business-health-cold-start");
+  const run = await createRun(browser, profile, "business-health-cold-start", { bootstrapDelayMs: 2_200 });
   const { page } = run;
   await page.addInitScript(() => {
     window.__bdHealthRenderedSnapshotIds = [];
@@ -996,13 +998,16 @@ async function businessHealthColdStartFlow(browser, profile) {
   });
   const response = await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   assert.equal(response?.status(), 200, `${profile.name}: cold start expected HTTP 200`);
-  const splash = page.locator('[data-bd-splash="brand-loading-v332"]');
+  const splash = page.locator('[data-bd-splash="brand-loading-v347"], [data-bd-static-startup="v201"]').first();
   const splashObserved = await splash.waitFor({ timeout: 2_500 }).then(() => true, () => false);
   if (splashObserved) {
-    const splashText = await splash.textContent();
-    assert.match(splashText || "", /BarDoctor.*AI-управляющий/s, `${profile.name}: branding splash is incomplete`);
-    assert.doesNotMatch(splashText || "", /\/100|Достоверность|Финансы|Операции/, `${profile.name}: splash leaked Health data`);
-    await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-splash.png`), fullPage: false });
+    const visibleSplash = page.locator('[data-bd-splash="brand-loading-v347"]:visible, .bd-static-startup-content-v202:visible').first();
+    if (await visibleSplash.count()) {
+      const splashText = await visibleSplash.textContent();
+      assert.match(splashText || "", /BarDoctor.*AI-управляющий/s, `${profile.name}: branding splash is incomplete`);
+      assert.doesNotMatch(splashText || "", /\/100|Достоверность|Финансы|Операции/, `${profile.name}: splash leaked Health data`);
+      await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-splash.png`), fullPage: false });
+    }
   }
 
   const home = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');

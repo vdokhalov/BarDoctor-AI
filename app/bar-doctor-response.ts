@@ -6,6 +6,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-390x844-v348.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <script>
       (function () {
         var path = window.location.pathname;
@@ -16,8 +17,11 @@ const BAR_DOCTOR_HTML = `<!doctype html>
       })();
     </script>
     <style>
+      /* bd-seamless-startup-v356 */
+      /* bd-static-startup-fastpaint-v343 */
       .bd-static-startup-v201 { display: none; }
       html[data-bd-startup-pending="v201"] {
+        min-height: 100%;
         background: #070911;
         color-scheme: dark;
       }
@@ -38,58 +42,22 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         box-sizing: border-box;
         display: flex;
         min-height: 100dvh;
-        padding: 0;
+        padding: max(20px, env(safe-area-inset-top)) 24px max(20px, env(safe-area-inset-bottom));
         align-items: center;
         justify-content: center;
         overflow: hidden;
         color: #fff;
-        padding-top: env(safe-area-inset-top);
-        padding-right: env(safe-area-inset-right);
-        padding-bottom: env(safe-area-inset-bottom);
-        padding-left: env(safe-area-inset-left);
-        opacity: 1;
         background: #070911;
         font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         text-align: center;
-        transition: opacity 180ms ease;
-        will-change: opacity;
+        opacity: 1;
+        transition: opacity 180ms ease-out;
       }
-      html[data-bd-startup-pending="v201"] .bd-static-startup-v201.bd-static-startup-leaving-v341 {
+      html[data-bd-startup-pending="v201"] .bd-static-startup-v201.bd-static-startup-leaving-v356 {
         opacity: 0;
         pointer-events: none;
       }
-      html[data-bd-startup-pending="v201"] .bd-static-startup-v201::before {
-        display: none;
-        position: absolute;
-        top: 22%;
-        left: 50%;
-        width: 360px;
-        height: 360px;
-        border-radius: 50%;
-        background: rgba(91, 92, 235, 0.18);
-        filter: blur(90px);
-        content: "";
-        margin-left: -180px;
-        animation: bd-static-startup-purple-halo-v202 3.2s ease-in-out infinite;
-        pointer-events: none;
-      }
-      html[data-bd-startup-pending="v201"] .bd-static-startup-v201::after {
-        display: none;
-        position: absolute;
-        right: -18%;
-        bottom: 8%;
-        width: 260px;
-        height: 260px;
-        border-radius: 50%;
-        background: rgba(46, 211, 183, 0.08);
-        filter: blur(80px);
-        content: "";
-        animation: bd-static-startup-green-halo-v202 4s ease-in-out infinite;
-        pointer-events: none;
-      }
       .bd-static-startup-content-v202 {
-        position: relative;
-        z-index: 1;
         box-sizing: border-box;
         display: flex;
         width: 100%;
@@ -97,47 +65,22 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         padding: 32px 28px;
         flex-direction: column;
         align-items: center;
-        text-align: center;
       }
       .bd-static-startup-mark-v201 {
-        position: relative;
         display: grid;
         width: 92px;
         height: 92px;
         margin-bottom: 24px;
         place-items: center;
       }
-      .bd-static-startup-mark-v201::before,
-      .bd-static-startup-mark-v201::after {
-        display: none;
-      }
-      .bd-static-startup-mark-v201::before {
-        inset: 0;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-top-color: #8b7bff;
-        border-right-color: rgba(91, 92, 235, 0.65);
-        box-shadow: 0 0 34px rgba(91, 92, 235, 0.16);
-        animation: bd-static-startup-spin-v201 2.4s linear infinite;
-      }
-      .bd-static-startup-mark-v201::after {
-        inset: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 60px rgba(0, 0, 0, 0.34);
-        animation: bd-static-startup-core-v202 2.2s ease-in-out infinite;
-      }
-      html[data-bd-startup-pending="v201"] .bd-static-startup-mark-v201 img {
-        position: relative;
-        z-index: 1;
+      .bd-static-startup-mark-v201 img {
         display: block;
         width: 92px;
         height: 92px;
         border-radius: 25px;
         object-fit: cover;
-        box-shadow: 0 16px 44px rgba(0, 0, 0, 0.34);
       }
       .bd-static-startup-brand-v201 {
-        position: relative;
         margin: 0;
         color: #fff;
         font-size: 38px;
@@ -145,23 +88,15 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         letter-spacing: -0.045em;
         line-height: 1;
       }
-      .bd-static-startup-brand-v201 span {
-        color: transparent;
-        background: linear-gradient(100deg, #9b8cff 0%, #6f78ff 48%, #69e6d1 120%);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
+      .bd-static-startup-brand-v201 span { color: #8b7bff; }
       .bd-static-startup-tagline-v201 {
-        position: relative;
         margin: 13px 0 0;
-        color: rgba(255, 255, 255, 0.78);
+        color: rgba(255, 255, 255, 0.72);
         font-size: 16px;
         font-weight: 650;
         letter-spacing: -0.01em;
       }
       .bd-static-startup-status-v201 {
-        position: relative;
         display: flex;
         margin: 34px 0 0;
         align-items: center;
@@ -179,32 +114,23 @@ const BAR_DOCTOR_HTML = `<!doctype html>
         height: 4px;
         border-radius: 50%;
         background: #8b7bff;
-        animation: bd-static-startup-dot-v202 1s ease-in-out infinite;
+        animation: bd-static-startup-dot-v356 1s ease-in-out infinite;
       }
       .bd-static-startup-dots-v202 span:nth-child(2) { animation-delay: 0.16s; }
       .bd-static-startup-dots-v202 span:nth-child(3) { animation-delay: 0.32s; }
-      @keyframes bd-static-startup-spin-v201 { to { transform: rotate(360deg); } }
-      @keyframes bd-static-startup-purple-halo-v202 {
-        0%, 100% { opacity: 0.35; transform: scale(0.9); }
-        50% { opacity: 0.65; transform: scale(1.08); }
-      }
-      @keyframes bd-static-startup-green-halo-v202 {
-        0%, 100% { opacity: 0.2; transform: scale(1); }
-        50% { opacity: 0.5; transform: scale(1.15); }
-      }
-      @keyframes bd-static-startup-core-v202 {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.025); }
-      }
-      @keyframes bd-static-startup-dot-v202 {
-        0%, 100% { opacity: 0.2; transform: translateY(0); }
+      @keyframes bd-static-startup-dot-v356 {
+        0%, 100% { opacity: 0.25; transform: translateY(0); }
         50% { opacity: 1; transform: translateY(-2px); }
       }
+      @media (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
+        html[data-bd-startup-pending="v201"] .bd-static-startup-v201 {
+          padding: 0;
+          background: #070911 url("/icons/bardoctor-launch-390x844-v348.png") center / 100% 100% no-repeat;
+        }
+        html[data-bd-startup-pending="v201"] .bd-static-startup-content-v202 { visibility: hidden; }
+      }
       @media (prefers-reduced-motion: reduce) {
-        .bd-static-startup-mark-v201::before,
-        .bd-static-startup-mark-v201::after,
-        .bd-static-startup-v201::before,
-        .bd-static-startup-v201::after,
+        html[data-bd-startup-pending="v201"] .bd-static-startup-v201 { transition-duration: 1ms; }
         .bd-static-startup-dots-v202 span { animation: none; }
       }
     </style>
@@ -213,6 +139,15 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="BarDoctor" />
+    <meta name="bd-startup-performance" content="v343" />
+    <meta name="bd-authoritative-home" content="v344" />
+    <meta name="bd-authenticated-home-shell" content="v345" />
+    <meta name="bd-branded-startup-handoff" content="v346" />
+    <meta name="bd-coherent-startup" content="v347" />
+    <meta name="bd-ios-launch-screen" content="v348" />
+    <meta name="bd-single-ready-home" content="v349" />
+    <meta name="bd-seamless-startup" content="v356" />
+    <meta name="bd-bounded-startup-handoff" content="v357" />
     <meta name="bd-app-version" content="${BARDOCTOR_BUILD_VERSION}" />
     <meta name="bd-build-id" content="${BARDOCTOR_BUILD_ID}" />
     <title>BarDoctor</title>
@@ -222,68 +157,69 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="manifest" href="/manifest.json?v=20260812-brand-v159" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/bardoctor-v159-apple-180.png" />
     <link rel="preload" href="/icons/bardoctor-mark-v159.svg" as="image" type="image/svg+xml" />
+    <link rel="modulepreload" href="/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260826-invoice-recognition-v2-20260824-canonical-supplier-v260-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260825-business-health-v284-20260826-venue-identity-v297-20260826-menu-sale-size-v298-20260828-calculation-audit-v320-20260828-accounting-money-v321-20260828-authoritative-bootstrap-v324-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-20260828-business-health-ux-v332-20260828-business-health-ux-v333-20260828-business-health-canonical-v335-20260829-canonical-taxonomy-v336-20260829-startup-recovery-v341-20260829-startup-runtime-v342-20260829-startup-performance-v343-20260826-invoice-create-canonical-v297-20260829-single-ready-home-v349-20260829-menu-nomenclature-action-v351-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-purchase-review-v356-purchase-receiving-v357-bd-purchase-accounting-v359-bd-taxonomy-manager-ux-v360-bd-optional-subcategory-v361-bd-classification-ux-v362-bd-alphabetical-taxonomy-v363-bd-taxonomy-action-sheet-v364-bd-nested-sections-v365-bd-nomenclature-catalog-route-v366-bd-purchase-category-options-v367-bd-tech-card-catalog-picker-v368-bd-nomenclature-uat-v369-purchase-receiving-stability-v371-20260830-seamless-startup-v356-20260830-bounded-startup-v357" />
     <link rel="stylesheet" href="/assets/index-D0AhgpbR.css?v=20260809-rc-v78" />
-    <link rel="stylesheet" href="/access-entry.css?v=20260726-access-v1" />
-    <link rel="stylesheet" href="/market-entry.css?v=20260828-competitors-v329" />
-    <link rel="stylesheet" href="/opportunities-entry.css?v=20260828-opportunity-calendar-v327" />
-    <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224" />
-    <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a" />
-    <link rel="stylesheet" href="/sales-consumption-v275.css?v=20260824-sales-batch-ledger-v275" />
-    <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239-20260824-canonical-supplier-v260" />
-    <link rel="stylesheet" href="/canonical-taxonomy-v336.css?v=20260829-canonical-taxonomy-v336" />
+    <link rel="stylesheet" href="/access-entry.css?v=20260726-access-v1" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/market-entry.css?v=20260828-competitors-v329" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/opportunities-entry.css?v=20260828-opportunity-calendar-v327" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/suppliers.css?v=20260821-inventory-reconciliation-v224-purchase-review-v356-purchase-receiving-v357" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/warehouse.css?v=20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/sales-consumption-v275.css?v=20260824-sales-batch-ledger-v275" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/nomenclature-v208.css?v=20260821-warehouse-v214-purchase-units-v237-collapsed-tree-v239-20260824-canonical-supplier-v260-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-bd-classification-ux-v362-bd-nomenclature-uat-v369" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/canonical-taxonomy-v336.css?v=20260829-menu-nomenclature-action-v351-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-menu-link-v352-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-bd-taxonomy-manager-ux-v360-bd-classification-ux-v362-bd-taxonomy-action-sheet-v364-bd-nested-sections-v365-bd-nomenclature-uat-v369" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
-    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260" />
-    <link rel="stylesheet" href="/ai-action-plan.css?v=20260803-action-plan-v2" />
-    <link rel="stylesheet" href="/employee-detail.css?v=20260817-employee-edit-page-v206" />
-    <link rel="stylesheet" href="/employee-list.css?v=20260817-employee-edit-page-v206" />
-    <link rel="stylesheet" href="/team-dashboard-v163.css?v=20260812-team-v163" />
-    <link rel="stylesheet" href="/payroll-dashboard-v164.css?v=20260812-payroll-v164" />
+    <link rel="stylesheet" href="/catalog.css?v=20260801-catalog-move-v44-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-publication-readiness-v355-purchase-review-v356-purchase-receiving-v357-bd-tech-card-catalog-picker-v368" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/ai-action-plan.css?v=20260803-action-plan-v2" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/employee-detail.css?v=20260817-employee-edit-page-v206" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/employee-list.css?v=20260817-employee-edit-page-v206" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/team-dashboard-v163.css?v=20260812-team-v163" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/payroll-dashboard-v164.css?v=20260812-payroll-v164" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/brand-identity-v159.css?v=20260812-brand-v159" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260812-modern-v158" />
     <link rel="stylesheet" href="/home-visual-v151.css?v=20260811-home-v151" />
-    <link rel="stylesheet" href="/health-score-experience-v152.css?v=20260828-business-health-canonical-v335" />
-    <link rel="stylesheet" href="/shifts-visual-v156.css?v=20260812-shifts-v158" />
-    <link rel="stylesheet" href="/finance-dashboard-v160.css?v=20260812-finance-v161" />
-    <link rel="stylesheet" href="/monthly-report-v165.css?v=20260812-monthly-v165" />
-    <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" />
-    <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" />
-    <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" />
-    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326" />
-    <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" />
-    <link rel="stylesheet" href="/profile-v280.css?v=20260825-profile-v280" />
-    <link rel="stylesheet" href="/profile-v281.css?v=20260825-profile-v282" />
-    <link rel="stylesheet" href="/ai-doctor-attention-v196.css?v=20260823-self-service-v255" />
+    <link rel="stylesheet" href="/health-score-experience-v152.css?v=20260828-business-health-canonical-v335-20260829-authoritative-home-v344" />
+    <link rel="stylesheet" href="/shifts-visual-v156.css?v=20260812-shifts-v158" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/finance-dashboard-v160.css?v=20260812-finance-v161" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/monthly-report-v165.css?v=20260812-monthly-v165" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-publication-readiness-v355" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/profile-v280.css?v=20260825-profile-v280" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/profile-v281.css?v=20260825-profile-v282" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/ai-doctor-attention-v196.css?v=20260823-self-service-v255" media="print" onload="this.media='all'" />
     ${canonicalUserShellAssets()}
-    <script src="/monthly-report-qa-v165.js?v=20260812-monthly-v165"></script>
-    <script src="/more-hub-qa-v166.js?v=20260812-more-v166"></script>
-    <script src="/equipment-qa-v167.js?v=20260812-equipment-v167"></script>
-    <script src="/procurement-qa-v168.js?v=20260814-finance-purchase-delete-v195"></script>
-    <script src="/assortment-qa-v170.js?v=20260813-assortment-v171"></script>
-    <script src="/nomenclature-qa-v238.js?v=20260821-accounting-currency-v243"></script>
-    <script src="/health-score-experience.js?v=20260828-health-startup-v332"></script>
-    <script src="/opportunity-calendar-qa-v327.js?v=20260828-opportunity-calendar-v328"></script>
-    <script src="/opportunity-calendar-client-v327.js?v=20260828-opportunity-calendar-v327"></script>
-    <script src="/competitor-market-qa-v329.js?v=20260828-competitors-v329"></script>
-    <script src="/competitor-market-client-v329.js?v=20260828-competitors-v329"></script>
+    <script src="/monthly-report-qa-v165.js?v=20260812-monthly-v165" defer></script>
+    <script src="/more-hub-qa-v166.js?v=20260812-more-v166" defer></script>
+    <script src="/equipment-qa-v167.js?v=20260812-equipment-v167" defer></script>
+    <script src="/procurement-qa-v168.js?v=20260814-finance-purchase-delete-v195" defer></script>
+    <script src="/assortment-qa-v170.js?v=20260813-assortment-v171" defer></script>
+    <script src="/nomenclature-qa-v238.js?v=20260821-accounting-currency-v243" defer></script>
+    <script src="/health-score-experience.js?v=20260828-health-startup-v332" defer></script>
+    <script src="/opportunity-calendar-qa-v327.js?v=20260828-opportunity-calendar-v328" defer></script>
+    <script src="/opportunity-calendar-client-v327.js?v=20260828-opportunity-calendar-v327" defer></script>
+    <script src="/competitor-market-qa-v329.js?v=20260828-competitors-v329" defer></script>
+    <script src="/competitor-market-client-v329.js?v=20260828-competitors-v329" defer></script>
     <script src="/server-migration-discovery-v262.js?v=20260824-controlled-migration-v262" defer></script>
-    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260824-controlled-migration-v262-20260824-owner-rbac-v273-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260826-venue-identity-v297-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-20260828-opportunity-calendar-v328-20260828-competitors-v329-20260828-business-health-ux-v332-20260828-business-health-ux-v333-20260828-business-health-canonical-v335-20260829-canonical-taxonomy-v336"></script>
+    <script src="/bardoctor-preview.js?v=20260821-inventory-cache-reconciliation-v235-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260822-navigation-v247-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260824-controlled-migration-v262-20260824-owner-rbac-v273-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260826-venue-identity-v297-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-20260828-opportunity-calendar-v328-20260828-competitors-v329-20260828-business-health-ux-v332-20260828-business-health-ux-v333-20260828-business-health-canonical-v335-20260829-canonical-taxonomy-v336-20260829-startup-recovery-v341-20260829-startup-runtime-v342-20260829-authoritative-home-v344-20260829-authenticated-home-v345-20260829-branded-startup-v346-20260829-coherent-startup-v347-20260829-single-ready-home-v349-20260830-seamless-startup-v356-20260830-bounded-startup-v357" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body>
     <div class="bd-static-startup-v201" data-bd-static-startup="v201" role="status" aria-label="BarDoctor загружается">
-        <div class="bd-static-startup-content-v202">
-          <div class="bd-static-startup-mark-v201" aria-hidden="true">
-            <img src="/icons/bardoctor-mark-v159.svg" alt="" width="112" height="112" />
-          </div>
-          <h1 class="bd-static-startup-brand-v201">Bar<span>Doctor</span></h1>
-          <p class="bd-static-startup-tagline-v201">AI-управляющий для вашего заведения</p>
-          <p class="bd-static-startup-status-v201">
-            <span>Загрузка</span>
-            <span class="bd-static-startup-dots-v202" aria-hidden="true"><span></span><span></span><span></span></span>
-          </p>
+      <div class="bd-static-startup-content-v202">
+        <div class="bd-static-startup-mark-v201" aria-hidden="true">
+          <img src="/icons/bardoctor-mark-v159.svg" alt="" width="92" height="92" />
         </div>
+        <h1 class="bd-static-startup-brand-v201">Bar<span>Doctor</span></h1>
+        <p class="bd-static-startup-tagline-v201">AI-управляющий для вашего заведения</p>
+        <p class="bd-static-startup-status-v201">
+          <span>Загрузка</span>
+          <span class="bd-static-startup-dots-v202" aria-hidden="true"><span></span><span></span><span></span></span>
+        </p>
+      </div>
     </div>
     <div id="root"></div>
   </body>

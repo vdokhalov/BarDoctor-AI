@@ -543,6 +543,96 @@ async function aiResolveUnresolved(input: {
   };
 }
 
+async function matchLegacyRecognition(input: {
+  accountId: number;
+  actorAccountId: number;
+  venueId: number;
+  jobId: string;
+  legacy: unknown;
+}): Promise<{
+  document: Record<string, unknown>;
+  recognition: Record<string, unknown>;
+}> {
+  const startedAt = Date.now();
+  const stores = await recognitionStores(input.accountId);
+  const parsed = parsedInvoiceDocumentFromLegacy(input.legacy);
+  const supplierId = resolveSupplier(parsed, stores.suppliers);
+  const candidates = nomenclatureCandidates(stores.assortment, input.venueId);
+  const matchingStartedAt = Date.now();
+  let matched = applyDeterministicMappings({
+    document: parsed,
+    supplierId,
+    venueId: input.venueId,
+    mappings: [
+      ...canonicalInvoiceSupplierMappings(stores.assortment, input.venueId),
+      ...stores.mappings,
+    ],
+    nomenclature: candidates,
+  });
+  const matchingDurationMs = Date.now() - matchingStartedAt;
+  const fallbackEnabled = String(
+    environment().INVOICE_RECOGNITION_V2_AI_FALLBACK ?? "on",
+  ).toLocaleLowerCase("en-US") !== "off";
+  const unresolvedCount = matched.items.filter((item) => item.requiresReview).length;
+  const ai = fallbackEnabled && unresolvedCount > 0
+    ? await aiResolveUnresolved({
+      accountId: input.accountId,
+      actorAccountId: input.actorAccountId,
+      venueId: input.venueId,
+      jobId: input.jobId,
+      document: matched,
+    })
+    : {
+      document: matched,
+      aiFallbackLinesCount: 0,
+      aiRequestCount: 0,
+      aiEstimatedInputTokens: 0,
+      aiEstimatedOutputTokens: 0,
+      aiEstimatedTokenUsage: 0,
+      unavailable: false,
+    };
+  matched = ai.document;
+  const document = mergeShadowMappingMetadata(input.legacy, matched);
+  if (ai.unavailable) {
+    const currentWarnings = Array.isArray(document.warnings) ? document.warnings : [];
+    document.warnings = [
+      ...currentWarnings,
+      "Часть товаров не удалось сопоставить автоматически. Уже найденные связи сохранены — проверьте только оставшиеся позиции.",
+    ];
+  }
+  const metrics = recognitionMetrics({
+    mode: "legacy",
+    ocr: null,
+    document: matched,
+    aiFallbackLinesCount: ai.aiFallbackLinesCount,
+    aiRequestCount: ai.aiRequestCount,
+    aiEstimatedInputTokens: ai.aiEstimatedInputTokens,
+    aiEstimatedOutputTokens: ai.aiEstimatedOutputTokens,
+    aiEstimatedTokenUsage: ai.aiEstimatedTokenUsage,
+    nomenclatureCandidatesCount: candidates.length,
+    matchingDurationMs,
+    startedAt,
+  });
+  console.info("INVOICE_RECOGNITION_LEGACY_MATCHING_COMPLETED", {
+    jobId: input.jobId,
+    accountId: input.accountId,
+    venueId: input.venueId,
+    ...metrics,
+  });
+  return {
+    document,
+    recognition: {
+      jobId: input.jobId,
+      version: 2,
+      mode: "legacy",
+      activePipeline: "legacy_authoritative_canonical_matching",
+      metrics,
+      aiUnavailable: ai.unavailable,
+      manualContinuation: true,
+    },
+  };
+}
+
 async function recogniseDocumentV2(input: {
   accountId: number;
   actorAccountId: number;
@@ -868,13 +958,26 @@ export async function POST(request: Request): Promise<Response> {
     let recognition: Record<string, unknown> | undefined;
     if (mode === "legacy") {
       const venueContext = await loadVenueAIContext(account, "purchase");
-      recognised = await recogniseDocument({
+      const legacy = await recogniseDocument({
         accountId: account.id,
         jobId: id,
         documents,
         hint,
         contextHint: JSON.stringify(venueAIContextForPrompt(venueContext)),
       });
+      const matched = await matchLegacyRecognition({
+        accountId: account.id,
+        actorAccountId: account.actorAccountId,
+        venueId: account.venueId,
+        jobId: id,
+        legacy,
+      });
+      recognised = matched.document;
+      recognition = {
+        ...matched.recognition,
+        configuredMode: modeSelection.configuredMode,
+        qaMode: modeSelection.qaMode,
+      };
     } else if (mode === "primary") {
       const v2 = await recogniseDocumentV2({
         accountId: account.id,

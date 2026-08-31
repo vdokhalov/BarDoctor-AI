@@ -396,37 +396,20 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  let supplier = document.supplierId
-    ? suppliers.map(record).find((item) => item?.id === document.supplierId) ?? null
-    : null;
-  if (!supplier) {
-    const requestedName = supplierName(document.supplierName).toLocaleLowerCase("ru");
-    supplier = suppliers.map(record).find((item) =>
-      String(item?.name ?? "").trim().toLocaleLowerCase("ru") === requestedName
-    ) ?? null;
+  if (!document.supplierId) {
+    return Response.json({
+      ok: false,
+      code: "SUPPLIER_SELECTION_REQUIRED",
+      error: "Выберите существующего поставщика или сначала создайте отдельную карточку поставщика.",
+    }, { status: 422 });
   }
-  if (!supplier) {
-    supplier = {
-      id: document.supplierId || crypto.randomUUID(),
-      name: supplierName(document.supplierName),
-      type: document.supplierType,
-      categories: [...new Set(document.items.map((item) => item.category))],
-      currency: document.currency,
-      status: "active",
-      source: document.documentType === "receipt" ? "receipt" : "document",
-      createdAt: now,
-      updatedAt: now,
-    };
-    suppliers.unshift(supplier);
-  } else {
-    supplier.name = supplierName(document.supplierName || String(supplier.name ?? ""));
-    supplier.type = document.supplierType;
-    supplier.currency = document.currency;
-    supplier.categories = [...new Set([
-      ...(Array.isArray(supplier.categories) ? supplier.categories.map(String) : []),
-      ...document.items.map((item) => item.category),
-    ])];
-    supplier.updatedAt = now;
+  const supplier = suppliers.map(record).find((item) => item?.id === document.supplierId) ?? null;
+  if (!supplier || supplier.status === "archived") {
+    return Response.json({
+      ok: false,
+      code: "SUPPLIER_NOT_FOUND",
+      error: "Поставщик не найден или находится в архиве. Выберите активную карточку поставщика.",
+    }, { status: 422 });
   }
 
   const shouldRecordPayment = body.recordPayment === true

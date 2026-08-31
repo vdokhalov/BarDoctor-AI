@@ -8,7 +8,7 @@ test("authoritative bootstrap replaces present stores and invalidates missing se
   const bundle = await readFile(new URL("public/assets/index-BQGspy0I.js", root), "utf8");
   assert.match(bundle, /bdAuthoritativeBootstrapVersionV324="authoritative-bootstrap-v324"/);
   assert.match(bundle, /return\{entries:r,persistenceBoundary:n\.persistenceBoundary\?\?null\}/);
-  assert.match(bundle, /Object\.prototype\.hasOwnProperty\.call\(d\.entries,f\)\|\|cz\(f\)\|\|bdClearMissingServerStoreV324\(f\)/);
+  assert.match(bundle, /Object\.prototype\.hasOwnProperty\.call\([a-z]\.entries,[a-z]\)\|\|cz\([a-z]\)\|\|bdClearMissingServerStoreV324\([a-z]\)/);
   assert.match(bundle, /localStorage\.removeItem\(Sz\(e\)\)/);
   assert.match(bundle, /"bd_finance_expenses"/);
   assert.match(bundle, /"bd_ai_diagnosis_v9"/);
@@ -18,6 +18,6 @@ test("authoritative bootstrap replaces present stores and invalidates missing se
 test("bootstrap preserves pending offline edits while invalidating only after a successful server read", async () => {
   const bundle = await readFile(new URL("public/assets/index-BQGspy0I.js", root), "utf8");
   assert.match(bundle, /if\(!n\.ok\|\|!n\.entries\)return null/);
-  assert.match(bundle, /if\(d\)\{for\(const\[f,m\]of Object\.entries\(d\.entries\)\)cz\(f\)\|\|Kse\(f,m\)/);
-  assert.match(bundle, /hasOwnProperty\.call\(d\.entries,f\)\|\|cz\(f\)\|\|bdClearMissingServerStoreV324\(f\)/);
+  assert.match(bundle, /if\([a-z]\)\{for\(const\[[a-z],[a-z]\]of Object\.entries\([a-z]\.entries\)\)cz\([a-z]\)\|\|Kse\([a-z],[a-z]\)/);
+  assert.match(bundle, /hasOwnProperty\.call\([a-z]\.entries,[a-z]\)\|\|cz\([a-z]\)\|\|bdClearMissingServerStoreV324\([a-z]\)/);
 });

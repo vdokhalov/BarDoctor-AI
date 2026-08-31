@@ -153,6 +153,23 @@ test("manual correction is marked as confirmed with full confidence", () => {
   });
 });
 
+test("manual classification allows a category without a subcategory", () => {
+  assert.deepEqual(manualClassification({
+    sectionId: "bar",
+    taxonomyCategoryId: "cigarettes",
+    subcategoryId: "",
+    storageLocationId: "bar-store",
+  }), {
+    sectionId: "bar",
+    taxonomyCategoryId: "cigarettes",
+    subcategoryId: "",
+    storageLocationId: "bar-store",
+    classificationStatus: "confirmed",
+    classificationConfidence: 1,
+    classificationSource: "manual",
+  });
+});
+
 test("a correction is remembered for the same product name on future purchases", () => {
   const rules = rememberNomenclatureCorrection([], { name: "Авторский микс №1" }, {
     sectionId: "hookah",

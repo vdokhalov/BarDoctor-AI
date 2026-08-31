@@ -37,6 +37,8 @@ import {
 } from "../../../../lib/bardoctor/menu-sale-size";
 import { normalizeAssortmentMenuCurrencyUpdates } from "../../../../lib/bardoctor/assortment-currency";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomenclature";
+import { materializeMenuTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 import {
   normalizeVenueCurrencyArrayUpdates,
   VENUE_CURRENCY_ARRAY_STORE_KEYS,
@@ -197,6 +199,16 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       );
     }
     after = currencyNormalization.data;
+    const changedMenuHasCanonicalPath = before != null && array(record(after).menuItems).some((value) => {
+      const item = record(value);
+      const previous = array(record(before).menuItems).map(record)
+        .find((candidate) => String(candidate.id ?? "") === String(item.id ?? ""));
+      const changed = !previous || JSON.stringify(previous) !== JSON.stringify(item);
+      return changed && Boolean(item.sectionId && item.taxonomyCategoryId && item.subcategoryId);
+    });
+    if (changedMenuHasCanonicalPath) {
+      after = materializeMenuTaxonomy(after, defaultNomenclatureStructure());
+    }
     if (before != null) {
       const beforeRoot = record(before);
       const afterRoot = { ...record(after) };

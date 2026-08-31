@@ -71,6 +71,6 @@ test("warehouse allocation row deep-links to the existing Nomenclature review wo
   assert.match(nomenclature, /\["structure","all","attention","taxonomy"\]\.includes\(window\.bdReadNavigationQuery\("view","structure"\)\)/);
   assert.match(nomenclature, /\[a,s\]=S\.useState\(\(\)=>window\.bdReadNavigationQuery\("q",""\)\)/);
   assert.match(nomenclature, /window\.bdSyncNavigationQuery\(\{view:l==="structure"\?null:l,q:a\|\|null\}\)/);
-  assert.match(nomenclature, /back:window\.bdReadNavigationQuery\("returnTo",""\)==="warehouse"\?"\/warehouse":"\/more"/);
+  assert.match(nomenclature, /back:window\.bdReadNavigationQuery\("returnTo",""\)==="warehouse"\?"\/warehouse":window\.bdReadNavigationQuery\("returnTo",""\)==="assortment"\?"\/assortment":"\/more"/);
   assert.match(nomenclature, /\[\["structure","Структура"\],\["taxonomy","Категории"\],\["all","Все позиции"\],\["attention","На проверке"\]\]/);
 });

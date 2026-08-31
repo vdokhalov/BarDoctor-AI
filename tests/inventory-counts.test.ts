@@ -193,6 +193,24 @@ test("canonical hierarchy exposes every eligible top-level section without hardc
   assert.equal(scopes[0].itemCount, 1);
 });
 
+test("a parent section scope includes balances from nested sections", () => {
+  const nested = structuredClone(assortment);
+  nested.nomenclatureStructure.sections.push({
+    id: "operations",
+    name: "Операции",
+  });
+  const bar = nested.nomenclatureStructure.sections.find((section) => section.id === "bar");
+  assert.ok(bar);
+  (bar as typeof bar & { parentId?: string }).parentId = "operations";
+  const scopes = inventoryCountScopes(nested);
+  const parent = scopes.find((scope) => scope.type === "section" && scope.id === "operations");
+  const child = scopes.find((scope) => scope.type === "section" && scope.id === "bar");
+  assert.ok(parent);
+  assert.ok(child);
+  assert.equal(parent.itemCount, child.itemCount);
+  assert.equal(child.label, "Операции → Бар");
+});
+
 test("section, category and subcategory scopes snapshot only their stable-ID descendants", () => {
   const expected = new Map<"section" | "category" | "subcategory", string[]>([
     ["section", ["cognac"]],

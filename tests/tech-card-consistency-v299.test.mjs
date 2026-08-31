@@ -10,16 +10,15 @@ test("compiled tech-card consistency patch remains valid", () => {
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
 });
 
-test("ingredient selector uses canonical server search and cursor pagination", () => {
+test("ingredient selector keeps canonical matching and uses the complete structured catalogue", () => {
   for (const marker of [
     "bd-tech-card-consistency-v299",
-    "/api/tech-cards/nomenclature?",
-    "Поиск по номенклатуре…",
-    "Загружаем номенклатуру…",
-    "Ищем по всей номенклатуре…",
-    "Ничего не найдено",
-    "Повторить",
-    "v1:",
+    "bd-tech-card-catalog-picker-v368",
+    "Поиск по всей номенклатуре",
+    "Все активные складские позиции · по алфавиту",
+    "Все разделы",
+    "Все категории",
+    "Все подкатегории",
   ]) assert.ok(bundle.includes(marker), marker);
   assert.ok(!bundle.includes("const P=bdCatRankProductsV258(e,t,s),c=s?P:P.slice(0,20)"));
 });
@@ -30,13 +29,14 @@ test("approval waits for persistence and refreshes from authoritative cache", ()
   assert.ok(bundle.includes("await s({...l,ingredients:c,status:p?\"confirmed\":\"draft\""));
 });
 
-test("create and edit actions keep the shared editor mounted", () => {
-  assert.ok(bundle.includes('w&&z(E.menuItems.find(R=>R.id===w.id)||null)'));
-  assert.ok(bundle.includes('onRecipe:()=>{const w=E.menuItems.find(R=>R.id===ge.id);w&&z(w)}'));
+test("recipe creation requires an explicit menu-item choice and opens the shared editor atomically", () => {
+  assert.ok(bundle.includes('title:"Выберите позицию меню"'));
+  assert.ok(!bundle.includes('w&&z(E.menuItems.find(R=>R.id===w.id)||null)'));
+  assert.ok(bundle.includes('onRecipe:()=>{const w=E.menuItems.find(R=>R.id===ge.id);w&&(M(null),U(null),q(null),z(w))}'));
 });
 
 test("selector controls remain usable on mobile", () => {
-  for (const marker of [".bd-ingredient-selector-v299", ".bd-selector-pagination-v299", "@media(max-width:520px)", "font-size:16px", "position:sticky"]) {
+  for (const marker of [".bd-ingredient-selector-v299", ".bd-tech-card-taxonomy-v368", "@media(max-width:640px)", "grid-template-columns:1fr", "position:sticky"]) {
     assert.ok(css.includes(marker), marker);
   }
 });

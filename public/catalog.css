@@ -1544,3 +1544,213 @@
 .bd-invoice-review-summary-v4{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid #dfe3ff;border-radius:14px;background:#f7f7ff}.bd-invoice-review-summary-v4>div{display:grid;gap:4px}.bd-invoice-review-summary-v4 strong{font-size:16px;color:#1f2440}.bd-invoice-review-summary-v4 span{font-size:12px;line-height:1.4;color:#5f6578}.bd-invoice-review-summary-v4 button{min-height:42px;border:0;border-radius:11px;padding:8px 12px;background:#5b5ceb;color:#fff;font-weight:800}@media(max-width:560px){.bd-invoice-review-summary-v4{align-items:stretch;flex-direction:column}.bd-invoice-review-summary-v4 button{width:100%}}
 
 .bd-monthly-currency-boundary-v320{display:grid;gap:5px;padding:14px 16px;border:1px solid #e5bd69;border-radius:14px;background:#fff8e8;color:#5e4511}.bd-monthly-currency-boundary-v320 strong{font-size:14px}.bd-monthly-currency-boundary-v320 p{margin:0;font-size:13px;line-height:1.45}.bd-home-currency-boundary-v320{margin:10px 0 0;padding:9px 11px;border-radius:10px;background:#fff8e8;color:#765714;font-size:12px;line-height:1.4}
+
+
+/* Catalog workflow UX v353 */
+.bd-catalog-workflow-status-v353 {
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid #dcd9ff;
+  border-radius: 14px;
+  color: #403a96;
+  background: #f7f6ff;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.bd-catalog-workflow-status-v353.good {
+  border-color: #cdebd9;
+  color: #216746;
+  background: #f0faf4;
+}
+.bd-catalog-stock-box-v353 {
+  border: 1px solid #e3e5ed;
+  border-radius: 13px;
+  background: #fafbfe;
+}
+.bd-catalog-stock-box-v353 > summary {
+  min-height: 42px;
+  padding: 0 12px;
+  cursor: pointer;
+  color: #616980;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 42px;
+}
+.bd-catalog-stock-box-v353 > :not(summary) { margin-inline: 12px; }
+.bd-catalog-stock-box-v353 > :last-child { margin-bottom: 12px; }
+.bd-menu-type-note-v353 {
+  margin: -3px 0 2px;
+  color: #697087;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+
+/* Modal workspace v354
+ * Contract: one primary workspace at a time; contextual quick-create is the only child layer.
+ */
+.bd-tech-card-workspace-v354 {
+  z-index: 1220;
+  align-items: stretch;
+  justify-content: flex-end;
+  background: rgba(15, 18, 39, .58);
+  backdrop-filter: blur(6px);
+}
+
+.bd-tech-card-editor-v354 {
+  display: flex;
+  width: min(720px, calc(100vw - 260px));
+  max-width: 720px;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin-left: auto;
+  padding: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0;
+  background: #f8f9fc;
+  box-shadow: -20px 0 68px rgba(12, 16, 39, .28);
+}
+
+.bd-tech-card-editor-v354:focus { outline: none; }
+.bd-tech-card-editor-v354 .bd-catalog-sheet-handle { display: none; }
+
+.bd-tech-card-editor-v354 .bd-catalog-sheet-head {
+  flex: 0 0 auto;
+  align-items: center;
+  margin: 0;
+  padding: calc(16px + env(safe-area-inset-top)) 20px 15px;
+  border-bottom: 1px solid #e5e7ee;
+  background: rgba(255, 255, 255, .97);
+}
+
+.bd-tech-card-context-v354 {
+  display: block;
+  margin-bottom: 4px;
+  color: #5b55d9;
+  font-size: 9.5px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-sheet-head h2 {
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-form {
+  min-height: 0;
+  flex: 1 1 auto;
+  gap: 13px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px 20px calc(18px + env(safe-area-inset-bottom));
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-sheet-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: calc(-18px - env(safe-area-inset-bottom));
+  margin: 4px -20px calc(-18px - env(safe-area-inset-bottom));
+  padding: 12px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid #e5e7ee;
+  background: rgba(255, 255, 255, .98);
+  box-shadow: 0 -10px 28px rgba(24, 29, 53, .07);
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-ingredient {
+  padding: 14px;
+  border-radius: 17px;
+}
+
+@media (max-width: 719px) {
+  .bd-tech-card-workspace-v354 { padding: 0; }
+  .bd-tech-card-editor-v354 {
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+  }
+  .bd-tech-card-editor-v354 .bd-catalog-sheet-head,
+  .bd-tech-card-editor-v354 .bd-catalog-form { padding-inline: 14px; }
+  .bd-tech-card-editor-v354 .bd-catalog-sheet-actions {
+    margin-inline: -14px;
+    padding-inline: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-tech-card-editor-v354 { scroll-behavior: auto; }
+}
+
+
+/* Publication readiness v355
+ * Keep primary actions reachable and make the tech-card workspace truly viewport-sized.
+ */
+.bd-tech-card-workspace-v354 {
+  padding: 0 !important;
+}
+
+.bd-tech-card-editor-v354 {
+  width: min(720px, calc(100vw - 260px)) !important;
+  max-width: 720px !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  border-radius: 0 !important;
+}
+
+.bd-tech-card-workspace-v354 .bd-tech-card-editor-v354 {
+  max-height: 100dvh !important;
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.bd-tech-card-editor-v354 .bd-catalog-sheet-actions {
+  margin-top: auto !important;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 719px) {
+  .bd-catalog-sheet-backdrop:not(.bd-tech-card-workspace-v354) {
+    padding: 0;
+  }
+
+  .bd-catalog-sheet:not(.bd-tech-card-editor-v354) {
+    display: flex;
+    max-height: calc(100dvh - 50px);
+    padding-bottom: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .bd-catalog-sheet:not(.bd-tech-card-editor-v354) > .bd-catalog-form {
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+
+  .bd-catalog-sheet:not(.bd-tech-card-editor-v354) .bd-catalog-sheet-actions {
+    bottom: calc(-12px - env(safe-area-inset-bottom));
+    margin: auto -18px calc(-12px - env(safe-area-inset-bottom)) !important;
+    padding: 11px 18px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(248, 249, 252, .98);
+    box-shadow: 0 -9px 24px rgba(24, 29, 53, .08);
+  }
+
+  .bd-tech-card-editor-v354 {
+    width: 100% !important;
+    max-width: none !important;
+  }
+}
+
+
+/* Purchase review mapping v356 */
+.bd-invoice-mapping-v356{display:grid;gap:9px;padding:11px 12px;border:1px solid #dfe3ec;border-radius:14px;background:#f8f9fc}.bd-invoice-mapping-v356>span{display:grid;gap:3px;min-width:0}.bd-invoice-mapping-v356 strong{color:#242941;font-size:12px}.bd-invoice-mapping-v356 small{color:#747b8e;font-size:10.5px;line-height:1.35}.bd-invoice-mapping-v356.is-linked,.bd-invoice-mapping-v356.is-review{grid-template-columns:minmax(0,1fr) auto;align-items:center}.bd-invoice-mapping-v356.is-review{border-color:#efcf8f;background:#fffaf0}.bd-invoice-mapping-v356.is-unlinked{border-color:#e1e3ee;background:#fafafe}.bd-invoice-mapping-v356>button,.bd-invoice-mapping-actions-v356 button{min-height:38px;padding:0 11px;border:1px solid #d5d9e5;border-radius:10px;background:#fff;color:#4c5267;font-size:11px;font-weight:800}.bd-invoice-mapping-v356>button.open{color:#5146dc;border-color:#d8d4ff;background:#f4f2ff}.bd-invoice-mapping-actions-v356{display:flex;gap:6px}.bd-invoice-mapping-actions-v356 button.confirm{color:#fff;border-color:#5b55f5;background:#5b55f5}.bd-invoice-suggestions-v356{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.bd-invoice-suggestions-v356 button,.bd-invoice-mapping-results-v356 button{display:grid;gap:2px;min-width:0;min-height:44px;padding:8px 10px;text-align:left;border:1px solid #e1e5ee;border-radius:10px;background:#fff}.bd-invoice-suggestions-v356 b,.bd-invoice-mapping-results-v356 b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px}.bd-invoice-mapping-v356.is-open{border-color:#cfcaff;background:#f8f7ff}.bd-invoice-mapping-title-v356{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.bd-invoice-mapping-title-v356>span{display:grid;gap:2px}.bd-invoice-mapping-title-v356>button{width:32px;height:32px;flex:0 0 auto;border:0;border-radius:50%;background:#e9e7f8;color:#4d5268;font-size:19px}.bd-invoice-mapping-v356.is-open>input{width:100%;min-height:44px;padding:0 12px;border:1px solid #cfd2df;border-radius:11px;background:#fff;font-size:16px}.bd-invoice-mapping-results-v356{display:grid;gap:6px;max-height:248px;overflow:auto;overscroll-behavior:contain}.bd-invoice-mapping-results-v356 button:active,.bd-invoice-suggestions-v356 button:active{background:#f0efff}@media(max-width:520px){.bd-invoice-mapping-v356.is-linked,.bd-invoice-mapping-v356.is-review{grid-template-columns:1fr}.bd-invoice-mapping-actions-v356{display:grid;grid-template-columns:1fr 1fr}.bd-invoice-suggestions-v356{grid-template-columns:1fr}.bd-invoice-mapping-results-v356{max-height:32dvh}}
+
+.bd-tech-card-picker-v368{display:grid;gap:12px}.bd-tech-card-taxonomy-v368{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.bd-tech-card-taxonomy-v368 label{display:grid;gap:5px}.bd-tech-card-taxonomy-v368 label>span{font-size:12px;font-weight:800;color:#73788b}.bd-tech-card-taxonomy-v368 select{width:100%;min-width:0;min-height:44px}.bd-tech-card-picker-summary-v368{display:flex;justify-content:space-between;gap:10px;align-items:baseline;color:#74798c;font-size:12px}.bd-tech-card-picker-summary-v368 strong{color:#252941}.bd-tech-card-groups-v368{display:grid;gap:12px;max-height:46vh;overflow:auto;padding-right:3px}.bd-tech-card-groups-v368 section{display:grid;gap:6px}.bd-tech-card-groups-v368 h4{position:sticky;top:0;z-index:1;margin:0;padding:8px 10px;border-radius:10px;background:#eef0ff;color:#4f46e5;font-size:12px;line-height:1.35}.bd-tech-card-groups-v368 section>div{display:grid;gap:6px}.bd-tech-card-groups-v368 button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:52px;padding:9px 11px;border:1px solid #dde1ec;border-radius:12px;background:#fff;text-align:left}.bd-tech-card-groups-v368 button.selected{border-color:#635bff;background:#f4f3ff}.bd-tech-card-groups-v368 button span{display:grid;gap:3px;min-width:0}.bd-tech-card-groups-v368 button strong{overflow:hidden;text-overflow:ellipsis}.bd-tech-card-groups-v368 button small{color:#777d90}.bd-tech-card-groups-v368 button>b{color:#584ff0;font-size:12px;white-space:nowrap}@media(max-width:640px){.bd-tech-card-taxonomy-v368{grid-template-columns:1fr}.bd-tech-card-picker-summary-v368{align-items:flex-start;flex-direction:column;gap:3px}.bd-tech-card-groups-v368{max-height:52vh}.bd-tech-card-groups-v368 button{min-height:56px}}

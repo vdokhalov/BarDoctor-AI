@@ -22,6 +22,14 @@ export type CanonicalTaxonomy = {
   locations: CanonicalTaxonomyNode[];
 };
 
+export type LegacyMenuTaxonomyPath = {
+  groupId: string;
+  subgroupId: string;
+  sectionId: string;
+  taxonomyCategoryId: string;
+  subcategoryId: string;
+};
+
 export type TaxonomyMutation = {
   action: "create" | "rename" | "move" | "reorder" | "archive" | "restore" | "delete";
   level: TaxonomyLevel;
@@ -56,6 +64,10 @@ function slug(value: string): string {
     .replace(/[^a-zа-я0-9]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "node";
+}
+
+function normalizedName(value: unknown): string {
+  return text(value).toLocaleLowerCase("ru-RU").replace(/ё/g, "е").replace(/\s+/g, " ");
 }
 
 function nodes(value: unknown): CanonicalTaxonomyNode[] {
@@ -98,6 +110,118 @@ export function normalizeCanonicalTaxonomy(value: unknown, fallback?: CanonicalT
   };
 }
 
+/**
+ * Legacy menu groups are read as an additive compatibility source until the
+ * venue persists the canonical tree. GET callers can use this projection
+ * without writing production data; a later user-authorized save can persist
+ * the same stable IDs through materializeMenuTaxonomy().
+ */
+export function canonicalTaxonomyForAssortment(
+  assortment: unknown,
+  fallback?: CanonicalTaxonomy,
+): {
+  taxonomy: CanonicalTaxonomy;
+  legacyMenuPaths: LegacyMenuTaxonomyPath[];
+  derivedFromMenu: boolean;
+} {
+  const root = record(assortment);
+  let taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, fallback);
+  const structuralCount = taxonomy.sections.length + taxonomy.categories.length + taxonomy.subcategories.length;
+  if (structuralCount === 0 && fallback) taxonomy = normalizeCanonicalTaxonomy(fallback);
+
+  taxonomy = {
+    ...taxonomy,
+    sections: taxonomy.sections.map((node) => ({ ...node })),
+    categories: taxonomy.categories.map((node) => ({ ...node })),
+    subcategories: taxonomy.subcategories.map((node) => ({ ...node })),
+    locations: taxonomy.locations.map((node) => ({ ...node })),
+  };
+  const groups = array(root.groups).map(record).filter((group) =>
+    text(group.id, "", 120) && text(group.name ?? group.label, "", 160) && group.active !== false
+  );
+  const subgroups = array(root.subgroups).map(record).filter((subgroup) =>
+    text(subgroup.id, "", 120) && text(subgroup.groupId, "", 120)
+      && text(subgroup.name ?? subgroup.label, "", 160) && subgroup.active !== false
+  );
+  const paths: LegacyMenuTaxonomyPath[] = [];
+  let derivedFromMenu = structuralCount === 0 && groups.length > 0;
+
+  const ensureGenericPath = (group: JsonRecord, subgroup?: JsonRecord): LegacyMenuTaxonomyPath => {
+    const groupId = text(group.id, "", 120);
+    const subgroupId = text(subgroup?.id, "", 120);
+    const groupName = text(group.name ?? group.label, "Раздел", 160);
+    const subgroupName = text(subgroup?.name ?? subgroup?.label, "Общее", 160);
+    let section = taxonomy.sections.find((node) => normalizedName(node.name) === normalizedName(groupName));
+    if (!section) {
+      section = { id: `menu-section:${groupId}`, name: groupName, order: number(group.sortOrder, taxonomy.sections.length * 10 + 10), active: true };
+      taxonomy.sections.push(section);
+      derivedFromMenu = true;
+    }
+
+    const existingSubcategory = taxonomy.subcategories.find((node) => {
+      if (normalizedName(node.name) !== normalizedName(subgroupName)) return false;
+      const category = taxonomy.categories.find((candidate) => candidate.id === node.parentId);
+      return category?.parentId === section?.id;
+    });
+    if (existingSubcategory) {
+      const category = taxonomy.categories.find((node) => node.id === existingSubcategory.parentId)!;
+      return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: existingSubcategory.id };
+    }
+
+    let category = taxonomy.categories.find((node) =>
+      node.parentId === section?.id && normalizedName(node.name) === normalizedName(subgroupName)
+    );
+    if (!category) {
+      category = {
+        id: `menu-category:${subgroupId || groupId}`,
+        name: subgroupName,
+        parentId: section.id,
+        order: number(subgroup?.sortOrder, taxonomy.categories.filter((node) => node.parentId === section?.id).length * 10 + 10),
+        active: true,
+      };
+      taxonomy.categories.push(category);
+      derivedFromMenu = true;
+    }
+    let subcategory = taxonomy.subcategories.find((node) =>
+      node.parentId === category?.id && normalizedName(node.name) === "без подкатегории"
+    ) ?? taxonomy.subcategories.find((node) => node.parentId === category?.id && node.active);
+    if (!subcategory) {
+      subcategory = {
+        id: `menu-subcategory:${subgroupId || groupId}`,
+        name: "Без подкатегории",
+        parentId: category.id,
+        order: 999,
+        active: true,
+      };
+      taxonomy.subcategories.push(subcategory);
+      derivedFromMenu = true;
+    }
+    return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: subcategory.id };
+  };
+
+  for (const group of groups) {
+    const children = subgroups.filter((subgroup) => text(subgroup.groupId, "", 120) === text(group.id, "", 120));
+    if (!children.length) paths.push(ensureGenericPath(group));
+    else children.forEach((subgroup) => paths.push(ensureGenericPath(group, subgroup)));
+  }
+  taxonomy.sections.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+  taxonomy.categories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+  taxonomy.subcategories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+  return { taxonomy, legacyMenuPaths: paths, derivedFromMenu };
+}
+
+export function materializeMenuTaxonomy(assortment: unknown, fallback?: CanonicalTaxonomy): JsonRecord {
+  const root = { ...record(assortment) };
+  const effective = canonicalTaxonomyForAssortment(root, fallback);
+  root.nomenclatureStructure = effective.taxonomy;
+  root.nomenclatureTaxonomyMigration = {
+    ...record(root.nomenclatureTaxonomyMigration),
+    menuGroupsAdopted: true,
+    version: "v350",
+  };
+  return root;
+}
+
 export function taxonomyArrays(level: TaxonomyLevel): keyof Pick<CanonicalTaxonomy, "sections" | "categories" | "subcategories"> {
   return level === "section" ? "sections" : level === "category" ? "categories" : "subcategories";
 }
@@ -106,8 +230,29 @@ export function taxonomyItemCount(assortment: unknown, level: TaxonomyLevel, id:
   const root = record(assortment);
   const field = level === "section" ? "sectionId" : level === "category" ? "taxonomyCategoryId" : "subcategoryId";
   const keys = new Set<string>();
-  for (const item of [...array(root.nomenclature), ...array(root.stockBalances), ...array(root.menuItems)]) {
+  // Nomenclature is authoritative for identity and archive state. Stock balances
+  // are only a compatibility fallback for legacy products that do not yet have a
+  // canonical nomenclature row. Menu items are consumers, not extra positions.
+  const canonicalKeys = new Set(array(root.nomenclature).map((item) => {
     const row = record(item);
+    return text(row.productKey ?? row.key ?? row.id, "", 300);
+  }).filter(Boolean));
+  const items = [
+    ...array(root.nomenclature),
+    ...array(root.stockBalances).filter((item) => {
+      const row = record(item);
+      const key = text(row.productKey ?? row.key ?? row.id, "", 300);
+      return key && !canonicalKeys.has(key);
+    }),
+    ...array(root.internalItems).filter((item) => {
+      const row = record(item);
+      const key = text(row.productKey ?? row.key ?? row.id, "", 300);
+      return key && !canonicalKeys.has(key);
+    }),
+  ];
+  for (const item of items) {
+    const row = record(item);
+    if (row.active === false || row.archived === true) continue;
     if (text(row[field], "", 120) !== id) continue;
     const key = text(row.productKey ?? row.key ?? row.id, "", 300);
     if (key) keys.add(key);
@@ -122,8 +267,32 @@ export function taxonomyUsage(assortment: unknown, taxonomy: CanonicalTaxonomy):
   });
 }
 
-function validateParent(taxonomy: CanonicalTaxonomy, level: TaxonomyLevel, parentId: string): boolean {
-  if (level === "section") return !parentId;
+function sectionDescendantIds(taxonomy: CanonicalTaxonomy, sectionId: string): Set<string> {
+  const descendants = new Set<string>();
+  let frontier = [sectionId];
+  while (frontier.length) {
+    const parents = new Set(frontier);
+    frontier = taxonomy.sections
+      .filter((node) => node.parentId && parents.has(node.parentId) && !descendants.has(node.id))
+      .map((node) => node.id);
+    for (const id of frontier) descendants.add(id);
+  }
+  return descendants;
+}
+
+function validateParent(
+  taxonomy: CanonicalTaxonomy,
+  level: TaxonomyLevel,
+  parentId: string,
+  currentId?: string,
+): boolean {
+  if (level === "section") {
+    if (!parentId) return true;
+    if (parentId === currentId) return false;
+    const parent = taxonomy.sections.find((node) => node.id === parentId && node.active);
+    if (!parent) return false;
+    return !currentId || !sectionDescendantIds(taxonomy, currentId).has(parentId);
+  }
   const parents = level === "category" ? taxonomy.sections : taxonomy.categories;
   return parents.some((node) => node.id === parentId && node.active);
 }
@@ -254,7 +423,10 @@ export function mutateCanonicalTaxonomy(input: {
   const current = list[index];
   const itemCount = taxonomyItemCount(root, mutation.level, current.id);
   const children = mutation.level === "section"
-    ? taxonomy.categories.filter((node) => node.parentId === current.id)
+    ? [
+        ...taxonomy.sections.filter((node) => node.parentId === current.id),
+        ...taxonomy.categories.filter((node) => node.parentId === current.id),
+      ]
     : mutation.level === "category"
       ? taxonomy.subcategories.filter((node) => node.parentId === current.id)
       : [];
@@ -265,11 +437,19 @@ export function mutateCanonicalTaxonomy(input: {
     taxonomy[key] = list.map((node) => node.id === current.id ? { ...node, name, updatedAt: now } : node);
   } else if (mutation.action === "move") {
     const parentId = text(mutation.parentId, "", 120);
-    if (mutation.level === "section" || !validateParent(taxonomy, mutation.level, parentId)) {
+    if (!validateParent(taxonomy, mutation.level, parentId, current.id)) {
       return { ok: false, code: "TAXONOMY_PARENT_INVALID", error: "Нельзя переместить в выбранный раздел" };
     }
-    taxonomy[key] = list.map((node) => node.id === current.id ? { ...node, parentId, updatedAt: now } : node);
-    Object.assign(root, moveReferencePath(root, taxonomy, mutation.level as Exclude<TaxonomyLevel, "section">, current.id, parentId));
+    taxonomy[key] = list.map((node) => {
+      if (node.id !== current.id) return node;
+      const next = { ...node, updatedAt: now };
+      if (parentId) next.parentId = parentId;
+      else delete next.parentId;
+      return next;
+    });
+    if (mutation.level !== "section") {
+      Object.assign(root, moveReferencePath(root, taxonomy, mutation.level, current.id, parentId));
+    }
   } else if (mutation.action === "reorder") {
     const siblings = list.filter((node) => (node.parentId ?? "") === (current.parentId ?? ""))
       .sort((left, right) => left.order - right.order);
@@ -314,5 +494,13 @@ export function taxonomyPath(taxonomy: CanonicalTaxonomy, item: unknown): string
   const section = taxonomy.sections.find((node) => node.id === row.sectionId);
   const category = taxonomy.categories.find((node) => node.id === row.taxonomyCategoryId);
   const subcategory = taxonomy.subcategories.find((node) => node.id === row.subcategoryId);
-  return [section?.name, category?.name, subcategory?.name].filter(Boolean) as string[];
+  const sectionPath: string[] = [];
+  const visited = new Set<string>();
+  let current = section;
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    sectionPath.unshift(current.name);
+    current = current.parentId ? taxonomy.sections.find((node) => node.id === current?.parentId) : undefined;
+  }
+  return [...sectionPath, category?.name, subcategory?.name].filter(Boolean) as string[];
 }

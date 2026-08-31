@@ -31,10 +31,24 @@ async function openCatalog(browser, viewport, label) {
     hasTouch: viewport.width < 700,
   });
   const errors = [];
-  await context.route("**/api/store/**", (route) => route.fulfill(response({ ok: true })));
+  await context.route("**/api/store**", (route) => route.fulfill(response({ ok: true, value: null })));
+  await context.route("**/api/business-health**", (route) => route.fulfill(response({ ok: true, snapshot: null })));
+  await context.route("**/api/nomenclature/taxonomy**", (route) => route.fulfill(response({
+    ok: true,
+    updatedAt: "2026-08-31T00:00:00.000Z",
+    taxonomy: {
+      version: "v336",
+      sections: [{ id: "bar", name: "Бар", order: 10, active: true }],
+      categories: [{ id: "bar-cocktails", name: "Коктейли", parentId: "bar", order: 10, active: true }],
+      subcategories: [],
+      locations: [],
+    },
+    usage: [],
+  })));
   const page = await context.newPage();
   page.on("console", (message) => { if (message.type() === "error") errors.push(`console: ${message.text()}`); });
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
+  page.on("response", (result) => { if (result.status() >= 400) errors.push(`response ${result.status()}: ${result.url()}`); });
   page.on("requestfailed", (request) => {
     if (!/ERR_ABORTED/.test(request.failure()?.errorText || "")) errors.push(`requestfailed: ${request.url()}`);
   });
@@ -65,6 +79,20 @@ async function assertEditorLayout(page, label) {
   return layout;
 }
 
+async function ensureClassification(page) {
+  for (const index of [0, 1]) {
+    const select = page.locator(".bd-tax-selectors-v336 select").nth(index);
+    await select.waitFor({ state: "visible" });
+    if (await select.inputValue()) continue;
+    await select.locator('option:not([value=""])').first().waitFor({ state: "attached" });
+    const value = await select.locator("option").evaluateAll((options) =>
+      options.map((option) => option.value).find(Boolean) || "",
+    );
+    assert.ok(value, `classification selector ${index} has no available option`);
+    await select.selectOption(value);
+  }
+}
+
 async function mobileFlow(browser) {
   const { context, page, errors } = await openCatalog(browser, { width: 320, height: 852 }, "mobile");
   const bar = page.locator("[data-assortment-section-id='bar'] > .bd-assortment-section-toggle-v171");
@@ -83,6 +111,7 @@ async function mobileFlow(browser) {
   await unit.selectOption("ml");
   const layout = await assertEditorLayout(page, "mobile editor");
   await page.screenshot({ path: path.join(outputDir, "mobile-edit-320x852.png"), fullPage: true });
+  await ensureClassification(page);
   await page.getByRole("button", { name: "Сохранить позицию", exact: true }).click();
   await page.locator(".bd-catalog-sheet").waitFor({ state: "detached" });
   const stateAfterEdit = await catalogState(page);
@@ -94,7 +123,8 @@ async function mobileFlow(browser) {
   assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"]').count(), 1);
   assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"] select').count(), 0);
   await page.locator('.bd-catalog-field:has-text("Название") input').fill("Консультация бармена");
-  await page.locator('.bd-catalog-field:has-text("Тип позиции") select').selectOption("service");
+  await page.locator('.bd-catalog-field:has-text("Что продаётся") select').selectOption("service");
+  await ensureClassification(page);
   assert.equal(await page.getByLabel("Количество продажи").count(), 0, "service must not require a fake physical size");
   assert.equal(await page.getByRole("button", { name: "Сохранить позицию", exact: true }).isEnabled(), true);
   await page.getByRole("button", { name: "Сохранить позицию", exact: true }).click();
@@ -113,9 +143,10 @@ async function desktopFlow(browser) {
   assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"]').count(), 1);
   assert.equal(await page.locator('[data-bd-venue-currency-lock="v326"] select').count(), 0);
   await page.locator('.bd-catalog-field:has-text("Название") input').fill("Кола 1,25 л");
-  await page.locator('.bd-catalog-field:has-text("Тип позиции") select').selectOption("ready");
-  const readyProduct = page.locator('.bd-catalog-field:has-text("Связанный готовый товар") select');
+  await page.locator('.bd-catalog-field:has-text("Что продаётся") select').selectOption("ready");
+  const readyProduct = page.locator(".bd-menu-nomenclature-picker-v350 select");
   await readyProduct.selectOption("product:cola");
+  await ensureClassification(page);
   await page.locator(".bd-menu-ready-summary-v298").waitFor({ state: "visible" });
   assert.match(await page.locator(".bd-menu-ready-summary-v298").innerText(), /1 уп\. · 1,25 л/);
   assert.equal(await page.getByLabel("Количество продажи").count(), 0, "packaging-derived size must not be duplicated manually");
@@ -139,6 +170,7 @@ async function desktopFlow(browser) {
   assert.equal(await page.getByLabel("Количество продажи").inputValue(), "1,25");
   await page.getByLabel("Количество продажи").fill("1.25");
   assert.equal(await page.getByLabel("Количество продажи").inputValue(), "1.25");
+  await ensureClassification(page);
   await page.getByRole("button", { name: "Сохранить позицию", exact: true }).click();
   await page.locator(".bd-catalog-sheet").waitFor({ state: "detached" });
   const lemonade = (await catalogState(page)).menuItems.find((item) => item.name === "Лимонад на розлив");

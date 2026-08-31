@@ -22,7 +22,8 @@ test("menu create and edit use controlled numeric quantity plus canonical unit p
 
 test("ready product editor links canonical nomenclature packaging", async () => {
   const bundle = await readFile(bundleUrl, "utf8");
-  assert.match(bundle, /label:"Связанный готовый товар"/);
+  assert.match(bundle, /label:"Номенклатура"/);
+  assert.match(bundle, /Найти товар, например Спрайт/);
   assert.match(bundle, /label:"Упаковка продажи"/);
   assert.match(bundle, /packagesPerSale:1/);
   assert.match(bundle, /bdMenuStructuredSizeV298\(n\.quantity,n\.unit,"packaging"/);

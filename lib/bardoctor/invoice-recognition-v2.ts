@@ -1096,7 +1096,11 @@ export function matchInvoiceLine(input: {
     };
   }
   const exact = exactCandidates(input.line, input.nomenclature);
-  if (exact.length === 1 && input.line.confidence >= 0.55) {
+  // A unique canonical/alias equality is stronger identity evidence than the
+  // document-level OCR confidence. Legacy vision frequently reports a low
+  // confidence for an otherwise exact, arithmetically valid line; requiring
+  // 0.55 here made obvious names fall through to manual search.
+  if (exact.length === 1) {
     const candidate = exact[0];
     const strongIdentity = hasStrongInvoiceIdentityEvidence(input.line, candidate);
     const arithmeticValid = invoiceCommercialArithmeticIsValid(

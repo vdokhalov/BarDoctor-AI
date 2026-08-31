@@ -49,8 +49,8 @@ export async function POST(request: Request): Promise<Response> {
   const sectionId = text(body.sectionId, "", 120);
   const taxonomyCategoryId = text(body.taxonomyCategoryId, "", 120);
   const subcategoryId = text(body.subcategoryId, "", 120);
-  if (!productKeys.length || !sectionId || !taxonomyCategoryId || !subcategoryId) {
-    return Response.json({ ok: false, error: "Выберите позиции и полный путь классификации" }, { status: 422 });
+  if (!productKeys.length || !sectionId || !taxonomyCategoryId) {
+    return Response.json({ ok: false, error: "Выберите позиции, раздел и категорию" }, { status: 422 });
   }
 
   const database = getD1();
@@ -74,7 +74,7 @@ export async function POST(request: Request): Promise<Response> {
   const section = taxonomy.sections.find((node) => node.id === sectionId && node.active);
   const category = taxonomy.categories.find((node) => node.id === taxonomyCategoryId && node.active && node.parentId === sectionId);
   const subcategory = taxonomy.subcategories.find((node) => node.id === subcategoryId && node.active && node.parentId === taxonomyCategoryId);
-  if (!section || !category || !subcategory) {
+  if (!section || !category || (subcategoryId && !subcategory)) {
     return Response.json({ ok: false, code: "TAXONOMY_PATH_INVALID", error: "Выбранный путь классификации больше недоступен" }, { status: 409 });
   }
   const selected = new Set(productKeys);

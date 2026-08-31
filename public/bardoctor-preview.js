@@ -4,6 +4,167 @@
   window.__bdBootstrapPending = true;
   window.__bdAuthBootstrapV274 = { state: "loading", reason: "auth_bootstrap_pending" };
 
+  var bdStartupRecoveryVersionV341 = "bounded-startup-v357";
+  var bdStartupHealthyV341 = false;
+  var bdStartupRecoveryVisibleV341 = false;
+  var bdStartupWatchdogV341 = null;
+  var bdStartupFailureDetailV342 = null;
+
+  function bdStartupPathV341() {
+    return window.location.pathname === "/" || window.location.pathname === "/home";
+  }
+
+  function bdMarkStartupHealthyV341() {
+    bdStartupHealthyV341 = true;
+    if (bdStartupWatchdogV341) window.clearTimeout(bdStartupWatchdogV341);
+    try { sessionStorage.removeItem("bd_startup_retry_v341"); } catch { /* no-op */ }
+  }
+
+  function bdSanitizeStartupDetailV342(value) {
+    return String(value || "")
+      .replace(/https?:\/\/[^\s)]+/g, "[url]")
+      .replace(/[A-Za-z0-9_-]{32,}/g, "[redacted]")
+      .replace(/[\r\n\t]+/g, " ")
+      .slice(0, 180);
+  }
+
+  function bdReportStartupFailureV342(detail) {
+    if (!detail || detail.reported) return;
+    detail.reported = true;
+    try {
+      fetch("/api/client-runtime-diagnostic", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          version: bdStartupRecoveryVersionV341,
+          kind: bdSanitizeStartupDetailV342(detail.kind),
+          message: bdSanitizeStartupDetailV342(detail.message),
+          source: bdSanitizeStartupDetailV342(detail.source),
+          line: Number(detail.line) || 0,
+          column: Number(detail.column) || 0,
+          path: bdStartupPathV341() ? window.location.pathname : "other"
+        }),
+        keepalive: true
+      }).catch(function () {});
+    } catch { /* no-op */ }
+  }
+
+  function bdRenderStartupRecoveryV341(reason, failureDetail) {
+    if (bdStartupHealthyV341 || bdStartupRecoveryVisibleV341) return;
+    var render = function () {
+      if (bdStartupHealthyV341 || bdStartupRecoveryVisibleV341) return;
+      var root = document.getElementById("root");
+      if (!root) return;
+      bdStartupRecoveryVisibleV341 = true;
+      document.documentElement.removeAttribute("data-bd-startup-pending");
+      document.body.style.overflow = "auto";
+      root.innerHTML = "";
+      var page = document.createElement("main");
+      page.setAttribute("data-bd-startup-recovery", bdStartupRecoveryVersionV341);
+      page.setAttribute("role", "alert");
+      page.style.cssText = "min-height:100dvh;display:grid;place-items:center;box-sizing:border-box;padding:24px;background:#070911;color:#fff;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+      var card = document.createElement("section");
+      card.style.cssText = "width:min(100%,430px);box-sizing:border-box;padding:26px 22px;border:1px solid rgba(255,255,255,.12);border-radius:22px;background:#11152a;box-shadow:0 18px 50px rgba(0,0,0,.28);text-align:center";
+      var title = document.createElement("h1");
+      title.style.cssText = "margin:0;font-size:22px;line-height:1.2";
+      title.textContent = "BarDoctor не завершил загрузку";
+      var copy = document.createElement("p");
+      copy.style.cssText = "margin:10px 0 18px;color:rgba(255,255,255,.68);font-size:14px;line-height:1.5";
+      copy.textContent = "Сессия и данные сохранены. Обновите приложение — оно загрузит свежую версию файлов.";
+      var retry = document.createElement("button");
+      retry.type = "button";
+      retry.style.cssText = "min-height:50px;width:100%;border:0;border-radius:14px;background:#5753e8;color:#fff;font-size:14px;font-weight:800;cursor:pointer";
+      retry.textContent = "Обновить приложение";
+      retry.addEventListener("click", function () {
+        retry.disabled = true;
+        retry.textContent = "Обновляем…";
+        var clearCaches = typeof caches === "undefined"
+          ? Promise.resolve()
+          : caches.keys().then(function (keys) {
+            return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+          }).catch(function () {});
+        clearCaches.finally(function () {
+          try { sessionStorage.removeItem("bd_startup_retry_v341"); } catch { /* no-op */ }
+          var url = new URL(window.location.href);
+          url.searchParams.set("bd-recovery", String(Date.now()));
+          window.location.replace(url.pathname + url.search + url.hash);
+        });
+      });
+      var detail = document.createElement("small");
+      detail.style.cssText = "display:block;margin-top:12px;color:rgba(255,255,255,.42);font-size:11px";
+      var failureCode = failureDetail && failureDetail.message
+        ? " · " + bdSanitizeStartupDetailV342(failureDetail.message)
+        : "";
+      detail.textContent = "Код восстановления: " + bdStartupRecoveryVersionV341 + (reason ? " · " + reason : "") + failureCode;
+      card.appendChild(title);
+      card.appendChild(copy);
+      card.appendChild(retry);
+      card.appendChild(detail);
+      page.appendChild(card);
+      root.appendChild(page);
+    };
+    if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", render, { once: true });
+    else render();
+  }
+
+  function bdRecoverStartupV341(reason, failureDetail) {
+    if (!bdStartupPathV341() || bdStartupHealthyV341 || bdStartupRecoveryVisibleV341) return;
+    if (failureDetail) {
+      bdStartupFailureDetailV342 = failureDetail;
+      bdReportStartupFailureV342(failureDetail);
+    }
+    bdRenderStartupRecoveryV341(reason, failureDetail || bdStartupFailureDetailV342);
+  }
+
+  window.addEventListener("bd:startup-complete", bdMarkStartupHealthyV341, { once: true });
+  window.addEventListener("error", function (event) {
+    var source = String(event.filename || "");
+    var stack = String(event.error && event.error.stack || "");
+    if (source.indexOf("/assets/index-BQGspy0I.js") >= 0 || stack.indexOf("index-BQGspy0I.js") >= 0) {
+      var failure = {
+        kind: "runtime",
+        message: String(event.message || event.error && event.error.message || "client-runtime-error"),
+        source: source.split("/").pop() || "index-BQGspy0I.js",
+        line: event.lineno,
+        column: event.colno,
+        reported: false
+      };
+      bdStartupFailureDetailV342 = failure;
+      bdReportStartupFailureV342(failure);
+      window.setTimeout(function () {
+        if (document.querySelector('[data-bd-home-page], [data-bd-home-health-index]')) {
+          bdMarkStartupHealthyV341();
+          return;
+        }
+        bdRecoverStartupV341("runtime", failure);
+      }, 900);
+    }
+  }, true);
+  window.addEventListener("unhandledrejection", function (event) {
+    var reason = event && event.reason;
+    var stack = String(reason && reason.stack || "");
+    if (stack.indexOf("index-BQGspy0I.js") < 0) return;
+    var failure = {
+      kind: "promise",
+      message: String(reason && reason.message || reason || "client-promise-error"),
+      source: "index-BQGspy0I.js",
+      line: 0,
+      column: 0,
+      reported: false
+    };
+    bdStartupFailureDetailV342 = failure;
+    bdReportStartupFailureV342(failure);
+    window.setTimeout(function () {
+      if (document.querySelector('[data-bd-home-page], [data-bd-home-health-index]')) {
+        bdMarkStartupHealthyV341();
+        return;
+      }
+      bdRecoverStartupV341("promise", failure);
+    }, 900);
+  });
+
   var currentFirstName = localStorage.getItem("bd_user_first_name") || "";
   var currentRole = localStorage.getItem("bd_active_role") || "";
   var currentPermissions = (function () {
@@ -1400,8 +1561,26 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260826-invoice-recognition-v2-20260824-canonical-supplier-v260-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260825-business-health-v284-20260826-venue-identity-v297-20260826-menu-sale-size-v298-20260828-calculation-audit-v320-20260828-accounting-money-v321-20260828-authoritative-bootstrap-v324-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-20260828-business-health-ux-v332-20260828-business-health-ux-v333-20260828-business-health-live-v334-20260828-business-health-canonical-v335-20260829-canonical-taxonomy-v336-20260826-invoice-create-canonical-v297";
+    script.src = "/assets/index-BQGspy0I.js?v=20260821-inventory-reconciliation-v224-user-display-units-v236-purchase-units-v237-collapsed-tree-v239-accounting-currency-v243-warehouse-valuation-v244-inventory-workflow-v245-inventory-layer-v246-20260823-auth-login-v248-20260823-existing-venue-gate-v249-20260823-embedded-login-transition-v250-20260823-venue-setup-boundary-v251-20260823-inventory-scope-hierarchy-v256-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260826-invoice-recognition-v2-20260824-canonical-supplier-v260-20260824-auth-bootstrap-state-v274-20260825-profile-v280a-20260825-profile-v281-20260825-profile-v282-20260825-business-health-v284-20260826-venue-identity-v297-20260826-menu-sale-size-v298-20260828-calculation-audit-v320-20260828-accounting-money-v321-20260828-authoritative-bootstrap-v324-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-20260828-business-health-ux-v332-20260828-business-health-ux-v333-20260828-business-health-live-v334-20260828-business-health-canonical-v335-20260829-canonical-taxonomy-v336-20260829-startup-recovery-v341-20260829-startup-runtime-v342-20260829-startup-performance-v343-20260829-authoritative-home-v344-20260829-authenticated-home-v345-20260829-branded-startup-v346-20260829-coherent-startup-v347-20260829-single-ready-home-v349-20260826-invoice-create-canonical-v297-purchase-review-v356-purchase-receiving-v357-bd-purchase-accounting-v359-bd-taxonomy-manager-ux-v360-bd-optional-subcategory-v361-bd-classification-ux-v362-bd-alphabetical-taxonomy-v363-bd-taxonomy-action-sheet-v364-bd-nested-sections-v365-bd-nomenclature-catalog-route-v366-bd-purchase-category-options-v367-bd-tech-card-catalog-picker-v368-bd-nomenclature-uat-v369-purchase-receiving-stability-v371-20260830-seamless-startup-v356-20260830-bounded-startup-v357";
+    script.addEventListener("error", function () { bdRecoverStartupV341("module-load"); }, { once: true });
     document.head.appendChild(script);
+    if (bdStartupPathV341()) {
+      bdStartupWatchdogV341 = window.setTimeout(function () {
+        if (bdStartupHealthyV341) return;
+        var root = document.getElementById("root");
+        var home = document.querySelector('[data-bd-home-page], [data-bd-home-health-index]');
+        var recovery = document.querySelector('[data-bd-bootstrap-state], [data-bd-startup-recovery]');
+        if (home || recovery) {
+          bdMarkStartupHealthyV341();
+          return;
+        }
+        var hasVisibleContent = root && String(root.textContent || "").trim().length > 0;
+        var stillLoading = document.documentElement.getAttribute("data-bd-startup-pending") === "v201"
+          || Boolean(document.querySelector('[data-bd-root-splash], [data-bd-splash]'));
+        if (!hasVisibleContent || stillLoading) bdRecoverStartupV341("watchdog");
+        else bdMarkStartupHealthyV341();
+      }, 12000);
+    }
   }
 
   function injectSupplierAlternativesEntry() {

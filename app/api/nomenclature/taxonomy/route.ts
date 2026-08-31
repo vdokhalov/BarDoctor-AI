@@ -4,8 +4,9 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomenclature";
 import {
+  canonicalTaxonomyForAssortment,
+  materializeMenuTaxonomy,
   mutateCanonicalTaxonomy,
-  normalizeCanonicalTaxonomy,
   taxonomyUsage,
   type TaxonomyMutation,
 } from "../../../../lib/bardoctor/nomenclature-taxonomy";
@@ -70,14 +71,14 @@ export async function GET(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Структура номенклатуры недоступна" }, { status: 403 });
   }
   const { assortment, updatedAt } = await load(account.id);
-  const taxonomy = normalizeCanonicalTaxonomy(
-    assortment.nomenclatureStructure,
-    defaultNomenclatureStructure(),
-  );
+  const effective = canonicalTaxonomyForAssortment(assortment, defaultNomenclatureStructure());
+  const taxonomy = effective.taxonomy;
   return Response.json({
     ok: true,
     venueId: account.venueId,
     taxonomy,
+    legacyMenuPaths: effective.legacyMenuPaths,
+    derivedFromMenu: effective.derivedFromMenu,
     usage: taxonomyUsage(assortment, taxonomy),
     items: currentItems(assortment),
     updatedAt,
@@ -127,7 +128,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   const now = new Date().toISOString();
   const result = mutateCanonicalTaxonomy({
-    assortment,
+    assortment: materializeMenuTaxonomy(assortment, defaultNomenclatureStructure()),
     mutation,
     fallback: defaultNomenclatureStructure(),
     now,

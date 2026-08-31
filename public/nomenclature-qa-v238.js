@@ -28,6 +28,7 @@
       { id: 'alcohol', name: 'Алкоголь', parentId: 'bar', order: 10 },
       { id: 'soft-drinks', name: 'Безалкогольные напитки', parentId: 'bar', order: 20 },
       { id: 'bar-supplies', name: 'Барные расходники', parentId: 'bar', order: 30 },
+      { id: 'cigarettes', name: 'Сигареты', parentId: 'bar', order: 40 },
       { id: 'food', name: 'Продукты', parentId: 'kitchen', order: 10 },
       { id: 'hookah-tobacco', name: 'Табак и смеси', parentId: 'hookah', order: 10 },
       { id: 'cleaning', name: 'Уборка и гигиена', parentId: 'household', order: 10 },
@@ -56,6 +57,9 @@
       { id: 'kitchen-fridge', name: 'Холодильник кухни', parentId: 'kitchen', order: 10 },
     ],
   };
+  ['sections', 'categories', 'subcategories', 'locations'].forEach(function (key) {
+    structure[key].forEach(function (node) { if (node.active == null) node.active = true; });
+  });
 
   function item(id, name, current, unit, subcategoryId, extra) {
     var categoryId = ['soft-drinks-general'].includes(subcategoryId) ? 'soft-drinks'
@@ -110,6 +114,7 @@
       item('cola', 'Coca-Cola 0,5 л', 18, 'pcs', 'soft-drinks-general'),
       item('syrup-test', 'Сироп тестовый', 0, 'ml', 'soft-drinks-general', { displayUnit: 'ml', packageSize: '1 л' }),
       item('straws', 'Трубочки бумажные', 0, 'pcs', 'bar-consumables'),
+      item('winston', 'Сигареты Winston', 10, 'pcs', '', { taxonomyCategoryId: 'cigarettes', sectionId: 'bar', subcategoryId: '', storageLocationId: 'bar-storage' }),
       item('chicken', 'Куриное филе охлаждённое', 5200, 'g', 'meat', { displayUnit: 'kg', packageSize: '1 кг' }),
       item('tobacco', 'Табак для кальяна', 3, 'pcs', 'tobacco'),
       item('cleaner', 'Средство для стекла', 7, 'pcs', 'cleaning-products'),
@@ -145,6 +150,17 @@
     localStorage.setItem('bd_venue_context__' + email, JSON.stringify({ activeVenueId: venueId, activeWorkspaceId: 'qa-nomenclature-workspace', canCreateVenues: true, venues: venues }));
   }
 
+  function taxonomyUsage() {
+    var rows = assortment && assortment.nomenclature || [];
+    return structure.sections.map(function (node) {
+      return { level: 'section', id: node.id, count: rows.filter(function (row) { return row.sectionId === node.id; }).length };
+    }).concat(structure.categories.map(function (node) {
+      return { level: 'category', id: node.id, count: rows.filter(function (row) { return row.taxonomyCategoryId === node.id; }).length };
+    }), structure.subcategories.map(function (node) {
+      return { level: 'subcategory', id: node.id, count: rows.filter(function (row) { return row.subcategoryId === node.id; }).length };
+    }));
+  }
+
   localStorage.setItem('bd_session', email);
   localStorage.setItem('bd_session_token', 'qa-local-token');
   localStorage.setItem('bd_session_userid', 'qa-nomenclature-user');
@@ -165,6 +181,9 @@
     if (url.indexOf('/api/users/me') >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: 'QA', lastName: 'Nomenclature', email: email, role: 'owner', permissions: permissions } }), { status: 200, headers: headers }));
     if (url.indexOf('/api/migrate') >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, imported: [], skipped: [] }), { status: 200, headers: headers }));
     if (/\/api\/store(?:\?|$)/.test(url)) return Promise.resolve(new Response(JSON.stringify({ ok: true, entries: { bd_assortment_v1: { data: assortment, updatedAt: assortment.updatedAt } } }), { status: 200, headers: headers }));
+    if (url.indexOf('/api/nomenclature/taxonomy') >= 0 && (!init || !init.method || init.method === 'GET')) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, taxonomy: structure, usage: taxonomyUsage(), items: assortment.nomenclature, updatedAt: assortment.updatedAt }), { status: 200, headers: headers }));
+    }
     if (url.indexOf('/api/inventory/products') >= 0) {
       var body = {};
       try { body = JSON.parse(init && init.body || '{}'); } catch { body = {}; }

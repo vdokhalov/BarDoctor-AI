@@ -1447,3 +1447,23 @@
   font-size: 9px;
   line-height: 1.35;
 }
+
+
+/* Assortment workflow navigation v353 */
+.bd-assortment-tabs-v170 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 520px) {
+  .bd-assortment-tabs-v170 { overflow-x: auto; grid-template-columns: repeat(5, minmax(92px, 1fr)); }
+}
+
+
+/* Publication header alignment v355 */
+@media (max-width: 767px) {
+  .bd-assortment-command-v170 {
+    padding-top: 0;
+  }
+
+  body:has(.bd-assortment-command-v170) bd-app-header .bd-app-header-copy h1 {
+    font-size: 14px;
+    letter-spacing: -0.035em;
+  }
+}

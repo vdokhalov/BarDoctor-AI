@@ -179,6 +179,38 @@ test("canonical matching cannot clear an arithmetic anomaly", () => {
   assert.notEqual(mapped.items[0].confidenceLevel, "high");
 });
 
+test("a unique exact canonical name auto-links even when legacy OCR confidence is low", () => {
+  const line = parseInvoiceLine("Капуста пекинская 1,09 кг 44,95 49,00");
+  assert.ok(line);
+  const document = applyDeterministicMappings({
+    document: {
+      documentType: "invoice",
+      supplierName: "Рынок",
+      supplierType: "wholesale",
+      currency: "RUB",
+      paymentMethod: "unknown",
+      total: 49,
+      confidence: 0.41,
+      warnings: [],
+      items: [{ ...line, confidence: 0.41, confidenceLevel: "low", requiresReview: false }],
+    },
+    supplierId: "market",
+    venueId: 1,
+    mappings: [],
+    nomenclature: [{
+      id: "chinese-cabbage",
+      key: "stock:капуста пекинская|g",
+      name: "Капуста пекинская",
+      unit: "g",
+      packageSize: "",
+      aliases: [],
+    }],
+  });
+  assert.equal(document.items[0].nomenclatureId, "chinese-cabbage");
+  assert.equal(document.items[0].mappingSource, "exact_alias");
+  assert.equal(document.items[0].requiresReview, false);
+});
+
 test("parser handles real 1C-style Russian headers, word dates and numbered table rows", () => {
   const draft = parseInvoiceOcr({
     rawText: [
@@ -986,10 +1018,10 @@ test("20-line partial invoice keeps 18 deterministic results when AI is unavaila
 
 test("low-confidence OCR never auto-selects a fuzzy nomenclature candidate", () => {
   const parsed = parseInvoiceOcr({
-    rawText: "Поставщик\nКОКА КОЛА ПЭТ 1,25 2 шт 38,50 77,00",
+    rawText: "Поставщик\nКОКА КОЛА ПЭТТ 1,25 2 шт 38,50 77,00",
     lines: [
       { text: "Поставщик", confidence: 0.3 },
-      { text: "КОКА КОЛА ПЭТ 1,25 2 шт 38,50 77,00", confidence: 0.3 },
+      { text: "КОКА КОЛА ПЭТТ 1,25 2 шт 38,50 77,00", confidence: 0.3 },
     ],
     confidence: 0.3,
     durationMs: 100,
@@ -1259,25 +1291,28 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /sessionStorage\.removeItem\(bdInvoiceRecognitionQaStorageV2/);
   assert.doesNotMatch(bundle, /fetch\("\/api\/purchases\/scan"/);
   assert.doesNotMatch(bundle, /(?<!bdInvoiceRecognitionPhaseTimer=)setTimeout\(\(\)=>[GE]\("Сопоставляем позиции…"\),650\)/);
-  assert.match(bundle, /function bdInvoiceLineMappingV3/);
-  assert.match(bundle, /data-bd-invoice-mapping-memory":"canonical-v3"/);
+  assert.match(bundle, /function bdInvoiceLineMappingV356/);
+  assert.match(bundle, /data-bd-invoice-mapping-memory":"compact-v356"/);
   assert.match(bundle, /fetch\("\/api\/purchases\/mappings"/);
-  assert.match(bundle, /Найти по всей номенклатуре…/);
+  assert.match(bundle, /Введите минимум 2 символа…/);
+  assert.match(bundle, /new URLSearchParams\(\{q:k,limit:"12"\}\)/);
   assert.match(bundle, /mappingSource:"manual"/);
   assert.match(bundle, /nomenclatureName:k\.name,name:e\.rawName\|\|e\.name/);
   assert.doesNotMatch(bundle, /nomenclatureId:k\.id,name:k\.name/);
-  assert.match(bundle, /children:e\.nomenclatureName\|\|C\.find/);
+  assert.match(bundle, /children:e\.nomenclatureName\|\|z\.name/);
   assert.match(bundle, /Оставить без связи/);
   assert.match(bundle, /action:"remove"/);
-  assert.match(bundle, /Подтвердите предложенную номенклатуру/);
-  assert.match(bundle, /e\.mappingSource==="ai"/);
+  assert.match(bundle, /Проверьте предложенную связь перед сохранением/);
+  assert.match(bundle, /e\.purchaseProductKey&&e\.requiresReview/);
+  assert.match(bundle, /children:"Подтвердить"/);
   assert.match(bundle, /function bdInvoiceReviewSummaryV4/);
   assert.match(bundle, /Подтвердить ",s," уверенных соответствий/);
-  assert.match(bundle, /bdInvoiceReviewOrderV4\(e\.items\)\.map/);
-  assert.match(bundle, /e\.source==="manual"\|\|\(!g\.requiresReview/);
+  assert.match(bundle, /bdShownLinesV357\.map/);
+  assert.match(bundle, /bdAttentionLinesV357/);
+  assert.match(bundle, /e\.source==="manual"\|\|\(!line\.requiresReview/);
   assert.match(bundle, /C=bdCatArray\(e\.mappingCandidates\)/);
   assert.match(bundle, /context:"receipt"/);
-  assert.match(bundle, /onCreated:k=>\{O\(k\),bdSetQuickOpenV336\(!1\)\}/);
+  assert.match(bundle, /onCreated:k=>\{O\(k\),bdSetQuickOpenV356\(!1\)\}/);
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);

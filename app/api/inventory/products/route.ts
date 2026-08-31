@@ -30,7 +30,10 @@ import {
   manualCanonicalDuplicateSuggestions,
 } from "../../../../lib/bardoctor/nomenclature-identity";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
-import { normalizeCanonicalTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
+import {
+  canonicalTaxonomyForAssortment,
+  materializeMenuTaxonomy,
+} from "../../../../lib/bardoctor/nomenclature-taxonomy";
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -370,11 +373,8 @@ export async function POST(request: Request): Promise<Response> {
         { status: 422 },
       );
     }
-    const root = record(assortment);
-    if (!record(root.nomenclatureStructure).version) {
-      root.nomenclatureStructure = defaultNomenclatureStructure();
-    }
-    const taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, defaultNomenclatureStructure());
+    const root = materializeMenuTaxonomy(assortment, defaultNomenclatureStructure());
+    const taxonomy = canonicalTaxonomyForAssortment(root, defaultNomenclatureStructure()).taxonomy;
     const balances = Array.isArray(root.stockBalances) ? root.stockBalances.map(record) : [];
     const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
     const productKey = inventoryProductKey({ name, unit, packageSize });
@@ -465,9 +465,9 @@ export async function POST(request: Request): Promise<Response> {
         && node.parentId === section?.id && node.active);
       const subcategory = taxonomy.subcategories.find((node) => node.id === manual.subcategoryId
         && node.parentId === category?.id && node.active);
-      if (!section || !category || !subcategory) {
+      if (!section || !category || (manual.subcategoryId && !subcategory)) {
         return Response.json(
-          { ok: false, code: "TAXONOMY_PATH_INVALID", error: "Выберите действующий раздел, категорию и подкатегорию" },
+          { ok: false, code: "TAXONOMY_PATH_INVALID", error: "Выберите действующий раздел и категорию" },
           { status: 422 },
         );
       }

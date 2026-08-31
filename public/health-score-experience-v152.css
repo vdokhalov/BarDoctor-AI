@@ -1408,3 +1408,16 @@ button.bd-home-health-priority-action-v332 {
   .bd-home-health-card-v332 { padding: 15px 17px 13px; }
   .bd-home-health-live-v334 strong { font-size: 12px; }
 }
+
+/* authoritative-home-startup-v344 */
+.bd-home-health-card-v332.is-loading.is-compact-loading-v344 { min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 16px 18px; }
+.bd-home-health-loading-row-v344 { display: flex; align-items: center; gap: 12px; }
+.bd-home-health-loading-row-v344 > span:last-child { display: grid; gap: 3px; min-width: 0; }
+.bd-home-health-loading-row-v344 strong { color: #171a2b; font-size: 14px; line-height: 1.25; }
+.bd-home-health-loading-row-v344 small { color: #747b8d; font-size: 11px; line-height: 1.35; }
+.bd-home-health-loading-dot-v344 { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 999px; background: #5b5ceb; box-shadow: 0 0 0 5px rgba(91,92,235,.12); animation: bd-health-v344-pulse 1.25s ease-in-out infinite; }
+.bd-home-money-loading-v344 { min-height: 104px; border-radius: 24px; padding: 18px 20px; display: grid; align-content: center; gap: 5px; background: linear-gradient(145deg,#141b3d,#222d68); color: #fff; box-shadow: 0 16px 34px rgba(21,29,69,.16); }
+.bd-home-money-loading-v344 p { margin: 0; color: rgba(255,255,255,.62); font-size: 10px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.bd-home-money-loading-v344 strong { font-size: 17px; line-height: 1.25; }
+.bd-home-money-loading-v344 small { color: rgba(255,255,255,.62); font-size: 11px; }
+@keyframes bd-health-v344-pulse { 50% { opacity: .42; transform: scale(.82); } }

@@ -4,7 +4,7 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomenclature";
 import { queryCanonicalNomenclature, normalizeNomenclatureSearch } from "../../../../lib/bardoctor/nomenclature-selector";
-import { normalizeCanonicalTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
+import { canonicalTaxonomyForAssortment } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 import { PURCHASE_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 
@@ -122,6 +122,7 @@ export async function GET(request: Request): Promise<Response> {
       mapped: Boolean(mapping?.canonicalProductKey ?? source.purchaseProductKey),
     };
   });
+  const effective = canonicalTaxonomyForAssortment(assortment, defaultNomenclatureStructure());
   return Response.json({
     ok: true,
     venueId: account.venueId,
@@ -129,6 +130,8 @@ export async function GET(request: Request): Promise<Response> {
     accountingCurrency,
     matches,
     purchaseSources,
-    taxonomy: normalizeCanonicalTaxonomy(assortment.nomenclatureStructure, defaultNomenclatureStructure()),
+    taxonomy: effective.taxonomy,
+    legacyMenuPaths: effective.legacyMenuPaths,
+    derivedFromMenu: effective.derivedFromMenu,
   }, { headers: { "Cache-Control": "private, no-store" } });
 }

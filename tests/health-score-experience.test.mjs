@@ -30,7 +30,7 @@ test("Home keeps the compact canonical Business Health card before the financial
   assert.match(bundle, /bdOwnerUATFixesV286="owner-uat-v286"/);
   assert.match(bundle, /function bdHealthShiftCoverage\(e,t,n=new Date\).*trackingStartDate.*for\(const f of t\)/s);
   assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v334/);
-  assert.match(bundle, /data-bd-home-health-index":"business-health-v334-loading/);
+  assert.match(bundle, /data-bd-home-health-index":"business-health-v344-loading/);
   assert.match(bundle, /data-bd-home-health-index":"business-health-v334-unavailable/);
   assert.match(bundle, /"data-bd-health-snapshot-id":e\?\.snapshotId/);
   assert.match(bundle, /children:"Business Health"/);
@@ -282,7 +282,7 @@ test("main factor is selected from existing diagnostic domains", () => {
   }), { id: "finance", label: "Финансы", score: 48 });
 });
 
-test("production artifact has one score-free startup owner and server-authoritative Health", async () => {
+test("production artifact keeps one startup surface and opens server-authoritative Home", async () => {
   const [bundle, css, runtime, response, manifest] = await Promise.all([
     readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8"),
     readFile(new URL("../public/health-score-experience-v152.css", import.meta.url), "utf8"),
@@ -293,7 +293,7 @@ test("production artifact has one score-free startup owner and server-authoritat
   assert.doesNotThrow(() => parse(runtime, { ecmaVersion: "latest", sourceType: "script" }));
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v334"/);
-  assert.match(bundle, /data-bd-splash":"brand-loading-v332/);
+  assert.match(bundle, /data-bd-splash":"brand-loading-v347/);
   assert.match(bundle, /data-bd-health-score-resting":"v153/);
   assert.match(bundle, /Pt\("bd_health_score_experience_v152"\)/);
   assert.match(bundle, /onClick:\(\)=>t\("\/health"\)/);
@@ -302,25 +302,18 @@ test("production artifact has one score-free startup owner and server-authoritat
   assert.match(bundle, /source:"server_business_intelligence"/);
   assert.match(bundle, /function bdHealthStartupGateV155\(\{children:e\}\)/);
   assert.match(bundle, /i\.jsx\(bdHealthStartupGateV155,\{children:i\.jsxs\(bse/);
-  assert.match(bundle, /"data-bd-health-startup-machine":"v335"/);
-  assert.match(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
-  assert.match(bundle, /\?"SPLASH_LOADING":"HOME"/);
+  assert.match(bundle, /bdStartupPerformanceVersionV343="v343"/);
+  assert.doesNotMatch(bundle, /"data-bd-health-startup-machine":"v335"/);
+  assert.doesNotMatch(bundle, /"data-bd-health-startup-machine":"v356"/);
+  assert.doesNotMatch(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
+  assert.doesNotMatch(bundle, /\?"SPLASH_LOADING":"HOME"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdHealthStartupGateV155")), /bdHealthLaunchRenderedV155|HEALTH_ENTRY/);
-  assert.match(bundle, /bdHealthLaunchCompleteV155\("server-bootstrap-ready"\)/);
-  assert.doesNotMatch(
-    bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
-    /bdHealthLaunchFallbackV155|server-bootstrap-timeout/,
-  );
+  assert.match(bundle, /S\.useState\(\(\)=>bz\(\)\),\[r,a\]=S\.useState\(\(\)=>bz\(\)!==null\)/);
+  assert.match(bundle, /function Woe\(\{children:e\}\)\{const\{isReady:t,profile:n\}=Un\(\),\[r,a\]=S\.useState\(!1\)/);
   assert.doesNotMatch(runtime, /cached-health-score-ready/);
   assert.match(runtime, /server-bootstrap-timeout/);
-  assert.match(bundle, /setTimeout\(\(\)=>U\(!0\),900\)/);
-  assert.doesNotMatch(
-    bundle.slice(bundle.indexOf("function bdHealthStartupGateV155"), bundle.indexOf("function cEe(){")),
-    /5200/,
-  );
-  assert.match(bundle, /window\.location\.pathname/);
-  assert.match(bundle, /===\"\/\"\?Cle\(\)/);
-  assert.match(bundle, /window\.history\.replaceState\(window\.history\.state,"","\/home"\)/);
+  assert.doesNotMatch(bundle, /setTimeout\(\(\)=>U\(!0\),900\)/);
+  assert.doesNotMatch(bundle, /setTimeout\(\(\)=>I\(!0\),5200\)/);
   assert.doesNotMatch(
     bundle,
     /bdHealthLaunchCompleteV153|bdHealthStartupGateV154|bdHomeLaunchPhase|bdHomeLaunchRequested/,
@@ -330,16 +323,17 @@ test("production artifact has one score-free startup owner and server-authoritat
   const homeEnd = bundle.indexOf("const q7=", homeStart);
   assert.ok(homeStart >= 0 && homeEnd > homeStart);
   const homeSource = bundle.slice(homeStart, homeEnd);
-  assert.doesNotMatch(homeSource, /Launch|health-entry|SPLASH_LOADING|setTimeout/);
+  assert.doesNotMatch(homeSource, /Launch|health-entry|SPLASH_LOADING|bdHomeStartupTimedOutV349/);
   assert.match(homeSource, /data-bd-home-page":"v151/);
 
   const coordinatorStart = bundle.indexOf("function bdHealthStartupGateV155");
   const coordinatorEnd = bundle.indexOf("function cEe(){", coordinatorStart);
   const coordinator = bundle.slice(coordinatorStart, coordinatorEnd);
   assert.match(coordinator, /bdUseBusinessHealthSnapshotV284\(\)/);
-  assert.match(coordinator, /snapshot:j/);
-  assert.match(coordinator, /!n\|\|!r/);
-  assert.match(coordinator, /data-bd-root-splash":"seamless-startup-v341/);
+  assert.match(coordinator, /n&&!!t/);
+  assert.doesNotMatch(coordinator, /financeReady/);
+  assert.match(coordinator, /bdStartupFirstPaintCompleteV201\(\)/);
+  assert.match(coordinator, /return e/);
   assert.doesNotMatch(coordinator, /children:i\.jsx\(ble/);
   assert.doesNotMatch(coordinator, /zC\(/);
   assert.doesNotMatch(coordinator, /bdHealthScoreValueV153/);
@@ -359,8 +353,8 @@ test("production artifact has one score-free startup owner and server-authoritat
 
   assert.doesNotMatch(homeSource, /fetch\("\/api\/ai\/diagnosis"/, "Home navigation does not request a second diagnosis");
   assert.match(bundle, /fetch\("\/api\/business-health"/, "Home uses the deterministic canonical Health endpoint");
-  assert.match(homeSource, /bdCanonicalSnapshot=bdHomeCloudReady\?g:null/, "Home waits for the authoritative server bootstrap");
-  assert.match(homeSource, /bdHealthLoading=!bdHomeCloudReady\|\|!g&&bdLiveHealthStatus!=="error"/);
+  assert.match(homeSource, /bdCanonicalSnapshot=g/, "Home shows the last canonical snapshot while refreshing");
+  assert.match(homeSource, /bdHealthLoading=!g&&bdLiveHealthStatus!=="error"/);
   assert.match(bundle, /bdBusinessHealthCommitEnvelopeV284\(n,!0\),bdPersistDiagnosisV294\(n\)/, "refresh commits atomically before authoritative persistence");
 
   const splashStart = bundle.indexOf("function _le(){");

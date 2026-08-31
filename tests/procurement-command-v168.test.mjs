@@ -85,10 +85,10 @@ test("Procurement list uses operational states and item-level review", async () 
   assert.match(bundle, /for\(const payment of active\)/);
   assert.match(bundle, /Связанные оплаты отменены, склад и расчёты пересчитаны/);
   assert.match(bundle, /document:viewedPurchaseDocument[^}]*onDelete:viewedPurchaseDocument&&canManagePurchases\?deleteViewedPurchase:null/);
-  assert.match(purchaseReview, /Не оплачено — долг поставщику/);
-  assert.match(purchaseReview, /label:"Оплата"/);
+  assert.doesNotMatch(purchaseReview, /label:"Оплата"/);
+  assert.match(purchaseReview, /оплату добавьте отдельной операцией/);
   assert.match(purchaseReview, /Определить автоматически/);
-  assert.match(purchaseReview, /Добавить покупку/);
+  assert.match(purchaseReview, /Провести приход/);
   assert.match(bundle, /bdProcPackageGroupsV209/);
   assert.match(purchaseReview, /Фасовка одной единицы/);
   assert.match(bundle, /Штучная и упаковки/);

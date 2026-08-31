@@ -347,11 +347,40 @@ function costBasis(balance: JsonRecord, accountingCurrency?: string) {
   };
 }
 
-function scopeMatches(balance: JsonRecord, scope: InventoryCountScope): boolean {
+function sectionBranchIds(structure: ReturnType<typeof inventoryHierarchyNodes>, sectionId: string): Set<string> {
+  const branch = new Set([sectionId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const section of structure.sections) {
+      if (section.parentId && branch.has(section.parentId) && !branch.has(section.id)) {
+        branch.add(section.id);
+        changed = true;
+      }
+    }
+  }
+  return branch;
+}
+
+function sectionPathNames(structure: ReturnType<typeof inventoryHierarchyNodes>, sectionId: string): string[] {
+  const path: string[] = [];
+  const visited = new Set<string>();
+  let current = structure.sections.find((section) => section.id === sectionId);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    path.unshift(current.name);
+    current = current.parentId ? structure.sections.find((section) => section.id === current?.parentId) : undefined;
+  }
+  return path;
+}
+
+function scopeMatches(balance: JsonRecord, scope: InventoryCountScope, assortment: unknown): boolean {
   if (scope.type === "all") return true;
   const id = text(scope.id, "", 100);
   if (!id) return false;
-  if (scope.type === "section") return text(balance.sectionId, "", 100) === id;
+  if (scope.type === "section") {
+    return sectionBranchIds(inventoryHierarchyNodes(assortment), id).has(text(balance.sectionId, "", 100));
+  }
   if (scope.type === "category") {
     return text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100) === id;
   }
@@ -363,19 +392,20 @@ function scopeLabel(scope: InventoryCountScope, assortment: unknown): string {
   if (scope.type === "all") return "Весь активный склад";
   const structure = inventoryHierarchyNodes(assortment);
   const id = text(scope.id, "", 100);
-  const sectionById = new Map(structure.sections.map((value) => [value.id, value]));
   const categoryById = new Map(structure.categories.map((value) => [value.id, value]));
-  if (scope.type === "section") return sectionById.get(id)?.name ?? text(scope.label, "Выбранный раздел", 120);
+  if (scope.type === "section") {
+    return sectionPathNames(structure, id).join(" → ") || text(scope.label, "Выбранный раздел", 120);
+  }
   if (scope.type === "category") {
     const category = categoryById.get(id);
-    const section = category?.parentId ? sectionById.get(category.parentId) : undefined;
-    return [section?.name, category?.name].filter(Boolean).join(" → ") || text(scope.label, "Выбранная категория", 120);
+    const sectionPath = category?.parentId ? sectionPathNames(structure, category.parentId) : [];
+    return [...sectionPath, category?.name].filter(Boolean).join(" → ") || text(scope.label, "Выбранная категория", 120);
   }
   if (scope.type === "subcategory") {
     const subcategory = structure.subcategories.find((value) => value.id === id);
     const category = subcategory?.parentId ? categoryById.get(subcategory.parentId) : undefined;
-    const section = category?.parentId ? sectionById.get(category.parentId) : undefined;
-    return [section?.name, category?.name, subcategory?.name].filter(Boolean).join(" → ")
+    const sectionPath = category?.parentId ? sectionPathNames(structure, category.parentId) : [];
+    return [...sectionPath, category?.name, subcategory?.name].filter(Boolean).join(" → ")
       || text(scope.label, "Выбранный подраздел", 120);
   }
   return text(scope.label, "Склад / зона", 120);
@@ -392,9 +422,11 @@ export function inventoryCountScopes(assortment: unknown): InventoryCountScope[]
   }];
   const count = (predicate: (balance: JsonRecord) => boolean) => balances.filter(predicate).length;
   for (const section of structure.sections.filter((value) => value.active)) {
-    const itemCount = count((balance) => text(balance.sectionId, "", 100) === section.id);
+    const branchIds = sectionBranchIds(structure, section.id);
+    const itemCount = count((balance) => branchIds.has(text(balance.sectionId, "", 100)));
     if (!itemCount) continue;
-    result.push({ type: "section", id: section.id, label: section.name, name: section.name, itemCount });
+    const label = sectionPathNames(structure, section.id).join(" → ") || section.name;
+    result.push({ type: "section", id: section.id, label, name: section.name, itemCount });
   }
   for (const category of structure.categories.filter((value) => value.active && value.parentId)) {
     const itemCount = count((balance) =>
@@ -488,7 +520,7 @@ export function createInventoryCountDocument(input: {
       ? "Импорт инвентаризационной ведомости"
       : "Вручную";
   const items = inventoryEligibleBalances(input.assortment)
-    .filter((balance) => scopeMatches(balance, scope))
+    .filter((balance) => scopeMatches(balance, scope, input.assortment))
     .map((balance, index): InventoryCountLine | null => {
       const key = productKey(balance);
       const unit = text(balance.unit, "", 20);
