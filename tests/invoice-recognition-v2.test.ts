@@ -211,6 +211,115 @@ test("a unique exact canonical name auto-links even when legacy OCR confidence i
   assert.equal(document.items[0].requiresReview, false);
 });
 
+test("legacy account-scoped nomenclature inherits the authenticated venue", () => {
+  const candidates = nomenclatureCandidates({
+    nomenclature: [
+      {
+        id: "chinese-cabbage",
+        productKey: "stock:капуста пекинская|g",
+        name: "Капуста пекинская",
+        unit: "g",
+        active: true,
+        // Production Köln data historically used this account-scoped label.
+        venueId: "primary",
+      },
+      {
+        id: "russian-cheese",
+        productKey: "stock:сыр российский|g",
+        name: "Сыр Российский",
+        unit: "g",
+        active: true,
+        // Older canonical rows can omit venueId altogether.
+      },
+      {
+        id: "foreign-item",
+        productKey: "stock:foreign|pcs",
+        name: "Foreign item",
+        unit: "pcs",
+        active: true,
+        venueId: 2,
+      },
+    ],
+    stockBalances: [],
+  }, 1);
+
+  assert.deepEqual(
+    candidates.map((candidate) => candidate.name),
+    ["Капуста пекинская", "Сыр Российский"],
+  );
+
+  const parsed = parsedInvoiceDocumentFromLegacy({
+    documentType: "invoice",
+    supplierName: "Рынок",
+    total: 81.96,
+    confidence: 0.49,
+    items: [
+      { name: "Капуста пекинская", quantity: 1.09, unit: "кг", unitPrice: 44.95, lineTotal: 49, confidence: 0.49 },
+      { name: "Сыр Российский", quantity: 0.206, unit: "кг", unitPrice: 160, lineTotal: 32.96, confidence: 0.49 },
+    ],
+  });
+  const matched = applyDeterministicMappings({
+    document: parsed,
+    supplierId: "market",
+    venueId: 1,
+    mappings: [],
+    nomenclature: candidates,
+  });
+
+  assert.deepEqual(
+    matched.items.map((item) => ({ name: item.rawName, source: item.mappingSource, review: item.requiresReview })),
+    [
+      { name: "Капуста пекинская", source: "exact_alias", review: false },
+      { name: "Сыр Российский", source: "exact_alias", review: false },
+    ],
+  );
+});
+
+test("all exact lines from the 15-position market invoice survive the production legacy venue shape", () => {
+  const names = [
+    "Капуста пекинская", "Сыр Российский", "Майонез", "Кетчуп", "Специи в ассортименте",
+    "Апельсины", "Лимоны", "Лаваш", "Шампиньоны", "Яблоки", "Помидоры", "Огурцы",
+    "Зелень пучок", "Лист салата", "Филе куриное",
+  ];
+  const candidates = nomenclatureCandidates({
+    nomenclature: names.map((name, index) => ({
+      id: `market-${index}`,
+      productKey: `stock:market-${index}|${index === 7 || index === 12 ? "pcs" : "g"}`,
+      name,
+      unit: index === 7 || index === 12 ? "pcs" : "g",
+      active: true,
+      ...(index % 2 === 0 ? { venueId: "primary" } : {}),
+    })),
+    stockBalances: [],
+  }, 1);
+  const parsed = parsedInvoiceDocumentFromLegacy({
+    documentType: "invoice",
+    supplierName: "Рынок",
+    total: 150,
+    confidence: 0.49,
+    items: names.map((name, index) => ({
+      id: `legacy-line-${index + 1}`,
+      name,
+      quantity: 1,
+      unit: index === 7 || index === 12 ? "шт." : "кг",
+      unitPrice: 10,
+      lineTotal: 10,
+      confidence: 0.49,
+    })),
+  });
+  const matched = applyDeterministicMappings({
+    document: parsed,
+    supplierId: "market",
+    venueId: 1,
+    mappings: [],
+    nomenclature: candidates,
+  });
+
+  assert.equal(candidates.length, 15);
+  assert.equal(matched.items.filter((item) => item.mappingSource === "exact_alias").length, 15);
+  assert.equal(matched.items.filter((item) => item.requiresReview).length, 0);
+});
+
 test("parser handles real 1C-style Russian headers, word dates and numbered table rows", () => {
   const draft = parseInvoiceOcr({
     rawText: [

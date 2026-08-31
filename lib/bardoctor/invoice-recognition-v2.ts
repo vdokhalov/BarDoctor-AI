@@ -175,7 +175,13 @@ export function normalizeInvoiceNumericToken(value: unknown): string {
 
 function numeric(value: unknown, fallback = 0): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  const parsed = Number(normalizeInvoiceNumericToken(value));
+  const token = normalizeInvoiceNumericToken(value);
+  // Number("") is 0, which used to defeat every non-zero fallback. In the
+  // production Köln assortment, legacy rows either omit venueId or use the
+  // historical "primary" label. Those account-scoped rows must inherit the
+  // authenticated venue instead of being misclassified as venue 0.
+  if (!token) return fallback;
+  const parsed = Number(token);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
