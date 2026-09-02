@@ -6,7 +6,7 @@ const inputPath = process.argv[2];
 const outputPath = process.argv[3];
 if (!inputPath || !outputPath) throw new Error("usage: input.json output.json");
 const bytes = await readFile(inputPath);
-const root = JSON.parse(bytes.toString("utf8")) as Record<string, unknown>;
+const root = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
 const snapshot = root.snapshot as Record<string, unknown>;
 const stores = snapshot.stores as Record<string, unknown>;
 const documents = Array.isArray(stores.bd_purchase_documents) ? stores.bd_purchase_documents : [];

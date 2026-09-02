@@ -74,15 +74,9 @@
 
   function sessionHeaders(contentType) {
     var headers = {};
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venueId = localStorage.getItem("bd_active_venue_id");
     if (contentType !== false) headers["Content-Type"] = "application/json";
-    if (email && token) {
-      headers["X-Session-Email"] = email;
-      headers["X-Session-Token"] = token;
-      if (venueId) headers["X-Venue-Id"] = venueId;
-    }
+    if (venueId) headers["X-Venue-Id"] = venueId;
     return headers;
   }
 
@@ -92,6 +86,7 @@
     var headers = Object.assign({}, sessionHeaders(!isForm), settings.headers || {});
     var response = await fetch(path, Object.assign({}, settings, {
       headers: headers,
+      credentials: "same-origin",
       cache: "no-store",
       signal: signal || settings.signal
     }));
@@ -907,10 +902,9 @@
   }
 
   async function ensureSession() {
-    if (localStorage.getItem("bd_session") && localStorage.getItem("bd_session_token")) return;
     var result = await api("/api/auth/bootstrap", { method: "POST", body: "{}" });
     localStorage.setItem("bd_session", result.email);
-    localStorage.setItem("bd_session_token", result.token);
+    localStorage.removeItem("bd_session_token");
     localStorage.setItem("bd_session_userid", String(result.userId));
   }
 

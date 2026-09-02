@@ -5,6 +5,7 @@ import {
   BARDOCTOR_BUILD_TIMESTAMP,
   BARDOCTOR_SCHEMA_VERSION,
 } from "./version";
+import { CURRENT_MUTATION_CONTRACT, MINIMUM_MUTATION_CONTRACT } from "./client-contract";
 
 export interface BarDoctorReleaseIdentity {
   appVersion: string;
@@ -13,6 +14,8 @@ export interface BarDoctorReleaseIdentity {
   buildTimestamp: string;
   schemaVersion: string;
   environment: string;
+  mutationContractVersion: number;
+  minimumSupportedMutationContract: number;
 }
 
 export function getBarDoctorReleaseIdentity(environment = "unconfigured"): BarDoctorReleaseIdentity {
@@ -23,5 +26,7 @@ export function getBarDoctorReleaseIdentity(environment = "unconfigured"): BarDo
     buildTimestamp: BARDOCTOR_BUILD_TIMESTAMP,
     schemaVersion: BARDOCTOR_SCHEMA_VERSION,
     environment,
+    mutationContractVersion: CURRENT_MUTATION_CONTRACT,
+    minimumSupportedMutationContract: MINIMUM_MUTATION_CONTRACT,
   };
 }

@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
 const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
+const { installSyntheticSession } = require("./browser-synthetic-auth.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4175";
 let browserPath = process.env.BD_QA_BROWSER || "/tmp/chromium";
@@ -26,6 +27,17 @@ function query(state, extras = {}) {
   return `/suppliers?${params.toString()}`;
 }
 
+function fixtureBootstrap(state, extras) {
+  const venueId = Number(extras.venue) || (state === "venue-b" ? 402 : 401);
+  const permissions = ["inventory.view", "inventory.manage", "expenses.create", "finance.view", "finance.manage", "data.import", "integrations.manage", "settings.manage"];
+  const primaryName = state === "long" ? "Кёльн · Центральная площадка с очень длинным названием" : "Кёльн";
+  const venues = [
+    { id: 401, workspaceId: "qa-procurement-workspace", name: primaryName, role: "owner", isPrimary: true, status: "active", permissions },
+    { id: 402, workspaceId: "qa-procurement-workspace", name: "Причал", role: "owner", isPrimary: false, status: "active", permissions },
+  ];
+  return { ok: true, email: "procurement-v168-qa@bardoctor.local", userId: "qa-procurement-user", firstName: "QA", lastName: "Procurement", role: "owner", permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: 2, confirmedOwnedVenueCount: 2, inaccessibleOwnedVenueCount: 0 } };
+}
+
 async function openPage(browser, {
   state = "default",
   extras = {},
@@ -40,6 +52,17 @@ async function openPage(browser, {
     locale: "ru-RU",
     timezoneId: "Europe/Chisinau",
   });
+  await installSyntheticSession(context, baseUrl, name);
+  // The deterministic browser fixture owns the app bootstrap. Fulfill the
+  // earlier shell request from the same scoped fixture to prevent a race.
+  await context.route("**/api/auth/bootstrap", (route) => {
+    const documentUrl = route.request().frame().url();
+    const referer = route.request().headers().referer || "";
+    const requestParams = new URL(documentUrl || referer || `${baseUrl}${query(state, extras)}`).searchParams;
+    const requestState = requestParams.get("qaProcurement") || state;
+    return route.fulfill(jsonResponse(fixtureBootstrap(requestState, Object.fromEntries(requestParams))));
+  });
+  await context.route("**/api/store/bd_assortment_v1", (route) => route.fulfill(jsonResponse({ ok: true, data: { stockBalances: [] } })));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
   const page = await context.newPage();
   const issues = [];
@@ -342,8 +365,7 @@ async function financeDocumentDeleteEntryFlow(browser, viewport, name, screensho
   });
   const { page } = run;
 
-  await page.getByRole("link", { name: "Финансы", exact: true }).click();
-  await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await page.goto(`${baseUrl}/finance?qaProcurement=default&venue=401&month=2026-08`, { waitUntil: "networkidle", timeout: 60_000 });
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   const linkedPurchase = page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).first();
   assert.equal(await linkedPurchase.isVisible(), true, `${name}: linked purchase expense must be visible`);
@@ -410,8 +432,7 @@ async function financePurchaseDeletionFlow(browser) {
     name: "finance-paid-purchase-delete-visible-ui",
   });
   const { page } = run;
-  await page.getByRole("link", { name: "Финансы", exact: true }).click();
-  await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await page.goto(`${baseUrl}/finance?qaProcurement=e2e&qaScenario=debt&venue=401&month=2026-08`, { waitUntil: "networkidle", timeout: 60_000 });
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   const linkedPurchase = page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).first();
   await linkedPurchase.waitFor({ state: "visible" });

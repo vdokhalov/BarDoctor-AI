@@ -11,6 +11,7 @@ import {
   normalizePurchaseAccounting,
   normalizePurchaseDocument,
   purchaseCommercialArithmeticIssues,
+  purchaseMutationValidationIssues,
   purchaseAffectsInventory,
   purchasePaymentSummary,
   PURCHASE_STORE_KEY,
@@ -141,6 +142,15 @@ export async function POST(request: Request): Promise<Response> {
   const updateReason = typeof body.updateReason === "string" && body.updateReason.trim()
     ? body.updateReason.trim().slice(0, 240)
     : "Подтверждённый закупочный документ исправлен пользователем";
+  const validationIssues = purchaseMutationValidationIssues(body.document);
+  if (validationIssues.length) {
+    return Response.json({
+      ok: false,
+      code: "PURCHASE_INPUT_INVALID",
+      error: "Проверьте формат, длину и диапазон полей закупки.",
+      issues: validationIssues,
+    }, { status: 422 });
+  }
   let document = normalizePurchaseDocument(body.document, "");
   if (!document.id) {
     return Response.json({ ok: false, error: "Не найден идентификатор накладной" }, { status: 422 });

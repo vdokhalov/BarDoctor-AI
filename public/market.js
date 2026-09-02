@@ -1,7 +1,7 @@
 (function(){
 "use strict";
 var shared=window.bdCompetitorMarketClientV329,state={restaurant:{},analysis:null,stale:false,filter:"all",selected:null,tab:"overview",refreshing:false,bootstrapping:true,offline:false,refreshFailed:false,coordinates:null},$=function(s){return document.querySelector(s)};
-function headers(extra){var h=new Headers(extra||{}),e=localStorage.getItem("bd_session"),t=localStorage.getItem("bd_session_token"),v=localStorage.getItem("bd_active_venue_id");if(e&&t){h.set("X-Session-Email",e);h.set("X-Session-Token",t)}if(v)h.set("X-Venue-Id",v);return h}
+function headers(extra){var h=new Headers(extra||{}),v=localStorage.getItem("bd_active_venue_id");if(v)h.set("X-Venue-Id",v);return h}
 async function api(url,options,timeout){var c=new AbortController(),timer=setTimeout(function(){c.abort()},timeout||18000);try{var r=await fetch(url,Object.assign({},options||{},{headers:headers(options&&options.headers),signal:c.signal})),b=await r.json().catch(function(){return{}});if(!r.ok||b.ok===false)throw new Error(b.error||"Не удалось выполнить запрос");return b}finally{clearTimeout(timer)}}
 function esc(v){return String(v==null?"":v).replace(/[&<>\"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]})}function list(v){return Array.isArray(v)?v.filter(Boolean):[]}function date(v,short){var d=new Date(v||"");if(!Number.isFinite(d.getTime()))return"давно";return d.toLocaleString("ru-RU",short?{day:"numeric",month:"short"}:{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}
 function key(i){return String(i.key||(String(i.name||"").toLowerCase()+"|"+list(i.sourceUrls)[0])).slice(0,400)}

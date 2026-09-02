@@ -18,6 +18,7 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run pretest:artifact && npm run audit:buttons && npm run audit:navigation && npm run audit:headers && npm run audit:modern && npm run typecheck && npm run build && npm run test:data-integrity-operator && npm run test:artifact && node --test tests/purchase-receiving-stability-v371.test.mjs tests/quick-add-purchase-v372.test.mjs && npm run test:taxonomy-artifact && npm run test:release-safety && npm run test:unit",
     "test:data-control-runtime": "node scripts/verify-data-control-runtime.mjs",
+    "test:auth-runtime": "node scripts/verify-auth-hardening-runtime.mjs",
     "test:data-integrity-operator": "node --test tests/data-integrity-operator-v370.test.mjs",
     "test:venue-runtime": "node scripts/verify-venue-switch-runtime.mjs",
     "test:avatar-runtime": "node scripts/verify-user-avatar-runtime.mjs",
@@ -40,7 +41,7 @@
     "qa:invoice-394-representative": "node --import tsx scripts/run-invoice-394-representative-qa.ts",
     "qa:invoice-hybrid-500": "node --import tsx scripts/run-invoice-hybrid-simulation.ts",
     "pretest:artifact": "node scripts/verify-canonical-source.mjs",
-    "test:artifact": "node --test tests/rendered-html.test.mjs tests/navigation-consistency.test.mjs tests/navigation-contract-v247.test.mjs tests/visual-layout-regression-v279.test.mjs tests/profile-experience-v280.test.mjs tests/profile-experience-v281.test.mjs tests/auth-login-v248.test.mjs tests/auth-bootstrap-state-v274.test.mjs tests/startup-recovery-v341.test.mjs tests/startup-runtime-hardening-v342.test.mjs tests/startup-performance-v343.test.mjs tests/authoritative-home-startup-v344.test.mjs tests/authenticated-home-shell-v345.test.mjs tests/branded-startup-handoff-v346.test.mjs tests/coherent-startup-v347.test.mjs tests/ios-launch-screen-v348.test.mjs tests/single-ready-home-v349.test.mjs tests/seamless-startup-v356.test.mjs tests/bounded-startup-handoff-v357.test.mjs tests/purchase-review-ux-v356.test.mjs tests/purchase-accounting-v359.test.mjs tests/purchase-category-options-v367.test.mjs tests/taxonomy-manager-ux-v360.test.mjs tests/optional-subcategory-v361.test.mjs tests/classification-ux-v362.test.mjs tests/alphabetical-taxonomy-v363.test.mjs tests/taxonomy-action-sheet-v364.test.mjs tests/nested-sections-v365.test.mjs tests/nomenclature-catalog-route-v366.test.mjs tests/existing-venue-gate-v249.test.mjs tests/embedded-login-transition-v250.test.mjs tests/venue-setup-boundary-v251.test.mjs tests/app-shell-v185.test.mjs tests/modern-ux.test.mjs tests/health-score-experience.test.mjs tests/business-health-detail-v377.test.mjs tests/business-health-watchdog-v378.test.mjs tests/versioned-client-asset-v379.test.mjs tests/shifts-experience.test.mjs tests/sync-experience.test.mjs tests/brand-identity.test.mjs tests/finance-dashboard-v160.test.mjs tests/team-management-v163.test.mjs tests/payroll-dashboard-v164.test.mjs tests/monthly-report-v165.test.mjs tests/more-hub-v166.test.mjs tests/nomenclature-v208.test.mjs tests/nomenclature-canonical-supplier-v260.test.mjs tests/warehouse-v240.test.mjs tests/warehouse-v241.test.mjs tests/warehouse-v242.test.mjs tests/warehouse-v244.test.mjs tests/inventory-workflow-v245.test.mjs tests/inventory-layer-v246.test.mjs tests/inventory-delete-v270.test.mjs tests/writeoff-workflow-v271.test.mjs tests/shift-writeoffs-v272.test.mjs tests/sales-consumption-v275.test.mjs tests/menu-sale-size-v298.test.mjs tests/menu-nomenclature-flow-v350.test.mjs tests/catalog-workflow-ux-v353.test.mjs tests/modal-workspace-v354.test.mjs tests/publication-readiness-v355.test.mjs tests/inventory-scope-hierarchy-v256.test.mjs tests/tech-card-reconciliation-v257.test.mjs tests/tech-card-semantic-matching-v258.test.mjs tests/tech-card-entity-resolution-v259.test.mjs tests/tech-card-consistency-v299.test.mjs tests/tech-card-catalog-picker-v368.test.mjs tests/nomenclature-uat-v369.test.mjs tests/receiving-warehouse-ux-v373.test.mjs tests/dismissible-overlays-v374.test.mjs tests/tech-card-search-ux-v375.test.mjs tests/tech-card-costing-v376.test.mjs tests/unit-product-costing-v380.test.mjs tests/accounting-currency-v243.test.mjs tests/equipment-command-v167.test.mjs tests/procurement-command-v168.test.mjs tests/assortment-command-v170.test.mjs tests/catalog-accounting-v208.test.mjs tests/inventory-display-units-v220.test.mjs tests/purchase-quantity-semantics-v221.test.mjs tests/inventory-cache-reconciliation-v235.test.mjs tests/integrations-experience-v178.test.mjs tests/reviews-experience-v179.test.mjs tests/settings-experience-v182.test.mjs tests/warehouse-unit-integrity-v399.test.mjs",
+    "test:artifact": "node --test tests/rendered-html.test.mjs tests/navigation-consistency.test.mjs tests/navigation-contract-v247.test.mjs tests/visual-layout-regression-v279.test.mjs tests/profile-experience-v280.test.mjs tests/profile-experience-v281.test.mjs tests/auth-login-v248.test.mjs tests/auth-bootstrap-state-v274.test.mjs tests/startup-recovery-v341.test.mjs tests/startup-runtime-hardening-v342.test.mjs tests/startup-performance-v343.test.mjs tests/authoritative-home-startup-v344.test.mjs tests/authenticated-home-shell-v345.test.mjs tests/branded-startup-handoff-v346.test.mjs tests/coherent-startup-v347.test.mjs tests/ios-launch-screen-v348.test.mjs tests/single-ready-home-v349.test.mjs tests/seamless-startup-v356.test.mjs tests/bounded-startup-handoff-v357.test.mjs tests/purchase-review-ux-v356.test.mjs tests/purchase-accounting-v359.test.mjs tests/purchase-category-options-v367.test.mjs tests/taxonomy-manager-ux-v360.test.mjs tests/optional-subcategory-v361.test.mjs tests/classification-ux-v362.test.mjs tests/alphabetical-taxonomy-v363.test.mjs tests/taxonomy-action-sheet-v364.test.mjs tests/nested-sections-v365.test.mjs tests/nomenclature-catalog-route-v366.test.mjs tests/existing-venue-gate-v249.test.mjs tests/embedded-login-transition-v250.test.mjs tests/venue-setup-boundary-v251.test.mjs tests/app-shell-v185.test.mjs tests/modern-ux.test.mjs tests/health-score-experience.test.mjs tests/business-health-detail-v377.test.mjs tests/business-health-watchdog-v378.test.mjs tests/versioned-client-asset-v379.test.mjs tests/shifts-experience.test.mjs tests/sync-experience.test.mjs tests/brand-identity.test.mjs tests/finance-dashboard-v160.test.mjs tests/team-management-v163.test.mjs tests/payroll-dashboard-v164.test.mjs tests/monthly-report-v165.test.mjs tests/more-hub-v166.test.mjs tests/nomenclature-v208.test.mjs tests/nomenclature-canonical-supplier-v260.test.mjs tests/warehouse-v240.test.mjs tests/warehouse-v241.test.mjs tests/warehouse-v242.test.mjs tests/warehouse-v244.test.mjs tests/inventory-workflow-v245.test.mjs tests/inventory-layer-v246.test.mjs tests/inventory-delete-v270.test.mjs tests/writeoff-workflow-v271.test.mjs tests/shift-writeoffs-v272.test.mjs tests/sales-consumption-v275.test.mjs tests/menu-sale-size-v298.test.mjs tests/menu-nomenclature-flow-v350.test.mjs tests/catalog-workflow-ux-v353.test.mjs tests/modal-workspace-v354.test.mjs tests/publication-readiness-v355.test.mjs tests/inventory-scope-hierarchy-v256.test.mjs tests/tech-card-reconciliation-v257.test.mjs tests/tech-card-semantic-matching-v258.test.mjs tests/tech-card-entity-resolution-v259.test.mjs tests/tech-card-consistency-v299.test.mjs tests/tech-card-catalog-picker-v368.test.mjs tests/nomenclature-uat-v369.test.mjs tests/receiving-warehouse-ux-v373.test.mjs tests/dismissible-overlays-v374.test.mjs tests/tech-card-search-ux-v375.test.mjs tests/tech-card-costing-v376.test.mjs tests/unit-product-costing-v380.test.mjs tests/accounting-currency-v243.test.mjs tests/equipment-command-v167.test.mjs tests/procurement-command-v168.test.mjs tests/assortment-command-v170.test.mjs tests/catalog-accounting-v208.test.mjs tests/inventory-display-units-v220.test.mjs tests/purchase-quantity-semantics-v221.test.mjs tests/inventory-cache-reconciliation-v235.test.mjs tests/integrations-experience-v178.test.mjs tests/reviews-experience-v179.test.mjs tests/settings-experience-v182.test.mjs tests/warehouse-unit-integrity-v399.test.mjs tests/widget-boundaries-v405.test.mjs",
     "posttest:artifact": "node --test tests/unit-product-costing-v381.test.mjs tests/unit-product-costing-v382.test.mjs tests/unit-product-costing-v385.test.mjs tests/unit-product-costing-v386.test.mjs tests/unit-product-costing-v387.test.mjs tests/stable-splash-v394.test.mjs tests/single-splash-v395.test.mjs tests/native-continuity-v396.test.mjs tests/shell-first-startup-v397.test.mjs tests/native-fullscreen-raster-v398.test.mjs",
     "test:taxonomy-artifact": "node --test tests/canonical-taxonomy-workflow-v338.test.mjs",
     "test:unit": "node --import tsx --test tests/*.test.ts",
@@ -52,14 +53,15 @@
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@cloudflare/workers-types": "^4.20260702.1",
+    "@cloudflare/vite-plugin": "1.54.3",
+    "@cloudflare/workers-types": "5.20260902.1",
+    "@rolldown/binding-wasm32-wasi": "1.2.7",
     "@sparticuz/chromium": "149.0.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
@@ -70,15 +72,18 @@
     "acorn": "8.16.0",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.4",
     "playwright-core": "^1.58.2",
-    "react-server-dom-webpack": "19.2.6",
+    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
     "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "wrangler": "4.92.0"
+    "vite": "8.2.2",
+    "wrangler": "4.128.0"
   },
   "type": "module",
-  "displayName": "BarDoctor Preview"
+  "displayName": "BarDoctor Preview",
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "1.2.7"
+  }
 }

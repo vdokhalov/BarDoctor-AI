@@ -68,6 +68,7 @@ const localRuntimeBindings = Object.fromEntries(
     "INVOICE_OCR_MODEL",
     "ONESIGNAL_APP_ID",
     "ONESIGNAL_REST_API_KEY",
+    "NOTIFICATION_CRON_SECRET",
     "BARDOCTOR_SECRETS_KEY",
   ]
     .map((key) => [key, process.env[key]])

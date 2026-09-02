@@ -8,6 +8,7 @@ import {
   type PlatformAdmin,
 } from "../../db/schema";
 import {
+  authenticateIdentitySessionDetails,
   authenticateIdentityRequest,
   getChatGPTEmail,
   normalizeEmail,
@@ -15,6 +16,7 @@ import {
 import { runtimeEnv } from "./runtime-env";
 
 export const PLATFORM_ADMIN_PERMISSION = "platform.admin" as const;
+const PLATFORM_ADMIN_SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
 
 export type AuthenticatedPlatformAdmin = {
   account: Account;
@@ -67,9 +69,12 @@ async function adminForChatGPTIdentity(request: Request): Promise<AuthenticatedP
 export async function authenticatePlatformAdmin(
   request: Request,
 ): Promise<AuthenticatedPlatformAdmin | null> {
-  const sessionAccount = await authenticateIdentityRequest(request);
-  if (sessionAccount) {
-    const sessionAdmin = await adminForAccount(sessionAccount);
+  const identitySession = await authenticateIdentitySessionDetails(request);
+  if (identitySession) {
+    const createdAt = new Date(identitySession.createdAt).valueOf();
+    const sessionIsRecent = Number.isFinite(createdAt)
+      && Date.now() - createdAt <= PLATFORM_ADMIN_SESSION_MAX_AGE_MS;
+    const sessionAdmin = sessionIsRecent ? await adminForAccount(identitySession.account) : null;
     if (sessionAdmin) return sessionAdmin;
   }
   return adminForChatGPTIdentity(request);

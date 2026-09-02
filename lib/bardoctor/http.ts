@@ -1,4 +1,4 @@
-const DEFAULT_MAX_JSON_BYTES = 8 * 1024 * 1024;
+const DEFAULT_MAX_JSON_BYTES = 1024 * 1024;
 
 export type JsonRequestResult<T> =
   | { ok: true; data: T }

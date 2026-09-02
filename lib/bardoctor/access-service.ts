@@ -35,15 +35,17 @@ export async function inviteCodeHash(value: string): Promise<string> {
 }
 
 function randomInviteCode(): string {
-  const bytes = new Uint8Array(8);
+  // 16 symbols from a 32-character alphabet provide 80 bits of entropy.
+  // Legacy 8-symbol invitations remain accepted until their 72-hour expiry.
+  const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   const body = Array.from(bytes, (byte) => INVITE_ALPHABET[byte % INVITE_ALPHABET.length]).join("");
-  return `BD-${body.slice(0, 4)}-${body.slice(4)}`;
+  return `BD-${body.slice(0, 4)}-${body.slice(4, 8)}-${body.slice(8, 12)}-${body.slice(12)}`;
 }
 
 export async function findActiveInvite(code: string) {
   const normalized = normalizeInviteCode(code);
-  if (normalized.length !== 10 || !normalized.startsWith("BD")) return null;
+  if (![10, 18].includes(normalized.length) || !normalized.startsWith("BD")) return null;
   const codeHash = await inviteCodeHash(normalized);
   const now = new Date().toISOString();
   const [invite] = await getDb()

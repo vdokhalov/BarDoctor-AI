@@ -12,6 +12,11 @@ import {
   passwordValidationError,
 } from "../../../../lib/bardoctor/password";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
+import {
+  authRateLimitedResponse,
+  clearSuccessfulAuthLimit,
+  consumeAuthRateLimit,
+} from "../../../../lib/bardoctor/auth-rate-limit";
 
 const IDENTITY_MISMATCH =
   "Этот аккаунт BarDoctor не связан с подтверждённой учётной записью ChatGPT";
@@ -19,6 +24,12 @@ const IDENTITY_MISMATCH =
 export async function POST(request: Request): Promise<Response> {
   try {
     const authenticatedEmail = getChatGPTEmail(request);
+    const rateLimit = await consumeAuthRateLimit(
+      request,
+      "password-reset",
+      authenticatedEmail ?? "anonymous",
+    );
+    if (!rateLimit.allowed) return authRateLimitedResponse(rateLimit);
     if (!authenticatedEmail) {
       return Response.json(
         {
@@ -63,6 +74,7 @@ export async function POST(request: Request): Promise<Response> {
         .where(eq(accounts.id, account.id)),
       db.delete(sessions).where(eq(sessions.accountId, account.id)),
     ]);
+    await clearSuccessfulAuthLimit(request, "password-reset", authenticatedEmail);
 
     return Response.json({
       ok: true,

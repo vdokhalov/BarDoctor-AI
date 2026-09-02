@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../../db";
 import { hasPermission } from "../../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../../lib/bardoctor/auth";
+import { readJsonRequest } from "../../../../../lib/bardoctor/http";
 import { closedMonthsFromStore } from "../../../../../lib/bardoctor/data-trust";
 import {
   EXPENSE_STORE_KEY,
@@ -107,12 +108,9 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  let body: JsonRecord;
-  try {
-    body = record(JSON.parse(await request.text()) as unknown);
-  } catch {
-    return Response.json({ ok: false, error: "Некорректный запрос" }, { status: 400 });
-  }
+  const parsed = await readJsonRequest<unknown>(request, { maxBytes: 12 * 1024 });
+  if (!parsed.ok) return parsed.response;
+  const body = record(parsed.data);
   const paymentId = text(body.paymentId ?? body.id, "", 100);
   if (!paymentId) {
     return Response.json({ ok: false, error: "Не указан платёж" }, { status: 422 });

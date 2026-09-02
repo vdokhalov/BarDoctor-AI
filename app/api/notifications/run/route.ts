@@ -17,9 +17,7 @@ function safeEqual(left: string, right: string): boolean {
 function authorized(request: Request): boolean {
   const secret = runtimeEnv("NOTIFICATION_CRON_SECRET");
   const header = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  const query = new URL(request.url).searchParams.get("token") ?? "";
-  const supplied = header || query;
-  return Boolean(secret && supplied && safeEqual(secret, supplied));
+  return Boolean(secret && header && safeEqual(secret, header));
 }
 
 function responseHeaders(): HeadersInit {
@@ -52,18 +50,11 @@ async function run(request: Request, includeSummary: boolean): Promise<Response>
   });
 }
 
-export async function GET(request: Request): Promise<Response> {
-  if (authorized(request)) return run(request, true);
-
-  // This public, read-like tick cannot choose recipients or message content.
-  // D1 state limits it to one effective evaluation per account per hour.
-  if (!(await notificationTriggersAreDue())) {
-    return Response.json(
-      { ok: true, ran: false, reason: "not_due" },
-      { headers: responseHeaders() },
-    );
-  }
-  return run(request, false);
+export function GET(): Response {
+  return Response.json(
+    { ok: false, code: "METHOD_NOT_ALLOWED", error: "Используйте авторизованный POST" },
+    { status: 405, headers: { ...responseHeaders(), Allow: "POST" } },
+  );
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -71,6 +62,14 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(
       { ok: false, error: "Недоступно" },
       { status: 401, headers: responseHeaders() },
+    );
+  }
+  // Replays inside the durable account run interval become a no-op. Delivery
+  // rows also enforce account + dedupe-key uniqueness for concurrent overlap.
+  if (!(await notificationTriggersAreDue())) {
+    return Response.json(
+      { ok: true, ran: false, reason: "not_due" },
+      { headers: responseHeaders() },
     );
   }
   return run(request, true);

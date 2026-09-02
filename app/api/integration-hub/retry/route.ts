@@ -1,5 +1,6 @@
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import type { CanonicalEnvelope } from "../../../../lib/bardoctor/integrations/contracts";
 import { connectionForTenant, retryableItems } from "../../../../lib/bardoctor/integrations/repository";
 import { runIntegrationSync } from "../../../../lib/bardoctor/integrations/sync-engine";
@@ -11,13 +12,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!hasPermission(account, "integrations.manage")) {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав" }, { status: 403 });
   }
-  let runId = "";
-  try {
-    const body = await request.json() as { runId?: unknown };
-    runId = typeof body.runId === "string" ? body.runId.trim() : "";
-  } catch {
-    return Response.json({ ok: false, error: "Некорректный запрос" }, { status: 400 });
-  }
+  const parsed = await readJsonRequest<{ runId?: unknown }>(request, { maxBytes: 8 * 1024 });
+  if (!parsed.ok) return parsed.response;
+  const runId = typeof parsed.data.runId === "string" ? parsed.data.runId.trim() : "";
   const items = runId ? await retryableItems(account, runId) : [];
   if (!items.length) {
     return Response.json({ ok: false, error: "В этом запуске нет записей для повтора" }, { status: 409 });

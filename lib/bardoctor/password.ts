@@ -2,6 +2,16 @@
 const PASSWORD_ITERATIONS = 100_000;
 const PASSWORD_KEY_BYTES = 32;
 const PASSWORD_SALT_BYTES = 16;
+const MINIMUM_NEW_PASSWORD_LENGTH = 15;
+const MAXIMUM_PASSWORD_LENGTH = 256;
+
+const COMMON_PASSWORDS = new Set([
+  "123456", "12345678", "123456789", "1234567890", "111111", "000000",
+  "password", "password1", "password123", "qwerty", "qwerty123", "admin",
+  "administrator", "letmein", "welcome", "iloveyou", "monkey", "dragon",
+  "football", "baseball", "master", "login", "passw0rd", "пароль",
+  "йцукен", "bardoctor", "bar doctor",
+]);
 
 export type PasswordRecord = {
   passwordHash: string;
@@ -57,18 +67,30 @@ function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
 }
 
 export function passwordValidationError(password: string): string | null {
-  if (password.length < 6) return "Пароль должен содержать не менее 6 символов";
-  if (password.length > 256) return "Пароль слишком длинный";
+  const normalized = password.normalize("NFC");
+  if (normalized.length < MINIMUM_NEW_PASSWORD_LENGTH) {
+    return `Пароль должен содержать не менее ${MINIMUM_NEW_PASSWORD_LENGTH} символов`;
+  }
+  if (normalized.length > MAXIMUM_PASSWORD_LENGTH) return "Пароль слишком длинный";
+  const commonCandidate = normalized.trim().toLowerCase().replace(/\s+/g, " ");
+  if (COMMON_PASSWORDS.has(commonCandidate)) {
+    return "Выберите менее распространённый пароль или длинную парольную фразу";
+  }
   return null;
 }
 
-export async function hashPassword(password: string): Promise<PasswordRecord> {
-  const validationError = passwordValidationError(password);
+export async function hashPassword(
+  password: string,
+  options: { verifiedExistingCredential?: boolean } = {},
+): Promise<PasswordRecord> {
+  const validationError = options.verifiedExistingCredential
+    ? (password.length === 0 || password.length > MAXIMUM_PASSWORD_LENGTH ? "Некорректный пароль" : null)
+    : passwordValidationError(password);
   if (validationError) throw new Error(validationError);
 
   const salt = new Uint8Array(PASSWORD_SALT_BYTES);
   crypto.getRandomValues(salt);
-  const digest = await derivePassword(password, salt, PASSWORD_ITERATIONS);
+  const digest = await derivePassword(password.normalize("NFC"), salt, PASSWORD_ITERATIONS);
   return {
     passwordHash: toBase64Url(digest),
     passwordSalt: toBase64Url(salt),
@@ -87,13 +109,17 @@ export async function verifyPassword(
   if (!record.passwordHash || !record.passwordSalt || !record.passwordIterations) {
     return false;
   }
-  if (password.length === 0 || password.length > 256) return false;
+  if (password.length === 0 || password.length > MAXIMUM_PASSWORD_LENGTH) return false;
 
   try {
     const salt = fromBase64Url(record.passwordSalt);
     const expected = fromBase64Url(record.passwordHash);
-    const actual = await derivePassword(password, salt, record.passwordIterations);
-    return equalBytes(actual, expected);
+    const normalized = password.normalize("NFC");
+    const actual = await derivePassword(normalized, salt, record.passwordIterations);
+    if (equalBytes(actual, expected)) return true;
+    if (normalized === password) return false;
+    const legacyActual = await derivePassword(password, salt, record.passwordIterations);
+    return equalBytes(legacyActual, expected);
   } catch {
     return false;
   }

@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { assertSpreadsheetInput } from "../../../../lib/bardoctor/spreadsheet-safety";
 import { env } from "cloudflare:workers";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -168,7 +169,8 @@ function normalizedUploadMimeType(
 function spreadsheetText(bytes: Uint8Array): string {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(bytes, { type: "array", cellDates: true });
+    assertSpreadsheetInput(bytes, MAX_FILE_BYTES);
+    workbook = XLSX.read(bytes, { type: "array", cellDates: true, sheetRows: 901 });
   } catch {
     throw new AIServiceError("Не удалось открыть таблицу меню.", 422);
   }

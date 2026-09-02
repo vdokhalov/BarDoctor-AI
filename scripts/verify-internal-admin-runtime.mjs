@@ -8,7 +8,7 @@ import path from "node:path";
 const port = 5192;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const password = "Admin-QA-2468";
+const password = "Admin-Runtime-QA-2468";
 const adminIdentity = `admin-runtime-${runId}@example.test`;
 const adminIdentityHash = createHash("sha256").update(adminIdentity).digest("hex");
 const openAISecret = `sk-runtime-${runId}`;
@@ -82,8 +82,7 @@ async function request(pathname, options = {}) {
 function authHeaders(session, extra = {}) {
   return {
     "Content-Type": "application/json",
-    "X-Session-Email": session.email,
-    "X-Session-Token": session.token,
+    Cookie: session.cookie,
     ...extra,
   };
 }
@@ -152,13 +151,7 @@ try {
   database.prepare(`DELETE FROM platform_admin_audit WHERE admin_account_id IN (SELECT id FROM accounts WHERE app_email LIKE 'admin-runtime-%@example.test')`).run();
   database.prepare(`DELETE FROM platform_admins WHERE provisioned_by = 'verified_identity_bootstrap' AND account_id IN (SELECT id FROM accounts WHERE app_email LIKE 'admin-runtime-%@example.test')`).run();
 
-  const registeredAdmin = await register(adminIdentity, "Platform Admin", adminIdentity);
-  const sessionBridge = await request("/api/auth/bootstrap", {
-    method: "POST",
-    headers: authHeaders(registeredAdmin),
-  });
-  assert.equal(sessionBridge.response.status, 200, JSON.stringify(sessionBridge.body));
-  const admin = { ...registeredAdmin, cookie: responseCookie(sessionBridge.response) };
+  const admin = await register(adminIdentity, "Platform Admin", adminIdentity);
   const owner = await register(`owner-runtime-${runId}@example.test`, "Owner");
   const manager = await join(`manager-runtime-${runId}@example.test`, "Manager", await createInvite(owner, "manager"));
   const employee = await join(`employee-runtime-${runId}@example.test`, "Employee", await createInvite(owner, "shift_manager"));

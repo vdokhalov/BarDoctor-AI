@@ -1,4 +1,6 @@
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
+import { recordException, requestIdFor, withRequestId } from "../../../lib/bardoctor/observability";
+import { readJsonRequest } from "../../../lib/bardoctor/http";
 
 const MAX_TEXT_LENGTH = 180;
 
@@ -16,18 +18,16 @@ function safeNumber(value: unknown): number {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const requestId = requestIdFor(request);
+  const startedAt = performance.now();
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
 
-  let payload: Record<string, unknown> = {};
-  try {
-    const parsed = await request.json();
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      payload = parsed as Record<string, unknown>;
-    }
-  } catch {
-    return Response.json({ ok: false, error: "Invalid diagnostic payload" }, { status: 400 });
-  }
+  const parsed = await readJsonRequest<Record<string, unknown>>(request, { maxBytes: 4 * 1024 });
+  if (!parsed.ok) return parsed.response;
+  const payload = parsed.data && typeof parsed.data === "object" && !Array.isArray(parsed.data)
+    ? parsed.data
+    : {};
 
   const diagnostic = {
     version: safeText(payload.version),
@@ -40,12 +40,20 @@ export async function POST(request: Request): Promise<Response> {
     venueId: account.venueId,
   };
 
-  console.error(`[BarDoctor client runtime] ${JSON.stringify(diagnostic)}`);
-  return new Response(null, {
+  recordException({
+    requestId,
+    endpoint: "/api/client-runtime-diagnostic",
+    category: `frontend_${diagnostic.kind || "runtime"}`,
+    error: new Error(diagnostic.message || "Client runtime error"),
+    startedAt,
+    venueId: account.venueId,
+    accountId: account.id,
+  });
+  return withRequestId(new Response(null, {
     status: 204,
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
       Pragma: "no-cache",
     },
-  });
+  }), requestId);
 }

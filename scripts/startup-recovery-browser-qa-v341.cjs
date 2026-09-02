@@ -11,7 +11,6 @@ fs.mkdirSync(outputDir, { recursive: true });
 
 const session = {
   email: "startup-recovery-qa@bardoctor.local",
-  token: "startup-recovery-qa-token",
   userId: "startup-recovery-qa-user",
 };
 const venue = {
@@ -31,7 +30,6 @@ function response(body, status = 200) {
 async function configureContext(context) {
   await context.addInitScript(({ currentSession, activeVenue }) => {
     localStorage.setItem("bd_session", currentSession.email);
-    localStorage.setItem("bd_session_token", currentSession.token);
     localStorage.setItem("bd_session_userid", currentSession.userId);
     localStorage.setItem("bd_active_venue_id", String(activeVenue.id));
     localStorage.setItem("bd_active_venue_is_primary", "1");
@@ -208,7 +206,7 @@ async function runFailureRecovery(browser) {
     email: localStorage.getItem("bd_session"),
     token: localStorage.getItem("bd_session_token"),
     userId: localStorage.getItem("bd_session_userid"),
-  })), session);
+  })), { ...session, token: null });
   await context.close();
   return { blockedBundleRequests, documentRequests, sessionPreserved: true };
 }

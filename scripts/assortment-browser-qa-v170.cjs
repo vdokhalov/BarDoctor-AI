@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
+const { installSyntheticSession } = require("./browser-synthetic-auth.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4173";
 const browserPath = process.env.BD_QA_BROWSER || "/tmp/chromium";
@@ -25,6 +26,19 @@ function query(state, extras = {}) {
   return `/catalog?${params.toString()}`;
 }
 
+function fixtureBootstrap(state, extras) {
+  const venueId = Number(extras.venue) || (state === "venue-b" ? 502 : 501);
+  const permissions = ["inventory.view", "inventory.manage", "expenses.create", "finance.view", "finance.manage", "data.import", "integrations.manage", "settings.manage"];
+  const role = state === "readonly" ? "manager" : "owner";
+  const effectivePermissions = role === "manager" ? permissions.filter((permission) => permission !== "inventory.manage") : permissions;
+  const primaryName = state === "long" ? "Кёльн · Центральная площадка с исключительно длинным названием" : "Кёльн";
+  const venues = [
+    { id: 501, workspaceId: "qa-assortment-workspace", name: primaryName, role, isPrimary: true, status: "active", permissions: effectivePermissions },
+    { id: 502, workspaceId: "qa-assortment-workspace", name: "Причал", role, isPrimary: false, status: "active", permissions: effectivePermissions },
+  ];
+  return { ok: true, email: "assortment-v170-qa@bardoctor.local", userId: "qa-assortment-user", firstName: "QA", lastName: "Assortment", role, permissions: effectivePermissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: 2, confirmedOwnedVenueCount: 2, inaccessibleOwnedVenueCount: 0 } };
+}
+
 async function openPage(browser, {
   state = "default",
   extras = {},
@@ -39,6 +53,28 @@ async function openPage(browser, {
     locale: "ru-RU",
     timezoneId: "Europe/Chisinau",
   });
+  await installSyntheticSession(context, baseUrl, name);
+  await context.addInitScript(() => {
+    const targetVenue = new URLSearchParams(location.search).get("venue");
+    if (targetVenue) {
+      localStorage.setItem("bd_session", "assortment-v170-qa@bardoctor.local");
+      localStorage.setItem("bd_active_venue_id", targetVenue);
+    }
+    if (targetVenue === "502") {
+      localStorage.removeItem("bd_assortment_disclosure_v171__assortment-v170-qa@bardoctor.local__venue_502");
+    }
+  });
+  // Keep the shell bootstrap from winning the race with the deterministic QA
+  // fixture. The fixture supplies its own venue-scoped bootstrap to the app,
+  // while the real cookie remains available to every unmocked API request.
+  await context.route("**/api/auth/bootstrap", (route) => {
+    const documentUrl = route.request().frame().url();
+    const referer = route.request().headers().referer || "";
+    const requestParams = new URL(documentUrl || referer || `${baseUrl}${query(state, extras)}`).searchParams;
+    const requestState = requestParams.get("qaAssortment") || state;
+    return route.fulfill(jsonResponse(fixtureBootstrap(requestState, Object.fromEntries(requestParams))));
+  });
+  await context.route("**/api/store/**", (route) => route.fulfill(jsonResponse({ ok: true, data: null })));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
   const page = await context.newPage();
   const issues = [];
@@ -397,11 +433,21 @@ async function actualVenueSwitch(browser) {
   await page.waitForURL(/venue=502/, { timeout: 20_000 });
   assert.equal(new URL(page.url()).pathname, "/catalog", "venue switch must remain in assortment");
   await page.goto(`${baseUrl}/catalog?qaAssortment=venue-b&venue=502&tab=menu`, { waitUntil: "networkidle" });
+  // Exercise a cold render after the switch. This separates persisted
+  // venue-scoped disclosure from the outgoing component's in-memory state.
+  await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector(".bd-assortment-menu-v170");
   const text = await page.locator(".bd-assortment-menu-v170").innerText();
   assert.doesNotMatch(text, /Aperol Spritz/);
   const secondaryBar = page.locator("[data-assortment-section-id='bar'] > .bd-assortment-section-toggle-v171");
-  assert.equal(await secondaryBar.getAttribute("aria-expanded"), "false", "accordion state must be isolated per venue");
+  const disclosureState = await page.evaluate(() => ({
+    activeVenueId: localStorage.getItem("bd_active_venue_id"),
+    session: localStorage.getItem("bd_session"),
+    entries: Object.fromEntries(Object.keys(localStorage)
+      .filter((key) => key.includes("assortment_disclosure"))
+      .map((key) => [key, localStorage.getItem(key)])),
+  }));
+  assert.equal(await secondaryBar.getAttribute("aria-expanded"), "false", `accordion state must be isolated per venue: ${JSON.stringify(disclosureState)}`);
   await secondaryBar.click();
   await page.locator("[data-assortment-subsection-id] > .bd-assortment-subgroup-toggle-v171").first().click();
   assert.match(await page.locator(".bd-assortment-menu-v170").innerText(), /Домашний лимонад/);

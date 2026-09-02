@@ -664,6 +664,74 @@ export type PurchaseCommercialArithmeticIssue = {
   delta: number;
 };
 
+export type PurchaseMutationValidationIssue = {
+  code: "DATE_INVALID" | "ITEMS_LIMIT_EXCEEDED" | "NUMBER_INVALID" | "NUMBER_OUT_OF_RANGE" | "STRING_TOO_LONG";
+  path: string;
+};
+
+const MAX_ACCOUNTING_VALUE = 1_000_000_000_000;
+
+function strictDecimal(value: unknown): number | null {
+  if (typeof value !== "number" && typeof value !== "string") return null;
+  if (typeof value === "string" && !value.trim()) return null;
+  const parsed = typeof value === "string"
+    ? Number(value.replace(/\s/g, "").replace(",", "."))
+    : value;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function actualIsoDate(value: unknown): boolean {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/** Rejects accounting input that normalization would otherwise silently coerce. */
+export function purchaseMutationValidationIssues(value: unknown): PurchaseMutationValidationIssue[] {
+  const input = record(value);
+  const issues: PurchaseMutationValidationIssue[] = [];
+  if (input.date != null && !actualIsoDate(input.date)) issues.push({ code: "DATE_INVALID", path: "date" });
+  const stringLimits: Array<[unknown, string, number]> = [
+    [input.id, "id", 80],
+    [input.supplierName ?? input.storeName ?? input.vendorName, "supplierName", 180],
+    [input.currency, "currency", 8],
+  ];
+  for (const [candidate, path, limit] of stringLimits) {
+    if (typeof candidate === "string" && candidate.length > limit) issues.push({ code: "STRING_TOO_LONG", path });
+  }
+  if (input.total != null) {
+    const total = strictDecimal(input.total);
+    if (total === null) issues.push({ code: "NUMBER_INVALID", path: "total" });
+    else if (total < 0 || total > MAX_ACCOUNTING_VALUE) issues.push({ code: "NUMBER_OUT_OF_RANGE", path: "total" });
+  }
+  const items = Array.isArray(input.items) ? input.items : [];
+  if (items.length > 250) issues.push({ code: "ITEMS_LIMIT_EXCEEDED", path: "items" });
+  for (const [index, raw] of items.entries()) {
+    const item = record(raw);
+    const prefix = `items[${index}]`;
+    for (const [candidate, path, limit] of [
+      [item.id, `${prefix}.id`, 80],
+      [item.name ?? item.productName, `${prefix}.name`, 240],
+      [item.unit, `${prefix}.unit`, 32],
+    ] as Array<[unknown, string, number]>) {
+      if (typeof candidate === "string" && candidate.length > limit) issues.push({ code: "STRING_TOO_LONG", path });
+    }
+    for (const [candidate, path, allowZero] of [
+      [item.quantity, `${prefix}.quantity`, false],
+      [item.unitPrice ?? item.price, `${prefix}.unitPrice`, true],
+      [item.lineTotal ?? item.total, `${prefix}.lineTotal`, true],
+    ] as Array<[unknown, string, boolean]>) {
+      if (candidate == null) continue;
+      const parsed = strictDecimal(candidate);
+      if (parsed === null) issues.push({ code: "NUMBER_INVALID", path });
+      else if (parsed > MAX_ACCOUNTING_VALUE || parsed < 0 || (!allowZero && parsed === 0)) {
+        issues.push({ code: "NUMBER_OUT_OF_RANGE", path });
+      }
+    }
+  }
+  return issues;
+}
+
 function currencyCents(value: number): number {
   return Math.round((value + Number.EPSILON) * 100);
 }

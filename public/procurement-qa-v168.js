@@ -323,7 +323,7 @@
   }
 
   localStorage.setItem("bd_session", email);
-  localStorage.setItem("bd_session_token", "qa-local-token");
+  localStorage.removeItem("bd_session_token");
   localStorage.setItem("bd_session_userid", "qa-procurement-user");
   localStorage.setItem("bd_active_venue_id", String(venueId));
   localStorage.setItem("bd_active_venue_is_primary", venueId === 401 ? "1" : "0");
@@ -348,7 +348,7 @@
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : input && input.url || "";
     if (url.indexOf("/api/auth/bootstrap") >= 0) {
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-procurement-user", token: "qa-local-token", firstName: "QA", lastName: "Procurement", phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-procurement-user", firstName: "QA", lastName: "Procurement", phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     }
     if (url.indexOf("/api/restaurants/me") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, restaurant: profile }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -368,6 +368,21 @@
         assortment = assortmentBody.data || assortment;
       }
       return Promise.resolve(qaJson({ ok: true, data: assortment }));
+    }
+    var storeMatch = /\/api\/store\/(bd_purchase_documents|bd_suppliers|bd_finance_expenses|bd_stock_movements)(?:\?|$)/.exec(url);
+    if (storeMatch) {
+      var storeBody = init && init.method === "PUT" ? qaBody(init) : null;
+      if (storeBody && Object.prototype.hasOwnProperty.call(storeBody, "data")) {
+        if (storeMatch[1] === "bd_purchase_documents") documents = storeBody.data;
+        if (storeMatch[1] === "bd_suppliers") suppliers = storeBody.data;
+        if (storeMatch[1] === "bd_finance_expenses") expenses = storeBody.data;
+        if (storeMatch[1] === "bd_stock_movements") movements = storeBody.data;
+      }
+      var storeData = storeMatch[1] === "bd_purchase_documents" ? documents
+        : storeMatch[1] === "bd_suppliers" ? suppliers
+          : storeMatch[1] === "bd_finance_expenses" ? expenses
+            : movements;
+      return Promise.resolve(qaJson({ ok: true, data: storeData }));
     }
     if (/\/api\/store(?:\?|$)/.test(url)) {
       var now = "2026-08-12T12:00:00.000Z";

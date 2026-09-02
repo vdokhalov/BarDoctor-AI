@@ -1,3 +1,5 @@
+import { escapeHtml } from "./html";
+
 export const INVENTORY_COUNT_STORE_KEY = "bd_inventory_snapshots";
 
 export type InventoryCountStatus = "draft" | "counting" | "review" | "completed" | "cancelled";
@@ -715,15 +717,6 @@ export function inventoryCountConflicts(input: {
     }
   }
   return conflicts;
-}
-
-function escapeHtml(value: unknown): string {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 export function renderInventoryCountPrintSheet(input: {

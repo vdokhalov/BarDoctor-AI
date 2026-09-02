@@ -5,7 +5,7 @@ const port = 5192;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const email = `avatar-runtime-${runId}@example.test`;
-const password = "Avatar-QA-2468";
+const password = "Avatar-Runtime-QA-2468";
 let serverOutput = "";
 
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
@@ -35,8 +35,7 @@ async function waitForServer() {
 
 function authHeaders(session) {
   return {
-    "X-Session-Email": session.email,
-    "X-Session-Token": session.token,
+    Cookie: session.cookie,
   };
 }
 
@@ -50,13 +49,13 @@ try {
   await waitForServer();
   const registered = await json("/api/auth/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "cf-connecting-ip": "198.51.100.61" },
     body: JSON.stringify({ email, password, firstName: "Аватар", registrationMode: "owner" }),
   });
   assert.equal(registered.response.status, 201, JSON.stringify(registered.body));
-  const session = registered.body;
   const sessionCookie = registered.response.headers.get("set-cookie")?.split(";", 1)[0];
   assert.ok(sessionCookie, "registration must issue the HttpOnly server session used by image requests");
+  const session = { ...registered.body, cookie: sessionCookie };
 
   const png = new Uint8Array([
     0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -92,10 +91,10 @@ try {
 
   const removed = await json(`/api/users/avatar/${uploaded.body.avatar.id}`, {
     method: "DELETE",
-    headers: authHeaders(loggedIn.body),
+    headers: authHeaders({ ...loggedIn.body, cookie: loginCookie }),
   });
   assert.equal(removed.response.status, 200, JSON.stringify(removed.body));
-  const meAfterDelete = await json("/api/users/me", { headers: authHeaders(loggedIn.body) });
+  const meAfterDelete = await json("/api/users/me", { headers: authHeaders({ ...loggedIn.body, cookie: loginCookie }) });
   assert.equal(meAfterDelete.body.user.avatarId, null);
 
   console.log(JSON.stringify({ ok: true, upload: true, refresh: true, relogin: true, remove: true }, null, 2));

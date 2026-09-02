@@ -88,7 +88,7 @@ test("v1.1.0 distribution contains preflight, config and a valid checksum", asyn
   const archive = await readFile(new URL("public/downloads/BarDoctor-Local-Connector-Windows-v1.1.0.zip", root));
   const checksum = await source("public/downloads/BarDoctor-Local-Connector-Windows-v1.1.0.zip.sha256");
   assert.equal(createHash("sha256").update(archive).digest("hex"), checksum.trim().split(/\s+/)[0]);
-  const centralDirectory = archive.toString("latin1");
+  const centralDirectory = new TextDecoder("latin1").decode(archive);
   for (const required of [
     "Check-BarDoctor-Compatibility.cmd",
     "check-compatibility.ps1",

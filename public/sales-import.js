@@ -42,14 +42,8 @@
   }
   function sessionHeaders(extra) {
     var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venue = localStorage.getItem("bd_active_venue_id");
-    if (email && token) {
-      headers.set("X-Session-Email", email);
-      headers.set("X-Session-Token", token);
-      if (venue) headers.set("X-Venue-Id", venue);
-    }
+    if (venue) headers.set("X-Venue-Id", venue);
     return headers;
   }
   function request(url, options) {

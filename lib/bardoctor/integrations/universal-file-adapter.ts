@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { assertSpreadsheetInput } from "../spreadsheet-safety";
 import { normalizePurchaseDocument } from "../purchases";
 import { normalizeSalesDocument } from "../sales";
 import {
@@ -607,11 +608,13 @@ function parseXml(bytes: Uint8Array): { type: IntegrationEntityType | null; syst
 }
 
 function spreadsheetRows(bytes: Uint8Array, csv = false): unknown[] {
+  assertSpreadsheetInput(bytes);
   const workbook = csv
     // CSV calendar values are already text. Letting SheetJS infer Date objects
     // makes an ISO date drift to the previous day in negative UTC offsets.
-    ? XLSX.read(new TextDecoder("utf-8").decode(bytes), { type: "string", cellDates: false, raw: true })
-    : XLSX.read(bytes, { type: "array", cellDates: true });
+    // Keep one row beyond the data limit (plus the header) so truncation remains observable.
+    ? XLSX.read(new TextDecoder("utf-8").decode(bytes), { type: "string", cellDates: false, raw: true, sheetRows: MAX_RECORDS + 2 })
+    : XLSX.read(bytes, { type: "array", cellDates: true, sheetRows: MAX_RECORDS + 2 });
   const sheetName = workbook.SheetNames[0];
   if (!sheetName) throw new Error("В файле нет листов");
   return XLSX.utils.sheet_to_json<JsonRecord>(workbook.Sheets[sheetName], {

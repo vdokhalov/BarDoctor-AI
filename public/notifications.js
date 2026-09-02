@@ -30,14 +30,8 @@
 
   function authHeaders(extra) {
     var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venueId = localStorage.getItem("bd_active_venue_id");
-    if (email && token) {
-      headers.set("X-Session-Email", email);
-      headers.set("X-Session-Token", token);
-      if (venueId) headers.set("X-Venue-Id", venueId);
-    }
+    if (venueId) headers.set("X-Venue-Id", venueId);
     return headers;
   }
 

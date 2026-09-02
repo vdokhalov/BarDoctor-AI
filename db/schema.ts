@@ -40,12 +40,33 @@ export const sessions = sqliteTable(
       .references(() => accounts.id, { onDelete: "cascade" }),
     activeVenueId: integer("active_venue_id"),
     expiresAt: text("expires_at").notNull(),
+    lastSeenAt: text("last_seen_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index("sessions_account_id_idx").on(table.accountId),
     index("sessions_active_venue_id_idx").on(table.activeVenueId),
     index("sessions_expires_at_idx").on(table.expiresAt),
+  ],
+);
+
+/**
+ * Durable, privacy-preserving buckets for public authentication endpoints.
+ * Only SHA-256 fingerprints are stored; raw emails, IP addresses and tokens
+ * must never be written to this table.
+ */
+export const authRateLimits = sqliteTable(
+  "auth_rate_limits",
+  {
+    key: text("key").primaryKey(),
+    action: text("action").notNull(),
+    scope: text("scope").notNull(),
+    windowStartedAt: text("window_started_at").notNull(),
+    requestCount: integer("request_count").notNull().default(0),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("auth_rate_limits_action_updated_idx").on(table.action, table.updatedAt),
   ],
 );
 
@@ -180,6 +201,8 @@ export const domainData = sqliteTable(
       .references(() => accounts.id, { onDelete: "cascade" }),
     storeKey: text("store_key").notNull(),
     dataJson: text("data_json").notNull(),
+    revision: integer("revision").notNull().default(1),
+    mutationId: text("mutation_id"),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

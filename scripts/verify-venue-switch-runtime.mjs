@@ -7,7 +7,7 @@ import path from "node:path";
 const port = 5191;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const password = "Venue-QA-2468";
+const password = "Venue-Runtime-QA-2468";
 let serverOutput = "";
 
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
@@ -74,9 +74,9 @@ async function request(pathname, options = {}) {
 function headers(session, venueId, extra = {}) {
   return {
     "Content-Type": "application/json",
-    "X-Session-Email": session.email,
-    "X-Session-Token": session.token,
+    Cookie: session.cookie,
     "X-Venue-Id": String(venueId),
+    "X-BarDoctor-Client-Contract": "1",
     ...extra,
   };
 }
@@ -92,7 +92,7 @@ async function json(session, venueId, pathname, method = "GET", data) {
 async function register() {
   const result = await request("/api/auth/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "cf-connecting-ip": "198.51.100.41" },
     body: JSON.stringify({
       email: `venue-runtime-${runId}@example.test`,
       password,
@@ -101,7 +101,9 @@ async function register() {
     }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.body));
-  return result.body;
+  const cookie = result.response.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie, "registration must issue a server session cookie");
+  return { ...result.body, cookie };
 }
 
 async function putStore(session, venueId, key, data) {
@@ -218,10 +220,7 @@ try {
   assert.equal(activeB.body.activeVenueId, venueB);
   const bootstrapB = await request("/api/auth/bootstrap", {
     method: "POST",
-    headers: {
-      "X-Session-Email": owner.email,
-      "X-Session-Token": owner.token,
-    },
+    headers: { Cookie: owner.cookie },
   });
   assert.equal(bootstrapB.body.activeVenueId, venueB);
 
@@ -230,10 +229,7 @@ try {
   assert.equal(activeA.body.activeVenueId, venueA);
   const bootstrapA = await request("/api/auth/bootstrap", {
     method: "POST",
-    headers: {
-      "X-Session-Email": owner.email,
-      "X-Session-Token": owner.token,
-    },
+    headers: { Cookie: owner.cookie },
   });
   assert.equal(bootstrapA.body.activeVenueId, venueA);
 
@@ -245,7 +241,7 @@ try {
 
   const outsider = await request("/api/auth/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "cf-connecting-ip": "198.51.100.42" },
     body: JSON.stringify({
       email: `venue-outsider-${runId}@example.test`,
       password,

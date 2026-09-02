@@ -13,7 +13,11 @@ let serverOutput = "";
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
   cwd: process.cwd(),
   detached: true,
-  env: { ...process.env, ONESIGNAL_APP_ID: "runtime-public-app" },
+  env: {
+    ...process.env,
+    ONESIGNAL_APP_ID: "runtime-public-app",
+    NOTIFICATION_CRON_SECRET: "runtime-notification-cron-secret",
+  },
   stdio: ["ignore", "pipe", "pipe"],
 });
 server.stdout.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-14_000); });
@@ -71,8 +75,7 @@ async function request(pathname, options = {}) {
 function headers(session, venueId, extra = {}) {
   return {
     "Content-Type": "application/json",
-    "X-Session-Email": session.email,
-    "X-Session-Token": session.token,
+    Cookie: session.cookie,
     "X-Venue-Id": String(venueId),
     ...extra,
   };
@@ -81,7 +84,7 @@ function headers(session, venueId, extra = {}) {
 async function register(label) {
   const result = await request("/api/auth/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "cf-connecting-ip": `198.51.100.${label === "owner" ? 31 : 32}` },
     body: JSON.stringify({
       email: `notifications-${label}-${runId}@example.test`,
       password,
@@ -90,13 +93,32 @@ async function register(label) {
     }),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.body));
-  return result.body;
+  const cookie = result.response.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie, "registration must issue a server session cookie");
+  return { ...result.body, cookie };
 }
 
 let database;
 try {
   await waitForServer();
   database = await localDatabase();
+
+  const sideEffectGet = await request(
+    "/api/notifications/run?token=runtime-notification-cron-secret",
+  );
+  assert.equal(sideEffectGet.response.status, 405, JSON.stringify(sideEffectGet.body));
+  assert.equal(sideEffectGet.response.headers.get("allow"), "POST");
+  const queryTokenPost = await request(
+    "/api/notifications/run?token=runtime-notification-cron-secret",
+    { method: "POST" },
+  );
+  assert.equal(queryTokenPost.response.status, 401, JSON.stringify(queryTokenPost.body));
+  const authorizedIdlePost = await request("/api/notifications/run", {
+    method: "POST",
+    headers: { Authorization: "Bearer runtime-notification-cron-secret" },
+  });
+  assert.equal(authorizedIdlePost.response.status, 200, JSON.stringify(authorizedIdlePost.body));
+  assert.equal(authorizedIdlePost.body.ran, false);
 
   const unauthenticated = await request("/api/notifications");
   assert.equal(unauthenticated.response.status, 401);
@@ -212,4 +234,3 @@ try {
   database?.close();
   stopServer();
 }
-

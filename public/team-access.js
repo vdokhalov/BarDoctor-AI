@@ -14,11 +14,7 @@
   function roleLabel(role) { return ROLE_LABELS[role] || role || "Без роли"; }
   function sessionHeaders(extra) {
     var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venueId = localStorage.getItem("bd_active_venue_id");
-    if (email) headers.set("X-Session-Email", email);
-    if (token) headers.set("X-Session-Token", token);
     if (venueId) headers.set("X-Venue-Id", venueId);
     return headers;
   }

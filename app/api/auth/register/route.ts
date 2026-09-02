@@ -19,6 +19,14 @@ import {
   passwordValidationError,
 } from "../../../../lib/bardoctor/password";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
+import {
+  authRateLimitedResponse,
+  clearSuccessfulAuthLimit,
+  consumeAuthRateLimit,
+} from "../../../../lib/bardoctor/auth-rate-limit";
+
+const REGISTRATION_UNAVAILABLE =
+  "Не удалось завершить регистрацию. Проверьте данные или войдите в существующий аккаунт.";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -41,6 +49,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const appEmail = normalizeEmail(body.email);
+    const rateLimit = await consumeAuthRateLimit(request, "register", appEmail);
+    if (!rateLimit.allowed) return authRateLimitedResponse(rateLimit);
     const chatgptEmail = getChatGPTEmail(request);
     const joiningVenue = body.registrationMode === "join" || Boolean(body.invitationCode?.trim());
     if (joiningVenue && !body.invitationCode?.trim()) {
@@ -48,6 +58,14 @@ export async function POST(request: Request): Promise<Response> {
         { ok: false, error: "Введите код приглашения от владельца" },
         { status: 400 },
       );
+    }
+    if (joiningVenue) {
+      const inviteRateLimit = await consumeAuthRateLimit(
+        request,
+        "invitation",
+        body.invitationCode ?? "",
+      );
+      if (!inviteRateLimit.allowed) return authRateLimitedResponse(inviteRateLimit);
     }
     const invite = joiningVenue
       ? await findActiveInvite(body.invitationCode ?? "")
@@ -65,13 +83,8 @@ export async function POST(request: Request): Promise<Response> {
 
     if (await findAccountByAppEmail(appEmail)) {
       return Response.json(
-        {
-          ok: false,
-          error: joiningVenue
-            ? "Аккаунт с таким email уже есть. Войдите и добавьте код в разделе «Доступ»"
-            : "Аккаунт с таким email уже зарегистрирован",
-        },
-        { status: 409 },
+        { ok: false, code: "REGISTRATION_UNAVAILABLE", error: REGISTRATION_UNAVAILABLE },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
 
@@ -108,6 +121,10 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const token = await issueSession(account);
+    await clearSuccessfulAuthLimit(request, "register", appEmail);
+    if (invite) {
+      await clearSuccessfulAuthLimit(request, "invitation", body.invitationCode ?? "");
+    }
     return sessionResponse(
       {
         ...(await authResult(account, token, request)),
@@ -120,8 +137,8 @@ export async function POST(request: Request): Promise<Response> {
   } catch (error) {
     if (error instanceof Error && /unique/i.test(error.message)) {
       return Response.json(
-        { ok: false, error: "Аккаунт с таким email уже зарегистрирован" },
-        { status: 409 },
+        { ok: false, code: "REGISTRATION_UNAVAILABLE", error: REGISTRATION_UNAVAILABLE },
+        { status: 400, headers: { "Cache-Control": "no-store" } },
       );
     }
     console.error(

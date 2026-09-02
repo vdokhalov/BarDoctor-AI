@@ -157,12 +157,9 @@
 
   function sessionHeaders() {
     var sessionEmail = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
-    if (!sessionEmail || !token) return null;
+    if (!sessionEmail) return null;
     var headers = {
-      "Content-Type": "application/json",
-      "X-Session-Email": sessionEmail,
-      "X-Session-Token": token
+      "Content-Type": "application/json"
     };
     if (context.activeVenueId) headers["X-Venue-Id"] = String(context.activeVenueId);
     return headers;

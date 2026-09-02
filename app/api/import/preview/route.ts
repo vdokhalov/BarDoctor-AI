@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
+import { assertSpreadsheetInput } from "../../../../lib/bardoctor/spreadsheet-safety";
 
 const MAX_FILE_BYTES = 6 * 1024 * 1024;
 const MAX_ROWS = 2_000;
@@ -50,7 +51,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
-    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const bytes = new Uint8Array(buffer);
+    assertSpreadsheetInput(bytes, MAX_FILE_BYTES);
+    const workbook = XLSX.read(bytes, { type: "array", cellDates: true, sheetRows: MAX_ROWS + 1 });
     const sheetName = workbook.SheetNames[0];
     if (!sheetName) throw new Error("В книге нет листов");
     const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheetName], {

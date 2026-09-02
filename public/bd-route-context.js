@@ -141,13 +141,21 @@
   });
 
   var nativeFetch = window.fetch.bind(window);
-  window.fetch = function () {
-    var init = arguments[1] || {};
-    var method = String(init.method || "GET").toUpperCase();
-    var request = nativeFetch.apply(null, arguments);
+  window.fetch = function (input, options) {
+    var init = Object.assign({}, options || {});
+    var method = String(init.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+    var url = new URL(typeof input === "string" ? input : input.url, window.location.href);
+    if (url.origin === window.location.origin && url.pathname.startsWith("/api/") && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+      var headers = new Headers(input instanceof Request ? input.headers : undefined);
+      new Headers(init.headers || {}).forEach(function (value, key) { headers.set(key, value); });
+      headers.set("X-BarDoctor-Client-Contract", "1");
+      init.headers = headers;
+    }
+    var request = nativeFetch(input, init);
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return request;
     saveIntent = Date.now() + 30000;
     return request.then(function (response) {
+      if (response.status === 426 && window.bdRequireClientUpdateV404) window.bdRequireClientUpdateV404();
       if (response.ok) window.setTimeout(markSaved, 0);
       else saveIntent = 0;
       return response;

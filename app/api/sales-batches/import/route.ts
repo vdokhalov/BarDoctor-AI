@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { assertSpreadsheetInput } from "../../../../lib/bardoctor/spreadsheet-safety";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -90,7 +91,11 @@ export async function POST(request: Request): Promise<Response> {
   if (value.size <= 0 || value.size > MAX_FILE_BYTES) return Response.json({ ok: false, error: "Файл должен быть не больше 12 МБ" }, { status: 413 });
   if (!/\.(csv|tsv|xls|xlsx)$/i.test(value.name)) return Response.json({ ok: false, code: "UNSUPPORTED_FILE", error: "Для структурированного импорта поддерживаются CSV, XLSX и XLS" }, { status: 415 });
   let workbook: XLSX.WorkBook;
-  try { workbook = XLSX.read(new Uint8Array(await value.arrayBuffer()), { type: "array", cellDates: true }); }
+  try {
+    const bytes = new Uint8Array(await value.arrayBuffer());
+    assertSpreadsheetInput(bytes, MAX_FILE_BYTES);
+    workbook = XLSX.read(bytes, { type: "array", cellDates: true, sheetRows: 5_101 });
+  }
   catch { return Response.json({ ok: false, code: "FILE_PARSE_ERROR", error: "Не удалось открыть таблицу" }, { status: 422 }); }
   const sheetName = text(form.get("sheetName"), workbook.SheetNames[0], 160);
   const sheet = workbook.Sheets[sheetName] ?? workbook.Sheets[workbook.SheetNames[0]];
