@@ -29,6 +29,12 @@ function sqlConstant(source: string, name: string): string {
   return match[1];
 }
 
+function runD1SqlInNodeSqlite(database: DatabaseSync, sql: string, value: number) {
+  // D1 accepts numbered positional parameters (`?1`). Node 22's experimental
+  // sqlite binding requires the equivalent anonymous positional form.
+  return database.prepare(sql.replaceAll("?1", "?")).run(value);
+}
+
 test("owner is a venue-scoped wildcard over the complete current permission catalog", () => {
   const permissions = permissionsFor("owner");
   assert.deepEqual(new Set(permissions), new Set(PERMISSION_KEYS));
@@ -94,8 +100,8 @@ test("owner reconciliation is idempotent, repairs only the confirmed creator, an
   `).run(venueB.id, creator.id);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    database.prepare(workspaceUpsert).run(venueA.id);
-    database.prepare(venueUpsert).run(venueA.id);
+    runD1SqlInNodeSqlite(database, workspaceUpsert, venueA.id);
+    runD1SqlInNodeSqlite(database, venueUpsert, venueA.id);
   }
 
   const repaired = database.prepare(`
@@ -133,8 +139,8 @@ test("reconciliation never reactivates an archived venue", async () => {
     INSERT INTO venues (workspace_id, data_account_id, created_by_account_id, status)
     VALUES (?, ?, ?, 'archived') RETURNING id
   `).get(workspace.id, owner.id, owner.id) as { id: number };
-  database.prepare(workspaceUpsert).run(venue.id);
-  database.prepare(venueUpsert).run(venue.id);
+  runD1SqlInNodeSqlite(database, workspaceUpsert, venue.id);
+  runD1SqlInNodeSqlite(database, venueUpsert, venue.id);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM venue_memberships").get()?.count, 0);
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM workspace_memberships").get()?.count, 0);
   assert.equal(database.prepare("SELECT status FROM venues WHERE id = ?").get(venue.id)?.status, "archived");
