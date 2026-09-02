@@ -1,5 +1,3 @@
-import { BARDOCTOR_APP_VERSION, BARDOCTOR_BUILD_NUMBER } from "../../lib/bardoctor/version";
-
 const manifest = {
   $schema: "https://json.schemastore.org/web-manifest-combined.json",
   id: "/?source=pwa",
@@ -15,8 +13,6 @@ const manifest = {
   background_color: "#070911",
   theme_color: "#070911",
   categories: ["business", "finance", "productivity"],
-  version: BARDOCTOR_APP_VERSION,
-  build_number: BARDOCTOR_BUILD_NUMBER,
   icons: [
     { src: "/icons/bardoctor-v159-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
     { src: "/icons/bardoctor-v159-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

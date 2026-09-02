@@ -1,9 +1,4 @@
-import {
-  BARDOCTOR_BUILD_ID,
-  BARDOCTOR_BUILD_VERSION,
-  BARDOCTOR_SCHEMA_VERSION,
-} from "../lib/bardoctor/version";
-import { BARDOCTOR_SOURCE_COMMIT } from "../lib/bardoctor/source-commit";
+import { BARDOCTOR_BUILD_ID, BARDOCTOR_BUILD_VERSION } from "../lib/bardoctor/version";
 import { canonicalUserShellAssets } from "../lib/bardoctor/app-shell";
 
 const BAR_DOCTOR_HTML = `<!doctype html>
@@ -286,9 +281,6 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <meta name="bd-shell-first-startup" content="v397" />
     <meta name="bd-app-version" content="${BARDOCTOR_BUILD_VERSION}" />
     <meta name="bd-build-id" content="${BARDOCTOR_BUILD_ID}" />
-    <meta name="bd-source-commit" content="${BARDOCTOR_SOURCE_COMMIT}" />
-    <meta name="bd-schema-version" content="${BARDOCTOR_SCHEMA_VERSION}" />
-    <meta name="bd-release-endpoint" content="/api/release" />
     <title>BarDoctor</title>
     <link rel="icon" type="image/svg+xml" href="/favicon-v159.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/bardoctor-v159-favicon-32.png" />
