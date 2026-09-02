@@ -207,9 +207,12 @@ function packageLabels(balance: JsonRecord): string[] {
 function lineBaseQuantity(line: JsonRecord, balance: JsonRecord):
   | { ok: true; amount: number; unit: BaseInventoryUnit; packagingLabel?: string }
   | { ok: false; code: WriteOffFailureCode; error: string } {
-  const quantity = number(line.quantity, Number.NaN);
+  const quantity = (typeof line.quantity === "number" || typeof line.quantity === "string")
+    && !(typeof line.quantity === "string" && !line.quantity.trim())
+    ? number(line.quantity, Number.NaN)
+    : Number.NaN;
   const name = text(balance.name, "Товар");
-  if (!Number.isFinite(quantity) || quantity <= 0) {
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000_000_000) {
     return { ok: false, code: "WRITE_OFF_QUANTITY_INVALID", error: `Укажите количество для «${name}»` };
   }
   const packagingLabel = text(line.packagingLabel, "", 120);

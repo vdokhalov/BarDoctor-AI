@@ -28,6 +28,23 @@ function draft(items: unknown[], id = "wo-test") {
   return { id, date: "2026-08-24", location: "Бар", reasonCode: "spoilage", comment: "Тест", items, idempotencyKey: `post:${id}` };
 }
 
+test("write-off quantities reject JS coercion and unsafe accounting ranges", () => {
+  for (const quantity of [true, "", "Infinity", 1_000_000_000_001]) {
+    const result = postWriteOffDocument({
+      documents: [],
+      assortment: assortment(),
+      stockMovements: [],
+      venueId: 1,
+      draft: draft([{ productKey: "whiskey", quantity, unit: "л" }], `wo-invalid-${String(quantity)}`),
+      actor,
+      allowNegativeStock: true,
+      now,
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.code, "WRITE_OFF_QUANTITY_INVALID");
+  }
+});
+
 test("single item write-off decreases canonical stock and uses moving-average cost", () => {
   const result = postWriteOffDocument({ documents: [], assortment: assortment(), stockMovements: [], venueId: 1, draft: draft([{ productKey: "whiskey", quantity: 1.5, unit: "л" }]), actor, allowNegativeStock: true, now });
   assert.equal(result.ok, true);

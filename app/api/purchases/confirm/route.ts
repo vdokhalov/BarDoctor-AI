@@ -11,6 +11,7 @@ import {
   normalizePurchaseDocument,
   normalizePurchaseAccounting,
   purchaseCommercialArithmeticIssues,
+  purchaseMutationValidationIssues,
   purchaseIdempotencyKey,
   PURCHASE_STORE_KEY,
   SUPPLIER_STORE_KEY,
@@ -141,6 +142,15 @@ export async function POST(request: Request): Promise<Response> {
   }
   const now = new Date().toISOString();
   const requestedDocument = record(body.document) ?? {};
+  const validationIssues = purchaseMutationValidationIssues(requestedDocument);
+  if (validationIssues.length) {
+    return Response.json({
+      ok: false,
+      code: "PURCHASE_INPUT_INVALID",
+      error: "Проверьте формат, длину и диапазон полей закупки.",
+      issues: validationIssues,
+    }, { status: 422 });
+  }
   const requestedIdempotencyKey = text(
     body.idempotencyKey ?? request.headers.get("idempotency-key"),
     "",

@@ -11,9 +11,35 @@ import {
   purchaseUnitForPackage,
   purchasePaymentSummary,
   purchaseCommercialArithmeticIssues,
+  purchaseMutationValidationIssues,
   supplierDebtSummary,
   withPurchasePaymentSummary,
 } from "../lib/bardoctor/purchases";
+
+test("purchase mutation validation rejects coercion, impossible dates and unsafe accounting ranges", () => {
+  const issues = purchaseMutationValidationIssues({
+    date: "2026-02-30",
+    supplierName: "x".repeat(181),
+    total: "Infinity",
+    items: [{ name: "Product", quantity: true, unitPrice: -1, lineTotal: 1_000_000_000_001 }],
+  });
+  assert.deepEqual(issues, [
+    { code: "DATE_INVALID", path: "date" },
+    { code: "STRING_TOO_LONG", path: "supplierName" },
+    { code: "NUMBER_INVALID", path: "total" },
+    { code: "NUMBER_INVALID", path: "items[0].quantity" },
+    { code: "NUMBER_OUT_OF_RANGE", path: "items[0].unitPrice" },
+    { code: "NUMBER_OUT_OF_RANGE", path: "items[0].lineTotal" },
+  ]);
+});
+
+test("purchase mutation validation accepts decimal-comma values inside accounting limits", () => {
+  assert.deepEqual(purchaseMutationValidationIssues({
+    date: "2026-09-02",
+    total: "10 000,50",
+    items: [{ name: "Product", quantity: "2,5", unitPrice: "4000,20", lineTotal: "10000,50" }],
+  }), []);
+});
 
 test("manual purchase packaging offers useful defaults without overwriting an explicit package", () => {
   assert.equal(inferPurchasePackageSize("Молоко", "", "шт."), "1 л");
