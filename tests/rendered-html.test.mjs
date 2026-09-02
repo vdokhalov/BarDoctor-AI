@@ -1070,7 +1070,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /НА ЭТОМ УСТРОЙСТВЕ/);
   assert.doesNotMatch(worker, /App API Key|dashboard\.onesignal\.com/);
   assert.match(worker, /async scheduled\(/);
-  assert.match(worker, /searchParams\.get\("token"\)/);
+  assert.doesNotMatch(worker, /searchParams\.get\("token"\)/);
+  assert.match(worker, /authorization/i);
   assert.deepEqual(JSON.parse(workerConfig).triggers?.crons, ["0 * * * *"]);
   assert.match(pushMigration, /CREATE TABLE `notification_preferences`/);
   assert.match(pushMigration, /CREATE TABLE `notification_deliveries`/);

@@ -57,6 +57,8 @@ test("v342 reports a sanitized authenticated diagnostic and delays fatal recover
 
   assert.match(diagnosticRoute, /authenticateRequest\(request\)/);
   assert.match(diagnosticRoute, /MAX_TEXT_LENGTH = 180/);
-  assert.match(diagnosticRoute, /console\.error\(`\[BarDoctor client runtime\]/);
+  assert.match(diagnosticRoute, /recordException\(\{/);
+  assert.match(diagnosticRoute, /requestIdFor\(request\)/);
+  assert.doesNotMatch(diagnosticRoute, /password|sessionToken|apiKey/);
   assert.doesNotMatch(diagnosticRoute, /prepare\(|INSERT|UPDATE|DELETE/);
 });

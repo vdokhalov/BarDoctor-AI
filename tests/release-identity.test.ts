@@ -10,12 +10,16 @@ const requiredKeys = [
   "buildTimestamp",
   "schemaVersion",
   "environment",
+  "mutationContractVersion",
+  "minimumSupportedMutationContract",
 ] as const;
 
 test("release identity exposes the complete non-secret contract", () => {
   const identity = getBarDoctorReleaseIdentity("test");
   assert.deepEqual(Object.keys(identity).sort(), [...requiredKeys].sort());
-  for (const key of requiredKeys) assert.equal(typeof identity[key], "string");
+  for (const key of requiredKeys.slice(0, 6)) assert.equal(typeof identity[key], "string");
+  assert.equal(identity.mutationContractVersion, 1);
+  assert.equal(identity.minimumSupportedMutationContract, 1);
   assert.equal(identity.environment, "test");
 });
 

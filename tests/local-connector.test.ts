@@ -283,7 +283,7 @@ test("Windows distribution is complete, checksum-valid and requires no developer
   const zipUrl = new URL("public/downloads/BarDoctor-Local-Connector-Windows-v1.1.0.zip", root);
   const checksumText = await readFile(new URL("public/downloads/BarDoctor-Local-Connector-Windows-v1.1.0.zip.sha256", root), "utf8");
   const archive = await readFile(zipUrl);
-  assert.equal(archive.subarray(0, 2).toString("ascii"), "PK");
+  assert.equal(new TextDecoder("ascii").decode(archive.subarray(0, 2)), "PK");
   assert.equal(createHash("sha256").update(archive).digest("hex"), checksumText.trim().split(/\s+/)[0]);
   const installer = await source("local-connector/windows/install.ps1");
   const command = await source("local-connector/windows/Install-BarDoctor-Local-Connector.cmd");
