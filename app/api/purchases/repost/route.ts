@@ -1,6 +1,7 @@
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import {
@@ -115,12 +116,9 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     );
   }
-  let body: JsonRecord;
-  try {
-    body = record(JSON.parse(await request.text()) as unknown);
-  } catch {
-    return Response.json({ ok: false, error: "Некорректный запрос" }, { status: 400 });
-  }
+  const parsed = await readJsonRequest<unknown>(request, { maxBytes: 12 * 1024 });
+  if (!parsed.ok) return parsed.response;
+  const body = record(parsed.data);
   const documentId = text(body.documentId ?? body.purchaseId, "", 100);
   if (!documentId) {
     return Response.json({ ok: false, error: "Не указана закупочная накладная" }, { status: 422 });

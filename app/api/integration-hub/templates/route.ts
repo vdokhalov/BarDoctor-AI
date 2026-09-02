@@ -1,5 +1,6 @@
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import {
   INTEGRATION_ENTITY_TYPES,
   type FieldMapping,
@@ -39,8 +40,9 @@ export async function POST(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return response(await unauthorized().json(), 401);
   if (!hasPermission(account, "integrations.manage")) return response({ ok: false, error: "Недостаточно прав" }, 403);
-  let value: JsonRecord;
-  try { value = record(await request.json()); } catch { return response({ ok: false, error: "Некорректный шаблон" }, 400); }
+  const parsed = await readJsonRequest<unknown>(request, { maxBytes: 64 * 1024 });
+  if (!parsed.ok) return parsed.response;
+  const value = record(parsed.data);
   const connectionId = text(value.connectionId);
   const entityType = text(value.entityType) as IntegrationEntityType;
   if (!INTEGRATION_ENTITY_TYPES.includes(entityType) || !await connectionForTenant(account, connectionId)) {
