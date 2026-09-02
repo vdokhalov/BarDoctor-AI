@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
@@ -7,6 +8,13 @@ import path from "node:path";
 
 const productionSource = process.env.BD_V400_SOURCE;
 assert.ok(productionSource, "BD_V400_SOURCE must point to the exact Sites v400 source checkout");
+const gitSha = (directory) => execFileSync("git", ["rev-parse", "HEAD"], {
+  cwd: directory,
+  encoding: "utf8",
+}).trim();
+const productionSourceSha = gitSha(productionSource);
+const releaseCandidateSha = gitSha(process.cwd());
+assert.equal(productionSourceSha, "6cc90fc91e9d7df28947c1ddc920733d767e08b4");
 
 const port = Number(process.env.BD_ZERO_MIGRATION_PORT || 5197);
 const externalOrigin = process.env.BD_ZERO_MIGRATION_BASE_URL?.replace(/\/$/, "") || "";
@@ -227,8 +235,8 @@ try {
   console.log(JSON.stringify({
     ok: false,
     verdict: "ZERO_MIGRATION_INCOMPATIBLE",
-    productionSourceSha: "6cc90fc91e9d7df28947c1ddc920733d767e08b4",
-    releaseCandidateSha: "a6e570db48450215a1431e7d2d8bc61cfd603ba5",
+    productionSourceSha,
+    releaseCandidateSha,
     historicalModel: "v400 journal 0000-0020 plus v400 runtime auth repair and unledgered invoice schema",
     historicalSurface,
     startup: { root: startup.status, home: home.status, health: health.status },
