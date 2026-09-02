@@ -15,7 +15,10 @@ test("warehouse write-offs use the canonical multi-item document workflow", asyn
   assert.match(bundle, /bdWriteoffPickerV271/);
   assert.match(bundle, /bdWriteoffDetailV271/);
   assert.match(bundle, /bd-writeoff-movement-link-v271/);
-  assert.match(bundle, /function x\(\)\{const A=bdWarehouseNavigationUrlV247\(\{writeoff:null,tab:"writeoffs"\}\);a\(A,\{replace:!0\}\),setTimeout\(\(\)=>window\.dispatchEvent\(new PopStateEvent\("popstate",\{state:window\.history\.state\}\)\),0\)\}/);
+  assert.match(bundle, /\[bdDismissedWriteoffV401,bdSetDismissedWriteoffV401\]=S\.useState\(""\)/);
+  assert.match(bundle, /function x\(\)\{bdSetDismissedWriteoffV401\(bdWriteoffRouteKeyV401\);const A=bdWarehouseNavigationUrlV247/);
+  assert.match(bundle, /function bdOpenNewWriteoffV401\(\)\{bdSetDismissedWriteoffV401\(""\),a\(bdWarehouseNavigationUrlV247/);
+  assert.match(bundle, /N==="new"&&n&&bdDismissedWriteoffV401!==bdWriteoffRouteKeyV401&&i\.jsx\(bdWriteoffSheet/);
   const workflow = bundle.slice(bundle.indexOf("const bdWriteoffWorkflowVersionV271"), bundle.indexOf("function bdWarehouseNavigationUrlV247"));
   assert.doesNotMatch(workflow, /Себестоимость списания/);
   assert.doesNotMatch(workflow, /window\.confirm/);
