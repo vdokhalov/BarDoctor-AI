@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { assertSpreadsheetInput } from "../../../../lib/bardoctor/spreadsheet-safety";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { AIServiceError, aiText, parseAIJson } from "../../../../lib/bardoctor/ai-provider";
@@ -86,7 +87,8 @@ function inferredMimeType(filename: string): string {
 function spreadsheetText(bytes: Uint8Array): string {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(bytes, { type: "array", cellDates: true });
+    assertSpreadsheetInput(bytes, MAX_FILE_BYTES);
+    workbook = XLSX.read(bytes, { type: "array", cellDates: true, sheetRows: 2_001 });
   } catch {
     throw new AIServiceError("Не удалось открыть ведомость. Проверьте файл Excel или CSV.", 422);
   }
