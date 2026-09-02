@@ -59,7 +59,28 @@ jobs:
         run: npm run test:mobile-navigation
         env:
           BD_QA_PROFILE: pixel-7
-      - name: Desktop navigation QA
+      - name: Desktop write-offs QA
         run: npm run test:mobile-navigation
         env:
           BD_QA_PROFILE: desktop-chrome
+          BD_QA_SCENARIO: writeoffs
+      - name: Desktop embedded modules QA
+        run: npm run test:mobile-navigation
+        env:
+          BD_QA_PROFILE: desktop-chrome
+          BD_QA_SCENARIO: embedded-modules
+      - name: Desktop shift write-offs QA
+        run: npm run test:mobile-navigation
+        env:
+          BD_QA_PROFILE: desktop-chrome
+          BD_QA_SCENARIO: shift-canonical-writeoffs
+      - name: Desktop inventory delete QA
+        run: npm run test:mobile-navigation
+        env:
+          BD_QA_PROFILE: desktop-chrome
+          BD_QA_SCENARIO: inventory-delete
+      - name: Desktop Business Health QA
+        run: npm run test:mobile-navigation
+        env:
+          BD_QA_PROFILE: desktop-chrome
+          BD_QA_SCENARIO: business-health-cold-start
