@@ -18,6 +18,16 @@ if [[ ! -x "${vinext}" ]]; then
   exit 69
 fi
 
+release_environment="${BARDOCTOR_ENVIRONMENT:-unconfigured}"
+if [[ "${release_environment}" == "production" || "${release_environment}" == "release-candidate" ]]; then
+  release_status="$(git -C "${SITES_PROJECT_ROOT}" status --porcelain=v1 --untracked-files=all)"
+  if [[ -n "${release_status}" ]]; then
+    echo "Release build requires an exact clean Git checkout; refusing dirty or untracked source." >&2
+    printf '%s\n' "${release_status}" >&2
+    exit 65
+  fi
+fi
+
 before_status="$(git -C "${SITES_PROJECT_ROOT}" status --porcelain=v1 --untracked-files=no)"
 
 node "${script_dir}/validate-build-secrets.mjs"

@@ -15,6 +15,10 @@ test("release build never invokes source patch scripts", async () => {
   assert.match(build, /version-built-client-asset\.mjs/);
   assert.match(build, /generate-release-manifest\.mjs/);
   assert.match(build, /validate-build-secrets\.mjs/);
+  assert.match(build, /release-candidate/);
+  assert.match(build, /production/);
+  assert.match(build, /--untracked-files=all/);
+  assert.match(build, /Release build requires an exact clean Git checkout/);
 });
 
 test("release builds require non-public Vinext build secrets", async () => {
