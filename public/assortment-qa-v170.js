@@ -262,7 +262,7 @@
   }
 
   localStorage.setItem("bd_session", email);
-  localStorage.setItem("bd_session_token", "qa-local-token");
+  localStorage.removeItem("bd_session_token");
   localStorage.setItem("bd_session_userid", "qa-assortment-user");
   localStorage.setItem("bd_active_venue_id", String(venueId));
   localStorage.setItem("bd_active_venue_is_primary", venueId === 501 ? "1" : "0");
@@ -281,7 +281,7 @@
     var url = typeof input === "string" ? input : input && input.url || "";
     var jsonHeaders = { "Content-Type": "application/json" };
     if (url.indexOf("/api/auth/bootstrap") >= 0) {
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-assortment-user", token: "qa-local-token", firstName: "QA", lastName: "Assortment", phone: null, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: jsonHeaders }));
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-assortment-user", firstName: "QA", lastName: "Assortment", phone: null, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: jsonHeaders }));
     }
     if (url.indexOf("/api/restaurants/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, restaurant: profile }), { status: 200, headers: jsonHeaders }));
     if (url.indexOf("/api/users/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: "QA", lastName: "Assortment", email: email, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows } }), { status: 200, headers: jsonHeaders }));
@@ -330,6 +330,7 @@
       try { body = JSON.parse(init.body || "{}"); } catch { body = {}; }
       var next = Number(body.venueId) || venueId;
       localStorage.setItem("bd_active_venue_id", String(next));
+      localStorage.removeItem("bd_assortment_disclosure_v171__" + email + "__venue_" + next);
       return Promise.resolve(new Response(JSON.stringify({ ok: true, activeVenueId: next, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: next === 501, role: activeRole, permissions: permissions }), { status: 200, headers: jsonHeaders }));
     }
     return originalFetch(input, init);

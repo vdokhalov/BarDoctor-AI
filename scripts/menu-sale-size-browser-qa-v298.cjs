@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { chromium } = require("playwright-core");
 const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
+const { installSyntheticSession } = require("./browser-synthetic-auth.cjs");
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4176";
 const outputDir = process.env.BD_QA_OUTPUT || "/tmp/bardoctor-menu-sale-size-v298-qa";
@@ -11,6 +12,15 @@ fs.mkdirSync(outputDir, { recursive: true });
 
 function response(body, status = 200) {
   return { status, contentType: "application/json", body: JSON.stringify(body) };
+}
+
+function fixtureBootstrap() {
+  const permissions = ["inventory.view", "inventory.manage", "expenses.create", "finance.view", "finance.manage", "data.import", "integrations.manage", "settings.manage"];
+  const venues = [
+    { id: 501, workspaceId: "qa-assortment-workspace", name: "Кёльн", role: "owner", isPrimary: true, status: "active", permissions },
+    { id: 502, workspaceId: "qa-assortment-workspace", name: "Причал", role: "owner", isPrimary: false, status: "active", permissions },
+  ];
+  return { ok: true, email: "assortment-v170-qa@bardoctor.local", userId: "qa-assortment-user", firstName: "QA", lastName: "Assortment", role: "owner", permissions, activeVenueId: 501, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: true, canCreateVenues: true, venues, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: 2, confirmedOwnedVenueCount: 2, inaccessibleOwnedVenueCount: 0 } };
 }
 
 async function catalogState(page) {
@@ -30,6 +40,8 @@ async function openCatalog(browser, viewport, label) {
     isMobile: viewport.width < 700,
     hasTouch: viewport.width < 700,
   });
+  await installSyntheticSession(context, baseUrl, label);
+  await context.route("**/api/auth/bootstrap", (route) => route.fulfill(response(fixtureBootstrap())));
   const errors = [];
   await context.route("**/api/store**", (route) => route.fulfill(response({ ok: true, value: null })));
   await context.route("**/api/business-health**", (route) => route.fulfill(response({ ok: true, snapshot: null })));
