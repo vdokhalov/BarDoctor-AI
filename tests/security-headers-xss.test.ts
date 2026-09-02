@@ -17,19 +17,20 @@ test("global responses receive one compatible security-header baseline", () => {
   assert.match(csp, /object-src 'none'/);
   assert.match(csp, /frame-ancestors 'self'/);
   assert.doesNotMatch(csp, /unsafe-eval/);
-  assert.doesNotMatch(csp, /unsafe-inline/);
+  const scriptPolicy = csp.match(/(?:^|; )script-src ([^;]+)/)?.[1] ?? "";
+  const stylePolicy = csp.match(/(?:^|; )style-src ([^;]+)/)?.[1] ?? "";
+  assert.doesNotMatch(scriptPolicy, /unsafe-inline/);
+  assert.match(stylePolicy, /unsafe-inline/);
 });
 
-test("CSP hashes exactly authorize the fixed startup blocks and stylesheet handler", async () => {
+test("CSP hashes exactly authorize the fixed startup script and stylesheet handler", async () => {
   const response = barDoctorResponse();
   const html = await response.text();
   const policy = response.headers.get("content-security-policy") ?? "";
-  for (const tag of ["script", "style"]) {
-    const block = html.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1];
-    assert.ok(block, `missing inline ${tag} block`);
-    const hash = createHash("sha256").update(block).digest("base64");
-    assert.ok(policy.includes(`'sha256-${hash}'`), `${tag} hash is stale`);
-  }
+  const block = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+  assert.ok(block, "missing inline script block");
+  const hash = createHash("sha256").update(block).digest("base64");
+  assert.ok(policy.includes(`'sha256-${hash}'`), "script hash is stale");
   const handlerHash = createHash("sha256").update("this.media='all'").digest("base64");
   assert.ok(policy.includes(`'sha256-${handlerHash}'`), "stylesheet handler hash is stale");
   assert.match(policy, /'unsafe-hashes'/);

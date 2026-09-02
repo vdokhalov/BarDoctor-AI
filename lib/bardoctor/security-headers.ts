@@ -4,7 +4,10 @@ const CONTENT_SECURITY_POLICY = [
   // pinned by exact SHA-256 values. Any inline change fails closed until its
   // reviewed hash and regression evidence are updated.
   "script-src 'self' 'unsafe-hashes' 'sha256-PYeXSaErC501H9Xp0mV6DGT7X+le9SyJ1TntZjdMYik=' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' https://cdn.onesignal.com https://api.onesignal.com",
-  "style-src 'self' 'sha256-S+fVyI4g7WfW8rHivegg48+6J6DZ3WlbQrtGUiURnKY='",
+  // The current React bundle applies computed layout values through style
+  // attributes. Keep style-only unsafe-inline until those declarations are
+  // extracted; script execution remains hash-pinned and forbids unsafe-inline.
+  "style-src 'self' 'unsafe-inline'",
   "connect-src 'self' https://api.onesignal.com https://*.onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://places.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
