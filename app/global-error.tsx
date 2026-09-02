@@ -1,6 +1,23 @@
 "use client";
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react";
+
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    void fetch("/api/client-runtime-diagnostic", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        version: "global-error-v2",
+        kind: "global-boundary",
+        message: error.message,
+        source: error.digest || "app-root",
+        path: "other",
+      }),
+    }).catch(() => undefined);
+  }, [error]);
+
   return (
     <html lang="ru">
       <body style={{ margin: 0 }}>
@@ -13,4 +30,3 @@ export default function GlobalError({ reset }: { error: Error & { digest?: strin
     </html>
   );
 }
-

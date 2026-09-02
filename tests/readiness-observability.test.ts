@@ -29,17 +29,34 @@ test("correlation IDs accept bounded safe values and replace unsafe input", () =
 });
 
 test("frontend has route and root error boundaries and backend logs structured release context", async () => {
-  const [routeBoundary, globalBoundary, observability, health] = await Promise.all([
+  const [routeBoundary, globalBoundary, observability, health, worker, runtimeHook] = await Promise.all([
     readFile(new URL("../app/error.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/global-error.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/bardoctor/observability.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/healthz/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../worker/index.ts", import.meta.url), "utf8"),
+    readFile(new URL("../public/runtime-diagnostics-v406.js", import.meta.url), "utf8"),
   ]);
   assert.match(routeBoundary, /client-runtime-diagnostic/);
   assert.match(routeBoundary, /Данные не изменены/);
   assert.match(globalBoundary, /результат неизвестен/);
+  assert.match(globalBoundary, /client-runtime-diagnostic/);
   assert.match(observability, /releaseSha/);
   assert.match(observability, /durationMs/);
   assert.match(health, /status: database\.ok \? 200 : 503/);
+  assert.match(worker, /recordRequest/);
+  assert.match(worker, /Server-Timing/);
+  assert.match(worker, /withRequestId\(response, requestId\)/);
+  assert.match(runtimeHook, /unhandledrejection/);
+  assert.match(runtimeHook, /bd:widget-error/);
+  assert.match(runtimeHook, /MAX_REPORTS = 5/);
+  assert.doesNotMatch(runtimeHook, /bd_session_token|X-Session-Token|Authorization/);
 });
 
+test("global request telemetry normalizes endpoints and never emits URL queries or credentials", async () => {
+  const observability = await readFile(new URL("../lib/bardoctor/observability.ts", import.meta.url), "utf8");
+  assert.match(observability, /event: "request_complete"/);
+  assert.match(observability, /safeEndpoint\(input\.request\)/);
+  assert.match(observability, /new URL\(request\.url\)\.pathname/);
+  assert.doesNotMatch(observability, /\.searchParams|authorization|cookie/i);
+});
