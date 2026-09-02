@@ -102,8 +102,7 @@ async function request(path, options = {}) {
 function sessionHeaders(session, extra = {}) {
   return {
     "Content-Type": "application/json",
-    "X-Session-Email": session.email,
-    "X-Session-Token": session.token,
+    Cookie: session.cookie,
     "X-Venue-Id": String(session.activeVenueId),
     "X-BarDoctor-Client-Contract": "1",
     ...extra,
@@ -122,12 +121,17 @@ async function register(suffix, firstName, invitationCode) {
   };
   const result = await request("/api/auth/register", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "cf-connecting-ip": `198.51.100.${({ "owner-a": 51, "owner-b": 52, limited: 53, denied: 54 })[suffix] ?? 59}`,
+    },
     body: JSON.stringify(payload),
   });
   assert.equal(result.response.status, 201, JSON.stringify(result.body));
   assert.equal(result.body.ok, true);
-  return result.body;
+  const cookie = result.response.headers.get("set-cookie")?.split(";", 1)[0];
+  assert.ok(cookie, "registration must issue a server session cookie");
+  return { ...result.body, cookie };
 }
 
 async function jsonRequest(session, path, method, data, extraHeaders) {
