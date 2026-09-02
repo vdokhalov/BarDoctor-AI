@@ -105,6 +105,7 @@ function sessionHeaders(session, extra = {}) {
     "X-Session-Email": session.email,
     "X-Session-Token": session.token,
     "X-Venue-Id": String(session.activeVenueId),
+    "X-BarDoctor-Client-Contract": "1",
     ...extra,
   };
 }

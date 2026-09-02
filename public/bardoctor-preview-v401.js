@@ -1469,7 +1469,44 @@
     bdDispatchNavigationChange();
   });
 
+  function bdRequireClientUpdateV404() {
+    if (document.querySelector("[data-bd-client-update-v404]")) return;
+    var layer = document.createElement("div");
+    layer.setAttribute("data-bd-client-update-v404", "true");
+    layer.setAttribute("role", "alertdialog");
+    layer.setAttribute("aria-modal", "true");
+    layer.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;padding:24px;background:rgba(7,9,17,.92);color:#fff;font-family:system-ui";
+    var card = document.createElement("div");
+    card.style.cssText = "max-width:420px;padding:24px;border-radius:18px;background:#171a25";
+    var title = document.createElement("h2");
+    title.style.marginTop = "0";
+    title.textContent = "Нужно обновить BarDoctor";
+    var message = document.createElement("p");
+    message.textContent = "Операция не выполнена. Обновите приложение, затем повторите действие.";
+    var button = document.createElement("button");
+    button.type = "button";
+    button.style.cssText = "min-height:44px;padding:0 18px";
+    button.textContent = "Обновить";
+    button.addEventListener("click", function () { window.location.reload(); });
+    card.append(title, message, button);
+    layer.appendChild(card);
+    document.body.appendChild(layer);
+  }
+  window.bdRequireClientUpdateV404 = bdRequireClientUpdateV404;
+
   var nativeFetch = window.fetch.bind(window);
+  window.__bdReleaseCompatibilityV404 = { state: "checking", clientContract: 1 };
+  nativeFetch("/api/release", { cache: "no-store", credentials: "include" })
+    .then(function (response) { return response.ok ? response.json() : Promise.reject(new Error("release-unavailable")); })
+    .then(function (release) {
+      window.__bdReleaseCompatibilityV404 = {
+        state: Number(release.minimumSupportedMutationContract || 0) <= 1 ? "compatible" : "update-required",
+        clientContract: 1,
+        release: release
+      };
+      if (window.__bdReleaseCompatibilityV404.state === "update-required") bdRequireClientUpdateV404();
+    })
+    .catch(function () { window.__bdReleaseCompatibilityV404 = { state: "unavailable", clientContract: 1 }; });
   window.fetch = function authenticatedFetch(input, init) {
     var requestUrl = null;
     var requestVenueId = null;
@@ -1538,6 +1575,15 @@
             // The normal store request will be rejected safely by the server.
           }
         }
+        var contractMethod = String(init && init.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+        if (["POST", "PUT", "PATCH", "DELETE"].indexOf(contractMethod) >= 0) {
+          var contractHeaders = new Headers(input instanceof Request ? input.headers : undefined);
+          new Headers(init && init.headers ? init.headers : undefined).forEach(function (value, key) {
+            contractHeaders.set(key, value);
+          });
+          contractHeaders.set("X-BarDoctor-Client-Contract", "1");
+          init = Object.assign({}, init || {}, { headers: contractHeaders });
+        }
       }
     } catch {
       // Preserve the browser's normal fetch behavior for unusual Request objects.
@@ -1548,6 +1594,12 @@
         : (typeof Request !== "undefined" && input instanceof Request ? input.method : "GET")
     ).toUpperCase();
     var pendingResponse = nativeFetch(input, init);
+    if (requestUrl && requestUrl.origin === window.location.origin && ["POST", "PUT", "PATCH", "DELETE"].indexOf(requestMethod) >= 0) {
+      pendingResponse = pendingResponse.then(function (response) {
+        if (response.status === 426) bdRequireClientUpdateV404();
+        return response;
+      });
+    }
     if (rejectStaleVenueResponse) {
       pendingResponse = pendingResponse.then(function (response) {
         var activeVenueId = localStorage.getItem("bd_active_venue_id");
