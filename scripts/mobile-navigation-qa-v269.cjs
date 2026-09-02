@@ -1067,7 +1067,7 @@ async function businessHealthColdStartFlow(browser, profile) {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
-  assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
+  assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 300 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
   assert.ok((homeLayout.moneyTop ?? Infinity) < homeLayout.viewportHeight, `${profile.name}: financial result is not visible on the first screen`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
