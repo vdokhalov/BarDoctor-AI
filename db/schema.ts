@@ -200,6 +200,8 @@ export const domainData = sqliteTable(
       .references(() => accounts.id, { onDelete: "cascade" }),
     storeKey: text("store_key").notNull(),
     dataJson: text("data_json").notNull(),
+    revision: integer("revision").notNull().default(1),
+    mutationId: text("mutation_id"),
     updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

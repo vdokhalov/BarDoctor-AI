@@ -55,7 +55,21 @@ async function ensureLocalSchema() {
     const accountTable = database.prepare(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'accounts'",
     ).get();
-    if (accountTable) return;
+    if (accountTable) {
+      const hasRateLimits = database.prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'auth_rate_limits'",
+      ).get();
+      if (!hasRateLimits) {
+        database.exec((await readFile(path.join(process.cwd(), "drizzle/0022_auth_rate_limits.sql"), "utf8"))
+          .replaceAll("--> statement-breakpoint", ""));
+      }
+      const domainColumns = database.prepare("PRAGMA table_info(domain_data)").all();
+      if (!domainColumns.some((column) => column.name === "revision")) {
+        database.exec((await readFile(path.join(process.cwd(), "drizzle/0023_store_atomic_revision.sql"), "utf8"))
+          .replaceAll("--> statement-breakpoint", ""));
+      }
+      return;
+    }
     const migrations = (await readdir(path.join(process.cwd(), "drizzle")))
       .filter((name) => /^\d{4}_.+\.sql$/.test(name))
       .sort();
@@ -66,6 +80,14 @@ async function ensureLocalSchema() {
   } finally {
     database.close();
   }
+}
+
+async function openLocalDatabase() {
+  const d1Directory = path.join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
+  const databases = (await readdir(d1Directory))
+    .filter((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite");
+  assert.equal(databases.length, 1);
+  return new DatabaseSync(path.join(d1Directory, databases[0]));
 }
 
 async function request(path, options = {}) {
@@ -390,6 +412,66 @@ try {
   assert.equal(immutablePost.response.status, 405);
   assert.equal(immutablePatch.response.status, 405);
 
+  const failureDatabase = await openLocalDatabase();
+  let atomicFailureRolledBack = false;
+  let concurrentConflictDetected = false;
+  try {
+    const beforeFailure = failureDatabase.prepare(`
+      SELECT data_json, revision FROM domain_data
+      WHERE account_id = ? AND store_key = 'bd_tasks'
+    `).get(ownerA.userId);
+    failureDatabase.exec("DROP TRIGGER IF EXISTS qa_step_1_4_fail_audit");
+    failureDatabase.exec(`
+      CREATE TRIGGER qa_step_1_4_fail_audit
+      BEFORE INSERT ON audit_log
+      WHEN NEW.reason = 'STEP_1_4_FAILURE_INJECTION'
+      BEGIN
+        SELECT RAISE(ABORT, 'intentional local audit failure');
+      END
+    `);
+    const failedAtomicWrite = await putStore(
+      ownerA,
+      "bd_tasks",
+      [...historySeed, { id: "must-rollback", title: "Не должно сохраниться" }],
+      "STEP_1_4_FAILURE_INJECTION",
+      historySeed,
+    );
+    assert.equal(failedAtomicWrite.response.status, 500);
+    const afterFailure = failureDatabase.prepare(`
+      SELECT data_json, revision FROM domain_data
+      WHERE account_id = ? AND store_key = 'bd_tasks'
+    `).get(ownerA.userId);
+    assert.deepEqual(afterFailure, beforeFailure, "domain mutation survived a failed audit insert");
+    atomicFailureRolledBack = true;
+    failureDatabase.exec("DROP TRIGGER qa_step_1_4_fail_audit");
+
+    const current = await jsonRequest(ownerA, "/api/store/bd_tasks", "GET");
+    const writerA = [...current.body.data, { id: "parallel-shared", title: "Writer A" }];
+    const writerB = [...current.body.data, { id: "parallel-shared", title: "Writer B" }];
+    const [parallelA, parallelB] = await Promise.all([
+      putStore(ownerA, "bd_tasks", writerA, "Parallel writer A", current.body.data),
+      putStore(ownerA, "bd_tasks", writerB, "Parallel writer B", current.body.data),
+    ]);
+    assert.ok([200, 409].includes(parallelA.response.status), JSON.stringify(parallelA.body));
+    assert.ok([200, 409].includes(parallelB.response.status), JSON.stringify(parallelB.body));
+    assert.ok(parallelA.response.status === 200 || parallelB.response.status === 200);
+    const afterParallel = await jsonRequest(ownerA, "/api/store/bd_tasks", "GET");
+    const sharedRows = afterParallel.body.data.filter((item) => item.id === "parallel-shared");
+    assert.equal(sharedRows.length, 1, "parallel writers duplicated the same business entity");
+    if (parallelA.response.status === 200 && parallelB.response.status === 200) {
+      concurrentConflictDetected = Number(parallelA.body.mergedConflicts || 0) > 0
+        || Number(parallelB.body.mergedConflicts || 0) > 0;
+    } else {
+      const rejected = parallelA.response.status === 409 ? parallelA : parallelB;
+      assert.equal(rejected.body.code, "STORE_CONCURRENT_MODIFICATION");
+      concurrentConflictDetected = true;
+    }
+    assert.equal(concurrentConflictDetected, true, "parallel writers completed without a conflict signal");
+  } finally {
+    try { failureDatabase.exec("DROP TRIGGER IF EXISTS qa_step_1_4_fail_audit"); } catch {}
+    failureDatabase.close();
+  }
+
   const finalAudit = await getAudit(ownerA, "limit=100");
   assert.equal(finalAudit.response.status, 200);
   assert.equal(finalAudit.body.overview.periods.history.some((period) => period.monthKey === "2026-07" && period.status === "reopened"), true);
@@ -419,6 +501,8 @@ try {
     security: { auditImmutable: true, financialDiffRedacted: true, venueTamperingDenied: true },
     relationshipDiagnostic: { platformAdminOnly: true, venueUserStatus: diagnostic.response.status },
     multiVenue: { sameEntityIdIsolated: true, authorizedVenueSwitchIsolated: true, exportIsolated: true },
+    atomicity: { auditFailureRolledBack: atomicFailureRolledBack },
+    concurrency: { conflictDetected: concurrentConflictDetected },
   }, null, 2)}\n`);
 } catch (error) {
   process.stderr.write(`${serverOutput}\n`);

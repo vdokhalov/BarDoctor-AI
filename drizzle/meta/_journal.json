@@ -162,6 +162,13 @@
       "when": 1788351455651,
       "tag": "0022_auth_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1788353462521,
+      "tag": "0023_store_atomic_revision",
+      "breakpoints": true
     }
   ]
 }

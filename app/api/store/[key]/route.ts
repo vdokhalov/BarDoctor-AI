@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { getDb } from "../../../../db";
+import { getD1, getDb } from "../../../../db";
 import { auditLog, domainData } from "../../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { isAllowedStoreKey } from "../../../../lib/bardoctor/constants";
@@ -43,6 +43,10 @@ import {
   normalizeVenueCurrencyArrayUpdates,
   VENUE_CURRENCY_ARRAY_STORE_KEYS,
 } from "../../../../lib/bardoctor/venue-currency-policy";
+import {
+  persistStoreMutationAtomic,
+  type StoreAuditWrite,
+} from "../../../../lib/bardoctor/store-persistence";
 
 type RouteContext = { params: Promise<{ key: string }> };
 
@@ -87,6 +91,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     ok: true,
     data,
     updatedAt: row?.updatedAt ?? null,
+    revision: row?.revision ?? null,
     source: row ? "server_d1" : "missing",
     authoritative: Boolean(row),
     legacyImportRequired: !row && [ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY].includes(key),
@@ -404,44 +409,20 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
 
   const updatedAt = new Date().toISOString();
-  await db
-    .insert(domainData)
-    .values({
-      accountId: account.id,
-      storeKey: key,
-      dataJson: JSON.stringify(after),
-      updatedAt,
-    })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify(after), updatedAt },
-    });
-
-  if (mutations.length > 0) {
-    const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
-    for (const mutation of mutations.slice(0, 250)) {
-      await db.insert(auditLog).values({
-        accountId: account.id,
-        storeKey: key,
-        action: mutation.action,
-        entityId: mutation.entityId,
-        entityLabel: mutation.entityLabel,
-        monthKey: mutation.monthKey,
-        beforeJson: mutation.before == null ? null : JSON.stringify(mutation.before),
-        afterJson: mutation.after == null ? null : JSON.stringify(mutation.after),
-        changedFieldsJson: JSON.stringify(mutation.changedFields),
-        actorName,
-        actorRole: account.role,
-        reason: body.reason?.trim().slice(0, 500) || null,
-        createdAt: updatedAt,
-      });
-    }
-  }
-
+  const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
+  const reason = body.reason?.trim().slice(0, 500) || null;
+  const audits: StoreAuditWrite[] = mutations.slice(0, 250).map((mutation) => ({
+    action: mutation.action,
+    entityId: mutation.entityId,
+    entityLabel: mutation.entityLabel,
+    monthKey: mutation.monthKey,
+    beforeJson: mutation.before == null ? null : JSON.stringify(mutation.before),
+    afterJson: mutation.after == null ? null : JSON.stringify(mutation.after),
+    changedFieldsJson: JSON.stringify(mutation.changedFields),
+    reason,
+  }));
   if (merge.conflicts > 0) {
-    await db.insert(auditLog).values({
-      accountId: account.id,
-      storeKey: key,
+    audits.push({
       action: "conflict",
       entityId: null,
       entityLabel: `Параллельное изменение · ${merge.conflicts}`,
@@ -449,16 +430,46 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       beforeJson: null,
       afterJson: null,
       changedFieldsJson: "[]",
-      actorName: [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,
-      actorRole: account.role,
       reason: `Обнаружено параллельных изменений: ${merge.conflicts}. Применено безопасное трёхстороннее объединение.`,
-      createdAt: updatedAt,
     });
+  }
+  const nextRevision = (existing?.revision ?? 0) + 1;
+  const mutationId = crypto.randomUUID();
+  const committed = await persistStoreMutationAtomic({
+    database: getD1(),
+    accountId: account.id,
+    storeKey: key,
+    dataJson: JSON.stringify(after),
+    previousRevision: existing?.revision ?? null,
+    nextRevision,
+    mutationId,
+    updatedAt,
+    actorName,
+    actorRole: account.role,
+    audits,
+  });
+  if (!committed) {
+    const [current] = await db
+      .select()
+      .from(domainData)
+      .where(and(eq(domainData.accountId, account.id), eq(domainData.storeKey, key)))
+      .limit(1);
+    return Response.json(
+      {
+        ok: false,
+        code: "STORE_CONCURRENT_MODIFICATION",
+        error: "Данные изменились параллельно. Обновите раздел и повторите действие.",
+        currentRevision: current?.revision ?? null,
+        currentData: current ? JSON.parse(current.dataJson) : null,
+      },
+      { status: 409 },
+    );
   }
 
   return Response.json({
     ok: true,
     updatedAt,
+    revision: nextRevision,
     auditedChanges: mutations.length,
     mergedConflicts: merge.conflicts,
     data: after,
