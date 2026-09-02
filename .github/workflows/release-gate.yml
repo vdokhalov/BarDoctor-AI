@@ -1,0 +1,66 @@
+name: release-gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "release/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.17.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm run install:ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Release infrastructure checks
+        run: npm run test:release-infrastructure
+      - name: Unit, integration and regression checks
+        run: npm test
+      - name: Verify release build from clean Git source
+        env:
+          BARDOCTOR_ENVIRONMENT: release-candidate
+          BARDOCTOR_SOURCE_COMMIT: ${{ github.sha }}
+          BARDOCTOR_BUILD_NUMBER: ${{ github.run_number }}
+          BARDOCTOR_BUILD_TIMESTAMP: ${{ github.event.head_commit.timestamp || github.event.pull_request.head.repo.pushed_at }}
+          BARDOCTOR_VINEXT_DRAFT_SECRET: ci-only-placeholder-not-a-production-secret
+          BARDOCTOR_VINEXT_PRERENDER_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: npm run build
+      - name: Reject tracked build mutations
+        run: git diff --exit-code
+
+  browser-critical:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.17.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm run install:ci
+      - name: Startup recovery QA
+        run: npm run test:startup-recovery
+      - name: Mobile navigation and data-safety QA
+        run: npm run test:mobile-navigation
+

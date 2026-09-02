@@ -1,19 +1,55 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
-function sourceCommit(): string {
-  if (process.env.BARDOCTOR_SOURCE_COMMIT?.trim()) return process.env.BARDOCTOR_SOURCE_COMMIT.trim();
+function gitValue(args: string[], fallback: string): string {
   try {
-    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+    return execFileSync("git", args, { encoding: "utf8" }).trim();
   } catch {
-    return "source-commit-unavailable";
+    return fallback;
   }
+}
+
+function sourceCommit(): string {
+  return process.env.BARDOCTOR_SOURCE_COMMIT?.trim()
+    || gitValue(["rev-parse", "HEAD"], "source-commit-unavailable");
+}
+
+function buildNumber(): string {
+  return process.env.BARDOCTOR_BUILD_NUMBER?.trim()
+    || gitValue(["rev-list", "--count", "HEAD"], "build-number-unavailable");
+}
+
+function buildTimestamp(): string {
+  if (process.env.BARDOCTOR_BUILD_TIMESTAMP?.trim()) {
+    return process.env.BARDOCTOR_BUILD_TIMESTAMP.trim();
+  }
+  if (process.env.SOURCE_DATE_EPOCH?.trim()) {
+    const seconds = Number(process.env.SOURCE_DATE_EPOCH);
+    if (Number.isFinite(seconds)) return new Date(seconds * 1000).toISOString();
+  }
+  return gitValue(["show", "-s", "--format=%cI", "HEAD"], "build-timestamp-unavailable");
+}
+
+function appVersion(): string {
+  const parsed = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as { version?: unknown };
+  return typeof parsed.version === "string" && parsed.version.trim()
+    ? parsed.version.trim()
+    : "app-version-unavailable";
+}
+
+function schemaVersion(): string {
+  const journal = JSON.parse(
+    readFileSync(new URL("./drizzle/meta/_journal.json", import.meta.url), "utf8"),
+  ) as { entries?: Array<{ tag?: unknown }> };
+  const tag = journal.entries?.at(-1)?.tag;
+  return typeof tag === "string" ? tag.match(/^(\d{4})_/)?.[1] || tag : "schema-version-unavailable";
 }
 
 const { d1, r2 } = hostingConfig;
@@ -79,6 +115,10 @@ export default defineConfig(async () => {
 
   return {
     define: {
+      __BARDOCTOR_APP_VERSION__: JSON.stringify(appVersion()),
+      __BARDOCTOR_BUILD_NUMBER__: JSON.stringify(buildNumber()),
+      __BARDOCTOR_BUILD_TIMESTAMP__: JSON.stringify(buildTimestamp()),
+      __BARDOCTOR_SCHEMA_VERSION__: JSON.stringify(schemaVersion()),
       __BARDOCTOR_SOURCE_COMMIT__: JSON.stringify(sourceCommit()),
     },
     server: {

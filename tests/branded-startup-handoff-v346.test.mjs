@@ -12,7 +12,8 @@ const [bundle, bootstrap, html, responseSource] = await Promise.all([
 test("v346 is retained in release history and superseded by coherent startup v347", () => {
   assert.match(bundle, /bdBrandedStartupHandoffVersionV346="v346"/);
   assert.match(bundle, /bdCoherentStartupVersionV347="v347"/);
-  assert.match(bundle, /data-bd-splash":"brand-loading-v347"/);
+  assert.match(bundle, /bdSingleSplashVersionV395="v395"/);
+  assert.match(bundle, /function ble\(\)\{return null\}/);
 });
 
 test("v347 disables the v346 artificial Home handoff", () => {

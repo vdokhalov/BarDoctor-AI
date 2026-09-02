@@ -52,6 +52,26 @@ function decide(name: string, assortment: unknown, unit = "г", purchaseDocument
   });
 }
 
+function cheesePurchase(productKey: string) {
+  return {
+    id: `purchase:${productKey}`,
+    venueId: 1,
+    status: "confirmed",
+    documentType: "invoice",
+    supplierName: "Молочный поставщик",
+    date: "2026-08-22",
+    currency: "RUB",
+    items: [{
+      id: `line:${productKey}`,
+      name: "Сыр",
+      purchaseProductKey: productKey,
+      quantity: 1,
+      unit: "кг",
+      lineTotal: 800,
+    }],
+  };
+}
+
 test("canonical normalization ignores word order, punctuation, case and safe morphology", () => {
   const variants = ["ГОЛЛАНДСКИЙ СЫР", "Сыр Голландский", "сыр \"голландская\"", "СЫР  ГОЛЛАНДСКИЙ"];
   const normalized = variants.map((value) => normalizeIngredientIdentity(value).normalized);
@@ -161,7 +181,12 @@ test("СУЛУГУНИ resolves to Сыр Сулугуни while pcs to kg requi
   assert.equal(result.report.unmatchedIngredientLines, 0);
   assert.equal(result.report.linkedUnitReviewIngredientLines, 1);
   assert.equal(result.report.highIdentityPreviouslyUnmatched, 1);
-  const analytics = buildAssortmentAnalytics({ assortment: result.assortment, venueId: 1, now });
+  const analytics = buildAssortmentAnalytics({
+    assortment: result.assortment,
+    purchaseDocuments: [cheesePurchase("cheese:suluguni")],
+    venueId: 1,
+    now,
+  });
   assert.equal(analytics.counts.unmappedIngredients, 0);
   assert.equal(analytics.counts.linkedUnitReviewIngredients, 1);
   assert.equal(analytics.menuItems[0].recipeCost, null);
@@ -207,7 +232,12 @@ test("confirmed item-specific piece conversion makes cost calculable", () => {
   assert.equal(ingredient.normalizedQuantity, 450);
   assert.equal(ingredient.resolutionStatus, "linked_ready");
   assert.equal(result.report.costRecoveredIngredientLines, 1);
-  const analytics = buildAssortmentAnalytics({ assortment: result.assortment, venueId: 1, now });
+  const analytics = buildAssortmentAnalytics({
+    assortment: result.assortment,
+    purchaseDocuments: [cheesePurchase("cheese:suluguni")],
+    venueId: 1,
+    now,
+  });
   assert.equal(analytics.menuItems[0].recipeCost, 360);
   assert.equal(analytics.counts.linkedUnitReviewIngredients, 0);
 });
@@ -282,7 +312,12 @@ test("semantic reconciliation is idempotent and recalculates cost after a high l
     ...first.assortment,
     recipes: (first.assortment.recipes as Array<Record<string, unknown>>).map((recipe) => ({ ...recipe, status: "confirmed", reviewStatus: "approved" })),
   };
-  const analytics = buildAssortmentAnalytics({ assortment: approved, venueId: 1, now });
+  const analytics = buildAssortmentAnalytics({
+    assortment: approved,
+    purchaseDocuments: [cheesePurchase("cheese:nl")],
+    venueId: 1,
+    now,
+  });
   assert.equal(analytics.menuItems[0].recipeCost, 80);
 });
 

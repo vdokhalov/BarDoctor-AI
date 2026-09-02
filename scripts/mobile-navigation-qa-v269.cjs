@@ -889,7 +889,7 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
   const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  await goto(page, "/suppliers?qaProcurement=default&venue=901");
   try {
     await page.waitForSelector(".bd-proc-command-v168");
   } catch {
@@ -899,6 +899,18 @@ async function procurementFlow(browser, profile) {
   const procurementLabels = (await procurementTabs.allTextContents()).map((label) => label.trim());
   assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
   await procurementTabs.filter({ hasText: "Закупки" }).click();
+  if (process.env.BD_QA_DEBUG) {
+    await page.waitForTimeout(500);
+    const diagnostic = await page.evaluate(() => ({
+      url: location.href,
+      visibleText: document.body.textContent.replace(/\s+/g, " ").slice(-1600),
+      purchaseRows: document.querySelectorAll(".bd-proc-purchase-row-v168").length,
+      purchaseCaches: Object.keys(localStorage)
+        .filter((key) => key.startsWith("bd_purchase_documents"))
+        .map((key) => ({ key, size: String(localStorage.getItem(key) || "").length })),
+    }));
+    process.stderr.write(`[mobile-qa] procurement diagnostic ${JSON.stringify(diagnostic)}\n`);
+  }
   const row = page.locator(".bd-proc-purchase-row-v168").first();
   await row.locator(".bd-proc-purchase-main-v168").click();
   await page.waitForSelector(".bd-proc-sheet-v168");

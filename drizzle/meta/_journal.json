@@ -148,6 +148,13 @@
       "when": 1787548355387,
       "tag": "0020_deep_silver_centurion",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1788335491963,
+      "tag": "0021_release_schema_contract",
+      "breakpoints": true
     }
   ]
 }

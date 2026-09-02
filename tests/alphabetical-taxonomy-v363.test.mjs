@@ -29,7 +29,7 @@ test("tree and manager are alphabetical at every taxonomy level", () => {
     assert.match(bundle, new RegExp(`${level}:bdAlphabeticalV363`));
   }
   assert.match(bundle, /data-bd-taxonomy-order":"alphabetical-v363/);
-  assert.match(bundle, /const T=bdAlphabeticalV363\(t\.sections\),A=bdAlphabeticalV363\(t\.categories\),k=bdAlphabeticalV363\(t\.subcategories\)/);
+  assert.match(bundle, /const T=bdAlphabeticalV363\(t\.sections\.filter\(bdIsInventoryTaxonomyNodeV373\)\),A=bdAlphabeticalV363\(t\.categories\.filter\(bdIsInventoryTaxonomyNodeV373\)\),k=bdAlphabeticalV363\(t\.subcategories\.filter\(bdIsInventoryTaxonomyNodeV373\)\)/);
   assert.match(bundle, /Раскрывайте только нужную ветку/);
 });
 

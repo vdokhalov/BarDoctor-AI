@@ -8,7 +8,8 @@ test("v349 warms critical Home reads before React routing completes", async () =
   const bundle = await readFile(new URL("public/assets/index-BQGspy0I.js", root), "utf8");
   assert.match(bundle, /bdSingleReadyHomeVersionV349="v349"/);
   assert.match(bundle, /function bdWarmCriticalHomeV349\(\)/);
-  assert.match(bundle, /__bdStartupBusinessHealthWarmV349=fetch\("\/api\/business-health"/);
+  assert.match(bundle, /__bdStartupBusinessHealthWarmV349=bdFetchBusinessHealthV377\(e\)/);
+  assert.match(bundle, /fetch\("\/api\/business-health",\{headers:ca\(session\),cache:"no-store",signal:controller\.signal\}/);
   assert.match(bundle, /__bdStartupFinanceWarmV349=Promise\.all\(\["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"\]/);
 });
 

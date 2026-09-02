@@ -597,6 +597,15 @@ test("purchase lifecycle is venue-scoped and preserves stock and payment history
 });
 
 test("build contains the BarDoctor shell, local APIs, and D1 migrations", async () => {
+  const builtHtml = await readFile(
+    new URL("../dist/client/app.html", import.meta.url),
+    "utf8",
+  );
+  const builtClientAsset = builtHtml.match(
+    /\/assets\/(index-BQGspy0I-[a-f0-9]{12}\.js)/,
+  );
+  assert.ok(builtClientAsset, "built HTML must reference the content-versioned BarDoctor client");
+
   const [
     worker,
     bootstrap,
@@ -666,7 +675,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
       "utf8",
     ),
     readFile(
-      new URL("../dist/client/assets/index-BQGspy0I.js", import.meta.url),
+      new URL(`../dist/client/assets/${builtClientAsset[1]}`, import.meta.url),
       "utf8",
     ),
     readFile(
@@ -748,7 +757,10 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /navigation\.css\?v=20260811-navigation-v85/);
   assert.match(worker, /employee-detail\.css\?v=20260817-employee-edit-page-v206/);
   assert.match(worker, /employee-list\.css\?v=20260817-employee-edit-page-v206/);
-  assert.match(bootstrap, /index-BQGspy0I\.js\?v=20260821-inventory-reconciliation-v224/);
+  assert.match(
+    bootstrap,
+    /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=20260821-inventory-reconciliation-v224/,
+  );
   assert.match(bootstrap, /function installProtectedOriginalLinks\(\)/);
   assert.match(bootstrap, /window\.open\("about:blank", "_blank"\)/);
   assert.match(bootstrap, /fetch\(targetUrl\.pathname \+ targetUrl\.search/);
@@ -864,7 +876,10 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
   assert.match(bootstrap, /\/api\/auth\/bootstrap/);
   assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
-  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
+  assert.ok(
+    bootstrap.includes(`/assets/${builtClientAsset[1]}`),
+    "the bootstrap must load the same content-versioned client referenced by built HTML",
+  );
   assert.match(bootstrap, /randomUUIDFallback/);
   assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
   assert.match(bootstrap, /navigateInApplication/);
@@ -1111,14 +1126,14 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(oneSignalWorker, /cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js/);
   assert.match(runtimeWorkerLoader, /cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js/);
   assert.ok(appIcon.byteLength > 5_000);
-  assert.match(mainBundle, /data-bd-root-splash":"ai-pulse/);
+  assert.match(mainBundle, /bdSingleSplashVersionV395="v395"/);
+  assert.match(mainBundle, /function ble\(\)\{return null\}/);
   assert.match(mainBundle, /Заведение под контролем/);
   assert.match(mainBundle, /bdStartupPerformanceVersionV343="v343"/);
   assert.doesNotMatch(mainBundle, /"data-bd-health-startup-machine":"v335"/);
   assert.doesNotMatch(mainBundle, /"data-bd-health-startup-machine":"v356"/);
   assert.match(mainBundle, /bdBoundedStartupHandoffVersionV357="v357"/);
-  assert.match(mainBundle, /data-bd-splash":"brand-loading-v347/);
-  assert.match(mainBundle, /data-bd-brand-splash":"v332/);
+  assert.doesNotMatch(mainBundle, /data-bd-splash":"/);
   assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function bdHealthStartupGateV155")), /data-bd-health-entry/);
   assert.match(mainBundle, /\/warehouse\?add=inventory/);
   assert.match(mainBundle, /data-bd-warehouse-version":"compact-tree-v240/);

@@ -32,7 +32,9 @@ replaceOnceUnlessPresent(
 replaceOnceUnlessPresent(
   'onClick:()=>e("/nomenclature"),children:[i.jsx("span",{children:"Номенклатура"})',
   'onClick:()=>e("/nomenclature?returnTo=warehouse"),children:[i.jsx("span",{children:"Номенклатура"})',
-  'onClick:()=>e("/nomenclature?returnTo=warehouse"),children:[i.jsx("span",{children:"Номенклатура"})',
+  source.includes('onClick:()=>e("/nomenclature?view=taxonomy&returnTo=warehouse")')
+    ? 'onClick:()=>e("/nomenclature?view=taxonomy&returnTo=warehouse")'
+    : 'onClick:()=>e("/nomenclature?returnTo=warehouse"),children:[i.jsx("span",{children:"Номенклатура"})',
   "warehouse nomenclature return context",
 );
 replaceOnceUnlessPresent(

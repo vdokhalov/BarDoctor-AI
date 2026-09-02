@@ -1,72 +1,73 @@
-# Design QA — классификация номенклатуры v362
+**Comparison Target**
 
-## Evidence
+- Source visual truth paths:
+  - `/workspace/scratch/730a34e846e9/upload/IMG_3076.png`
+  - `/workspace/scratch/730a34e846e9/upload/IMG_3077.png`
+  - `/workspace/scratch/730a34e846e9/upload/IMG_3078.png`
+- Source pixel dimensions: 1170 × 2532 px for each capture.
+- Source CSS viewport: approximately 390 × 844 CSS px at 3× device density.
+- Intended state: authenticated Köln venue; purchase receiving review and Warehouse taxonomy screens.
+- Implementation screenshot path: unavailable.
+- Implementation viewport: intended 390 × 844 CSS px at device scale factor 1 or an equivalent normalized 1170 × 2532 capture.
+- Density normalization: source would be normalized from 3× to 1× before comparison.
 
-- Source visual truth: `/workspace/scratch/0d34a9e3f581/generated_images/exec-9335e213-a2fc-4be8-952d-1c16877f0a23.png`
-- Browser-rendered implementation capture: `cloud-browser://cdp/tab-1/nomenclature?qaNomenclature=1#mobile-frame`
-- Source pixels: `851 × 1849` at 1×.
-- Implementation pixels / CSS viewport: `390 × 844` at device scale factor 1.
-- Density normalization: the source and implementation have the same 0.460 aspect scale (`851 → 390`, `1849 → 848`; the four-pixel height difference is browser-frame crop). The comparison used the app content, not browser chrome.
-- State: mobile nomenclature card for `Сигареты Winston`; section `Бар`, category `Сигареты`, no subcategory, storage `Склад бара`.
+**Findings**
 
-## Findings
+- [P1] Browser-rendered implementation evidence is unavailable
+  Location: purchase receiving workspace and Warehouse.
+  Evidence: the cloud browser reaches the published BarDoctor sign-in screen, while the locally changed v373 build cannot be exposed through the available preview connection. The authenticated Köln states therefore cannot be captured without the owner signing in and the new build being published.
+  Impact: the fixed footer, filtered inventory taxonomy, empty-branch suppression, and category-management link cannot yet be judged from like-for-like rendered screenshots.
+  Fix: publish the verified build, sign in to the Köln venue in the cloud browser, then capture both target screens at the matching mobile viewport.
 
-No actionable P0, P1, or P2 differences remain.
+**Full-view Comparison Evidence**
 
-The implementation preserves the selected visual direction: one compact classification summary, a single disclosure for editing, the existing BarDoctor typography and violet token, large mobile controls, and a sticky save area. Product behavior intentionally extends the static mock by hiding the subcategory control when the category has no children and by displaying category-level items under `Без подкатегории` in the structure tree.
+- Source purchase capture shows the action bar overlapping the receiving list instead of remaining in its own stable footer region.
+- Source Warehouse captures show menu-derived and empty branches mixed with the inventory hierarchy.
+- No like-for-like rendered implementation capture is available, so no visual pass is claimed.
 
-## Required fidelity surfaces
+**Focused Region Comparison Evidence**
 
-- Fonts and typography: existing product sans-serif stack and established weight hierarchy retained; no new font drift or illegible wrapping in the 390 px viewport.
-- Spacing and layout rhythm: compact summary aligns with neighboring fields; the `flex: none` correction prevents mobile collapse; sticky actions remain visible.
-- Colors and visual tokens: existing foreground, border, surface, focus-violet, warning, and destructive tokens retained.
-- Image quality and asset fidelity: this flow contains no raster imagery, logos, or decorative image assets; existing icon treatment is unchanged.
-- Copy and content: path uses `Раздел → Категория → Подкатегория`; optionality is stated in the UI; save-blocking feedback identifies the first missing required field; purchase labels use business language.
+- Not completed. The required authenticated implementation state is unavailable in the cloud browser.
 
-## Full-view comparison evidence
+**Required Fidelity Surfaces**
 
-The 390 × 844 browser-rendered mobile frame was inspected against the full selected mock. Overall hierarchy, density, classification placement, field rhythm, and the sticky footer match the chosen compact direction. No horizontal clipping or collapsed content remained after the final fix.
+- Fonts and typography: not visually verified; existing design-system typography was preserved in code.
+- Spacing and layout rhythm: not visually verified; the receiving form is now the only scrollable region and the action footer is a non-shrinking sibling with safe-area padding.
+- Colors and visual tokens: not visually verified; existing tokens and component styling were retained.
+- Image quality and asset fidelity: no imagery or custom assets were changed.
+- Copy and content: code/tests confirm the Warehouse action reads `Номенклатура / категории`; visual rendering is not yet verified.
 
-## Focused region comparison evidence
+**Primary Interactions Tested**
 
-The classification region was inspected in both collapsed and expanded states. The final collapsed state shows `Бар → Сигареты`, `Путь задан`, and one `Изменить` disclosure. The expanded state shows section and category controls, omits subcategory for `Сигареты`, and explains that no additional choice is required.
+- Static and unit coverage confirms the receiving footer is outside the scrolling form.
+- Static and unit coverage confirms Warehouse excludes menu taxonomy IDs and empty branches.
+- Static and unit coverage confirms the category-management action deep-links to the taxonomy view.
+- Full project verification passed: build, typecheck, UI audits, navigation audits, and 741 tests.
 
-## Comparison history
+**Console Errors Checked**
 
-1. P1 — classification container collapsed to roughly 2 px in the mobile flex layout.
-   - Fix: added `flex: none` to `.bd-nomenclature-classification-v362`.
-   - Post-fix evidence: browser capture at 390 × 844 shows the full path, status, and disclosure without clipping.
-2. P1 — items saved directly to a category could disappear from the structure tree when there was no subcategory.
-   - Fix: added a category-level `Без подкатегории` group and rendered direct items there even when sibling subcategories exist.
-   - Post-fix evidence: browser DOM and rendered tree show `Сигареты Winston` inside `Бар → Сигареты → Без подкатегории`.
+- Authenticated implementation screen: not available, so runtime console verification for this state is blocked.
+- Build and test logs contain no implementation errors.
 
-## Primary interactions tested
+**Comparison History**
 
-- Opened section and category in the structure tree.
-- Opened a category-level item with no subcategory.
-- Expanded and collapsed the classification editor.
-- Changed section and confirmed dependent category/subcategory values clear.
-- Confirmed disabled save state names the missing category.
-- Selected a category with no subcategory and saved successfully in the local QA fixture.
-- Confirmed the saved item remains visible under `Без подкатегории`.
-- Opened the category manager; confirmed add-category controls follow each section list and row actions are collapsed under `Действия`.
-- Opened row actions and confirmed reorder, rename, archive, and delete commands are available.
+- Iteration 1: source defects were translated into v373 layout and taxonomy rules. Code-level verification passed, but rendered comparison could not start because the target state requires authentication and the local preview connection was unavailable.
 
-## Console check
+**Open Questions**
 
-No application-origin console errors were recorded. Browser-extension metadata errors were excluded because they originate from `chrome-extension://` and are unrelated to the app.
+- None about the intended behavior. Only authenticated visual evidence remains.
 
-## Implementation checklist
+**Implementation Checklist**
 
-- [x] Compact classification summary
-- [x] Conditional optional subcategory
-- [x] Inline category creation in the current section
-- [x] Category-level item visibility
-- [x] Compact category manager actions
-- [x] Mobile interaction and console verification
+- Publish the verified v373 build.
+- Sign in to the Köln venue in the cloud browser.
+- Capture the receiving footer at top, middle, and end-of-list scroll positions.
+- Capture Warehouse and confirm only non-empty inventory branches are visible.
+- Open `Номенклатура / категории` and verify the direct taxonomy-management route.
+- Check the browser console, then repeat the comparison at the normalized mobile viewport.
 
-## Follow-up polish
+**Follow-up Polish**
 
-No blocking polish remains for this scope.
+- None proposed until the like-for-like visual pass is complete.
 
-final result: passed
+final result: blocked

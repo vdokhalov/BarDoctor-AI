@@ -34,7 +34,7 @@ test("v343 lets the static startup screen paint before noncritical assets", () =
     assert.match(source, /rel="modulepreload" href="\/assets\/index-BQGspy0I\.js\?[^\"]*startup-performance-v343/);
     assert.match(source, /canonical-taxonomy-v336\.css[^>]*media="print" onload="this\.media='all'"/);
     assert.match(source, /monthly-report-qa-v165\.js[^>]*defer/);
-    assert.match(source, /bardoctor-preview\.js[^>]*defer/);
+    assert.match(source, /bardoctor-preview(?:-v396)?\.js[^>]*defer/);
   }
   assert.match(bootstrap, /startup-performance-v343/);
 });

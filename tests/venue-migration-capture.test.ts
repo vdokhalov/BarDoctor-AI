@@ -49,7 +49,8 @@ test("primary venue may use exact scoped or documented compatibility keys", () =
 test("capture route persists only an immutable backup and performs no business writes", async () => {
   const route = await source("app/api/migration/capture/route.ts");
   assert.match(route, /authenticateRequest\(request\)/);
-  assert.match(route, /x-migration-intent.*capture-current-venue-legacy-data/s);
+  assert.match(route, /migrationIntentAccepted\(request, "capture-current-venue-legacy-data"\)/);
+  assert.match(route, /authenticatePlatformAdmin\(request\)/);
   assert.match(route, /validateCapturedCandidates/);
   assert.match(route, /venueMigrationExports/);
   assert.match(route, /writesPerformed: 0/);

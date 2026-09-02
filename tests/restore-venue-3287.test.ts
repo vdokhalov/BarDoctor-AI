@@ -5,7 +5,7 @@ import test from "node:test";
 
 const migrationDirectory = new URL("../drizzle/", import.meta.url);
 const restorationMigration = new URL(
-  "../drizzle/0022_restore_confirmed_venue_3287.sql",
+  "../ops/manual-migrations/0022_restore_confirmed_venue_3287.sql",
   import.meta.url,
 );
 

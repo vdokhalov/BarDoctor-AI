@@ -90,7 +90,7 @@ test("new primary and secondary venue paths declare server authority", async () 
 });
 
 test("Plakuchaya Iva empty initialization is backup-guarded and never overwrites data", async () => {
-  const migration = await readFile(new URL("../drizzle/0021_initialize_empty_plakuchaya_iva.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../ops/manual-migrations/0021_initialize_empty_plakuchaya_iva.sql", import.meta.url), "utf8");
   assert.match(migration, /v\.`id` = 3280/);
   assert.match(migration, /EXISTS \(SELECT 1 FROM `venue_migration_exports`/);
   assert.equal((migration.match(/INSERT OR IGNORE INTO `domain_data`/g) || []).length, 5);
@@ -115,7 +115,7 @@ test("Plakuchaya Iva initialization preserves an existing server store and fills
     ) VALUES ('backup-3280', 3280, 8, 'commit', 'schema', 'checksum', '{}', '{}', '2026-08-24T06:00:00.000Z', 15);
     INSERT INTO domain_data (account_id, store_key, data_json) VALUES (8, 'bd_suppliers', '[{"id":"keep"}]');
   `);
-  const migration = await readFile(new URL("../drizzle/0021_initialize_empty_plakuchaya_iva.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../ops/manual-migrations/0021_initialize_empty_plakuchaya_iva.sql", import.meta.url), "utf8");
   database.exec(migration.replaceAll("--> statement-breakpoint", ""));
   assert.equal(database.prepare("SELECT COUNT(*) AS count FROM domain_data WHERE account_id = 8").get()?.count, 5);
   assert.equal(database.prepare("SELECT data_json FROM domain_data WHERE account_id = 8 AND store_key = 'bd_suppliers'").get()?.data_json, '[{"id":"keep"}]');

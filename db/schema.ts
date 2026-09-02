@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const accounts = sqliteTable(
   "accounts",
@@ -185,6 +185,27 @@ export const domainData = sqliteTable(
   (table) => [
     uniqueIndex("domain_data_account_key_uq").on(table.accountId, table.storeKey),
     index("domain_data_account_id_idx").on(table.accountId),
+  ],
+);
+
+/** Request-idempotency ledger for asynchronous invoice recognition. */
+export const invoiceRecognitionJobs = sqliteTable(
+  "invoice_recognition_jobs",
+  {
+    accountId: integer("account_id").notNull(),
+    venueId: integer("venue_id").notNull(),
+    fingerprint: text("fingerprint").notNull(),
+    jobId: text("job_id").notNull(),
+    status: text("status").notNull().default("processing"),
+    resultJson: text("result_json"),
+    metricsJson: text("metrics_json"),
+    issuesJson: text("issues_json"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.accountId, table.venueId, table.fingerprint] }),
+    index("invoice_recognition_jobs_updated_idx").on(table.updatedAt),
   ],
 );
 

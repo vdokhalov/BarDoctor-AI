@@ -63,6 +63,17 @@ function normalizedName(value: unknown): string {
     .trim();
 }
 
+function exactCostIdentity(value: unknown): string {
+  const withoutPackage = normalizedName(value)
+    .replace(/\s+\d+(?:\s+\d+)?\s+(?:л|l|мл|ml|кг|kg|г|g|шт|pcs)(?=\s|$)/g, " ")
+    .replace(/^(?:вода минеральная|минеральная вода|вода)\s+/, "")
+    .replace(/\s+(?:минеральная вода|минеральная|газированная вода|негазированная вода|газированная|негазированная|вода)$/g, "")
+    .trim();
+  if (["coca cola", "кока кола", "cola", "кола"].includes(withoutPackage)) return "cola";
+  if (["sprite", "спрайт"].includes(withoutPackage)) return "sprite";
+  return withoutPackage;
+}
+
 function isoDate(value: unknown): string {
   const candidate = text(value, "", 40);
   return /^\d{4}-\d{2}-\d{2}/.test(candidate) ? candidate.slice(0, 10) : "";
@@ -179,10 +190,60 @@ function pointHistory(points: ProcurementPricePoint[]) {
   return map;
 }
 
-function balanceMap(value: JsonRecord) {
+function productAliases(value: JsonRecord): JsonRecord[] {
+  const aliases = [
+    ...array(value.canonicalProductAliases),
+    ...array(value.inventoryProductAliases),
+  ].map(record);
+  for (const product of [...array(value.nomenclature), ...array(value.stockBalances)].map(record)) {
+    const canonical = text(product.productKey ?? product.key ?? product.id, "", 300);
+    if (!canonical) continue;
+    for (const identity of [product.id, product.nomenclatureItemId, product.key, product.productKey]) {
+      const from = text(identity, "", 300);
+      if (from && from !== canonical) aliases.push({ from, to: canonical });
+    }
+    for (const identity of [...array(product.externalProductKeys), ...array(product.mergedFromProductKeys)]) {
+      const from = text(identity, "", 300);
+      if (from && from !== canonical) aliases.push({ from, to: canonical });
+    }
+  }
+  return aliases;
+}
+
+function productKeyResolver(value: JsonRecord) {
+  const aliases = new Map(productAliases(value)
+    .map((alias) => [text(alias.from, "", 300), text(alias.to, "", 300)] as const)
+    .filter(([from, to]) => Boolean(from && to && from !== to)));
+  return (initial: unknown): string => {
+    let current = text(initial, "", 300);
+    const seen = new Set<string>();
+    while (aliases.has(current) && !seen.has(current)) {
+      seen.add(current);
+      current = aliases.get(current)!;
+    }
+    return current;
+  };
+}
+
+function ingredientProductKey(ingredient: JsonRecord, resolveProductKey: (value: unknown) => string): string {
+  return resolveProductKey(
+    ingredient.purchaseProductKey
+      ?? ingredient.productKey
+      ?? ingredient.canonicalProductKey
+      ?? ingredient.nomenclatureItemId,
+  );
+}
+
+function balanceMap(value: JsonRecord, resolveProductKey: (value: unknown) => string) {
   const map = new Map<string, JsonRecord>();
   array(value.stockBalances).map(record).forEach((balance) => {
-    const key = text(balance.key ?? balance.purchaseProductKey, "", 300);
+    const key = resolveProductKey(
+      balance.productKey
+        ?? balance.key
+        ?? balance.purchaseProductKey
+        ?? balance.nomenclatureItemId
+        ?? balance.id,
+    );
     if (key) map.set(key, balance);
   });
   return map;
@@ -221,11 +282,26 @@ function resolvedIngredientAmount(ingredient: JsonRecord): {
 
 function ingredientCost(
   ingredient: JsonRecord,
-  prices: Map<string, ProcurementPricePoint>,
-  balances: Map<string, JsonRecord>,
+  history: Map<string, ProcurementPricePoint[]>,
+  resolveProductKey: (value: unknown) => string,
+  packageHint?: { amount: number; unit: BaseUnit; label: string } | null,
 ) {
-  const amount = resolvedIngredientAmount(ingredient);
-  const productKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
+  const resolvedAmount = resolvedIngredientAmount(ingredient);
+  const fallbackAmount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
+  const packageHintResolvesPiece = resolvedAmount.reason === "packaging_resolution"
+    && packageHint != null
+    && fallbackAmount.unit === "pcs";
+  const amountBeforePackageRepair = packageHintResolvesPiece
+    ? { ...fallbackAmount, reason: null }
+    : resolvedAmount;
+  const packageHintRepairsLegacyDisplayUnit = packageHint != null
+    && ["ml", "g"].includes(amountBeforePackageRepair.unit)
+    && amountBeforePackageRepair.unit === packageHint.unit
+    && Math.abs(amountBeforePackageRepair.amount * 1_000 - packageHint.amount) < 0.0001;
+  const amount = packageHintRepairsLegacyDisplayUnit
+    ? { amount: packageHint.amount, unit: packageHint.unit, reason: null }
+    : amountBeforePackageRepair;
+  const productKey = ingredientProductKey(ingredient, resolveProductKey);
   if (amount.reason) {
     return { complete: false, reason: amount.reason, amount: amount.amount, unit: amount.unit, productKey };
   }
@@ -235,17 +311,56 @@ function ingredientCost(
   if (!productKey) {
     return { complete: false, reason: "mapping", amount: amount.amount, unit: amount.unit, productKey };
   }
-  const balance = balances.get(productKey);
-  const balanceUnit = text(balance?.unit, "", 20);
-  const averageUnitCost = nonNegative(balance?.averageUnitCost);
-  const point = prices.get(pointKey(productKey, amount.unit));
-  const useWeightedAverage = averageUnitCost !== null
-    && averageUnitCost > 0
-    && balanceUnit === amount.unit;
-  const unitPrice = useWeightedAverage ? averageUnitCost : point?.normalizedUnitPrice ?? null;
-  const currency = useWeightedAverage
-    ? text(balance?.currency, point?.currency ?? "", 12).toUpperCase()
-    : point?.currency ?? "";
+  const directCandidates = packageHint
+    ? [...history.entries()]
+      .filter(([key]) => key.startsWith(`${productKey}|`))
+      .flatMap(([, points]) => points)
+    : history.get(pointKey(productKey, amount.unit)) ?? [];
+  const packageMatches = (candidate: ProcurementPricePoint) => {
+    if (!packageHint) return true;
+    const packageValue = inventoryPackageAmount(
+      candidate.packageSize,
+      candidate.baseUnit === "pcs" ? "шт." : candidate.baseUnit,
+    );
+    return packageValue.unit === packageHint.unit
+      && Math.abs(packageValue.amount - packageHint.amount) < 0.0001;
+  };
+  const ingredientIdentity = exactCostIdentity(
+    ingredient.matchedName ?? ingredient.canonicalName ?? ingredient.name,
+  );
+  const directExactPackageCandidates = directCandidates.filter(packageMatches);
+  const identityCandidates = packageHint && directExactPackageCandidates.length === 0 && ingredientIdentity
+    ? [...history.values()]
+      .flat()
+      .filter((candidate) => exactCostIdentity(candidate.productName) === ingredientIdentity)
+    : [];
+  const identityExactPackageCandidates = packageHint
+    ? identityCandidates.filter(packageMatches)
+    : identityCandidates;
+  const exactPackageCandidates = directExactPackageCandidates.length > 0
+    ? directExactPackageCandidates
+    : identityExactPackageCandidates;
+  const aggregateSource = directCandidates.length > 0 ? directCandidates : identityCandidates;
+  const aggregatePackageCandidates = packageHint && exactPackageCandidates.length === 0
+    && aggregateSource.length > 0
+    && aggregateSource.every((candidate) => {
+      if (candidate.baseUnit !== packageHint.unit || candidate.baseAmount < packageHint.amount) return false;
+      const packages = candidate.baseAmount / packageHint.amount;
+      return Math.abs(packages - Math.round(packages)) < 0.000001;
+    })
+    ? aggregateSource
+    : [];
+  const point = (exactPackageCandidates.length > 0
+    ? exactPackageCandidates
+    : aggregatePackageCandidates)
+    .sort((left, right) => left.date.localeCompare(right.date) || left.id.localeCompare(right.id))
+    .at(-1);
+  const unitPrice = point?.baseUnit === amount.unit
+    ? point.normalizedUnitPrice
+    : point && amount.unit === "pcs" && packageHint
+      ? point.normalizedUnitPrice * packageHint.amount
+      : null;
+  const currency = point?.currency ?? "";
   if (!(unitPrice != null && unitPrice > 0) || !currency) {
     return {
       complete: false,
@@ -265,15 +380,21 @@ function ingredientCost(
     unitPrice: rounded(unitPrice, 6),
     cost: rounded(amount.amount * unitPrice, 2),
     currency,
-    source: useWeightedAverage ? "weighted_inventory_average" : "latest_confirmed_purchase",
+    source: "latest_confirmed_purchase",
     supplierName: point?.supplierName ?? null,
     priceDate: point?.date ?? null,
+    purchaseDate: point?.date ?? null,
+    purchaseDocumentId: point?.documentId ?? null,
+    purchaseDocumentNumber: point?.documentNumber ?? null,
+    purchasePackageSize: point?.packageSize ?? null,
+    packageLabel: packageHint?.label || null,
   };
 }
 
 function historicalRecipeCosts(
   ingredients: JsonRecord[],
   history: Map<string, ProcurementPricePoint[]>,
+  resolveProductKey: (value: unknown) => string,
 ) {
   if (!ingredients.length) return [];
   const normalized = ingredients.map((ingredient) => {
@@ -282,7 +403,7 @@ function historicalRecipeCosts(
       amount: amount.amount,
       unit: amount.unit,
       reason: amount.reason,
-      productKey: text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300),
+      productKey: ingredientProductKey(ingredient, resolveProductKey),
     };
   });
   if (normalized.some((item) => item.unit === "unknown" || item.reason || !item.productKey)) return [];
@@ -323,10 +444,11 @@ function recipeCostDrivers(
   previousDate: string,
   currentDate: string,
   currency: string,
+  resolveProductKey: (value: unknown) => string,
 ) {
   return ingredients.flatMap((ingredient) => {
     const amount = resolvedIngredientAmount(ingredient);
-    const productKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
+    const productKey = ingredientProductKey(ingredient, resolveProductKey);
     if (amount.unit === "unknown" || amount.reason || !productKey) return [];
     const points = history.get(pointKey(productKey, amount.unit)) ?? [];
     const previous = points.filter((point) =>
@@ -408,11 +530,15 @@ export function buildAssortmentAnalytics(input: {
     text(item.id),
     canonicalTechCardForOwner(item.id, recipes),
   ]));
-  const balances = balanceMap(assortment);
+  const resolveProductKey = productKeyResolver(assortment);
+  const aliases = productAliases(assortment);
+  const balances = balanceMap(assortment, resolveProductKey);
   const pricePoints = procurementPricePoints(input.purchaseDocuments ?? [], {
     venueId: input.venueId,
     includePriceLists: false,
-    productAliases: assortment.canonicalProductAliases,
+    includeUnmappedExact: true,
+    productAliases: aliases,
+    supplierProductMappings: assortment.supplierProductMappings,
   });
   const currentPrices = latestPoints(pricePoints);
   const priceHistory = pointHistory(pricePoints);
@@ -456,6 +582,7 @@ export function buildAssortmentAnalytics(input: {
     const recipe = recipeByMenuId.get(id);
     const directReadyProduct = resolveReadyProductConsumption(item, assortment);
     const resolvedSaleSize = resolveMenuItemSaleSize(item, assortment);
+    const salePackageLabel = formatMenuSaleSize(resolvedSaleSize);
     const ownerCards = recipes.filter((candidate) =>
       text(candidate.menuItemId ?? candidate.ownerId, "", 120) === id
     );
@@ -475,11 +602,26 @@ export function buildAssortmentAnalytics(input: {
             nomenclatureItemId: directReadyProduct.nomenclatureItemId,
           }]
         : [];
+    const saleSize = record(resolvedSaleSize);
+    const salePackageHint = ingredients.length === 1
+      && nonNegative(saleSize.baseQuantity) != null
+      && ["ml", "g", "pcs"].includes(text(saleSize.baseUnit, "", 20))
+      ? {
+          amount: nonNegative(saleSize.baseQuantity)!,
+          unit: text(saleSize.baseUnit, "", 20) as BaseUnit,
+          label: salePackageLabel,
+        }
+      : null;
     const ingredientRows = ingredients.map((ingredient) => ({
       id: text(ingredient.id, crypto.randomUUID(), 120),
-      name: text(ingredient.name, "Ингредиент", 180),
+      name: text(
+        ingredient.matchedName ?? ingredient.canonicalName ?? ingredient.name,
+        "Ингредиент",
+        180,
+      ),
+      recipeName: text(ingredient.name, "Ингредиент", 180),
       quantity: nonNegative(ingredient.quantity),
-      ...ingredientCost(ingredient, currentPrices, balances),
+      ...ingredientCost(ingredient, priceHistory, resolveProductKey, salePackageHint),
     }));
     const isService = text(item.type) === "service";
     const reviewStatus = recipe
@@ -507,7 +649,7 @@ export function buildAssortmentAnalytics(input: {
     const unitGrossProfit = comparableCurrency && salePrice != null
       ? rounded(salePrice - recipeCost, 2)
       : null;
-    const history = historicalRecipeCosts(ingredients, priceHistory);
+    const history = historicalRecipeCosts(ingredients, priceHistory, resolveProductKey);
     const currentHistory = history[history.length - 1];
     const previousHistory = history[history.length - 2];
     const costChangePercent = currentHistory && previousHistory && previousHistory.cost > 0
@@ -520,6 +662,7 @@ export function buildAssortmentAnalytics(input: {
           previousHistory.date,
           currentHistory.date,
           currentHistory.currency,
+          resolveProductKey,
         )
       : [];
     const metric = salesMetrics.get(id);
@@ -998,7 +1141,7 @@ export function buildAssortmentAnalytics(input: {
     },
     sources: array(assortment.sources).map(record).slice(0, 30),
     valuation: {
-      currentCostRule: "Средневзвешенная стоимость существующего складского остатка; при её отсутствии — последняя подтверждённая закупочная цена",
+      currentCostRule: "Последняя подтверждённая закупочная цена точной фасовки товара",
       costChangeRule: "Текущая подтверждённая техкарта пересчитывается по хронологии подтверждённых закупочных цен",
       externalPricesUsed: false,
       unconfirmedOcrUsed: false,

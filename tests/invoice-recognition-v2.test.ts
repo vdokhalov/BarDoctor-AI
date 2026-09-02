@@ -1345,7 +1345,7 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   const mappingRoute = await readFile(new URL("../app/api/purchases/mappings/route.ts", import.meta.url), "utf8");
   const aiMatching = await readFile(new URL("../lib/bardoctor/invoice-ai-matching.ts", import.meta.url), "utf8");
   const aiProvider = await readFile(new URL("../lib/bardoctor/invoice-ai-openai-provider.ts", import.meta.url), "utf8");
-  const jobMigration = await readFile(new URL("../drizzle/0025_hybrid_invoice_matching_jobs.sql", import.meta.url), "utf8");
+  const jobMigration = await readFile(new URL("../drizzle/0021_release_schema_contract.sql", import.meta.url), "utf8");
   const bundle = await readFile(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
   const bootstrap = await readFile(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
   const appHtml = await readFile(new URL("../public/app.html", import.meta.url), "utf8");

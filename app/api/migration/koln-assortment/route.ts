@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getD1, getDb } from "../../../../db";
-import { auditLog, venueMigrationExports, venueMigrationOperations } from "../../../../db/schema";
+import { auditLog, venueMigrationOperations } from "../../../../db/schema";
 import { buildAssortmentMigrationPreview } from "../../../../lib/bardoctor/assortment-migration-preview";
 import {
   authenticateIdentityRequest, findAccountByAppEmail, getChatGPTEmail, unauthorized, venueContextForAccount,
@@ -9,6 +9,12 @@ import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/
 import { buildKolnAssortmentReconciliation } from "../../../../lib/bardoctor/koln-assortment-migration";
 import { PURCHASE_STORE_KEY, SUPPLIER_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
+import {
+  migrationIntentAccepted,
+  migrationOperationsEnabled,
+  migrationOperationsUnavailable,
+} from "../../../../lib/bardoctor/migration-guard";
+import { adminForbidden, authenticatePlatformAdmin } from "../../../../lib/bardoctor/platform-admin";
 
 type StoreRow = { store_key: string; data_json: string; updated_at: string };
 type JsonRecord = Record<string, unknown>;
@@ -28,11 +34,6 @@ function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
 }
 function count(value: unknown): number { return Array.isArray(value) ? value.length : 0; }
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
-}
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -95,9 +96,13 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (!migrationOperationsEnabled()) return migrationOperationsUnavailable();
+  const admin = await authenticatePlatformAdmin(request);
+  if (!admin) return adminForbidden();
   const actor = await owner(request);
   if (!actor) return unauthorized();
-  if (!sameOrigin(request) || request.headers.get("x-migration-intent") !== "apply-koln-safe-canonical-assortment") {
+  if (admin.account.id !== actor.id) return adminForbidden();
+  if (!migrationIntentAccepted(request, "apply-koln-safe-canonical-assortment")) {
     return Response.json({ ok: false, code: "MIGRATION_INTENT_REQUIRED", error: "Запрос миграции отклонён" }, { status: 403 });
   }
   const url = new URL(request.url);

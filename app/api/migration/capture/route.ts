@@ -11,12 +11,12 @@ import {
   CAPTURE_ENABLED_VENUE_IDS,
   validateCapturedCandidates,
 } from "../../../../lib/bardoctor/venue-migration-capture";
-
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
-}
+import {
+  migrationIntentAccepted,
+  migrationOperationsEnabled,
+  migrationOperationsUnavailable,
+} from "../../../../lib/bardoctor/migration-guard";
+import { adminForbidden, authenticatePlatformAdmin } from "../../../../lib/bardoctor/platform-admin";
 
 function enabledVenue(venueId: number): boolean {
   return CAPTURE_ENABLED_VENUE_IDS.includes(venueId as (typeof CAPTURE_ENABLED_VENUE_IDS)[number]);
@@ -77,12 +77,16 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (!migrationOperationsEnabled()) return migrationOperationsUnavailable();
+  const admin = await authenticatePlatformAdmin(request);
+  if (!admin) return adminForbidden();
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
+  if (admin.account.id !== account.actorAccountId) return adminForbidden();
   if (!enabledVenue(account.venueId)) {
     return Response.json({ ok: false, code: "VENUE_CAPTURE_NOT_ENABLED", error: "Для этого заведения перенос не запланирован" }, { status: 403 });
   }
-  if (!sameOrigin(request) || request.headers.get("x-migration-intent") !== "capture-current-venue-legacy-data") {
+  if (!migrationIntentAccepted(request, "capture-current-venue-legacy-data")) {
     return Response.json({ ok: false, code: "CAPTURE_INTENT_REQUIRED", error: "Запрос захвата отклонён" }, { status: 403 });
   }
   const parsed = await readJsonRequest<{ venueId?: unknown; candidates?: unknown }>(request, { maxBytes: 16 * 1024 * 1024 });
