@@ -5,6 +5,7 @@ import { progressiveBackoffSeconds } from "./auth-rate-limit-policy";
 export type AuthRateLimitAction =
   | "login"
   | "register"
+  | "invitation"
   | "password-reset"
   | "auth-bootstrap"
   | "session-exchange";
@@ -18,6 +19,7 @@ type LimitPolicy = {
 const POLICIES: Record<AuthRateLimitAction, LimitPolicy> = {
   login: { attempts: 8, sourceAttempts: 40, windowMs: 15 * 60_000 },
   register: { attempts: 5, sourceAttempts: 20, windowMs: 30 * 60_000 },
+  invitation: { attempts: 5, sourceAttempts: 20, windowMs: 30 * 60_000 },
   "password-reset": { attempts: 5, sourceAttempts: 20, windowMs: 30 * 60_000 },
   "auth-bootstrap": { attempts: 8, sourceAttempts: 30, windowMs: 15 * 60_000 },
   "session-exchange": { attempts: 8, sourceAttempts: 30, windowMs: 15 * 60_000 },

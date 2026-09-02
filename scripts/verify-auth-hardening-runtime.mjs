@@ -117,6 +117,34 @@ try {
   });
   assert.equal(rotatedSource.response.status, 429, "identity bucket must survive source rotation");
 
+  const guessedInvite = "BD-2222-2222-2222-2222";
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const result = await json("/api/auth/register", {
+      method: "POST",
+      headers: authHeaders(`198.51.100.${30 + attempt}`),
+      body: JSON.stringify({
+        email: `invite-guess-${attempt}-${runId}@example.test`,
+        password,
+        firstName: "Invite QA",
+        registrationMode: "join",
+        invitationCode: guessedInvite,
+      }),
+    });
+    assert.equal(result.response.status, 400, `invite attempt ${attempt}: ${JSON.stringify(result.body)}`);
+  }
+  const inviteBlockedAcrossIdentityAndSourceRotation = await json("/api/auth/register", {
+    method: "POST",
+    headers: authHeaders("203.0.113.199"),
+    body: JSON.stringify({
+      email: `invite-guess-blocked-${runId}@example.test`,
+      password,
+      firstName: "Invite QA",
+      registrationMode: "join",
+      invitationCode: guessedInvite,
+    }),
+  });
+  assert.equal(inviteBlockedAcrossIdentityAndSourceRotation.response.status, 429);
+
   const registeredEmail = `auth-register-${runId}@example.test`;
   const registration = await json("/api/auth/register", {
     method: "POST",
@@ -207,6 +235,7 @@ try {
     ok: true,
     loginAttemptsBeforeBlock: 8,
     identitySurvivedSourceRotation: true,
+    inviteCodeSurvivedIdentityAndSourceRotation: true,
     registrationEnumerationProtected: true,
     rawIdentityStored: false,
     cookiePrimary: true,

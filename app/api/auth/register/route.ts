@@ -59,6 +59,14 @@ export async function POST(request: Request): Promise<Response> {
         { status: 400 },
       );
     }
+    if (joiningVenue) {
+      const inviteRateLimit = await consumeAuthRateLimit(
+        request,
+        "invitation",
+        body.invitationCode ?? "",
+      );
+      if (!inviteRateLimit.allowed) return authRateLimitedResponse(inviteRateLimit);
+    }
     const invite = joiningVenue
       ? await findActiveInvite(body.invitationCode ?? "")
       : null;
@@ -114,6 +122,9 @@ export async function POST(request: Request): Promise<Response> {
 
     const token = await issueSession(account);
     await clearSuccessfulAuthLimit(request, "register", appEmail);
+    if (invite) {
+      await clearSuccessfulAuthLimit(request, "invitation", body.invitationCode ?? "");
+    }
     return sessionResponse(
       {
         ...(await authResult(account, token, request)),

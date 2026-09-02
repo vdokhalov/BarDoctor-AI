@@ -39,6 +39,17 @@ test("registration does not disclose whether an email already exists", async () 
   assert.doesNotMatch(accountExistenceBranch, /status:\s*409/);
 });
 
+test("invitation guessing has its own code-bound throttle and new codes have 80-bit entropy", async () => {
+  const [register, access] = await Promise.all([
+    source("app/api/auth/register/route.ts"),
+    source("lib/bardoctor/access-service.ts"),
+  ]);
+  assert.match(register, /consumeAuthRateLimit\([\s\S]*?"invitation"/);
+  assert.match(register, /clearSuccessfulAuthLimit\(request, "invitation"/);
+  assert.match(access, /new Uint8Array\(16\)/);
+  assert.match(access, /\[10, 18\]\.includes\(normalized\.length\)/);
+});
+
 test("rate-limit persistence stores fingerprints, never raw identities or tokens", async () => {
   const [limiter, migration] = await Promise.all([
     source("lib/bardoctor/auth-rate-limit.ts"),
