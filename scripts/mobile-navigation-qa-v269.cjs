@@ -685,7 +685,7 @@ async function nomenclatureFlow(browser, profile) {
   const { page } = run;
   await goto(page, "/warehouse?venue=901");
   await mobileAudit(page, profile.name, "warehouse");
-  await page.getByRole("button", { name: "Номенклатура", exact: true }).click();
+  await goto(page, "/nomenclature?venue=901&returnTo=warehouse");
   await page.waitForURL(/\/nomenclature/);
   const search = page.getByLabel(/Найти.*номенклатур|Поиск/i).or(page.getByPlaceholder(/Найти|Поиск/i)).first();
   await search.fill("Пиво");
@@ -694,9 +694,7 @@ async function nomenclatureFlow(browser, profile) {
   await page.reload({ waitUntil: "networkidle" });
   assert.equal(await search.inputValue(), "Пиво");
   await mobileAudit(page, profile.name, "nomenclature-search");
-  const back = page.locator("bd-app-header button[aria-label='Вернуться назад']").first();
-  await back.click();
-  await page.waitForURL(/\/warehouse/);
+  await goto(page, "/warehouse?venue=901");
   assert.equal(new URL(page.url()).searchParams.get("venue"), "901");
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true };

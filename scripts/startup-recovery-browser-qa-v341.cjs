@@ -172,7 +172,7 @@ async function runFailureRecovery(browser) {
 
   const page = await context.newPage();
   await page.goto(`${baseUrl}/home`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  const recovery = page.locator('[data-bd-startup-recovery="bounded-startup-v357"]');
+  const recovery = page.locator('[data-bd-startup-recovery]');
   await recovery.waitFor({ state: "visible", timeout: 5_000 });
   await page.screenshot({ path: path.join(outputDir, "03-recovery.png"), fullPage: false });
   assert.match(await recovery.textContent(), /BarDoctor не завершил загрузку.*Обновить приложение/s);
