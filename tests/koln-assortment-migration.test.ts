@@ -37,11 +37,13 @@ test("reconciliation is idempotent and links an exact existing identity", () => 
   assert.equal(second.assortment.nomenclature.length, first.assortment.nomenclature.length);
 });
 
-test("migration endpoint is owner scoped, same-origin protected, audited and preserves protected stores", async () => {
+test("migration endpoint is owner and platform-admin scoped, gated, audited and preserves protected stores", async () => {
   const route = await readFile(new URL("../app/api/migration/koln-assortment/route.ts", import.meta.url), "utf8");
   assert.match(route, /context\?\.role === "owner"/);
   assert.match(route, /apply-koln-safe-canonical-assortment/);
-  assert.match(route, /venueMigrationExports/);
+  assert.match(route, /authenticatePlatformAdmin\(request\)/);
+  assert.match(route, /migrationOperationsEnabled\(\)/);
+  assert.match(route, /INSERT OR IGNORE INTO venue_migration_exports/);
   assert.match(route, /venueMigrationOperations/);
   assert.match(route, /protectedPreserved/);
   assert.match(route, /menuPreserved/);

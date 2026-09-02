@@ -24,6 +24,7 @@
     "test:profile-browser": "bash scripts/sites-env.sh -- bash scripts/run-profile-browser-qa-v282.sh",
     "test:admin-runtime": "node scripts/verify-internal-admin-runtime.mjs",
     "test:migrations": "node scripts/verify-migration-ledger.mjs && node --import tsx --test tests/runtime-ddl-safety.test.ts tests/migration-security-gate.test.ts",
+    "test:restore-drill": "node scripts/restore-drill.mjs",
     "test:notifications-runtime": "node scripts/verify-notifications-runtime.mjs",
     "browser:install": "bash scripts/sites-env.sh -- playwright-core install chromium",
     "test:mobile-navigation": "bash scripts/sites-env.sh -- bash scripts/run-mobile-navigation-qa-v269.sh",
