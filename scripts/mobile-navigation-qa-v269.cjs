@@ -555,6 +555,30 @@ async function closeRun(run) {
   await run.context.close();
 }
 
+async function createProcurementRun(browser, profile) {
+  const label = "suppliers-purchases";
+  const context = await browser.newContext({
+    ...profile.descriptor,
+    locale: "ru-RU",
+    timezoneId: "Europe/Chisinau",
+    colorScheme: "light",
+    reducedMotion: "reduce",
+  });
+  await context.addInitScript({ path: path.resolve(process.cwd(), "public/procurement-qa-v168.js") });
+  await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
+  const page = await context.newPage();
+  const issues = [];
+  page.on("dialog", async (dialog) => {
+    issues.push({ type: "native-dialog", message: dialog.message() });
+    await dialog.dismiss();
+  });
+  page.on("pageerror", (error) => issues.push({ type: "pageerror", message: error.message }));
+  page.on("console", (message) => {
+    if (message.type() === "error" && !/401 \(Unauthorized\)|Failed to load resource/.test(message.text())) issues.push({ type: "console", url: page.url(), location: message.location(), message: message.text() });
+  });
+  return { context, page, profile, label, issues };
+}
+
 async function inventoryFlow(browser, profile) {
   const run = await createRun(browser, profile, "inventory-fullscreen");
   const { page } = run;
@@ -885,7 +909,7 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 }
 
 async function procurementFlow(browser, profile) {
-  const run = await createRun(browser, profile, "suppliers-purchases");
+  const run = await createProcurementRun(browser, profile);
   const { page } = run;
   await goto(page, "/suppliers?qaProcurement=default&venue=401");
   try {
