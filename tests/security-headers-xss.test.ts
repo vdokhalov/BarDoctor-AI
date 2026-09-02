@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { barDoctorResponse } from "../app/bar-doctor-response";
 import { escapeHtml } from "../lib/bardoctor/html";
 import { securityHeaders } from "../lib/bardoctor/security-headers";
 import { proxy } from "../proxy";
@@ -15,6 +17,22 @@ test("global responses receive one compatible security-header baseline", () => {
   assert.match(csp, /object-src 'none'/);
   assert.match(csp, /frame-ancestors 'self'/);
   assert.doesNotMatch(csp, /unsafe-eval/);
+  assert.doesNotMatch(csp, /unsafe-inline/);
+});
+
+test("CSP hashes exactly authorize the fixed startup blocks and stylesheet handler", async () => {
+  const response = barDoctorResponse();
+  const html = await response.text();
+  const policy = response.headers.get("content-security-policy") ?? "";
+  for (const tag of ["script", "style"]) {
+    const block = html.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`))?.[1];
+    assert.ok(block, `missing inline ${tag} block`);
+    const hash = createHash("sha256").update(block).digest("base64");
+    assert.ok(policy.includes(`'sha256-${hash}'`), `${tag} hash is stale`);
+  }
+  const handlerHash = createHash("sha256").update("this.media='all'").digest("base64");
+  assert.ok(policy.includes(`'sha256-${handlerHash}'`), "stylesheet handler hash is stale");
+  assert.match(policy, /'unsafe-hashes'/);
 });
 
 test("HTML payload-like user strings are encoded as text", () => {

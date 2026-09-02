@@ -1,10 +1,10 @@
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  // The legacy shell still contains static inline startup/print code. unsafe-eval
-  // is deliberately excluded; removing unsafe-inline requires extracting that
-  // shell code without changing its pixel-stable startup behavior.
-  "script-src 'self' 'unsafe-inline' https://cdn.onesignal.com https://api.onesignal.com",
-  "style-src 'self' 'unsafe-inline'",
+  // The two static shell blocks and the inert stylesheet-onload expression are
+  // pinned by exact SHA-256 values. Any inline change fails closed until its
+  // reviewed hash and regression evidence are updated.
+  "script-src 'self' 'unsafe-hashes' 'sha256-PYeXSaErC501H9Xp0mV6DGT7X+le9SyJ1TntZjdMYik=' 'sha256-MhtPZXr7+LpJUY5qtMutB+qWfQtMaPccfe7QXtCcEYc=' https://cdn.onesignal.com https://api.onesignal.com",
+  "style-src 'self' 'sha256-S+fVyI4g7WfW8rHivegg48+6J6DZ3WlbQrtGUiURnKY='",
   "connect-src 'self' https://api.onesignal.com https://*.onesignal.com wss://*.onesignal.com https://maps.googleapis.com https://places.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
@@ -25,4 +25,3 @@ export function securityHeaders(): Record<string, string> {
     "X-Content-Type-Options": "nosniff",
   };
 }
-
