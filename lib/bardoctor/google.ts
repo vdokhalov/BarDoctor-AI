@@ -22,6 +22,34 @@ export class GoogleServiceError extends Error {
   }
 }
 
+type GoogleOperation = "OAuth" | "аккаунты" | "заведения" | "отзывы";
+
+function googleHttpError(operation: GoogleOperation, status: number): GoogleServiceError {
+  if (status === 400 && operation === "OAuth") {
+    return new GoogleServiceError("Google отклонил Client ID, Client Secret или Callback URL. Проверьте OAuth Client.", 400);
+  }
+  if (status === 401) return new GoogleServiceError("Доступ Google истёк или был отозван. Подключите Google заново.", 401);
+  if (status === 403) return new GoogleServiceError(`Google запретил доступ к данным (${operation}). Проверьте права аккаунта и включённые Google Business API.`, 403);
+  if (status === 429) return new GoogleServiceError("Google временно ограничил частоту запросов. Повторите синхронизацию позже.", 429);
+  if (status >= 500) return new GoogleServiceError("Google Business Profile временно недоступен. Повторите попытку позже.", 503);
+  return new GoogleServiceError(`Google не выполнил запрос (${operation}). Проверьте подключение и повторите попытку.`, 502);
+}
+
+async function googleFetch(
+  input: string,
+  init: RequestInit,
+  operation: GoogleOperation,
+): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError")) {
+      throw new GoogleServiceError("Google не ответил вовремя. Повторите попытку.", 504);
+    }
+    throw new GoogleServiceError(`Не удалось связаться с Google (${operation}). Проверьте сеть и повторите попытку.`, 503);
+  }
+}
+
 async function credentials(accountId: number): Promise<{ clientId: string; clientSecret: string }> {
   const [clientId, clientSecret] = await Promise.all([
     getIntegrationValue(accountId, "GOOGLE_CLIENT_ID"),
@@ -144,13 +172,13 @@ export type GoogleTokens = {
 };
 
 async function tokenRequest(params: URLSearchParams): Promise<GoogleTokens> {
-  const response = await fetch(GOOGLE_TOKEN_URL, {
+  const response = await googleFetch(GOOGLE_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: params,
     signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) throw new GoogleServiceError(`Google отклонил OAuth-запрос (HTTP ${response.status}).`, 502);
+  }, "OAuth");
+  if (!response.ok) throw googleHttpError("OAuth", response.status);
   const data = await response.json() as {
     access_token?: string;
     refresh_token?: string;
@@ -195,22 +223,23 @@ export async function refreshGoogleToken(
 export type GoogleLocation = { id: string; name: string };
 
 export async function listGoogleLocations(accessToken: string): Promise<GoogleLocation[]> {
-  const accountsResponse = await fetch(ACCOUNTS_API, {
+  const accountsResponse = await googleFetch(ACCOUNTS_API, {
     headers: { Authorization: `Bearer ${accessToken}` },
     signal: AbortSignal.timeout(30_000),
-  });
-  if (!accountsResponse.ok) throw new GoogleServiceError(`Не удалось получить аккаунты Google (HTTP ${accountsResponse.status}).`);
+  }, "аккаунты");
+  if (!accountsResponse.ok) throw googleHttpError("аккаунты", accountsResponse.status);
   const accountsData = await accountsResponse.json() as { accounts?: Array<{ name?: string }> };
   const locations: GoogleLocation[] = [];
   for (const account of accountsData.accounts ?? []) {
     const accountName = account.name;
     const accountId = accountName?.split("/")[1];
     if (!accountName || !accountId) continue;
-    const response = await fetch(
+    const response = await googleFetch(
       `${LOCATIONS_API}/${accountName}/locations?readMask=name,title&pageSize=100`,
       { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(30_000) },
+      "заведения",
     );
-    if (!response.ok) continue;
+    if (!response.ok) throw googleHttpError("заведения", response.status);
     const data = await response.json() as { locations?: Array<{ name?: string; title?: string }> };
     for (const location of data.locations ?? []) {
       const locationId = location.name?.split("/")[1];
@@ -242,11 +271,12 @@ export async function fetchGoogleReviews(
   do {
     const params = new URLSearchParams({ pageSize: "50" });
     if (pageToken) params.set("pageToken", pageToken);
-    const response = await fetch(
+    const response = await googleFetch(
       `${REVIEWS_API}/accounts/${accountId}/locations/${locationId}/reviews?${params.toString()}`,
       { headers: { Authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(30_000) },
+      "отзывы",
     );
-    if (!response.ok) throw new GoogleServiceError(`Не удалось получить отзывы Google (HTTP ${response.status}).`);
+    if (!response.ok) throw googleHttpError("отзывы", response.status);
     const data = await response.json() as {
       reviews?: Array<{
         reviewId?: string;

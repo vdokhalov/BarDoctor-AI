@@ -353,7 +353,8 @@ export async function handleGoogleSourceGet(request: Request, action: string): P
           pendingLocationsJson: null,
         });
         await logReviewSourceEvent(oauthState.accountId, "oauth_connected", `Подключено: ${locations[0]!.name}`);
-        return callbackRedirect(request, "googleConnect=success");
+        const firstSync = await syncGoogleReviews(oauthState.accountId);
+        return callbackRedirect(request, firstSync.ok ? "googleConnect=success" : "googleConnect=success&sync=error");
       }
       await upsertConnection(oauthState.accountId, {
         ...tokenValues,
@@ -454,7 +455,8 @@ export async function handleGoogleSourcePost(request: Request, action: string): 
         lastSyncError: null,
       });
       await logReviewSourceEvent(account.id, "oauth_connected", `Подключено: ${selected.name ?? selected.id}`);
-      return Response.json({ success: true, data: { locationName: selected.name ?? selected.id } });
+      const firstSync = await syncGoogleReviews(account.id);
+      return Response.json({ success: true, data: { locationName: selected.name ?? selected.id, sync: firstSync } });
     }
 
     if (action === "sync") {
