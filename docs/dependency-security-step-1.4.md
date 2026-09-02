@@ -13,7 +13,7 @@ Date: 2026-09-02
 | `wrangler` | direct build/dev | 4.92.0 | 4.128.0 | patched transitive advisories |
 | `eslint-config-next` | direct dev | 16.2.6 | 16.3.4 | aligned with Next runtime |
 | `@cloudflare/workers-types` | direct type-only dev | 4.20260702.1 | 5.20260902.1 | satisfies the supported Wrangler peer contract |
-| `@rolldown/binding-wasm32-wasi` | direct build/dev | absent | 1.2.7 | cross-platform fallback makes clean installs reproducible when npm omits native optional packages |
+| `@rolldown/binding-wasm32-wasi` plus platform-optional Linux binding | direct/optional build | absent | 1.2.7 | cross-platform fallback plus native CI path make clean installs reproducible when npm omits transitive optional packages |
 
 No forced install or blanket major application-framework migration was used. Compatible transitive fixes were applied by `npm audit fix` without `--force` after the direct upgrades.
 

@@ -82,5 +82,8 @@
     "wrangler": "4.128.0"
   },
   "type": "module",
-  "displayName": "BarDoctor Preview"
+  "displayName": "BarDoctor Preview",
+  "optionalDependencies": {
+    "@rolldown/binding-linux-x64-gnu": "1.2.7"
+  }
 }
