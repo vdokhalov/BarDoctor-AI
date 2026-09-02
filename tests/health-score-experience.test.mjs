@@ -293,7 +293,8 @@ test("production artifact keeps one startup surface and opens server-authoritati
   assert.doesNotThrow(() => parse(runtime, { ecmaVersion: "latest", sourceType: "script" }));
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bdHealthScoreExperienceVersion="health-score-v334"/);
-  assert.match(bundle, /data-bd-splash":"brand-loading-v347/);
+  assert.match(bundle, /bdSingleSplashVersionV395="v395"/);
+  assert.match(bundle, /function ble\(\)\{return null\}/);
   assert.match(bundle, /data-bd-health-score-resting":"v153/);
   assert.match(bundle, /Pt\("bd_health_score_experience_v152"\)/);
   assert.match(bundle, /onClick:\(\)=>t\("\/health"\)/);
@@ -360,7 +361,12 @@ test("production artifact keeps one startup surface and opens server-authoritati
   const splashStart = bundle.indexOf("function _le(){");
   const splashEnd = bundle.indexOf("const Ele=", splashStart);
   const rootSplash = bundle.slice(splashStart, splashEnd);
-  assert.match(rootSplash, /setTimeout\(\(\)=>n\(!0\),2700\)/);
+  if (bundle.includes('bdStableSplashVersionV394="v394"')) {
+    assert.match(rootSplash, /useLayoutEffect/);
+    assert.doesNotMatch(rootSplash, /2700|setTimeout|animate:|onAnimationComplete/);
+  } else {
+    assert.match(rootSplash, /setTimeout\(\(\)=>n\(!0\),2700\)/);
+  }
   assert.doesNotMatch(rootSplash, /Ai\(|HealthLaunch|5200/);
   assert.doesNotMatch(rootSplash, /\/100|confidence|Диагноз/);
 

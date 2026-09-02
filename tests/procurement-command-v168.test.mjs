@@ -124,7 +124,8 @@ test("Price analytics only use confirmed normalized comparable evidence", async 
 
   assert.match(analytics, /text\(document\.status\) === "confirmed"/);
   assert.match(analytics, /purchaseLineBaseAmount/);
-  assert.match(analytics, /mappingStatus = productKey \? "confirmed"/);
+  assert.match(analytics, /mappingStatus = mappedProductKey \? "confirmed"/);
+  assert.match(analytics, /includeUnmappedExact/);
   assert.match(analytics, /includePriceLists: false/);
   assert.match(analytics, /\[point\.productKey, point\.currency, point\.baseUnit\]/);
   assert.match(analytics, /PROCUREMENT_PRICE_CHANGE_THRESHOLD_PERCENT = 5/);

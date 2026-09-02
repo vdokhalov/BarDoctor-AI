@@ -82,9 +82,12 @@ test("Settings v182 links only real legal resources and reads canonical build me
   assert.match(settings, /Условия тестирования/);
   assert.match(settings, /bdSettingsBuildVersionV182/);
   assert.match(response, /meta name="bd-app-version" content="\$\{BARDOCTOR_BUILD_VERSION\}"/);
+  assert.match(response, /meta name="bd-source-commit" content="\$\{BARDOCTOR_SOURCE_COMMIT\}"/);
+  assert.match(response, /meta name="bd-schema-version" content="\$\{BARDOCTOR_SCHEMA_VERSION\}"/);
   assert.match(response, /settings-v182\.css\?v=20260814-notifications-v184/);
-  assert.match(appHtml, /meta name="bd-app-version" content="202"/);
-  assert.match(version, /BARDOCTOR_BUILD_VERSION = "206"/);
+  assert.match(appHtml, /meta name="bd-release-endpoint" content="\/api\/release"/);
+  assert.doesNotMatch(appHtml, /meta name="bd-app-version" content="\d+"/);
+  assert.match(version, /BARDOCTOR_BUILD_VERSION = BARDOCTOR_APP_VERSION/);
   assert.match(css, /@media \(min-width: 720px\)/);
   assert.match(css, /@media \(max-width: 360px\)/);
   assert.match(css, /overflow-wrap: anywhere/);

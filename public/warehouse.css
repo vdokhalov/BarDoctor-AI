@@ -3994,3 +3994,17 @@ body.bd-inventory-delete-open-v270 {
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+
+/* Warehouse inventory taxonomy entry v373 */
+main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-nomenclature-link-v241 span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 430px) {
+  main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-nomenclature-link-v241 {
+    max-width: 150px;
+  }
+}

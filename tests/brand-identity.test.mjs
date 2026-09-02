@@ -73,7 +73,7 @@ test("manifest and HTML metadata use cache-busted v159 brand assets", async () =
   assert.match(manifest, /bardoctor-v159-maskable-512\.png/);
   assert.match(manifest, /purpose: "any"/);
   assert.match(manifest, /purpose: "maskable"/);
-  assert.match(manifest, /background_color: "#070b24"/);
+  assert.match(manifest, /background_color: "#070911"/);
   assert.match(manifest, /no-cache, max-age=0, must-revalidate/);
   assert.doesNotMatch(manifest, /purpose: "any maskable"/);
 
@@ -101,12 +101,13 @@ test("splash and interface brand marks use the same symbol without BD letters", 
       .then((parts) => parts.join("\n")),
   ]);
 
-  assert.match(bundle, /data-bd-brand-splash":"v332/);
-  assert.match(bundle, /data-bd-splash":"brand-loading-v347/);
+  assert.match(bundle, /bdSingleSplashVersionV395="v395"/);
+  assert.match(bundle, /function ble\(\)\{return null\}/);
+  assert.doesNotMatch(bundle, /data-bd-splash":"/);
   assert.match(bundle, /src:"\/icons\/bardoctor-mark-v159\.svg"/);
   assert.match(bundle, /function Wle\(\{onStart:e\}\).*data-bd-brand-mark":"cloche-pulse-v159/s);
-  assert.match(bundle, /children:"Bar"/);
-  assert.match(bundle, /children:"Doctor"/);
+  assert.match(bundle, /children:"BarDoctor"/);
+  assert.doesNotMatch(bundle.slice(bundle.indexOf("function ble(){"), bundle.indexOf("\nconst j7=")), /children:"Bar"|children:"Doctor"/);
   assert.doesNotMatch(bundle, /bd-auth-brand-mark",children:"BD"/);
   assert.doesNotMatch(bundle, /i\.jsx\("span",\{children:"BD"\}\)/);
   assert.doesNotMatch(bundle, /children:i\.jsxs\("svg",\{width:"34",height:"34"/);

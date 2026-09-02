@@ -247,6 +247,30 @@ function productKey(value: JsonRecord): string {
   );
 }
 
+function canonicalProductKey(assortment: JsonRecord, initial: string): string {
+  const aliases = new Map([
+    ...array(assortment.canonicalProductAliases),
+    ...array(assortment.inventoryProductAliases),
+  ].map(record)
+    .map((alias) => [text(alias.from, "", 320), text(alias.to, "", 320)] as const)
+    .filter(([from, to]) => Boolean(from && to && from !== to)));
+  for (const product of [...array(assortment.nomenclature), ...array(assortment.stockBalances)].map(record)) {
+    const canonical = text(product.productKey ?? product.key ?? product.id, "", 320);
+    if (!canonical) continue;
+    for (const identity of [product.id, product.nomenclatureItemId, product.key, product.productKey]) {
+      const from = text(identity, "", 320);
+      if (from && from !== canonical) aliases.set(from, canonical);
+    }
+  }
+  let current = initial;
+  const seen = new Set<string>();
+  while (aliases.has(current) && !seen.has(current)) {
+    seen.add(current);
+    current = aliases.get(current)!;
+  }
+  return current;
+}
+
 function ingredientExternalId(value: JsonRecord): string {
   return text(
     value.nomenclatureSourceId
@@ -331,13 +355,15 @@ function reconcileIngredient(
 } {
   const before = JSON.stringify(ingredient);
 
-  const requestedKey = productKey(ingredient);
+  const requestedKey = canonicalProductKey(assortment, productKey(ingredient));
   if (requestedKey) {
     if (crossVenueProductKeys.has(requestedKey) || !sameVenue(ingredient, venueId)) {
       const after = { ...ingredient, linkStatus: "wrong_venue" };
       return { ingredient: after, state: "wrong_venue", changed: JSON.stringify(after) !== before, tier: "low", manualProtected: true, unitMismatch: false, duplicateCandidateCase: false, resolutionStatus: "wrong_venue", highIdentityPreviouslyUnmatched: false, costRecovered: false };
     }
-    const matched = candidates.find((candidate) => productKey(candidate) === requestedKey);
+    const matched = candidates.find((candidate) =>
+      canonicalProductKey(assortment, productKey(candidate)) === requestedKey,
+    );
     if (!matched) {
       const after = { ...ingredient, linkStatus: "missing" };
       return { ingredient: after, state: "missing", changed: JSON.stringify(after) !== before, tier: "low", manualProtected: true, unitMismatch: false, duplicateCandidateCase: false, resolutionStatus: "manual_protected", highIdentityPreviouslyUnmatched: false, costRecovered: false };

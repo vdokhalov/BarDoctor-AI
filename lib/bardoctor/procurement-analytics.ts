@@ -23,6 +23,7 @@ export type ProcurementDocumentState =
 export type ProcurementPricePoint = {
   id: string;
   documentId: string;
+  documentNumber: string;
   itemId: string;
   sourceKind: "purchase" | "price_list";
   productKey: string;
@@ -151,7 +152,13 @@ export function confirmedProcurementDocuments(
 
 export function procurementPricePoints(
   values: unknown[],
-  options: { venueId?: number; includePriceLists?: boolean; productAliases?: unknown } = {},
+  options: {
+    venueId?: number;
+    includePriceLists?: boolean;
+    includeUnmappedExact?: boolean;
+    productAliases?: unknown;
+    supplierProductMappings?: unknown;
+  } = {},
 ): ProcurementPricePoint[] {
   const aliases = new Map(array(options.productAliases).map(record)
     .map((alias) => [text(alias.from, "", 300), text(alias.to, "", 300)] as const)
@@ -166,21 +173,58 @@ export function procurementPricePoints(
     return current;
   };
   const includePriceLists = options.includePriceLists !== false;
+  const productKeyByPurchaseLine = new Map<string, string>();
+  for (const mappingValue of array(options.supplierProductMappings)) {
+    const mapping = record(mappingValue);
+    const mappedKey = canonicalKey(text(mapping.canonicalProductKey, "", 300));
+    if (!mappedKey) continue;
+    for (const lineId of array(mapping.purchaseLineIds)) {
+      const id = text(lineId, "", 120);
+      if (id) productKeyByPurchaseLine.set(id, mappedKey);
+    }
+  }
   const points: ProcurementPricePoint[] = [];
   for (const document of confirmedProcurementDocuments(values, options.venueId)) {
     const sourceKind = text(document.documentType) === "price_list" ? "price_list" : "purchase";
     if (sourceKind === "price_list" && !includePriceLists) continue;
     const documentId = text(document.id, "", 100);
+    const documentNumber = text(document.documentNumber ?? document.number, "", 80);
     const supplierName = text(document.supplierName, "Поставщик", 180);
     const supplierId = text(document.supplierId, normalizedName(supplierName), 100);
     const currency = text(document.currency, "RUB", 12).toUpperCase();
     const date = isoDate(document.date);
     array(document.items).map(record).forEach((item, index) => {
       const itemId = text(item.id, `line-${index + 1}`, 100);
-      const productKey = canonicalKey(text(item.purchaseProductKey ?? item.productKey, "", 300));
-      const mappingStatus = productKey ? "confirmed" as const : "unconfirmed" as const;
+      const mappedProductKey = canonicalKey(text(
+        item.purchaseProductKey
+          ?? item.productKey
+          ?? item.canonicalProductKey
+          ?? productKeyByPurchaseLine.get(itemId)
+          ?? item.nomenclatureId,
+        "",
+        300,
+      ));
+      const mappingStatus = mappedProductKey ? "confirmed" as const : "unconfirmed" as const;
       const received = purchaseLineBaseAmount(item);
-      if (!productKey || received.amount <= 0 || received.unit === "unknown") return;
+      if (received.amount <= 0 || received.unit === "unknown") return;
+      const productName = text(item.name ?? item.nomenclatureName ?? item.rawName, "", 240);
+      const exactPackage = text(
+        item.packageSize
+          ?? item.packageLabel
+          ?? item.name
+          ?? item.nomenclatureName
+          ?? item.rawName
+          ?? item.unit,
+        "",
+        120,
+      );
+      const exactIdentity = normalizedName(productName);
+      const productKey = mappedProductKey || (
+        options.includeUnmappedExact && exactIdentity && exactPackage
+          ? `unmapped:${exactIdentity}|${received.unit}|${normalizedName(exactPackage)}`
+          : ""
+      );
+      if (!productKey) return;
       const lineTotal = Math.max(
         0,
         number(item.lineTotal) || number(item.unitPrice) * Math.max(0, number(item.quantity)),
@@ -191,12 +235,13 @@ export function procurementPricePoints(
       points.push({
         id: `${documentId}:${itemId}`,
         documentId,
+        documentNumber,
         itemId,
         sourceKind,
         productKey,
-        productName: text(item.name, "Позиция", 240),
+        productName: productName || "Позиция",
         category: text(item.category, text(document.expenseCategory, "other", 50), 50),
-        packageSize: text(item.packageSize ?? item.unit, "", 120),
+        packageSize: exactPackage,
         mappingStatus,
         quantity: rounded(number(item.quantity), 3),
         baseAmount: rounded(received.amount, 3),
