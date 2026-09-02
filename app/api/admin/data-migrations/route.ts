@@ -27,6 +27,10 @@ import {
   sanitizeLegacyCandidates,
 } from "../../../../lib/bardoctor/platform-persistence-service";
 import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
+import {
+  migrationOperationsEnabled,
+  migrationOperationsUnavailable,
+} from "../../../../lib/bardoctor/migration-guard";
 
 type MigrationAction = "dry_run" | "persist_phase_a_backups" | "migrate_safe_venue" | "migrate_captured_venue" | "rollback_fixture_only";
 
@@ -247,6 +251,7 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (!migrationOperationsEnabled()) return migrationOperationsUnavailable();
   const admin = await authenticatePlatformAdmin(request);
   if (!admin) return adminForbidden();
   const parsed = await readJsonRequest<{

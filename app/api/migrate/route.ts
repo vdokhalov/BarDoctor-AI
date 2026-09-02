@@ -4,8 +4,19 @@ import { domainData } from "../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { ALLOWED_STORE_KEYS } from "../../../lib/bardoctor/constants";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
+import {
+  migrationIntentAccepted,
+  migrationOperationsEnabled,
+  migrationOperationsUnavailable,
+} from "../../../lib/bardoctor/migration-guard";
+import { adminForbidden, authenticatePlatformAdmin } from "../../../lib/bardoctor/platform-admin";
 
 export async function POST(request: Request): Promise<Response> {
+  if (!migrationOperationsEnabled()) return migrationOperationsUnavailable();
+  if (!await authenticatePlatformAdmin(request)) return adminForbidden();
+  if (!migrationIntentAccepted(request, "import-legacy-account-data")) {
+    return Response.json({ ok: false, code: "MIGRATION_INTENT_REQUIRED" }, { status: 403 });
+  }
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (account.role !== "owner") {

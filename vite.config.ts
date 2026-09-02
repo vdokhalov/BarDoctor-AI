@@ -1,7 +1,7 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
@@ -45,11 +45,11 @@ function appVersion(): string {
 }
 
 function schemaVersion(): string {
-  const versions = readdirSync(new URL("./drizzle", import.meta.url))
-    .map((name) => /^(\d{4})_.+\.sql$/.exec(name)?.[1])
-    .filter((value): value is string => Boolean(value))
-    .sort();
-  return versions.at(-1) || "schema-version-unavailable";
+  const journal = JSON.parse(
+    readFileSync(new URL("./drizzle/meta/_journal.json", import.meta.url), "utf8"),
+  ) as { entries?: Array<{ tag?: unknown }> };
+  const tag = journal.entries?.at(-1)?.tag;
+  return typeof tag === "string" ? tag.match(/^(\d{4})_/)?.[1] || tag : "schema-version-unavailable";
 }
 
 const { d1, r2 } = hostingConfig;

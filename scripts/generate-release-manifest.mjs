@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
@@ -8,11 +8,11 @@ const git = (args, fallback) => {
   catch { return fallback; }
 };
 const packageJson = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
-const schemaVersion = readdirSync(path.join(root, "drizzle"))
-  .map((name) => /^(\d{4})_.+\.sql$/.exec(name)?.[1])
-  .filter(Boolean)
-  .sort()
-  .at(-1) || "schema-version-unavailable";
+const migrationJournal = JSON.parse(readFileSync(path.join(root, "drizzle", "meta", "_journal.json"), "utf8"));
+const schemaTag = migrationJournal.entries?.at(-1)?.tag;
+const schemaVersion = typeof schemaTag === "string"
+  ? schemaTag.match(/^(\d{4})_/)?.[1] || schemaTag
+  : "schema-version-unavailable";
 const digest = execFileSync(process.execPath, [path.join(root, "scripts", "artifact-digest.mjs"), "dist"], {
   cwd: root,
   encoding: "utf8",

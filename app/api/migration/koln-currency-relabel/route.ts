@@ -10,6 +10,12 @@ import {
 } from "../../../../lib/bardoctor/koln-currency-relabel";
 import { stableJson } from "../../../../lib/bardoctor/authoritative-persistence";
 import { BARDOCTOR_SOURCE_COMMIT } from "../../../../lib/bardoctor/source-commit";
+import {
+  migrationIntentAccepted,
+  migrationOperationsEnabled,
+  migrationOperationsUnavailable,
+} from "../../../../lib/bardoctor/migration-guard";
+import { adminForbidden, authenticatePlatformAdmin } from "../../../../lib/bardoctor/platform-admin";
 
 type JsonRecord = Record<string, unknown>;
 type StoreRow = { store_key: string; data_json: string; updated_at: string };
@@ -65,15 +71,8 @@ async function tokenAuthorized(request: Request): Promise<boolean> {
   return difference === 0;
 }
 
-function sameOrigin(request: Request): boolean {
-  const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try { return new URL(origin).origin === new URL(request.url).origin; } catch { return false; }
-}
-
 async function authorized(request: Request): Promise<boolean> {
-  return sameOrigin(request)
-    && request.headers.get("x-migration-intent") === INTENT
+  return migrationIntentAccepted(request, INTENT)
     && await tokenAuthorized(request);
 }
 
@@ -514,6 +513,8 @@ async function validate(operationId: string): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  if (!migrationOperationsEnabled()) return migrationOperationsUnavailable();
+  if (!await authenticatePlatformAdmin(request)) return adminForbidden();
   if (!await authorized(request)) {
     return Response.json({ ok: false, code: "MIGRATION_AUTHORIZATION_REQUIRED" }, { status: 403 });
   }
