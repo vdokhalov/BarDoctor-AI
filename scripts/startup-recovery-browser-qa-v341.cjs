@@ -90,6 +90,13 @@ async function configureContext(context) {
     if (url.pathname === "/api/client-runtime-diagnostic") return route.fulfill(response({ ok: true }));
     return route.fulfill(response({ ok: true }));
   });
+
+  const qaOrigin = new URL(baseUrl).origin;
+  await context.route("**/*", (route) => {
+    const requestOrigin = new URL(route.request().url()).origin;
+    if (requestOrigin === qaOrigin) return route.fallback();
+    return route.abort("blockedbyclient");
+  });
 }
 
 async function runSuccessfulHandoff(browser) {
@@ -115,9 +122,15 @@ async function runSuccessfulHandoff(browser) {
   const runtimeErrors = [];
   page.on("console", (message) => { if (message.type() === "error") runtimeErrors.push(`console: ${message.text()}`); });
   page.on("pageerror", (error) => runtimeErrors.push(`pageerror: ${error.message}`));
+  const launchStartedAt = Date.now();
   await page.goto(`${baseUrl}/home`, { waitUntil: "commit", timeout: 60_000 });
   const splash = page.locator('[data-bd-static-startup="v201"]');
   await splash.waitFor({ state: "visible", timeout: 5_000 });
+  const initialSplashBox = await splash.boundingBox();
+  await page.waitForTimeout(250);
+  const settledSplashBox = await splash.boundingBox();
+  assert.deepEqual(settledSplashBox, initialSplashBox, "startup splash changed its bounding box before handoff");
+  assert.equal(await page.locator('[data-bd-root-splash], [data-bd-splash]').count(), 0, "a second application splash appeared behind the launch splash");
   await page.screenshot({ path: path.join(outputDir, "01-launch.png"), fullPage: false });
 
   const home = page.locator('[data-bd-home-page="v151"]');
@@ -137,16 +150,18 @@ async function runSuccessfulHandoff(browser) {
   }
   await splash.waitFor({ state: "hidden", timeout: 5_000 });
   const elapsedMs = Date.now() - bundleReleasedAt;
+  const shellVisibleMs = Date.now() - launchStartedAt;
   await page.screenshot({ path: path.join(outputDir, "02-home.png"), fullPage: false });
 
   assert.ok(bundleRequests >= 1, "application bundle was not requested");
   assert.ok(elapsedMs < 5_000, `startup handoff exceeded the 5 second QA ceiling: ${elapsedMs}ms`);
+  assert.ok(shellVisibleMs < 2_000, `Home shell was not visible within the 2 second release budget: ${shellVisibleMs}ms`);
   assert.equal(await page.locator('[data-bd-startup-recovery]').count(), 0, "recovery UI appeared during a successful launch");
   assert.equal(await page.evaluate(() => document.documentElement.hasAttribute("data-bd-startup-pending")), false);
   assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor === "rgb(255, 255, 255)"), false, "white transition frame remained after startup");
   assert.deepEqual(runtimeErrors, [], `runtime errors during successful startup:\n${runtimeErrors.join("\n")}`);
   await context.close();
-  return { elapsedMs, bundleRequests };
+  return { elapsedMs, shellVisibleMs, bundleRequests, stableSplashBox: true, applicationSplashCount: 0 };
 }
 
 async function runFailureRecovery(browser) {
@@ -176,6 +191,17 @@ async function runFailureRecovery(browser) {
   await recovery.waitFor({ state: "visible", timeout: 5_000 });
   await page.screenshot({ path: path.join(outputDir, "03-recovery.png"), fullPage: false });
   assert.match(await recovery.textContent(), /BarDoctor не завершил загрузку.*Обновить приложение/s);
+  assert.equal(await page.locator('[data-bd-static-startup="v201"]').count(), 0, "launch splash obscured the recovery UI");
+  const recoveryCoverage = await recovery.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return { top: box.top, left: box.left, right: box.right, bottom: box.bottom, width: innerWidth, height: innerHeight };
+  });
+  assert.ok(
+    recoveryCoverage.top <= 0 && recoveryCoverage.left <= 0
+      && recoveryCoverage.right >= recoveryCoverage.width
+      && recoveryCoverage.bottom >= recoveryCoverage.height,
+    `recovery UI did not cover the viewport: ${JSON.stringify(recoveryCoverage)}`,
+  );
   assert.equal(blockedBundleRequests, 2, "startup made requests beyond preload plus the one application load");
   assert.equal(documentRequests, 1, "startup reloaded the document automatically");
   assert.deepEqual(await page.evaluate(() => ({

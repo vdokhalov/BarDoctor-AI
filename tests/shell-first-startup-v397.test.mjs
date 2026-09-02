@@ -9,14 +9,14 @@ for (const path of ["public/app.html", "app/bar-doctor-response.ts"]) {
   test(`${path} starts the cached shell with the compact v397 bootstrap`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
     assert.match(source, /bd-shell-first-startup" content="v397/);
-    assert.match(source, /src="\/bardoctor-preview-v397\.js\?v=shell-first-startup-v397" defer/);
+    assert.match(source, /src="\/bardoctor-preview-v401\.js\?v=p0-release-blockers-v401" defer/);
     assert.match(source, /modulepreload" href="\/assets\/index-BQGspy0I\.js\?v=[^"]*startup-performance-v343/);
     assert.doesNotMatch(source, /<script src="\/server-migration-discovery-v262\.js[^>]*><\/script>-/);
   });
 }
 
 test("v397 bootstrap renders before auth and business-data refresh", async () => {
-  const path = new URL("public/bardoctor-preview-v397.js", root);
+  const path = new URL("public/bardoctor-preview-v401.js", root);
   assert.ok(existsSync(path));
   const source = await readFile(path, "utf8");
   const load = source.indexOf("  loadApplication();");
