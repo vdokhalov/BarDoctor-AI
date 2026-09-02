@@ -597,6 +597,15 @@ test("purchase lifecycle is venue-scoped and preserves stock and payment history
 });
 
 test("build contains the BarDoctor shell, local APIs, and D1 migrations", async () => {
+  const builtHtml = await readFile(
+    new URL("../dist/client/app.html", import.meta.url),
+    "utf8",
+  );
+  const builtClientAsset = builtHtml.match(
+    /\/assets\/(index-BQGspy0I-[a-f0-9]{12}\.js)/,
+  );
+  assert.ok(builtClientAsset, "built HTML must reference the content-versioned BarDoctor client");
+
   const [
     worker,
     bootstrap,
@@ -666,7 +675,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
       "utf8",
     ),
     readFile(
-      new URL("../dist/client/assets/index-BQGspy0I.js", import.meta.url),
+      new URL(`../dist/client/assets/${builtClientAsset[1]}`, import.meta.url),
       "utf8",
     ),
     readFile(
@@ -867,7 +876,10 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
   assert.match(bootstrap, /\/api\/auth\/bootstrap/);
   assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
-  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
+  assert.ok(
+    bootstrap.includes(`/assets/${builtClientAsset[1]}`),
+    "the bootstrap must load the same content-versioned client referenced by built HTML",
+  );
   assert.match(bootstrap, /randomUUIDFallback/);
   assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
   assert.match(bootstrap, /navigateInApplication/);
