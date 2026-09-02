@@ -1,5 +1,5 @@
 import {
-  authenticateIdentityRequest,
+  authenticateIdentitySession,
   authResult,
   issueSession,
   sessionResponse,
@@ -16,13 +16,12 @@ export async function POST(request: Request): Promise<Response> {
     const identifier = request.headers.get("x-session-email") ?? "anonymous";
     const rateLimit = await consumeAuthRateLimit(request, "auth-bootstrap", identifier);
     if (!rateLimit.allowed) return authRateLimitedResponse(rateLimit);
-    const existingSession = await authenticateIdentityRequest(request);
-    const existingToken = request.headers.get("x-session-token");
-    if (existingSession && existingToken) {
+    const existingSession = await authenticateIdentitySession(request);
+    if (existingSession) {
       await clearSuccessfulAuthLimit(request, "auth-bootstrap", identifier);
       return sessionResponse(
-        await authResult(existingSession, existingToken, request),
-        existingToken,
+        await authResult(existingSession.account, existingSession.token, request),
+        existingSession.token,
         request,
       );
     }

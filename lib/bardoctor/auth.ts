@@ -147,6 +147,7 @@ export async function synchronizeServerSession(
 async function sessionForRequest(request: Request): Promise<{
   account: Account;
   activeVenueId: number | null;
+  token: string;
 } | null> {
   const credentials = sessionCredentials(request);
   if (!credentials) return null;
@@ -168,7 +169,7 @@ async function sessionForRequest(request: Request): Promise<{
     )
     .limit(1);
 
-  return row ?? null;
+  return row ? { ...row, token } : null;
 }
 
 async function rememberActiveVenueForToken(
@@ -258,6 +259,13 @@ export async function revokeOtherAuthenticatedSessions(
 
 export async function authenticateIdentityRequest(request: Request): Promise<Account | null> {
   return (await sessionForRequest(request))?.account ?? null;
+}
+
+export async function authenticateIdentitySession(
+  request: Request,
+): Promise<{ account: Account; token: string } | null> {
+  const session = await sessionForRequest(request);
+  return session ? { account: session.account, token: session.token } : null;
 }
 
 function venueName(account: Account): string {
@@ -420,6 +428,7 @@ export async function authenticateRequest(
 }
 
 export async function authResult(account: Account, token: string, request?: Request) {
+  const exposeLegacyToken = request?.headers.get("x-bardoctor-auth-mode") !== "cookie-v1";
   const requestedHeader = request?.headers.get("x-venue-id");
   const requestedValue = Number(requestedHeader);
   const rememberedVenueId = request
@@ -468,7 +477,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     ok: true as const,
     email: account.appEmail,
     userId: account.id,
-    token,
+    ...(exposeLegacyToken ? { token } : {}),
     firstName: account.firstName,
     lastName: account.lastName,
     phone: account.phone,

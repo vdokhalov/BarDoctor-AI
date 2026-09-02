@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
@@ -119,7 +120,10 @@ try {
   const registeredEmail = `auth-register-${runId}@example.test`;
   const registration = await json("/api/auth/register", {
     method: "POST",
-    headers: authHeaders("203.0.113.30"),
+    headers: {
+      ...authHeaders("203.0.113.30"),
+      "X-BarDoctor-Auth-Mode": "cookie-v1",
+    },
     body: JSON.stringify({
       email: registeredEmail,
       password,
@@ -128,8 +132,30 @@ try {
     }),
   });
   assert.equal(registration.response.status, 201, JSON.stringify(registration.body));
+  assert.equal(Object.hasOwn(registration.body, "token"), false);
   assert.match(registration.response.headers.get("set-cookie") ?? "", /HttpOnly/);
   assert.match(registration.response.headers.get("set-cookie") ?? "", /SameSite=Strict/);
+  const sessionCookie = (registration.response.headers.get("set-cookie") ?? "").split(";", 1)[0];
+  assert.match(sessionCookie, /^bd_server_session=/);
+
+  const bootstrapHeaders = {
+    Cookie: sessionCookie,
+    "X-BarDoctor-Auth-Mode": "cookie-v1",
+  };
+  const firstTab = await json("/api/auth/bootstrap", { method: "POST", headers: bootstrapHeaders });
+  const secondTab = await json("/api/auth/bootstrap", { method: "POST", headers: bootstrapHeaders });
+  assert.equal(firstTab.response.status, 200, JSON.stringify(firstTab.body));
+  assert.equal(secondTab.response.status, 200, JSON.stringify(secondTab.body));
+  assert.equal(Object.hasOwn(firstTab.body, "token"), false);
+
+  const forged = await json("/api/auth/bootstrap", {
+    method: "POST",
+    headers: {
+      Cookie: "bd_server_session=forged-session-token",
+      "X-BarDoctor-Auth-Mode": "cookie-v1",
+    },
+  });
+  assert.equal(forged.response.status, 401, JSON.stringify(forged.body));
 
   const duplicate = await json("/api/auth/register", {
     method: "POST",
@@ -145,6 +171,32 @@ try {
   assert.equal(duplicate.body.code, "REGISTRATION_UNAVAILABLE");
   assert.equal(JSON.stringify(duplicate.body).includes(registeredEmail), false);
 
+  const logout = await json("/api/auth/logout", {
+    method: "POST",
+    headers: bootstrapHeaders,
+  });
+  assert.equal(logout.response.status, 200, JSON.stringify(logout.body));
+  const staleAfterLogout = await json("/api/auth/bootstrap", {
+    method: "POST",
+    headers: bootstrapHeaders,
+  });
+  assert.equal(staleAfterLogout.response.status, 401, JSON.stringify(staleAfterLogout.body));
+
+  const expiredToken = `expired-${runId}`;
+  const expiredHash = createHash("sha256").update(expiredToken).digest("hex");
+  database.prepare(`
+    INSERT INTO sessions (token_hash, account_id, expires_at)
+    VALUES (?, ?, ?)
+  `).run(expiredHash, registration.body.userId, "2020-01-01T00:00:00.000Z");
+  const expired = await json("/api/auth/bootstrap", {
+    method: "POST",
+    headers: {
+      Cookie: `bd_server_session=${expiredToken}`,
+      "X-BarDoctor-Auth-Mode": "cookie-v1",
+    },
+  });
+  assert.equal(expired.response.status, 401, JSON.stringify(expired.body));
+
   const rawIdentityRows = database.prepare(`
     SELECT COUNT(*) AS count FROM auth_rate_limits
     WHERE key LIKE ? OR action LIKE ? OR scope LIKE ?
@@ -157,6 +209,11 @@ try {
     identitySurvivedSourceRotation: true,
     registrationEnumerationProtected: true,
     rawIdentityStored: false,
+    cookiePrimary: true,
+    bearerReturnedToNewClient: false,
+    forgedRejected: true,
+    expiredRejected: true,
+    logoutRevokedAcrossTabs: true,
   }, null, 2));
 } catch (error) {
   console.error(error);

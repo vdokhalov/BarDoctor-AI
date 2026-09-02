@@ -33,9 +33,9 @@
   window.__bdBootstrapPending = true;
   /* bd-p0-release-blockers-v401: render the last verified local shell while auth refreshes. */
   var bdCachedSessionV397 = localStorage.getItem("bd_session");
-  var bdCachedTokenV397 = localStorage.getItem("bd_session_token");
   var bdCachedVenueV397 = localStorage.getItem("bd_active_venue_id");
-  window.__bdAuthBootstrapV274 = bdCachedSessionV397 && bdCachedTokenV397
+  try { localStorage.removeItem("bd_session_token"); } catch { /* cookie auth migration */ }
+  window.__bdAuthBootstrapV274 = bdCachedSessionV397
     ? (bdCachedVenueV397
       ? { state: "ready", reason: "cached_shell_ready_v397" }
       : { state: "onboarding_required", reason: "cached_shell_needs_venue_v397" })
@@ -231,15 +231,11 @@
 
   async function refreshServerInventoryCacheV235() {
     var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
-    if (!email || !token) return;
+    if (!email) return;
     try {
       var response = await fetch("/api/store/bd_assortment_v1", {
         method: "GET",
-        headers: {
-          "X-Session-Email": email,
-          "X-Session-Token": token
-        },
+        credentials: "include",
         cache: "no-store"
       });
       if (!response.ok) return;
@@ -768,14 +764,8 @@
     var shared = window.bdOpportunityCalendarClientV327;
     function opportunityHeaders(extra) {
       var headers = new Headers(extra || {});
-      var email = localStorage.getItem("bd_session");
-      var token = localStorage.getItem("bd_session_token");
       var venueId = localStorage.getItem("bd_active_venue_id");
-      if (email && token) {
-        headers.set("X-Session-Email", email);
-        headers.set("X-Session-Token", token);
-        if (venueId) headers.set("X-Venue-Id", venueId);
-      }
+      if (venueId) headers.set("X-Venue-Id", venueId);
       return headers;
     }
     function datePart(value, options) {
@@ -1488,15 +1478,12 @@
       requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
       if (requestUrl.origin === window.location.origin && requestUrl.pathname.startsWith("/api/")) {
         var sessionEmail = localStorage.getItem("bd_session");
-        var sessionToken = localStorage.getItem("bd_session_token");
         var activeVenueId = localStorage.getItem("bd_active_venue_id");
-        if (sessionEmail && sessionToken) {
+        if (sessionEmail) {
           var headers = new Headers(input instanceof Request ? input.headers : undefined);
           new Headers(init && init.headers ? init.headers : undefined).forEach(function (value, key) {
             headers.set(key, value);
           });
-          if (!headers.has("X-Session-Email")) headers.set("X-Session-Email", sessionEmail);
-          if (!headers.has("X-Session-Token")) headers.set("X-Session-Token", sessionToken);
           if (activeVenueId && !headers.has("X-Venue-Id")) headers.set("X-Venue-Id", activeVenueId);
           requestVenueId = headers.get("X-Venue-Id");
           rejectStaleVenueResponse = Boolean(requestVenueId)
@@ -1504,6 +1491,14 @@
             && requestUrl.pathname !== "/api/access/active-venue"
             && requestUrl.pathname !== "/api/access/join";
           init = Object.assign({}, init || {}, { headers: headers });
+        }
+        if (requestUrl.pathname.startsWith("/api/auth/")) {
+          var authHeaders = new Headers(input instanceof Request ? input.headers : undefined);
+          new Headers(init && init.headers ? init.headers : undefined).forEach(function (value, key) {
+            authHeaders.set(key, value);
+          });
+          authHeaders.set("X-BarDoctor-Auth-Mode", "cookie-v1");
+          init = Object.assign({}, init || {}, { headers: authHeaders, credentials: "include" });
         }
         if (requestUrl.pathname === "/api/auth/register" && init && typeof init.body === "string") {
           try {
@@ -1938,17 +1933,10 @@
       demoKeys.forEach(function (key) { localStorage.removeItem(key); });
     }
 
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
-    var headers = {};
-    if (email && token) {
-      headers["X-Session-Email"] = email;
-      headers["X-Session-Token"] = token;
-    }
-
     var response = await fetch("/api/auth/bootstrap", {
       method: "POST",
-      headers: headers,
+      credentials: "include",
+      headers: { "X-BarDoctor-Auth-Mode": "cookie-v1" },
       signal: AbortSignal.timeout(30000)
     });
     var result = await response.json();
@@ -1957,7 +1945,7 @@
       rememberAccessContext(result);
       currentFirstName = cleanFirstName(result.firstName);
       localStorage.setItem("bd_session", result.email);
-      localStorage.setItem("bd_session_token", result.token);
+      localStorage.removeItem("bd_session_token");
       localStorage.setItem("bd_session_userid", String(result.userId));
       if (currentFirstName) localStorage.setItem("bd_user_first_name", currentFirstName);
       else localStorage.removeItem("bd_user_first_name");
