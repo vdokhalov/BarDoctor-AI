@@ -4,27 +4,30 @@ import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 
-const port = 5189;
-const origin = `http://127.0.0.1:${port}`;
+const port = Number(process.env.BD_QA_PORT || 5189);
+const externalOrigin = process.env.BD_QA_BASE_URL?.replace(/\/$/, "") || "";
+const origin = externalOrigin || `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const syntheticPassword = "Runtime-QA-2468";
 let serverOutput = "";
 
-const server = spawn(
-  "npm",
-  ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)],
-  {
-    cwd: process.cwd(),
-    detached: true,
-    env: process.env,
-    stdio: ["ignore", "pipe", "pipe"],
-  },
-);
-server.stdout.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
-server.stderr.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
+const server = externalOrigin
+  ? null
+  : spawn(
+    "npm",
+    ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)],
+    {
+      cwd: process.cwd(),
+      detached: true,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+server?.stdout.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
+server?.stderr.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-12_000); });
 
 function stopServer() {
-  if (!server.pid) return;
+  if (!server?.pid) return;
   try { process.kill(-server.pid, "SIGTERM"); } catch {}
 }
 process.once("exit", stopServer);
