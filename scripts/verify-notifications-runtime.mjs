@@ -13,7 +13,11 @@ let serverOutput = "";
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
   cwd: process.cwd(),
   detached: true,
-  env: { ...process.env, ONESIGNAL_APP_ID: "runtime-public-app" },
+  env: {
+    ...process.env,
+    ONESIGNAL_APP_ID: "runtime-public-app",
+    NOTIFICATION_CRON_SECRET: "runtime-notification-cron-secret",
+  },
   stdio: ["ignore", "pipe", "pipe"],
 });
 server.stdout.on("data", (chunk) => { serverOutput = (serverOutput + chunk).slice(-14_000); });
@@ -97,6 +101,23 @@ let database;
 try {
   await waitForServer();
   database = await localDatabase();
+
+  const sideEffectGet = await request(
+    "/api/notifications/run?token=runtime-notification-cron-secret",
+  );
+  assert.equal(sideEffectGet.response.status, 405, JSON.stringify(sideEffectGet.body));
+  assert.equal(sideEffectGet.response.headers.get("allow"), "POST");
+  const queryTokenPost = await request(
+    "/api/notifications/run?token=runtime-notification-cron-secret",
+    { method: "POST" },
+  );
+  assert.equal(queryTokenPost.response.status, 401, JSON.stringify(queryTokenPost.body));
+  const authorizedIdlePost = await request("/api/notifications/run", {
+    method: "POST",
+    headers: { Authorization: "Bearer runtime-notification-cron-secret" },
+  });
+  assert.equal(authorizedIdlePost.response.status, 200, JSON.stringify(authorizedIdlePost.body));
+  assert.equal(authorizedIdlePost.body.ran, false);
 
   const unauthenticated = await request("/api/notifications");
   assert.equal(unauthenticated.response.status, 401);
@@ -212,4 +233,3 @@ try {
   database?.close();
   stopServer();
 }
-
