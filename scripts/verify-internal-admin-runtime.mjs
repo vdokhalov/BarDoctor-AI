@@ -8,7 +8,7 @@ import path from "node:path";
 const port = 5192;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const password = "Admin-QA-2468";
+const password = "Admin-Runtime-QA-2468";
 const adminIdentity = `admin-runtime-${runId}@example.test`;
 const adminIdentityHash = createHash("sha256").update(adminIdentity).digest("hex");
 const openAISecret = `sk-runtime-${runId}`;

@@ -18,6 +18,7 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run pretest:artifact && npm run audit:buttons && npm run audit:navigation && npm run audit:headers && npm run audit:modern && npm run typecheck && npm run build && npm run test:data-integrity-operator && npm run test:artifact && node --test tests/purchase-receiving-stability-v371.test.mjs tests/quick-add-purchase-v372.test.mjs && npm run test:taxonomy-artifact && npm run test:release-safety && npm run test:unit",
     "test:data-control-runtime": "node scripts/verify-data-control-runtime.mjs",
+    "test:auth-runtime": "node scripts/verify-auth-hardening-runtime.mjs",
     "test:data-integrity-operator": "node --test tests/data-integrity-operator-v370.test.mjs",
     "test:venue-runtime": "node scripts/verify-venue-switch-runtime.mjs",
     "test:avatar-runtime": "node scripts/verify-user-avatar-runtime.mjs",

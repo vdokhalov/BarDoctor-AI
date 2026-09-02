@@ -49,6 +49,26 @@ export const sessions = sqliteTable(
   ],
 );
 
+/**
+ * Durable, privacy-preserving buckets for public authentication endpoints.
+ * Only SHA-256 fingerprints are stored; raw emails, IP addresses and tokens
+ * must never be written to this table.
+ */
+export const authRateLimits = sqliteTable(
+  "auth_rate_limits",
+  {
+    key: text("key").primaryKey(),
+    action: text("action").notNull(),
+    scope: text("scope").notNull(),
+    windowStartedAt: text("window_started_at").notNull(),
+    requestCount: integer("request_count").notNull().default(0),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("auth_rate_limits_action_updated_idx").on(table.action, table.updatedAt),
+  ],
+);
+
 export const workspaces = sqliteTable(
   "workspaces",
   {

@@ -5,12 +5,21 @@ import {
   sessionResponse,
 } from "../../../../lib/bardoctor/auth";
 import { importLegacyAccount } from "../../../../lib/bardoctor/legacy-import";
+import {
+  authRateLimitedResponse,
+  clearSuccessfulAuthLimit,
+  consumeAuthRateLimit,
+} from "../../../../lib/bardoctor/auth-rate-limit";
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    const identifier = request.headers.get("x-session-email") ?? "anonymous";
+    const rateLimit = await consumeAuthRateLimit(request, "auth-bootstrap", identifier);
+    if (!rateLimit.allowed) return authRateLimitedResponse(rateLimit);
     const existingSession = await authenticateIdentityRequest(request);
     const existingToken = request.headers.get("x-session-token");
     if (existingSession && existingToken) {
+      await clearSuccessfulAuthLimit(request, "auth-bootstrap", identifier);
       return sessionResponse(
         await authResult(existingSession, existingToken, request),
         existingToken,
@@ -28,6 +37,7 @@ export async function POST(request: Request): Promise<Response> {
           token: legacyToken,
         });
         const token = await issueSession(account);
+        await clearSuccessfulAuthLimit(request, "auth-bootstrap", identifier);
         return sessionResponse({
           ...(await authResult(account, token, request)),
           migrated: true,

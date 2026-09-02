@@ -20,6 +20,11 @@ import {
 } from "../../../../lib/bardoctor/password";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import { canImportLegacyAccount } from "../../../../lib/bardoctor/account-identity";
+import {
+  authRateLimitedResponse,
+  clearSuccessfulAuthLimit,
+  consumeAuthRateLimit,
+} from "../../../../lib/bardoctor/auth-rate-limit";
 
 const INVALID_CREDENTIALS = "Неверный email или пароль";
 
@@ -35,6 +40,8 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const email = normalizeEmail(body.email);
+    const rateLimit = await consumeAuthRateLimit(request, "login", email);
+    if (!rateLimit.allowed) return authRateLimitedResponse(rateLimit);
     const existing = await findAccountByAppEmail(email);
     if (existing?.passwordHash) {
       const valid = await verifyPassword(body.password, existing);
@@ -42,6 +49,7 @@ export async function POST(request: Request): Promise<Response> {
         return Response.json({ ok: false, error: INVALID_CREDENTIALS }, { status: 401 });
       }
       const token = await issueSession(existing);
+      await clearSuccessfulAuthLimit(request, "login", email);
       return sessionResponse(await authResult(existing, token, request), token, request);
     }
 
@@ -58,6 +66,7 @@ export async function POST(request: Request): Promise<Response> {
         .where(eq(accounts.id, existing.id));
       const upgradedAccount = { ...existing, ...password };
       const token = await issueSession(upgradedAccount);
+      await clearSuccessfulAuthLimit(request, "login", email);
       return sessionResponse({
         ...(await authResult(upgradedAccount, token, request)),
         passwordUpgraded: true,
@@ -91,13 +100,14 @@ export async function POST(request: Request): Promise<Response> {
         loginProfile: legacyAuth,
       });
     }
-    const password = await hashPassword(body.password);
+    const password = await hashPassword(body.password, { verifiedExistingCredential: true });
     await getDb()
       .update(accounts)
       .set({ ...password, updatedAt: new Date().toISOString() })
       .where(eq(accounts.id, account.id));
     account = { ...account, ...password };
     const token = await issueSession(account);
+    await clearSuccessfulAuthLimit(request, "login", email);
     return sessionResponse({
       ...(await authResult(account, token, request)),
       migrated: !existing,

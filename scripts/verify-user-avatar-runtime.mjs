@@ -5,7 +5,7 @@ const port = 5192;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const email = `avatar-runtime-${runId}@example.test`;
-const password = "Avatar-QA-2468";
+const password = "Avatar-Runtime-QA-2468";
 let serverOutput = "";
 
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {

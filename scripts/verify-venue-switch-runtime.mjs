@@ -7,7 +7,7 @@ import path from "node:path";
 const port = 5191;
 const origin = `http://127.0.0.1:${port}`;
 const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const password = "Venue-QA-2468";
+const password = "Venue-Runtime-QA-2468";
 let serverOutput = "";
 
 const server = spawn("npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)], {
