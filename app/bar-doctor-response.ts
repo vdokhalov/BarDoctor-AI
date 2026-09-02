@@ -5,6 +5,7 @@ import {
 } from "../lib/bardoctor/version";
 import { BARDOCTOR_SOURCE_COMMIT } from "../lib/bardoctor/source-commit";
 import { canonicalUserShellAssets } from "../lib/bardoctor/app-shell";
+import { securityHeaders } from "../lib/bardoctor/security-headers";
 
 const BAR_DOCTOR_HTML = `<!doctype html>
 <html lang="ru">
@@ -363,6 +364,7 @@ export function barDoctorResponse(): Response {
   return new Response(BAR_DOCTOR_HTML, {
     status: 200,
     headers: {
+      ...securityHeaders(),
       "Cache-Control": "public, max-age=60, s-maxage=300, stale-while-revalidate=86400",
       "Content-Type": "text/html; charset=utf-8",
     },

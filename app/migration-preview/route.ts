@@ -9,6 +9,7 @@ import {
 import { buildAssortmentMigrationPreview } from "../../lib/bardoctor/assortment-migration-preview";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../lib/bardoctor/inventory";
 import { PURCHASE_STORE_KEY, SUPPLIER_STORE_KEY } from "../../lib/bardoctor/purchases";
+import { escapeHtml } from "../../lib/bardoctor/html";
 
 type StoreRow = { store_key: string; data_json: string };
 
@@ -18,10 +19,6 @@ const KOLN_DATA_ACCOUNT_ID = 1;
 function parse(value: string | undefined, fallback: unknown): unknown {
   if (!value) return fallback;
   try { return JSON.parse(value) as unknown; } catch { return fallback; }
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export async function GET(request: Request): Promise<Response> {
