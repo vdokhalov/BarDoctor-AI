@@ -46,14 +46,7 @@
   }
 
   function sessionHeaders(extra) {
-    var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
-    if (email && token) {
-      headers.set("X-Session-Email", email);
-      headers.set("X-Session-Token", token);
-    }
-    return headers;
+    return new Headers(extra || {});
   }
 
   async function api(section, options) {

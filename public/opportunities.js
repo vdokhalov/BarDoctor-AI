@@ -7,14 +7,8 @@
 
   function authHeaders(extra) {
     var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venueId = localStorage.getItem("bd_active_venue_id");
-    if (email && token) {
-      headers.set("X-Session-Email", email);
-      headers.set("X-Session-Token", token);
-      if (venueId) headers.set("X-Venue-Id", venueId);
-    }
+    if (venueId) headers.set("X-Venue-Id", venueId);
     return headers;
   }
 
@@ -22,7 +16,7 @@
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, timeout || 35_000);
     try {
-      var response = await fetch(url, Object.assign({}, options || {}, { headers: authHeaders(options && options.headers), signal: controller.signal }));
+      var response = await fetch(url, Object.assign({}, options || {}, { headers: authHeaders(options && options.headers), credentials: "same-origin", signal: controller.signal }));
       var body = await response.json().catch(function () { return {}; });
       if (!response.ok || body.ok === false) {
         var error = new Error(body.error || "Не удалось выполнить запрос");

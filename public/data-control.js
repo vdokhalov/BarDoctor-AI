@@ -25,17 +25,14 @@
   function contextKey() { return "bd_data_control_context_v171:" + currentVenueId(); }
   function sessionHeaders(extra) {
     var headers = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venueId = localStorage.getItem("bd_active_venue_id");
-    if (email) headers.set("X-Session-Email", email);
-    if (token) headers.set("X-Session-Token", token);
     if (venueId) headers.set("X-Venue-Id", venueId);
     return headers;
   }
   async function api(url, options) {
     var response = await fetch(url, Object.assign({}, options || {}, {
       headers: sessionHeaders(options && options.headers),
+      credentials: "same-origin",
       cache: "no-store"
     }));
     var result;

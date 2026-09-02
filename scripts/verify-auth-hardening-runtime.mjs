@@ -74,6 +74,11 @@ async function localDatabase() {
     database.exec((await readFile(path.join(process.cwd(), "drizzle/0022_auth_rate_limits.sql"), "utf8"))
       .replaceAll("--> statement-breakpoint", ""));
   }
+  const sessionColumns = database.prepare("PRAGMA table_info(sessions)").all();
+  if (!sessionColumns.some((column) => column.name === "last_seen_at")) {
+    database.exec((await readFile(path.join(process.cwd(), "drizzle/0024_closed_mongu.sql"), "utf8"))
+      .replaceAll("--> statement-breakpoint", ""));
+  }
   return database;
 }
 
@@ -150,7 +155,6 @@ try {
     method: "POST",
     headers: {
       ...authHeaders("203.0.113.30"),
-      "X-BarDoctor-Auth-Mode": "cookie-v1",
     },
     body: JSON.stringify({
       email: registeredEmail,
@@ -168,7 +172,6 @@ try {
 
   const bootstrapHeaders = {
     Cookie: sessionCookie,
-    "X-BarDoctor-Auth-Mode": "cookie-v1",
   };
   const firstTab = await json("/api/auth/bootstrap", { method: "POST", headers: bootstrapHeaders });
   const secondTab = await json("/api/auth/bootstrap", { method: "POST", headers: bootstrapHeaders });
@@ -180,10 +183,21 @@ try {
     method: "POST",
     headers: {
       Cookie: "bd_server_session=forged-session-token",
-      "X-BarDoctor-Auth-Mode": "cookie-v1",
     },
   });
   assert.equal(forged.response.status, 401, JSON.stringify(forged.body));
+
+  const rawToken = decodeURIComponent(sessionCookie.slice("bd_server_session=".length));
+  const bearerReplay = await json("/api/auth/bootstrap", {
+    method: "POST",
+    headers: { "X-Session-Email": registeredEmail, "X-Session-Token": rawToken },
+  });
+  assert.equal(bearerReplay.response.status, 401, JSON.stringify(bearerReplay.body));
+  const retiredExchange = await json("/api/auth/server-session", {
+    method: "POST",
+    headers: { "X-Session-Email": registeredEmail, "X-Session-Token": rawToken },
+  });
+  assert.equal(retiredExchange.response.status, 410, JSON.stringify(retiredExchange.body));
 
   const duplicate = await json("/api/auth/register", {
     method: "POST",
@@ -220,10 +234,21 @@ try {
     method: "POST",
     headers: {
       Cookie: `bd_server_session=${expiredToken}`,
-      "X-BarDoctor-Auth-Mode": "cookie-v1",
     },
   });
   assert.equal(expired.response.status, 401, JSON.stringify(expired.body));
+
+  const inactiveToken = `inactive-${runId}`;
+  const inactiveHash = createHash("sha256").update(inactiveToken).digest("hex");
+  database.prepare(`
+    INSERT INTO sessions (token_hash, account_id, expires_at, last_seen_at)
+    VALUES (?, ?, ?, ?)
+  `).run(inactiveHash, registration.body.userId, "2099-01-01T00:00:00.000Z", "2020-01-01T00:00:00.000Z");
+  const inactive = await json("/api/auth/bootstrap", {
+    method: "POST",
+    headers: { Cookie: `bd_server_session=${inactiveToken}` },
+  });
+  assert.equal(inactive.response.status, 401, JSON.stringify(inactive.body));
 
   const rawIdentityRows = database.prepare(`
     SELECT COUNT(*) AS count FROM auth_rate_limits
@@ -240,8 +265,11 @@ try {
     rawIdentityStored: false,
     cookiePrimary: true,
     bearerReturnedToNewClient: false,
+    bearerHeaderReplayRejected: true,
+    legacySessionExchangeRetired: true,
     forgedRejected: true,
     expiredRejected: true,
+    inactiveRejected: true,
     logoutRevokedAcrossTabs: true,
   }, null, 2));
 } catch (error) {

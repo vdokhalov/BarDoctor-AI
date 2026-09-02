@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, sql } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
   accounts,
@@ -29,6 +29,8 @@ import {
 import { venueIdentityFromJson } from "./venue-identity";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+const SESSION_INACTIVITY_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_TOUCH_INTERVAL_MS = 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
 
 export type { AuthenticatedAccount } from "./access-control";
@@ -78,7 +80,8 @@ export async function issueSession(account: Account): Promise<string> {
   const token = randomToken();
   const tokenHash = await sha256Hex(token);
   const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS).toISOString();
-  await getDb().insert(sessions).values({ tokenHash, accountId: account.id, expiresAt });
+  const now = new Date().toISOString();
+  await getDb().insert(sessions).values({ tokenHash, accountId: account.id, expiresAt, lastSeenAt: now });
   return token;
 }
 
@@ -98,16 +101,9 @@ function cookieValue(request: Request, name: string): string | null {
   return null;
 }
 
-function sessionCredentials(request: Request): { email: string | null; token: string } | null {
-  const headerEmail = request.headers.get("x-session-email");
-  const headerToken = request.headers.get("x-session-token");
-  // A partial header pair is invalid and must never fall back to the cookie.
-  if (headerEmail || headerToken) {
-    if (!headerEmail?.trim() || !headerToken) return null;
-    return { email: headerEmail, token: headerToken };
-  }
+function sessionCredentials(request: Request): { token: string } | null {
   const cookieToken = cookieValue(request, SERVER_SESSION_COOKIE);
-  return cookieToken ? { email: null, token: cookieToken } : null;
+  return cookieToken ? { token: cookieToken } : null;
 }
 
 function sessionCookie(token: string, request: Request, maxAge = SESSION_LIFETIME_MS / 1_000): string {
@@ -134,42 +130,46 @@ export function clearSessionCookie(request: Request): string {
   return sessionCookie("", request, 0);
 }
 
-export async function synchronizeServerSession(
-  request: Request,
-): Promise<{ account: Account; token: string } | null> {
-  const email = request.headers.get("x-session-email");
-  const token = request.headers.get("x-session-token");
-  if (!email?.trim() || !token) return null;
-  const account = await authenticateIdentityRequest(request);
-  return account ? { account, token } : null;
-}
-
 async function sessionForRequest(request: Request): Promise<{
   account: Account;
   activeVenueId: number | null;
   token: string;
+  createdAt: string;
+  lastSeenAt: string | null;
 } | null> {
   const credentials = sessionCredentials(request);
   if (!credentials) return null;
-  const { email, token } = credentials;
+  const { token } = credentials;
 
   const tokenHash = await sha256Hex(token);
-  const now = new Date().toISOString();
+  const nowDate = new Date();
+  const now = nowDate.toISOString();
+  const inactivityCutoff = new Date(nowDate.valueOf() - SESSION_INACTIVITY_MS).toISOString();
   const [row] = await getDb()
-    .select({ account: accounts, activeVenueId: sessions.activeVenueId })
+    .select({
+      account: accounts,
+      activeVenueId: sessions.activeVenueId,
+      createdAt: sessions.createdAt,
+      lastSeenAt: sessions.lastSeenAt,
+    })
     .from(sessions)
     .innerJoin(accounts, eq(sessions.accountId, accounts.id))
     .where(
       and(
         eq(sessions.tokenHash, tokenHash),
-        email ? eq(accounts.appEmail, normalizeEmail(email)) : undefined,
         eq(accounts.accountKind, "user"),
         gt(sessions.expiresAt, now),
+        gt(sql`coalesce(${sessions.lastSeenAt}, ${sessions.createdAt})`, inactivityCutoff),
       ),
     )
     .limit(1);
 
-  return row ? { ...row, token } : null;
+  if (!row) return null;
+  const lastActivity = new Date(row.lastSeenAt ?? row.createdAt).valueOf();
+  if (Number.isFinite(lastActivity) && nowDate.valueOf() - lastActivity >= SESSION_TOUCH_INTERVAL_MS) {
+    await getDb().update(sessions).set({ lastSeenAt: now }).where(eq(sessions.tokenHash, tokenHash));
+  }
+  return { ...row, token };
 }
 
 async function rememberActiveVenueForToken(
@@ -266,6 +266,17 @@ export async function authenticateIdentitySession(
 ): Promise<{ account: Account; token: string } | null> {
   const session = await sessionForRequest(request);
   return session ? { account: session.account, token: session.token } : null;
+}
+
+export async function authenticateIdentitySessionDetails(request: Request): Promise<{
+  account: Account;
+  createdAt: string;
+  lastSeenAt: string | null;
+} | null> {
+  const session = await sessionForRequest(request);
+  return session
+    ? { account: session.account, createdAt: session.createdAt, lastSeenAt: session.lastSeenAt }
+    : null;
 }
 
 function venueName(account: Account): string {
@@ -428,16 +439,11 @@ export async function authenticateRequest(
 }
 
 export async function authResult(account: Account, token: string, request?: Request) {
-  const exposeLegacyToken = request?.headers.get("x-bardoctor-auth-mode") !== "cookie-v1";
   const requestedHeader = request?.headers.get("x-venue-id");
   const requestedValue = Number(requestedHeader);
   const rememberedVenueId = request
-    ? (await sessionForRequest(new Request(request.url, {
-      headers: {
-        "x-session-email": account.appEmail,
-        "x-session-token": token,
-      },
-    })))?.activeVenueId ?? null
+    ? (await getDb().select({ activeVenueId: sessions.activeVenueId }).from(sessions)
+      .where(eq(sessions.tokenHash, await sha256Hex(token))).limit(1))[0]?.activeVenueId ?? null
     : null;
   const requestedVenueId = Number.isInteger(requestedValue) && requestedValue > 0
     ? requestedValue
@@ -477,7 +483,6 @@ export async function authResult(account: Account, token: string, request?: Requ
     ok: true as const,
     email: account.appEmail,
     userId: account.id,
-    ...(exposeLegacyToken ? { token } : {}),
     firstName: account.firstName,
     lastName: account.lastName,
     phone: account.phone,

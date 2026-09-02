@@ -116,13 +116,14 @@ test("admin routes authorize on the backend and expose no venue navigation or mu
   assert.doesNotMatch(client, /renderActivation|data-admin-bootstrap/);
   assert.match(bootstrapClient, /\/api\/admin\/claim/);
   assert.doesNotMatch(bootstrapClient, /dashboard|users|venues|integrations|\/api\/admin\/session/i);
-  assert.match(bridgeClient, /\/api\/auth\/server-session/);
+  assert.doesNotMatch(bridgeClient, /\/api\/auth\/server-session|X-Session-(?:Email|Token)/);
+  assert.match(bridgeClient, /localStorage\.removeItem\("bd_session_token"\)/);
   assert.doesNotMatch(bridgeClient, /\/api\/admin\/claim|BARDOCTOR_PLATFORM_ADMIN_IDENTITY_SHA256/);
   assert.match(auth, /bd_server_session/);
   assert.match(auth, /HttpOnly; SameSite=Strict/);
-  assert.match(auth, /A partial header pair is invalid and must never fall back to the cookie/);
-  assert.match(serverSession, /synchronizeServerSession\(request\)/);
-  assert.match(serverSession, /sessionResponse\(/);
+  assert.doesNotMatch(auth, /request\.headers\.get\("x-session-token"\)/);
+  assert.match(serverSession, /LEGACY_SESSION_EXCHANGE_REMOVED/);
+  assert.match(serverSession, /status: 410/);
   assert.match(data, /ai_usage_events/);
   assert.match(data, /totalTokens/);
   assert.match(data, /estimatedCost: null/);

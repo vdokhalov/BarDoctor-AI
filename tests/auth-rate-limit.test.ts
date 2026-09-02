@@ -19,7 +19,6 @@ test("public authentication routes consume durable server-side buckets", async (
     source("app/api/auth/register/route.ts"),
     source("app/api/auth/reset-password/route.ts"),
     source("app/api/auth/bootstrap/route.ts"),
-    source("app/api/auth/server-session/route.ts"),
   ]);
   for (const route of routes) {
     assert.match(route, /consumeAuthRateLimit\(/);

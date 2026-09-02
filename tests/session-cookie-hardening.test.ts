@@ -4,16 +4,18 @@ import test from "node:test";
 
 const read = (path: string) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("new clients receive cookie-only auth while cached clients retain a bounded compatibility path", async () => {
+test("all BarDoctor sessions are cookie-only with absolute and inactivity expiry", async () => {
   const auth = await read("lib/bardoctor/auth.ts");
-  assert.match(auth, /x-bardoctor-auth-mode/);
-  assert.match(auth, /exposeLegacyToken \? \{ token \} : \{\}/);
+  assert.doesNotMatch(auth, /exposeLegacyToken/);
+  assert.doesNotMatch(auth, /request\.headers\.get\("x-session-token"\)/);
   assert.match(auth, /HttpOnly; SameSite=Strict/);
   assert.match(auth, /Secure/);
   assert.match(auth, /gt\(sessions\.expiresAt, now\)/);
+  assert.match(auth, /SESSION_INACTIVITY_MS/);
+  assert.match(auth, /coalesce\(\$\{sessions\.lastSeenAt\}, \$\{sessions\.createdAt\}\)/);
 });
 
-test("the current primary client never reads, writes or transmits a bearer session", async () => {
+test("every current first-party client removes or ignores the legacy bearer", async () => {
   const paths = [
     "public/bardoctor-preview-v401.js",
     "public/assets/index-BQGspy0I.js",
@@ -23,6 +25,13 @@ test("the current primary client never reads, writes or transmits a bearer sessi
     "public/market.js",
     "public/sales-import.js",
     "public/venue-switcher.js",
+    "public/integrations.js",
+    "public/reviews.js",
+    "public/opportunities.js",
+    "public/supplier-alternatives.js",
+    "public/data-control.js",
+    "public/admin-v175.js",
+    "public/admin-session-bridge-v176.js",
   ];
   const sources = await Promise.all(paths.map(read));
   for (let index = 0; index < sources.length; index += 1) {
@@ -31,6 +40,27 @@ test("the current primary client never reads, writes or transmits a bearer sessi
   }
   assert.match(sources[0], /X-BarDoctor-Auth-Mode", "cookie-v1/);
   assert.match(sources[1], /bd-cookie-session-v403/);
+});
+
+test("legacy D1 bearer exchange is retired while legacy account import remains isolated", async () => {
+  const [route, bootstrap, legacyImport] = await Promise.all([
+    read("app/api/auth/server-session/route.ts"),
+    read("app/api/auth/bootstrap/route.ts"),
+    read("lib/bardoctor/legacy-import.ts"),
+  ]);
+  assert.match(route, /LEGACY_SESSION_EXCHANGE_REMOVED/);
+  assert.match(route, /status: 410/);
+  assert.doesNotMatch(route, /sessionResponse|synchronizeServerSession/);
+  assert.match(bootstrap, /importLegacyAccount/);
+  assert.match(legacyImport, /LEGACY_REPLIT_ORIGIN/);
+  assert.match(legacyImport, /function legacyAuthHeaders/);
+});
+
+test("platform-admin cookie sessions require recent authentication", async () => {
+  const admin = await read("lib/bardoctor/platform-admin.ts");
+  assert.match(admin, /PLATFORM_ADMIN_SESSION_MAX_AGE_MS = 8 \* 60 \* 60 \* 1000/);
+  assert.match(admin, /authenticateIdentitySessionDetails/);
+  assert.match(admin, /sessionIsRecent/);
 });
 
 test("logout clears the HttpOnly cookie and revokes the exact server session", async () => {

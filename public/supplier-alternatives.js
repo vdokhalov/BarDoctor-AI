@@ -21,14 +21,8 @@
 
   function headers(extra) {
     var result = new Headers(extra || {});
-    var email = localStorage.getItem("bd_session");
-    var token = localStorage.getItem("bd_session_token");
     var venue = localStorage.getItem("bd_active_venue_id");
-    if (email && token) {
-      result.set("X-Session-Email", email);
-      result.set("X-Session-Token", token);
-      if (venue) result.set("X-Venue-Id", venue);
-    }
+    if (venue) result.set("X-Venue-Id", venue);
     return result;
   }
 
@@ -36,6 +30,7 @@
     var response = await fetch("/api/supplier-alternatives", {
       method: method,
       headers: headers({ "Content-Type": "application/json" }),
+      credentials: "same-origin",
       body: body ? JSON.stringify(body) : undefined,
     });
     var json = await response.json().catch(function () { return {}; });

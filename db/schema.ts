@@ -40,6 +40,7 @@ export const sessions = sqliteTable(
       .references(() => accounts.id, { onDelete: "cascade" }),
     activeVenueId: integer("active_venue_id"),
     expiresAt: text("expires_at").notNull(),
+    lastSeenAt: text("last_seen_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

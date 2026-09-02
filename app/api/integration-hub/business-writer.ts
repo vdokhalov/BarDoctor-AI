@@ -37,7 +37,7 @@ function record(value: unknown): JsonRecord {
 
 function authenticatedJsonRequest(original: Request, path: string, body: unknown): Request {
   const headers = new Headers({ "Content-Type": "application/json" });
-  for (const name of ["x-session-email", "x-session-token", "x-venue-id"]) {
+  for (const name of ["cookie", "x-venue-id"]) {
     const value = original.headers.get(name);
     if (value) headers.set(name, value);
   }
@@ -160,8 +160,7 @@ export async function serviceIntegrationBusinessWriter(input: {
   const token = await issueSession(identity);
   const request = new Request(input.requestUrl, {
     headers: {
-      "x-session-email": identity.appEmail,
-      "x-session-token": token,
+      cookie: `bd_server_session=${encodeURIComponent(token)}`,
       "x-venue-id": String(input.venueId),
     },
   });
