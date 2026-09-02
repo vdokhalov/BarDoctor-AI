@@ -167,6 +167,12 @@ try {
   await waitForServer();
   await ensureLocalSchema();
 
+  const readiness = await request("/api/healthz");
+  assert.equal(readiness.response.status, 200, JSON.stringify(readiness.body));
+  assert.equal(readiness.body.status, "ready");
+  assert.equal(readiness.body.checks.database.ok, true);
+  assert.match(readiness.response.headers.get("x-request-id") ?? "", /^[A-Za-z0-9._:-]{8,80}$/);
+
   const unauthenticated = await request("/api/audit");
   assert.equal(unauthenticated.response.status, 401);
 
@@ -478,6 +484,7 @@ try {
 
   process.stdout.write(`${JSON.stringify({
     ok: true,
+    readiness: { database: true, falsePositiveGreenPrevented: true, requestId: true },
     authentication: { unauthenticatedStatus: 401, auditPermissionDeniedStatus: 403 },
     journal: {
       create: true,

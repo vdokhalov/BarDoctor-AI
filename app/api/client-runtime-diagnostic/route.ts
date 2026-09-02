@@ -1,4 +1,5 @@
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
+import { recordException, requestIdFor, withRequestId } from "../../../lib/bardoctor/observability";
 
 const MAX_TEXT_LENGTH = 180;
 
@@ -16,6 +17,8 @@ function safeNumber(value: unknown): number {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const requestId = requestIdFor(request);
+  const startedAt = performance.now();
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
 
@@ -40,12 +43,20 @@ export async function POST(request: Request): Promise<Response> {
     venueId: account.venueId,
   };
 
-  console.error(`[BarDoctor client runtime] ${JSON.stringify(diagnostic)}`);
-  return new Response(null, {
+  recordException({
+    requestId,
+    endpoint: "/api/client-runtime-diagnostic",
+    category: `frontend_${diagnostic.kind || "runtime"}`,
+    error: new Error(diagnostic.message || "Client runtime error"),
+    startedAt,
+    venueId: account.venueId,
+    accountId: account.id,
+  });
+  return withRequestId(new Response(null, {
     status: 204,
     headers: {
       "Cache-Control": "private, no-store, max-age=0",
       Pragma: "no-cache",
     },
-  });
+  }), requestId);
 }
