@@ -1,0 +1,376 @@
+{
+  "reportVersion": "step-1.2-v1",
+  "generatedAt": "2026-09-02T11:49:00.000Z",
+  "expected": {
+    "source": [
+      "db/schema.ts",
+      "drizzle/0000-0021",
+      "drizzle/meta/_journal.json",
+      "drizzle/meta/0021_snapshot.json"
+    ],
+    "schemaVersion": "0021",
+    "tableCount": 37
+  },
+  "production": {
+    "source": "Sites read-only database overview/table-row metadata",
+    "tableCount": 37
+  },
+  "summary": {
+    "tablePresence": "MATCH",
+    "columnNames": "MATCH",
+    "tablesMatchedByNameAndColumnSet": 37,
+    "missing": 0,
+    "extra": 0,
+    "differentColumnSets": 0,
+    "fullSchemaCompatibility": "UNKNOWN",
+    "migrationLedger": "UNKNOWN"
+  },
+  "objects": [
+    {
+      "object": "accounts",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "ai_usage_events",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "ai_usage_limits",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "audit_log",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "domain_data",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "google_connections",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_connections",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_connector_agents",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_credentials",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_entity_links",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_field_mapping_templates",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_ingress_deliveries",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_ingress_tokens",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_mappings",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_secrets",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_sync_items",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "integration_sync_runs",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "invoice_recognition_jobs",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "notification_deliveries",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "notification_devices",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "notification_job_events",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "notification_jobs",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "notification_preferences",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "oauth_states",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "platform_admin_audit",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "platform_admin_rate_limits",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "platform_admins",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "platform_secrets",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "review_source_events",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "sessions",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "venue_invites",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "venue_memberships",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "venue_migration_exports",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "venue_migration_operations",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "venues",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "workspace_memberships",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    },
+    {
+      "object": "workspaces",
+      "expected": "present",
+      "production": "present",
+      "status": "UNKNOWN",
+      "verifiedSubset": "table name and column-name set MATCH",
+      "risk": "Production types, constraints, indexes, foreign keys, triggers, and ledger are unavailable."
+    }
+  ],
+  "criticalAccountingObjects": [
+    {
+      "object": "users/accounts",
+      "physicalSurface": "accounts",
+      "status": "UNKNOWN",
+      "evidence": "table and column names match; constraints and ledger unavailable"
+    },
+    {
+      "object": "venues",
+      "physicalSurface": "venues",
+      "status": "UNKNOWN",
+      "evidence": "table and column names match; 17 observed rows; tested account/workspace references have 0 violations"
+    },
+    {
+      "object": "venue memberships/access",
+      "physicalSurface": "venue_memberships, workspace_memberships",
+      "status": "UNKNOWN",
+      "evidence": "table and column names match; tested references have 0 violations"
+    },
+    {
+      "object": "nomenclature/taxonomy/inventory/tech cards/menu/sales",
+      "physicalSurface": "domain_data and legacy accounts.restaurant_json",
+      "status": "UNKNOWN",
+      "evidence": "logical JSON payloads are not fully exposed by the reader"
+    },
+    {
+      "object": "purchases/purchase lines/suppliers",
+      "physicalSurface": "domain_data store keys",
+      "status": "UNKNOWN",
+      "evidence": "bd_purchase_documents and bd_suppliers are present, but purchase JSON was truncated"
+    },
+    {
+      "object": "employees/shifts/finance/expenses",
+      "physicalSurface": "domain_data store keys and legacy payload",
+      "status": "UNKNOWN",
+      "evidence": "some store rows are present; JSON payloads are incomplete or truncated"
+    },
+    {
+      "object": "integrations",
+      "physicalSurface": "integration_* tables",
+      "status": "UNKNOWN",
+      "evidence": "table and column names match; tested account/venue references have 0 violations"
+    },
+    {
+      "object": "audit/data integrity",
+      "physicalSurface": "audit_log, domain_data",
+      "status": "UNKNOWN",
+      "evidence": "schema constraints and PRAGMA integrity results unavailable"
+    }
+  ]
+}

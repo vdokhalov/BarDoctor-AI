@@ -1,0 +1,947 @@
+{
+  "reportVersion": "step-1.2-v1",
+  "generatedAt": "2026-09-02T11:49:00.000Z",
+  "mode": "read-only",
+  "releaseCandidate": {
+    "gitSha": "9f48337be90008d63467a2abe52b05498c52d7bc",
+    "gitTree": "8d2fc6f365582b53f0a5824256eb0ff1ae29fd85",
+    "appVersion": "0.1.0",
+    "build": "8",
+    "artifactSha256": "a7f1f3ac59b651bcc011734880d8230bb1b108a11b3c785d27026dc6864bce11",
+    "expectedSchema": "0021",
+    "canonicalMigrationCount": 22
+  },
+  "production": {
+    "provider": "Sites-managed Cloudflare D1",
+    "siteProject": "BarDoctor Preview",
+    "databaseBinding": "DB",
+    "tableCount": 37,
+    "tables": [
+      {
+        "name": "accounts",
+        "columns": [
+          "id",
+          "chatgpt_email",
+          "app_email",
+          "first_name",
+          "last_name",
+          "phone",
+          "role",
+          "restaurant_json",
+          "competitors_json",
+          "review_sources_json",
+          "migration_status",
+          "migration_summary_json",
+          "imported_at",
+          "created_at",
+          "updated_at",
+          "password_hash",
+          "password_salt",
+          "password_iterations",
+          "owns_venue",
+          "account_kind",
+          "avatar_id"
+        ]
+      },
+      {
+        "name": "ai_usage_events",
+        "columns": [
+          "id",
+          "account_id",
+          "actor_account_id",
+          "venue_id",
+          "request_id",
+          "provider",
+          "model",
+          "feature",
+          "input_tokens",
+          "output_tokens",
+          "total_tokens",
+          "status",
+          "latency_ms",
+          "error_code",
+          "created_at"
+        ]
+      },
+      {
+        "name": "ai_usage_limits",
+        "columns": [
+          "account_id",
+          "used_requests",
+          "request_limit",
+          "period_key",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "audit_log",
+        "columns": [
+          "id",
+          "account_id",
+          "store_key",
+          "action",
+          "entity_id",
+          "entity_label",
+          "month_key",
+          "before_json",
+          "after_json",
+          "changed_fields_json",
+          "actor_name",
+          "actor_role",
+          "reason",
+          "created_at"
+        ]
+      },
+      {
+        "name": "domain_data",
+        "columns": [
+          "id",
+          "account_id",
+          "store_key",
+          "data_json",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "google_connections",
+        "columns": [
+          "id",
+          "account_id",
+          "status",
+          "linked_url",
+          "place_id",
+          "cid",
+          "lat",
+          "lng",
+          "location_name",
+          "google_account_id",
+          "google_location_id",
+          "access_token_encrypted",
+          "refresh_token_encrypted",
+          "token_expires_at",
+          "pending_locations_json",
+          "last_synced_at",
+          "last_sync_error",
+          "auto_sync_enabled",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_connections",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "provider",
+          "adapter_key",
+          "display_name",
+          "channel",
+          "status",
+          "capabilities_json",
+          "config_json",
+          "cursor_json",
+          "last_sync_at",
+          "last_success_at",
+          "last_error",
+          "created_by_account_id",
+          "created_at",
+          "updated_at",
+          "source_key",
+          "source_type",
+          "sync_enabled"
+        ]
+      },
+      {
+        "name": "integration_connector_agents",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "machine_id_hash",
+          "machine_name",
+          "agent_version",
+          "operating_system",
+          "adapter_key",
+          "platform_version",
+          "configuration_name",
+          "configuration_version",
+          "infobase_name",
+          "read_only",
+          "status",
+          "auto_sync",
+          "interval_minutes",
+          "last_entity_type",
+          "imported_count",
+          "last_seen_at",
+          "last_sync_at",
+          "last_error",
+          "metadata_json",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_credentials",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "key",
+          "encrypted_value",
+          "rotated_at",
+          "revoked_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_entity_links",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "entity_type",
+          "external_id",
+          "internal_id",
+          "payload_hash",
+          "external_updated_at",
+          "sync_status",
+          "last_sync_run_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_field_mapping_templates",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "entity_type",
+          "name",
+          "file_kind",
+          "header_signature",
+          "mapping_json",
+          "defaults_json",
+          "active",
+          "created_by_account_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_ingress_deliveries",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "delivery_id",
+          "payload_hash",
+          "status",
+          "run_id",
+          "cursor_json",
+          "error",
+          "received_at",
+          "completed_at",
+          "updated_at",
+          "attempt_count"
+        ]
+      },
+      {
+        "name": "integration_ingress_tokens",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "label",
+          "token_prefix",
+          "token_hash",
+          "scopes_json",
+          "last_used_at",
+          "expires_at",
+          "revoked_at",
+          "created_by_account_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_mappings",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "entity_type",
+          "external_id",
+          "external_name",
+          "external_unit",
+          "internal_id",
+          "internal_name",
+          "status",
+          "confidence",
+          "reason",
+          "external_payload_json",
+          "confirmed_by_account_id",
+          "confirmed_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_secrets",
+        "columns": [
+          "id",
+          "account_id",
+          "key",
+          "encrypted_value",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_sync_items",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "run_id",
+          "entity_type",
+          "external_id",
+          "internal_id",
+          "status",
+          "payload_hash",
+          "payload_json",
+          "error_code",
+          "error_message",
+          "mapping_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "integration_sync_runs",
+        "columns": [
+          "id",
+          "venue_id",
+          "data_account_id",
+          "connection_id",
+          "trigger",
+          "data_type",
+          "status",
+          "source_name",
+          "received_count",
+          "created_count",
+          "updated_count",
+          "skipped_count",
+          "error_count",
+          "mapping_issue_count",
+          "errors_json",
+          "retry_of_run_id",
+          "started_at",
+          "finished_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "invoice_recognition_jobs",
+        "columns": [
+          "account_id",
+          "venue_id",
+          "fingerprint",
+          "job_id",
+          "status",
+          "result_json",
+          "metrics_json",
+          "issues_json",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "notification_deliveries",
+        "columns": [
+          "id",
+          "account_id",
+          "category",
+          "dedupe_key",
+          "title",
+          "message",
+          "target_url",
+          "status",
+          "provider_message_id",
+          "detail",
+          "created_at"
+        ]
+      },
+      {
+        "name": "notification_devices",
+        "columns": [
+          "id",
+          "account_id",
+          "device_key",
+          "subscription_id",
+          "permission",
+          "opted_in",
+          "active",
+          "last_seen_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "notification_job_events",
+        "columns": [
+          "id",
+          "job_id",
+          "from_status",
+          "to_status",
+          "detail",
+          "created_at"
+        ]
+      },
+      {
+        "name": "notification_jobs",
+        "columns": [
+          "id",
+          "account_id",
+          "venue_id",
+          "source_type",
+          "source_id",
+          "category",
+          "dedupe_key",
+          "title",
+          "message",
+          "target_url",
+          "target_at",
+          "timezone",
+          "status",
+          "provider_message_id",
+          "attempt_count",
+          "next_attempt_at",
+          "leased_at",
+          "last_error",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "notification_preferences",
+        "columns": [
+          "account_id",
+          "enabled",
+          "shift_alerts",
+          "task_alerts",
+          "equipment_alerts",
+          "calendar_alerts",
+          "finance_alerts",
+          "quiet_start",
+          "quiet_end",
+          "timezone",
+          "last_test_at",
+          "created_at",
+          "updated_at",
+          "incident_alerts",
+          "last_run_at"
+        ]
+      },
+      {
+        "name": "oauth_states",
+        "columns": [
+          "token_hash",
+          "account_id",
+          "redirect_uri",
+          "expires_at",
+          "created_at"
+        ]
+      },
+      {
+        "name": "platform_admin_audit",
+        "columns": [
+          "id",
+          "admin_account_id",
+          "action",
+          "target_type",
+          "target_id",
+          "before_json",
+          "after_json",
+          "result",
+          "reason",
+          "request_id",
+          "created_at"
+        ]
+      },
+      {
+        "name": "platform_admin_rate_limits",
+        "columns": [
+          "key",
+          "account_id",
+          "action",
+          "window_started_at",
+          "request_count",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "platform_admins",
+        "columns": [
+          "account_id",
+          "permissions_json",
+          "status",
+          "provisioned_by",
+          "granted_by_account_id",
+          "mfa_required",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "platform_secrets",
+        "columns": [
+          "key",
+          "encrypted_value",
+          "source_account_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "review_source_events",
+        "columns": [
+          "id",
+          "account_id",
+          "source",
+          "event",
+          "detail",
+          "created_at"
+        ]
+      },
+      {
+        "name": "sessions",
+        "columns": [
+          "token_hash",
+          "account_id",
+          "expires_at",
+          "created_at",
+          "active_venue_id"
+        ]
+      },
+      {
+        "name": "venue_invites",
+        "columns": [
+          "id",
+          "venue_id",
+          "code_hash",
+          "role",
+          "permissions_json",
+          "created_by_account_id",
+          "expires_at",
+          "used_at",
+          "used_by_account_id",
+          "revoked_at",
+          "created_at"
+        ]
+      },
+      {
+        "name": "venue_memberships",
+        "columns": [
+          "id",
+          "venue_id",
+          "account_id",
+          "role",
+          "permissions_json",
+          "status",
+          "employee_id",
+          "invited_by_account_id",
+          "joined_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "venue_migration_exports",
+        "columns": [
+          "export_id",
+          "venue_id",
+          "data_account_id",
+          "source_commit",
+          "schema_version",
+          "checksum",
+          "payload_json",
+          "record_counts_json",
+          "generated_at",
+          "created_by_account_id",
+          "created_at"
+        ]
+      },
+      {
+        "name": "venue_migration_operations",
+        "columns": [
+          "operation_id",
+          "venue_id",
+          "data_account_id",
+          "export_id",
+          "source_commit",
+          "status",
+          "plan_json",
+          "affected_store_keys_json",
+          "before_checksum",
+          "after_checksum",
+          "cutover_at",
+          "rollback_at",
+          "failure_reason",
+          "created_by_account_id",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "venues",
+        "columns": [
+          "id",
+          "data_account_id",
+          "created_at",
+          "updated_at",
+          "workspace_id",
+          "status",
+          "created_by_account_id"
+        ]
+      },
+      {
+        "name": "workspace_memberships",
+        "columns": [
+          "id",
+          "workspace_id",
+          "account_id",
+          "role",
+          "status",
+          "joined_at",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      {
+        "name": "workspaces",
+        "columns": [
+          "id",
+          "name",
+          "status",
+          "created_by_account_id",
+          "created_at",
+          "updated_at"
+        ]
+      }
+    ],
+    "relationalIntegrity": {
+      "checks": [
+        {
+          "checked": 17,
+          "name": "venues.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 17,
+          "name": "venues.created_by_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 17,
+          "name": "venues.workspace_id -> workspaces.id",
+          "violations": 0
+        },
+        {
+          "checked": 20,
+          "name": "venue_memberships.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 20,
+          "name": "venue_memberships.account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 18,
+          "name": "workspace_memberships.workspace_id -> workspaces.id",
+          "violations": 0
+        },
+        {
+          "checked": 18,
+          "name": "workspace_memberships.account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 1,
+          "name": "integration_connections.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 1,
+          "name": "integration_connections.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_connector_agents.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_connector_agents.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_credentials.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_credentials.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_entity_links.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_entity_links.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_field_mapping_templates.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_field_mapping_templates.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_ingress_deliveries.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_ingress_deliveries.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 5,
+          "name": "integration_ingress_tokens.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 5,
+          "name": "integration_ingress_tokens.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_mappings.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_mappings.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_sync_items.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_sync_items.data_account_id -> accounts.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_sync_runs.venue_id -> venues.id",
+          "violations": 0
+        },
+        {
+          "checked": 0,
+          "name": "integration_sync_runs.data_account_id -> accounts.id",
+          "violations": 0
+        }
+      ],
+      "tables": [
+        {
+          "capped": false,
+          "row_count": 20,
+          "table": "accounts",
+          "truncated": true,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 17,
+          "table": "venues",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 20,
+          "table": "venue_memberships",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 15,
+          "table": "workspaces",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 18,
+          "table": "workspace_memberships",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 1,
+          "table": "integration_connections",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_connector_agents",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_credentials",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_entity_links",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_field_mapping_templates",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_ingress_deliveries",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 5,
+          "table": "integration_ingress_tokens",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_mappings",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_sync_items",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 0,
+          "table": "integration_sync_runs",
+          "truncated": false,
+          "truncated_values": 0
+        },
+        {
+          "capped": false,
+          "row_count": 10,
+          "table": "venue_migration_exports",
+          "truncated": true,
+          "truncated_values": 10
+        },
+        {
+          "capped": false,
+          "row_count": 1,
+          "table": "venue_migration_operations",
+          "truncated": true,
+          "truncated_values": 1
+        }
+      ]
+    },
+    "domainData": {
+      "capped": false,
+      "duplicate_account_store_groups": 0,
+      "orphan_account_refs": 0,
+      "row_count_observed": 60,
+      "store_key_counts": {
+        "bd_action_plans": 3,
+        "bd_action_tasks": 3,
+        "bd_ai_diagnosis_v4": 2,
+        "bd_cases": 3,
+        "bd_decisions": 3,
+        "bd_employees": 3,
+        "bd_equipment": 3,
+        "bd_equipment_history": 3,
+        "bd_events": 3,
+        "bd_finance_expenses": 3,
+        "bd_finance_gap_reasons": 3,
+        "bd_finance_revenue": 3,
+        "bd_finance_settings": 3,
+        "bd_inventory_snapshots": 3,
+        "bd_market_analysis_v1": 3,
+        "bd_month_closings": 3,
+        "bd_opportunity_calendar_v1": 3,
+        "bd_payroll_entries": 3,
+        "bd_payroll_rules": 3,
+        "bd_purchase_documents": 1,
+        "bd_suppliers": 1,
+        "bd_tasks": 2
+      },
+      "truncated": true,
+      "truncated_values": 27
+    }
+  },
+  "unavailableEvidence": [
+    "production column types, nullability, defaults, primary keys, indexes, foreign keys, and triggers",
+    "provider-managed migration ledger and migration checksums",
+    "PRAGMA integrity_check and PRAGMA foreign_key_check",
+    "D1 backend version, bookmarks, Time Travel availability, retention, and recovery-point timestamps",
+    "full consistent export or snapshot",
+    "isolated provider restore target and application restore smoke"
+  ],
+  "privacy": "No production row values or secrets are stored in this evidence file."
+}
