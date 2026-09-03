@@ -34,7 +34,7 @@ test("embedded integrations delegates navigation to the parent shell", async () 
 });
 
 test("settings serves the SPA shell and resolves to the existing user settings screen", async () => {
-  const response = getSettings();
+  const response = await getSettings();
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("location"), null);
