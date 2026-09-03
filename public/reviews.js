@@ -7,6 +7,7 @@
     sequence: 0,
     controller: null,
     search: "",
+    filter: "all",
     source: "all",
     importInspection: null,
     analysisAttempted: false,
@@ -266,9 +267,9 @@
     var google = providers.find(function (provider) { return provider.id === "google"; }) || null;
     var status = googleStatus(google);
     var googleActions = [];
-    if (canManageIntegrations()) googleActions.push({ label: google && google.configured ? "Настройки" : "Настроить", handler: openGoogleSettings });
+    if (canManageIntegrations()) googleActions.push({ label: google && google.configured ? "Управлять подключением" : "Настроить в Интеграциях", handler: function () { window.location.assign("/integrations?flow=google"); } });
     if (google && google.status === "connected" && canManageReviews()) googleActions.push({ label: "Синхронизировать", handler: syncGoogle });
-    else if (google && google.status !== "pending_location" && google.configured && canManageReviews()) googleActions.push({ label: google.status === "error" ? "Подключить заново" : "Подключить Google", handler: connectGoogle });
+    else if (google && google.status !== "pending_location" && canManageReviews()) googleActions.push({ label: "Открыть Интеграции", handler: function () { window.location.assign("/integrations?flow=google"); } });
     var googleRow = sourceRow({ mark: "G", google: true, title: "Google Business Profile", description: status.code + ". " + status.description, actions: googleActions });
     if (google && google.status === "pending_location" && Array.isArray(google.pendingLocations)) {
       var location = node("div", "location-select");
@@ -302,20 +303,41 @@
     }));
   }
 
-  function sourceFilterButton(id, label, count) {
-    var button = node("button", "review-filter" + (state.source === id ? " active" : ""), label + (typeof count === "number" ? " · " + number(count) : ""));
+  function statusFilterButton(id, label, count) {
+    var button = node("button", "review-filter" + (state.filter === id ? " active" : ""), label + (typeof count === "number" ? " · " + number(count) : ""));
     button.type = "button";
-    button.addEventListener("click", function () { state.source = id; renderFilters(); renderReviewList(); });
+    button.addEventListener("click", function () { state.filter = id; renderFilters(); renderReviewList(); });
     return button;
+  }
+
+  function hasOwnerReply(review) {
+    return typeof review.ownerReply === "string" && review.ownerReply.trim().length > 0;
+  }
+
+  function needsAttention(review) {
+    return !hasOwnerReply(review) && ((typeof review.rating === "number" && review.rating <= 3) || review.sentiment === "negative");
   }
 
   function renderFilters() {
     var root = document.getElementById("review-source-filters");
     root.textContent = "";
-    root.appendChild(sourceFilterButton("all", "Все", reviews().length));
-    Object.entries(summary().sources || {}).sort(function (left, right) { return right[1] - left[1]; }).forEach(function (entry) {
-      root.appendChild(sourceFilterButton(entry[0], sourceLabels[entry[0]] || entry[0], entry[1]));
-    });
+    root.appendChild(statusFilterButton("all", "Все", reviews().length));
+    root.appendChild(statusFilterButton("unanswered", "Без ответа", reviews().filter(function (review) { return !hasOwnerReply(review); }).length));
+    root.appendChild(statusFilterButton("negative", "Негативные", reviews().filter(needsAttention).length));
+    var select = document.getElementById("review-source-select");
+    if (select) {
+      var selected = state.source;
+      select.textContent = "";
+      var all = node("option", "", "Все источники");
+      all.value = "all";
+      select.appendChild(all);
+      Object.entries(summary().sources || {}).sort(function (left, right) { return right[1] - left[1]; }).forEach(function (entry) {
+        var option = node("option", "", (sourceLabels[entry[0]] || entry[0]) + " · " + number(entry[1]));
+        option.value = entry[0];
+        select.appendChild(option);
+      });
+      select.value = selected;
+    }
   }
 
   function ratingStars(value) {
@@ -329,6 +351,8 @@
     var query = state.search.trim().toLocaleLowerCase("ru");
     var values = reviews().filter(function (review) {
       if (state.source !== "all" && review.source !== state.source) return false;
+      if (state.filter === "unanswered" && hasOwnerReply(review)) return false;
+      if (state.filter === "negative" && !needsAttention(review)) return false;
       if (!query) return true;
       return [review.text, review.authorName, sourceLabels[review.source] || review.source]
         .filter(Boolean).join(" ").toLocaleLowerCase("ru").includes(query);
@@ -351,7 +375,17 @@
       head.appendChild(node("span", "rating-stars", ratingStars(review.rating)));
       head.appendChild(node("span", "review-source-label", sourceLabels[review.source] || review.source || "Источник не указан"));
       main.appendChild(head);
-      main.appendChild(node("p", "review-item-text", review.text));
+      var metadata = review.sourceMetadata && typeof review.sourceMetadata === "object" ? review.sourceMetadata : {};
+      var originalText = typeof metadata.originalText === "string" && metadata.originalText.trim() ? metadata.originalText.trim() : review.text;
+      var translatedText = typeof metadata.translatedText === "string" && metadata.translatedText.trim() ? metadata.translatedText.trim() : "";
+      main.appendChild(node("p", "review-item-text", originalText));
+      if (translatedText && translatedText !== originalText) {
+        var translation = node("details", "review-translation");
+        translation.appendChild(node("summary", "", "Показать перевод Google"));
+        translation.appendChild(node("p", "", translatedText));
+        main.appendChild(translation);
+      }
+      if (hasOwnerReply(review)) main.appendChild(node("p", "review-owner-reply", "Ответ опубликован"));
       if (review.aiSummary) main.appendChild(node("p", "review-ai-summary", review.aiSummary));
       if (Array.isArray(review.topics) && review.topics.length) {
         var topics = node("div", "review-topics");
@@ -445,6 +479,8 @@
     }
   }
 
+  // Retained for backward-compatible embedded entry points; the visible setup entry now lives in Integrations.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function openGoogleSettings() {
     if (!canManageIntegrations()) return showMessage("Настройки OAuth доступны только владельцу.", true);
     googleForm.reset();
@@ -604,6 +640,7 @@
     target.disabled = true;
     try {
       var result = await api("/api/reviews/reply", { method: "POST", body: JSON.stringify({ review: review }) });
+      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + review.text;
       document.getElementById("review-reply-copy").textContent = result.data && result.data.draft ? result.data.draft : "Черновик не подготовлен.";
       replyDialog.showModal();
     } catch (problem) {
@@ -655,6 +692,7 @@
   document.getElementById("add-review").addEventListener("click", openManual);
   document.getElementById("import-reviews").addEventListener("click", openImport);
   document.getElementById("review-search").addEventListener("input", function (event) { state.search = event.target.value; renderReviewList(); });
+  document.getElementById("review-source-select").addEventListener("change", function (event) { state.source = event.target.value; renderReviewList(); });
   document.querySelectorAll("[data-close-dialog]").forEach(function (control) {
     control.addEventListener("click", function () {
       var dialog = document.getElementById(control.dataset.closeDialog);
@@ -809,10 +847,12 @@
     state.googleSettings = null;
     state.googleConnecting = false;
     state.search = "";
+    state.filter = "all";
     state.source = "all";
   });
 
   var params = new URLSearchParams(window.location.search);
+  if (params.get("filter") === "unanswered" || params.get("filter") === "negative") state.filter = params.get("filter");
   var googleReason = params.get("reason");
   var googleErrors = {
     access_denied: "Вы отменили доступ Google. Подключение не изменено.",

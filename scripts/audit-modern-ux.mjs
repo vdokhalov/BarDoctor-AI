@@ -156,8 +156,9 @@ export async function runModernUxAudit() {
   const home = bundle.slice(homeStart, homeEnd);
   requireOrder(home, [
     "bdHomeMoneyCard",
-    "bdHomeTodayCard",
+    "bdHomeReviewsCardV409",
     "bdHomeAttention",
+    "bdHomeTodayCard",
     "bdHomeFreshAi",
     "bdHomeContextCardsV151",
   ], "home information hierarchy");

@@ -6,7 +6,7 @@ import {
   venues,
   type Account,
 } from "../../db/schema";
-import { authenticateRequest, unauthorized } from "./auth";
+import { authenticateRequest, unauthorized, type AuthenticatedAccount } from "./auth";
 import { hasPermission } from "./access-control";
 import {
   buildGoogleAuthUrl,
@@ -29,6 +29,7 @@ import {
 } from "./google-oauth-error";
 import { parseGoogleMapsUrl } from "./google-maps-url";
 import { readJsonRequest } from "./http";
+import { homeReviewMetrics } from "./review-model";
 import {
   loadReviewLayer,
   logReviewLayerEvent,
@@ -64,6 +65,23 @@ async function connectionFor(accountId: number): Promise<Connection | null> {
     .where(eq(googleConnections.accountId, accountId))
     .limit(1);
   return connection ?? null;
+}
+
+export async function loadHomeReviewSnapshot(account: AuthenticatedAccount) {
+  const [connection, layer] = await Promise.all([
+    connectionFor(account.id),
+    loadReviewLayer(account),
+  ]);
+  return {
+    provider: {
+      status: connection?.status ?? "disconnected",
+      locationName: connection?.locationName ?? null,
+      lastSyncedAt: connection?.lastSyncedAt ?? null,
+      lastSyncError: connection?.lastSyncError ?? null,
+    },
+    metrics: homeReviewMetrics(layer.reviews),
+    layerUpdatedAt: layer.updatedAt,
+  };
 }
 
 async function upsertConnection(
@@ -310,7 +328,7 @@ export async function syncGoogleReviewsIfDue(accountId: number): Promise<{
 }
 
 function callbackRedirect(request: Request, query: string): Response {
-  return Response.redirect(new URL(`/reviews?${query}`, request.url), 302);
+  return Response.redirect(new URL(`/integrations?flow=google&${query}`, request.url), 302);
 }
 
 async function recordGoogleOAuthFailure(

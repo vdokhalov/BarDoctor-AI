@@ -110,7 +110,7 @@ test("Google OAuth authorization always replaces the top-level browser context",
 
   assert.match(client, /navigateGoogleOAuth\(url\)/);
   assert.doesNotMatch(client, /(?:createElement\(["']iframe["']\)|<iframe)[^\n]*(?:google|oauth|url\.href)/i);
-  assert.match(page, /reviews\.js\?v=20260903-google-oauth-token-diagnostics-v408/);
+  assert.match(page, /reviews\.js\?v=20260903-home-reviews-ux-v409/);
 });
 
 test("account Google OAuth credentials override any environment fallback", async () => {

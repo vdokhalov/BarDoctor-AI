@@ -839,7 +839,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /route:\/api\/integrations/);
   assert.match(worker, /route:\/integrations/);
   assert.match(worker, /route:\/settings/);
-  assert.match(worker, /integrations\.js\?v=20260814-connector-download-v187/);
+  assert.match(worker, /integrations\.js\?v=20260903-home-reviews-ux-v409/);
   assert.match(worker, /route:\/api\/integration-hub\/import/);
   assert.match(worker, /route:\/api\/integration-hub\/import\/preview/);
   assert.match(worker, /route:\/api\/integration-hub\/connections/);
@@ -1219,8 +1219,9 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   const homeOrder = [
     "i.jsx(bdHomeHealthIndexV200",
     "i.jsx(bdHomeMoneyCard",
-    "i.jsx(bdHomeTodayCard",
+    "i.jsx(bdHomeReviewsCardV409",
     "i.jsx(bdHomeAttention",
+    "i.jsx(bdHomeTodayCard",
     "i.jsx(bdHomeFreshAi",
     "i.jsx(bdHomeContextCardsV151",
   ].map((token) => homeDailySource.indexOf(token));

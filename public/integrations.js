@@ -13,6 +13,8 @@
   var state = {
     hub: null,
     reviews: null,
+    googleSettings: null,
+    googleConnecting: false,
     auxiliaryErrors: {},
     view: "overview",
     connectionId: "",
@@ -292,6 +294,7 @@
     var providers = state.reviews && state.reviews.data && Array.isArray(state.reviews.data.providers) ? state.reviews.data.providers : [];
     var provider = providers.find(function (item) { return item.id === "google"; }) || null;
     if (!provider) return { kind: "unknown", label: "Неизвестно", known: false, reason: "Состояние Google Business Profile не удалось проверить." };
+    if (provider && provider.status === "connected" && provider.lastSyncError) return { kind: "attention", label: "Ошибка синхронизации", known: true, provider: provider, reason: provider.lastSyncError };
     if (provider && provider.status === "connected") return { kind: "working", label: "Работает", known: true, provider: provider, reason: "Отзывы автоматически поступают в BarDoctor." };
     if (provider && provider.status === "pending_location") return { kind: "attention", label: "Нужно выбрать профиль", known: true, provider: provider, reason: "Google авторизован, но профиль заведения ещё не выбран." };
     if (provider && (provider.status === "error" || provider.status === "url_linked")) return { kind: "attention", label: "Требует настройки", known: true, provider: provider, reason: provider.lastSyncError || "Завершите подключение профиля Google." };
@@ -325,7 +328,8 @@
     copy.appendChild(capabilities);
     root.appendChild(copy);
     var side = node("div", "card-side");
-    side.appendChild(linkButton("Настроить источники", "/reviews#sources", "secondary small"));
+    side.appendChild(button("Управлять подключением", "secondary small", function () { showView("google", "", true); }));
+    side.appendChild(linkButton("Открыть отзывы", "/reviews", "secondary small"));
     root.appendChild(side);
   }
 
@@ -390,7 +394,7 @@
 
   function parseView() {
     var url = new URL(window.location.href);
-    var allowed = new Set(["catalog", "onec", "api", "file"]);
+    var allowed = new Set(["catalog", "onec", "api", "file", "google"]);
     var view = allowed.has(url.searchParams.get("flow")) ? url.searchParams.get("flow") : "overview";
     return { view: view, connectionId: url.searchParams.get("connection") || "" };
   }
@@ -402,10 +406,11 @@
       section.classList.toggle("hidden", section.dataset.integrationView !== state.view);
     });
     document.body.classList.toggle("integration-subview", state.view !== "overview");
-    document.getElementById("page-title").textContent = state.view === "overview" ? "Интеграции" : state.view === "catalog" ? "Подключить систему" : state.view === "onec" ? "1С:Предприятие" : state.view === "api" ? "Подключение API" : "Импорт из файла";
+    document.getElementById("page-title").textContent = state.view === "overview" ? "Интеграции" : state.view === "catalog" ? "Подключить систему" : state.view === "onec" ? "1С:Предприятие" : state.view === "api" ? "Подключение API" : state.view === "google" ? "Google Business Profile" : "Импорт из файла";
     if (push) window.history.pushState({ integrationView: state.view }, "", currentViewUrl(state.view, state.connectionId));
     if (state.view === "onec") renderOneCDetail();
     if (state.view === "api") renderApiDetail();
+    if (state.view === "google") loadGoogleIntegration();
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -914,6 +919,112 @@
     localStorage.setItem("bd_session_userid", String(result.userId));
   }
 
+  function googleProvider() {
+    var providers = state.reviews && state.reviews.data && Array.isArray(state.reviews.data.providers) ? state.reviews.data.providers : [];
+    return providers.find(function (provider) { return provider.id === "google"; }) || null;
+  }
+
+  function googleIntegrationError(text) {
+    var root = document.getElementById("google-integration-error");
+    root.textContent = text || "";
+    root.classList.toggle("hidden", !text);
+  }
+
+  function renderGoogleIntegration() {
+    var provider = googleProvider();
+    var configured = Boolean(state.googleSettings && state.googleSettings.services && state.googleSettings.services.google_business && state.googleSettings.services.google_business.configured) || Boolean(provider && provider.configured);
+    var status = provider ? googleBusinessPresentation() : { kind: "unknown", label: "Неизвестно", reason: "Состояние Google Business Profile не получено." };
+    var statusRoot = document.getElementById("google-integration-status");
+    statusRoot.className = "google-integration-status " + status.kind;
+    statusRoot.textContent = "";
+    statusRoot.appendChild(node("strong", "", status.label));
+    statusRoot.appendChild(node("p", "", status.reason + (provider && provider.lastSyncedAt ? " Последняя синхронизация: " + readableDate(provider.lastSyncedAt) + "." : "")));
+    document.getElementById("google-integration-callback").value = state.googleSettings && state.googleSettings.googleCallbackUrl ? state.googleSettings.googleCallbackUrl : "";
+    var connect = document.getElementById("google-connect-profile");
+    connect.classList.toggle("hidden", !configured || Boolean(provider && provider.status === "connected") || Boolean(provider && provider.status === "pending_location"));
+    connect.textContent = provider && provider.status === "error" ? "Подключить заново" : "Подключить Google";
+    connect.disabled = state.googleConnecting;
+    document.getElementById("google-sync-reviews").classList.toggle("hidden", !(provider && provider.status === "connected"));
+    var picker = document.getElementById("google-location-picker");
+    picker.textContent = "";
+    picker.classList.toggle("hidden", !(provider && provider.status === "pending_location" && Array.isArray(provider.pendingLocations)));
+    if (provider && provider.status === "pending_location" && Array.isArray(provider.pendingLocations)) {
+      var select = document.createElement("select");
+      provider.pendingLocations.forEach(function (location) { var option = node("option", "", location.name || location.id); option.value = location.id; select.appendChild(option); });
+      var confirm = button("Выбрать профиль", "secondary small", function () { selectGoogleLocation(select.value, confirm); });
+      picker.append(select, confirm);
+    }
+  }
+
+  async function loadGoogleIntegration() {
+    googleIntegrationError("");
+    try {
+      var result = await api("/api/integrations", { method: "GET" });
+      state.googleSettings = result.data;
+      renderGoogleIntegration();
+    } catch (error) {
+      googleIntegrationError(error.message || "Не удалось загрузить OAuth-настройки.");
+      renderGoogleIntegration();
+    }
+  }
+
+  async function saveGoogleIntegration(event) {
+    event.preventDefault();
+    var form = event.currentTarget;
+    var clientId = String(form.elements.clientId.value || "").trim();
+    var clientSecret = String(form.elements.clientSecret.value || "").trim();
+    if (!clientId || !clientSecret) return googleIntegrationError("Введите Google Client ID и Client Secret.");
+    var submit = document.getElementById("google-save-settings");
+    submit.disabled = true;
+    googleIntegrationError("");
+    try {
+      var result = await api("/api/integrations", { method: "PUT", body: JSON.stringify({ service: "google_business", clientId: clientId, clientSecret: clientSecret }) });
+      state.googleSettings = result.data;
+      form.elements.clientId.value = "";
+      form.elements.clientSecret.value = "";
+      renderGoogleIntegration();
+      showMessage("Google OAuth настроен.");
+    } catch (error) { googleIntegrationError(error.message || "Не удалось сохранить OAuth-настройки."); }
+    finally { submit.disabled = false; }
+  }
+
+  async function connectGoogleProfile(event) {
+    var target = event.currentTarget;
+    target.disabled = true;
+    state.googleConnecting = true;
+    try {
+      var result = await api("/api/reviews/sources/google/connect", { method: "GET" });
+      var url = result.data && result.data.url ? new URL(result.data.url) : null;
+      if (!url || url.protocol !== "https:" || url.hostname !== "accounts.google.com") throw new Error("Google вернул некорректную ссылку авторизации.");
+      window.top.location.assign(url.href);
+    } catch (error) {
+      state.googleConnecting = false;
+      target.disabled = false;
+      googleIntegrationError(error.message || "Не удалось начать подключение Google.");
+    }
+  }
+
+  async function selectGoogleLocation(locationId, target) {
+    target.disabled = true;
+    try {
+      await api("/api/reviews/sources/google/select-location", { method: "POST", body: JSON.stringify({ locationId: locationId }) });
+      await loadData(true);
+      showMessage("Профиль Google подключён.");
+    } catch (error) { target.disabled = false; googleIntegrationError(error.message || "Не удалось выбрать профиль."); }
+  }
+
+  async function syncGoogleIntegration(event) {
+    var target = event.currentTarget;
+    target.disabled = true;
+    try {
+      var result = await api("/api/reviews/sources/google/sync", { method: "POST", body: "{}" });
+      if (!result.data || !result.data.synced) throw new Error(result.data && result.data.error ? result.data.error : "Синхронизация не завершена");
+      await loadData(true);
+      showMessage("Отзывы Google синхронизированы.");
+    } catch (error) { googleIntegrationError(error.message || "Не удалось синхронизировать Google."); }
+    finally { target.disabled = false; }
+  }
+
   async function loadData(preserveView) {
     var sequence = ++state.sequence;
     if (state.controller) state.controller.abort();
@@ -951,6 +1062,15 @@
   }
 
   document.getElementById("retry-load").addEventListener("click", function () { loadData(true); });
+  document.getElementById("google-integration-form").addEventListener("submit", saveGoogleIntegration);
+  document.getElementById("google-connect-profile").addEventListener("click", connectGoogleProfile);
+  document.getElementById("google-sync-reviews").addEventListener("click", syncGoogleIntegration);
+  document.getElementById("google-copy-callback").addEventListener("click", async function () {
+    var value = document.getElementById("google-integration-callback").value;
+    if (!value) return googleIntegrationError("Callback URL пока не получен.");
+    try { await navigator.clipboard.writeText(value); showMessage("Callback URL скопирован."); }
+    catch { googleIntegrationError("Скопируйте Callback URL вручную."); }
+  });
   document.getElementById("open-catalog").addEventListener("click", function () { showView("catalog", "", true); });
   document.querySelectorAll("[data-system]").forEach(function (control) {
     control.addEventListener("click", function () {
@@ -985,6 +1105,26 @@
       download(template.name, template.value, format === "csv" ? "text/csv;charset=utf-8" : "application/json;charset=utf-8");
     });
   });
+
+  var googleCallbackParams = new URLSearchParams(window.location.search);
+  var googleCallbackErrors = {
+    access_denied: "Вы отменили доступ Google. Подключение не изменено.",
+    invalid_state: "Сессия подключения истекла. Начните подключение Google заново.",
+    no_locations: "В аккаунте Google Business Profile не найдено доступных заведений.",
+    invalid_client: "Google отклонил Client ID или Client Secret.",
+    invalid_client_secret: "Google отклонил Client Secret для этого OAuth Client ID.",
+    redirect_uri_mismatch: "Callback URL не совпадает с Authorized redirect URI в Google Cloud.",
+    invalid_grant: "Google authorization code истёк, уже использован или был отозван.",
+    profile_unauthorized: "Google-токен истёк или был отозван. Подключите Google заново.",
+    profile_forbidden: "Google авторизация завершена, но доступ к Business Profile запрещён.",
+    profile_rate_limited: "Google временно ограничил запросы. Повторите попытку позже.",
+    profile_unavailable: "Google Business Profile временно недоступен.",
+    exchange_failed: "Google не завершил обмен authorization code. Повторите подключение."
+  };
+  if (googleCallbackParams.get("googleConnect") === "success" && googleCallbackParams.get("sync") === "error") showMessage("Google подключён, но первая синхронизация завершилась ошибкой.", true);
+  else if (googleCallbackParams.get("googleConnect") === "success") showMessage("Google Business Profile подключён.");
+  else if (googleCallbackParams.get("googleConnect") === "pending") showMessage("Выберите профиль заведения Google.");
+  else if (googleCallbackParams.get("googleConnect") === "error") showMessage(googleCallbackErrors[googleCallbackParams.get("reason")] || "Подключение Google не завершено.", true);
 
   loadData(false);
 })();

@@ -1,0 +1,67 @@
+/* Home + Reviews UX v409 */
+.bd-home-reviews-v409 {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid rgba(100, 92, 222, .2);
+  border-radius: 22px;
+  color: #171a2b;
+  background: linear-gradient(145deg, #fff 0%, #faf9ff 100%);
+  box-shadow: 0 10px 28px rgba(38, 43, 79, .07);
+}
+.bd-home-reviews-head-v409, .bd-home-reviews-title-v409, .bd-home-reviews-actions-v409 { display: flex; align-items: center; }
+.bd-home-reviews-head-v409 { justify-content: space-between; gap: 14px; }
+.bd-home-reviews-title-v409 { min-width: 0; gap: 10px; }
+.bd-home-reviews-icon-v409 { display: grid; width: 38px; height: 38px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: #5b55f5; background: #eeecff; }
+.bd-home-reviews-title-v409 h2 { margin: 0; font-size: 16px; font-weight: 900; letter-spacing: -.02em; }
+.bd-home-reviews-title-v409 small, .bd-home-reviews-sync-v409 { display: block; margin-top: 2px; color: #818697; font-size: 9px; line-height: 1.35; }
+.bd-home-reviews-sync-v409 { flex: 0 1 auto; max-width: 46%; margin: 0; text-align: right; }
+.bd-home-reviews-metrics-v409 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 16px; overflow: hidden; border: 1px solid #e7e6f3; border-radius: 16px; background: rgba(255, 255, 255, .84); }
+.bd-home-reviews-metrics-v409 > div { min-width: 0; padding: 13px; border-right: 1px solid #e7e6f3; }
+.bd-home-reviews-metrics-v409 > div:last-child { border-right: 0; }
+.bd-home-reviews-metrics-v409 small { display: block; min-height: 26px; color: #777d90; font-size: 9px; font-weight: 760; line-height: 1.35; }
+.bd-home-reviews-metrics-v409 strong { display: block; margin-top: 4px; overflow-wrap: anywhere; font-size: 22px; font-weight: 930; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.bd-home-reviews-metrics-v409 strong span { color: #8a8fa0; font-size: 11px; font-weight: 700; }
+.bd-home-reviews-metrics-v409 p { margin: 5px 0 0; color: #858a9a; font-size: 8.5px; line-height: 1.35; }
+.bd-home-reviews-metrics-v409 .is-rating strong { color: #5b55f5; }
+.bd-home-reviews-metrics-v409 .is-attention strong { color: #c33d52; }
+.bd-home-reviews-insight-v409 { display: flex; gap: 10px; margin-top: 12px; padding: 12px; border-radius: 14px; background: #f3f1ff; }
+.bd-home-reviews-insight-v409 > span { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: #fff; background: #655ff0; font-size: 9px; font-weight: 900; }
+.bd-home-reviews-insight-v409 strong { display: block; font-size: 10.5px; line-height: 1.4; overflow-wrap: anywhere; }
+.bd-home-reviews-insight-v409 p { margin: 3px 0 0; color: #73788b; font-size: 9px; line-height: 1.4; }
+.bd-home-reviews-actions-v409 { gap: 8px; margin-top: 13px; }
+.bd-home-reviews-actions-v409 button, .bd-home-reviews-v409.is-empty button, .bd-home-reviews-v409.is-error button { min-height: 40px; padding: 9px 13px; border: 0; border-radius: 12px; color: #514acb; background: #eceaff; font-size: 10px; font-weight: 840; cursor: pointer; }
+.bd-home-reviews-actions-v409 button:disabled { color: #85899a; background: #f0f1f4; cursor: default; }
+.bd-home-reviews-error-v409 { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; color: #a93850; background: #fff0f3; font-size: 9.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.bd-home-reviews-v409.is-empty p, .bd-home-reviews-v409.is-error p { margin: 12px 0; color: #666c80; font-size: 11px; line-height: 1.5; }
+.bd-home-reviews-v409.is-error h2 { margin: 6px 0 0; font-size: 16px; }
+.bd-home-reviews-kicker-v409 { margin: 0 !important; color: #5b55f5 !important; font-size: 9px !important; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.bd-home-reviews-v409.is-loading { display: grid; gap: 12px; min-height: 190px; align-content: center; }
+.bd-home-reviews-skeleton-v409 { height: 16px; border-radius: 8px; background: linear-gradient(90deg, #efeff6, #f8f8fc, #efeff6); background-size: 220% 100%; animation: bd-home-reviews-shimmer-v409 1.4s ease infinite; }
+.bd-home-reviews-skeleton-v409.wide { width: 48%; }
+.bd-home-reviews-skeleton-v409.metrics { height: 78px; }
+.bd-home-reviews-skeleton-v409.actions { width: 42%; height: 36px; }
+@keyframes bd-home-reviews-shimmer-v409 { to { background-position: -120% 0; } }
+
+@media (max-width: 390px) {
+  .bd-home-reviews-v409 { padding: 15px; }
+  .bd-home-reviews-head-v409 { align-items: flex-start; flex-direction: column; }
+  .bd-home-reviews-sync-v409 { max-width: none; text-align: left; }
+  .bd-home-reviews-metrics-v409 > div { padding: 11px 9px; }
+  .bd-home-reviews-metrics-v409 small { font-size: 8px; }
+  .bd-home-reviews-metrics-v409 strong { font-size: 19px; }
+  .bd-home-reviews-actions-v409 { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
+  .bd-home-reviews-actions-v409 button { min-width: 0; padding-inline: 8px; font-size: 9px; }
+}
+
+[data-bd-nav-key="reviews"] { display: none !important; }
+@media (min-width: 1024px) {
+  [data-bd-nav-key="reviews"] { display: flex !important; }
+  .bd-home-daily { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(330px, .7fr); align-items: start; gap: 18px; }
+  .bd-home-daily.bd-home-daily > .bd-home-health-card-v332 { grid-column: 1 / -1 !important; grid-row: 1; }
+  .bd-home-daily.bd-home-daily > .bd-home-money, .bd-home-daily.bd-home-daily > .bd-home-money-loading-v344 { grid-column: 1 !important; grid-row: 2; }
+  .bd-home-daily.bd-home-daily > .bd-home-reviews-v409 { grid-column: 2; grid-row: 2; }
+  .bd-home-attention, .bd-home-today, .bd-home-ai, .bd-home-context-grid { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) { .bd-home-reviews-skeleton-v409 { animation: none; } }
