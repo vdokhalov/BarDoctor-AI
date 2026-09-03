@@ -5,11 +5,38 @@ import vm from "node:vm";
 
 const bundle = fs.readFileSync(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
 
-function costingApi(): any {
+type CanonicalResolver = (value: unknown) => string;
+type CostRow = Record<string, unknown> & {
+  complete?: boolean;
+  cost?: number;
+  unitPrice?: number;
+  currency?: string;
+  source?: string;
+  purchaseDocumentNumber?: string | null;
+  reason?: string | null;
+};
+type CostingApi = {
+  canonical: (state: unknown) => CanonicalResolver;
+  maps: (state: unknown, purchases: unknown[], canonical: CanonicalResolver) => unknown;
+  row: (
+    ingredientValue: unknown,
+    maps: unknown,
+    canonical: CanonicalResolver,
+    menuItem?: unknown,
+    menuPackageHint?: string,
+  ) => CostRow;
+};
+type VmCostingContext = {
+  bdCatArray: (value: unknown) => unknown[];
+  bdAssortmentNumberV170: (value: unknown, fallback?: number) => number;
+  api?: CostingApi;
+};
+
+function costingApi(): CostingApi {
   const start = bundle.indexOf("function bdTechCostUnitV376");
   const end = bundle.indexOf("function bdAssortmentFallbackAnalyticsV170", start);
   assert.ok(start >= 0 && end > start, "tech-card costing helpers must exist");
-  const context: any = {
+  const context: VmCostingContext = {
     bdCatArray: (value: unknown) => Array.isArray(value) ? value : [],
     bdAssortmentNumberV170: (value: unknown, fallback = 0) => {
       const parsed = Number(String(value ?? "").replace(/\s/g, "").replace(",", "."));
@@ -21,6 +48,7 @@ function costingApi(): any {
     `${bundle.slice(start, end)};this.api={canonical:bdTechCostCanonicalV376,maps:bdTechCostMapsV376,row:bdTechCostRowV376}`,
     context,
   );
+  assert.ok(context.api, "costing API must be exposed by the bundle helpers");
   return context.api;
 }
 
