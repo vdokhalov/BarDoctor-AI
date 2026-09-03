@@ -819,8 +819,13 @@
     invalid_state: "Сессия подключения истекла. Начните подключение Google заново.",
     no_locations: "В аккаунте Google Business Profile не найдено доступных заведений.",
     invalid_client: "Google отклонил Client ID или Client Secret.",
+    invalid_client_secret: "Google отклонил Client Secret для этого OAuth Client ID.",
     redirect_uri_mismatch: "Callback URL не совпадает с Authorized redirect URI в Google Cloud.",
     invalid_grant: "Google authorization code истёк, уже использован или был отозван. Начните подключение заново.",
+    profile_unauthorized: "Google-токен истёк или был отозван. Подключите Google заново.",
+    profile_forbidden: "Google авторизация завершена, но доступ к Business Profile запрещён. Проверьте права аккаунта и включённые Google Business API.",
+    profile_rate_limited: "Google временно ограничил запросы к Business Profile. Повторите попытку позже.",
+    profile_unavailable: "Google авторизация завершена, но Business Profile временно недоступен.",
     exchange_failed: "Google не завершил обмен authorization code. Повторите подключение."
   };
   if (params.get("googleConnect") === "success" && params.get("sync") === "error") showMessage("Google Business Profile подключён, но первая синхронизация завершилась ошибкой.", true);

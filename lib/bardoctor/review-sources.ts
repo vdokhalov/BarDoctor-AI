@@ -16,12 +16,14 @@ import {
   exchangeGoogleCode,
   fetchGoogleReviews,
   googleErrorResponse,
+  GoogleServiceError,
   isGoogleOAuthConfigured,
   listGoogleLocations,
   refreshGoogleToken,
 } from "./google";
 import {
   googleOAuthErrorCode,
+  googleOAuthSafeDiagnostic,
   normalizeGoogleOAuthError,
   type GoogleOAuthErrorCode,
 } from "./google-oauth-error";
@@ -314,12 +316,44 @@ function callbackRedirect(request: Request, query: string): Response {
 async function recordGoogleOAuthFailure(
   accountId: number,
   code: GoogleOAuthErrorCode,
+  diagnostic?: string,
 ): Promise<void> {
   try {
-    await logReviewSourceEvent(accountId, "oauth_failed", `Google OAuth: ${code}`);
+    await logReviewSourceEvent(
+      accountId,
+      "oauth_failed",
+      diagnostic ? `Google OAuth: ${code}; ${diagnostic}` : `Google OAuth: ${code}`,
+    );
   } catch {
     // An audit write must not replace the safe OAuth result shown to the owner.
   }
+}
+
+async function recordGoogleTokenExchangeSuccess(accountId: number, status: number): Promise<void> {
+  try {
+    await logReviewSourceEvent(
+      accountId,
+      "oauth_token_exchanged",
+      `Google OAuth token: HTTP ${status}; grant_type=authorization_code; client_id=present; client_secret=present; code=present; redirect_uri=present`,
+    );
+  } catch {
+    // Diagnostics must not interrupt a successful OAuth flow.
+  }
+}
+
+function googleProfileErrorCode(error: unknown): GoogleOAuthErrorCode {
+  const status = error instanceof GoogleServiceError ? error.upstreamStatus ?? error.status : 0;
+  if (status === 401) return "profile_unauthorized";
+  if (status === 403) return "profile_forbidden";
+  if (status === 429) return "profile_rate_limited";
+  return "profile_unavailable";
+}
+
+function googleProfileSafeDiagnostic(error: unknown): string {
+  if (!(error instanceof GoogleServiceError)) {
+    return "business_profile HTTP unavailable; operation=unknown";
+  }
+  return `business_profile HTTP ${error.upstreamStatus ?? error.status}; operation=${error.operation ?? "unknown"}`;
 }
 
 export async function handleGoogleSourceGet(request: Request, action: string): Promise<Response> {
@@ -344,13 +378,38 @@ export async function handleGoogleSourceGet(request: Request, action: string): P
       await recordGoogleOAuthFailure(oauthState.accountId, "exchange_failed");
       return callbackRedirect(request, "googleConnect=error&reason=exchange_failed");
     }
+    let tokens;
     try {
-      const tokens = await exchangeGoogleCode(
+      tokens = await exchangeGoogleCode(
         oauthState.accountId,
         code,
         oauthState.redirectUri,
       );
-      const locations = await listGoogleLocations(tokens.accessToken);
+      await recordGoogleTokenExchangeSuccess(oauthState.accountId, tokens.tokenEndpointStatus);
+    } catch (error) {
+      const reason = googleOAuthErrorCode(error);
+      await recordGoogleOAuthFailure(
+        oauthState.accountId,
+        reason,
+        googleOAuthSafeDiagnostic(error),
+      );
+      return callbackRedirect(request, `googleConnect=error&reason=${reason}`);
+    }
+
+    let locations;
+    try {
+      locations = await listGoogleLocations(tokens.accessToken);
+    } catch (error) {
+      const reason = googleProfileErrorCode(error);
+      await recordGoogleOAuthFailure(
+        oauthState.accountId,
+        reason,
+        googleProfileSafeDiagnostic(error),
+      );
+      return callbackRedirect(request, `googleConnect=error&reason=${reason}`);
+    }
+
+    try {
       const existing = await connectionFor(oauthState.accountId);
       const tokenValues = {
         accessTokenEncrypted: await encryptGoogleToken(oauthState.accountId, tokens.accessToken),
@@ -389,10 +448,9 @@ export async function handleGoogleSourceGet(request: Request, action: string): P
         pendingLocationsJson: JSON.stringify(locations),
       });
       return callbackRedirect(request, "googleConnect=pending");
-    } catch (error) {
-      const reason = googleOAuthErrorCode(error);
-      await recordGoogleOAuthFailure(oauthState.accountId, reason);
-      return callbackRedirect(request, `googleConnect=error&reason=${reason}`);
+    } catch {
+      await recordGoogleOAuthFailure(oauthState.accountId, "profile_unavailable", "connection_store HTTP unavailable; operation=store_connection");
+      return callbackRedirect(request, "googleConnect=error&reason=profile_unavailable");
     }
   }
 

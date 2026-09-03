@@ -18,6 +18,8 @@ export class GoogleServiceError extends Error {
   constructor(
     message: string,
     readonly status = 502,
+    readonly operation?: GoogleOperation,
+    readonly upstreamStatus?: number,
   ) {
     super(message);
   }
@@ -27,13 +29,13 @@ type GoogleOperation = "OAuth" | "аккаунты" | "заведения" | "о
 
 function googleHttpError(operation: GoogleOperation, status: number): GoogleServiceError {
   if (status === 400 && operation === "OAuth") {
-    return new GoogleServiceError("Google отклонил Client ID, Client Secret или Callback URL. Проверьте OAuth Client.", 400);
+    return new GoogleServiceError("Google отклонил Client ID, Client Secret или Callback URL. Проверьте OAuth Client.", 400, operation, status);
   }
-  if (status === 401) return new GoogleServiceError("Доступ Google истёк или был отозван. Подключите Google заново.", 401);
-  if (status === 403) return new GoogleServiceError(`Google запретил доступ к данным (${operation}). Проверьте права аккаунта и включённые Google Business API.`, 403);
-  if (status === 429) return new GoogleServiceError("Google временно ограничил частоту запросов. Повторите синхронизацию позже.", 429);
-  if (status >= 500) return new GoogleServiceError("Google Business Profile временно недоступен. Повторите попытку позже.", 503);
-  return new GoogleServiceError(`Google не выполнил запрос (${operation}). Проверьте подключение и повторите попытку.`, 502);
+  if (status === 401) return new GoogleServiceError("Доступ Google истёк или был отозван. Подключите Google заново.", 401, operation, status);
+  if (status === 403) return new GoogleServiceError(`Google запретил доступ к данным (${operation}). Проверьте права аккаунта и включённые Google Business API.`, 403, operation, status);
+  if (status === 429) return new GoogleServiceError("Google временно ограничил частоту запросов. Повторите синхронизацию позже.", 429, operation, status);
+  if (status >= 500) return new GoogleServiceError("Google Business Profile временно недоступен. Повторите попытку позже.", 503, operation, status);
+  return new GoogleServiceError(`Google не выполнил запрос (${operation}). Проверьте подключение и повторите попытку.`, 502, operation, status);
 }
 
 async function googleFetch(
@@ -170,6 +172,7 @@ export type GoogleTokens = {
   accessToken: string;
   refreshToken?: string;
   expiresAt: string;
+  tokenEndpointStatus: number;
 };
 
 async function tokenRequest(params: URLSearchParams): Promise<GoogleTokens> {
@@ -190,6 +193,7 @@ async function tokenRequest(params: URLSearchParams): Promise<GoogleTokens> {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     expiresAt: new Date(Date.now() + Number(data.expires_in ?? 3_600) * 1_000).toISOString(),
+    tokenEndpointStatus: response.status,
   };
 }
 
