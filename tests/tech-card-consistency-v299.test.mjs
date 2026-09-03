@@ -13,9 +13,9 @@ test("compiled tech-card consistency patch remains valid", () => {
 test("ingredient selector keeps canonical matching and uses the complete structured catalogue", () => {
   for (const marker of [
     "bd-tech-card-consistency-v299",
-    "bd-tech-card-catalog-picker-v368",
+    "bd-tech-card-search-ux-v375",
     "Поиск по всей номенклатуре",
-    "Все активные складские позиции · по алфавиту",
+    "Поиск по всему справочнику",
     "Все разделы",
     "Все категории",
     "Все подкатегории",
@@ -36,7 +36,7 @@ test("recipe creation requires an explicit menu-item choice and opens the shared
 });
 
 test("selector controls remain usable on mobile", () => {
-  for (const marker of [".bd-ingredient-selector-v299", ".bd-tech-card-taxonomy-v368", "@media(max-width:640px)", "grid-template-columns:1fr", "position:sticky"]) {
+  for (const marker of [".bd-ingredient-selector-v299", ".bd-tech-card-taxonomy-v375", "@media(max-width:640px)", "grid-template-columns:1fr", "position:sticky"]) {
     assert.ok(css.includes(marker), marker);
   }
 });

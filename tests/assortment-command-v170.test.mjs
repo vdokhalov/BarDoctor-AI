@@ -172,9 +172,10 @@ test("Cost analytics only use confirmed normalized venue data", async () => {
   assert.match(analytics, /procurementPricePoints/);
   assert.match(analytics, /includePriceLists: false/);
   assert.match(analytics, /text\(value\.status\) === "confirmed"/);
-  assert.match(analytics, /weighted_inventory_average/);
   assert.match(analytics, /latest_confirmed_purchase/);
-  assert.match(analytics, /averageUnitCost/);
+  assert.match(analytics, /externalProductKeys/);
+  assert.match(analytics, /purchasePackageSize/);
+  assert.doesNotMatch(analytics, /weighted_inventory_average/);
   assert.match(analytics, /ingredient\.reason === "mapping"/);
   assert.match(analytics, /ASSORTMENT_COST_CHANGE_THRESHOLD_PERCENT = 5/);
   assert.match(analytics, /same_elapsed_days/);

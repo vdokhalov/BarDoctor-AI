@@ -192,6 +192,7 @@ function patchBundle(path) {
 function patchShell(path) {
   if (!existsSync(path)) return false;
   let source = readFileSync(path, "utf8");
+  if (source.includes("bd-stable-splash-v394")) return false;
   const styleStart = source.indexOf("    <style>\n      /* bd-static-startup-fastpaint-v343 */");
   const styleEnd = source.indexOf("    </style>", styleStart);
   if (styleStart < 0 || styleEnd < 0) {

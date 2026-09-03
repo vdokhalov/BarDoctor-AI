@@ -558,25 +558,32 @@ export function reconcileIngredientQuantity(input: {
     `${value.unit}:${value.amount}`,
     value,
   ])).values()];
-  if (ingredientAmount.unit === "pcs" && uniqueConfirmedPackages.length === 1) {
-    const packageValue = uniqueConfirmedPackages[0];
+  const knownPackages = [...new Map([
+    ...uniqueConfirmedPackages,
+    ...uniquePackages,
+  ].map((value) => [
+    `${value.unit}:${value.amount}`,
+    value,
+  ])).values()];
+  if (ingredientAmount.unit === "pcs" && knownPackages.length === 1) {
+    const packageValue = knownPackages[0];
     return {
       ...base,
       status: "packaging_compatible",
       score: 90,
       normalizedAmount: ingredientAmount.amount * packageValue.amount,
       normalizedUnit: packageValue.unit,
-      packageOptions: uniqueConfirmedPackages,
+      packageOptions: knownPackages,
       evidence: ["использована единственная известная фасовка товара"],
       reason: `Норма пересчитана по фасовке ${packageValue.label}`,
     };
   }
-  if (ingredientAmount.unit === "pcs" && (uniquePackages.length > 0 || uniqueConfirmedPackages.length > 1)) {
+  if (ingredientAmount.unit === "pcs" && knownPackages.length > 0) {
     return {
       ...base,
       status: "packaging_review",
       score: 45,
-      packageOptions: (uniqueConfirmedPackages.length ? uniqueConfirmedPackages : uniquePackages).slice(0, 5),
+      packageOptions: knownPackages.slice(0, 5),
       evidence: ["у товара несколько подходящих фасовок"],
       reason: "Выберите фасовку для пересчёта нормы",
       plausibilityWarning: "Количество в штуках нельзя пересчитать без выбора фасовки.",

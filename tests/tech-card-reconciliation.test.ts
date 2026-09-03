@@ -90,6 +90,26 @@ function approvedRecipe(patch: Record<string, unknown> = {}) {
   };
 }
 
+function ginPurchase() {
+  return {
+    id: "purchase-gin",
+    venueId: 1,
+    status: "confirmed",
+    documentType: "invoice",
+    supplierName: "Поставщик джина",
+    date: "2026-08-22",
+    currency: "RUB",
+    items: [{
+      id: "purchase-line-gin",
+      name: "Джин",
+      purchaseProductKey: "stock:gin|ml",
+      quantity: 1,
+      unit: "л",
+      lineTotal: 500,
+    }],
+  };
+}
+
 test("existing owner and AI generation produce one linked AI draft", () => {
   const assortment = baseAssortment();
   assortment.recipes = [{
@@ -106,6 +126,23 @@ test("existing owner and AI generation produce one linked AI draft", () => {
   assert.equal(recipe.reviewStatus, "ai_draft");
   assert.equal(recipe.currentDraft, true);
   assert.equal(result.report.autoLinked, 0);
+});
+
+test("legacy candidate keys resolve through canonical product aliases", () => {
+  const assortment = Object.assign(baseAssortment(), {
+    inventoryProductAliases: [{ from: "legacy:gin", to: "stock:gin|ml" }],
+  });
+  assortment.nomenclature[0].productKey = "legacy:gin";
+  assortment.recipes = [approvedRecipe({
+    ingredients: [linkedIngredient({ purchaseProductKey: "stock:gin|ml" })],
+  })];
+
+  const result = reconcileTechCards({ assortment, venueId: 1, now });
+  const recipe = (result.assortment.recipes as Record<string, unknown>[])[0];
+  const ingredient = (recipe.ingredients as Record<string, unknown>[])[0];
+
+  assert.equal(ingredient.linkStatus, "linked");
+  assert.equal(ingredient.resolutionStatus, "linked_ready");
 });
 
 test("approved manual card remains canonical and an AI draft cannot overwrite it", () => {
@@ -253,13 +290,23 @@ test("ingredient reconciliation links stable and unique name+unit matches but ne
 test("valid units calculate cost; invalid conversion and missing price stay incomplete instead of zero", () => {
   const assortment = baseAssortment();
   assortment.recipes = [approvedRecipe()];
-  const analytics = buildAssortmentAnalytics({ assortment, venueId: 1, now });
+  const analytics = buildAssortmentAnalytics({
+    assortment,
+    purchaseDocuments: [ginPurchase()],
+    venueId: 1,
+    now,
+  });
   assert.equal(analytics.menuItems[0].recipeCost, 25);
   assert.equal(analytics.menuItems[0].techCardStatus, "approved");
 
   const invalid = baseAssortment();
   invalid.recipes = [approvedRecipe({ ingredients: [linkedIngredient({ unit: "ведро" })] })];
-  const invalidAnalytics = buildAssortmentAnalytics({ assortment: invalid, venueId: 1, now });
+  const invalidAnalytics = buildAssortmentAnalytics({
+    assortment: invalid,
+    purchaseDocuments: [ginPurchase()],
+    venueId: 1,
+    now,
+  });
   assert.equal(invalidAnalytics.menuItems[0].recipeCost, null);
   assert.equal(invalidAnalytics.menuItems[0].techCardStatus, "requires_review");
   assert.equal(invalidAnalytics.counts.invalidUnits, 1);

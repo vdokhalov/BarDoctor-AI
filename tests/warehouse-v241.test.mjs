@@ -19,7 +19,7 @@ test("warehouse v241 separates allocation quality status from the stock hierarch
   assert.match(warehouse, /bdWarehouseVisibleStock=F\.filter\(B=>B\.sectionId&&B\.sectionId!=="unassigned"\)/);
   assert.match(warehouse, /className:"bd-warehouse-distribution-row-v241"/);
   assert.match(warehouse, /onClick:\(\)=>e\("\/nomenclature\?view=attention&returnTo=warehouse"\)/);
-  assert.match(warehouse, /onClick:\(\)=>e\("\/nomenclature\?returnTo=warehouse"\)/);
+  assert.match(warehouse, /onClick:\(\)=>e\("\/nomenclature\?view=taxonomy&returnTo=warehouse"\)/);
   assert.match(warehouse, /items:bdWarehouseVisibleStock/);
   assert.ok(warehouse.indexOf("bd-warehouse-distribution-row-v241") < warehouse.indexOf("items:bdWarehouseVisibleStock"));
   assert.match(css, /\.bd-warehouse-distribution-row-v241 \{[\s\S]*?min-height: 44px/);
@@ -41,7 +41,7 @@ test("warehouse v241 keeps controls compact, complete and fully actionable", asy
   assert.match(warehouse, /value:"sections",children:"Структура"/);
   assert.doesNotMatch(warehouse, /value:"sections",children:"Разделы и подразделы"/);
   assert.match(warehouse, /className:"bd-warehouse-nomenclature-link-v241"/);
-  assert.match(warehouse, /onClick:\(\)=>e\("\/nomenclature\?returnTo=warehouse"\)/);
+  assert.match(warehouse, /onClick:\(\)=>e\("\/nomenclature\?view=taxonomy&returnTo=warehouse"\)/);
   assert.match(css, /\.bd-warehouse-nomenclature-tools-v207 \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 148px/);
   assert.match(css, /\.bd-warehouse-search::placeholder \{[\s\S]*?font-size: 10\.5px/);
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 128px/);

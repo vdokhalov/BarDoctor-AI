@@ -9,14 +9,14 @@ const bootstrapPath = new URL("../public/bardoctor-preview.js", import.meta.url)
 
 test("tech-card picker renders canonical items and supplier evidence separately", async () => {
   const bundle = await readFile(bundlePath, "utf8");
-  const start = bundle.indexOf("function bdCatIngredientMatchV368");
-  const end = bundle.indexOf("const bdCatIngredientMatchV299=bdCatIngredientMatchV368", start);
+  const start = bundle.indexOf("function bdCatIngredientMatchV375");
+  const end = bundle.indexOf("const bdCatIngredientMatchV368=bdCatIngredientMatchV375", start);
   const matching = bundle.slice(start, end);
   assert.ok(start > 0 && end > start);
   assert.match(bundle, /supplierProductMappings/);
-  assert.match(matching, /bdTechProductDocumentV368/);
+  assert.match(matching, /bdTechProductDocumentV375/);
   assert.match(matching, /supplierName/);
-  assert.match(bundle, /Название, поставщик или фасовка…/);
+  assert.match(bundle, /Введите название, поставщика или фасовку…/);
   assert.match(bundle, /Поставщики: /);
   assert.match(bundle, /aria-label":"Поиск по всей номенклатуре/);
   assert.match(matching, /bdNomenclatureQuickCreateV336/);

@@ -7,11 +7,14 @@
     sequence: 0,
     controller: null,
     search: "",
+    filter: "all",
     source: "all",
     importInspection: null,
     analysisAttempted: false,
     doctorAttempted: false,
     doctor: null,
+    googleSettings: null,
+    googleConnecting: false,
     toastTimer: 0
   };
 
@@ -47,6 +50,8 @@
   var manualDialog = document.getElementById("manual-review-dialog");
   var importDialog = document.getElementById("review-import-dialog");
   var replyDialog = document.getElementById("review-reply-dialog");
+  var googleDialog = document.getElementById("google-business-dialog");
+  var googleForm = document.getElementById("google-business-form");
 
   function node(tag, className, text) {
     var result = document.createElement(tag);
@@ -67,6 +72,11 @@
     var role = localStorage.getItem("bd_active_role") || "";
     var values = permissions();
     return values.includes("reviews.manage") || role === "owner" || role === "manager";
+  }
+
+  function canManageIntegrations() {
+    var role = localStorage.getItem("bd_active_role") || "";
+    return role === "owner" || permissions().includes("integrations.manage");
   }
 
   function canImportReviews() {
@@ -224,23 +234,30 @@
     copy.appendChild(node("strong", "", options.title));
     copy.appendChild(node("p", "", options.description));
     row.appendChild(copy);
-    if (options.action) {
-      var action = node("button", "source-action", options.action.label);
-      action.type = "button";
-      action.disabled = Boolean(options.action.disabled);
-      if (!action.disabled) action.addEventListener("click", options.action.handler);
-      row.appendChild(action);
+    var actions = Array.isArray(options.actions) ? options.actions : options.action ? [options.action] : [];
+    if (actions.length) {
+      var actionRoot = node("div", "source-actions");
+      actions.forEach(function (actionOptions) {
+        var action = node("button", "source-action", actionOptions.label);
+        action.type = "button";
+        action.disabled = Boolean(actionOptions.disabled);
+        if (!action.disabled) action.addEventListener("click", actionOptions.handler);
+        actionRoot.appendChild(action);
+      });
+      row.appendChild(actionRoot);
     }
     return row;
   }
 
   function googleStatus(provider) {
-    if (!provider) return { label: "Состояние неизвестно", description: "Не удалось проверить Google Business Profile." };
-    if (provider.status === "connected") return { label: "Автосинхронизация подключена", description: "Последняя синхронизация: " + readableDate(provider.lastSyncedAt, true) };
-    if (provider.status === "pending_location") return { label: "Выберите профиль заведения", description: "Авторизация завершена, осталось выбрать профиль." };
-    if (provider.status === "error" || provider.status === "url_linked") return { label: "Требует настройки", description: provider.lastSyncError || "Завершите подключение Google." };
-    if (provider.configured) return { label: "Не подключено", description: "Подключите аккаунт Google и выберите профиль заведения." };
-    return { label: "Автоматическая синхронизация пока недоступна", description: "Google OAuth не настроен платформой. Ручной ввод и импорт работают." };
+    if (state.googleConnecting) return { code: "CONNECTING", description: "Открываю авторизацию Google…" };
+    if (!provider) return { code: "SYNC ERROR", description: "Не удалось проверить Google Business Profile." };
+    if (provider.status === "connected" && provider.lastSyncError) return { code: "SYNC ERROR", description: provider.lastSyncError };
+    if (provider.status === "connected") return { code: "CONNECTED", description: provider.locationName ? "Подключено: " + provider.locationName + ". Последняя синхронизация: " + readableDate(provider.lastSyncedAt, true) : "Google Business Profile подключён." };
+    if (provider.status === "pending_location") return { code: "PENDING LOCATION", description: "Авторизация завершена. Выберите заведение Google Business Profile." };
+    if (provider.status === "error") return { code: "SYNC ERROR", description: provider.lastSyncError || "Google-подключение требует повторной авторизации." };
+    if (provider.configured) return { code: "READY TO CONNECT", description: "Google OAuth настроен. Подключите аккаунт Google." };
+    return { code: "NOT CONFIGURED", description: "Сохраните Google Client ID и Client Secret." };
   }
 
   function renderSources() {
@@ -249,12 +266,11 @@
     var providers = state.sources && Array.isArray(state.sources.providers) ? state.sources.providers : [];
     var google = providers.find(function (provider) { return provider.id === "google"; }) || null;
     var status = googleStatus(google);
-    var googleAction;
-    if (google && google.status === "connected") googleAction = { label: "Синхронизировать", handler: syncGoogle };
-    else if (google && google.status === "pending_location") googleAction = null;
-    else if (google && google.configured && canManageReviews()) googleAction = { label: google.status === "error" ? "Подключить заново" : "Подключить", handler: connectGoogle };
-    else googleAction = { label: "Недоступно", disabled: true };
-    var googleRow = sourceRow({ mark: "G", google: true, title: "Google Business Profile", description: status.label + ". " + status.description, action: googleAction });
+    var googleActions = [];
+    if (canManageIntegrations()) googleActions.push({ label: google && google.configured ? "Управлять подключением" : "Настроить в Интеграциях", handler: function () { window.location.assign("/integrations?flow=google"); } });
+    if (google && google.status === "connected" && canManageReviews()) googleActions.push({ label: "Синхронизировать", handler: syncGoogle });
+    else if (google && google.status !== "pending_location" && canManageReviews()) googleActions.push({ label: "Открыть Интеграции", handler: function () { window.location.assign("/integrations?flow=google"); } });
+    var googleRow = sourceRow({ mark: "G", google: true, title: "Google Business Profile", description: status.code + ". " + status.description, actions: googleActions });
     if (google && google.status === "pending_location" && Array.isArray(google.pendingLocations)) {
       var location = node("div", "location-select");
       var select = document.createElement("select");
@@ -287,20 +303,41 @@
     }));
   }
 
-  function sourceFilterButton(id, label, count) {
-    var button = node("button", "review-filter" + (state.source === id ? " active" : ""), label + (typeof count === "number" ? " · " + number(count) : ""));
+  function statusFilterButton(id, label, count) {
+    var button = node("button", "review-filter" + (state.filter === id ? " active" : ""), label + (typeof count === "number" ? " · " + number(count) : ""));
     button.type = "button";
-    button.addEventListener("click", function () { state.source = id; renderFilters(); renderReviewList(); });
+    button.addEventListener("click", function () { state.filter = id; renderFilters(); renderReviewList(); });
     return button;
+  }
+
+  function hasOwnerReply(review) {
+    return typeof review.ownerReply === "string" && review.ownerReply.trim().length > 0;
+  }
+
+  function needsAttention(review) {
+    return !hasOwnerReply(review) && ((typeof review.rating === "number" && review.rating <= 3) || review.sentiment === "negative");
   }
 
   function renderFilters() {
     var root = document.getElementById("review-source-filters");
     root.textContent = "";
-    root.appendChild(sourceFilterButton("all", "Все", reviews().length));
-    Object.entries(summary().sources || {}).sort(function (left, right) { return right[1] - left[1]; }).forEach(function (entry) {
-      root.appendChild(sourceFilterButton(entry[0], sourceLabels[entry[0]] || entry[0], entry[1]));
-    });
+    root.appendChild(statusFilterButton("all", "Все", reviews().length));
+    root.appendChild(statusFilterButton("unanswered", "Без ответа", reviews().filter(function (review) { return !hasOwnerReply(review); }).length));
+    root.appendChild(statusFilterButton("negative", "Негативные", reviews().filter(needsAttention).length));
+    var select = document.getElementById("review-source-select");
+    if (select) {
+      var selected = state.source;
+      select.textContent = "";
+      var all = node("option", "", "Все источники");
+      all.value = "all";
+      select.appendChild(all);
+      Object.entries(summary().sources || {}).sort(function (left, right) { return right[1] - left[1]; }).forEach(function (entry) {
+        var option = node("option", "", (sourceLabels[entry[0]] || entry[0]) + " · " + number(entry[1]));
+        option.value = entry[0];
+        select.appendChild(option);
+      });
+      select.value = selected;
+    }
   }
 
   function ratingStars(value) {
@@ -314,6 +351,8 @@
     var query = state.search.trim().toLocaleLowerCase("ru");
     var values = reviews().filter(function (review) {
       if (state.source !== "all" && review.source !== state.source) return false;
+      if (state.filter === "unanswered" && hasOwnerReply(review)) return false;
+      if (state.filter === "negative" && !needsAttention(review)) return false;
       if (!query) return true;
       return [review.text, review.authorName, sourceLabels[review.source] || review.source]
         .filter(Boolean).join(" ").toLocaleLowerCase("ru").includes(query);
@@ -336,7 +375,17 @@
       head.appendChild(node("span", "rating-stars", ratingStars(review.rating)));
       head.appendChild(node("span", "review-source-label", sourceLabels[review.source] || review.source || "Источник не указан"));
       main.appendChild(head);
-      main.appendChild(node("p", "review-item-text", review.text));
+      var metadata = review.sourceMetadata && typeof review.sourceMetadata === "object" ? review.sourceMetadata : {};
+      var originalText = typeof metadata.originalText === "string" && metadata.originalText.trim() ? metadata.originalText.trim() : review.text;
+      var translatedText = typeof metadata.translatedText === "string" && metadata.translatedText.trim() ? metadata.translatedText.trim() : "";
+      main.appendChild(node("p", "review-item-text", originalText));
+      if (translatedText && translatedText !== originalText) {
+        var translation = node("details", "review-translation");
+        translation.appendChild(node("summary", "", "Показать перевод Google"));
+        translation.appendChild(node("p", "", translatedText));
+        main.appendChild(translation);
+      }
+      if (hasOwnerReply(review)) main.appendChild(node("p", "review-owner-reply", "Ответ опубликован"));
       if (review.aiSummary) main.appendChild(node("p", "review-ai-summary", review.aiSummary));
       if (Array.isArray(review.topics) && review.topics.length) {
         var topics = node("div", "review-topics");
@@ -376,15 +425,121 @@
     document.getElementById("import-reviews").hidden = !canImportReviews();
   }
 
+  function googleProvider() {
+    var providers = state.sources && Array.isArray(state.sources.providers) ? state.sources.providers : [];
+    return providers.find(function (provider) { return provider.id === "google"; }) || null;
+  }
+
+  function setGoogleSettingsError(text) {
+    var error = document.getElementById("google-settings-error");
+    error.textContent = text || "";
+    error.classList.toggle("hidden", !text);
+  }
+
+  function resetGoogleSecretVisibility() {
+    var secret = googleForm.elements.clientSecret;
+    var toggle = document.getElementById("google-secret-toggle");
+    secret.type = "password";
+    toggle.textContent = "Показать";
+    toggle.setAttribute("aria-pressed", "false");
+    toggle.disabled = !secret.value;
+  }
+
+  function updateGoogleSecretToggle() {
+    document.getElementById("google-secret-toggle").disabled = !googleForm.elements.clientSecret.value;
+  }
+
+  function navigateGoogleOAuth(url) {
+    window.top.location.assign(url.href);
+  }
+
+  function renderGoogleSettings() {
+    var provider = googleProvider();
+    var status = googleStatus(provider);
+    var settings = state.googleSettings;
+    var configured = Boolean(settings && settings.services && settings.services.google_business && settings.services.google_business.configured) || Boolean(provider && provider.configured);
+    if (!provider && configured) status = { code: "READY TO CONNECT", description: "Google OAuth настроен. Подключите аккаунт Google." };
+    document.getElementById("google-setup-state").textContent = status.code;
+    document.getElementById("google-setup-description").textContent = configured ? (status.code === "NOT CONFIGURED" ? "Google OAuth настроен." : status.description) : "Введите Google Client ID и Client Secret.";
+    document.getElementById("google-callback-url").value = settings && settings.googleCallbackUrl ? settings.googleCallbackUrl : "";
+    var connect = document.getElementById("google-connect-button");
+    connect.classList.toggle("hidden", !configured || status.code === "CONNECTED" || status.code === "PENDING LOCATION");
+    connect.disabled = state.googleConnecting;
+    connect.textContent = state.googleConnecting ? "Подключаю…" : status.code === "SYNC ERROR" ? "Подключить заново" : "Подключить Google";
+  }
+
+  async function loadGoogleSettings() {
+    setGoogleSettingsError("");
+    try {
+      var result = await api("/api/integrations", { method: "GET" });
+      state.googleSettings = result.data;
+      renderGoogleSettings();
+    } catch (problem) {
+      setGoogleSettingsError(problem.message || "Не удалось загрузить настройки Google OAuth.");
+    }
+  }
+
+  // Retained for backward-compatible embedded entry points; the visible setup entry now lives in Integrations.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  function openGoogleSettings() {
+    if (!canManageIntegrations()) return showMessage("Настройки OAuth доступны только владельцу.", true);
+    googleForm.reset();
+    resetGoogleSecretVisibility();
+    setGoogleSettingsError("");
+    renderGoogleSettings();
+    googleDialog.showModal();
+    loadGoogleSettings();
+  }
+
+  async function saveGoogleSettings(event) {
+    event.preventDefault();
+    var clientId = String(googleForm.elements.clientId.value || "").trim();
+    var clientSecret = String(googleForm.elements.clientSecret.value || "").trim();
+    var submit = document.getElementById("google-settings-save");
+    setGoogleSettingsError("");
+    if (!clientId && !clientSecret) return setGoogleSettingsError("Введите Google Client ID и Client Secret.");
+    if (!clientId) return setGoogleSettingsError("Введите Google Client ID.");
+    if (!clientSecret) return setGoogleSettingsError("Введите Google Client Secret.");
+    submit.disabled = true;
+    submit.textContent = "Сохраняю…";
+    try {
+      var result = await api("/api/integrations", {
+        method: "PUT",
+        body: JSON.stringify({ service: "google_business", clientId: clientId, clientSecret: clientSecret })
+      });
+      state.googleSettings = result.data;
+      var provider = googleProvider();
+      if (provider) provider.configured = true;
+      googleForm.reset();
+      resetGoogleSecretVisibility();
+      renderAll();
+      renderGoogleSettings();
+      showMessage("Google OAuth настроен.");
+    } catch (problem) {
+      setGoogleSettingsError(problem.message || "Не удалось сохранить настройки Google OAuth.");
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Сохранить";
+    }
+  }
+
   async function connectGoogle(event) {
     var target = event && event.currentTarget;
     if (target) target.disabled = true;
+    state.googleConnecting = true;
+    renderSources();
     try {
       var result = await api("/api/reviews/sources/google/connect", { method: "GET" });
       var url = result.data && result.data.url ? new URL(result.data.url) : null;
       if (!url || url.protocol !== "https:" || url.hostname !== "accounts.google.com") throw new Error("Google вернул некорректную ссылку авторизации.");
-      window.location.assign(url.href);
-    } catch {
+      navigateGoogleOAuth(url);
+    } catch (problem) {
+      state.googleConnecting = false;
+      renderSources();
+      if (googleDialog.open) {
+        renderGoogleSettings();
+        setGoogleSettingsError(problem.message || "Не удалось начать подключение Google.");
+      }
       showMessage(problem.message || "Не удалось начать подключение Google.", true);
       if (target) target.disabled = false;
     }
@@ -393,8 +548,9 @@
   async function selectGoogleLocation(locationId, target) {
     target.disabled = true;
     try {
-      await api("/api/reviews/sources/google/select-location", { method: "POST", body: JSON.stringify({ locationId: locationId }) });
-      showMessage("Профиль Google подключён.");
+      var result = await api("/api/reviews/sources/google/select-location", { method: "POST", body: JSON.stringify({ locationId: locationId }) });
+      var sync = result.data && result.data.sync;
+      showMessage(sync && sync.ok === false ? "Профиль подключён, но первая синхронизация не завершена: " + (sync.error || "повторите попытку") : "Профиль Google подключён, первая синхронизация завершена.", Boolean(sync && sync.ok === false));
       await loadData();
     } catch (problem) {
       showMessage(problem.message || "Не удалось выбрать профиль.", true);
@@ -484,6 +640,7 @@
     target.disabled = true;
     try {
       var result = await api("/api/reviews/reply", { method: "POST", body: JSON.stringify({ review: review }) });
+      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + review.text;
       document.getElementById("review-reply-copy").textContent = result.data && result.data.draft ? result.data.draft : "Черновик не подготовлен.";
       replyDialog.showModal();
     } catch (problem) {
@@ -535,11 +692,43 @@
   document.getElementById("add-review").addEventListener("click", openManual);
   document.getElementById("import-reviews").addEventListener("click", openImport);
   document.getElementById("review-search").addEventListener("input", function (event) { state.search = event.target.value; renderReviewList(); });
+  document.getElementById("review-source-select").addEventListener("change", function (event) { state.source = event.target.value; renderReviewList(); });
   document.querySelectorAll("[data-close-dialog]").forEach(function (control) {
     control.addEventListener("click", function () {
       var dialog = document.getElementById(control.dataset.closeDialog);
-      if (dialog && dialog.open) dialog.close();
+      if (dialog && dialog.open) {
+        dialog.close();
+        if (dialog === googleDialog) {
+          googleForm.reset();
+          resetGoogleSecretVisibility();
+          setGoogleSettingsError("");
+        }
+      }
     });
+  });
+
+  googleForm.addEventListener("submit", saveGoogleSettings);
+  document.getElementById("google-connect-button").addEventListener("click", connectGoogle);
+  googleForm.elements.clientSecret.addEventListener("input", updateGoogleSecretToggle);
+  document.getElementById("google-secret-toggle").addEventListener("click", function () {
+    var secret = googleForm.elements.clientSecret;
+    if (!secret.value) return;
+    var reveal = secret.type === "password";
+    secret.type = reveal ? "text" : "password";
+    this.textContent = reveal ? "Скрыть" : "Показать";
+    this.setAttribute("aria-pressed", String(reveal));
+    secret.focus();
+  });
+  document.getElementById("copy-google-callback").addEventListener("click", async function () {
+    var callbackUrl = document.getElementById("google-callback-url").value;
+    if (!callbackUrl) return setGoogleSettingsError("Callback URL пока не получен от сервера.");
+    try {
+      await navigator.clipboard.writeText(callbackUrl);
+      showMessage("Callback URL скопирован.");
+    } catch {
+      document.getElementById("google-callback-url").select();
+      setGoogleSettingsError("Автокопирование недоступно. Скопируйте выделенный Callback URL.");
+    }
   });
 
   document.getElementById("manual-review-form").addEventListener("submit", async function (event) {
@@ -655,14 +844,34 @@
     if (state.controller) state.controller.abort();
     state.layer = null;
     state.sources = null;
+    state.googleSettings = null;
+    state.googleConnecting = false;
     state.search = "";
+    state.filter = "all";
     state.source = "all";
   });
 
   var params = new URLSearchParams(window.location.search);
-  if (params.get("googleConnect") === "success") showMessage("Google Business Profile подключён.");
+  if (params.get("filter") === "unanswered" || params.get("filter") === "negative") state.filter = params.get("filter");
+  var googleReason = params.get("reason");
+  var googleErrors = {
+    access_denied: "Вы отменили доступ Google. Подключение не изменено.",
+    invalid_state: "Сессия подключения истекла. Начните подключение Google заново.",
+    no_locations: "В аккаунте Google Business Profile не найдено доступных заведений.",
+    invalid_client: "Google отклонил Client ID или Client Secret.",
+    invalid_client_secret: "Google отклонил Client Secret для этого OAuth Client ID.",
+    redirect_uri_mismatch: "Callback URL не совпадает с Authorized redirect URI в Google Cloud.",
+    invalid_grant: "Google authorization code истёк, уже использован или был отозван. Начните подключение заново.",
+    profile_unauthorized: "Google-токен истёк или был отозван. Подключите Google заново.",
+    profile_forbidden: "Google авторизация завершена, но доступ к Business Profile запрещён. Проверьте права аккаунта и включённые Google Business API.",
+    profile_rate_limited: "Google временно ограничил запросы к Business Profile. Повторите попытку позже.",
+    profile_unavailable: "Google авторизация завершена, но Business Profile временно недоступен.",
+    exchange_failed: "Google не завершил обмен authorization code. Повторите подключение."
+  };
+  if (params.get("googleConnect") === "success" && params.get("sync") === "error") showMessage("Google Business Profile подключён, но первая синхронизация завершилась ошибкой.", true);
+  else if (params.get("googleConnect") === "success") showMessage("Google Business Profile подключён, первая синхронизация завершена.");
   else if (params.get("googleConnect") === "pending") showMessage("Выберите профиль заведения Google.");
-  else if (params.get("googleConnect") === "error") showMessage("Подключение Google не завершено. Ручной ввод и импорт остаются доступны.", true);
+  else if (params.get("googleConnect") === "error") showMessage(googleErrors[googleReason] || "Подключение Google не завершено. Проверьте OAuth-настройки и повторите попытку.", true);
 
   loadData();
 })();

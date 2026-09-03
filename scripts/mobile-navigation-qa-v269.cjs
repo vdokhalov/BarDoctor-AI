@@ -10,17 +10,24 @@ let browserPath = process.env.BD_QA_BROWSER || chromium.executablePath();
 const outputDir = path.resolve(process.cwd(), "qa-artifacts/mobile-navigation-v269");
 fs.mkdirSync(outputDir, { recursive: true });
 
-const profiles = [
+const standardProfiles = [
   { name: "iphone-13", descriptor: devices["iPhone 13"], userAgentPattern: /iPhone/ },
   { name: "pixel-7", descriptor: devices["Pixel 7"], userAgentPattern: /Android/ },
 ];
+const homeReviewProfiles = [
+  { name: "iphone-small", descriptor: { ...devices["iPhone 13"], viewport: { width: 320, height: 568 }, screen: { width: 320, height: 568 } }, userAgentPattern: /iPhone/ },
+  { name: "iphone-normal", descriptor: devices["iPhone 13"], userAgentPattern: /iPhone/ },
+  { name: "iphone-large", descriptor: { ...devices["iPhone 13"], viewport: { width: 430, height: 932 }, screen: { width: 430, height: 932 } }, userAgentPattern: /iPhone/ },
+  { name: "pixel-7", descriptor: devices["Pixel 7"], userAgentPattern: /Android/ },
+];
+const profiles = process.env.BD_QA_SCENARIO === "home-reviews" ? homeReviewProfiles : standardProfiles;
 const desktopProfile = { name: "desktop-chrome", descriptor: devices["Desktop Chrome"] };
 
 const permissions = [
   "inventory.view", "inventory.manage", "finance.view", "finance.manage",
   "expenses.create", "team.view", "team.manage", "equipment.view",
   "equipment.manage", "integrations.manage", "settings.manage", "access.manage",
-  "data.import", "finance.export", "reviews.view", "shifts.manage",
+  "data.import", "finance.export", "reviews.view", "reviews.manage", "shifts.manage",
 ];
 
 const venues = [
@@ -184,6 +191,53 @@ function jsonResponse(value, status = 200) {
   return { status, contentType: "application/json", body: JSON.stringify(value) };
 }
 
+function reviewQaFixtures() {
+  const reviews = Array.from({ length: 105 }, (_, index) => {
+    const negative = index < 7;
+    const recent = index < 23;
+    return {
+      id: `google-review-${index + 1}`,
+      externalId: `google-review-${index + 1}`,
+      source: "google",
+      ingestionMethod: "sync",
+      authorName: index === 0 ? "Anna" : `Гость ${index + 1}`,
+      rating: negative ? 2 : 4,
+      text: negative ? "Очень долго ждали заказ, музыка была слишком громкой." : "Хорошая атмосфера и внимательная команда.",
+      publishedAt: recent ? "2026-09-01T12:00:00.000Z" : "2026-07-01T12:00:00.000Z",
+      receivedAt: "2026-09-02T09:15:00.000Z",
+      sentiment: negative ? "negative" : "positive",
+      topics: negative ? ["wait_time", "music"] : ["atmosphere", "staff"],
+      aiSummary: negative ? "Гость недоволен ожиданием и громкостью музыки." : "Гость отмечает атмосферу и команду.",
+      analyzedAt: "2026-09-02T09:20:00.000Z",
+      ownerReply: negative ? null : "Спасибо за обратную связь!",
+      sourceMetadata: index === 0 ? { originalText: "We waited too long and the music was too loud.", translatedText: "Очень долго ждали заказ, музыка была слишком громкой." } : {},
+    };
+  });
+  return {
+    reviews,
+    summary: {
+      total: 105,
+      rated: 105,
+      averageRating: 3.19,
+      lastReceivedAt: "2026-09-02T09:15:00.000Z",
+      analyzed: 105,
+      sources: { google: 105 },
+      methods: { sync: 105 },
+      sentiment: { positive: 98, neutral: 0, negative: 7 },
+      topics: [
+        { topic: "wait_time", count: 7, positive: 0, negative: 7 },
+        { topic: "music", count: 7, positive: 0, negative: 7 },
+        { topic: "atmosphere", count: 98, positive: 98, negative: 0 },
+      ],
+      complaints: [{ topic: "wait_time", count: 7, negative: 7 }, { topic: "music", count: 7, negative: 7 }],
+      confidence: "high",
+      confidenceReason: "Проанализировано 105 отзывов.",
+      trend: { available: false, reason: "Недостаточно данных" },
+    },
+    updatedAt: "2026-09-02T09:20:00.000Z",
+  };
+}
+
 async function createRun(browser, profile, label, options = {}) {
   const state = {
     activeVenueId: options.venueId || 901,
@@ -266,6 +320,19 @@ async function createRun(browser, profile, label, options = {}) {
       return route.fulfill(jsonResponse(freshBusinessHealthEnvelope(state.activeVenueId, state.healthMode === "healthy")));
     }
     if (url.pathname === "/api/users/me") return route.fulfill(jsonResponse({ ok: true, user: { firstName: "Mobile", lastName: "QA", email: "mobile-qa@bardoctor.local", role: "owner", permissions } }));
+    if (url.pathname === "/api/reviews/home") return route.fulfill(jsonResponse({
+      success: true,
+      data: {
+        provider: { status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null },
+        metrics: { total: 105, averageRating: 3.19, new7d: 6, new30d: 23, unanswered: 7, needsAttention: 7, analyzed: 105, complaints: [{ topic: "wait_time", count: 7 }, { topic: "music", count: 7 }], lastPublishedAt: "2026-09-01T12:00:00.000Z" },
+        layerUpdatedAt: "2026-09-02T09:20:00.000Z",
+        canManage: true,
+      },
+    }));
+    if (url.pathname === "/api/review-layer" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: reviewQaFixtures() }));
+    if (url.pathname === "/api/reviews/sources" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: { providers: [{ id: "google", configured: true, status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null }] } }));
+    if (url.pathname === "/api/reviews/reply" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { draft: "Спасибо за честный отзыв. Мы проверим скорость обслуживания и уровень музыки." } }));
+    if (url.pathname === "/api/reviews/doctor-summary" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { recommendations: ["Проверьте скорость обслуживания в часы пик."] } }));
     if (url.pathname === "/api/migrate") return route.fulfill(jsonResponse({ ok: true, imported: [], skipped: [] }));
     if (url.pathname === "/api/access/active-venue" && method === "POST") {
       const body = request.postDataJSON();
@@ -983,6 +1050,90 @@ async function moduleSmokeFlow(browser, profile) {
   return { profile: profile.name, scenario: run.label, passed: true, routes: routes.map(([route]) => route) };
 }
 
+async function homeReviewsFlow(browser, profile) {
+  const run = await createRun(browser, profile, "home-reviews");
+  const { page } = run;
+  await goto(page, "/home?venue=901");
+  const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
+  const finance = page.locator('[data-bd-home-money="result-v151"]');
+  const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
+  const attention = page.locator('[data-bd-home-attention="universal-v198"]');
+  await reviewsCard.waitFor({ timeout: 10_000 });
+  const homeLayout = await page.evaluate(() => {
+    const selectors = [
+      '[data-bd-home-health-index="business-health-snapshot-v334"]',
+      '[data-bd-home-money="result-v151"]',
+      '[data-bd-home-reviews="ready-v409"]',
+      '[data-bd-home-attention="universal-v198"]',
+    ];
+    const rects = selectors.map((selector) => document.querySelector(selector)?.getBoundingClientRect()).map((rect) => rect ? ({ top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width }) : null);
+    const nav = document.querySelector("[data-bd-primary-navigation]");
+    const navRect = nav?.getBoundingClientRect();
+    return {
+      rects,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      navVisible: Boolean(navRect && navRect.width > 0 && navRect.height > 0),
+      navTop: navRect?.top ?? null,
+      viewportHeight: innerHeight,
+    };
+  });
+  assert.ok(homeLayout.rects.every(Boolean), `${profile.name}: a required Home block is missing`);
+  if (profile.descriptor.isMobile) {
+    assert.ok(homeLayout.rects[0].top < homeLayout.rects[1].top && homeLayout.rects[1].top < homeLayout.rects[2].top && homeLayout.rects[2].top < homeLayout.rects[3].top, `${profile.name}: mobile Home hierarchy is incorrect`);
+    assert.equal(homeLayout.navVisible, true, `${profile.name}: bottom navigation is missing`);
+    assert.ok(homeLayout.navTop < homeLayout.viewportHeight, `${profile.name}: bottom navigation is outside viewport`);
+  } else {
+    assert.ok(homeLayout.rects[0].top < homeLayout.rects[1].top && homeLayout.rects[1].top === homeLayout.rects[2].top, `${profile.name}: desktop Health/Finance/Reviews hierarchy is incorrect`);
+    assert.ok(await page.locator('[data-bd-nav-key="reviews"]').isVisible(), `${profile.name}: direct Reviews navigation is hidden`);
+  }
+  assert.ok(homeLayout.scrollWidth <= homeLayout.clientWidth + 1, `${profile.name}: Home has horizontal overflow`);
+  assert.match(await health.textContent(), /83/);
+  assert.match(await finance.textContent(), /Финансовый результат/);
+  assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
+  assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
+  await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
+
+  await reviewsCard.getByRole("button", { name: "Все отзывы", exact: true }).click();
+  await page.waitForURL(/\/reviews(?:\?|$)/);
+  await page.waitForSelector('iframe[src^="/reviews"]');
+  const reviewFrame = page.frames().find((candidate) => {
+    try {
+      const url = new URL(candidate.url());
+      return url.pathname === "/reviews" && url.searchParams.get("embedded") === "1";
+    } catch { return false; }
+  });
+  assert.ok(reviewFrame, `${profile.name}: embedded Reviews frame is missing`);
+  try {
+    await reviewFrame.locator("#reviews-content:not(.hidden)").waitFor({ timeout: 10_000 });
+  } catch {
+    throw new Error(`${profile.name}: Reviews module did not become ready: ${JSON.stringify({ frameUrl: reviewFrame.url(), body: (await reviewFrame.locator("body").textContent())?.replace(/\s+/g, " ").slice(0, 900), issues: run.issues })}`);
+  }
+  assert.match(await reviewFrame.locator("body").textContent(), /105.*3,19 \/ 5.*Google Business Profile/s);
+  const allItems = reviewFrame.locator(".review-item");
+  assert.equal(await allItems.count(), 105, `${profile.name}: 105-review dataset was not rendered`);
+  await reviewFrame.getByRole("button", { name: /Без ответа · 7/ }).click();
+  assert.equal(await allItems.count(), 7, `${profile.name}: unanswered filter is incorrect`);
+  await reviewFrame.getByRole("button", { name: /Негативные · 7/ }).click();
+  assert.equal(await allItems.count(), 7, `${profile.name}: negative filter is incorrect`);
+  await reviewFrame.getByPlaceholder("Поиск по отзывам…").fill("долго ждали");
+  assert.equal(await allItems.count(), 7, `${profile.name}: review search is incorrect`);
+  const first = allItems.first();
+  assert.match(await first.textContent(), /Google.*Показать перевод Google/s);
+  await first.getByRole("button", { name: "Подготовить ответ", exact: true }).click();
+  const dialog = reviewFrame.locator("#review-reply-dialog");
+  await dialog.waitFor({ state: "visible" });
+  assert.match(await dialog.textContent(), /Anna.*We waited too long.*Черновик не публикуется автоматически.*Спасибо за честный отзыв/s);
+  assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
+  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await page.goBack({ waitUntil: "networkidle" });
+  await reviewsCard.waitFor({ timeout: 10_000 });
+  assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
+  await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
+  await closeRun(run);
+  return { profile: profile.name, scenario: run.label, passed: true, layout: homeLayout };
+}
+
 async function businessHealthColdStartFlow(browser, profile) {
   const run = await createRun(browser, profile, "business-health-cold-start", { bootstrapDelayMs: 2_200 });
   const { page } = run;
@@ -1355,6 +1506,7 @@ async function runProfile(browser, profile) {
     ["critical-form-close", formCloseFlow],
     ["critical-modules", moduleSmokeFlow],
     ["business-health-cold-start", businessHealthColdStartFlow],
+    ["home-reviews", homeReviewsFlow],
   ]) {
     if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
     process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
@@ -1398,6 +1550,10 @@ async function runProfile(browser, profile) {
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "business-health-cold-start") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/business-health-cold-start\n`);
         results.push(await businessHealthColdStartFlow(browser, desktopProfile));
+      }
+      if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "home-reviews") {
+        process.stderr.write(`[mobile-qa] ${desktopProfile.name}/home-reviews\n`);
+        results.push(await homeReviewsFlow(browser, desktopProfile));
       }
     }
   } catch (error) {
