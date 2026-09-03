@@ -77,6 +77,42 @@ test("Google Business flow implements all connection states and first review syn
   assert.match(google, /TimeoutError/);
 });
 
+test("Google OAuth authorization always replaces the top-level browser context", async () => {
+  const [page, client] = await Promise.all([
+    read("app/reviews/route.ts"),
+    read("public/reviews.js"),
+  ]);
+
+  const helper = client.match(/function navigateGoogleOAuth\(url\) \{[\s\S]*?\n  \}/)?.[0];
+  assert.ok(helper, "top-level Google OAuth navigation helper must exist");
+  const makeNavigator = new Function("window", `${helper}; return navigateGoogleOAuth;`) as (
+    window: { top: { location: { assign: (url: string) => void } } },
+  ) => (url: URL) => void;
+  const oauthUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth?state=csrf-state");
+  const embeddedAssignments: string[] = [];
+  const frameAssignments: string[] = [];
+  const embeddedWindow = {
+    top: { location: { assign: (url: string) => embeddedAssignments.push(url) } },
+    location: { assign: (url: string) => frameAssignments.push(url) },
+  };
+  makeNavigator(embeddedWindow)(oauthUrl);
+  assert.deepEqual(embeddedAssignments, [oauthUrl.href]);
+  assert.deepEqual(frameAssignments, []);
+
+  const pwaAssignments: string[] = [];
+  const pwaWindow: {
+    top?: { location: { assign: (url: string) => void } };
+    location: { assign: (url: string) => void };
+  } = { location: { assign: (url: string) => { pwaAssignments.push(url); } } };
+  pwaWindow.top = pwaWindow;
+  makeNavigator(pwaWindow as { top: { location: { assign: (url: string) => void } } })(oauthUrl);
+  assert.deepEqual(pwaAssignments, [oauthUrl.href]);
+
+  assert.match(client, /navigateGoogleOAuth\(url\)/);
+  assert.doesNotMatch(client, /(?:createElement\(["']iframe["']\)|<iframe)[^\n]*(?:google|oauth|url\.href)/i);
+  assert.match(page, /reviews\.js\?v=20260903-google-oauth-top-level-v405/);
+});
+
 test("Google Business patch depends only on tables already present in the v400 migration ledger", async () => {
   const [schema, googleMigration, secretMigration, journal] = await Promise.all([
     read("db/schema.ts"),

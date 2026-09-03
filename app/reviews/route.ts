@@ -19,7 +19,7 @@ return `<!doctype html>
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
-    <script src="/reviews.js?v=20260902-google-business-setup-v400" defer></script>
+    <script src="/reviews.js?v=20260903-google-oauth-top-level-v405" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/integrations">

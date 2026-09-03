@@ -415,6 +415,10 @@
     document.getElementById("google-secret-toggle").disabled = !googleForm.elements.clientSecret.value;
   }
 
+  function navigateGoogleOAuth(url) {
+    window.top.location.assign(url.href);
+  }
+
   function renderGoogleSettings() {
     var provider = googleProvider();
     var status = googleStatus(provider);
@@ -492,7 +496,7 @@
       var result = await api("/api/reviews/sources/google/connect", { method: "GET" });
       var url = result.data && result.data.url ? new URL(result.data.url) : null;
       if (!url || url.protocol !== "https:" || url.hostname !== "accounts.google.com") throw new Error("Google вернул некорректную ссылку авторизации.");
-      window.location.assign(url.href);
+      navigateGoogleOAuth(url);
     } catch (problem) {
       state.googleConnecting = false;
       renderSources();
