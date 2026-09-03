@@ -17,8 +17,10 @@ test("v357 renders Home behind the one native-aligned launch surface", () => {
   assert.match(bundle, /bdBoundedStartupHandoffVersionV357="v357"/);
   assert.match(coordinator, /return e/);
   assert.match(coordinator, /data-bd-home-page/);
-  assert.match(coordinator, /business-health-v344-loading/);
-  assert.match(coordinator, /authoritative-loading-v344/);
+  if (!bundle.includes('bdStableSplashVersionV394="v394"')) {
+    assert.match(coordinator, /business-health-v344-loading/);
+    assert.match(coordinator, /authoritative-loading-v344/);
+  }
   assert.doesNotMatch(coordinator, /financeReady|data-bd-root-splash|SPLASH_LOADING|children:i\.jsx\(ble/);
 });
 
@@ -26,9 +28,22 @@ test("v357 has a short bounded handoff and cannot trap the user", () => {
   const start = bundle.indexOf("function bdHealthStartupGateV155");
   const end = bundle.indexOf("function cEe(){", start);
   const coordinator = bundle.slice(start, end);
-  assert.match(coordinator, /y>=650&&j&&!v&&f\("home-ready"\)/);
-  assert.match(coordinator, /window\.setTimeout\(\(\)=>f\("bounded-home-handoff"\),3500\)/);
-  assert.match(coordinator, /window\.setInterval\(m,80\)/);
+  if (bundle.includes('bdNativeContinuityVersionV396="v396"')) {
+    assert.match(coordinator, /window\.setInterval\(f,16\)/);
+    assert.doesNotMatch(coordinator, /setTimeout|shell-timeout/);
+  } else if (bundle.includes('bdSingleSplashVersionV395="v395"')) {
+    assert.match(coordinator, /y>=450&&j&&f\("shell-ready"\)/);
+    assert.match(coordinator, /window\.setTimeout\(\(\)=>f\("shell-timeout"\),1500\)/);
+    assert.match(coordinator, /window\.setInterval\(m,32\)/);
+  } else if (bundle.includes('bdStableSplashVersionV394="v394"')) {
+    assert.match(coordinator, /y>=350&&j&&f\("shell-ready"\)/);
+    assert.match(coordinator, /window\.setTimeout\(\(\)=>f\("shell-timeout"\),1800\)/);
+    assert.match(coordinator, /window\.setInterval\(m,50\)/);
+  } else {
+    assert.match(coordinator, /y>=650&&j&&!v&&f\("home-ready"\)/);
+    assert.match(coordinator, /window\.setTimeout\(\(\)=>f\("bounded-home-handoff"\),3500\)/);
+    assert.match(coordinator, /window\.setInterval\(m,80\)/);
+  }
   assert.doesNotMatch(coordinator, /5200|12e3|15e3|server-bootstrap-timeout/);
 });
 
@@ -36,7 +51,7 @@ test("v357 reports a real failure directly without an automatic reload loop", ()
   const start = bootstrap.indexOf("function bdRecoverStartupV341");
   const end = bootstrap.indexOf('window.addEventListener("bd:startup-complete"', start);
   const recovery = bootstrap.slice(start, end);
-  assert.match(bootstrap, /bdStartupRecoveryVersionV341 = "bounded-startup-v357"/);
+  assert.match(bootstrap, /bdStartupRecoveryVersionV341 = "(?:bounded-startup-v357|stable-splash-v394|single-splash-v395|native-continuity-v396)"/);
   assert.match(recovery, /bdRenderStartupRecoveryV341/);
   assert.doesNotMatch(recovery, /window\.location\.replace|bd_startup_retry_v341|sessionStorage\.setItem/);
 });

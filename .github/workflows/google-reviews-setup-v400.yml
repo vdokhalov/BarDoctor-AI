@@ -1,0 +1,41 @@
+name: google-reviews-setup-v400
+
+on:
+  pull_request:
+  push:
+    branches:
+      - feature/google-reviews-setup-v400-2026-09-02
+      - fix/google-oauth-top-level-v405-2026-09-03
+      - fix/google-oauth-source-errors-v406-2026-09-03
+      - fix/google-oauth-token-diagnostics-v407-2026-09-03
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: google-reviews-setup-v400-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm run install:ci
+      - name: Google, integrations, reviews, and RBAC tests
+        run: |
+          node --import tsx --test tests/google-business-setup-v400.test.ts tests/platform-integrations.test.ts tests/access-control.test.ts
+          node --test tests/reviews-experience-v179.test.mjs tests/integrations-experience-v178.test.mjs
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Full regression and verified build
+        run: npm test

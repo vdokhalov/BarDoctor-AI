@@ -47,7 +47,7 @@ test("review APIs enforce authentication, permissions and server-side idempotenc
   assert.doesNotMatch(google, /const storeKey = "bd_guest_reviews"/);
 });
 
-test("the UI has honest Google fallback, shared AI analysis and late-response guards", async () => {
+test("the UI has actionable Google setup, shared AI analysis and late-response guards", async () => {
   const [client, css, sources, adminRoute, adminClient, competitors] = await Promise.all([
     source("public/reviews.js"),
     source("public/reviews.css"),
@@ -56,7 +56,9 @@ test("the UI has honest Google fallback, shared AI analysis and late-response gu
     source("public/admin-v175.js"),
     source("app/api/competitors/refresh/route.ts"),
   ]);
-  assert.match(client, /Автоматическая синхронизация пока недоступна/);
+  assert.match(client, /NOT CONFIGURED/);
+  assert.match(client, /READY TO CONNECT/);
+  assert.match(client, /openGoogleSettings/);
   assert.match(client, /\/api\/review-layer\/reviews/);
   assert.match(client, /\/api\/review-layer\/import\/preview/);
   assert.match(client, /\/api\/reviews\/analyze/);

@@ -10,8 +10,8 @@ const manifest = {
   scope: "/",
   display: "standalone",
   orientation: "portrait",
-  background_color: "#070b24",
-  theme_color: "#070b24",
+  background_color: "#070911",
+  theme_color: "#070911",
   categories: ["business", "finance", "productivity"],
   icons: [
     { src: "/icons/bardoctor-v159-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

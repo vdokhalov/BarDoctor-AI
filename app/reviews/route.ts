@@ -12,19 +12,19 @@ return `<!doctype html>
     <meta name="theme-color" content="#f7f8fc" />
     <title>Отзывы гостей — BarDoctor</title>
     <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
-    <link rel="stylesheet" href="/reviews.css?v=20260813-reviews-v179" />
+    <link rel="stylesheet" href="/reviews.css?v=20260903-home-reviews-ux-v409" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
-    <script src="/reviews.js?v=20260813-reviews-v179" defer></script>
+    <script src="/reviews.js?v=20260903-home-reviews-ux-v409" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
-  <body data-bd-parent-route="/integrations">
+  <body data-bd-parent-route="/more">
     <header class="integration-header">
-      <a class="icon-button" href="/integrations" aria-label="Вернуться в Интеграции" data-bd-back>
+      <a class="icon-button" href="/more" aria-label="Вернуться в раздел «Ещё»" data-bd-back>
         <img src="/integration-icons/arrow-left.svg" alt="" aria-hidden="true" />
       </a>
       <div class="module-identity">
@@ -73,7 +73,10 @@ return `<!doctype html>
             <div><p class="section-label">ИСТОРИЯ</p><h2 id="review-history-title">Все отзывы</h2></div>
             <label class="review-search"><span class="sr-only">Поиск</span><input id="review-search" type="search" placeholder="Поиск по отзывам…" /></label>
           </div>
-          <div id="review-source-filters" class="review-filter-row" role="group" aria-label="Фильтр по источнику"></div>
+          <div class="review-filter-bar">
+            <div id="review-source-filters" class="review-filter-row" role="group" aria-label="Фильтр отзывов"></div>
+            <label class="review-source-select"><span class="sr-only">Источник</span><select id="review-source-select" aria-label="Фильтр по источнику"><option value="all">Все источники</option></select></label>
+          </div>
           <div id="review-list" class="review-list"></div>
         </section>
       </div>
@@ -108,8 +111,28 @@ return `<!doctype html>
 
     <dialog id="review-reply-dialog" class="review-dialog">
       <div class="dialog-heading"><div><p class="section-label">ОТВЕТ ГОСТЮ</p><h2>Черновик ответа</h2></div><button class="dialog-close" type="button" data-close-dialog="review-reply-dialog" aria-label="Закрыть">×</button></div>
+      <div id="review-reply-context" class="review-reply-context"></div>
+      <p class="reply-safety">Черновик не публикуется автоматически. Проверьте текст перед отправкой.</p>
       <p id="review-reply-copy" class="reply-copy"></p>
       <div class="dialog-actions"><button class="button secondary" type="button" data-close-dialog="review-reply-dialog">Закрыть</button><button id="copy-review-reply" class="button primary" type="button">Скопировать</button></div>
+    </dialog>
+
+    <dialog id="google-business-dialog" class="review-dialog google-business-dialog">
+      <form id="google-business-form" method="dialog" autocomplete="off">
+        <div class="dialog-heading"><div><p class="section-label">GOOGLE BUSINESS PROFILE</p><h2>Настроить источник</h2></div><button class="dialog-close" type="button" data-close-dialog="google-business-dialog" aria-label="Закрыть">×</button></div>
+        <div class="google-setup-status" role="status"><strong id="google-setup-state">NOT CONFIGURED</strong><p id="google-setup-description">Проверяю настройки Google OAuth…</p></div>
+        <label>Google Client ID<input name="clientId" type="text" maxlength="8000" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /></label>
+        <label>Google Client Secret
+          <span class="google-secret-field"><input name="clientSecret" type="password" maxlength="8000" autocomplete="new-password" autocapitalize="off" spellcheck="false" /><button id="google-secret-toggle" type="button" aria-pressed="false">Показать</button></span>
+          <small>После сохранения секрет больше не отображается и не возвращается из BarDoctor.</small>
+        </label>
+        <label>Google OAuth Callback / Redirect URL
+          <span class="google-callback-field"><input id="google-callback-url" type="text" readonly value="" aria-describedby="google-callback-help" /><button id="copy-google-callback" type="button">Скопировать callback URL</button></span>
+          <small id="google-callback-help">Укажите этот адрес в Authorized redirect URIs вашего OAuth Client.</small>
+        </label>
+        <div id="google-settings-error" class="result-box error hidden" role="alert"></div>
+        <div class="dialog-actions google-dialog-actions"><button class="button secondary" type="button" data-close-dialog="google-business-dialog">Отмена</button><button id="google-connect-button" class="button secondary hidden" type="button">Подключить Google</button><button id="google-settings-save" class="button primary" type="submit">Сохранить</button></div>
+      </form>
     </dialog>
 
     ${canonicalAppNavigationForRequest(request, "more")}

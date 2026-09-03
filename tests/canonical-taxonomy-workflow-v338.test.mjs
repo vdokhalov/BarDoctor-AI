@@ -25,8 +25,8 @@ test("nomenclature exposes one editable canonical taxonomy without an automatic 
 
 test("tech cards, receipts and write-offs share quick create and preserve their active workflow", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
-  const ingredientStart = bundle.indexOf("function bdCatIngredientMatchV368");
-  const ingredientEnd = bundle.indexOf("const bdCatIngredientMatchV299=bdCatIngredientMatchV368", ingredientStart);
+  const ingredientStart = bundle.indexOf("function bdCatIngredientMatchV375");
+  const ingredientEnd = bundle.indexOf("const bdCatIngredientMatchV368=bdCatIngredientMatchV375", ingredientStart);
   const receiptStart = bundle.indexOf("function bdInvoiceLineMappingV3");
   const receiptEnd = bundle.indexOf("function bdPurchaseReview", receiptStart);
   const writeoffStart = bundle.indexOf("function bdWriteoffPickerV271");

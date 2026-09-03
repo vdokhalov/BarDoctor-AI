@@ -99,7 +99,7 @@ test("new menu items default to the active venue currency", async () => {
 test("saved venue catalog remains authoritative while server analytics refreshes", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV290="owner-uat-v290"/);
-  assert.match(bundle, /bdAssortmentLocal=bdAssortmentFallbackAnalyticsV170\(E,m\)/);
+  assert.match(bundle, /bdAssortmentLocal=bdAssortmentFallbackAnalyticsV170\(E,C,m\)/);
   assert.match(bundle, /bdAssortmentLocal\.menuItems\.length\?\{\.\.\.bdAssortmentLocal,economics:V\?\.economics/);
 });
 
@@ -114,14 +114,15 @@ test("assortment prefers the populated server read model and labels confirmed fa
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV292="owner-uat-v292"/);
   assert.match(bundle, /he=V\?\.menuItems\?\.length\?V:bdAssortmentLocal\.menuItems\.length/);
-  assert.match(bundle, /techCardStatus:h\?h\.reviewStatus==="approved"\|\|h\.status==="confirmed"\?"approved"/);
+  assert.match(bundle, /approved=Boolean\(h&&\(h\.reviewStatus==="approved"\|\|h\.status==="confirmed"\)\)/);
+  assert.match(bundle, /techCardStatus:h\?approved\?"approved"/);
 });
 
 test("assortment renders canonical base units in owner-facing Russian labels", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV293="owner-uat-v293"/);
   assert.match(bundle, /function bdAssortmentUnitLabelV293/);
-  assert.match(bundle, /bdAssortmentUnitLabelV293\(v\.unit\)/);
+  assert.match(bundle, /bdTechCostLineAmountV393\(v\)/);
 });
 
 test("AI diagnosis uses authoritative last-write persistence", async () => {
@@ -143,6 +144,8 @@ test("empty venues do not claim completed setup or 100 percent readiness", async
 test("assortment detail also translates canonical base units", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV295="owner-uat-v295"/);
-  assert.match(bundle, /bdAssortmentUnitLabelV293\(g\.unit\)/);
+  assert.match(bundle, /function bdTechCostLineAmountV393/);
+  assert.match(bundle, /children:bdTechCostLineAmountV393\(g\)/);
+  assert.match(bundle, /bdTechCostLineAmountV393\(v\)/);
   assert.doesNotMatch(bundle, /g\.quantity!=null\?g\.quantity:"—"," ",g\.unit\|\|""/);
 });

@@ -11,6 +11,19 @@ const [bundle, bootstrap, html, responseSource] = await Promise.all([
 
 test("v347 keeps one branded startup surface until the real route is ready", () => {
   assert.match(bundle, /bdCoherentStartupVersionV347="v347"/);
+  if (bundle.includes('bdSingleSplashVersionV395="v395"')) {
+    assert.match(bundle, /function ble\(\)\{return null\}/);
+    const splash = bundle.slice(bundle.indexOf("function ble(){"), bundle.indexOf("\nconst j7=", bundle.indexOf("function ble(){")));
+    assert.doesNotMatch(splash, /data-bd-splash|BarDoctor|bdAuthenticatedHomeBootV345|setTimeout|useState|initial:|animate:/);
+    return;
+  }
+  if (bundle.includes('bdStableSplashVersionV394="v394"')) {
+    assert.match(bundle, /function ble\(\)\{return i\.jsx\("div",\{"data-bd-splash":"stable-v394"/);
+    const splash = bundle.slice(bundle.indexOf("function ble(){"), bundle.indexOf("\nconst j7=", bundle.indexOf("function ble(){")));
+    assert.doesNotMatch(splash, /bdAuthenticatedHomeBootV345|setTimeout|useState|initial:|animate:/);
+    assert.match(splash, /BarDoctor.*AI-управляющий/s);
+    return;
+  }
   assert.match(bundle, /function ble\(\)\{return i\.jsx\("div",\{"data-bd-splash":"brand-loading-v347"/);
   const splash = bundle.slice(bundle.indexOf("function ble(){"), bundle.indexOf("\nconst j7=", bundle.indexOf("function ble(){")));
   assert.doesNotMatch(splash, /bdAuthenticatedHomeBootV345|setTimeout|useState/);
