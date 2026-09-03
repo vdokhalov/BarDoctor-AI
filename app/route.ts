@@ -1,5 +1,5 @@
-import { barDoctorResponse } from "./bar-doctor-response";
+import { barDoctorStartupResponseV411 } from "./bar-doctor-startup-v411";
 
-export function GET(): Response {
-  return barDoctorResponse();
+export function GET(): Promise<Response> {
+  return barDoctorStartupResponseV411();
 }
