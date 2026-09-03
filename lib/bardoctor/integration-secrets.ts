@@ -216,15 +216,14 @@ export async function getIntegrationValue(
 ): Promise<string | null> {
   if (isPlatformIntegrationKey(key)) return getPlatformIntegrationValue(key);
 
-  const environmentValue = runtimeEnv(key);
-  if (environmentValue) return environmentValue;
-
   const [row] = await getDb()
     .select({ encryptedValue: integrationSecrets.encryptedValue })
     .from(integrationSecrets)
     .where(and(eq(integrationSecrets.accountId, accountId), eq(integrationSecrets.key, key)))
     .limit(1);
-  return row ? decryptValue(accountId, key, row.encryptedValue) : null;
+  if (row) return decryptValue(accountId, key, row.encryptedValue);
+
+  return runtimeEnv(key);
 }
 
 export async function saveIntegrationValue(
@@ -300,10 +299,10 @@ export async function integrationStatus(
       key,
       isPlatformIntegrationKey(key)
         ? platformStatus.get(key) ?? "missing"
-        : runtimeEnv(key)
-          ? "environment"
-          : stored.has(key)
-            ? "secure_store"
+        : stored.has(key)
+          ? "secure_store"
+          : runtimeEnv(key)
+            ? "environment"
             : "missing",
     ]),
   ) as Record<IntegrationKey, IntegrationStatus>;

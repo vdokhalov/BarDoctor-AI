@@ -110,7 +110,68 @@ test("Google OAuth authorization always replaces the top-level browser context",
 
   assert.match(client, /navigateGoogleOAuth\(url\)/);
   assert.doesNotMatch(client, /(?:createElement\(["']iframe["']\)|<iframe)[^\n]*(?:google|oauth|url\.href)/i);
-  assert.match(page, /reviews\.js\?v=20260903-google-oauth-top-level-v405/);
+  assert.match(page, /reviews\.js\?v=20260903-google-oauth-source-errors-v406/);
+});
+
+test("account Google OAuth credentials override any environment fallback", async () => {
+  const [secrets, google] = await Promise.all([
+    read("lib/bardoctor/integration-secrets.ts"),
+    read("lib/bardoctor/google.ts"),
+  ]);
+  const getter = secrets.match(/export async function getIntegrationValue\([\s\S]*?\n\}/)?.[0];
+  const status = secrets.match(/export async function integrationStatus\([\s\S]*?\n\}/)?.[0];
+  assert.ok(getter);
+  assert.ok(status);
+  assert.ok(getter.indexOf("if (row) return decryptValue") < getter.indexOf("return runtimeEnv(key)"));
+  assert.match(
+    status,
+    /: stored\.has\(key\)\s+\? "secure_store"\s+: runtimeEnv\(key\)\s+\? "environment"/,
+  );
+  assert.match(google, /getIntegrationValue\(accountId, "GOOGLE_CLIENT_ID"\)/);
+  assert.match(google, /const \{ clientId \} = await credentials\(accountId\)/);
+  assert.match(google, /client_id: clientId/);
+});
+
+test("Google OAuth errors retain safe exact codes without raw response details", async () => {
+  const {
+    GoogleOAuthExchangeError,
+    googleOAuthErrorCode,
+    googleOAuthExchangeError,
+    normalizeGoogleOAuthError,
+  } = await import("../lib/bardoctor/google-oauth-error");
+
+  assert.equal(normalizeGoogleOAuthError("invalid_client"), "invalid_client");
+  assert.equal(normalizeGoogleOAuthError("invalid_request", "Bad redirect_uri"), "redirect_uri_mismatch");
+  assert.equal(normalizeGoogleOAuthError("access_denied"), "access_denied");
+  assert.equal(normalizeGoogleOAuthError("invalid_grant"), "invalid_grant");
+  assert.equal(normalizeGoogleOAuthError("unexpected_google_detail"), "exchange_failed");
+
+  const parsed = await googleOAuthExchangeError(new Response(JSON.stringify({
+    error: "invalid_grant",
+    error_description: "authorization code contains sensitive diagnostic detail",
+  }), { status: 400, headers: { "Content-Type": "application/json" } }));
+  assert.equal(parsed.code, "invalid_grant");
+  assert.equal(parsed.status, 400);
+  assert.doesNotMatch(parsed.message, /sensitive diagnostic detail/);
+  assert.equal(googleOAuthErrorCode(parsed), "invalid_grant");
+  assert.equal(googleOAuthErrorCode(new Error("raw failure")), "exchange_failed");
+  assert.ok(parsed instanceof GoogleOAuthExchangeError);
+});
+
+test("Google callback validates state and records only normalized OAuth failure codes", async () => {
+  const [sources, client] = await Promise.all([
+    read("lib/bardoctor/review-sources.ts"),
+    read("public/reviews.js"),
+  ]);
+  const callback = sources.match(/if \(action === "callback"\) \{[\s\S]*?\n  \}\n\n  if \(action !== "connect"\)/)?.[0];
+  assert.ok(callback);
+  assert.ok(callback.indexOf("consumeGoogleState(state)") < callback.indexOf("if (googleError)"));
+  assert.match(callback, /normalizeGoogleOAuthError/);
+  assert.match(callback, /recordGoogleOAuthFailure\(oauthState\.accountId, reason\)/);
+  assert.doesNotMatch(callback, /encodeURIComponent\(googleError\)/);
+  for (const code of ["invalid_client", "redirect_uri_mismatch", "access_denied", "invalid_grant", "exchange_failed"]) {
+    assert.match(client, new RegExp(`${code}:`));
+  }
 });
 
 test("Google Business patch depends only on tables already present in the v400 migration ledger", async () => {

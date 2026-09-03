@@ -5,6 +5,7 @@ import {
   getIntegrationValue,
   integrationEncryptionKey,
 } from "./integration-secrets";
+import { googleOAuthExchangeError } from "./google-oauth-error";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -178,7 +179,7 @@ async function tokenRequest(params: URLSearchParams): Promise<GoogleTokens> {
     body: params,
     signal: AbortSignal.timeout(30_000),
   }, "OAuth");
-  if (!response.ok) throw googleHttpError("OAuth", response.status);
+  if (!response.ok) throw await googleOAuthExchangeError(response);
   const data = await response.json() as {
     access_token?: string;
     refresh_token?: string;

@@ -20,6 +20,11 @@ import {
   listGoogleLocations,
   refreshGoogleToken,
 } from "./google";
+import {
+  googleOAuthErrorCode,
+  normalizeGoogleOAuthError,
+  type GoogleOAuthErrorCode,
+} from "./google-oauth-error";
 import { parseGoogleMapsUrl } from "./google-maps-url";
 import { readJsonRequest } from "./http";
 import {
@@ -306,18 +311,40 @@ function callbackRedirect(request: Request, query: string): Response {
   return Response.redirect(new URL(`/reviews?${query}`, request.url), 302);
 }
 
+async function recordGoogleOAuthFailure(
+  accountId: number,
+  code: GoogleOAuthErrorCode,
+): Promise<void> {
+  try {
+    await logReviewSourceEvent(accountId, "oauth_failed", `Google OAuth: ${code}`);
+  } catch {
+    // An audit write must not replace the safe OAuth result shown to the owner.
+  }
+}
+
 export async function handleGoogleSourceGet(request: Request, action: string): Promise<Response> {
   if (action === "callback") {
     const url = new URL(request.url);
     const googleError = url.searchParams.get("error");
-    if (googleError) return callbackRedirect(request, `googleConnect=error&reason=${encodeURIComponent(googleError)}`);
     const code = url.searchParams.get("code");
     const state = url.searchParams.get("state");
-    if (!code || !state) return callbackRedirect(request, "googleConnect=error&reason=invalid_state");
+    if (!state) return callbackRedirect(request, "googleConnect=error&reason=invalid_state");
 
+    const oauthState = await consumeGoogleState(state);
+    if (!oauthState) return callbackRedirect(request, "googleConnect=error&reason=invalid_state");
+    if (googleError) {
+      const reason = normalizeGoogleOAuthError(
+        googleError,
+        url.searchParams.get("error_description"),
+      );
+      await recordGoogleOAuthFailure(oauthState.accountId, reason);
+      return callbackRedirect(request, `googleConnect=error&reason=${reason}`);
+    }
+    if (!code) {
+      await recordGoogleOAuthFailure(oauthState.accountId, "exchange_failed");
+      return callbackRedirect(request, "googleConnect=error&reason=exchange_failed");
+    }
     try {
-      const oauthState = await consumeGoogleState(state);
-      if (!oauthState) return callbackRedirect(request, "googleConnect=error&reason=invalid_state");
       const tokens = await exchangeGoogleCode(
         oauthState.accountId,
         code,
@@ -362,8 +389,10 @@ export async function handleGoogleSourceGet(request: Request, action: string): P
         pendingLocationsJson: JSON.stringify(locations),
       });
       return callbackRedirect(request, "googleConnect=pending");
-    } catch {
-      return callbackRedirect(request, "googleConnect=error&reason=exchange_failed");
+    } catch (error) {
+      const reason = googleOAuthErrorCode(error);
+      await recordGoogleOAuthFailure(oauthState.accountId, reason);
+      return callbackRedirect(request, `googleConnect=error&reason=${reason}`);
     }
   }
 

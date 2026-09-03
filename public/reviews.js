@@ -820,7 +820,8 @@
     no_locations: "В аккаунте Google Business Profile не найдено доступных заведений.",
     invalid_client: "Google отклонил Client ID или Client Secret.",
     redirect_uri_mismatch: "Callback URL не совпадает с Authorized redirect URI в Google Cloud.",
-    exchange_failed: "Google отклонил credentials или Callback URL. Проверьте настройки OAuth Client."
+    invalid_grant: "Google authorization code истёк, уже использован или был отозван. Начните подключение заново.",
+    exchange_failed: "Google не завершил обмен authorization code. Повторите подключение."
   };
   if (params.get("googleConnect") === "success" && params.get("sync") === "error") showMessage("Google Business Profile подключён, но первая синхронизация завершилась ошибкой.", true);
   else if (params.get("googleConnect") === "success") showMessage("Google Business Profile подключён, первая синхронизация завершена.");
