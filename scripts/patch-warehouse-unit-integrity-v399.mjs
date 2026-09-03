@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const bundlePath = path.join(root, "public/assets/index-BQGspy0I.js");
 const marker = "bd-warehouse-unit-integrity-v399";
+const bundlePath = path.join(root, "public/assets/index-BQGspy0I.js");
+const cssPath = path.join(root, "public/catalog.css");
 let source = fs.readFileSync(bundlePath, "utf8");
 
 function replaceExactly(before, after, label, expected = 1) {
@@ -49,5 +50,7 @@ for (const relativePath of [
   );
   fs.writeFileSync(filePath, contents);
 }
+
+await import("./patch-manual-nomenclature-cost-fallback-v409.mjs");
 
 console.log(`${marker}: applied`);

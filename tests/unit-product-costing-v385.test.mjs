@@ -30,10 +30,11 @@ function costingApi() {
   return context.api;
 }
 
-test("v385 production bundle is valid and declares last-confirmed-purchase costing", () => {
+test("v385 production bundle is valid and keeps last-confirmed purchase authoritative", () => {
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bd-unit-product-costing-v385/);
-  assert.match(bundle, /source:"latest_confirmed_purchase"/);
+  assert.match(bundle, /bd-manual-nomenclature-cost-fallback-v409/);
+  assert.match(bundle, /source:point\?\.source\|\|"latest_confirmed_purchase"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdTechCostRowV376"), bundle.indexOf("function bdAssortmentFallbackAnalyticsV170")), /weighted_inventory_average|averageUnitCost/);
 });
 
