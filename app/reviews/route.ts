@@ -12,19 +12,19 @@ return `<!doctype html>
     <meta name="theme-color" content="#f7f8fc" />
     <title>Отзывы гостей — BarDoctor</title>
     <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
-    <link rel="stylesheet" href="/reviews.css?v=20260902-google-business-setup-v400" />
+    <link rel="stylesheet" href="/reviews.css?v=20260903-home-reviews-ux-v409" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
-    <script src="/reviews.js?v=20260903-google-oauth-token-diagnostics-v408" defer></script>
+    <script src="/reviews.js?v=20260903-home-reviews-ux-v409" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
-  <body data-bd-parent-route="/integrations">
+  <body data-bd-parent-route="/more">
     <header class="integration-header">
-      <a class="icon-button" href="/integrations" aria-label="Вернуться в Интеграции" data-bd-back>
+      <a class="icon-button" href="/more" aria-label="Вернуться в раздел «Ещё»" data-bd-back>
         <img src="/integration-icons/arrow-left.svg" alt="" aria-hidden="true" />
       </a>
       <div class="module-identity">
@@ -73,7 +73,10 @@ return `<!doctype html>
             <div><p class="section-label">ИСТОРИЯ</p><h2 id="review-history-title">Все отзывы</h2></div>
             <label class="review-search"><span class="sr-only">Поиск</span><input id="review-search" type="search" placeholder="Поиск по отзывам…" /></label>
           </div>
-          <div id="review-source-filters" class="review-filter-row" role="group" aria-label="Фильтр по источнику"></div>
+          <div class="review-filter-bar">
+            <div id="review-source-filters" class="review-filter-row" role="group" aria-label="Фильтр отзывов"></div>
+            <label class="review-source-select"><span class="sr-only">Источник</span><select id="review-source-select" aria-label="Фильтр по источнику"><option value="all">Все источники</option></select></label>
+          </div>
           <div id="review-list" class="review-list"></div>
         </section>
       </div>
@@ -108,6 +111,8 @@ return `<!doctype html>
 
     <dialog id="review-reply-dialog" class="review-dialog">
       <div class="dialog-heading"><div><p class="section-label">ОТВЕТ ГОСТЮ</p><h2>Черновик ответа</h2></div><button class="dialog-close" type="button" data-close-dialog="review-reply-dialog" aria-label="Закрыть">×</button></div>
+      <div id="review-reply-context" class="review-reply-context"></div>
+      <p class="reply-safety">Черновик не публикуется автоматически. Проверьте текст перед отправкой.</p>
       <p id="review-reply-copy" class="reply-copy"></p>
       <div class="dialog-actions"><button class="button secondary" type="button" data-close-dialog="review-reply-dialog">Закрыть</button><button id="copy-review-reply" class="button primary" type="button">Скопировать</button></div>
     </dialog>

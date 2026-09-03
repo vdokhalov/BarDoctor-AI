@@ -24,7 +24,9 @@ test("user integrations are organised by systems rather than transport internals
   assert.match(page, /canonicalAppNavigationForRequest\(request, "more"\)/);
 
   assert.doesNotMatch(page, /data-card="openai"|data-card="onesignal"/i);
-  assert.doesNotMatch(page, /OAuth Client ID|Client secret|Google API key|OPENAI_API_KEY|ONESIGNAL_REST_API_KEY/);
+  assert.match(page, /Google Client ID/);
+  assert.match(page, /Google Client Secret/);
+  assert.doesNotMatch(page, /Google API key|OPENAI_API_KEY|ONESIGNAL_REST_API_KEY/);
   assert.doesNotMatch(client, /Сохранить OneSignal|Осталось:|В этом месяце использовано/);
 });
 
@@ -35,7 +37,8 @@ test("the new experience reuses production integration capabilities and honest s
   assert.match(client, /\/api\/integration-hub\/import\/preview/);
   assert.match(client, /\/api\/integration-hub\/import/);
   assert.match(client, /\/api\/reviews\/sources/);
-  assert.match(client, /Настроить источники/);
+  assert.match(client, /Управлять подключением/);
+  assert.match(client, /Открыть отзывы/);
   assert.doesNotMatch(client, /\/api\/competitors\/me|googlePlacesPresentation|renderGooglePlaces/);
   assert.match(client, /connection\.localStatus/);
   assert.match(client, /Агент ещё не подключался/);

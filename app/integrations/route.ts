@@ -17,14 +17,14 @@ function integrationsHtml(request: Request): string {
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="theme-color" content="#f7f8fc" />
     <title>Интеграции — BarDoctor</title>
-    <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
+    <link rel="stylesheet" href="/integrations.css?v=20260903-home-reviews-ux-v409" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
-    <script src="/integrations.js?v=20260814-connector-download-v187" defer></script>
+    <script src="/integrations.js?v=20260903-home-reviews-ux-v409" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/more" data-bd-navigation-owner="${navigationOwner}">
@@ -144,6 +144,23 @@ function integrationsHtml(request: Request): string {
       <section id="api-view" class="integration-view hidden" data-integration-view="api">
         <div class="view-heading"><p class="section-label">ДЛЯ РАЗРАБОТЧИКОВ</p><h2>Собственная система / API</h2><p>Подключите систему, которая умеет отправлять данные в BarDoctor API.</p></div>
         <div id="api-detail"></div>
+      </section>
+
+      <section id="google-view" class="integration-view hidden" data-integration-view="google">
+        <div class="view-heading"><p class="section-label">ОТЗЫВЫ И РЕПУТАЦИЯ</p><h2>Google Business Profile</h2><p>Подключение, OAuth и техническое состояние источника. Работа с отзывами находится в отдельном модуле.</p></div>
+        <section class="detail-card google-integration-detail">
+          <div id="google-integration-status" class="google-integration-status" role="status"><strong>Проверяю подключение…</strong><p>Загружаю техническое состояние Google Business Profile.</p></div>
+          <form id="google-integration-form" autocomplete="off">
+            <div class="form-grid">
+              <label>Google Client ID<input name="clientId" type="text" maxlength="8000" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="…apps.googleusercontent.com" /></label>
+              <label>Google Client Secret<input name="clientSecret" type="password" maxlength="8000" autocomplete="new-password" autocapitalize="off" spellcheck="false" /></label>
+            </div>
+            <label>Google OAuth Callback / Redirect URL<span class="google-callback-row"><input id="google-integration-callback" type="text" readonly /><button id="google-copy-callback" class="button secondary small" type="button">Скопировать</button></span><small>Укажите этот адрес в Authorized redirect URIs вашего OAuth Client.</small></label>
+            <div id="google-location-picker" class="google-location-picker hidden"></div>
+            <div id="google-integration-error" class="result-box error hidden" role="alert"></div>
+            <div class="detail-actions"><button id="google-save-settings" class="button primary" type="submit">Сохранить OAuth</button><button id="google-connect-profile" class="button secondary hidden" type="button">Подключить Google</button><button id="google-sync-reviews" class="button secondary hidden" type="button">Синхронизировать</button><a class="button secondary" href="/reviews">Открыть отзывы</a></div>
+          </form>
+        </section>
       </section>
 
       <section id="file-view" class="integration-view hidden" data-integration-view="file">

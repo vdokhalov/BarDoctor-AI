@@ -415,3 +415,38 @@ export function reviewLayerSummary(reviews: CanonicalReview[], now = new Date())
     lastPublishedAt: reviews[0]?.publishedAt ?? null,
   };
 }
+
+export function reviewHasOwnerReply(review: CanonicalReview): boolean {
+  return Boolean(reviewText(review.ownerReply, "", 10_000));
+}
+
+export function reviewNeedsAttention(review: CanonicalReview): boolean {
+  if (reviewHasOwnerReply(review)) return false;
+  const sentiment = reviewText(review.sentiment).toLocaleLowerCase("en");
+  return (review.rating !== null && review.rating <= 3) || sentiment === "negative";
+}
+
+export function homeReviewMetrics(reviews: CanonicalReview[], now = new Date()) {
+  const googleReviews = reviews.filter((review) => review.source === "google");
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000);
+  const summary = reviewLayerSummary(googleReviews, now);
+  const isNewerThan = (review: CanonicalReview, boundary: Date) => {
+    const timestamp = new Date(review.publishedAt).getTime();
+    return Number.isFinite(timestamp) && timestamp >= boundary.getTime();
+  };
+  return {
+    total: googleReviews.length,
+    averageRating: summary.averageRating,
+    new7d: googleReviews.filter((review) => isNewerThan(review, sevenDaysAgo)).length,
+    new30d: googleReviews.filter((review) => isNewerThan(review, thirtyDaysAgo)).length,
+    unanswered: googleReviews.filter((review) => !reviewHasOwnerReply(review)).length,
+    needsAttention: googleReviews.filter(reviewNeedsAttention).length,
+    analyzed: summary.analyzed,
+    complaints: summary.complaints.slice(0, 3).map((item) => ({
+      topic: item.topic,
+      count: item.negative,
+    })),
+    lastPublishedAt: summary.lastPublishedAt,
+  };
+}

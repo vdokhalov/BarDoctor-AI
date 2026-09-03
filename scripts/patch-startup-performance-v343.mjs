@@ -103,6 +103,7 @@ const criticalStyles = [
   "/brand-identity-v159.css",
   "/modern-polish.css",
   "/home-visual-v151.css",
+  "/home-reviews-v409.css",
   "/health-score-experience-v152.css",
   "/venue-switcher.css",
   "/app-shell-v185.css",
