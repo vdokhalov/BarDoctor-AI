@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - feature/google-reviews-setup-v400-2026-09-02
+      - fix/google-oauth-top-level-v405-2026-09-03
   workflow_dispatch:
 
 permissions:
