@@ -39,3 +39,11 @@ jobs:
         run: npm run lint
       - name: Full regression and verified build
         run: npm test
+      - name: Install Chromium for browser QA
+        run: npm run browser:install
+      - name: Startup recovery browser QA
+        run: npm run test:startup-recovery
+      - name: Mobile and desktop navigation QA
+        run: npm run test:mobile-navigation
+      - name: Home reviews viewport QA
+        run: npm run test:home-reviews-browser
