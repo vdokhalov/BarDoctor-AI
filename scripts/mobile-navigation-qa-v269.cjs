@@ -1067,12 +1067,22 @@ async function moduleSmokeFlow(browser, profile) {
 async function homeReviewsFlow(browser, profile) {
   const run = await createRun(browser, profile, "home-reviews");
   const { page } = run;
+  const touchSession = profile.descriptor.hasTouch ? await run.context.newCDPSession(page) : null;
+  const restoreTouchEmulation = async () => {
+    if (!touchSession) return;
+    // Chromium can reset the touch override when the embedded frame is removed.
+    // Restore real browser input emulation, never override navigator or skip QA.
+    await touchSession.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    await page.waitForFunction(() => navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches);
+  };
   await goto(page, "/home?venue=901");
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
   const attention = page.locator('[data-bd-home-attention="universal-v198"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
+  await restoreTouchEmulation();
+  await mobileAudit(page, profile.name, "home-reviews-before-navigation", { requireTouch: Boolean(profile.descriptor.hasTouch) });
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',
@@ -1108,7 +1118,10 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
-  await reviewsCard.getByRole("button", { name: "Все отзывы", exact: true }).click();
+  await restoreTouchEmulation();
+  const openReviews = reviewsCard.getByRole("button", { name: "Все отзывы", exact: true });
+  if (profile.descriptor.hasTouch) await openReviews.tap();
+  else await openReviews.click();
   await page.waitForURL(/\/reviews(?:\?|$)/);
   await page.waitForSelector('iframe[src^="/reviews"]');
   const reviewFrame = page.frames().find((candidate) => {
@@ -1143,7 +1156,13 @@ async function homeReviewsFlow(browser, profile) {
   await page.goBack({ waitUntil: "networkidle" });
   await reviewsCard.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
+  await restoreTouchEmulation();
   await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
+  if (profile.descriptor.hasTouch) {
+    await openReviews.tap();
+    await page.waitForURL(/\/reviews(?:\?|$)/);
+    await page.waitForSelector('iframe[src^="/reviews"]');
+  }
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true, layout: homeLayout };
 }
