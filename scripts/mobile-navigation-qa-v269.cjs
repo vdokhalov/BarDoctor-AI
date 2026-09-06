@@ -707,7 +707,10 @@ async function inventoryFlow(browser, profile) {
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.locator("[data-bd-venue-trigger]").click();
   await page.waitForSelector("[data-bd-venue-sheet]");
-  await page.locator(".bd-venue-row").filter({ hasText: "Mobile QA B" }).click();
+  await Promise.all([
+    page.waitForURL((url) => url.searchParams.get("venue") === "902", { waitUntil: "domcontentloaded", timeout: 20_000 }),
+    page.locator(".bd-venue-row").filter({ hasText: "Mobile QA B" }).click(),
+  ]);
   await page.waitForFunction(() => localStorage.getItem("bd_active_venue_id") === "902", undefined, { timeout: 10_000 });
   assert.equal(await page.evaluate(() => localStorage.getItem("bd_active_venue_id")), "902");
   assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: inventory leaked across venue switch`);

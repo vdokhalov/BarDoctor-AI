@@ -74,6 +74,7 @@ test("Home Reviews waits for authenticated bootstrap and invalidates stale venue
   assert.match(bundle, /reviewsReady:bdHomeCloudReady/);
   assert.match(browserQa, /bootstrapDelayMs: 2_200/);
   assert.match(browserQa, /homeReviewResponses, \[200\]/);
+  assert.match(browserQa, /waitForURL\(\(url\) => url\.searchParams\.get\("venue"\) === "902"/);
   assert.match(browserQa, /waitForFunction\(\(\) => localStorage\.getItem\("bd_active_venue_id"\) === "902"/);
   const activeLoader = await source("public/bardoctor-preview-v397.js");
   assert.match(activeLoader, /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=[^"]*home-reviews-auth-v415/);
