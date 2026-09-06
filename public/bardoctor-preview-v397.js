@@ -39,6 +39,8 @@
 
 
 
+
+
   window.__bdBootstrapPending = true;
   /* bd-shell-first-startup-v397: render from the last verified local shell while auth refreshes. */
   var bdCachedSessionV397 = localStorage.getItem("bd_session");

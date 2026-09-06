@@ -640,7 +640,9 @@
     target.disabled = true;
     try {
       var result = await api("/api/reviews/reply", { method: "POST", body: JSON.stringify({ review: review }) });
-      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + review.text;
+      var metadata = review.sourceMetadata || {};
+      var originalText = typeof metadata.originalText === "string" && metadata.originalText.trim() ? metadata.originalText.trim() : review.text;
+      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + originalText;
       document.getElementById("review-reply-copy").textContent = result.data && result.data.draft ? result.data.draft : "Черновик не подготовлен.";
       replyDialog.showModal();
     } catch (problem) {
