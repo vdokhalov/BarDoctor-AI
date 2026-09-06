@@ -46,4 +46,5 @@ jobs:
       - name: Mobile and desktop navigation QA
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
+        if: ${{ !cancelled() }}
         run: npm run test:home-reviews-browser

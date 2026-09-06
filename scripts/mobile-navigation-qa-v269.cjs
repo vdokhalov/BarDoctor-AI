@@ -958,7 +958,8 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
   const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  // The procurement fixture contains August purchases; do not depend on today's month.
+  await goto(page, "/suppliers?qaProcurement=default&venue=401&period=2026-08");
   try {
     await page.waitForSelector(".bd-proc-command-v168");
   } catch {
