@@ -91,6 +91,9 @@
   function queryScreen(url) {
     var path = url.pathname;
     var query = url.searchParams;
+    if (path === "/warehouse" && query.has("writeoff")) {
+      return { type: "fullscreen", title: "Списание", parent: clean(url, ["writeoff"]), shell: "fullscreen-owned", bottomNav: false, headerMode: "owned" };
+    }
     if (path === "/warehouse" && (query.has("inventory") || query.get("add") === "inventory")) {
       return { type: "fullscreen", title: "Инвентаризация", parent: clean(url, ["inventory", "add"]), shell: "fullscreen-owned", bottomNav: false, headerMode: "owned" };
     }

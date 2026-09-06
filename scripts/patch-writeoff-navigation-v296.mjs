@@ -6,12 +6,13 @@ const targets = [
 ];
 const guardedBackClose = 'function x(){window.bdNavigateBack(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}))}';
 const shellClose = 'function x(){window.bdNavigate(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}),{replace:!0})}';
-const newClose = 'function x(){a(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}),{replace:!0})}';
+const routerClose = 'function x(){a(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}),{replace:!0})}';
+const newClose = 'function x(){a(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}),{replace:!0});window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state}))}';
 
 for (const target of targets) {
   let source = fs.readFileSync(target, "utf8");
   if (!source.includes(newClose)) {
-    const anchor = source.includes(shellClose) ? shellClose : guardedBackClose;
+    const anchor = source.includes(routerClose) ? routerClose : source.includes(shellClose) ? shellClose : guardedBackClose;
     if (!source.includes(anchor)) throw new Error(`Write-off close navigation anchor was not found in ${target.pathname}`);
     source = source.replace(anchor, newClose);
     fs.writeFileSync(target, source);

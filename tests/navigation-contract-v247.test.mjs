@@ -32,6 +32,14 @@ test("deep links, refreshes and venue-aware query state resolve without browser 
   assert.equal(inventory.headerMode, "owned");
   assert.equal(inventory.bottomNav, false);
 
+  for (const id of ["new", "writeoff-17"]) {
+    const writeoff = contract.resolve(`https://bardoctor.test/warehouse?venue=7&tab=writeoffs&writeoff=${id}`);
+    assert.equal(writeoff.type, "fullscreen");
+    assert.equal(writeoff.parent, "/warehouse?venue=7&tab=writeoffs");
+    assert.equal(writeoff.headerMode, "owned");
+    assert.equal(writeoff.bottomNav, false);
+  }
+
   const product = contract.resolve("https://bardoctor.test/warehouse?venue=7&tab=products&q=tonic&product=tonic");
   assert.equal(product.parent, "/warehouse?venue=7&tab=products&q=tonic");
   assert.equal(product.type, "sheet");

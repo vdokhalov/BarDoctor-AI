@@ -605,7 +605,7 @@ async function mobileAudit(page, profileName, label, options = {}) {
     };
   });
   if (options.requireTouch !== false) {
-    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
+    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive: ${JSON.stringify(audit)}`);
     assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
   }
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${profileName}/${label}: horizontal overflow ${audit.scrollWidth}/${audit.clientWidth}`);
@@ -752,8 +752,10 @@ async function nomenclatureFlow(browser, profile) {
   const { page } = run;
   await goto(page, "/warehouse?venue=901");
   await mobileAudit(page, profile.name, "warehouse");
-  await page.getByRole("button", { name: "Номенклатура", exact: true }).click();
+  await page.getByRole("button", { name: "Настроить структуру склада", exact: true }).click();
   await page.waitForURL(/\/nomenclature/);
+  assert.equal(new URL(page.url()).searchParams.get("view"), "taxonomy");
+  await page.getByRole("button", { name: "Все позиции", exact: true }).click();
   const search = page.getByLabel(/Найти.*номенклатур|Поиск/i).or(page.getByPlaceholder(/Найти|Поиск/i)).first();
   await search.fill("Пиво");
   await page.waitForTimeout(100);
@@ -955,8 +957,20 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
-  const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  const { page, state } = run;
+  // Use the same authoritative venue store as bootstrap. The legacy qaProcurement
+  // script installs a competing account/store and can race the shared QA bootstrap.
+  state.stores[901].bd_suppliers = [{ id: "supplier-mobile", name: "Поставщик Mobile", type: "wholesale", categories: ["alcohol"], currency: "PMR_RUB", status: "active" }];
+  state.stores[901].bd_purchase_documents = [{
+    id: "purchase-mobile", venueId: 901, documentType: "invoice", documentNumber: "17",
+    supplierId: "supplier-mobile", supplierName: "Поставщик Mobile", date: "2026-08-24",
+    currency: "PMR_RUB", expenseCategory: "alcohol", paymentMethod: "transfer", total: 500,
+    status: "confirmed", syncStatus: "synced", confidence: 1, warnings: [],
+    confirmedAt: "2026-08-24T12:00:00.000Z", updatedAt: "2026-08-24T12:00:00.000Z",
+    items: [{ id: "purchase-line-mobile", name: "Пиво Mobile A", quantity: 10, unit: "шт.", packageSize: "1 шт.", unitPrice: 50, lineTotal: 500, purchaseProductKey: "stock:beer-a|pcs", confidence: 1 }],
+  }];
+  await page.route("**/api/procurement/overview?*", (route) => route.fulfill(jsonResponse({ ok: true, venueId: 901, analytics: null })));
+  await goto(page, "/suppliers?venue=901&period=2026-08");
   try {
     await page.waitForSelector(".bd-proc-command-v168");
   } catch {
@@ -1053,12 +1067,22 @@ async function moduleSmokeFlow(browser, profile) {
 async function homeReviewsFlow(browser, profile) {
   const run = await createRun(browser, profile, "home-reviews");
   const { page } = run;
+  const touchSession = profile.descriptor.hasTouch ? await run.context.newCDPSession(page) : null;
+  const restoreTouchEmulation = async () => {
+    if (!touchSession) return;
+    // Chromium can reset the touch override when the embedded frame is removed.
+    // Restore real browser input emulation, never override navigator or skip QA.
+    await touchSession.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
+    await page.waitForFunction(() => navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches);
+  };
   await goto(page, "/home?venue=901");
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
   const attention = page.locator('[data-bd-home-attention="universal-v198"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
+  await restoreTouchEmulation();
+  await mobileAudit(page, profile.name, "home-reviews-before-navigation", { requireTouch: Boolean(profile.descriptor.hasTouch) });
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',
@@ -1094,7 +1118,10 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
-  await reviewsCard.getByRole("button", { name: "Все отзывы", exact: true }).click();
+  await restoreTouchEmulation();
+  const openReviews = reviewsCard.getByRole("button", { name: "Все отзывы", exact: true });
+  if (profile.descriptor.hasTouch) await openReviews.tap();
+  else await openReviews.click();
   await page.waitForURL(/\/reviews(?:\?|$)/);
   await page.waitForSelector('iframe[src^="/reviews"]');
   const reviewFrame = page.frames().find((candidate) => {
@@ -1125,11 +1152,17 @@ async function homeReviewsFlow(browser, profile) {
   await dialog.waitFor({ state: "visible" });
   assert.match(await dialog.textContent(), /Anna.*We waited too long.*Черновик не публикуется автоматически.*Спасибо за честный отзыв/s);
   assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
-  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await dialog.locator("button.button.secondary[data-close-dialog='review-reply-dialog']").click();
   await page.goBack({ waitUntil: "networkidle" });
   await reviewsCard.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
+  await restoreTouchEmulation();
   await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
+  if (profile.descriptor.hasTouch) {
+    await openReviews.tap();
+    await page.waitForURL(/\/reviews(?:\?|$)/);
+    await page.waitForSelector('iframe[src^="/reviews"]');
+  }
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true, layout: homeLayout };
 }
@@ -1468,7 +1501,11 @@ async function writeoffFlow(browser, profile) {
   } catch {
     throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
   }
-  await shell.waitFor({ state: "detached" });
+  try {
+    await shell.waitFor({ state: "detached" });
+  } catch (error) {
+    throw new Error(`${profile.name}: confirmed writeoff Close left the form mounted: ${JSON.stringify({ issues: run.issues, page: await page.evaluate(() => ({ url: location.href, state: history.state, forms: [...document.querySelectorAll('[data-bd-writeoff-flow]')].map(node => ({ parent: node.parentElement?.tagName, parentClass: node.parentElement?.className, text: node.textContent.slice(0,300) })) })) })}`, { cause: error });
+  }
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
 
   await page.getByRole("button", { name: "+ Новое", exact: true }).click();
@@ -1521,7 +1558,9 @@ async function runProfile(browser, profile) {
   const browser = await chromium.launch({
     executablePath: browserPath,
     headless: true,
-    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
+    // Lambda Chromium flags disable site isolation and interfere with iframe
+    // emulation in the standard Playwright browser installed by CI.
+    args: [...(browserPath === chromium.executablePath() ? [] : chromiumArgs), "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
   });
   const results = [];
   const failures = [];
