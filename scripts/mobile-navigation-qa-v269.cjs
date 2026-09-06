@@ -708,7 +708,7 @@ async function inventoryFlow(browser, profile) {
   await page.locator("[data-bd-venue-trigger]").click();
   await page.waitForSelector("[data-bd-venue-sheet]");
   await page.locator(".bd-venue-row").filter({ hasText: "Mobile QA B" }).click();
-  await page.waitForTimeout(500);
+  await page.waitForFunction(() => localStorage.getItem("bd_active_venue_id") === "902", undefined, { timeout: 10_000 });
   assert.equal(await page.evaluate(() => localStorage.getItem("bd_active_venue_id")), "902");
   assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: inventory leaked across venue switch`);
   assert.equal(await page.locator(".bd-inventory-layer-v246").count(), 0);

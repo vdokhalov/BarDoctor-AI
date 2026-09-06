@@ -58,12 +58,13 @@ test("Home Reviews waits for authenticated bootstrap and invalidates stale venue
     source("scripts/build-verified.sh"),
     source("scripts/patch-authoritative-home-startup-v344.mjs"),
   ]);
-  const hook = bundle.slice(bundle.indexOf("function bdHomeReviewsAuthReadyV414"), bundle.indexOf("function bdHomeReviewDateV409"));
+  const hook = bundle.slice(bundle.indexOf("function bdHomeReviewsAuthReadyV415"), bundle.indexOf("function bdHomeReviewDateV409"));
   const daily = bundle.slice(bundle.indexOf("function bdHomeDaily"), bundle.indexOf("function bdHealthSafeComputeV342"));
   assert.match(hook, /function bdUseHomeReviewsV409\(e,t\)/);
   assert.match(hook, /__bdBootstrapPending!==!0/);
   assert.match(hook, /__bdAuthBootstrapV274\?\.state==="ready"/);
-  assert.match(hook, /!t\|\|!bdHomeReviewsAuthReadyV414\(\)/);
+  assert.match(hook, /!bdHomeReviewsAuthReadyV415\(\)/);
+  assert.doesNotMatch(hook, /!t\|\|!bdHomeReviewsAuthReady/);
   assert.match(hook, /e===s&&r\(t\)/);
   assert.match(hook, /bd:active-venue-changed/);
   assert.match(hook, /bd:bootstrap-complete/);
@@ -73,10 +74,11 @@ test("Home Reviews waits for authenticated bootstrap and invalidates stale venue
   assert.match(bundle, /reviewsReady:bdHomeCloudReady/);
   assert.match(browserQa, /bootstrapDelayMs: 2_200/);
   assert.match(browserQa, /homeReviewResponses, \[200\]/);
+  assert.match(browserQa, /waitForFunction\(\(\) => localStorage\.getItem\("bd_active_venue_id"\) === "902"/);
   const activeLoader = await source("public/bardoctor-preview-v397.js");
-  assert.match(activeLoader, /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=[^"]*home-reviews-lifecycle-v414/);
+  assert.match(activeLoader, /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=[^"]*home-reviews-auth-v415/);
   for (const shell of [await source("public/app.html"), await source("app/bar-doctor-response.ts")]) {
-    assert.match(shell, /bardoctor-preview-v397\.js\?v=[^"']*home-reviews-lifecycle-v414/);
+    assert.match(shell, /bardoctor-preview-v397\.js\?v=[^"']*home-reviews-auth-v415/);
     assert.equal(shell.match(/<script src="\/bardoctor-preview-v397\.js\?v=[^"]+" defer><\/script>/g)?.length, 1);
   }
   assert.ok(

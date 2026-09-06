@@ -302,6 +302,13 @@ test("Procurement browser regression uses only visible user actions for settleme
     assert.match(browserQa, new RegExp(action));
   }
   assert.match(browserQa, /page\.once\("dialog"/);
+  assert.match(browserQa, /context\.addInitScript\(\{ content: fixtureSource \}\)/);
+  assert.match(browserQa, /context\.route\("\*\*\/procurement-qa-v168\.js\*"/);
+  assert.match(browserQa, /document\.querySelector\("\.bd-document-detail-delete-v193"\)/);
+  assert.match(browserQa, /box\.right <= window\.innerWidth && box\.bottom <= window\.innerHeight/);
+  assert.match(browserQa, /selectFinanceFixtureMonth/);
+  assert.match(browserQa, /Более ранний месяц/);
+  assert.match(browserQa, /Более поздний месяц/);
   assert.match(browserQa, /\.bd-proc-pay-now-v190/);
   assert.match(browserQa, /\.bd-proc-payment-list-v186 article/);
   assert.match(browserQa, /page\.getByRole\("link", \{ name: "Ещё"/);
