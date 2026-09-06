@@ -52,10 +52,11 @@ test("Home Reviews maps live metrics, CTAs and controlled degraded states withou
 });
 
 test("Home Reviews waits for authenticated bootstrap and invalidates stale venue requests", async () => {
-  const [bundle, browserQa, buildScript] = await Promise.all([
+  const [bundle, browserQa, buildScript, authoritativeHomePatch] = await Promise.all([
     source("public/assets/index-BQGspy0I.js"),
     source("scripts/mobile-navigation-qa-v269.cjs"),
     source("scripts/build-verified.sh"),
+    source("scripts/patch-authoritative-home-startup-v344.mjs"),
   ]);
   const hook = bundle.slice(bundle.indexOf("function bdHomeReviewsAuthReadyV414"), bundle.indexOf("function bdHomeReviewDateV409"));
   const daily = bundle.slice(bundle.indexOf("function bdHomeDaily"), bundle.indexOf("function bdHealthSafeComputeV342"));
@@ -82,6 +83,12 @@ test("Home Reviews waits for authenticated bootstrap and invalidates stale venue
     buildScript.lastIndexOf('patch-home-reviews-ux-v409.mjs') > buildScript.lastIndexOf('patch-shell-first-startup-v397.mjs'),
     "final Home Reviews cache patch must run after shell-first recreates the active loader",
   );
+  assert.match(authoritativeHomePatch, /bundle\.includes\("function bdHomeDaily\(\{cloudReady:"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("i\.jsx\(bdHomeDaily,\{cloudReady:"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("bdUseLiveBusinessHealthV335\(n&&!!t\)"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("bdLiveHealthStatus=bdUseLiveBusinessHealthV335\(!!e\)"\)/);
+  assert.doesNotMatch(authoritativeHomePatch, /if \(!bundle\.includes\(newDailyHead\)\)/);
+  assert.doesNotMatch(authoritativeHomePatch, /if \(!bundle\.includes\(newDailyCall\)\)/);
 });
 
 test("Reviews is a direct desktop module while the six-action mobile contract remains intact", async () => {
