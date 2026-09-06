@@ -185,7 +185,8 @@ test("Google callback separates token exchange diagnostics from Business Profile
     read("lib/bardoctor/review-sources.ts"),
     read("public/reviews.js"),
   ]);
-  const callback = sources.match(/if \(action === "callback"\) \{[\s\S]*?\n  \}\n\n  if \(action !== "connect"\)/)?.[0];
+  const callback = sources.replace(/\r\n/g, "\n")
+    .match(/if \(action === "callback"\) \{[\s\S]*?\n  \}\n\n  if \(action !== "connect"\)/)?.[0];
   assert.ok(callback);
   assert.ok(callback.indexOf("consumeGoogleState(state)") < callback.indexOf("if (googleError)"));
   assert.match(callback, /normalizeGoogleOAuthError/);

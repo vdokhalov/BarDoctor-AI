@@ -162,3 +162,22 @@ test("warehouse scope and venue accounting currency remain isolated inputs", () 
   assert.equal(summarizeInventoryValuation({ balances, accountingCurrency: "RUB", warehouseId: "bar" }).total, 100);
   assert.equal(summarizeInventoryValuation({ balances, accountingCurrency: "MDL", warehouseId: "bar" }).total, 0);
 });
+
+test("an explicit zero purchase cost remains known while a missing cost stays unavailable", () => {
+  const explicitZero = resolvePurchaseLineAccountingCost({
+    accountingCurrency: "PMR_RUB",
+    document: { currency: "PMR_RUB" },
+    line: { quantity: 1, lineTotal: 0, unitPrice: 0 },
+  });
+  const missing = resolvePurchaseLineAccountingCost({
+    accountingCurrency: "PMR_RUB",
+    document: { currency: "PMR_RUB" },
+    line: { quantity: 1 },
+  });
+
+  assert.equal(explicitZero.known, true);
+  assert.equal(explicitZero.amount, 0);
+  assert.equal(explicitZero.reason, undefined);
+  assert.equal(missing.known, false);
+  assert.equal(missing.reason, "missing_cost_basis");
+});

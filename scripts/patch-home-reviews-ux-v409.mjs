@@ -100,4 +100,5 @@ fs.writeFileSync(bundlePath, source);
 fs.writeFileSync(bootstrapPath, bootstrap);
 fs.writeFileSync(appHtmlPath, appHtml);
 fs.writeFileSync(responsePath, response);
+await import("./patch-latest-cost-copy-v412.mjs");
 console.log("Home + Reviews UX v409 applied");

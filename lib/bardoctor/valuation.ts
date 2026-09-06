@@ -60,6 +60,7 @@ function record(value: unknown): JsonRecord {
 }
 
 function finite(value: unknown): number | null {
+  if (value == null || (typeof value === "string" && value.trim() === "")) return null;
   const parsed = typeof value === "string"
     ? Number(value.replace(/\s/g, "").replace(",", "."))
     : Number(value);
@@ -242,8 +243,18 @@ export function resolvePurchaseLineAccountingCost(input: {
   const accountingCurrency = normalizeAccountingCurrency(input.accountingCurrency);
   const transactionCurrency = normalizedCurrency(document.currency ?? line.currency);
   const quantity = positive(line.quantity);
-  const transactionAmount = money(positive(line.lineTotal ?? line.total)
-    || positive(line.unitPrice ?? line.price) * quantity);
+  const explicitTotal = finite(line.lineTotal ?? line.total);
+  const explicitUnitPrice = finite(line.unitPrice ?? line.price);
+  const explicitQuantity = finite(line.quantity);
+  const hasExplicitTotal = explicitTotal != null && explicitTotal >= 0;
+  const hasDerivedTotal = explicitUnitPrice != null && explicitUnitPrice >= 0
+    && explicitQuantity != null && explicitQuantity >= 0;
+  const hasTransactionAmount = hasExplicitTotal || hasDerivedTotal;
+  const transactionAmount = money(hasExplicitTotal
+    ? explicitTotal
+    : hasDerivedTotal
+      ? explicitUnitPrice * quantity
+      : 0);
   const unavailable = (
     reason: PurchaseLineAccountingCost["reason"],
   ): PurchaseLineAccountingCost => ({
@@ -259,13 +270,13 @@ export function resolvePurchaseLineAccountingCost(input: {
   if (!transactionCurrency) return unavailable("missing_document_currency");
   if (transactionCurrency === accountingCurrency) {
     return {
-      known: transactionAmount > 0,
+      known: hasTransactionAmount,
       amount: transactionAmount,
       accountingCurrency,
       transactionAmount,
       transactionCurrency,
       source: "same_currency",
-      reason: transactionAmount > 0 ? undefined : "missing_cost_basis",
+      reason: hasTransactionAmount ? undefined : "missing_cost_basis",
     };
   }
   const canonical = resolveAccountingMoney({

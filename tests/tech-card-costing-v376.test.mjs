@@ -10,6 +10,8 @@ test("tech-card costing patch keeps the production bundle valid", () => {
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bd-tech-card-costing-v376/);
   assert.match(bundle, /bdAssortmentFallbackAnalyticsV170\(E,C,m\)/);
+  assert.match(bundle, /currentCostRule:"Последний применимый подтверждённый приход"/);
+  assert.doesNotMatch(bundle, /Средневзвешенная складская стоимость; резерв/);
   for (const functionName of [
     "bdAssortmentHeaderV170",
     "bdAssortmentEmptyV170",
