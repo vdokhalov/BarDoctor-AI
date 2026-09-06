@@ -752,8 +752,10 @@ async function nomenclatureFlow(browser, profile) {
   const { page } = run;
   await goto(page, "/warehouse?venue=901");
   await mobileAudit(page, profile.name, "warehouse");
-  await page.getByRole("button", { name: "Номенклатура", exact: true }).click();
+  await page.getByRole("button", { name: "Настроить структуру склада", exact: true }).click();
   await page.waitForURL(/\/nomenclature/);
+  assert.equal(new URL(page.url()).searchParams.get("view"), "taxonomy");
+  await page.getByRole("button", { name: "Все позиции", exact: true }).click();
   const search = page.getByLabel(/Найти.*номенклатур|Поиск/i).or(page.getByPlaceholder(/Найти|Поиск/i)).first();
   await search.fill("Пиво");
   await page.waitForTimeout(100);
