@@ -605,7 +605,7 @@ async function mobileAudit(page, profileName, label, options = {}) {
     };
   });
   if (options.requireTouch !== false) {
-    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
+    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive: ${JSON.stringify(audit)}`);
     assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
   }
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${profileName}/${label}: horizontal overflow ${audit.scrollWidth}/${audit.clientWidth}`);
@@ -1535,7 +1535,9 @@ async function runProfile(browser, profile) {
   const browser = await chromium.launch({
     executablePath: browserPath,
     headless: true,
-    args: [...chromiumArgs, "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
+    // Lambda Chromium flags disable site isolation and interfere with iframe
+    // emulation in the standard Playwright browser installed by CI.
+    args: [...(browserPath === chromium.executablePath() ? [] : chromiumArgs), "--no-sandbox", "--disable-dev-shm-usage", "--no-proxy-server"],
   });
   const results = [];
   const failures = [];
