@@ -44,7 +44,11 @@ jobs:
       - name: Startup recovery browser QA
         run: npm run test:startup-recovery
       - name: Mobile and desktop navigation QA
-        run: npm run test:mobile-navigation
+        # Exercise the desktop discard guard first so its diagnostics are immediate.
+        # The complete navigation suite below remains required.
+        run: |
+          BD_QA_PROFILE=desktop-chrome BD_QA_SCENARIO=writeoffs npm run test:mobile-navigation
+          npm run test:mobile-navigation
       - name: Home reviews viewport QA
         if: ${{ !cancelled() }}
         run: npm run test:home-reviews-browser

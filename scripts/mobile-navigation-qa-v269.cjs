@@ -1501,7 +1501,11 @@ async function writeoffFlow(browser, profile) {
   } catch {
     throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
   }
-  await shell.waitFor({ state: "detached" });
+  try {
+    await shell.waitFor({ state: "detached" });
+  } catch (error) {
+    throw new Error(`${profile.name}: confirmed writeoff Close left the form mounted: ${JSON.stringify({ issues: run.issues, page: await page.evaluate(() => ({ url: location.href, state: history.state, forms: [...document.querySelectorAll('[data-bd-writeoff-flow]')].map(node => ({ parent: node.parentElement?.tagName, parentClass: node.parentElement?.className, text: node.textContent.slice(0,300) })) })) })}`, { cause: error });
+  }
   assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
 
   await page.getByRole("button", { name: "+ Новое", exact: true }).click();
