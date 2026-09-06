@@ -25,6 +25,7 @@ import {
   revisePurchaseInInventory,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 
@@ -117,7 +118,7 @@ function auditUpdate(
   );
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -163,7 +164,7 @@ export async function POST(request: Request): Promise<Response> {
       issues: commercialArithmeticIssues,
     }, { status: 422 });
   }
-  if (document.documentType !== "price_list" && document.total <= 0) {
+  if (document.documentType !== "price_list" && document.costStatus === "UNKNOWN") {
     return Response.json({ ok: false, error: "Укажите итоговую сумму закупки" }, { status: 422 });
   }
   if (document.documentType !== "price_list" && !hasPermission(account, "finance.manage")) {
@@ -174,6 +175,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [PURCHASE_STORE_KEY, SUPPLIER_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY]);
   const result = await database.prepare(`
     SELECT store_key, data_json
     FROM domain_data
@@ -418,7 +420,7 @@ export async function POST(request: Request): Promise<Response> {
       }),
     );
   }
-  await database.batch(statements);
+  await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
 
   return Response.json({
     ok: true,
@@ -431,4 +433,8 @@ export async function POST(request: Request): Promise<Response> {
     stockMovements: inventory.movements,
     inventorySummary: inventory.summary,
   });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

@@ -127,6 +127,9 @@ test("purchase requires complete item lines and classifies mixed content per ite
   }), false);
   assert.equal(hasMeaningfulPurchaseItems({
     items: [{ name: "Кофе", quantity: 1, unitPrice: 0 }],
+  }), true);
+  assert.equal(hasMeaningfulPurchaseItems({
+    items: [{ name: "Кофе", quantity: 1 }],
   }), false);
   assert.equal(hasMeaningfulPurchaseItems({
     items: [{ name: "Кофе", quantity: 2, unitPrice: 50 }],

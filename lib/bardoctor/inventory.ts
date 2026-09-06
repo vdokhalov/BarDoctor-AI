@@ -7,6 +7,7 @@ import {
 } from "./nomenclature-identity";
 import { PURCHASE_STOCK_CATEGORIES } from "./purchases";
 import { resolvePurchaseLineAccountingCost } from "./valuation";
+import { explicitCostStatus } from "./cost-knowledge";
 
 export const ASSORTMENT_STORE_KEY = "bd_assortment_v1";
 export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
@@ -69,8 +70,10 @@ export type StockMovement = {
   amount: number;
   unit: BaseInventoryUnit;
   costAmount?: number;
+  costStatus?: "UNKNOWN" | "KNOWN_ZERO" | "KNOWN";
   currency?: string;
   transactionCostAmount?: number;
+  transactionCostStatus?: "UNKNOWN" | "KNOWN_ZERO" | "KNOWN";
   transactionCurrency?: string;
   exchangeRateToAccounting?: number;
   sourceDocumentId: string;
@@ -2588,9 +2591,11 @@ export function applyPurchaseToInventory(input: {
       && previousCurrency !== accountingCurrency
     );
     const missingIncomingCost = !resolvedCost.known;
+    const previousCostKnownZero = previous.costStatus === "KNOWN_ZERO";
     const missingExistingCost = previousCurrent > 0
       && previousAverageCost <= 0
-      && previousInventoryValue <= 0;
+      && previousInventoryValue <= 0
+      && !previousCostKnownZero;
     const inheritedReview = previousCurrent > 0 && previous.costNeedsReview === true;
     const costNeedsReview = existingCurrencyConflict
       || missingIncomingCost
@@ -2639,6 +2644,7 @@ export function applyPurchaseToInventory(input: {
       onOrder: Math.max(0, rounded(number(previous.onOrder) - received.amount)),
       packageAmount: hasMultiplePackageSizes ? 0 : packageDetails.amount,
       averageUnitCost: nextAverageCost,
+      costStatus: costNeedsReview ? "UNKNOWN" : nextAverageCost === 0 ? "KNOWN_ZERO" : "KNOWN",
       inventoryValue: costNeedsReview
         ? rounded(previousInventoryValue, 2)
         : rounded(Math.max(0, nextCurrent) * nextAverageCost, 2),
@@ -2649,7 +2655,7 @@ export function applyPurchaseToInventory(input: {
       valuationMethod: "moving_weighted_average",
       lastPurchasePrice: Math.max(0, number(item.unitPrice)
         || transactionLineCost / Math.max(1, number(item.quantity))),
-      lastPurchaseAccountingCost: lineCost || undefined,
+      lastPurchaseAccountingCost: resolvedCost.known ? lineCost : undefined,
       lastTransactionCurrency: currency || undefined,
       lastPurchaseAt: date,
       lastDocumentId: documentId,
@@ -2676,9 +2682,11 @@ export function applyPurchaseToInventory(input: {
       productName: name,
       amount: received.amount,
       unit: received.unit,
-      costAmount: lineCost || undefined,
-      currency: lineCost ? accountingCurrency || currency || undefined : undefined,
-      transactionCostAmount: transactionLineCost || undefined,
+      costAmount: resolvedCost.known ? lineCost : undefined,
+      costStatus: resolvedCost.costStatus,
+      currency: resolvedCost.known ? accountingCurrency || currency || undefined : undefined,
+      transactionCostAmount: explicitCostStatus(item) !== "UNKNOWN" ? transactionLineCost : undefined,
+      transactionCostStatus: explicitCostStatus(item),
       transactionCurrency: currency || undefined,
       exchangeRateToAccounting: resolvedCost.exchangeRate,
       sourceDocumentId: documentId,
@@ -2765,7 +2773,10 @@ function movementRecord(value: unknown): StockMovement | null {
     unit: ["ml", "g", "pcs"].includes(text(item.unit))
       ? text(item.unit) as BaseInventoryUnit
       : "unknown",
-    costAmount: number(item.costAmount) || undefined,
+    costAmount: item.costAmount == null ? undefined : number(item.costAmount),
+    costStatus: item.costStatus === "UNKNOWN" || item.costStatus === "KNOWN_ZERO" || item.costStatus === "KNOWN"
+      ? item.costStatus
+      : item.costAmount == null ? undefined : number(item.costAmount) === 0 ? "KNOWN_ZERO" : "KNOWN",
     currency: text(item.currency, "", 12) || undefined,
     transactionCostAmount: number(item.transactionCostAmount) || undefined,
     transactionCurrency: text(item.transactionCurrency, "", 12) || undefined,
@@ -3296,7 +3307,8 @@ export function applySalesToInventory(input: {
         productName: text(ingredient.name, "Ингредиент"),
         amount: -amount,
         unit: baseUnit,
-        costAmount: averageUnitCost > 0 ? rounded(amount * averageUnitCost, 2) : undefined,
+        costAmount: previous.costStatus === "KNOWN_ZERO" || averageUnitCost > 0 ? rounded(amount * averageUnitCost, 2) : undefined,
+        costStatus: previous.costStatus === "KNOWN_ZERO" ? "KNOWN_ZERO" : averageUnitCost > 0 ? "KNOWN" : "UNKNOWN",
         currency: text(previous.currency, "", 12) || undefined,
         sourceDocumentId: documentId,
         sourceLineId: saleId,

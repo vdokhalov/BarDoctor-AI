@@ -31,7 +31,8 @@ test("shift close uses the shared canonical picker, quantity, units, reasons and
 test("shift close endpoint atomically persists the shift and canonical stock chain", async () => {
   const route = await readFile(new URL("../app/api/shifts/close/route.ts", import.meta.url), "utf8");
   assert.match(route, /closeShiftWithCanonicalWriteOffs/);
-  assert.match(route, /database\.batch\(statements\)/);
+  assert.match(route, /runStoreCasBatch\(database, account\.id, casSnapshots, statements, now\)/);
+  assert.match(route, /withStoreCasRetries/);
   assert.match(route, /writeOffs: result\.writeOffs/);
   assert.match(route, /REVENUE_STORE_KEY/);
   assert.match(route, /WRITE_OFF_STORE_KEY/);

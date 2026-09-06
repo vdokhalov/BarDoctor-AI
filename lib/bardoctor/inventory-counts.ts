@@ -1,3 +1,5 @@
+import { costKnowledge } from "./cost-knowledge";
+
 export const INVENTORY_COUNT_STORE_KEY = "bd_inventory_snapshots";
 
 export type InventoryCountStatus = "draft" | "counting" | "review" | "completed" | "cancelled";
@@ -316,7 +318,10 @@ function costBasis(balance: JsonRecord, accountingCurrency?: string) {
   const current = numeric(balance.current, 0);
   const inventoryValue = Math.max(0, numeric(balance.inventoryValue, 0));
   const storedAverage = Math.max(0, numeric(balance.averageUnitCost, 0));
-  const averageUnitCost = storedAverage > 0
+  const explicitCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
+  const averageUnitCost = explicitCost.known
+    ? explicitCost.value
+    : storedAverage > 0
     ? storedAverage
     : current > 0 && inventoryValue > 0
       ? inventoryValue / current
@@ -331,7 +336,7 @@ function costBasis(balance: JsonRecord, accountingCurrency?: string) {
       valuationReason: "Стоимость позиции сохранена не в валюте учёта заведения",
     };
   }
-  if (!(averageUnitCost > 0)) {
+  if (!(averageUnitCost >= 0) || (!explicitCost.known && !(inventoryValue > 0))) {
     return {
       averageUnitCost: null,
       currency: expectedCurrency ?? currency,

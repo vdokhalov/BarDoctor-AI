@@ -5,6 +5,7 @@ import {
   type BaseInventoryUnit,
   type StockMovement,
 } from "./inventory";
+import { costKnowledge } from "./cost-knowledge";
 
 export const WRITE_OFF_STORE_KEY = "bd_inventory_writeoffs";
 
@@ -186,9 +187,8 @@ function productKey(value: JsonRecord): string {
 }
 
 function balanceAverageCost(value: JsonRecord): number | null {
-  if (value.costNeedsReview === true) return null;
-  const stored = number(value.averageUnitCost);
-  if (stored > 0) return stored;
+  const stored = costKnowledge(value.averageUnitCost, value.costStatus, value.costNeedsReview);
+  if (stored.known) return stored.value;
   const current = number(value.current);
   const total = number(value.inventoryValue);
   return current > 0 && total > 0 ? total / current : null;
@@ -285,7 +285,7 @@ export function saveWriteOffDraft(input: {
     if (converted.unit !== balanceUnit) return { ok: false, code: "WRITE_OFF_UNIT_INVALID", error: `Единица «${text(balance.name, "Товар") }» не совпадает со складской` };
     const current = number(balance.current);
     const averageCost = balanceAverageCost(balance);
-    const knownCost = averageCost !== null && averageCost > 0 && Boolean(text(balance.currency, "", 12));
+    const knownCost = averageCost !== null && averageCost >= 0 && Boolean(text(balance.currency, "", 12));
     const totalCost = knownCost ? money(converted.amount * averageCost) : null;
     items.push({
       id: text(line.id, crypto.randomUUID(), 100),

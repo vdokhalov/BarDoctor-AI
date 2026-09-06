@@ -5,6 +5,8 @@ import {
   type StockMovement,
 } from "./inventory";
 import { canonicalTechCardForOwner } from "./tech-card-reconciliation";
+import { resolveConsumptionMode } from "./consumption-mode";
+import { costKnowledge } from "./cost-knowledge";
 import { resolveReadyProductConsumption } from "./menu-sale-size";
 
 export const SALES_BATCH_STORE_KEY = "bd_sales_batches";
@@ -301,6 +303,7 @@ export function tabularSalesAdapter(input: {
   headerRow?: number;
   businessDate?: string;
   sourceReference?: string;
+  externalBatchId?: string;
 }): NormalizedSalesDraft {
   const start = Math.max(0, (input.headerRow ?? -1) + 1);
   const lines = input.rows.slice(start, start + 5_000).flatMap((row, index) => {
@@ -316,6 +319,7 @@ export function tabularSalesAdapter(input: {
   return {
     source: "FILE_IMPORT",
     sourceReference: input.sourceReference,
+    externalBatchId: input.externalBatchId,
     businessDate: input.businessDate,
     lines,
     warnings: lines.some((line) => !Number.isFinite(line.quantity) || line.quantity <= 0)
@@ -475,6 +479,10 @@ function snapshotFor(input: {
   warehouses: JsonRecord[];
   now: string;
 }): { snapshot?: RecipeSnapshot; errorCode?: string; errorMessage?: string; cost: number | null; currency?: string } {
+  const consumptionMode = resolveConsumptionMode(input.menuItem, input.assortment);
+  if (!consumptionMode.ok) {
+    return { errorCode: consumptionMode.code, errorMessage: consumptionMode.error, cost: null };
+  }
   const readyProduct = resolveReadyProductConsumption(input.menuItem, input.assortment);
   if (readyProduct) {
     const warehouse = resolveWarehouse({ ...input, menuItem: input.menuItem });
@@ -515,9 +523,8 @@ function snapshotFor(input: {
         cost: null,
       };
     }
-    const unitCost = balance.costNeedsReview === true || !(numeric(balance.averageUnitCost) > 0)
-      ? null
-      : rounded(numeric(balance.averageUnitCost), 6);
+    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
+    const unitCost = knownCost.known ? rounded(knownCost.value, 6) : null;
     const baseQuantityTotal = rounded(readyProduct.quantityPerSale * input.quantity);
     const currency = unitCost === null
       ? undefined
@@ -595,9 +602,8 @@ function snapshotFor(input: {
     if (warehouse.id !== "__venue__" && Object.keys(warehouseBalances).length > 0 && !(warehouse.id in warehouseBalances)) {
       return { errorCode: "WAREHOUSE_MAPPING_REQUIRED", errorMessage: `Позиция «${text(balance.name, productKey)}» не заведена на выбранном складе`, cost: null };
     }
-    const unitCost = balance.costNeedsReview === true ? null : numeric(balance.averageUnitCost) > 0
-      ? rounded(numeric(balance.averageUnitCost), 6)
-      : null;
+    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
+    const unitCost = knownCost.known ? rounded(knownCost.value, 6) : null;
     const baseQuantityTotal = rounded(base.amount * input.quantity);
     snapshots.push({
       ingredientId: text(ingredient.id, `ingredient:${index}`, 160),
@@ -782,10 +788,18 @@ export function createOrUpdateSalesBatch(input: {
   venueId: number;
   actor: SalesBatch["createdBy"];
   now?: string;
-}): { ok: true; batch: SalesBatch; batches: SalesBatch[] } | { ok: false; code: string; error: string } {
+}): { ok: true; batch: SalesBatch; batches: SalesBatch[]; duplicate?: boolean } | { ok: false; code: string; error: string } {
   const now = input.now ?? new Date().toISOString();
   const existingBatches = salesBatches(input.batches, input.venueId);
-  const existing = input.batchId ? existingBatches.find((batch) => batch.id === input.batchId) : undefined;
+  const requestedExternalBatchId = text(input.draft.externalBatchId, "", 180);
+  const existing = input.batchId
+    ? existingBatches.find((batch) => batch.id === input.batchId)
+    : requestedExternalBatchId
+      ? existingBatches.find((batch) => batch.externalBatchId === requestedExternalBatchId)
+      : undefined;
+  if (!input.batchId && existing && requestedExternalBatchId) {
+    return { ok: true, batch: existing, batches: existingBatches, duplicate: true };
+  }
   if (existing && ["POSTED", "REVERSED", "CANCELLED"].includes(existing.status)) {
     return { ok: false, code: "SALES_BATCH_READ_ONLY", error: "Проведённый, отменённый или сторнированный документ нельзя изменить" };
   }
@@ -1036,7 +1050,8 @@ export function reverseSalesBatch(input: {
       id: crypto.randomUUID(),
       type: "sale_reversal",
       amount,
-      costAmount: cost ?? undefined,
+      costAmount: cost === null ? undefined : cost,
+      costStatus: cost === null ? "UNKNOWN" : cost === 0 ? "KNOWN_ZERO" : "KNOWN",
       sourceLineId: `reversal:${original.sourceLineId}`,
       originalMovementId: original.id,
       reversalReason: "SalesBatch сторнирован",

@@ -81,7 +81,8 @@ test("SalesBatch API keeps RBAC, tenant checks, audit and atomic ledger persiste
   ]);
   for (const permission of ["sales.view", "sales.create", "sales.post", "sales.reverse", "sales.manage_mapping"]) assert.ok(route.includes(permission));
   assert.match(route, /SALES_VENUE_MISMATCH/);
-  assert.match(route, /database\.batch/);
+  assert.match(route, /runStoreCasBatch/);
+  assert.match(route, /withStoreCasRetries/);
   assert.match(route, /sales_batch\.partially_posted/);
   assert.match(importer, /columnMappingRequired/);
   assert.match(importer, /CSV, XLSX и XLS/);

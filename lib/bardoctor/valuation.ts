@@ -1,5 +1,6 @@
 import { normalizeAccountingCurrency, type AccountingCurrency } from "./currency";
 import { resolveAccountingMoney } from "./accounting-money";
+import { explicitCostStatus, type CostKnowledgeStatus } from "./cost-knowledge";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -44,6 +45,7 @@ export type InventoryValuationSummary = {
 
 export type PurchaseLineAccountingCost = {
   known: boolean;
+  costStatus: CostKnowledgeStatus;
   amount: number;
   accountingCurrency: AccountingCurrency | null;
   transactionAmount: number;
@@ -163,7 +165,7 @@ function balanceLine(
         : reasonFromBalance(balance),
     };
   }
-  if (value <= 0) {
+  if (value <= 0 && balance.costStatus !== "KNOWN_ZERO") {
     return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: reasonFromBalance(balance) };
   }
   if (storedNormalized == null && !currency) {
@@ -240,6 +242,7 @@ export function resolvePurchaseLineAccountingCost(input: {
 }): PurchaseLineAccountingCost {
   const document = record(input.document);
   const line = record(input.line);
+  const requestedCostStatus = explicitCostStatus(line);
   const accountingCurrency = normalizeAccountingCurrency(input.accountingCurrency);
   const transactionCurrency = normalizedCurrency(document.currency ?? line.currency);
   const quantity = positive(line.quantity);
@@ -249,7 +252,7 @@ export function resolvePurchaseLineAccountingCost(input: {
   const hasExplicitTotal = explicitTotal != null && explicitTotal >= 0;
   const hasDerivedTotal = explicitUnitPrice != null && explicitUnitPrice >= 0
     && explicitQuantity != null && explicitQuantity >= 0;
-  const hasTransactionAmount = hasExplicitTotal || hasDerivedTotal;
+  const hasTransactionAmount = requestedCostStatus !== "UNKNOWN" && (hasExplicitTotal || hasDerivedTotal);
   const transactionAmount = money(hasExplicitTotal
     ? explicitTotal
     : hasDerivedTotal
@@ -259,6 +262,7 @@ export function resolvePurchaseLineAccountingCost(input: {
     reason: PurchaseLineAccountingCost["reason"],
   ): PurchaseLineAccountingCost => ({
     known: false,
+    costStatus: "UNKNOWN",
     amount: 0,
     accountingCurrency,
     transactionAmount,
@@ -268,15 +272,16 @@ export function resolvePurchaseLineAccountingCost(input: {
   });
   if (!accountingCurrency) return unavailable("missing_accounting_currency");
   if (!transactionCurrency) return unavailable("missing_document_currency");
+  if (!hasTransactionAmount) return unavailable("missing_cost_basis");
   if (transactionCurrency === accountingCurrency) {
     return {
-      known: hasTransactionAmount,
+      known: true,
+      costStatus: transactionAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: transactionAmount,
       accountingCurrency,
       transactionAmount,
       transactionCurrency,
       source: "same_currency",
-      reason: hasTransactionAmount ? undefined : "missing_cost_basis",
     };
   }
   const canonical = resolveAccountingMoney({
@@ -294,14 +299,14 @@ export function resolvePurchaseLineAccountingCost(input: {
   });
   if (canonical?.accountingAmount != null) {
     return {
-      known: canonical.accountingAmount > 0,
+      known: true,
+      costStatus: canonical.accountingAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: canonical.accountingAmount,
       accountingCurrency,
       transactionAmount,
       transactionCurrency,
       exchangeRate: canonical.fxRate,
       source: line.accountingLineTotal != null ? "stored_normalized_amount" : "stored_historical_rate",
-      reason: canonical.accountingAmount > 0 ? undefined : "missing_cost_basis",
     };
   }
   const normalizedCandidates: Array<[unknown, unknown]> = [
@@ -311,10 +316,11 @@ export function resolvePurchaseLineAccountingCost(input: {
     [line.baseLineTotal, line.baseCurrency ?? document.baseCurrency],
   ];
   for (const [amountValue, currencyValue] of normalizedCandidates) {
-    const amount = positive(amountValue);
-    if (amount > 0 && normalizedCurrency(currencyValue) === accountingCurrency) {
+    const amount = finite(amountValue);
+    if (amount != null && amount >= 0 && normalizedCurrency(currencyValue) === accountingCurrency) {
       return {
         known: true,
+        costStatus: amount === 0 ? "KNOWN_ZERO" : "KNOWN",
         amount: money(amount),
         accountingCurrency,
         transactionAmount,
@@ -324,9 +330,10 @@ export function resolvePurchaseLineAccountingCost(input: {
     }
   }
   const rate = positive(line.exchangeRateToAccounting ?? document.exchangeRateToAccounting);
-  if (rate > 0 && transactionAmount > 0) {
+  if (rate > 0 && transactionAmount >= 0) {
     return {
       known: true,
+      costStatus: transactionAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: money(transactionAmount * rate),
       accountingCurrency,
       transactionAmount,

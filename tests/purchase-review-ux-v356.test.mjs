@@ -57,6 +57,15 @@ test("receiving clearly separates draft review, posting, inventory, and payment"
   assert.doesNotMatch(review, /Добавить покупку/);
 });
 
+test("receiving preserves explicit zero cost and keeps an empty cost unknown", () => {
+  const review = between('const bdReceivingWorkspaceVersion="v357";', "const bdImageUploadVersion=");
+
+  assert.match(review, /costStatus:"UNKNOWN"/);
+  assert.match(review, /value===""\?"UNKNOWN":Number\(value\)===0\?"KNOWN_ZERO":"KNOWN"/);
+  assert.match(review, /bdLineCostKnownV414/);
+  assert.doesNotMatch(review, /Number\(line\.unitPrice\)>0\|\|Number\(line\.lineTotal\)>0\)\):/);
+});
+
 test("supplier is selected from the master data and never auto-created by confirmation", () => {
   const review = between('const bdReceivingWorkspaceVersion="v357";', "const bdImageUploadVersion=");
 

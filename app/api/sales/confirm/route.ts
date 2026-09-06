@@ -13,6 +13,7 @@ import {
 } from "../../../../lib/bardoctor/sales-consumption";
 import { normalizeSalesDocument } from "../../../../lib/bardoctor/sales";
 import { reconcileSalesRevenue, REVENUE_STORE_KEY } from "../../../../lib/bardoctor/sales-revenue";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 
 const WAREHOUSE_STORE_KEY = "bd_warehouses";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
@@ -49,7 +50,7 @@ function batchSource(value: unknown): SalesSource {
   return "OTHER_API";
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "sales.post")) return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права проводить продажи по складу" }, { status: 403 });
@@ -63,6 +64,17 @@ export async function POST(request: Request): Promise<Response> {
   if (document.venueId && document.venueId !== account.venueId) return Response.json({ ok: false, code: "SALES_VENUE_MISMATCH", error: "Отчёт относится к другому заведению" }, { status: 403 });
 
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [
+    SALES_DOCUMENT_STORE_KEY,
+    SALES_BATCH_STORE_KEY,
+    SALES_MAPPING_STORE_KEY,
+    SALES_WAREHOUSE_ROUTE_STORE_KEY,
+    ASSORTMENT_STORE_KEY,
+    STOCK_MOVEMENT_STORE_KEY,
+    WAREHOUSE_STORE_KEY,
+    MONTH_CLOSING_STORE_KEY,
+    REVENUE_STORE_KEY,
+  ]);
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
     WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -140,7 +152,7 @@ export async function POST(request: Request): Promise<Response> {
   const revenue = reconcileSalesRevenue({ revenues, salesDocuments: documents, document: confirmedDocument, now });
   if (!revenue.ok) return Response.json({ ok: false, code: revenue.code, error: revenue.error }, { status: 409 });
   const nextDocuments = [confirmedDocument, ...documents];
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, SALES_DOCUMENT_STORE_KEY, nextDocuments, now),
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, posted.batches, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, posted.assortment, now),
@@ -154,7 +166,7 @@ export async function POST(request: Request): Promise<Response> {
       JSON.stringify(posted.batch), JSON.stringify(["status", "lines", "movementIds", "recipeSnapshot"]), actor.name, actor.role,
       "Legacy POS report normalized into canonical SalesBatch before stock posting", now,
     ),
-  ]);
+  ], now);
   return Response.json({
     ok: true,
     document: confirmedDocument,
@@ -167,4 +179,8 @@ export async function POST(request: Request): Promise<Response> {
     revenueRecord: revenue.revenueRecord,
     inventorySummary: { postedLines: posted.batch.postedLineCount, movementCount: posted.batch.movementIds.length, unresolvedLines: [] },
   }, { status: 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

@@ -7,6 +7,8 @@ import {
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../lib/bardoctor/inventory";
 import { EXPENSE_STORE_KEY } from "../../../lib/bardoctor/purchases";
+import { costKnowledge } from "../../../lib/bardoctor/cost-knowledge";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import {
   cancelPostedWriteOff,
   deleteWriteOffDraft,
@@ -130,6 +132,7 @@ function catalog(assortment: JsonRecord, venueId: number) {
   }).map((balance) => {
     const key = text(balance.productKey ?? balance.key, "", 300);
     const canonical = canonicalByKey.get(key) ?? {};
+    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
     return {
       nomenclatureItemId: key,
       productKey: key,
@@ -149,8 +152,8 @@ function catalog(assortment: JsonRecord, venueId: number) {
         text(balance.purchasePackageSize, "", 120),
         balance.multiplePackageSizes === true ? "" : text(balance.packageSize, "", 120),
       ].filter(Boolean))],
-      averageUnitCost: balance.costNeedsReview === true ? null : number(balance.averageUnitCost) || null,
-      costStatus: balance.costNeedsReview === true || !(number(balance.averageUnitCost) > 0) ? "unvalued" : "valued",
+      averageUnitCost: knownCost.known ? knownCost.value : null,
+      costStatus: knownCost.known ? "valued" : "unvalued",
       currency: text(balance.currency, "", 12).toUpperCase() || null,
     };
   }).filter((item) => item.productKey);
@@ -171,7 +174,7 @@ export async function GET(request: Request): Promise<Response> {
   return Response.json({ ok: true, venueId: account.venueId, reasons: WRITE_OFF_REASONS, writeOffs: documents, catalog: catalog(stores.assortment, account.venueId) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права создавать и проводить списания" }, { status: 403 });
@@ -182,6 +185,7 @@ export async function POST(request: Request): Promise<Response> {
   if (body.venueId != null && number(body.venueId) !== account.venueId) return Response.json({ ok: false, code: "WRITE_OFF_VENUE_MISMATCH", error: "Заведение в запросе не совпадает с авторизованным контекстом" }, { status: 403 });
   const action = text(body.action, "post", 30);
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY]);
   const stores = await readStores(database, account.id);
   const current = writeOffDocuments(stores.documents, account.venueId);
   const now = new Date().toISOString();
@@ -201,10 +205,10 @@ export async function POST(request: Request): Promise<Response> {
     const result = deleteWriteOffDraft({ documents: current, venueId: account.venueId, id: text(body.id ?? draft.id, "", 100) });
     if (!result.ok) return Response.json(result, { status: 409 });
     if (!result.deleted || !result.document) return Response.json({ ok: true, idempotent: true, deleted: false, writeOffs: result.documents });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       auditStatement({ database, accountId: account.id, action: "write_off.deleted", document: result.document, before: result.document, actorName: currentActor.name, actorRole: currentActor.role, reason: "Удалён черновик списания; склад не изменён", now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, deleted: true, writeOffs: result.documents, stockChanged: false });
   }
 
@@ -216,13 +220,13 @@ export async function POST(request: Request): Promise<Response> {
     if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_NOT_FOUND" ? 404 : 409 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, stockChanged: false });
     const expenses = syncWriteOffExpense(stores.expenses, result.document);
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
       auditStatement({ database, accountId: account.id, action: "write_off.cancelled", document: result.document, before: existing, actorName: currentActor.name, actorRole: currentActor.role, reason: `Проведение отменено; создано обратных движений: ${result.document.reversalMovementIds?.length ?? 0}`, now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, writeOff: result.document, writeOffs: result.documents, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: true });
   }
 
@@ -230,10 +234,10 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "save_draft") {
     const result = saveWriteOffDraft({ documents: current, assortment: stores.assortment, venueId: account.venueId, draft, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: 422 });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       auditStatement({ database, accountId: account.id, action: before ? "write_off.draft_updated" : "write_off.draft_created", document: result.document, before, actorName: currentActor.name, actorRole: currentActor.role, reason: "Черновик списания сохранён; склад не изменён", now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, writeOff: result.document, writeOffs: result.documents, stockChanged: false }, { status: before ? 200 : 201 });
   }
   if (action !== "post") return Response.json({ ok: false, error: "Неизвестное действие списания" }, { status: 400 });
@@ -243,12 +247,16 @@ export async function POST(request: Request): Promise<Response> {
   if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_INSUFFICIENT_STOCK" ? 409 : 422 });
   if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: false });
   const expenses = syncWriteOffExpense(stores.expenses, result.document);
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
     auditStatement({ database, accountId: account.id, action: "write_off.posted", document: result.document, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Списание проведено атомарно; движений: ${result.document.movementIds.length}; причина: ${result.document.reasonCode}`, now }),
-  ]);
+  ], now);
   return Response.json({ ok: true, writeOff: result.document, writeOffs: result.documents, assortment: result.assortment, stockMovements: result.stockMovements, warnings: result.warnings, stockChanged: true }, { status: 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

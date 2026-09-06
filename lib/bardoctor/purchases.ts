@@ -6,6 +6,7 @@ import {
   type AccountingMoney,
 } from "./accounting-money";
 import type { AccountingCurrency } from "./currency";
+import { explicitCostStatus, type CostKnowledgeStatus } from "./cost-knowledge";
 
 export const PURCHASE_STORE_KEY = "bd_purchase_documents";
 export const SUPPLIER_STORE_KEY = "bd_suppliers";
@@ -87,6 +88,7 @@ export type PurchaseItem = {
   packageSize?: string;
   unitPrice: number;
   lineTotal: number;
+  costStatus?: CostKnowledgeStatus;
   originalLineTotal?: number;
   originalCurrency?: string;
   accountingLineTotal?: number;
@@ -131,6 +133,7 @@ export type PurchaseDocument = {
   paymentMethod: "cash" | "card" | "transfer" | "unknown";
   expenseCategory: string;
   total: number;
+  costStatus?: CostKnowledgeStatus;
   vat?: number;
   items: PurchaseItem[];
   confidence: number;
@@ -649,9 +652,7 @@ export function hasMeaningfulPurchaseItems(value: unknown): boolean {
     const item = record(value);
     const name = text(item.name ?? item.productName, "", 240);
     const quantity = number(item.quantity, 0);
-    const unitPrice = number(item.unitPrice ?? item.price, 0);
-    const lineTotal = number(item.lineTotal ?? item.total, 0);
-    return Boolean(name) && quantity > 0 && (unitPrice > 0 || lineTotal > 0);
+    return Boolean(name) && quantity > 0 && explicitCostStatus(item) !== "UNKNOWN";
   });
 }
 
@@ -714,6 +715,7 @@ export function normalizePurchaseItem(
   index: number,
 ): PurchaseItem {
   const input = record(value);
+  const costStatus = explicitCostStatus(input);
   const name = text(input.name ?? input.productName, `Позиция ${index + 1}`, 240);
   const quantity = positive(input.quantity, 1);
   let unitPrice = Math.max(0, number(input.unitPrice ?? input.price, 0));
@@ -745,6 +747,7 @@ export function normalizePurchaseItem(
     packageSize,
     unitPrice: Math.round(unitPrice * 100) / 100,
     lineTotal: Math.round(lineTotal * 100) / 100,
+    costStatus,
     originalLineTotal: input.originalLineTotal != null
       ? money(input.originalLineTotal)
       : undefined,
@@ -796,6 +799,11 @@ export function normalizePurchaseDocument(
     .slice(0, 250)
     .map(normalizePurchaseItem);
   const itemTotal = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const costStatus = explicitCostStatus(input) === "UNKNOWN"
+    ? items.every((item) => item.costStatus !== "UNKNOWN")
+      ? itemTotal === 0 ? "KNOWN_ZERO" : "KNOWN"
+      : "UNKNOWN"
+    : explicitCostStatus(input);
   const requestedTotal = Math.max(0, number(input.total, 0));
   const requestedCategory = text(input.expenseCategory, "", 32);
   const supplierName = text(
@@ -900,7 +908,8 @@ export function normalizePurchaseDocument(
       : PURCHASE_EXPENSE_CATEGORIES.has(requestedCategory)
       ? requestedCategory
       : items[0]?.category ?? "products",
-    total: Math.round((requestedTotal || itemTotal) * 100) / 100,
+    total: Math.round((Object.prototype.hasOwnProperty.call(input, "total") ? requestedTotal : itemTotal) * 100) / 100,
+    costStatus,
     vat: number(input.vat, 0) > 0 ? Math.round(number(input.vat, 0) * 100) / 100 : undefined,
     items,
     confidence: bounded(input.confidence ?? input.documentConfidence, 0.5),

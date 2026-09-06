@@ -40,6 +40,14 @@ test("manual choice is persisted as a confirmed user alias", () => {
   );
 });
 
+test("recipe editor never sends current stock in its metadata patch", () => {
+  const start = bundle.indexOf("function bdCatRecipeEditor");
+  const end = bundle.indexOf("function bdCatImportReview", start);
+  const editor = bundle.slice(start, end);
+  assert.ok(editor.includes('metadataSource:"recipe"'));
+  assert.doesNotMatch(editor, /return\{key:[^}]*current:[^}]*metadataSource:"recipe"/);
+});
+
 test("matching surfaces are responsive and overflow safe", () => {
   for (const marker of [
     ".bd-ingredient-match-v258",

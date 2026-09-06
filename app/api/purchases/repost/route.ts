@@ -17,6 +17,7 @@ import {
   PURCHASE_STORE_KEY,
   withPurchasePaymentSummary,
 } from "../../../../lib/bardoctor/purchases";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 type JsonRecord = Record<string, unknown>;
@@ -106,7 +107,7 @@ function auditUpdate(
   );
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -128,6 +129,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const now = new Date().toISOString();
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [PURCHASE_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY]);
   const result = await database.prepare(`
     SELECT store_key, data_json
     FROM domain_data
@@ -256,7 +258,7 @@ export async function POST(request: Request): Promise<Response> {
   documents[index] = reposted;
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")
     || account.appEmail;
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, nextAssortment, now),
@@ -274,7 +276,7 @@ export async function POST(request: Request): Promise<Response> {
       reason: text(body.reason, "Закупочная накладная проведена повторно", 500),
       createdAt: now,
     }),
-  ]);
+  ], now);
 
   return Response.json({
     ok: true,
@@ -285,4 +287,8 @@ export async function POST(request: Request): Promise<Response> {
     stockMovements: nextMovements,
     inventorySummary: inventory?.summary ?? null,
   });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }
