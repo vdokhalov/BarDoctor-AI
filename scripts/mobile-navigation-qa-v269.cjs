@@ -248,6 +248,8 @@ async function createRun(browser, profile, label, options = {}) {
     storeWrites: [],
     healthMode: "attention",
     bootstrapDelayMs: options.bootstrapDelayMs || 0,
+    bootstrapReady: false,
+    homeReviewResponses: [],
   };
   const context = await browser.newContext({
     ...profile.descriptor,
@@ -289,6 +291,7 @@ async function createRun(browser, profile, label, options = {}) {
     const activeProfile = profileFor(state.activeVenueId);
     if (url.pathname === "/api/auth/bootstrap") {
       if (state.bootstrapDelayMs) await new Promise((resolve) => setTimeout(resolve, state.bootstrapDelayMs));
+      state.bootstrapReady = true;
       return route.fulfill(jsonResponse({
         ok: true,
         email: "mobile-qa@bardoctor.local",
@@ -320,15 +323,22 @@ async function createRun(browser, profile, label, options = {}) {
       return route.fulfill(jsonResponse(freshBusinessHealthEnvelope(state.activeVenueId, state.healthMode === "healthy")));
     }
     if (url.pathname === "/api/users/me") return route.fulfill(jsonResponse({ ok: true, user: { firstName: "Mobile", lastName: "QA", email: "mobile-qa@bardoctor.local", role: "owner", permissions } }));
-    if (url.pathname === "/api/reviews/home") return route.fulfill(jsonResponse({
-      success: true,
-      data: {
-        provider: { status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null },
-        metrics: { total: 105, averageRating: 3.19, new7d: 6, new30d: 23, unanswered: 7, needsAttention: 7, analyzed: 105, complaints: [{ topic: "wait_time", count: 7 }, { topic: "music", count: 7 }], lastPublishedAt: "2026-09-01T12:00:00.000Z" },
-        layerUpdatedAt: "2026-09-02T09:20:00.000Z",
-        canManage: true,
-      },
-    }));
+    if (url.pathname === "/api/reviews/home") {
+      if (!state.bootstrapReady) {
+        state.homeReviewResponses.push(403);
+        return route.fulfill(jsonResponse({ success: false, error: "Authentication bootstrap is not ready" }, 403));
+      }
+      state.homeReviewResponses.push(200);
+      return route.fulfill(jsonResponse({
+        success: true,
+        data: {
+          provider: { status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null },
+          metrics: { total: 105, averageRating: 3.19, new7d: 6, new30d: 23, unanswered: 7, needsAttention: 7, analyzed: 105, complaints: [{ topic: "wait_time", count: 7 }, { topic: "music", count: 7 }], lastPublishedAt: "2026-09-01T12:00:00.000Z" },
+          layerUpdatedAt: "2026-09-02T09:20:00.000Z",
+          canManage: true,
+        },
+      }));
+    }
     if (url.pathname === "/api/review-layer" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: reviewQaFixtures() }));
     if (url.pathname === "/api/reviews/sources" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: { providers: [{ id: "google", configured: true, status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null }] } }));
     if (url.pathname === "/api/reviews/reply" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { draft: "Спасибо за честный отзыв. Мы проверим скорость обслуживания и уровень музыки." } }));
@@ -1080,14 +1090,15 @@ async function moduleSmokeFlow(browser, profile) {
 }
 
 async function homeReviewsFlow(browser, profile) {
-  const run = await createRun(browser, profile, "home-reviews");
-  const { page } = run;
+  const run = await createRun(browser, profile, "home-reviews", { bootstrapDelayMs: 2_200 });
+  const { page, state } = run;
   await goto(page, "/home?venue=901");
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
   const attention = page.locator('[data-bd-home-attention="universal-v198"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
+  assert.deepEqual(state.homeReviewResponses, [200], `${profile.name}: Home Reviews requested protected data before auth bootstrap was ready`);
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',

@@ -51,6 +51,39 @@ test("Home Reviews maps live metrics, CTAs and controlled degraded states withou
   assert.doesNotMatch(fetcher, /\/api\/reviews\/sources|\/api\/reviews\/analyze|google\/sync/);
 });
 
+test("Home Reviews waits for authenticated bootstrap and invalidates stale venue requests", async () => {
+  const [bundle, browserQa, buildScript] = await Promise.all([
+    source("public/assets/index-BQGspy0I.js"),
+    source("scripts/mobile-navigation-qa-v269.cjs"),
+    source("scripts/build-verified.sh"),
+  ]);
+  const hook = bundle.slice(bundle.indexOf("function bdHomeReviewsAuthReadyV414"), bundle.indexOf("function bdHomeReviewDateV409"));
+  const daily = bundle.slice(bundle.indexOf("function bdHomeDaily"), bundle.indexOf("function bdHealthSafeComputeV342"));
+  assert.match(hook, /function bdUseHomeReviewsV409\(e,t\)/);
+  assert.match(hook, /__bdBootstrapPending!==!0/);
+  assert.match(hook, /__bdAuthBootstrapV274\?\.state==="ready"/);
+  assert.match(hook, /!t\|\|!bdHomeReviewsAuthReadyV414\(\)/);
+  assert.match(hook, /e===s&&r\(t\)/);
+  assert.match(hook, /bd:active-venue-changed/);
+  assert.match(hook, /bd:bootstrap-complete/);
+  assert.match(hook, /\[e,t\]/);
+  assert.match(daily, /reviewsReady:bdHomeReviewsReady/);
+  assert.match(daily, /bdUseHomeReviewsV409\(String\(e\?\.id\?\?e\?\.name\?\?"venue"\),bdHomeReviewsReady\)/);
+  assert.match(bundle, /reviewsReady:bdHomeCloudReady/);
+  assert.match(browserQa, /bootstrapDelayMs: 2_200/);
+  assert.match(browserQa, /homeReviewResponses, \[200\]/);
+  const activeLoader = await source("public/bardoctor-preview-v397.js");
+  assert.match(activeLoader, /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=[^"]*home-reviews-lifecycle-v414/);
+  for (const shell of [await source("public/app.html"), await source("app/bar-doctor-response.ts")]) {
+    assert.match(shell, /bardoctor-preview-v397\.js\?v=[^"']*home-reviews-lifecycle-v414/);
+    assert.equal(shell.match(/<script src="\/bardoctor-preview-v397\.js\?v=[^"]+" defer><\/script>/g)?.length, 1);
+  }
+  assert.ok(
+    buildScript.lastIndexOf('patch-home-reviews-ux-v409.mjs') > buildScript.lastIndexOf('patch-shell-first-startup-v397.mjs'),
+    "final Home Reviews cache patch must run after shell-first recreates the active loader",
+  );
+});
+
 test("Reviews is a direct desktop module while the six-action mobile contract remains intact", async () => {
   const [bundle, css, route] = await Promise.all([
     source("public/assets/index-BQGspy0I.js"),

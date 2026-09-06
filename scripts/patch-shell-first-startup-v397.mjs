@@ -43,7 +43,7 @@ function patchBootstrap(path) {
     'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397";',
   );
   source = source.replace(
-    '  try {\n    var demoEmail = "demo@bardoctor.app";',
+    /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
     `  /* Start the application shell before any network-bound auth or business refresh. */
   observePurchaseConfirmation();
   installProtectedOriginalLinks();
@@ -66,11 +66,7 @@ function patchBootstrap(path) {
       }`,
   );
   source = source.replace(
-    `  observePurchaseConfirmation();
-  installProtectedOriginalLinks();
-  installNavigationConsistencyGuards();
-  loadApplication();
-  injectSupplierAlternativesEntry();`,
+    /  observePurchaseConfirmation\(\);\r?\n  installProtectedOriginalLinks\(\);\r?\n  installNavigationConsistencyGuards\(\);\r?\n  loadApplication\(\);\r?\n  injectSupplierAlternativesEntry\(\);/,
     '  injectSupplierAlternativesEntry();',
   );
 
@@ -85,7 +81,7 @@ function patchShell(path) {
 
   source = source.replace(/\n\s*<!-- bd-shell-first-compat-v397[\s\S]*?-->/, "");
   source = source.replace(/\n\s*<!-- compatibility: src="\/bardoctor-preview-v396\.js\?v=native-continuity-v396" defer -->/, "");
-  source = source.replace(/\n\s*<script src="\/bardoctor-preview-v397\.js\?v=shell-first-startup-v397" defer><\/script>/, "");
+  source = source.replace(/(?:\r?\n\s*<script src="\/bardoctor-preview-v397\.js\?v=[^"]+" defer><\/script>)+/g, "");
   source = source.replace(/\n\s*<!-- bd-bootstrap-history-v396[\s\S]*?-->/, "");
   source = source.replace(/\n\s*<script src="\/bardoctor-preview-v396\.js\?v=[^"]+" defer><\/script>/, "");
   const legacySource = legacyModuleSource();
