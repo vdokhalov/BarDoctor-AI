@@ -16,4 +16,7 @@ test("packaged release uses a physical content-versioned client asset", async ()
   const asset = await readFile(assetPath, "utf8");
   assert.match(asset, /bd-business-health-watchdog-v378/);
   assert.match(asset, /bdHealthWaitExpired/);
+  assert.match(asset, /function bdHomeReviewsCardV409/);
+  assert.match(asset, /bdHomeReviewsCardV409,\{state:bdHomeReviewState,onNavigate:g\}/);
+  assert.match(asset, /bd-manual-nomenclature-cost-fallback-v409/);
 });

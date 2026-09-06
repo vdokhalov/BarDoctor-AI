@@ -568,6 +568,21 @@ async function goto(page, pathName) {
   assert.notEqual(new URL(page.url()).pathname, "/login", `${pathName}: unexpected login redirect`);
 }
 
+async function waitForEmbeddedFrame(page, pathName, timeout = 10_000) {
+  const deadline = Date.now() + timeout;
+  do {
+    const frame = page.frames().find((candidate) => {
+      try {
+        const url = new URL(candidate.url());
+        return url.pathname === pathName && url.searchParams.get("embedded") === "1";
+      } catch { return false; }
+    });
+    if (frame) return frame;
+    await page.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  return null;
+}
+
 async function mobileAudit(page, profileName, label, options = {}) {
   const audit = await page.evaluate(() => {
     const root = document.documentElement;
@@ -605,8 +620,8 @@ async function mobileAudit(page, profileName, label, options = {}) {
     };
   });
   if (options.requireTouch !== false) {
-    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
-    assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
+    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive ${JSON.stringify(audit)}`);
+    assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse ${JSON.stringify(audit)}`);
   }
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${profileName}/${label}: horizontal overflow ${audit.scrollWidth}/${audit.clientWidth}`);
   assert.match(audit.viewportMeta, /width=device-width/, `${profileName}/${label}: viewport meta missing`);
@@ -957,8 +972,18 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
-  const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  const { page, state } = run;
+  state.stores[901].bd_suppliers = [{ id: "supplier-mobile", name: "Поставщик Mobile", type: "wholesale", categories: ["alcohol"], currency: "PMR_RUB", status: "active" }];
+  state.stores[901].bd_purchase_documents = [{
+    id: "purchase-mobile", venueId: 901, documentType: "invoice", documentNumber: "17",
+    supplierId: "supplier-mobile", supplierName: "Поставщик Mobile", date: "2026-08-24",
+    currency: "PMR_RUB", expenseCategory: "alcohol", paymentMethod: "transfer", total: 500,
+    status: "confirmed", syncStatus: "synced", confidence: 1, warnings: [],
+    confirmedAt: "2026-08-24T12:00:00.000Z", updatedAt: "2026-08-24T12:00:00.000Z",
+    items: [{ id: "purchase-line-mobile", name: "Пиво Mobile A", quantity: 10, unit: "шт.", packageSize: "1 шт.", unitPrice: 50, lineTotal: 500, purchaseProductKey: "stock:beer-a|pcs", confidence: 1 }],
+  }];
+  await page.route("**/api/procurement/overview?*", (route) => route.fulfill(jsonResponse({ ok: true, venueId: 901, analytics: null })));
+  await goto(page, "/suppliers?venue=901&period=2026-08");
   try {
     await page.waitForSelector(".bd-proc-command-v168");
   } catch {
@@ -969,9 +994,11 @@ async function procurementFlow(browser, profile) {
   assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
   await procurementTabs.filter({ hasText: "Закупки" }).click();
   const row = page.locator(".bd-proc-purchase-row-v168").first();
+  assert.match(await row.textContent(), /Поставщик Mobile.*Пиво|Поставщик Mobile.*500/s);
   await row.locator(".bd-proc-purchase-main-v168").click();
   await page.waitForSelector(".bd-proc-sheet-v168");
   assert.ok(new URL(page.url()).searchParams.has("documentId"));
+  assert.match(await page.locator(".bd-proc-sheet-v168").textContent(), /Поставщик Mobile.*№\s*17/s);
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector(".bd-proc-sheet-v168");
   await page.locator(".bd-proc-sheet-v168 button[aria-label='Закрыть']").last().click();
@@ -1094,17 +1121,13 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await finance.textContent(), /Финансовый результат/);
   assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
   assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
+  await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
   await reviewsCard.getByRole("button", { name: "Все отзывы", exact: true }).click();
   await page.waitForURL(/\/reviews(?:\?|$)/);
   await page.waitForSelector('iframe[src^="/reviews"]');
-  const reviewFrame = page.frames().find((candidate) => {
-    try {
-      const url = new URL(candidate.url());
-      return url.pathname === "/reviews" && url.searchParams.get("embedded") === "1";
-    } catch { return false; }
-  });
+  const reviewFrame = await waitForEmbeddedFrame(page, "/reviews");
   assert.ok(reviewFrame, `${profile.name}: embedded Reviews frame is missing`);
   try {
     await reviewFrame.locator("#reviews-content:not(.hidden)").waitFor({ timeout: 10_000 });
@@ -1127,11 +1150,11 @@ async function homeReviewsFlow(browser, profile) {
   await dialog.waitFor({ state: "visible" });
   assert.match(await dialog.textContent(), /Anna.*We waited too long.*Черновик не публикуется автоматически.*Спасибо за честный отзыв/s);
   assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
-  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await dialog.locator(".dialog-actions").getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.goBack({ waitUntil: "networkidle" });
   await reviewsCard.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
-  await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
+  await mobileAudit(page, profile.name, "home-reviews-return", { requireTouch: false });
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true, layout: homeLayout };
 }

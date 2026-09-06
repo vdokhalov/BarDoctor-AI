@@ -69,7 +69,7 @@ source = source.replace(
   '{key:"finance",name:"Финансы",href:"/finance",icon:$c},bdMoreHasPermissionV166("reviews.view")&&{key:"reviews",name:"Отзывы",href:"/reviews",icon:Mf},',
 );
 source = source.replace(
-  '    {key:"more",name:"Ещё",href:"/more",icon:tS}\n  ];\n  const d=[',
+  /    \{key:"more",name:"Ещё",href:"\/more",icon:tS\}\r?\n  \];\r?\n  const d=\[/,
   '    {key:"more",name:"Ещё",href:"/more",icon:tS}\n  ].filter(Boolean);\n  const d=[',
 );
 if (!source.includes('m.key==="reviews"?e==="/reviews"')) {
@@ -80,6 +80,8 @@ if (!source.includes('m.key==="reviews"?e==="/reviews"')) {
 }
 
 if (!source.includes('data-bd-home-reviews":"ready-v409')) throw new Error("Home Reviews v409 card missing");
+if (!source.includes('bdHomeReviewsCardV409,{state:bdHomeReviewState,onNavigate:g}')) throw new Error("Home Reviews v409 card is not mounted on Home");
+if (!source.includes('].filter(Boolean);\n  const d=[')) throw new Error("Home Reviews v409 navigation filtering is missing");
 if (!source.includes('data-bd-home-health-index":"business-health-snapshot-v334')) throw new Error("Canonical Business Health card was lost");
 if (!source.includes('data-bd-home-money":"result-v151')) throw new Error("Canonical Finance card was lost");
 if (source.includes('fetch("/api/reviews/sources"') && source.slice(source.indexOf("function bdFetchHomeReviewsV409"), source.indexOf("function bdHomeReviewsCardV409")).includes('/api/reviews/sources')) throw new Error("Home must not use the sync-capable review sources endpoint");
