@@ -29,11 +29,11 @@ if (!bundle.includes(marker)) {
 
 const oldGate = "function bdHealthStartupGateV155({children:e}){const{profile:t,isReady:n}=Un(),{isReady:r}=Ai();bdUseLiveBusinessHealthV335(n&&r&&!!t);bdUseBusinessHealthSnapshotV284();S.useLayoutEffect(()=>{bdStartupFirstPaintCompleteV201()},[]);return e}";
 const newGate = "function bdHealthStartupGateV155({children:e}){const{profile:t,isReady:n}=Un();bdUseLiveBusinessHealthV335(n&&!!t);bdUseBusinessHealthSnapshotV284();S.useLayoutEffect(()=>{bdStartupFirstPaintCompleteV201()},[]);return e}";
-if (!bundle.includes(newGate)) replaceOnce(oldGate, newGate, "start Business Health before cloud-store reconciliation");
+if (!bundle.includes("bdUseLiveBusinessHealthV335(n&&!!t)")) replaceOnce(oldGate, newGate, "start Business Health before cloud-store reconciliation");
 
 const oldHomeHead = "function Dce(){const{isReady:bdHomeCloudReady}=Ai(),bdLiveHealthStatus=bdUseLiveBusinessHealthV335(bdHomeCloudReady),{profile:e}=Un(),";
 const newHomeHead = "function Dce(){const{isReady:bdHomeCloudReady}=Ai(),{profile:e}=Un(),bdLiveHealthStatus=bdUseLiveBusinessHealthV335(!!e),";
-if (!bundle.includes(newHomeHead)) replaceOnce(oldHomeHead, newHomeHead, "refresh Home Health in the first request wave");
+if (!bundle.includes("bdLiveHealthStatus=bdUseLiveBusinessHealthV335(!!e)")) replaceOnce(oldHomeHead, newHomeHead, "refresh Home Health in the first request wave");
 
 const oldLoading = 'if(n)return i.jsxs("section",{className:"bd-home-health-card-v332 is-loading","data-bd-home-health-index":"business-health-v334-loading","aria-label":"Business Health загружается",children:[i.jsx("div",{className:"bd-health-skeleton-v332 wide"}),i.jsx("div",{className:"bd-health-skeleton-v332 score"}),i.jsx("div",{className:"bd-health-skeleton-v332 insight"}),i.jsx("div",{className:"bd-health-skeleton-v332 zones"}),i.jsx("div",{className:"bd-health-skeleton-v332 action"})]});';
 const newLoading = 'if(n)return i.jsxs("section",{className:"bd-home-health-card-v332 is-loading is-compact-loading-v344","data-bd-home-health-index":"business-health-v344-loading","aria-live":"polite",children:[i.jsx("p",{className:"bd-home-health-kicker-v332",children:"Business Health"}),i.jsxs("div",{className:"bd-home-health-loading-row-v344",children:[i.jsx("span",{className:"bd-home-health-loading-dot-v344","aria-hidden":!0}),i.jsxs("span",{children:[i.jsx("strong",{children:"Загружаем актуальное состояние"}),i.jsx("small",{children:"Финансы, операции и данные обновляются параллельно"})]})]})]});';
@@ -41,7 +41,7 @@ if (!bundle.includes(newLoading)) replaceOnce(oldLoading, newLoading, "replace t
 
 const oldDailyHead = "function bdHomeDaily({profile:e,revenue:t,expenses:n,gapReasons:r,employees:a,equipment:s,equipmentAlerts:l,settings:u,snapshots:d,diagnosis:f,snapshot:bdHealthSnapshot,health:m,healthLoading:bdHealthLoading,latestDataAt:h,onNavigate:g})";
 const newDailyHead = "function bdHomeDaily({cloudReady:bdHomeCloudReady,profile:e,revenue:t,expenses:n,gapReasons:r,employees:a,equipment:s,equipmentAlerts:l,settings:u,snapshots:d,diagnosis:f,snapshot:bdHealthSnapshot,health:m,healthLoading:bdHealthLoading,latestDataAt:h,onNavigate:g})";
-if (!bundle.includes(newDailyHead)) replaceOnce(oldDailyHead, newDailyHead, "pass authoritative store readiness into Home");
+if (!bundle.includes("function bdHomeDaily({cloudReady:")) replaceOnce(oldDailyHead, newDailyHead, "pass authoritative store readiness into Home");
 
 const moneyCard = 'i.jsx(bdHomeMoneyCard,{report:j,previousReport:v,onNavigate:g})';
 const guardedMoneyCard = 'bdHomeCloudReady?i.jsx(bdHomeMoneyCard,{report:j,previousReport:v,onNavigate:g}):i.jsxs("section",{className:"bd-home-money-loading-v344","data-bd-home-money":"authoritative-loading-v344","aria-live":"polite",children:[i.jsx("p",{children:"Финансовый результат · "+bdMonthDisplay(y)}),i.jsx("strong",{children:"Сверяем данные с сервером"}),i.jsx("small",{children:"Старые локальные суммы не показываются"})]})';
@@ -49,7 +49,7 @@ if (!bundle.includes(guardedMoneyCard)) replaceOnce(moneyCard, guardedMoneyCard,
 
 const oldDailyCall = "i.jsx(bdHomeDaily,{profile:e,revenue:d,expenses:f,gapReasons:bdHomeGapReasons";
 const newDailyCall = "i.jsx(bdHomeDaily,{cloudReady:bdHomeCloudReady,profile:e,revenue:d,expenses:f,gapReasons:bdHomeGapReasons";
-if (!bundle.includes(newDailyCall)) replaceOnce(oldDailyCall, newDailyCall, "wire Home cloud readiness");
+if (!bundle.includes("i.jsx(bdHomeDaily,{cloudReady:")) replaceOnce(oldDailyCall, newDailyCall, "wire Home cloud readiness");
 
 if (!bootstrap.includes("20260829-authoritative-home-v344")) {
   const token = "20260829-startup-performance-v343";

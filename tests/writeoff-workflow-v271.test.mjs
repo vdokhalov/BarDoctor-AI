@@ -15,7 +15,7 @@ test("warehouse write-offs use the canonical multi-item document workflow", asyn
   assert.match(bundle, /bdWriteoffPickerV271/);
   assert.match(bundle, /bdWriteoffDetailV271/);
   assert.match(bundle, /bd-writeoff-movement-link-v271/);
-  assert.match(bundle, /function x\(\)\{a\(bdWarehouseNavigationUrlV247\(\{writeoff:null,tab:"writeoffs"\}\),\{replace:!0\}\)\}/);
+  assert.match(bundle, /function x\(\)\{bdSetWriteoffSheetOpenV417\(!1\),a\(bdWarehouseNavigationUrlV247\(\{writeoff:null,tab:"writeoffs"\}\),\{replace:!0\}\)\}/);
   const workflow = bundle.slice(bundle.indexOf("const bdWriteoffWorkflowVersionV271"), bundle.indexOf("function bdWarehouseNavigationUrlV247"));
   assert.doesNotMatch(workflow, /Себестоимость списания/);
   assert.doesNotMatch(workflow, /window\.confirm/);
@@ -24,7 +24,8 @@ test("warehouse write-offs use the canonical multi-item document workflow", asyn
 test("write-off API persists document, balance, movement, finance shadow and audit in one batch", async () => {
   const route = await readFile(routePath, "utf8");
   assert.match(route, /postWriteOffDocument/);
-  assert.match(route, /database\.batch\(\[/);
+  assert.match(route, /runStoreCasBatch\(database, account\.id, casSnapshots, \[/);
+  assert.match(route, /withStoreCasRetries/);
   assert.match(route, /WRITE_OFF_STORE_KEY/);
   assert.match(route, /ASSORTMENT_STORE_KEY/);
   assert.match(route, /STOCK_MOVEMENT_STORE_KEY/);

@@ -8,6 +8,7 @@ const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cj
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4175";
 let browserPath = process.env.BD_QA_BROWSER || "/tmp/chromium";
 const outputDir = path.resolve(process.cwd(), "qa-artifacts/procurement-v195");
+const fixtureSource = fs.readFileSync(path.resolve(process.cwd(), "public/procurement-qa-v168.js"), "utf8");
 fs.mkdirSync(outputDir, { recursive: true });
 
 const results = [];
@@ -40,6 +41,12 @@ async function openPage(browser, {
     locale: "ru-RU",
     timezoneId: "Europe/Chisinau",
   });
+  await context.addInitScript({ content: fixtureSource });
+  await context.route("**/procurement-qa-v168.js*", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: "",
+  }));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
   const page = await context.newPage();
   const issues = [];
@@ -125,6 +132,18 @@ function purchaseRow(page, ...tokens) {
 
 function procurementTab(page, label) {
   return page.locator(".bd-proc-tabs-v168 button").filter({ hasText: label });
+}
+
+async function selectFinanceFixtureMonth(page, targetMonth = "2026-08") {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const currentMonth = new URL(page.url()).searchParams.get("month");
+    if (currentMonth === targetMonth) return;
+    assert.ok(/^\d{4}-\d{2}$/.test(currentMonth || ""), "Finance route must expose its selected month");
+    const direction = currentMonth > targetMonth ? "Более ранний месяц" : "Более поздний месяц";
+    await page.getByRole("button", { name: direction, exact: true }).click();
+    await page.waitForURL((url) => url.searchParams.get("month") !== currentMonth, { timeout: 20_000 });
+  }
+  assert.fail(`Finance fixture month ${targetMonth} was not reachable through visible month controls`);
 }
 
 async function warehousePositionCount(page) {
@@ -344,8 +363,10 @@ async function financeDocumentDeleteEntryFlow(browser, viewport, name, screensho
 
   await page.getByRole("link", { name: "Финансы", exact: true }).click();
   await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await selectFinanceFixtureMonth(page);
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   const linkedPurchase = page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).first();
+  await linkedPurchase.waitFor({ state: "visible", timeout: 30_000 });
   assert.equal(await linkedPurchase.isVisible(), true, `${name}: linked purchase expense must be visible`);
   await linkedPurchase.click();
 
@@ -354,7 +375,12 @@ async function financeDocumentDeleteEntryFlow(browser, viewport, name, screensho
   assert.match(await page.locator("[role='dialog']").last().innerText(), /режим просмотра[\s\S]*накладная[\s\S]*ВПРОК/i);
   const remove = documentSheet.getByRole("button", { name: "Удалить накладную", exact: true });
   assert.equal(await remove.isVisible(), true, `${name}: invoice deletion must be visible in the fixed document footer`);
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => {
+    const action = document.querySelector(".bd-document-detail-delete-v193");
+    if (!(action instanceof HTMLElement)) return false;
+    const box = action.getBoundingClientRect();
+    return box.x >= 0 && box.y >= 0 && box.right <= window.innerWidth && box.bottom <= window.innerHeight;
+  }, undefined, { timeout: 5_000 });
   const box = await remove.boundingBox();
   await shot(page, screenshot);
   assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height,
@@ -379,6 +405,7 @@ async function financeQuickActionsFlow(browser, viewport, name, screenshot) {
   const { page } = run;
   await page.getByRole("link", { name: "Финансы", exact: true }).click();
   await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await selectFinanceFixtureMonth(page);
   assert.equal(await page.locator("[data-bd-purchase-payment-entry]").count(), 0,
     `${name}: supplier payment must not occupy a dashboard banner`);
 
@@ -412,6 +439,7 @@ async function financePurchaseDeletionFlow(browser) {
   const { page } = run;
   await page.getByRole("link", { name: "Финансы", exact: true }).click();
   await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await selectFinanceFixtureMonth(page);
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   const linkedPurchase = page.locator(".bd-finance-record-main").filter({ hasText: "ВПРОК" }).first();
   await linkedPurchase.waitFor({ state: "visible" });
@@ -513,6 +541,7 @@ async function draftDeletionFlow(browser) {
 
   await page.getByRole("link", { name: "Финансы", exact: true }).click();
   await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
+  await selectFinanceFixtureMonth(page);
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
   assert.equal(await page.locator("button").filter({ hasText: "980" }).count(), 0, "Deleted draft must not create an expense");
   await openWarehouseThroughMore(page);
@@ -638,7 +667,9 @@ async function fullPaymentFinanceFlow(browser) {
   await page.getByRole("link", { name: "Финансы", exact: true }).click();
   await page.waitForURL(/\/finance(?:\?|$)/, { timeout: 20_000 });
   await page.getByRole("button", { name: "Открыть расходы", exact: true }).click();
-  assert.equal(await page.locator("button").filter({ hasText: "Шериф" }).count(), 1, "A full payment must create exactly one visible linked expense");
+  const linkedExpense = page.locator("button").filter({ hasText: "Шериф" });
+  await linkedExpense.first().waitFor({ state: "visible", timeout: 30_000 });
+  assert.equal(await linkedExpense.count(), 1, "A full payment must create exactly one visible linked expense");
 
   await page.getByRole("link", { name: "Ещё", exact: true }).click();
   await page.waitForURL(/\/more(?:\?|$)/, { timeout: 20_000 });

@@ -24,6 +24,7 @@ import {
   ASSORTMENT_STORE_KEY,
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../../lib/bardoctor/inventory";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 const MAX_BODY_BYTES = 1_200_000;
@@ -300,7 +301,7 @@ export async function GET(request: Request): Promise<Response> {
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -321,6 +322,7 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [INVENTORY_COUNT_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, MONTH_CLOSING_STORE_KEY]);
   const stores = await readStores(database, account.id);
   const snapshots = [...stores.snapshots];
   const requestedSnapshot = record(body.snapshot);
@@ -346,6 +348,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     let document = createInventoryCountDocument({
       assortment: stores.assortment,
+      stockMovements: stores.movements,
       venueId: account.venueId,
       sequenceNumber: nextInventoryCountNumber(snapshots, account.venueId),
       scope: allowedScope as InventoryCountScope,
@@ -379,7 +382,7 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ ok: false, error: "За один раз можно пересчитать до 2000 позиций" }, { status: 413 });
     }
     snapshots.unshift(document);
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
       auditStatement({
         database,
@@ -391,7 +394,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: `Создан snapshot инвентаризации; охват: ${document.scope.label}; склад не изменён`,
         now,
       }),
-    ]);
+    ], now);
     if (!legacyFinalize) {
       return Response.json({
         ok: true,
@@ -503,7 +506,7 @@ export async function POST(request: Request): Promise<Response> {
     }
     document = { ...document, summary: inventoryCountSummary(document) };
     snapshots[index] = document;
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
       auditStatement({
         database,
@@ -516,7 +519,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: action === "review" ? "Инвентаризация переведена на проверку; склад не изменён" : "Черновик подсчёта сохранён; склад не изменён",
         now,
       }),
-    ]);
+    ], now);
     return Response.json({
       ok: true,
       venueId: account.venueId,
@@ -529,7 +532,7 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "cancel") {
     const document: InventoryCountDocument = { ...existing, status: "cancelled", cancelledAt: now, updatedAt: now };
     snapshots[index] = document;
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
       auditStatement({
         database,
@@ -542,7 +545,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: "Инвентаризация отменена без изменения складских остатков",
         now,
       }),
-    ]);
+    ], now);
     return Response.json({ ok: true, inventory: presentDocument(document), snapshots: presentSnapshots(snapshots), stockChanged: false });
   }
 
@@ -574,7 +577,7 @@ export async function POST(request: Request): Promise<Response> {
       error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.`,
     }, { status: 423 });
   }
-  const conflicts = inventoryCountConflicts({ document: existing, assortment: stores.assortment });
+  const conflicts = inventoryCountConflicts({ document: existing, assortment: stores.assortment, stockMovements: stores.movements });
   if (conflicts.length) {
     return Response.json({
       ok: false,
@@ -586,6 +589,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const result = applyInventoryCount({
     assortment: stores.assortment,
+    stockMovements: stores.movements,
+    venueId: account.venueId,
+    accountingCurrency,
     snapshot: {
       id: existing.id,
       date: existing.date,
@@ -638,7 +644,7 @@ export async function POST(request: Request): Promise<Response> {
   };
   snapshots[index] = completed;
   const nextMovements = [...result.movements, ...stores.movements].slice(0, 20_000);
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
@@ -653,7 +659,7 @@ export async function POST(request: Request): Promise<Response> {
       reason: `Инвентаризация завершена; создано корректировок: ${result.movements.length}`,
       now,
     }),
-  ]);
+  ], now);
 
   return Response.json({
     ok: true,
@@ -665,4 +671,8 @@ export async function POST(request: Request): Promise<Response> {
     summary,
     stockChanged: result.movements.length > 0,
   });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

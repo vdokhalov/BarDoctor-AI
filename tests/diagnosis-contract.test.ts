@@ -106,13 +106,14 @@ test("diagnosis keeps canonical Business Health available when the AI provider i
 });
 
 test("AI Doctor attention UI is linked and responsive on mobile and desktop", async () => {
-  const [css, appHtml, response, bundle] = await Promise.all([
+  const [rawCss, appHtml, response, bundle] = await Promise.all([
     read("public/ai-doctor-attention-v196.css"),
     read("public/app.html"),
     read("app/bar-doctor-response.ts"),
     read("public/assets/index-BQGspy0I.js"),
   ]);
 
+  const css = rawCss.replace(/\r\n/g, "\n");
   assert.match(appHtml, /ai-doctor-attention-v196\.css/);
   assert.match(response, /ai-doctor-attention-v196\.css/);
   assert.match(css, /@media \(min-width: 760px\)/);

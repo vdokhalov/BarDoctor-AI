@@ -51,6 +51,49 @@ test("Home Reviews maps live metrics, CTAs and controlled degraded states withou
   assert.doesNotMatch(fetcher, /\/api\/reviews\/sources|\/api\/reviews\/analyze|google\/sync/);
 });
 
+test("Home Reviews waits for authenticated bootstrap and invalidates stale venue requests", async () => {
+  const [bundle, browserQa, buildScript, authoritativeHomePatch] = await Promise.all([
+    source("public/assets/index-BQGspy0I.js"),
+    source("scripts/mobile-navigation-qa-v269.cjs"),
+    source("scripts/build-verified.sh"),
+    source("scripts/patch-authoritative-home-startup-v344.mjs"),
+  ]);
+  const hook = bundle.slice(bundle.indexOf("function bdHomeReviewsAuthReadyV415"), bundle.indexOf("function bdHomeReviewDateV409"));
+  const daily = bundle.slice(bundle.indexOf("function bdHomeDaily"), bundle.indexOf("function bdHealthSafeComputeV342"));
+  assert.match(hook, /function bdUseHomeReviewsV409\(e,t\)/);
+  assert.match(hook, /__bdBootstrapPending!==!0/);
+  assert.match(hook, /__bdAuthBootstrapV274\?\.state==="ready"/);
+  assert.match(hook, /!bdHomeReviewsAuthReadyV415\(\)/);
+  assert.doesNotMatch(hook, /!t\|\|!bdHomeReviewsAuthReady/);
+  assert.match(hook, /e===s&&r\(t\)/);
+  assert.match(hook, /bd:active-venue-changed/);
+  assert.match(hook, /bd:bootstrap-complete/);
+  assert.match(hook, /\[e,t\]/);
+  assert.match(daily, /reviewsReady:bdHomeReviewsReady/);
+  assert.match(daily, /bdUseHomeReviewsV409\(String\(e\?\.id\?\?e\?\.name\?\?"venue"\),bdHomeReviewsReady\)/);
+  assert.match(bundle, /reviewsReady:bdHomeCloudReady/);
+  assert.match(browserQa, /bootstrapDelayMs: 2_200/);
+  assert.match(browserQa, /homeReviewResponses, \[200\]/);
+  assert.match(browserQa, /waitForURL\(\(url\) => url\.searchParams\.get\("venue"\) === "902"/);
+  assert.match(browserQa, /waitForFunction\(\(\) => localStorage\.getItem\("bd_active_venue_id"\) === "902"/);
+  const activeLoader = await source("public/bardoctor-preview-v397.js");
+  assert.match(activeLoader, /index-BQGspy0I(?:-[a-f0-9]{12})?\.js\?v=[^"]*home-reviews-auth-v415/);
+  for (const shell of [await source("public/app.html"), await source("app/bar-doctor-response.ts")]) {
+    assert.match(shell, /bardoctor-preview-v397\.js\?v=[^"']*home-reviews-auth-v415/);
+    assert.equal(shell.match(/<script src="\/bardoctor-preview-v397\.js\?v=[^"]+" defer><\/script>/g)?.length, 1);
+  }
+  assert.ok(
+    buildScript.lastIndexOf('patch-home-reviews-ux-v409.mjs') > buildScript.lastIndexOf('patch-shell-first-startup-v397.mjs'),
+    "final Home Reviews cache patch must run after shell-first recreates the active loader",
+  );
+  assert.match(authoritativeHomePatch, /bundle\.includes\("function bdHomeDaily\(\{cloudReady:"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("i\.jsx\(bdHomeDaily,\{cloudReady:"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("bdUseLiveBusinessHealthV335\(n&&!!t\)"\)/);
+  assert.match(authoritativeHomePatch, /bundle\.includes\("bdLiveHealthStatus=bdUseLiveBusinessHealthV335\(!!e\)"\)/);
+  assert.doesNotMatch(authoritativeHomePatch, /if \(!bundle\.includes\(newDailyHead\)\)/);
+  assert.doesNotMatch(authoritativeHomePatch, /if \(!bundle\.includes\(newDailyCall\)\)/);
+});
+
 test("Reviews is a direct desktop module while the six-action mobile contract remains intact", async () => {
   const [bundle, css, route] = await Promise.all([
     source("public/assets/index-BQGspy0I.js"),

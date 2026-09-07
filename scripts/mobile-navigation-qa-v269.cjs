@@ -248,6 +248,8 @@ async function createRun(browser, profile, label, options = {}) {
     storeWrites: [],
     healthMode: "attention",
     bootstrapDelayMs: options.bootstrapDelayMs || 0,
+    bootstrapReady: false,
+    homeReviewResponses: [],
   };
   const context = await browser.newContext({
     ...profile.descriptor,
@@ -289,6 +291,7 @@ async function createRun(browser, profile, label, options = {}) {
     const activeProfile = profileFor(state.activeVenueId);
     if (url.pathname === "/api/auth/bootstrap") {
       if (state.bootstrapDelayMs) await new Promise((resolve) => setTimeout(resolve, state.bootstrapDelayMs));
+      state.bootstrapReady = true;
       return route.fulfill(jsonResponse({
         ok: true,
         email: "mobile-qa@bardoctor.local",
@@ -320,15 +323,22 @@ async function createRun(browser, profile, label, options = {}) {
       return route.fulfill(jsonResponse(freshBusinessHealthEnvelope(state.activeVenueId, state.healthMode === "healthy")));
     }
     if (url.pathname === "/api/users/me") return route.fulfill(jsonResponse({ ok: true, user: { firstName: "Mobile", lastName: "QA", email: "mobile-qa@bardoctor.local", role: "owner", permissions } }));
-    if (url.pathname === "/api/reviews/home") return route.fulfill(jsonResponse({
-      success: true,
-      data: {
-        provider: { status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null },
-        metrics: { total: 105, averageRating: 3.19, new7d: 6, new30d: 23, unanswered: 7, needsAttention: 7, analyzed: 105, complaints: [{ topic: "wait_time", count: 7 }, { topic: "music", count: 7 }], lastPublishedAt: "2026-09-01T12:00:00.000Z" },
-        layerUpdatedAt: "2026-09-02T09:20:00.000Z",
-        canManage: true,
-      },
-    }));
+    if (url.pathname === "/api/reviews/home") {
+      if (!state.bootstrapReady) {
+        state.homeReviewResponses.push(403);
+        return route.fulfill(jsonResponse({ success: false, error: "Authentication bootstrap is not ready" }, 403));
+      }
+      state.homeReviewResponses.push(200);
+      return route.fulfill(jsonResponse({
+        success: true,
+        data: {
+          provider: { status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null },
+          metrics: { total: 105, averageRating: 3.19, new7d: 6, new30d: 23, unanswered: 7, needsAttention: 7, analyzed: 105, complaints: [{ topic: "wait_time", count: 7 }, { topic: "music", count: 7 }], lastPublishedAt: "2026-09-01T12:00:00.000Z" },
+          layerUpdatedAt: "2026-09-02T09:20:00.000Z",
+          canManage: true,
+        },
+      }));
+    }
     if (url.pathname === "/api/review-layer" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: reviewQaFixtures() }));
     if (url.pathname === "/api/reviews/sources" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: { providers: [{ id: "google", configured: true, status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null }] } }));
     if (url.pathname === "/api/reviews/reply" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { draft: "Спасибо за честный отзыв. Мы проверим скорость обслуживания и уровень музыки." } }));
@@ -568,6 +578,21 @@ async function goto(page, pathName) {
   assert.notEqual(new URL(page.url()).pathname, "/login", `${pathName}: unexpected login redirect`);
 }
 
+async function waitForEmbeddedFrame(page, pathName, timeout = 10_000) {
+  const deadline = Date.now() + timeout;
+  do {
+    const frame = page.frames().find((candidate) => {
+      try {
+        const url = new URL(candidate.url());
+        return url.pathname === pathName && url.searchParams.get("embedded") === "1";
+      } catch { return false; }
+    });
+    if (frame) return frame;
+    await page.waitForTimeout(50);
+  } while (Date.now() < deadline);
+  return null;
+}
+
 async function mobileAudit(page, profileName, label, options = {}) {
   const audit = await page.evaluate(() => {
     const root = document.documentElement;
@@ -605,8 +630,8 @@ async function mobileAudit(page, profileName, label, options = {}) {
     };
   });
   if (options.requireTouch !== false) {
-    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive`);
-    assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse`);
+    assert.ok(audit.maxTouchPoints > 0, `${profileName}/${label}: touch emulation is inactive ${JSON.stringify(audit)}`);
+    assert.ok(audit.coarsePointer, `${profileName}/${label}: pointer is not coarse ${JSON.stringify(audit)}`);
   }
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${profileName}/${label}: horizontal overflow ${audit.scrollWidth}/${audit.clientWidth}`);
   assert.match(audit.viewportMeta, /width=device-width/, `${profileName}/${label}: viewport meta missing`);
@@ -682,8 +707,11 @@ async function inventoryFlow(browser, profile) {
   await page.getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.locator("[data-bd-venue-trigger]").click();
   await page.waitForSelector("[data-bd-venue-sheet]");
-  await page.locator(".bd-venue-row").filter({ hasText: "Mobile QA B" }).click();
-  await page.waitForTimeout(500);
+  await Promise.all([
+    page.waitForURL((url) => url.searchParams.get("venue") === "902", { waitUntil: "domcontentloaded", timeout: 20_000 }),
+    page.locator(".bd-venue-row").filter({ hasText: "Mobile QA B" }).click(),
+  ]);
+  await page.waitForFunction(() => localStorage.getItem("bd_active_venue_id") === "902", undefined, { timeout: 10_000 });
   assert.equal(await page.evaluate(() => localStorage.getItem("bd_active_venue_id")), "902");
   assert.equal(new URL(page.url()).searchParams.get("inventory"), null, `${profile.name}: inventory leaked across venue switch`);
   assert.equal(await page.locator(".bd-inventory-layer-v246").count(), 0);
@@ -752,8 +780,10 @@ async function nomenclatureFlow(browser, profile) {
   const { page } = run;
   await goto(page, "/warehouse?venue=901");
   await mobileAudit(page, profile.name, "warehouse");
-  await page.getByRole("button", { name: "Номенклатура", exact: true }).click();
+  await page.getByRole("button", { name: "Настроить структуру склада", exact: true }).click();
   await page.waitForURL(/\/nomenclature/);
+  assert.equal(new URL(page.url()).searchParams.get("view"), "taxonomy");
+  await page.getByRole("button", { name: "Все позиции", exact: true }).click();
   const search = page.getByLabel(/Найти.*номенклатур|Поиск/i).or(page.getByPlaceholder(/Найти|Поиск/i)).first();
   await search.fill("Пиво");
   await page.waitForTimeout(100);
@@ -955,8 +985,18 @@ async function shiftCanonicalWriteoffFlow(browser, profile) {
 
 async function procurementFlow(browser, profile) {
   const run = await createRun(browser, profile, "suppliers-purchases");
-  const { page } = run;
-  await goto(page, "/suppliers?qaProcurement=default&venue=401");
+  const { page, state } = run;
+  state.stores[901].bd_suppliers = [{ id: "supplier-mobile", name: "Поставщик Mobile", type: "wholesale", categories: ["alcohol"], currency: "PMR_RUB", status: "active" }];
+  state.stores[901].bd_purchase_documents = [{
+    id: "purchase-mobile", venueId: 901, documentType: "invoice", documentNumber: "17",
+    supplierId: "supplier-mobile", supplierName: "Поставщик Mobile", date: "2026-08-24",
+    currency: "PMR_RUB", expenseCategory: "alcohol", paymentMethod: "transfer", total: 500,
+    status: "confirmed", syncStatus: "synced", confidence: 1, warnings: [],
+    confirmedAt: "2026-08-24T12:00:00.000Z", updatedAt: "2026-08-24T12:00:00.000Z",
+    items: [{ id: "purchase-line-mobile", name: "Пиво Mobile A", quantity: 10, unit: "шт.", packageSize: "1 шт.", unitPrice: 50, lineTotal: 500, purchaseProductKey: "stock:beer-a|pcs", confidence: 1 }],
+  }];
+  await page.route("**/api/procurement/overview?*", (route) => route.fulfill(jsonResponse({ ok: true, venueId: 901, analytics: null })));
+  await goto(page, "/suppliers?venue=901&period=2026-08");
   try {
     await page.waitForSelector(".bd-proc-command-v168");
   } catch {
@@ -967,9 +1007,11 @@ async function procurementFlow(browser, profile) {
   assert.ok(procurementLabels.some((label) => label.startsWith("Закупки")), `${profile.name}: procurement tabs missing: ${JSON.stringify(procurementLabels)}`);
   await procurementTabs.filter({ hasText: "Закупки" }).click();
   const row = page.locator(".bd-proc-purchase-row-v168").first();
+  assert.match(await row.textContent(), /Поставщик Mobile.*Пиво|Поставщик Mobile.*500/s);
   await row.locator(".bd-proc-purchase-main-v168").click();
   await page.waitForSelector(".bd-proc-sheet-v168");
   assert.ok(new URL(page.url()).searchParams.has("documentId"));
+  assert.match(await page.locator(".bd-proc-sheet-v168").textContent(), /Поставщик Mobile.*№\s*17/s);
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector(".bd-proc-sheet-v168");
   await page.locator(".bd-proc-sheet-v168 button[aria-label='Закрыть']").last().click();
@@ -1051,14 +1093,15 @@ async function moduleSmokeFlow(browser, profile) {
 }
 
 async function homeReviewsFlow(browser, profile) {
-  const run = await createRun(browser, profile, "home-reviews");
-  const { page } = run;
+  const run = await createRun(browser, profile, "home-reviews", { bootstrapDelayMs: 2_200 });
+  const { page, state } = run;
   await goto(page, "/home?venue=901");
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
   const attention = page.locator('[data-bd-home-attention="universal-v198"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
+  assert.deepEqual(state.homeReviewResponses, [200], `${profile.name}: Home Reviews requested protected data before auth bootstrap was ready`);
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',
@@ -1092,17 +1135,13 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await finance.textContent(), /Финансовый результат/);
   assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
   assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
+  await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
   await reviewsCard.getByRole("button", { name: "Все отзывы", exact: true }).click();
   await page.waitForURL(/\/reviews(?:\?|$)/);
   await page.waitForSelector('iframe[src^="/reviews"]');
-  const reviewFrame = page.frames().find((candidate) => {
-    try {
-      const url = new URL(candidate.url());
-      return url.pathname === "/reviews" && url.searchParams.get("embedded") === "1";
-    } catch { return false; }
-  });
+  const reviewFrame = await waitForEmbeddedFrame(page, "/reviews");
   assert.ok(reviewFrame, `${profile.name}: embedded Reviews frame is missing`);
   try {
     await reviewFrame.locator("#reviews-content:not(.hidden)").waitFor({ timeout: 10_000 });
@@ -1125,11 +1164,11 @@ async function homeReviewsFlow(browser, profile) {
   await dialog.waitFor({ state: "visible" });
   assert.match(await dialog.textContent(), /Anna.*We waited too long.*Черновик не публикуется автоматически.*Спасибо за честный отзыв/s);
   assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
-  await dialog.getByRole("button", { name: "Закрыть", exact: true }).click();
+  await dialog.locator(".dialog-actions").getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.goBack({ waitUntil: "networkidle" });
   await reviewsCard.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
-  await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
+  await mobileAudit(page, profile.name, "home-reviews-return", { requireTouch: false });
   await closeRun(run);
   return { profile: profile.name, scenario: run.label, passed: true, layout: homeLayout };
 }

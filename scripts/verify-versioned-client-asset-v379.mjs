@@ -19,6 +19,9 @@ for (const marker of [
   "bd-unit-product-costing-v385",
   "bd-unit-product-costing-v386",
   "bd-unit-product-costing-v387",
+  "function bdHomeReviewsCardV409",
+  "bdHomeReviewsCardV409,{state:bdHomeReviewState,onNavigate:g}",
+  "bd-manual-nomenclature-cost-fallback-v409",
 ]) {
   assert.ok(asset.includes(marker), `The packaged client asset is stale: ${marker} is missing`);
 }

@@ -30,6 +30,16 @@ test("generic writes cannot mutate immutable movement ledger or bootstrap over h
   assert.doesNotMatch(source, /repairInventoryPurchaseAmounts|repairedStockMovements/);
 });
 
+test("generic store writes reject a stale snapshot instead of overwriting a concurrent update", async () => {
+  const source = await readFile(new URL("../app/api/store/[key]/route.ts", import.meta.url), "utf8");
+  assert.match(source, /eq\(domainData\.updatedAt, existing\.updatedAt\)/);
+  assert.match(source, /eq\(domainData\.dataJson, existing\.dataJson\)/);
+  assert.match(source, /onConflictDoNothing/);
+  assert.match(source, /STORE_WRITE_CONFLICT/);
+  assert.match(source, /retryable: true/);
+  assert.doesNotMatch(source, /onConflictDoUpdate\(\{[\s\S]*target: \[domainData\.accountId, domainData\.storeKey\]/);
+});
+
 test("purchase posting and inventory finalization stop at a missing authoritative assortment", async () => {
   const purchase = await readFile(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), "utf8");
   const counts = await readFile(new URL("../app/api/inventory/counts/route.ts", import.meta.url), "utf8");

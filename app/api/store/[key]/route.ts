@@ -39,6 +39,8 @@ import { normalizeAssortmentMenuCurrencyUpdates } from "../../../../lib/bardocto
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomenclature";
 import { materializeMenuTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
+import { directBalanceMutations } from "../../../../lib/bardoctor/inventory-write-guard";
+import { changedConsumptionModeIssues } from "../../../../lib/bardoctor/consumption-mode";
 import {
   normalizeVenueCurrencyArrayUpdates,
   VENUE_CURRENCY_ARRAY_STORE_KEYS,
@@ -291,6 +293,24 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       venueId: account.venueId,
     });
     techCardReconciliation = techCards.report;
+    const consumptionIssues = changedConsumptionModeIssues(before, after);
+    if (consumptionIssues.length) {
+      return Response.json({
+        ok: false,
+        code: "CONSUMPTION_MODE_CONFLICT",
+        error: "Нельзя сохранить позицию с несколькими активными способами списания.",
+        issues: consumptionIssues.slice(0, 50),
+      }, { status: 422 });
+    }
+    const balanceMutations = directBalanceMutations(before, after);
+    if (balanceMutations.length) {
+      return Response.json({
+        ok: false,
+        code: "USE_INVENTORY_LIFECYCLE_API",
+        error: "Фактический остаток изменяется только явной складской операцией с движением.",
+        issues: balanceMutations.slice(0, 50),
+      }, { status: 409 });
+    }
   }
   const auditBefore = before == null && Array.isArray(after) ? [] : before;
   const auditAfter = after == null && Array.isArray(before) ? [] : after;
@@ -404,18 +424,36 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
 
   const updatedAt = new Date().toISOString();
-  await db
-    .insert(domainData)
-    .values({
-      accountId: account.id,
-      storeKey: key,
-      dataJson: JSON.stringify(after),
-      updatedAt,
-    })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify(after), updatedAt },
-    });
+  const dataJson = JSON.stringify(after);
+  const persisted = existing
+    ? await db
+      .update(domainData)
+      .set({ dataJson, updatedAt })
+      .where(and(
+        eq(domainData.id, existing.id),
+        eq(domainData.accountId, account.id),
+        eq(domainData.storeKey, key),
+        eq(domainData.updatedAt, existing.updatedAt),
+        eq(domainData.dataJson, existing.dataJson),
+      ))
+      .returning({ id: domainData.id })
+    : await db
+      .insert(domainData)
+      .values({ accountId: account.id, storeKey: key, dataJson, updatedAt })
+      .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] })
+      .returning({ id: domainData.id });
+
+  if (persisted.length !== 1) {
+    return Response.json(
+      {
+        ok: false,
+        code: "STORE_WRITE_CONFLICT",
+        error: "Данные изменились параллельно. Изменение сохранено локально и будет объединено при повторной синхронизации.",
+        retryable: true,
+      },
+      { status: 409 },
+    );
+  }
 
   if (mutations.length > 0) {
     const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;

@@ -10,6 +10,8 @@ const STORE_KEYS = [
   "bd_assortment_v1",
   "bd_purchase_documents",
   "bd_sales_documents",
+  "bd_sales_batches",
+  "bd_stock_movements",
   "bd_finance_revenue",
 ] as const;
 
@@ -64,7 +66,9 @@ export async function GET(request: Request): Promise<Response> {
   const analytics = buildAssortmentAnalytics({
     assortment: reconciliation.assortment,
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
+    stockMovements: values(stores.get("bd_stock_movements")),
     salesDocuments: values(stores.get("bd_sales_documents")),
+    salesBatches: values(stores.get("bd_sales_batches")),
     financeRevenue: values(stores.get("bd_finance_revenue")),
     period,
     venueId: account.venueId,

@@ -38,6 +38,17 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
   window.__bdBootstrapPending = true;
   /* bd-shell-first-startup-v397: render from the last verified local shell while auth refreshes. */
   var bdCachedSessionV397 = localStorage.getItem("bd_session");
@@ -1610,7 +1621,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397";
+    script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-20260906-home-reviews-auth-v415";
     script.addEventListener("error", function () { bdRecoverStartupV341("module-load"); }, { once: true });
     document.head.appendChild(script);
     if (bdStartupPathV341()) {

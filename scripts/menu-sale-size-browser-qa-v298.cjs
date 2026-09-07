@@ -7,6 +7,7 @@ const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cj
 
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4176";
 const outputDir = process.env.BD_QA_OUTPUT || "/tmp/bardoctor-menu-sale-size-v298-qa";
+const fixtureSource = fs.readFileSync(path.resolve(process.cwd(), "public/assortment-qa-v170.js"), "utf8");
 fs.mkdirSync(outputDir, { recursive: true });
 
 function response(body, status = 200) {
@@ -30,6 +31,12 @@ async function openCatalog(browser, viewport, label) {
     isMobile: viewport.width < 700,
     hasTouch: viewport.width < 700,
   });
+  await context.addInitScript({ content: fixtureSource });
+  await context.route("**/assortment-qa-v170.js*", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: "",
+  }));
   const errors = [];
   await context.route("**/api/store**", (route) => route.fulfill(response({ ok: true, value: null })));
   await context.route("**/api/business-health**", (route) => route.fulfill(response({ ok: true, snapshot: null })));
@@ -52,7 +59,7 @@ async function openCatalog(browser, viewport, label) {
   page.on("requestfailed", (request) => {
     if (!/ERR_ABORTED/.test(request.failure()?.errorText || "")) errors.push(`requestfailed: ${request.url()}`);
   });
-  const initial = await page.goto(`${baseUrl}/catalog?qaAssortment=default&tab=menu`, { waitUntil: "networkidle", timeout: 60_000 });
+  const initial = await page.goto(`${baseUrl}/catalog?qaAssortment=default&tab=menu`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   assert.equal(initial?.status(), 200, `${label}: catalog route`);
   await page.locator(".bd-assortment-menu-v170").waitFor({ state: "visible" });
   return { context, page, errors };

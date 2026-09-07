@@ -314,6 +314,22 @@
     return typeof review.ownerReply === "string" && review.ownerReply.trim().length > 0;
   }
 
+  function reviewSourceMetadata(review) {
+    return review && review.sourceMetadata && typeof review.sourceMetadata === "object" ? review.sourceMetadata : {};
+  }
+
+  function reviewOriginalText(review) {
+    var metadata = reviewSourceMetadata(review);
+    return typeof metadata.originalText === "string" && metadata.originalText.trim()
+      ? metadata.originalText.trim()
+      : (typeof review.text === "string" ? review.text : "");
+  }
+
+  function reviewTranslatedText(review) {
+    var metadata = reviewSourceMetadata(review);
+    return typeof metadata.translatedText === "string" && metadata.translatedText.trim() ? metadata.translatedText.trim() : "";
+  }
+
   function needsAttention(review) {
     return !hasOwnerReply(review) && ((typeof review.rating === "number" && review.rating <= 3) || review.sentiment === "negative");
   }
@@ -354,7 +370,7 @@
       if (state.filter === "unanswered" && hasOwnerReply(review)) return false;
       if (state.filter === "negative" && !needsAttention(review)) return false;
       if (!query) return true;
-      return [review.text, review.authorName, sourceLabels[review.source] || review.source]
+      return [reviewOriginalText(review), reviewTranslatedText(review), review.authorName, sourceLabels[review.source] || review.source]
         .filter(Boolean).join(" ").toLocaleLowerCase("ru").includes(query);
     });
     if (!values.length) {
@@ -375,9 +391,8 @@
       head.appendChild(node("span", "rating-stars", ratingStars(review.rating)));
       head.appendChild(node("span", "review-source-label", sourceLabels[review.source] || review.source || "Источник не указан"));
       main.appendChild(head);
-      var metadata = review.sourceMetadata && typeof review.sourceMetadata === "object" ? review.sourceMetadata : {};
-      var originalText = typeof metadata.originalText === "string" && metadata.originalText.trim() ? metadata.originalText.trim() : review.text;
-      var translatedText = typeof metadata.translatedText === "string" && metadata.translatedText.trim() ? metadata.translatedText.trim() : "";
+      var originalText = reviewOriginalText(review);
+      var translatedText = reviewTranslatedText(review);
       main.appendChild(node("p", "review-item-text", originalText));
       if (translatedText && translatedText !== originalText) {
         var translation = node("details", "review-translation");
@@ -639,8 +654,10 @@
   async function prepareReply(review, target) {
     target.disabled = true;
     try {
-      var result = await api("/api/reviews/reply", { method: "POST", body: JSON.stringify({ review: review }) });
-      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + review.text;
+      var originalText = reviewOriginalText(review);
+      var replyReview = Object.assign({}, review, { text: originalText });
+      var result = await api("/api/reviews/reply", { method: "POST", body: JSON.stringify({ review: replyReview }) });
+      document.getElementById("review-reply-context").textContent = (review.authorName || "Гость") + " · " + ratingStars(review.rating) + " · " + (sourceLabels[review.source] || review.source || "Источник") + "\n" + originalText;
       document.getElementById("review-reply-copy").textContent = result.data && result.data.draft ? result.data.draft : "Черновик не подготовлен.";
       replyDialog.showModal();
     } catch (problem) {

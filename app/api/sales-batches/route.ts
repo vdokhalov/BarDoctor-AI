@@ -3,6 +3,7 @@ import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../lib/bardoctor/inventory";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import {
   cancelSalesDraft,
   createOrUpdateSalesBatch,
@@ -243,7 +244,7 @@ export async function GET(request: Request): Promise<Response> {
   return Response.json(responsePayload(stores, account.venueId, account.permissions), { headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   const raw = await request.text();
@@ -262,6 +263,11 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для этого действия" }, { status: 403 });
   }
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [
+    SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY,
+    ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, WAREHOUSE_STORE_KEY,
+    MONTH_CLOSING_STORE_KEY, REVENUE_STORE_KEY,
+  ]);
   const stores = await readStores(database, account.id);
   const now = new Date().toISOString();
   const currentActor = actor(account);
@@ -314,6 +320,7 @@ export async function POST(request: Request): Promise<Response> {
         mappings: mapped.mappings,
         warehouseRoutes: stores.warehouseRoutes,
         warehouses: stores.warehouses,
+        stockMovements: stores.stockMovements,
         venueId: account.venueId,
         actor: currentActor,
         now,
@@ -332,20 +339,20 @@ export async function POST(request: Request): Promise<Response> {
       ),
     ];
     if (nextBatch) statements.unshift(upsertStore(database, account.id, SALES_BATCH_STORE_KEY, nextBatches, now));
-    await database.batch(statements);
+    await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
     return Response.json({ ok: true, mapping: mapped.mapping, batch: nextBatch, mappings: mapped.mappings });
   }
 
   if (action === "revoke_mapping") {
     const revoked = revokeSalesMapping({ mappings: stores.mappings, venueId: account.venueId, id: text(body.id, "", 160), now });
     if (!revoked.ok) return Response.json(revoked, { status: 404 });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_MAPPING_STORE_KEY, revoked.mappings, now),
       database.prepare(`
         INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key, before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
         VALUES (?, ?, 'sales.mapping.revoked', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)
       `).bind(account.id, SALES_MAPPING_STORE_KEY, revoked.mapping.id, revoked.mapping.rawName, JSON.stringify(revoked.mapping), JSON.stringify(["status"]), currentActor.name, currentActor.role, "Сопоставление отозвано без удаления истории", now),
-    ]);
+    ], now);
     return Response.json({ ok: true, mapping: revoked.mapping, mappings: revoked.mappings });
   }
 
@@ -363,13 +370,13 @@ export async function POST(request: Request): Promise<Response> {
     };
     if (!route.warehouseId) return Response.json({ ok: false, code: "WAREHOUSE_MAPPING_REQUIRED", error: "Выберите склад" }, { status: 422 });
     const routes = [route, ...stores.warehouseRoutes.filter((value) => text(record(value).id, "", 160) !== route.id)];
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_WAREHOUSE_ROUTE_STORE_KEY, routes, now),
       database.prepare(`
         INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key, before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
         VALUES (?, ?, 'sales.warehouse_route.updated', ?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)
       `).bind(account.id, SALES_WAREHOUSE_ROUTE_STORE_KEY, route.id, route.department, JSON.stringify(route), JSON.stringify(["department", "warehouseId", "active"]), currentActor.name, currentActor.role, "Настроена явная маршрутизация расхода продаж", now),
-    ]);
+    ], now);
     return Response.json({ ok: true, route, warehouseRoutes: routes });
   }
 
@@ -387,12 +394,12 @@ export async function POST(request: Request): Promise<Response> {
     });
     if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_NOT_FOUND" ? 404 : 422 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, batch: result.batch, postedNow: 0, stockChanged: false });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: result.batch.status === "POSTED" ? "sales_batch.posted" : "sales_batch.partially_posted", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано immutable SALE_CONSUMPTION движений: ${result.batch.movementIds.length}; отражено строк: ${result.batch.postedLineCount}/${result.batch.lines.length}`, now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, idempotent: false, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, postedNow: result.postedNow, stockChanged: true }, { status: 201 });
   }
 
@@ -403,22 +410,22 @@ export async function POST(request: Request): Promise<Response> {
     const result = reverseSalesBatch({ batches: stores.batches, batchId, assortment: stores.assortment, stockMovements: stores.stockMovements, venueId: account.venueId, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_NOT_FOUND" ? 404 : 409 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, batch: result.batch, stockChanged: false });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: "sales_batch.reversed", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано SALE_REVERSAL движений: ${result.batch.reversalMovementIds.length}; исходные движения не удалены`, now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: true });
   }
 
   if (action === "cancel") {
     const result = cancelSalesDraft({ batches: stores.batches, batchId, venueId: account.venueId, now });
     if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_NOT_FOUND" ? 404 : 409 });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       auditStatement({ database, accountId: account.id, action: "sales_batch.cancelled", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: "Черновик отменён; склад не изменён", now }),
-    ]);
+    ], now);
     return Response.json({ ok: true, batch: result.batch, batches: result.batches, stockChanged: false });
   }
 
@@ -451,14 +458,19 @@ export async function POST(request: Request): Promise<Response> {
     mappings: stores.mappings,
     warehouseRoutes: stores.warehouseRoutes,
     warehouses: stores.warehouses,
+    stockMovements: stores.stockMovements,
     venueId: account.venueId,
     actor: currentActor,
     now,
   });
   if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_READ_ONLY" ? 409 : 422 });
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
     auditStatement({ database, accountId: account.id, action: before ? "sales_batch.draft_updated" : "sales_batch.draft_created", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Черновик сохранён server-side; источник ${result.batch.source}; склад не изменён`, now }),
-  ]);
+  ], now);
   return Response.json({ ok: true, batch: result.batch, batches: result.batches, warnings: draft.warnings, stockChanged: false }, { status: before ? 200 : 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

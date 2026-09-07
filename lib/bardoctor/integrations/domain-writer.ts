@@ -318,8 +318,11 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   balance.stockExternalSystem = input.envelope.externalSystem;
   balance.stockExternalId = input.envelope.externalId;
   balance.stockMeasuredAt = date;
+  const stockMovements = array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), []));
   const inventory = applyInventoryCount({
     assortment,
+    stockMovements,
+    venueId: input.account.venueId,
     snapshot: {
       id: input.internalId,
       date,
@@ -352,7 +355,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   else snapshots.unshift(snapshot);
   const movements = [
     ...inventory.movements,
-    ...array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    ...stockMovements,
   ].slice(0, 20_000);
   await database.batch([
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),

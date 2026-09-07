@@ -639,6 +639,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     assortment: stored?.data,
     purchaseDocuments,
     salesDocuments: array(store(sources, "bd_sales_documents")?.data),
+    salesBatches: array(store(sources, "bd_sales_batches")?.data),
     financeRevenue: array(store(sources, "bd_finance_revenue")?.data),
     now,
   });

@@ -170,7 +170,7 @@ test("canonical purchase lifecycle separates documents, payments and reversals",
   assert.match(confirm, /withPurchasePaymentSummary/);
   assert.match(confirm, /applyPurchaseToInventory/);
   assert.match(confirm, /MONTH_LOCKED/);
-  assert.match(confirm, /database\.batch/);
+  assert.match(confirm, /runStoreCasBatch/);
   assert.match(confirm, /hasPermission\(account, "expenses\.create"\)/);
   assert.match(confirm, /recordPayment/);
   assert.match(confirm, /hasMeaningfulPurchaseItems/);
@@ -180,7 +180,7 @@ test("canonical purchase lifecycle separates documents, payments and reversals",
   assert.match(update, /revisePurchaseInInventory/);
   assert.match(update, /MONTH_LOCKED/);
   assert.match(update, /previousDocument\.venueId/);
-  assert.match(update, /database\.batch/);
+  assert.match(update, /runStoreCasBatch/);
 
   assert.match(payment, /hasPermission\(account, "expenses\.create"\)/);
   assert.match(payment, /IDEMPOTENCY_KEY_REQUIRED/);
@@ -302,6 +302,13 @@ test("Procurement browser regression uses only visible user actions for settleme
     assert.match(browserQa, new RegExp(action));
   }
   assert.match(browserQa, /page\.once\("dialog"/);
+  assert.match(browserQa, /context\.addInitScript\(\{ content: fixtureSource \}\)/);
+  assert.match(browserQa, /context\.route\("\*\*\/procurement-qa-v168\.js\*"/);
+  assert.match(browserQa, /document\.querySelector\("\.bd-document-detail-delete-v193"\)/);
+  assert.match(browserQa, /box\.right <= window\.innerWidth && box\.bottom <= window\.innerHeight/);
+  assert.match(browserQa, /selectFinanceFixtureMonth/);
+  assert.match(browserQa, /Более ранний месяц/);
+  assert.match(browserQa, /Более поздний месяц/);
   assert.match(browserQa, /\.bd-proc-pay-now-v190/);
   assert.match(browserQa, /\.bd-proc-payment-list-v186 article/);
   assert.match(browserQa, /page\.getByRole\("link", \{ name: "Ещё"/);

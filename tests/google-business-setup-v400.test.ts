@@ -110,7 +110,7 @@ test("Google OAuth authorization always replaces the top-level browser context",
 
   assert.match(client, /navigateGoogleOAuth\(url\)/);
   assert.doesNotMatch(client, /(?:createElement\(["']iframe["']\)|<iframe)[^\n]*(?:google|oauth|url\.href)/i);
-  assert.match(page, /reviews\.js\?v=20260903-home-reviews-ux-v409/);
+  assert.match(page, /reviews\.js\?v=20260906-review-original-text-v413/);
 });
 
 test("account Google OAuth credentials override any environment fallback", async () => {
@@ -185,7 +185,8 @@ test("Google callback separates token exchange diagnostics from Business Profile
     read("lib/bardoctor/review-sources.ts"),
     read("public/reviews.js"),
   ]);
-  const callback = sources.match(/if \(action === "callback"\) \{[\s\S]*?\n  \}\n\n  if \(action !== "connect"\)/)?.[0];
+  const callback = sources.replace(/\r\n/g, "\n")
+    .match(/if \(action === "callback"\) \{[\s\S]*?\n  \}\n\n  if \(action !== "connect"\)/)?.[0];
   assert.ok(callback);
   assert.ok(callback.indexOf("consumeGoogleState(state)") < callback.indexOf("if (googleError)"));
   assert.match(callback, /normalizeGoogleOAuthError/);

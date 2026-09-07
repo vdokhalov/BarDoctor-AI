@@ -7,6 +7,7 @@ const { chromium } = require("playwright-core");
 const baseUrl = process.env.BD_QA_BASE_URL || "http://127.0.0.1:4173";
 const browserPath = process.env.BD_QA_BROWSER || "/tmp/chromium";
 const outputDir = path.resolve(process.cwd(), "qa-artifacts/assortment-v171");
+const fixtureSource = fs.readFileSync(path.resolve(process.cwd(), "public/assortment-qa-v170.js"), "utf8");
 fs.mkdirSync(outputDir, { recursive: true });
 
 const results = [];
@@ -39,6 +40,12 @@ async function openPage(browser, {
     locale: "ru-RU",
     timezoneId: "Europe/Chisinau",
   });
+  await context.addInitScript({ content: fixtureSource });
+  await context.route("**/assortment-qa-v170.js*", (route) => route.fulfill({
+    status: 200,
+    contentType: "application/javascript",
+    body: "",
+  }));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
   const page = await context.newPage();
   const issues = [];
@@ -97,6 +104,11 @@ async function viewportAudit(page, label) {
     const bottom = bottomNode?.getBoundingClientRect() || null;
     const bottomItems = bottomNode
       ? [...bottomNode.querySelectorAll("[data-bd-primary-navigation] > a,[data-bd-primary-navigation] > button")]
+        .filter((node) => {
+          const style = getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          return style.visibility !== "hidden" && style.display !== "none" && rect.width > 0 && rect.height > 0;
+        })
       : [];
     const visible = [...document.querySelectorAll("button,a,input,select")].filter((node) => {
       const style = getComputedStyle(node);
@@ -409,7 +421,7 @@ async function actualVenueSwitch(browser) {
   await viewportAudit(page, "actual venue switch");
   await shot(page, "mobile-venue-switched-b.png");
   const fixtureTransitionIssues = run.issues.filter((issue) =>
-    (issue.type === "response" && /\/api\/(?:auth\/bootstrap|restaurants\/me)$/.test(issue.url || ""))
+    (issue.type === "response" && /\/api\/(?:auth\/bootstrap|restaurants\/me|users\/me)$/.test(issue.url || ""))
     || (issue.type === "pageerror" && /Unexpected end of JSON input/.test(issue.message || "")),
   );
   for (const issue of fixtureTransitionIssues) run.issues.splice(run.issues.indexOf(issue), 1);

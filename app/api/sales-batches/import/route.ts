@@ -2,7 +2,9 @@ import * as XLSX from "xlsx";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
-import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
+import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
+import { salesImportIdentity } from "../../../../lib/bardoctor/sales-import-identity";
+import { runStoreCasBatch, storeSnapshots, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import {
   createOrUpdateSalesBatch,
   SALES_BATCH_STORE_KEY,
@@ -15,7 +17,7 @@ const WAREHOUSE_STORE_KEY = "bd_warehouses";
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
+type StoreRow = { store_key: string; data_json: string; updated_at: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
@@ -66,20 +68,23 @@ function detectColumns(rows: unknown[][]): { headerRow: number; nameColumn: numb
 
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
-    SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?)
-  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY).all<StoreRow>();
+    SELECT store_key, data_json, updated_at FROM domain_data
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?)
+  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY, STOCK_MOVEMENT_STORE_KEY).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  const keys = [SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY];
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
     warehouses: array(parse(stores.get(WAREHOUSE_STORE_KEY), [])),
+    stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    snapshots: storeSnapshots(result.results ?? [], keys),
   };
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "sales.create")) return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права импортировать продажи" }, { status: 403 });
@@ -89,8 +94,9 @@ export async function POST(request: Request): Promise<Response> {
   if (!(value instanceof File)) return Response.json({ ok: false, error: "Выберите CSV или Excel" }, { status: 400 });
   if (value.size <= 0 || value.size > MAX_FILE_BYTES) return Response.json({ ok: false, error: "Файл должен быть не больше 12 МБ" }, { status: 413 });
   if (!/\.(csv|tsv|xls|xlsx)$/i.test(value.name)) return Response.json({ ok: false, code: "UNSUPPORTED_FILE", error: "Для структурированного импорта поддерживаются CSV, XLSX и XLS" }, { status: 415 });
+  const fileBytes = new Uint8Array(await value.arrayBuffer());
   let workbook: XLSX.WorkBook;
-  try { workbook = XLSX.read(new Uint8Array(await value.arrayBuffer()), { type: "array", cellDates: true }); }
+  try { workbook = XLSX.read(fileBytes, { type: "array", cellDates: true }); }
   catch { return Response.json({ ok: false, code: "FILE_PARSE_ERROR", error: "Не удалось открыть таблицу" }, { status: 422 }); }
   const sheetName = text(form.get("sheetName"), workbook.SheetNames[0], 160);
   const sheet = workbook.Sheets[sheetName] ?? workbook.Sheets[workbook.SheetNames[0]];
@@ -121,6 +127,12 @@ export async function POST(request: Request): Promise<Response> {
     headerRow,
     businessDate: text(form.get("businessDate"), "", 10) || undefined,
     sourceReference: value.name,
+    externalBatchId: await salesImportIdentity({
+      venueId: account.venueId,
+      sourceType: "tabular",
+      content: fileBytes,
+      parserVersion: `tabular-v1:${sheetName}:${headerRow}:${nameColumn}:${quantityColumn}`,
+    }),
   });
   if (!draft.lines.length) return Response.json({ ok: false, code: "SALES_LINES_REQUIRED", error: "В выбранных колонках нет строк продаж" }, { status: 422 });
   const database = getD1();
@@ -138,12 +150,13 @@ export async function POST(request: Request): Promise<Response> {
     mappings: stores.mappings,
     warehouseRoutes: stores.warehouseRoutes,
     warehouses: stores.warehouses,
+    stockMovements: stores.stockMovements,
     venueId: account.venueId,
     actor: currentActor,
     now,
   });
   if (!result.ok) return Response.json(result, { status: 422 });
-  await database.batch([
+  if (!result.duplicate) await runStoreCasBatch(database, account.id, stores.snapshots, [
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
     database.prepare(`
       INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key, before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
@@ -153,6 +166,10 @@ export async function POST(request: Request): Promise<Response> {
       JSON.stringify(result.batch), JSON.stringify(["source", "lines", "status"]), currentActor.name, currentActor.role,
       `Структурированный импорт ${value.name}; лист ${sheetName}; название col ${nameColumn}; количество col ${quantityColumn}`, now,
     ),
-  ]);
-  return Response.json({ ok: true, batch: result.batch, batches: result.batches, warnings: draft.warnings, columnMapping: { sheetName, headerRow, nameColumn, quantityColumn } }, { status: 201 });
+  ], now);
+  return Response.json({ ok: true, duplicate: result.duplicate === true, batch: result.batch, batches: result.batches, warnings: draft.warnings, columnMapping: { sheetName, headerRow, nameColumn, quantityColumn } }, { status: result.duplicate ? 200 : 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

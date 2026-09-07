@@ -16,6 +16,7 @@ import {
   resolveMenuItemSaleSize,
   resolveReadyProductConsumption,
 } from "./menu-sale-size";
+import { COST_BASIS_METHOD, resolveCostBasis } from "./cost-basis";
 
 type JsonRecord = Record<string, unknown>;
 type BaseUnit = "ml" | "g" | "pcs";
@@ -285,6 +286,9 @@ function ingredientCost(
   history: Map<string, ProcurementPricePoint[]>,
   resolveProductKey: (value: unknown) => string,
   packageHint?: { amount: number; unit: BaseUnit; label: string } | null,
+  stockMovements: unknown[] = [],
+  venueId = 0,
+  asOf = new Date().toISOString(),
 ) {
   const resolvedAmount = resolvedIngredientAmount(ingredient);
   const fallbackAmount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
@@ -310,6 +314,63 @@ function ingredientCost(
   }
   if (!productKey) {
     return { complete: false, reason: "mapping", amount: amount.amount, unit: amount.unit, productKey };
+  }
+  const canonicalBasis = stockMovements.length
+    ? resolveCostBasis({
+        venueId,
+        nomenclatureItem: { productKey, unit: amount.unit },
+        asOf,
+        receipts: stockMovements,
+      })
+    : null;
+  const canonicalReceipts = stockMovements.filter((value) => {
+    const movement = record(value);
+    return text(movement.type) === "receipt"
+      && text(movement.productKey) === productKey
+      && (!movement.venueId || Number(movement.venueId) === venueId);
+  });
+  if (canonicalBasis?.known) {
+    const unitPrice = canonicalBasis.value ?? 0;
+    return {
+      complete: true,
+      reason: null,
+      amount: amount.amount,
+      unit: amount.unit,
+      productKey,
+      unitPrice: rounded(unitPrice, 6),
+      cost: rounded(amount.amount * unitPrice, 2),
+      currency: canonicalBasis.currency ?? "",
+      source: "latest_confirmed_purchase",
+      costStatus: canonicalBasis.status,
+      costBasisMethod: COST_BASIS_METHOD,
+      priceDate: canonicalBasis.effectiveDate ?? null,
+      purchaseDate: canonicalBasis.effectiveDate ?? null,
+      purchaseDocumentId: canonicalBasis.sourceDocumentId ?? null,
+      purchaseLineId: canonicalBasis.sourceLineId ?? null,
+      supplierName: null,
+      purchaseDocumentNumber: null,
+      purchasePackageSize: null,
+      packageLabel: packageHint?.label || null,
+    };
+  }
+  // A canonical receipt exists for this item, so its UNKNOWN result is
+  // authoritative. Purchase-document matching below is only a compatibility
+  // path for legacy data created before receipt movements carried a cost basis.
+  if (canonicalBasis && canonicalReceipts.length) {
+    return {
+      complete: false,
+      reason: "price",
+      amount: amount.amount,
+      unit: amount.unit,
+      productKey,
+      costStatus: canonicalBasis.status,
+      costBasisMethod: COST_BASIS_METHOD,
+      priceDate: canonicalBasis.effectiveDate ?? null,
+      purchaseDate: canonicalBasis.effectiveDate ?? null,
+      purchaseDocumentId: canonicalBasis.sourceDocumentId ?? null,
+      purchaseLineId: canonicalBasis.sourceLineId ?? null,
+      supplierName: null,
+    };
   }
   const directCandidates = packageHint
     ? [...history.entries()]
@@ -361,7 +422,7 @@ function ingredientCost(
       ? point.normalizedUnitPrice * packageHint.amount
       : null;
   const currency = point?.currency ?? "";
-  if (!(unitPrice != null && unitPrice > 0) || !currency) {
+  if (!(unitPrice != null && unitPrice >= 0) || !currency) {
     return {
       complete: false,
       reason: "price",
@@ -381,6 +442,7 @@ function ingredientCost(
     cost: rounded(amount.amount * unitPrice, 2),
     currency,
     source: "latest_confirmed_purchase",
+    costStatus: point?.costStatus,
     supplierName: point?.supplierName ?? null,
     priceDate: point?.date ?? null,
     purchaseDate: point?.date ?? null,
@@ -502,7 +564,9 @@ function itemStatus(
 export function buildAssortmentAnalytics(input: {
   assortment: unknown;
   purchaseDocuments?: unknown[];
+  stockMovements?: unknown[];
   salesDocuments?: unknown[];
+  salesBatches?: unknown[];
   financeRevenue?: unknown[];
   period?: string;
   venueId?: number;
@@ -543,6 +607,9 @@ export function buildAssortmentAnalytics(input: {
   const currentPrices = latestPoints(pricePoints);
   const priceHistory = pointHistory(pricePoints);
   const sales = confirmedSales(input.salesDocuments ?? [], input.venueId);
+  const salesBatches = new Map(deduplicated(input.salesBatches ?? [], input.venueId)
+    .filter((batch) => ["POSTED", "PARTIALLY_BLOCKED"].includes(text(batch.status)))
+    .map((batch) => [text(batch.id), batch]));
   const currentSales = sales.filter((document) => inRange(document.date, period.start, period.end));
   const previousSales = sales.filter((document) =>
     inRange(document.date, period.previousStart, period.previousEnd)
@@ -554,9 +621,16 @@ export function buildAssortmentAnalytics(input: {
     quantity: number;
     revenue: number;
     revenueComplete: boolean;
+    historicalCost: number;
+    historicalCostComplete: boolean;
     documents: Set<string>;
   }>();
   for (const document of currentSales) {
+    const batch = salesBatches.get(text(document.salesBatchId));
+    const batchLinesById = new Map(array(batch?.lines).map((value) => {
+      const line = record(value);
+      return [text(line.externalLineId ?? line.id), line];
+    }));
     for (const value of array(document.items)) {
       const line = record(value);
       const item = menuById.get(text(line.menuItemId)) ?? menuByName.get(normalizedName(line.name));
@@ -566,12 +640,21 @@ export function buildAssortmentAnalytics(input: {
         quantity: 0,
         revenue: 0,
         revenueComplete: true,
+        historicalCost: 0,
+        historicalCostComplete: true,
         documents: new Set<string>(),
       };
       metric.quantity += nonNegative(line.quantity) ?? 0;
       const grossSales = nonNegative(line.grossSales);
       if (grossSales === null) metric.revenueComplete = false;
       else metric.revenue += grossSales;
+      const postedLine = batchLinesById.get(text(line.id));
+      const historicalCost = postedLine ? nonNegative(postedLine.theoreticalCost) : null;
+      if (!postedLine || !["POSTED", "REVERSED"].includes(text(postedLine.processingStatus)) || historicalCost === null) {
+        metric.historicalCostComplete = false;
+      } else {
+        metric.historicalCost += historicalCost;
+      }
       metric.documents.add(text(document.id));
       salesMetrics.set(id, metric);
     }
@@ -621,7 +704,15 @@ export function buildAssortmentAnalytics(input: {
       ),
       recipeName: text(ingredient.name, "Ингредиент", 180),
       quantity: nonNegative(ingredient.quantity),
-      ...ingredientCost(ingredient, priceHistory, resolveProductKey, salePackageHint),
+      ...ingredientCost(
+        ingredient,
+        priceHistory,
+        resolveProductKey,
+        salePackageHint,
+        input.stockMovements ?? [],
+        input.venueId ?? 0,
+        now.toISOString(),
+      ),
     }));
     const isService = text(item.type) === "service";
     const reviewStatus = recipe
@@ -667,8 +758,8 @@ export function buildAssortmentAnalytics(input: {
       : [];
     const metric = salesMetrics.get(id);
     const itemRevenue = metric?.revenueComplete ? rounded(metric.revenue, 2) : null;
-    const soldCost = recipeCost !== null && metric
-      ? rounded(recipeCost * metric.quantity, 2)
+    const soldCost = metric?.historicalCostComplete
+      ? rounded(metric.historicalCost, 2)
       : null;
     const grossProfit = itemRevenue !== null && soldCost !== null
       ? rounded(itemRevenue - soldCost, 2)
@@ -726,6 +817,7 @@ export function buildAssortmentAnalytics(input: {
             revenue: itemRevenue,
             revenueComplete: metric.revenueComplete,
             documentCount: metric.documents.size,
+            costOfGoods: soldCost,
             grossProfit,
           }
         : null,
@@ -906,18 +998,14 @@ export function buildAssortmentAnalytics(input: {
   let soldCost = 0;
   let unresolvedSalesLines = 0;
   for (const document of currentSales) {
-    for (const value of array(document.items)) {
-      const line = record(value);
-      const item = menuById.get(text(line.menuItemId)) ?? menuByName.get(normalizedName(line.name));
-      const analytics = item && itemAnalytics.find((candidate) => candidate.id === text(item.id));
-      const quantity = nonNegative(line.quantity);
-      if (!analytics || quantity === null || analytics.recipeCost === null) {
-        salesCostComplete = false;
-        unresolvedSalesLines += 1;
-        continue;
-      }
-      soldCost += analytics.recipeCost * quantity;
+    const batch = salesBatches.get(text(document.salesBatchId));
+    const batchCost = batch ? nonNegative(batch.totalTheoreticalCost) : null;
+    if (!batch || batchCost === null || text(batch.costStatus) !== "FULL") {
+      salesCostComplete = false;
+      unresolvedSalesLines += Math.max(1, array(document.items).length);
+      continue;
     }
+    soldCost += batchCost;
   }
   soldCost = rounded(soldCost, 2);
   const costOfGoods = salesCostComplete && currentSales.length ? soldCost : null;

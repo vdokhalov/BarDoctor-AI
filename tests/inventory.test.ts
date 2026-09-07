@@ -35,6 +35,20 @@ test("inventory count replaces calculated balance and records only the differenc
 
   const result = applyInventoryCount({
     assortment,
+    stockMovements: [{
+      id: "receipt-cola",
+      type: "receipt",
+      status: "active",
+      venueId: 1,
+      productKey: "cola|0 5 л",
+      amount: 6_000,
+      unit: "ml",
+      costAmount: 240,
+      currency: "MDL",
+      businessDate: "2026-08-01",
+    }],
+    venueId: 1,
+    accountingCurrency: "MDL",
     snapshot: {
       id: "count-1",
       date: "2026-08-09",
@@ -65,7 +79,7 @@ test("inventory count replaces calculated balance and records only the differenc
   });
 });
 
-test("inventory adjustment preserves a stored value basis when legacy average cost is absent", () => {
+test("inventory adjustment does not invent a historical cost from a legacy stored value", () => {
   const result = applyInventoryCount({
     assortment: {
       stockBalances: [{
@@ -86,8 +100,9 @@ test("inventory adjustment preserves a stored value basis when legacy average co
   });
   const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
   assert.equal(balance.current, 8);
-  assert.equal(balance.inventoryValue, 800);
-  assert.equal(result.movements[0]?.costAmount, -200);
+  assert.equal(balance.inventoryValue, 1_000);
+  assert.equal(result.movements[0]?.costAmount, undefined);
+  assert.equal(result.movements[0]?.costStatus, "UNKNOWN");
 });
 
 test("inventory count does not invent unknown warehouse products", () => {
@@ -1505,8 +1520,8 @@ test("confirmed purchase increases stock, recalculates cost and links exact reci
 
   const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
   assert.equal(balance.current, 5_000);
-  assert.equal(balance.averageUnitCost, 0.0188);
-  assert.equal(balance.inventoryValue, 94);
+  assert.equal(balance.averageUnitCost, 0.018);
+  assert.equal(balance.inventoryValue, 90);
   assert.equal(result.movements[0].amount, 3_000);
   assert.equal(result.summary.postedLines, 1);
   assert.equal(result.summary.linkedIngredients, 1);
@@ -1622,7 +1637,7 @@ test("purchase without historical FX posts quantity but leaves an explicit unval
   assert.equal(posted.movements[0].transactionCostAmount, 10);
 });
 
-test("a valued purchase does not invent cost for an existing positive balance without basis", () => {
+test("a valued purchase establishes the latest receipt basis without pricing legacy quantity historically", () => {
   const result = applyPurchaseToInventory({
     accountingCurrency: "RUB",
     assortment: {
@@ -1646,9 +1661,9 @@ test("a valued purchase does not invent cost for an existing positive balance wi
   });
   const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
   assert.equal(balance.current, 10);
-  assert.equal(balance.inventoryValue, 0);
-  assert.equal(balance.costNeedsReview, true);
-  assert.equal(balance.costReviewReason, "missing_cost_basis");
+  assert.equal(balance.averageUnitCost, 100);
+  assert.equal(balance.inventoryValue, 1_000);
+  assert.equal(balance.costNeedsReview, undefined);
 });
 
 test("sales report consumes confirmed recipe without fabricating unmatched rows", () => {
@@ -1693,7 +1708,7 @@ test("sales report consumes confirmed recipe without fabricating unmatched rows"
   assert.equal(result.movements.length, 2);
 });
 
-test("sale keeps a stored value basis instead of making the remaining stock unvalued", () => {
+test("sale does not invent historical COGS from a legacy stored value", () => {
   const result = applySalesToInventory({
     assortment: {
       menuItems: [{ id: "bottled-water", name: "Вода", active: true }],
@@ -1720,8 +1735,9 @@ test("sale keeps a stored value basis instead of making the remaining stock unva
   });
   const balance = (result.assortment.stockBalances as Array<Record<string, unknown>>)[0];
   assert.equal(balance.current, 8);
-  assert.equal(balance.inventoryValue, 400);
-  assert.equal(result.movements[0]?.costAmount, 100);
+  assert.equal(balance.inventoryValue, 500);
+  assert.equal(result.movements[0]?.costAmount, undefined);
+  assert.equal(result.movements[0]?.costStatus, "UNKNOWN");
 });
 
 test("a partially linked recipe never creates a partial stock deduction", () => {

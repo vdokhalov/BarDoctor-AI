@@ -5,13 +5,22 @@ import {
   cancelPostedWriteOff,
   deleteWriteOffDraft,
   nextWriteOffNumber,
-  postWriteOffDocument,
+  postWriteOffDocument as postWriteOff,
   saveWriteOffDraft,
   writeOffDisplayNumber,
 } from "../lib/bardoctor/write-offs";
 
 const actor = { accountId: 7, name: "Тестировщик", role: "owner" };
 const now = "2026-08-24T10:00:00.000Z";
+
+const costingReceipts = [
+  { id: "receipt-whiskey", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "whiskey", productName: "Jack Daniel's", amount: 10_000, unit: "ml", costAmount: 1_800, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-whiskey", sourceLineId: "line-whiskey", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+  { id: "receipt-lemon", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "lemon", productName: "Лимон", amount: 3_250, unit: "g", costAmount: 146.25, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-lemon", sourceLineId: "line-lemon", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+] as const;
+
+function postWriteOffDocument(input: Parameters<typeof postWriteOff>[0]) {
+  return postWriteOff({ ...input, stockMovements: input.stockMovements.length ? input.stockMovements : [...costingReceipts] });
+}
 
 function assortment() {
   return {
@@ -28,7 +37,7 @@ function draft(items: unknown[], id = "wo-test") {
   return { id, date: "2026-08-24", location: "Бар", reasonCode: "spoilage", comment: "Тест", items, idempotencyKey: `post:${id}` };
 }
 
-test("single item write-off decreases canonical stock and uses moving-average cost", () => {
+test("single item write-off decreases canonical stock and uses latest-receipt cost", () => {
   const result = postWriteOffDocument({ documents: [], assortment: assortment(), stockMovements: [], venueId: 1, draft: draft([{ productKey: "whiskey", quantity: 1.5, unit: "л" }]), actor, allowNegativeStock: true, now });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -94,7 +103,7 @@ test("idempotent retry does not create a second movement or decrement stock twic
   if (!retry.ok) return;
   assert.equal(retry.idempotent, true);
   assert.equal((retry.assortment.stockBalances as Array<Record<string, unknown>>)[0].current, 9_000);
-  assert.equal(retry.stockMovements.length, 1);
+  assert.equal(retry.stockMovements.filter((movement) => movement.type === "writeoff").length, 1);
 });
 
 test("validation is transaction-safe when a later line is invalid", () => {

@@ -1,9 +1,11 @@
 import { normalizeAccountingCurrency, type AccountingCurrency } from "./currency";
 import { resolveAccountingMoney } from "./accounting-money";
+import { explicitCostStatus, type CostKnowledgeStatus } from "./cost-knowledge";
+import { COST_BASIS_METHOD, resolveCostBasis } from "./cost-basis";
 
 type JsonRecord = Record<string, unknown>;
 
-export const INVENTORY_VALUATION_METHOD = "moving_weighted_average" as const;
+export const INVENTORY_VALUATION_METHOD = COST_BASIS_METHOD;
 
 export type InventoryValuationReason =
   | "negative_stock"
@@ -44,6 +46,7 @@ export type InventoryValuationSummary = {
 
 export type PurchaseLineAccountingCost = {
   known: boolean;
+  costStatus: CostKnowledgeStatus;
   amount: number;
   accountingCurrency: AccountingCurrency | null;
   transactionAmount: number;
@@ -60,6 +63,7 @@ function record(value: unknown): JsonRecord {
 }
 
 function finite(value: unknown): number | null {
+  if (value == null || (typeof value === "string" && value.trim() === "")) return null;
   const parsed = typeof value === "string"
     ? Number(value.replace(/\s/g, "").replace(",", "."))
     : Number(value);
@@ -95,27 +99,13 @@ function reasonFromBalance(balance: JsonRecord): InventoryValuationReason {
   return "missing_cost_basis";
 }
 
-function normalizedStoredValue(
-  balance: JsonRecord,
-  accountingCurrency: AccountingCurrency,
-): number | null {
-  const candidates: Array<[unknown, unknown]> = [
-    [balance.accountingInventoryValue, balance.accountingCurrency],
-    [balance.normalizedInventoryValue, balance.normalizedCostCurrency ?? balance.normalizedCurrency],
-    [balance.reportingInventoryValue, balance.reportingCurrency],
-    [balance.baseInventoryValue, balance.baseCurrency],
-  ];
-  for (const [amountValue, currencyValue] of candidates) {
-    const amount = finite(amountValue);
-    if (amount == null || amount < 0) continue;
-    if (normalizedCurrency(currencyValue) === accountingCurrency) return money(amount);
-  }
-  return null;
-}
-
 function balanceLine(
   balance: JsonRecord,
   accountingCurrency: AccountingCurrency | null,
+  receipts: unknown[],
+  venueId: number,
+  asOf: string,
+  requestedWarehouseId?: string | null,
 ): InventoryValuationLine {
   const key = productKey(balance);
   const name = String(balance.name ?? balance.productName ?? "Позиция без названия").trim().slice(0, 240);
@@ -139,16 +129,15 @@ function balanceLine(
   if (!accountingCurrency) {
     return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "missing_cost_currency" };
   }
-  const storedNormalized = normalizedStoredValue(balance, accountingCurrency);
-  const storedInventoryValue = finite(balance.inventoryValue);
-  const averageUnitCost = positive(balance.averageUnitCost);
-  const derivedValue = storedInventoryValue != null && storedInventoryValue > 0
-    ? money(storedInventoryValue)
-    : averageUnitCost > 0
-      ? money(rawQuantity * averageUnitCost)
-      : 0;
-  const value = storedNormalized ?? derivedValue;
-  if (balance.costNeedsReview === true) {
+  const basis = resolveCostBasis({
+    venueId,
+    warehouseId: (requestedWarehouseId ?? String(balance.warehouseId ?? balance.warehouseExternalId ?? "")) || undefined,
+    nomenclatureItem: { productKey: key, unit },
+    asOf,
+    receipts,
+    accountingCurrency,
+  });
+  if (!basis.known) {
     return {
       productKey: key,
       name,
@@ -157,20 +146,16 @@ function balanceLine(
       status: "unvalued",
       value: 0,
       currency,
-      reason: reasonFromBalance(balance) === "missing_cost_basis"
-        ? "cost_basis_requires_review"
-        : reasonFromBalance(balance),
+      reason: basis.reason === "CURRENCY_MISMATCH"
+        ? "currency_mismatch"
+        : basis.reason === "UNIT_MISMATCH"
+          ? "broken_base_unit"
+          : balance.costNeedsReview === true
+            ? "cost_basis_requires_review"
+            : reasonFromBalance(balance),
     };
   }
-  if (value <= 0) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: reasonFromBalance(balance) };
-  }
-  if (storedNormalized == null && !currency) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "missing_cost_currency" };
-  }
-  if (storedNormalized == null && currency !== accountingCurrency) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "currency_mismatch" };
-  }
+  const value = money(rawQuantity * (basis.value ?? 0));
   return {
     productKey: key,
     name,
@@ -182,10 +167,34 @@ function balanceLine(
   };
 }
 
+function valuationScopes(balance: JsonRecord, requestedWarehouseId?: string | null): JsonRecord[] {
+  const warehouseBalances = record(balance.warehouseBalances);
+  const entries = Object.entries(warehouseBalances).filter(([, value]) => {
+    const row = record(value);
+    return finite(row.current ?? row.quantity ?? row.onHand) !== null;
+  });
+  if (!entries.length) return [balance];
+  const scoped = requestedWarehouseId
+    ? entries.filter(([warehouseId]) => warehouseId === requestedWarehouseId)
+    : entries;
+  return scoped.map(([warehouseId, value]) => {
+    const row = record(value);
+    return {
+      ...balance,
+      ...row,
+      current: row.current ?? row.quantity ?? row.onHand,
+      warehouseId,
+    };
+  });
+}
+
 export function summarizeInventoryValuation(input: {
   balances: unknown;
   accountingCurrency: unknown;
   warehouseId?: string | null;
+  stockMovements?: unknown[];
+  venueId?: number;
+  asOf?: string;
 }): InventoryValuationSummary {
   const accountingCurrency = normalizeAccountingCurrency(input.accountingCurrency);
   const root = record(input.balances);
@@ -196,11 +205,19 @@ export function summarizeInventoryValuation(input: {
       : [];
   const active = source.map(record).filter((balance) => {
     if (balance.archived === true || balance.deleted === true || balance.active === false) return false;
-    if (!input.warehouseId) return true;
+    if (!input.warehouseId || Object.keys(record(balance.warehouseBalances)).length > 0) return true;
     const scope = String(balance.warehouseId ?? balance.warehouseExternalId ?? "");
     return !scope || scope === input.warehouseId;
-  });
-  const lines = active.map((balance) => balanceLine(balance, accountingCurrency));
+  }).flatMap((balance) => valuationScopes(balance, input.warehouseId));
+  const asOf = input.asOf ?? new Date().toISOString();
+  const lines = active.map((balance) => balanceLine(
+    balance,
+    accountingCurrency,
+    input.stockMovements ?? [],
+    input.venueId ?? Number(balance.venueId ?? 0),
+    asOf,
+    input.warehouseId,
+  ));
   const valued = lines.filter((line) => line.status === "valued");
   const unvalued = lines.filter((line) => line.status === "unvalued");
   const zeroStockExcluded = lines.filter((line) => line.status === "excluded_zero_stock").length;
@@ -239,15 +256,27 @@ export function resolvePurchaseLineAccountingCost(input: {
 }): PurchaseLineAccountingCost {
   const document = record(input.document);
   const line = record(input.line);
+  const requestedCostStatus = explicitCostStatus(line);
   const accountingCurrency = normalizeAccountingCurrency(input.accountingCurrency);
   const transactionCurrency = normalizedCurrency(document.currency ?? line.currency);
   const quantity = positive(line.quantity);
-  const transactionAmount = money(positive(line.lineTotal ?? line.total)
-    || positive(line.unitPrice ?? line.price) * quantity);
+  const explicitTotal = finite(line.lineTotal ?? line.total);
+  const explicitUnitPrice = finite(line.unitPrice ?? line.price);
+  const explicitQuantity = finite(line.quantity);
+  const hasExplicitTotal = explicitTotal != null && explicitTotal >= 0;
+  const hasDerivedTotal = explicitUnitPrice != null && explicitUnitPrice >= 0
+    && explicitQuantity != null && explicitQuantity >= 0;
+  const hasTransactionAmount = requestedCostStatus !== "UNKNOWN" && (hasExplicitTotal || hasDerivedTotal);
+  const transactionAmount = money(hasExplicitTotal
+    ? explicitTotal
+    : hasDerivedTotal
+      ? explicitUnitPrice * quantity
+      : 0);
   const unavailable = (
     reason: PurchaseLineAccountingCost["reason"],
   ): PurchaseLineAccountingCost => ({
     known: false,
+    costStatus: "UNKNOWN",
     amount: 0,
     accountingCurrency,
     transactionAmount,
@@ -257,15 +286,16 @@ export function resolvePurchaseLineAccountingCost(input: {
   });
   if (!accountingCurrency) return unavailable("missing_accounting_currency");
   if (!transactionCurrency) return unavailable("missing_document_currency");
+  if (!hasTransactionAmount) return unavailable("missing_cost_basis");
   if (transactionCurrency === accountingCurrency) {
     return {
-      known: transactionAmount > 0,
+      known: true,
+      costStatus: transactionAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: transactionAmount,
       accountingCurrency,
       transactionAmount,
       transactionCurrency,
       source: "same_currency",
-      reason: transactionAmount > 0 ? undefined : "missing_cost_basis",
     };
   }
   const canonical = resolveAccountingMoney({
@@ -283,14 +313,14 @@ export function resolvePurchaseLineAccountingCost(input: {
   });
   if (canonical?.accountingAmount != null) {
     return {
-      known: canonical.accountingAmount > 0,
+      known: true,
+      costStatus: canonical.accountingAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: canonical.accountingAmount,
       accountingCurrency,
       transactionAmount,
       transactionCurrency,
       exchangeRate: canonical.fxRate,
       source: line.accountingLineTotal != null ? "stored_normalized_amount" : "stored_historical_rate",
-      reason: canonical.accountingAmount > 0 ? undefined : "missing_cost_basis",
     };
   }
   const normalizedCandidates: Array<[unknown, unknown]> = [
@@ -300,10 +330,11 @@ export function resolvePurchaseLineAccountingCost(input: {
     [line.baseLineTotal, line.baseCurrency ?? document.baseCurrency],
   ];
   for (const [amountValue, currencyValue] of normalizedCandidates) {
-    const amount = positive(amountValue);
-    if (amount > 0 && normalizedCurrency(currencyValue) === accountingCurrency) {
+    const amount = finite(amountValue);
+    if (amount != null && amount >= 0 && normalizedCurrency(currencyValue) === accountingCurrency) {
       return {
         known: true,
+        costStatus: amount === 0 ? "KNOWN_ZERO" : "KNOWN",
         amount: money(amount),
         accountingCurrency,
         transactionAmount,
@@ -313,9 +344,10 @@ export function resolvePurchaseLineAccountingCost(input: {
     }
   }
   const rate = positive(line.exchangeRateToAccounting ?? document.exchangeRateToAccounting);
-  if (rate > 0 && transactionAmount > 0) {
+  if (rate > 0 && transactionAmount >= 0) {
     return {
       known: true,
+      costStatus: transactionAmount === 0 ? "KNOWN_ZERO" : "KNOWN",
       amount: money(transactionAmount * rate),
       accountingCurrency,
       transactionAmount,

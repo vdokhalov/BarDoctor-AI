@@ -9,6 +9,8 @@ import {
   supplierDebtSummary,
 } from "./purchases";
 import { resolveAccountingMoney } from "./accounting-money";
+import { explicitCostStatus } from "./cost-knowledge";
+import { normalizeBaseUnitCost, type CostBasisStatus } from "./cost-basis";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -38,6 +40,7 @@ export type ProcurementPricePoint = {
   normalizedDisplayPrice: number;
   normalizedDisplayUnit: "л" | "кг" | "шт.";
   lineTotal: number;
+  costStatus: CostBasisStatus;
   supplierId: string;
   supplierName: string;
   currency: string;
@@ -69,6 +72,12 @@ function number(value: unknown, fallback = 0): number {
     ? Number(value.replace(/\s/g, "").replace(",", "."))
     : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function finite(value: unknown): number | null {
+  if (value == null || (typeof value === "string" && value.trim() === "")) return null;
+  const parsed = typeof value === "string" ? Number(value.replace(/\s/g, "").replace(",", ".")) : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function rounded(value: number, digits = 2): number {
@@ -225,12 +234,23 @@ export function procurementPricePoints(
           : ""
       );
       if (!productKey) return;
-      const lineTotal = Math.max(
-        0,
-        number(item.lineTotal) || number(item.unitPrice) * Math.max(0, number(item.quantity)),
-      );
-      if (!(lineTotal > 0)) return;
-      const normalizedUnitPrice = lineTotal / received.amount;
+      const explicitTotal = finite(item.lineTotal ?? item.total);
+      const unitPrice = finite(item.unitPrice ?? item.price);
+      const quantity = finite(item.quantity);
+      const lineTotal = explicitTotal != null && explicitTotal >= 0
+        ? explicitTotal
+        : unitPrice != null && unitPrice >= 0 && quantity != null && quantity >= 0
+          ? unitPrice * quantity
+          : null;
+      const normalized = normalizeBaseUnitCost({
+        baseQuantity: received.amount,
+        totalCost: lineTotal,
+        costStatus: explicitCostStatus(item),
+        currency,
+        baseUnit: received.unit,
+      });
+      if (!normalized.known || normalized.value === null || lineTotal === null) return;
+      const normalizedUnitPrice = normalized.value;
       const display = baseDisplay(received.unit, normalizedUnitPrice);
       points.push({
         id: `${documentId}:${itemId}`,
@@ -250,6 +270,7 @@ export function procurementPricePoints(
         normalizedDisplayPrice: display.price,
         normalizedDisplayUnit: display.unit,
         lineTotal: rounded(lineTotal, 2),
+        costStatus: normalized.status,
         supplierId,
         supplierName,
         currency,

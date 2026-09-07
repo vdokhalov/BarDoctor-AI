@@ -4,6 +4,7 @@ import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/aut
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { EXPENSE_STORE_KEY } from "../../../../lib/bardoctor/purchases";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { closeShiftWithCanonicalWriteOffs } from "../../../../lib/bardoctor/shift-close-write-offs";
 import { WRITE_OFF_STORE_KEY, writeOffDisplayNumber, type WriteOffDocument } from "../../../../lib/bardoctor/write-offs";
 
@@ -107,7 +108,7 @@ async function readStores(database: D1Database, accountId: number) {
   };
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "shifts.manage") || !hasPermission(account, "inventory.manage")) {
@@ -121,6 +122,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "SHIFT_VENUE_MISMATCH", error: "Смена относится к другому заведению" }, { status: 403 });
   }
   const database = getD1();
+  const casSnapshots = await readStoreSnapshots(database, account.id, [REVENUE_STORE_KEY, WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY]);
   const stores = await readStores(database, account.id);
   const date = text(record(body.revenueRecord).date, "", 10);
   if (date && stores.closedMonths.has(date.slice(0, 7))) {
@@ -197,7 +199,7 @@ export async function POST(request: Request): Promise<Response> {
       now,
     }));
   }
-  await database.batch(statements);
+  await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
   return Response.json({
     ok: true,
     idempotent: false,
@@ -211,4 +213,8 @@ export async function POST(request: Request): Promise<Response> {
     warnings: result.warnings,
     stockChanged: result.writeOffDocuments.length > 0,
   }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }
