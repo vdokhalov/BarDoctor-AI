@@ -344,6 +344,7 @@ async function postOnce(request: Request): Promise<Response> {
       const nomenclatureOnly = applyPurchaseToInventory({
         assortment,
         document: updatedDocument,
+        stockMovements,
         accountingCurrency,
         now,
       });

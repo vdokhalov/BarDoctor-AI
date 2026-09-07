@@ -8,6 +8,7 @@ import {
 import { PURCHASE_STOCK_CATEGORIES } from "./purchases";
 import { resolvePurchaseLineAccountingCost } from "./valuation";
 import { explicitCostStatus } from "./cost-knowledge";
+import { COST_BASIS_METHOD, normalizeBaseUnitCost, resolveCostBasis } from "./cost-basis";
 
 export const ASSORTMENT_STORE_KEY = "bd_assortment_v1";
 export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
@@ -71,6 +72,9 @@ export type StockMovement = {
   unit: BaseInventoryUnit;
   costAmount?: number;
   costStatus?: "UNKNOWN" | "KNOWN_ZERO" | "KNOWN";
+  unitCostAmount?: number;
+  costBasisMethod?: typeof COST_BASIS_METHOD;
+  costReviewReason?: string;
   currency?: string;
   transactionCostAmount?: number;
   transactionCostStatus?: "UNKNOWN" | "KNOWN_ZERO" | "KNOWN";
@@ -456,12 +460,35 @@ function valueOfBalance(value: JsonRecord): number {
   return number(value.current) * Math.max(0, number(value.averageUnitCost));
 }
 
-function averageCostOfBalance(value: JsonRecord): number {
-  const stored = Math.max(0, number(value.averageUnitCost));
-  if (stored > 0) return stored;
-  const current = number(value.current);
-  const total = Math.max(0, valueOfBalance(value));
-  return current > 0 && total > 0 ? total / current : 0;
+function projectLatestReceiptCost(input: {
+  balance: JsonRecord;
+  stockMovements: unknown[];
+  venueId: number;
+  asOf: string;
+  accountingCurrency?: unknown;
+}) {
+  const key = text(input.balance.productKey ?? input.balance.key, "", 300);
+  const unit = text(input.balance.unit, "unknown", 20) as BaseInventoryUnit;
+  const basis = resolveCostBasis({
+    venueId: input.venueId,
+    warehouseId: text(input.balance.warehouseId, "", 160) || undefined,
+    nomenclatureItem: { productKey: key, unit },
+    asOf: input.asOf,
+    receipts: input.stockMovements,
+    accountingCurrency: input.accountingCurrency ?? input.balance.accountingCurrency ?? input.balance.currency,
+  });
+  input.balance.averageUnitCost = basis.value ?? 0;
+  input.balance.costStatus = basis.status === "KNOWN_VALUE" ? "KNOWN" : basis.status;
+  input.balance.costNeedsReview = !basis.known || undefined;
+  input.balance.costReviewReason = basis.known ? undefined : basis.reason?.toLocaleLowerCase("en");
+  input.balance.inventoryValue = basis.known
+    ? rounded(Math.max(0, number(input.balance.current)) * (basis.value ?? 0), 2)
+    : number(input.balance.current) <= 0
+      ? 0
+      : Math.max(0, number(input.balance.inventoryValue));
+  input.balance.currency = basis.currency ?? input.balance.currency;
+  input.balance.valuationMethod = COST_BASIS_METHOD;
+  return basis;
 }
 
 function remappedProductKey(value: unknown, aliases: Map<string, string>): string {
@@ -1798,6 +1825,7 @@ export function repairInventoryPurchaseAmounts(input: {
     const restored = applyPurchaseToInventory({
       assortment,
       document: { ...document, items: missingItems },
+      stockMovements,
       now,
     });
     if (!restored.movements.length) continue;
@@ -2413,6 +2441,7 @@ function sourceLineId(item: JsonRecord, index: number): string {
 export function applyPurchaseToInventory(input: {
   assortment: unknown;
   document: unknown;
+  stockMovements?: unknown[];
   accountingCurrency?: unknown;
   now?: string;
 }): {
@@ -2573,7 +2602,6 @@ export function applyPurchaseToInventory(input: {
 
     const previousCurrent = number(previous.current);
     const previousInventoryValue = Math.max(0, valueOfBalance(previous));
-    const previousAverageCost = averageCostOfBalance(previous);
     const previousCurrency = text(previous.currency, accountingCurrency || currency, 12).toUpperCase();
     const resolvedCost = resolvePurchaseLineAccountingCost({
       document,
@@ -2583,40 +2611,24 @@ export function applyPurchaseToInventory(input: {
     const lineCost = resolvedCost.known ? resolvedCost.amount : 0;
     const transactionLineCost = resolvedCost.transactionAmount;
     const nextCurrent = rounded(previousCurrent + received.amount);
-    const existingCurrencyConflict = Boolean(
-      previousCurrent > 0
-      && previousAverageCost > 0
-      && previousCurrency
-      && accountingCurrency
-      && previousCurrency !== accountingCurrency
-    );
+    const existingCurrencyConflict = false;
     const missingIncomingCost = !resolvedCost.known;
-    const previousCostKnownZero = previous.costStatus === "KNOWN_ZERO";
-    const missingExistingCost = previousCurrent > 0
-      && previousAverageCost <= 0
-      && previousInventoryValue <= 0
-      && !previousCostKnownZero;
-    const inheritedReview = previousCurrent > 0 && previous.costNeedsReview === true;
-    const costNeedsReview = existingCurrencyConflict
-      || missingIncomingCost
-      || missingExistingCost
-      || inheritedReview;
+    const costNeedsReview = missingIncomingCost;
     if (existingCurrencyConflict || missingIncomingCost) currencyConflicts += 1;
-    const nextAverageCost = costNeedsReview
-      ? previousAverageCost
-      : nextCurrent > 0
-        ? rounded((previousCurrent * previousAverageCost + lineCost) / nextCurrent, 6)
-        : 0;
+    const normalizedIncoming = normalizeBaseUnitCost({
+      baseQuantity: received.amount,
+      totalCost: resolvedCost.known ? lineCost : null,
+      costStatus: resolvedCost.costStatus,
+      currency: accountingCurrency || currency,
+      baseUnit: received.unit,
+    });
+    const nextUnitCost = normalizedIncoming.value ?? 0;
     const costReviewReason = existingCurrencyConflict
       ? "currency_mismatch"
       : missingIncomingCost
         ? resolvedCost.reason ?? "missing_cost_basis"
-        : missingExistingCost
-          ? "missing_cost_basis"
-        : inheritedReview
-          ? text(previous.costReviewReason, "cost_basis_requires_review", 80)
-          : "";
-    if (existingCurrencyConflict || missingIncomingCost || missingExistingCost) {
+        : "";
+    if (existingCurrencyConflict || missingIncomingCost) {
       valuationIssues.push({
         id: itemId,
         name,
@@ -2643,16 +2655,18 @@ export function applyPurchaseToInventory(input: {
       current: nextCurrent,
       onOrder: Math.max(0, rounded(number(previous.onOrder) - received.amount)),
       packageAmount: hasMultiplePackageSizes ? 0 : packageDetails.amount,
-      averageUnitCost: nextAverageCost,
-      costStatus: costNeedsReview ? "UNKNOWN" : nextAverageCost === 0 ? "KNOWN_ZERO" : "KNOWN",
+      // Transitional persisted aliases: new operational readers use
+      // CostBasisResolver over receipt movements, never this mutable field.
+      averageUnitCost: nextUnitCost,
+      costStatus: costNeedsReview ? "UNKNOWN" : nextUnitCost === 0 ? "KNOWN_ZERO" : "KNOWN",
       inventoryValue: costNeedsReview
         ? rounded(previousInventoryValue, 2)
-        : rounded(Math.max(0, nextCurrent) * nextAverageCost, 2),
+        : rounded(Math.max(0, nextCurrent) * nextUnitCost, 2),
       currency: costNeedsReview
         ? previousCurrency || accountingCurrency || currency
         : accountingCurrency || currency,
       accountingCurrency: accountingCurrency || undefined,
-      valuationMethod: "moving_weighted_average",
+      valuationMethod: COST_BASIS_METHOD,
       lastPurchasePrice: Math.max(0, number(item.unitPrice)
         || transactionLineCost / Math.max(1, number(item.quantity))),
       lastPurchaseAccountingCost: resolvedCost.known ? lineCost : undefined,
@@ -2676,6 +2690,7 @@ export function applyPurchaseToInventory(input: {
     }
     movements.push({
       id: crypto.randomUUID(),
+      venueId: number(document.venueId, 0) || undefined,
       type: "receipt",
       date,
       productKey,
@@ -2684,17 +2699,35 @@ export function applyPurchaseToInventory(input: {
       unit: received.unit,
       costAmount: resolvedCost.known ? lineCost : undefined,
       costStatus: resolvedCost.costStatus,
+      unitCostAmount: normalizedIncoming.value ?? undefined,
+      costBasisMethod: COST_BASIS_METHOD,
+      costReviewReason: resolvedCost.known ? undefined : resolvedCost.reason,
       currency: resolvedCost.known ? accountingCurrency || currency || undefined : undefined,
       transactionCostAmount: explicitCostStatus(item) !== "UNKNOWN" ? transactionLineCost : undefined,
       transactionCostStatus: explicitCostStatus(item),
       transactionCurrency: currency || undefined,
       exchangeRateToAccounting: resolvedCost.exchangeRate,
+      warehouseId: text(document.warehouseExternalId ?? document.warehouseId, "", 160) || undefined,
       sourceDocumentId: documentId,
       sourceLineId: itemId,
       createdAt: now,
       status: "active",
     });
   });
+
+  // A newly confirmed receipt can be backdated. Re-project every touched
+  // balance from the actual latest applicable active receipt instead of from
+  // command order or a moving average.
+  const allReceipts = [...movements, ...array(input.stockMovements)] as StockMovement[];
+  const venueId = number(document.venueId, 0);
+  for (const movement of movements) {
+    const balance = indexedBalances.get(movement.productKey);
+    if (!balance) continue;
+    const basis = projectLatestReceiptCost({ balance, stockMovements: allReceipts, venueId, asOf: now, accountingCurrency: accountingCurrency || currency });
+    if (!basis.known && basis.sourceDocumentId === movement.sourceDocumentId) {
+      balance.costReviewReason = movement.costReviewReason ?? balance.costReviewReason;
+    }
+  }
 
   let linkedIngredients = 0;
   for (const recipe of parts.recipes) {
@@ -2793,6 +2826,9 @@ function movementRecord(value: unknown): StockMovement | null {
 export function applyInventoryCount(input: {
   assortment: unknown;
   snapshot: unknown;
+  stockMovements?: unknown[];
+  venueId?: number;
+  accountingCurrency?: unknown;
   now?: string;
 }): {
   assortment: JsonRecord;
@@ -2850,10 +2886,18 @@ export function applyInventoryCount(input: {
     const expected = rounded(number(balance.current));
     const nextActual = rounded(actual);
     const difference = rounded(nextActual - expected);
-    const averageUnitCost = averageCostOfBalance(balance);
-    const expectedValue = rounded(Math.max(0, expected) * averageUnitCost, 2);
-    const actualValue = rounded(nextActual * averageUnitCost, 2);
-    const differenceValue = rounded(actualValue - expectedValue, 2);
+    const basis = resolveCostBasis({
+      venueId: input.venueId ?? number(balance.venueId, 0),
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: { productKey, unit },
+      asOf: date,
+      receipts: input.stockMovements ?? [],
+      accountingCurrency: input.accountingCurrency ?? balance.accountingCurrency ?? balance.currency,
+    });
+    const unitCost = basis.value ?? 0;
+    const expectedValue = basis.known ? rounded(Math.max(0, expected) * unitCost, 2) : 0;
+    const actualValue = basis.known ? rounded(nextActual * unitCost, 2) : 0;
+    const differenceValue = basis.known ? rounded(actualValue - expectedValue, 2) : 0;
     const section = text(
       requested.section,
       text(balance.section ?? balance.area, "Прочее", 80),
@@ -2871,7 +2915,7 @@ export function applyInventoryCount(input: {
       expected,
       actual: nextActual,
       difference,
-      averageUnitCost,
+      averageUnitCost: unitCost,
       expectedValue,
       actualValue,
       differenceValue,
@@ -2880,7 +2924,19 @@ export function applyInventoryCount(input: {
     sections[section] = rounded((sections[section] ?? 0) + actualValue, 2);
 
     balance.current = nextActual;
-    balance.inventoryValue = actualValue;
+    const currentBasis = resolveCostBasis({
+      venueId: input.venueId ?? number(balance.venueId, 0),
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: { productKey, unit },
+      asOf: now,
+      receipts: input.stockMovements ?? [],
+      accountingCurrency: input.accountingCurrency ?? balance.accountingCurrency ?? balance.currency,
+    });
+    balance.averageUnitCost = currentBasis.value ?? 0;
+    balance.inventoryValue = currentBasis.known ? rounded(nextActual * (currentBasis.value ?? 0), 2) : number(balance.inventoryValue);
+    balance.costStatus = currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status;
+    balance.costNeedsReview = !currentBasis.known || undefined;
+    balance.valuationMethod = COST_BASIS_METHOD;
     balance.lastInventoryAt = date;
     balance.lastInventoryDocumentId = snapshotId;
     balance.checkedAt = now;
@@ -2895,8 +2951,11 @@ export function applyInventoryCount(input: {
         productName,
         amount: difference,
         unit,
-        costAmount: differenceValue,
-        currency: text(balance.currency, "", 12) || undefined,
+        costAmount: basis.known ? differenceValue : undefined,
+        costStatus: basis.status === "KNOWN_VALUE" ? "KNOWN" : basis.status,
+        currency: basis.currency,
+        venueId: (input.venueId ?? number(balance.venueId, 0)) || undefined,
+        warehouseId: text(balance.warehouseId, "", 160) || undefined,
         sourceDocumentId: snapshotId,
         sourceLineId: lineId,
         createdAt: now,
@@ -3018,6 +3077,17 @@ export function revisePurchaseInInventory(input: {
       }
       balance.updatedAt = now;
     }
+    const affected = new Set(previousReceipts.map((movement) => movement.productKey));
+    for (const balance of parts.balances) {
+      if (!affected.has(text(balance.productKey ?? balance.key, "", 300))) continue;
+      projectLatestReceiptCost({
+        balance,
+        stockMovements: nextMovements,
+        venueId: number(next.venueId ?? previous.venueId, 0),
+        asOf: now,
+        accountingCurrency: input.accountingCurrency ?? next.accountingCurrency ?? next.currency,
+      });
+    }
     parts.root.stockBalances = parts.balances;
     parts.root.recipes = parts.recipes;
     parts.root.updatedAt = now;
@@ -3078,10 +3148,8 @@ export function revisePurchaseInInventory(input: {
       };
     }
     const current = number(balance.current);
-    const currentValue = number(balance.inventoryValue, current * Math.max(0, number(balance.averageUnitCost)));
     const nextCurrent = rounded(current - movement.amount);
-    const nextValue = rounded(currentValue - Math.max(0, number(movement.costAmount)), 2);
-    if (nextCurrent < -0.001 || nextValue < -0.01) {
+    if (nextCurrent < -0.001) {
       return {
         ok: false,
         code: "PURCHASE_REVERSAL_INVALID",
@@ -3089,8 +3157,6 @@ export function revisePurchaseInInventory(input: {
       };
     }
     balance.current = Math.max(0, nextCurrent);
-    balance.inventoryValue = Math.max(0, nextValue);
-    balance.averageUnitCost = nextCurrent > 0 ? rounded(Math.max(0, nextValue) / nextCurrent, 6) : 0;
     balance.updatedAt = now;
   }
   parts.root.stockBalances = parts.balances;
@@ -3100,6 +3166,7 @@ export function revisePurchaseInInventory(input: {
   const reapplied = applyPurchaseToInventory({
     assortment: parts.root,
     document: next,
+    stockMovements: allMovements.filter((movement) => !(movement.type === "receipt" && movement.sourceDocumentId === previousId)),
     accountingCurrency: input.accountingCurrency,
     now,
   });
@@ -3121,15 +3188,28 @@ export function revisePurchaseInInventory(input: {
     reversalReason: input.reversalReason
       ?? "Закупочная накладная исправлена и проведена повторно",
   }));
+  const finalMovements = [
+    ...reapplied.movements,
+    ...cancelledPreviousReceipts,
+    ...movementHistory,
+    ...retained,
+  ].slice(0, 20_000) as StockMovement[];
+  const finalParts = assortmentParts(reapplied.assortment);
+  for (const balance of finalParts.balances) {
+    if (!affectedKeys.has(text(balance.productKey ?? balance.key, "", 300))) continue;
+    projectLatestReceiptCost({
+      balance,
+      stockMovements: finalMovements,
+      venueId: number(next.venueId ?? previous.venueId, 0),
+      asOf: now,
+      accountingCurrency: input.accountingCurrency ?? next.accountingCurrency ?? next.currency,
+    });
+  }
+  finalParts.root.stockBalances = finalParts.balances;
   return {
     ok: true,
-    assortment: reapplied.assortment,
-    movements: [
-      ...reapplied.movements,
-      ...cancelledPreviousReceipts,
-      ...movementHistory,
-      ...retained,
-    ].slice(0, 20_000) as StockMovement[],
+    assortment: finalParts.root,
+    movements: finalMovements,
     summary: reapplied.summary,
   };
 }
@@ -3187,6 +3267,9 @@ export function removePurchaseFromInventory(input: {
 export function applySalesToInventory(input: {
   assortment: unknown;
   salesDocument: unknown;
+  stockMovements?: unknown[];
+  venueId?: number;
+  accountingCurrency?: unknown;
   now?: string;
 }): {
   assortment: JsonRecord;
@@ -3288,11 +3371,30 @@ export function applySalesToInventory(input: {
     for (const prepared of preparedIngredients) {
       const { ingredient, productKey, amount, unit: baseUnit, balance: previous } = prepared;
       const nextCurrent = rounded(number(previous.current) - amount);
-      const averageUnitCost = averageCostOfBalance(previous);
+      const basis = resolveCostBasis({
+        venueId: input.venueId ?? number(previous.venueId, 0),
+        warehouseId: text(previous.warehouseId, "", 160) || undefined,
+        nomenclatureItem: { productKey, unit: baseUnit },
+        asOf: date,
+        receipts: input.stockMovements ?? [],
+        accountingCurrency: input.accountingCurrency ?? previous.accountingCurrency ?? previous.currency,
+      });
+      const currentBasis = resolveCostBasis({
+        venueId: input.venueId ?? number(previous.venueId, 0),
+        warehouseId: text(previous.warehouseId, "", 160) || undefined,
+        nomenclatureItem: { productKey, unit: baseUnit },
+        asOf: now,
+        receipts: input.stockMovements ?? [],
+        accountingCurrency: input.accountingCurrency ?? previous.accountingCurrency ?? previous.currency,
+      });
       const next = {
         ...previous,
         current: nextCurrent,
-        inventoryValue: rounded(Math.max(0, nextCurrent) * averageUnitCost, 2),
+        averageUnitCost: currentBasis.value ?? 0,
+        inventoryValue: currentBasis.known ? rounded(Math.max(0, nextCurrent) * (currentBasis.value ?? 0), 2) : number(previous.inventoryValue),
+        costStatus: currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status,
+        costNeedsReview: !currentBasis.known || undefined,
+        valuationMethod: COST_BASIS_METHOD,
         lastSaleAt: date,
         updatedAt: now,
       };
@@ -3307,9 +3409,11 @@ export function applySalesToInventory(input: {
         productName: text(ingredient.name, "Ингредиент"),
         amount: -amount,
         unit: baseUnit,
-        costAmount: previous.costStatus === "KNOWN_ZERO" || averageUnitCost > 0 ? rounded(amount * averageUnitCost, 2) : undefined,
-        costStatus: previous.costStatus === "KNOWN_ZERO" ? "KNOWN_ZERO" : averageUnitCost > 0 ? "KNOWN" : "UNKNOWN",
-        currency: text(previous.currency, "", 12) || undefined,
+        costAmount: basis.known ? rounded(amount * (basis.value ?? 0), 2) : undefined,
+        costStatus: basis.status === "KNOWN_VALUE" ? "KNOWN" : basis.status,
+        currency: basis.currency,
+        venueId: (input.venueId ?? number(previous.venueId, 0)) || undefined,
+        warehouseId: text(previous.warehouseId, "", 160) || undefined,
         sourceDocumentId: documentId,
         sourceLineId: saleId,
         menuItemId,

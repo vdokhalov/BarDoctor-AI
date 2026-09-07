@@ -9,7 +9,7 @@ test("valuation diagnostics are read-only, venue-scoped and never cached", async
   const route = await read("app/api/inventory/valuation/route.ts");
   assert.match(route, /authenticateRequest\(request\)/);
   assert.match(route, /account_id = \?/);
-  assert.match(route, /bind\(account\.id, ASSORTMENT_STORE_KEY\)/);
+  assert.match(route, /bind\(account\.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY\)/);
   assert.match(route, /venueId: account\.venueId/);
   assert.match(route, /accountingCurrencyFromProfile\(profile\)/);
   assert.match(route, /"Cache-Control": "no-store"/);

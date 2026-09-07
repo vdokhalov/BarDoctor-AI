@@ -6,7 +6,7 @@ import {
 } from "./inventory";
 import { canonicalTechCardForOwner } from "./tech-card-reconciliation";
 import { resolveConsumptionMode } from "./consumption-mode";
-import { costKnowledge } from "./cost-knowledge";
+import { COST_BASIS_METHOD, resolveCostBasis, type CostBasisStatus } from "./cost-basis";
 import { resolveReadyProductConsumption } from "./menu-sale-size";
 
 export const SALES_BATCH_STORE_KEY = "bd_sales_batches";
@@ -63,6 +63,11 @@ export type RecipeIngredientSnapshot = {
   warehouseId: string;
   unitCost: number | null;
   totalCost: number | null;
+  costStatus?: CostBasisStatus;
+  costBasisMethod?: typeof COST_BASIS_METHOD;
+  costSourceDocumentId?: string;
+  costSourceLineId?: string;
+  costEffectiveDate?: string;
   currency?: string;
   conversion: {
     inputQuantity: number;
@@ -477,6 +482,8 @@ function snapshotFor(input: {
   venueId: number;
   routes: SalesWarehouseRoute[];
   warehouses: JsonRecord[];
+  stockMovements: unknown[];
+  asOf: string;
   now: string;
 }): { snapshot?: RecipeSnapshot; errorCode?: string; errorMessage?: string; cost: number | null; currency?: string } {
   const consumptionMode = resolveConsumptionMode(input.menuItem, input.assortment);
@@ -523,12 +530,19 @@ function snapshotFor(input: {
         cost: null,
       };
     }
-    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
-    const unitCost = knownCost.known ? rounded(knownCost.value, 6) : null;
+    const basis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: warehouse.id,
+      nomenclatureItem: { productKey: readyProduct.productKey, unit: readyProduct.baseUnit },
+      asOf: input.asOf,
+      receipts: input.stockMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    const unitCost = basis.known ? rounded(basis.value ?? 0, 6) : null;
     const baseQuantityTotal = rounded(readyProduct.quantityPerSale * input.quantity);
     const currency = unitCost === null
       ? undefined
-      : text(balance.currency, "", 12).toUpperCase() || undefined;
+      : basis.currency;
     const totalCost = unitCost === null ? null : money(unitCost * baseQuantityTotal);
     return {
       snapshot: {
@@ -555,6 +569,11 @@ function snapshotFor(input: {
           warehouseId: warehouse.id,
           unitCost,
           totalCost,
+          costStatus: basis.status,
+          costBasisMethod: COST_BASIS_METHOD,
+          costSourceDocumentId: basis.sourceDocumentId,
+          costSourceLineId: basis.sourceLineId,
+          costEffectiveDate: basis.effectiveDate,
           currency,
           conversion: {
             inputQuantity: 1,
@@ -602,8 +621,15 @@ function snapshotFor(input: {
     if (warehouse.id !== "__venue__" && Object.keys(warehouseBalances).length > 0 && !(warehouse.id in warehouseBalances)) {
       return { errorCode: "WAREHOUSE_MAPPING_REQUIRED", errorMessage: `Позиция «${text(balance.name, productKey)}» не заведена на выбранном складе`, cost: null };
     }
-    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
-    const unitCost = knownCost.known ? rounded(knownCost.value, 6) : null;
+    const basis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: warehouse.id,
+      nomenclatureItem: { productKey, unit: base.unit },
+      asOf: input.asOf,
+      receipts: input.stockMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    const unitCost = basis.known ? rounded(basis.value ?? 0, 6) : null;
     const baseQuantityTotal = rounded(base.amount * input.quantity);
     snapshots.push({
       ingredientId: text(ingredient.id, `ingredient:${index}`, 160),
@@ -618,7 +644,12 @@ function snapshotFor(input: {
       warehouseId: warehouse.id,
       unitCost,
       totalCost: unitCost === null ? null : money(unitCost * baseQuantityTotal),
-      currency: unitCost === null ? undefined : text(balance.currency, "", 12).toUpperCase() || undefined,
+      currency: unitCost === null ? undefined : basis.currency,
+      costStatus: basis.status,
+      costBasisMethod: COST_BASIS_METHOD,
+      costSourceDocumentId: basis.sourceDocumentId,
+      costSourceLineId: basis.sourceLineId,
+      costEffectiveDate: basis.effectiveDate,
       conversion: {
         inputQuantity: numeric(ingredient.quantity),
         inputUnit: text(ingredient.unit, "", 40),
@@ -660,6 +691,8 @@ function prepareLine(input: {
   mappings: SalesNameMapping[];
   routes: SalesWarehouseRoute[];
   warehouses: JsonRecord[];
+  stockMovements: unknown[];
+  asOf: string;
   now: string;
   existing?: SalesBatchLine;
 }): SalesBatchLine {
@@ -709,6 +742,8 @@ function prepareLine(input: {
     venueId: input.venueId,
     routes: input.routes,
     warehouses: input.warehouses,
+    stockMovements: input.stockMovements,
+    asOf: input.asOf,
     now: input.now,
   });
   if (!prepared.snapshot) {
@@ -785,6 +820,7 @@ export function createOrUpdateSalesBatch(input: {
   mappings: unknown[];
   warehouseRoutes: unknown[];
   warehouses?: unknown[];
+  stockMovements?: unknown[];
   venueId: number;
   actor: SalesBatch["createdBy"];
   now?: string;
@@ -821,8 +857,10 @@ export function createOrUpdateSalesBatch(input: {
     source: currentSource,
     mappings: currentMappings,
     routes,
-    warehouses,
-    now,
+      warehouses,
+      stockMovements: input.stockMovements ?? [],
+      asOf: businessDate,
+      now,
     existing: existingById.get(text(line.id, "", 160)),
   }));
   for (const posted of existing?.lines.filter((line) => line.processingStatus === "POSTED") ?? []) {
@@ -868,7 +906,10 @@ function updateWarehouseBalance(balance: JsonRecord, warehouseId: string, amount
   const warehouseBalances = record(balance.warehouseBalances);
   if (warehouseId !== "__venue__" && Object.keys(warehouseBalances).length > 0) {
     const row = record(warehouseBalances[warehouseId]);
-    row.current = rounded(numeric(row.current) + amountDelta);
+    const rowCurrent = numeric(row.current ?? row.quantity ?? row.onHand);
+    row.current = rounded(rowCurrent + amountDelta);
+    if ("quantity" in row) row.quantity = row.current;
+    if ("onHand" in row) row.onHand = row.current;
     if (costDelta !== null) row.inventoryValue = money(Math.max(0, numeric(row.inventoryValue) + costDelta));
     row.updatedAt = now;
     warehouseBalances[warehouseId] = row;
@@ -921,6 +962,7 @@ export function postSalesBatch(input: {
     mappings: input.mappings,
     warehouseRoutes: input.warehouseRoutes,
     warehouses: input.warehouses,
+    stockMovements: input.stockMovements,
     venueId: input.venueId,
     actor: input.actor,
     now,
@@ -950,7 +992,20 @@ export function postSalesBatch(input: {
       if (!balance) return { ok: false, code: "INGREDIENT_NOMENCLATURE_REQUIRED", error: `Позиция «${ingredient.name}» больше не найдена на складе` };
       const movementId = crypto.randomUUID();
       const costAmount = ingredient.totalCost === null ? undefined : -ingredient.totalCost;
-      updateWarehouseBalance(balance, ingredient.warehouseId, -ingredient.baseQuantityTotal, costAmount ?? null, now);
+      updateWarehouseBalance(balance, ingredient.warehouseId, -ingredient.baseQuantityTotal, null, now);
+      const currentBasis = resolveCostBasis({
+        venueId: input.venueId,
+        warehouseId: ingredient.warehouseId,
+        nomenclatureItem: { productKey: ingredient.productKey, unit: ingredient.baseUnit },
+        asOf: now,
+        receipts: currentMovements,
+        accountingCurrency: balance.accountingCurrency ?? balance.currency,
+      });
+      balance.averageUnitCost = currentBasis.value ?? 0;
+      balance.inventoryValue = currentBasis.known ? money(Math.max(0, numeric(balance.current)) * (currentBasis.value ?? 0)) : numeric(balance.current) <= 0 ? 0 : numeric(balance.inventoryValue);
+      balance.costStatus = currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status;
+      balance.costNeedsReview = !currentBasis.known || undefined;
+      balance.valuationMethod = COST_BASIS_METHOD;
       const movement: StockMovement = {
         id: movementId,
         venueId: input.venueId,
@@ -962,6 +1017,7 @@ export function postSalesBatch(input: {
         amount: -ingredient.baseQuantityTotal,
         unit: ingredient.baseUnit,
         costAmount,
+        costStatus: ingredient.costStatus === "KNOWN_ZERO" ? "KNOWN_ZERO" : ingredient.costStatus === "KNOWN_VALUE" ? "KNOWN" : "UNKNOWN",
         currency: ingredient.currency,
         warehouseId: ingredient.warehouseId,
         sourceDocumentId: batch.id,
@@ -1044,7 +1100,20 @@ export function reverseSalesBatch(input: {
     if (!balance) return { ok: false, code: "INGREDIENT_NOMENCLATURE_REQUIRED", error: `Нельзя сторнировать: «${original.productName}» отсутствует в canonical Номенклатуре` };
     const amount = Math.abs(original.amount);
     const cost = original.costAmount == null ? null : Math.abs(original.costAmount);
-    updateWarehouseBalance(balance, original.warehouseId ?? "__venue__", amount, cost, now);
+    updateWarehouseBalance(balance, original.warehouseId ?? "__venue__", amount, null, now);
+    const currentBasis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: original.warehouseId,
+      nomenclatureItem: { productKey: original.productKey, unit: original.unit },
+      asOf: now,
+      receipts: currentMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    balance.averageUnitCost = currentBasis.value ?? 0;
+    balance.inventoryValue = currentBasis.known ? money(Math.max(0, numeric(balance.current)) * (currentBasis.value ?? 0)) : numeric(balance.current) <= 0 ? 0 : numeric(balance.inventoryValue);
+    balance.costStatus = currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status;
+    balance.costNeedsReview = !currentBasis.known || undefined;
+    balance.valuationMethod = COST_BASIS_METHOD;
     reversals.push({
       ...original,
       id: crypto.randomUUID(),

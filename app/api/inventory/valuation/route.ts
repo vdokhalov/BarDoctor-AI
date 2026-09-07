@@ -2,10 +2,10 @@ import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { accountingCurrencyFromProfile } from "../../../../lib/bardoctor/currency";
-import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
+import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { summarizeInventoryValuation } from "../../../../lib/bardoctor/valuation";
 
-type StoreRow = { data_json: string };
+type StoreRow = { store_key: string; data_json: string };
 
 function json(value: string | undefined): unknown {
   if (!value) return {};
@@ -22,12 +22,12 @@ export async function GET(request: Request): Promise<Response> {
   if (!hasPermission(account, "inventory.view")) {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать склад" }, { status: 403 });
   }
-  const [row] = (await getD1().prepare(`
-    SELECT data_json
+  const rows = (await getD1().prepare(`
+    SELECT store_key, data_json
     FROM domain_data
-    WHERE account_id = ? AND store_key = ?
-    LIMIT 1
-  `).bind(account.id, ASSORTMENT_STORE_KEY).all<StoreRow>()).results;
+    WHERE account_id = ? AND store_key IN (?, ?)
+  `).bind(account.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY).all<StoreRow>()).results;
+  const stores = new Map(rows.map((row) => [row.store_key, row.data_json]));
   let profile: unknown = null;
   try {
     profile = account.restaurantJson ? JSON.parse(account.restaurantJson) : null;
@@ -35,8 +35,11 @@ export async function GET(request: Request): Promise<Response> {
     profile = null;
   }
   const warehouseId = new URL(request.url).searchParams.get("warehouseId");
+  const movementData = json(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const summary = summarizeInventoryValuation({
-    balances: json(row?.data_json),
+    balances: json(stores.get(ASSORTMENT_STORE_KEY)),
+    stockMovements: Array.isArray(movementData) ? movementData : [],
+    venueId: account.venueId,
     accountingCurrency: accountingCurrencyFromProfile(profile),
     warehouseId,
   });

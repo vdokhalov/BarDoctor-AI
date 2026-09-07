@@ -348,6 +348,7 @@ async function postOnce(request: Request): Promise<Response> {
     }
     let document = createInventoryCountDocument({
       assortment: stores.assortment,
+      stockMovements: stores.movements,
       venueId: account.venueId,
       sequenceNumber: nextInventoryCountNumber(snapshots, account.venueId),
       scope: allowedScope as InventoryCountScope,
@@ -576,7 +577,7 @@ async function postOnce(request: Request): Promise<Response> {
       error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.`,
     }, { status: 423 });
   }
-  const conflicts = inventoryCountConflicts({ document: existing, assortment: stores.assortment });
+  const conflicts = inventoryCountConflicts({ document: existing, assortment: stores.assortment, stockMovements: stores.movements });
   if (conflicts.length) {
     return Response.json({
       ok: false,
@@ -588,6 +589,9 @@ async function postOnce(request: Request): Promise<Response> {
 
   const result = applyInventoryCount({
     assortment: stores.assortment,
+    stockMovements: stores.movements,
+    venueId: account.venueId,
+    accountingCurrency,
     snapshot: {
       id: existing.id,
       date: existing.date,

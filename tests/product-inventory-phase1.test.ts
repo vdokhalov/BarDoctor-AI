@@ -179,7 +179,12 @@ test("explicit zero cost remains known zero while missing cost remains unknown",
   assert.equal(missing.costStatus, "UNKNOWN");
   assert.equal(missing.items[0].costStatus, "UNKNOWN");
   assert.equal(normalizePurchaseDocument({ documentType: "invoice", items: [{ name: "Paid", quantity: 1, lineTotal: 10, costStatus: "KNOWN_ZERO" }] }, "mismatch").items[0].costStatus, "KNOWN");
-  const valuation = summarizeInventoryValuation({ balances: [{ productKey: "free", name: "Free", current: 2, unit: "pcs", averageUnitCost: 0, inventoryValue: 0, costStatus: "KNOWN_ZERO", currency: "RUB" }], accountingCurrency: "RUB" });
+  const valuation = summarizeInventoryValuation({
+    balances: [{ productKey: "free", name: "Free", current: 2, unit: "pcs", averageUnitCost: 0, inventoryValue: 0, costStatus: "KNOWN_ZERO", currency: "RUB" }],
+    accountingCurrency: "RUB",
+    venueId: 1,
+    stockMovements: [{ id: "free-receipt", type: "receipt", status: "active", venueId: 1, productKey: "free", amount: 2, unit: "pcs", costAmount: 0, costStatus: "KNOWN_ZERO", currency: "RUB", businessDate: "2026-08-01" }],
+  });
   assert.equal(valuation.status, "full");
   assert.equal(valuation.total, 0);
 });

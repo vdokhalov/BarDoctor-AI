@@ -487,6 +487,7 @@ async function postOnce(request: Request): Promise<Response> {
     ? applyPurchaseToInventory({
       assortment,
       document: confirmedDocument,
+      stockMovements,
       accountingCurrency,
       now,
     })

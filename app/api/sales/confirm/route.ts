@@ -123,6 +123,7 @@ async function postOnce(request: Request): Promise<Response> {
     mappings,
     warehouseRoutes: routes,
     warehouses,
+    stockMovements,
     venueId: account.venueId,
     actor,
     now,

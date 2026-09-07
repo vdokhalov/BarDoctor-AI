@@ -286,6 +286,12 @@
     if (url.indexOf("/api/restaurants/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, restaurant: profile }), { status: 200, headers: jsonHeaders }));
     if (url.indexOf("/api/users/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: "QA", lastName: "Assortment", email: email, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows } }), { status: 200, headers: jsonHeaders }));
     if (url.indexOf("/api/migrate") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, imported: [], skipped: [] }), { status: 200, headers: jsonHeaders }));
+    if (url.indexOf("/api/store/bd_purchase_documents") >= 0) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, data: purchases, updatedAt: "2026-08-12T12:00:00.000Z", source: "server_d1", authoritative: true, legacyImportRequired: false }), { status: 200, headers: jsonHeaders }));
+    }
+    if (url.indexOf("/api/store/bd_sales_documents") >= 0) {
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, data: sales, updatedAt: "2026-08-12T12:00:00.000Z", source: "server_d1", authoritative: true, legacyImportRequired: false }), { status: 200, headers: jsonHeaders }));
+    }
     if (/\/api\/store(?:\?|$)/.test(url)) {
       var now = "2026-08-12T12:00:00.000Z";
       return Promise.resolve(new Response(JSON.stringify({ ok: true, entries: { bd_assortment_v1: { data: catalog, updatedAt: now }, bd_purchase_documents: { data: purchases, updatedAt: now }, bd_sales_documents: { data: sales, updatedAt: now }, bd_finance_revenue: { data: revenues, updatedAt: now } } }), { status: 200, headers: jsonHeaders }));

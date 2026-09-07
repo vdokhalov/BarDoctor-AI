@@ -5,7 +5,7 @@ import {
   type BaseInventoryUnit,
   type StockMovement,
 } from "./inventory";
-import { costKnowledge } from "./cost-knowledge";
+import { COST_BASIS_METHOD, resolveCostBasis, type CostBasisStatus } from "./cost-basis";
 
 export const WRITE_OFF_STORE_KEY = "bd_inventory_writeoffs";
 
@@ -40,6 +40,11 @@ export type WriteOffItem = {
   baseUnit: BaseInventoryUnit;
   unitCost: number | null;
   totalCost: number | null;
+  costBasisStatus?: CostBasisStatus;
+  costBasisMethod?: typeof COST_BASIS_METHOD;
+  costSourceDocumentId?: string;
+  costSourceLineId?: string;
+  costEffectiveDate?: string;
   currency?: string;
   costStatus: "valued" | "unvalued";
   costIssue?: string;
@@ -186,14 +191,6 @@ function productKey(value: JsonRecord): string {
   return text(value.productKey ?? value.key ?? value.nomenclatureItemId, "", 300);
 }
 
-function balanceAverageCost(value: JsonRecord): number | null {
-  const stored = costKnowledge(value.averageUnitCost, value.costStatus, value.costNeedsReview);
-  if (stored.known) return stored.value;
-  const current = number(value.current);
-  const total = number(value.inventoryValue);
-  return current > 0 && total > 0 ? total / current : null;
-}
-
 function packageLabels(balance: JsonRecord): string[] {
   const values = [
     ...array(balance.packageOptions).map((value) => text(record(value).label ?? value, "", 120)),
@@ -252,6 +249,7 @@ export function writeOffDocuments(values: unknown[], venueId: number): WriteOffD
 export function saveWriteOffDraft(input: {
   documents: unknown[];
   assortment: unknown;
+  stockMovements?: unknown[];
   venueId: number;
   draft: WriteOffDraftInput;
   actor: { accountId: number; name: string; role: string };
@@ -284,9 +282,16 @@ export function saveWriteOffDraft(input: {
     const balanceUnit = text(balance.unit, "unknown", 20) as BaseInventoryUnit;
     if (converted.unit !== balanceUnit) return { ok: false, code: "WRITE_OFF_UNIT_INVALID", error: `Единица «${text(balance.name, "Товар") }» не совпадает со складской` };
     const current = number(balance.current);
-    const averageCost = balanceAverageCost(balance);
-    const knownCost = averageCost !== null && averageCost >= 0 && Boolean(text(balance.currency, "", 12));
-    const totalCost = knownCost ? money(converted.amount * averageCost) : null;
+    const basis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: { productKey: resolvedKey, unit: converted.unit },
+      asOf: date,
+      receipts: input.stockMovements ?? [],
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    const knownCost = basis.known;
+    const totalCost = knownCost ? money(converted.amount * (basis.value ?? 0)) : null;
     items.push({
       id: text(line.id, crypto.randomUUID(), 100),
       nomenclatureItemId: resolvedKey,
@@ -298,11 +303,16 @@ export function saveWriteOffDraft(input: {
       packagingLabel: converted.packagingLabel,
       baseQuantity: converted.amount,
       baseUnit: converted.unit,
-      unitCost: knownCost ? rounded(averageCost, 6) : null,
+      unitCost: knownCost ? rounded(basis.value ?? 0, 6) : null,
       totalCost,
-      currency: knownCost ? text(balance.currency, "", 12).toUpperCase() : undefined,
+      currency: knownCost ? basis.currency : undefined,
+      costBasisStatus: basis.status,
+      costBasisMethod: COST_BASIS_METHOD,
+      costSourceDocumentId: basis.sourceDocumentId,
+      costSourceLineId: basis.sourceLineId,
+      costEffectiveDate: basis.effectiveDate,
       costStatus: knownCost ? "valued" : "unvalued",
-      costIssue: knownCost ? undefined : text(balance.costReviewReason, "missing_cost_basis", 80),
+      costIssue: knownCost ? undefined : basis.reason?.toLocaleLowerCase("en") ?? "missing_cost_basis",
       stockBefore: current,
       stockAfter: rounded(current - converted.amount),
     });
@@ -400,7 +410,7 @@ export function postWriteOffDocument(input: {
   const idempotencyKey = text(input.draft.idempotencyKey, "", 240);
   const alreadyPosted = currentDocuments.find((item) => item.status === "posted" && (item.id === requestedId || Boolean(idempotencyKey && item.idempotencyKey === idempotencyKey)));
   if (alreadyPosted) return { ok: true, idempotent: true, document: alreadyPosted, documents: currentDocuments, assortment: record(input.assortment), stockMovements: array(input.stockMovements) as StockMovement[], warnings: [] };
-  const saved = saveWriteOffDraft({ documents: currentDocuments, assortment: input.assortment, venueId: input.venueId, draft: input.draft, actor: input.actor, now: input.now });
+  const saved = saveWriteOffDraft({ documents: currentDocuments, assortment: input.assortment, stockMovements: input.stockMovements, venueId: input.venueId, draft: input.draft, actor: input.actor, now: input.now });
   if (!saved.ok) return saved;
   if (!saved.document.items.length) return { ok: false, code: "WRITE_OFF_ITEMS_REQUIRED", error: "Добавьте хотя бы одну позицию" };
   const now = input.now ?? new Date().toISOString();
@@ -425,8 +435,19 @@ export function postWriteOffDocument(input: {
     const movementId = crypto.randomUUID();
     movementIds.push(movementId);
     balance.current = nextCurrent;
-    if (item.totalCost !== null) balance.inventoryValue = money(Math.max(0, number(balance.inventoryValue) - item.totalCost));
-    else balance.costNeedsReview = true;
+    const currentBasis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: { productKey: item.productKey, unit: item.baseUnit },
+      asOf: now,
+      receipts: input.stockMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    balance.averageUnitCost = currentBasis.value ?? 0;
+    balance.inventoryValue = currentBasis.known ? money(Math.max(0, nextCurrent) * (currentBasis.value ?? 0)) : nextCurrent <= 0 ? 0 : number(balance.inventoryValue);
+    balance.costStatus = currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status;
+    balance.costNeedsReview = !currentBasis.known || undefined;
+    balance.valuationMethod = COST_BASIS_METHOD;
     balance.lastWriteOffAt = saved.document.date;
     balance.updatedAt = now;
     movements.push({
@@ -439,6 +460,7 @@ export function postWriteOffDocument(input: {
       amount: -item.baseQuantity,
       unit: item.baseUnit,
       costAmount: item.totalCost === null ? undefined : -item.totalCost,
+      costStatus: item.costBasisStatus === "KNOWN_ZERO" ? "KNOWN_ZERO" : item.costBasisStatus === "KNOWN_VALUE" ? "KNOWN" : "UNKNOWN",
       currency: item.currency,
       sourceDocumentId: saved.document.id,
       sourceLineId: item.id,
@@ -488,13 +510,20 @@ export function cancelPostedWriteOff(input: {
     if (!balance) return { ok: false, code: "WRITE_OFF_PRODUCT_NOT_FOUND", error: `Нельзя отменить: «${item.productName}» отсутствует в номенклатуре` };
     const current = number(balance.current);
     const nextCurrent = rounded(current + item.baseQuantity);
-    const currentValue = Math.max(0, number(balance.inventoryValue));
     balance.current = nextCurrent;
-    if (item.totalCost !== null) {
-      const nextValue = money(currentValue + item.totalCost);
-      balance.inventoryValue = nextValue;
-      balance.averageUnitCost = nextCurrent > 0 ? rounded(nextValue / nextCurrent, 6) : number(balance.averageUnitCost);
-    } else balance.costNeedsReview = true;
+    const currentBasis = resolveCostBasis({
+      venueId: input.venueId,
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: { productKey: item.productKey, unit: item.baseUnit },
+      asOf: now,
+      receipts: input.stockMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
+    balance.averageUnitCost = currentBasis.value ?? 0;
+    balance.inventoryValue = currentBasis.known ? money(Math.max(0, nextCurrent) * (currentBasis.value ?? 0)) : nextCurrent <= 0 ? 0 : number(balance.inventoryValue);
+    balance.costStatus = currentBasis.status === "KNOWN_VALUE" ? "KNOWN" : currentBasis.status;
+    balance.costNeedsReview = !currentBasis.known || undefined;
+    balance.valuationMethod = COST_BASIS_METHOD;
     balance.lastWriteOffReversalAt = now;
     balance.updatedAt = now;
     reversals.push({

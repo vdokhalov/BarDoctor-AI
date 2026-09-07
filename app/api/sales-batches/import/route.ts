@@ -2,7 +2,7 @@ import * as XLSX from "xlsx";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
-import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
+import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { salesImportIdentity } from "../../../../lib/bardoctor/sales-import-identity";
 import { runStoreCasBatch, storeSnapshots, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import {
@@ -69,8 +69,8 @@ function detectColumns(rows: unknown[][]): { headerRow: number; nameColumn: numb
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json, updated_at FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?)
-  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY).all<StoreRow>();
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?)
+  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY, STOCK_MOVEMENT_STORE_KEY).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   const keys = [SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY];
   return {
@@ -79,6 +79,7 @@ async function readStores(database: D1Database, accountId: number) {
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
     warehouses: array(parse(stores.get(WAREHOUSE_STORE_KEY), [])),
+    stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
     snapshots: storeSnapshots(result.results ?? [], keys),
   };
 }
@@ -149,6 +150,7 @@ async function postOnce(request: Request): Promise<Response> {
     mappings: stores.mappings,
     warehouseRoutes: stores.warehouseRoutes,
     warehouses: stores.warehouses,
+    stockMovements: stores.stockMovements,
     venueId: account.venueId,
     actor: currentActor,
     now,

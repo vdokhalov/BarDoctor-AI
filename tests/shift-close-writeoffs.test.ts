@@ -17,7 +17,10 @@ function current() {
         { productKey: "venue-b", venueId: 2, name: "Чужой товар", unit: "pcs", current: 10, averageUnitCost: 50, inventoryValue: 500, currency: "RUB" },
       ],
     },
-    stockMovements: [],
+    stockMovements: [
+      { id: "receipt-whiskey", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "whiskey", productName: "Jack Daniel's", amount: 5_700, unit: "ml", costAmount: 1_026, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-whiskey", sourceLineId: "line-whiskey", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+      { id: "receipt-lemon", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "lemon", productName: "Лимон", amount: 3_250, unit: "g", costAmount: 146.25, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-lemon", sourceLineId: "line-lemon", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+    ],
     expenses: [],
   };
 }
@@ -103,7 +106,7 @@ test("retry and wizard back-forward reuse the same close session without duplica
   assert.equal(retry.ok, true);
   if (!retry.ok) return;
   assert.equal(retry.idempotent, true);
-  assert.equal(retry.stockMovements.length, 1);
+  assert.equal(retry.stockMovements.filter((movement) => (movement as { type?: string }).type === "writeoff").length, 1);
   assert.equal((retry.assortment.stockBalances as Array<Record<string, unknown>>)[0].current, 5_000);
 });
 

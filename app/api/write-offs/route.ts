@@ -7,7 +7,7 @@ import {
   STOCK_MOVEMENT_STORE_KEY,
 } from "../../../lib/bardoctor/inventory";
 import { EXPENSE_STORE_KEY } from "../../../lib/bardoctor/purchases";
-import { costKnowledge } from "../../../lib/bardoctor/cost-knowledge";
+import { resolveCostBasis } from "../../../lib/bardoctor/cost-basis";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import {
   cancelPostedWriteOff,
@@ -123,7 +123,7 @@ function auditStatement(input: {
   );
 }
 
-function catalog(assortment: JsonRecord, venueId: number) {
+function catalog(assortment: JsonRecord, stockMovements: unknown[], venueId: number) {
   const nomenclature = array(assortment.nomenclature).map(record);
   const canonicalByKey = new Map(nomenclature.map((item) => [text(item.productKey ?? item.key ?? item.id, "", 300), item]));
   return array(assortment.stockBalances).map(record).filter((balance) => {
@@ -132,7 +132,14 @@ function catalog(assortment: JsonRecord, venueId: number) {
   }).map((balance) => {
     const key = text(balance.productKey ?? balance.key, "", 300);
     const canonical = canonicalByKey.get(key) ?? {};
-    const knownCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
+    const knownCost = resolveCostBasis({
+      venueId,
+      warehouseId: text(balance.warehouseId, "", 160) || undefined,
+      nomenclatureItem: key,
+      asOf: new Date().toISOString(),
+      receipts: stockMovements,
+      accountingCurrency: balance.accountingCurrency ?? balance.currency,
+    });
     return {
       nomenclatureItemId: key,
       productKey: key,
@@ -171,7 +178,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!found) return Response.json({ ok: false, code: "WRITE_OFF_NOT_FOUND", error: "Списание не найдено или относится к другому заведению" }, { status: 404 });
     return Response.json({ ok: true, venueId: account.venueId, writeOff: found }, { headers: { "Cache-Control": "private, no-store" } });
   }
-  return Response.json({ ok: true, venueId: account.venueId, reasons: WRITE_OFF_REASONS, writeOffs: documents, catalog: catalog(stores.assortment, account.venueId) }, { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({ ok: true, venueId: account.venueId, reasons: WRITE_OFF_REASONS, writeOffs: documents, catalog: catalog(stores.assortment, stores.movements, account.venueId) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 async function postOnce(request: Request): Promise<Response> {
@@ -232,7 +239,7 @@ async function postOnce(request: Request): Promise<Response> {
 
   if (!Array.isArray(draft.items) && action !== "save_draft") return Response.json({ ok: false, code: "WRITE_OFF_ITEMS_REQUIRED", error: "Добавьте хотя бы одну позицию" }, { status: 422 });
   if (action === "save_draft") {
-    const result = saveWriteOffDraft({ documents: current, assortment: stores.assortment, venueId: account.venueId, draft, actor: currentActor, now });
+    const result = saveWriteOffDraft({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, draft, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: 422 });
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),

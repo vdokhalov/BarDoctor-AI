@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  createOrUpdateSalesBatch,
+  createOrUpdateSalesBatch as createSalesBatch,
   manualSalesAdapter,
   postSalesBatch,
   reverseSalesBatch,
@@ -14,6 +14,17 @@ import {
 import { hasPermission, permissionsFor } from "../lib/bardoctor/access-control";
 
 const actor = { accountId: 7, name: "Owner", role: "owner" };
+
+const costingReceipts = [
+  { id: "receipt-rum", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "rum", productName: "Rum", amount: 10_000, unit: "ml", costAmount: 500, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-rum", sourceLineId: "line-rum", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+  { id: "receipt-syrup", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "syrup", productName: "Syrup", amount: 5_000, unit: "ml", costAmount: 100, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-syrup", sourceLineId: "line-syrup", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+  { id: "receipt-lime", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "lime", productName: "Lime", amount: 50, unit: "pcs", costAmount: 400, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-lime", sourceLineId: "line-lime", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+  { id: "receipt-cola", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "stock-cola-125", productName: "Coca-Cola 1,25 л", amount: 12, unit: "pcs", costAmount: 480, costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "purchase-cola", sourceLineId: "line-cola", createdAt: "2026-08-20T10:00:00.000Z", status: "active" },
+] as const;
+
+function createOrUpdateSalesBatch(input: Parameters<typeof createSalesBatch>[0]) {
+  return createSalesBatch({ ...input, stockMovements: input.stockMovements ?? [...costingReceipts] });
+}
 
 type FixtureAssortment = {
   menuItems: Array<Record<string, unknown>>;

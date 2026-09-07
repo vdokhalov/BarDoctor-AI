@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createInventoryCountDocument,
+  createInventoryCountDocument as createCount,
   deleteInventoryCountDocument,
-  inventoryCountConflicts,
+  inventoryCountConflicts as countConflicts,
   inventoryCountDocumentScope,
   inventoryCountLineDifference,
   inventoryCountScopes,
@@ -84,6 +84,19 @@ const assortment = {
 };
 
 const creator = { accountId: 7, name: "Тестовый управляющий", role: "manager" };
+const costingReceipts = [{
+  id: "receipt-cognac", venueId: 1, type: "receipt", date: "2026-08-20", productKey: "cognac", productName: "Коньяк",
+  amount: 10_000, unit: "ml", costAmount: 2_000, costStatus: "KNOWN", currency: "RUB",
+  sourceDocumentId: "purchase-cognac", sourceLineId: "line-cognac", createdAt: "2026-08-20T10:00:00.000Z", status: "active",
+}] as const;
+
+function createInventoryCountDocument(input: Parameters<typeof createCount>[0]) {
+  return createCount({ ...input, stockMovements: input.stockMovements ?? [...costingReceipts] });
+}
+
+function inventoryCountConflicts(input: Parameters<typeof countConflicts>[0]) {
+  return countConflicts({ ...input, stockMovements: input.stockMovements ?? [...costingReceipts] });
+}
 
 test("draft/count/review deletion is idempotent, venue-scoped and stock-safe", () => {
   const draft = { id: "draft-a", venueId: 101, number: 3, date: "2026-08-24", status: "draft", items: [] };
@@ -417,10 +430,12 @@ test("concurrent purchase, sale or write-off blocks stale finalization", () => {
 
   const changedCost = structuredClone(assortment);
   changedCost.stockBalances[0].averageUnitCost = 0.25;
-  assert.equal(
-    inventoryCountConflicts({ document, assortment: changedCost })[0].reason,
-    "Cost basis изменился после начала подсчёта",
-  );
+  assert.deepEqual(inventoryCountConflicts({ document, assortment: changedCost }), [], "mutable legacy average is not a cost-basis change");
+  const changedReceipts = [...costingReceipts, {
+    ...costingReceipts[0], id: "receipt-cognac-2", date: "2026-08-21", costAmount: 2_500,
+    sourceDocumentId: "purchase-cognac-2", sourceLineId: "line-cognac-2", createdAt: "2026-08-21T10:00:00.000Z",
+  }];
+  assert.equal(inventoryCountConflicts({ document, assortment, stockMovements: changedReceipts })[0].reason, "Cost basis изменился после начала подсчёта");
 });
 
 test("blind A4 print sheet uses the inventory snapshot and never prints expected quantities", () => {

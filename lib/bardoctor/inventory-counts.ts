@@ -1,4 +1,4 @@
-import { costKnowledge } from "./cost-knowledge";
+import { COST_BASIS_METHOD, resolveCostBasis, type CostBasisStatus } from "./cost-basis";
 
 export const INVENTORY_COUNT_STORE_KEY = "bd_inventory_snapshots";
 
@@ -39,6 +39,11 @@ export type InventoryCountLine = {
   actual: number | null;
   note?: string;
   averageUnitCost: number | null;
+  costBasisStatus?: CostBasisStatus;
+  costBasisMethod?: typeof COST_BASIS_METHOD;
+  costSourceDocumentId?: string;
+  costSourceLineId?: string;
+  costEffectiveDate?: string;
   currency?: string;
   valuationKnown: boolean;
   valuationReason?: string;
@@ -314,41 +319,32 @@ function entryDefinition(balance: JsonRecord): { entryUnit: string; entryFactor:
   return { entryUnit: "шт.", entryFactor: 1 };
 }
 
-function costBasis(balance: JsonRecord, accountingCurrency?: string) {
-  const current = numeric(balance.current, 0);
-  const inventoryValue = Math.max(0, numeric(balance.inventoryValue, 0));
-  const storedAverage = Math.max(0, numeric(balance.averageUnitCost, 0));
-  const explicitCost = costKnowledge(balance.averageUnitCost, balance.costStatus, balance.costNeedsReview);
-  const averageUnitCost = explicitCost.known
-    ? explicitCost.value
-    : storedAverage > 0
-    ? storedAverage
-    : current > 0 && inventoryValue > 0
-      ? inventoryValue / current
-      : 0;
-  const currency = text(balance.currency, "", 12).toUpperCase() || undefined;
-  const expectedCurrency = text(accountingCurrency, "", 12).toUpperCase() || undefined;
-  if (expectedCurrency && currency && expectedCurrency !== currency) {
-    return {
-      averageUnitCost: null,
-      currency: expectedCurrency,
-      valuationKnown: false,
-      valuationReason: "Стоимость позиции сохранена не в валюте учёта заведения",
-    };
-  }
-  if (!(averageUnitCost >= 0) || (!explicitCost.known && !(inventoryValue > 0))) {
-    return {
-      averageUnitCost: null,
-      currency: expectedCurrency ?? currency,
-      valuationKnown: false,
-      valuationReason: "Нет cost basis для денежной оценки расхождения",
-    };
-  }
+function costBasis(input: {
+  balance: JsonRecord;
+  stockMovements: unknown[];
+  venueId: number;
+  asOf: string;
+  accountingCurrency?: string;
+}) {
+  const key = productKey(input.balance);
+  const basis = resolveCostBasis({
+    venueId: input.venueId,
+    warehouseId: text(input.balance.warehouseId, "", 100) || undefined,
+    nomenclatureItem: { productKey: key, unit: text(input.balance.unit, "unknown", 20) },
+    asOf: input.asOf,
+    receipts: input.stockMovements,
+    accountingCurrency: input.accountingCurrency ?? input.balance.accountingCurrency ?? input.balance.currency,
+  });
   return {
-    averageUnitCost: rounded(averageUnitCost, 6),
-    currency: expectedCurrency ?? currency,
-    valuationKnown: true,
-    valuationReason: undefined,
+    averageUnitCost: basis.known ? rounded(basis.value ?? 0, 6) : null,
+    currency: basis.currency,
+    valuationKnown: basis.known,
+    valuationReason: basis.known ? undefined : basis.reason ?? "Нет cost basis для денежной оценки расхождения",
+    costBasisStatus: basis.status,
+    costBasisMethod: COST_BASIS_METHOD,
+    costSourceDocumentId: basis.sourceDocumentId,
+    costSourceLineId: basis.sourceLineId,
+    costEffectiveDate: basis.effectiveDate,
   };
 }
 
@@ -501,6 +497,7 @@ export function inventoryCountDocumentScope(document: InventoryCountDocument): I
 
 export function createInventoryCountDocument(input: {
   assortment: unknown;
+  stockMovements?: unknown[];
   venueId: number;
   sequenceNumber: number;
   scope: InventoryCountScope;
@@ -532,7 +529,13 @@ export function createInventoryCountDocument(input: {
       if (!key || !["ml", "g", "pcs"].includes(unit)) return null;
       const hierarchy = hierarchyFor(balance, input.assortment);
       const entry = entryDefinition(balance);
-      const valuation = costBasis(balance, input.accountingCurrency);
+      const valuation = costBasis({
+        balance,
+        stockMovements: input.stockMovements ?? [],
+        venueId: input.venueId,
+        asOf: input.date ?? now,
+        accountingCurrency: input.accountingCurrency,
+      });
       return {
         id: `count-line-${index + 1}`,
         productKey: key,
@@ -551,6 +554,11 @@ export function createInventoryCountDocument(input: {
         currency: valuation.currency,
         valuationKnown: valuation.valuationKnown,
         valuationReason: valuation.valuationReason,
+        costBasisStatus: valuation.costBasisStatus,
+        costBasisMethod: valuation.costBasisMethod,
+        costSourceDocumentId: valuation.costSourceDocumentId,
+        costSourceLineId: valuation.costSourceLineId,
+        costEffectiveDate: valuation.costEffectiveDate,
         snapshotBalanceUpdatedAt: text(balance.updatedAt, "", 40) || undefined,
       };
     })
@@ -678,6 +686,7 @@ export function inventoryCountLineDifference(line: InventoryCountLine): {
 export function inventoryCountConflicts(input: {
   document: InventoryCountDocument;
   assortment: unknown;
+  stockMovements?: unknown[];
 }): Array<{ productKey: string; productName: string; reason: string; expected: number; current?: number }> {
   const currentByKey = new Map(activeStockBalances(input.assortment).map((value) => [productKey(value), value]));
   const conflicts: Array<{ productKey: string; productName: string; reason: string; expected: number; current?: number }> = [];
@@ -703,7 +712,13 @@ export function inventoryCountConflicts(input: {
       });
       continue;
     }
-    const currentCost = costBasis(current, input.document.accountingCurrency);
+    const currentCost = costBasis({
+      balance: current,
+      stockMovements: input.stockMovements ?? [],
+      venueId: input.document.venueId,
+      asOf: input.document.date,
+      accountingCurrency: input.document.accountingCurrency,
+    });
     const snapshotCost = line.averageUnitCost;
     if (
       currentCost.valuationKnown !== line.valuationKnown

@@ -3,8 +3,50 @@ import test from "node:test";
 import {
   INVENTORY_VALUATION_METHOD,
   resolvePurchaseLineAccountingCost,
-  summarizeInventoryValuation,
+  summarizeInventoryValuation as summarizeValuation,
 } from "../lib/bardoctor/valuation";
+
+type ValuationInput = Parameters<typeof summarizeValuation>[0];
+
+function summarizeInventoryValuation(input: ValuationInput) {
+  if (input.stockMovements) return summarizeValuation(input);
+  const balances = Array.isArray(input.balances)
+    ? input.balances as Array<Record<string, unknown>>
+    : [];
+  const stockMovements = balances.flatMap((balance, index) => {
+    const quantity = Number(balance.current ?? 0);
+    if (!(quantity > 0) || !["ml", "g", "pcs"].includes(String(balance.unit ?? ""))) return [];
+    const normalizedValue = balance.normalizedInventoryValue ?? balance.accountingInventoryValue;
+    const storedValue = normalizedValue ?? balance.inventoryValue;
+    const averageUnitCost = Number(balance.averageUnitCost);
+    const total = storedValue != null
+      ? Number(storedValue)
+      : Number.isFinite(averageUnitCost)
+        ? quantity * averageUnitCost
+        : null;
+    if (total == null || !Number.isFinite(total)) return [];
+    if (total === 0 && balance.costStatus !== "KNOWN_ZERO") return [];
+    return [{
+      id: `receipt-${index}`,
+      type: "receipt",
+      status: "active",
+      venueId: input.venueId ?? Number(balance.venueId ?? 1),
+      warehouseId: balance.warehouseId,
+      productKey: String(balance.productKey ?? balance.key ?? `item-${index}`),
+      amount: quantity,
+      unit: String(balance.unit),
+      costAmount: total,
+      currency: String(
+        normalizedValue != null
+          ? balance.normalizedCostCurrency ?? balance.accountingCurrency ?? input.accountingCurrency
+          : balance.currency ?? input.accountingCurrency,
+      ),
+      businessDate: "2026-01-01",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    }];
+  });
+  return summarizeValuation({ ...input, venueId: input.venueId ?? 1, stockMovements });
+}
 
 test("partial valuation keeps the known sum and counts only active non-zero stock", () => {
   const summary = summarizeInventoryValuation({
@@ -55,7 +97,7 @@ test("display units and package variants never change base-quantity valuation", 
     { displayUnit: "pcs", displayPackageSize: "1 л" },
   ].map((presentation) => summarizeInventoryValuation({
     accountingCurrency: "RUB",
-    balances: [{ current: 10_000, unit: "ml", averageUnitCost: 0.2377, currency: "RUB", ...presentation }],
+    balances: [{ key: "liquid", current: 10_000, unit: "ml", averageUnitCost: 0.2377, currency: "RUB", ...presentation }],
   }).total);
   assert.deepEqual(variants, [2_377, 2_377, 2_377]);
 });
