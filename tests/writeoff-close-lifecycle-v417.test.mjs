@@ -11,6 +11,7 @@ test("write-off close unmounts the React sheet before route synchronization", as
   assert.ok(start >= 0 && end > start, "write-off workspace must exist in the release bundle");
   const workspace = bundle.slice(start, end);
 
+  assert.match(workspace, /new URLSearchParams\(typeof window<"u"\?window\.location\.search:s\),N=b\.get\("writeoff"\)/);
   assert.match(workspace, /\[bdWriteoffSheetOpenV417,bdSetWriteoffSheetOpenV417\]=S\.useState\(\(\)=>N==="new"\)/);
   assert.match(workspace, /S\.useEffect\(\(\)=>\{bdSetWriteoffSheetOpenV417\(N==="new"\)\},\[N\]\)/);
   assert.match(workspace, /function x\(\)\{bdSetWriteoffSheetOpenV417\(!1\),a\(/);

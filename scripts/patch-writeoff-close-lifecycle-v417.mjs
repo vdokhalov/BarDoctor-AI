@@ -18,6 +18,11 @@ function patchWorkspace(source, label) {
   if (start < 0) throw new Error(`${marker}: write-off workspace missing in ${label}`);
 
   let workspace = source.slice(start, end);
+  const staleRouteQuery = 'b=new URLSearchParams(s),N=b.get("writeoff")';
+  const currentRouteQuery = 'b=new URLSearchParams(typeof window<"u"?window.location.search:s),N=b.get("writeoff")';
+  if (workspace.includes(staleRouteQuery)) {
+    workspace = workspace.replace(staleRouteQuery, currentRouteQuery);
+  }
   if (!workspace.includes("bdWriteoffSheetOpenV417")) {
     const replacements = [
       [
@@ -49,6 +54,7 @@ function patchWorkspace(source, label) {
   }
 
   const required = [
+    currentRouteQuery,
     'S.useState(()=>N==="new")',
     'bdSetWriteoffSheetOpenV417(N==="new")},[N]',
     'function x(){bdSetWriteoffSheetOpenV417(!1),a(',
