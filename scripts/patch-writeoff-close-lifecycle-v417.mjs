@@ -53,12 +53,37 @@ function patchWorkspace(source, label) {
     }
   }
 
+  const openState = '[bdWriteoffSheetOpenV417,bdSetWriteoffSheetOpenV417]=S.useState(()=>N==="new"),E=';
+  const guardedOpenState = '[bdWriteoffSheetOpenV417,bdSetWriteoffSheetOpenV417]=S.useState(()=>N==="new"),bdWriteoffClosingV418=S.useRef(!1),E=';
+  if (workspace.includes(openState)) {
+    workspace = workspace.replace(openState, guardedOpenState);
+  }
+
+  const routeSync = 'S.useEffect(()=>{bdSetWriteoffSheetOpenV417(N==="new")},[N])';
+  const guardedRouteSync = 'S.useEffect(()=>{N!=="new"&&(bdWriteoffClosingV418.current=!1),bdSetWriteoffSheetOpenV417(N==="new"&&!bdWriteoffClosingV418.current)},[N])';
+  if (workspace.includes(routeSync)) {
+    workspace = workspace.replace(routeSync, guardedRouteSync);
+  }
+
+  const closeLifecycle = 'function x(){bdSetWriteoffSheetOpenV417(!1),a(';
+  const guardedCloseLifecycle = 'function x(){bdWriteoffClosingV418.current=!0,bdSetWriteoffSheetOpenV417(!1),a(';
+  if (workspace.includes(closeLifecycle)) {
+    workspace = workspace.replace(closeLifecycle, guardedCloseLifecycle);
+  }
+
+  const openLifecycle = 'onClick:()=>{bdSetWriteoffSheetOpenV417(!0),a(';
+  const guardedOpenLifecycle = 'onClick:()=>{bdWriteoffClosingV418.current=!1,bdSetWriteoffSheetOpenV417(!0),a(';
+  if (workspace.includes(openLifecycle)) {
+    workspace = workspace.replaceAll(openLifecycle, guardedOpenLifecycle);
+  }
+
   const required = [
     currentRouteQuery,
     'S.useState(()=>N==="new")',
-    'bdSetWriteoffSheetOpenV417(N==="new")},[N]',
-    'function x(){bdSetWriteoffSheetOpenV417(!1),a(',
-    'onClick:()=>{bdSetWriteoffSheetOpenV417(!0),a(',
+    'bdWriteoffClosingV418=S.useRef(!1)',
+    'bdSetWriteoffSheetOpenV417(N==="new"&&!bdWriteoffClosingV418.current)},[N]',
+    'function x(){bdWriteoffClosingV418.current=!0,bdSetWriteoffSheetOpenV417(!1),a(',
+    'onClick:()=>{bdWriteoffClosingV418.current=!1,bdSetWriteoffSheetOpenV417(!0),a(',
     'N==="new"&&n&&bdWriteoffSheetOpenV417&&i.jsx(bdWriteoffSheet',
   ];
   for (const token of required) {

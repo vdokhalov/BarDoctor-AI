@@ -13,9 +13,10 @@ test("write-off close unmounts the React sheet before route synchronization", as
 
   assert.match(workspace, /new URLSearchParams\(typeof window<"u"\?window\.location\.search:s\),N=b\.get\("writeoff"\)/);
   assert.match(workspace, /\[bdWriteoffSheetOpenV417,bdSetWriteoffSheetOpenV417\]=S\.useState\(\(\)=>N==="new"\)/);
-  assert.match(workspace, /S\.useEffect\(\(\)=>\{bdSetWriteoffSheetOpenV417\(N==="new"\)\},\[N\]\)/);
-  assert.match(workspace, /function x\(\)\{bdSetWriteoffSheetOpenV417\(!1\),a\(/);
-  assert.match(workspace, /onClick:\(\)=>\{bdSetWriteoffSheetOpenV417\(!0\),a\(/);
+  assert.match(workspace, /bdWriteoffClosingV418=S\.useRef\(!1\)/);
+  assert.match(workspace, /S\.useEffect\(\(\)=>\{N!=="new"&&\(bdWriteoffClosingV418\.current=!1\),bdSetWriteoffSheetOpenV417\(N==="new"&&!bdWriteoffClosingV418\.current\)\},\[N\]\)/);
+  assert.match(workspace, /function x\(\)\{bdWriteoffClosingV418\.current=!0,bdSetWriteoffSheetOpenV417\(!1\),a\(/);
+  assert.match(workspace, /onClick:\(\)=>\{bdWriteoffClosingV418\.current=!1,bdSetWriteoffSheetOpenV417\(!0\),a\(/);
   assert.match(workspace, /N==="new"&&n&&bdWriteoffSheetOpenV417&&i\.jsx\(bdWriteoffSheet/);
 });
 
@@ -37,5 +38,6 @@ test("desktop browser QA waits for the write-off shell and body lock to release"
 test("legacy write-off navigation patch preserves the hardened close lifecycle", async () => {
   const patch = await readFile(new URL("scripts/patch-writeoff-navigation-v296.mjs", root), "utf8");
   assert.match(patch, /const lifecycleClose = 'function x\(\)\{bdSetWriteoffSheetOpenV417\(!1\),a\(/);
-  assert.match(patch, /!source\.includes\(newClose\) && !source\.includes\(lifecycleClose\)/);
+  assert.match(patch, /const guardedLifecycleClose = 'function x\(\)\{bdWriteoffClosingV418\.current=!0,bdSetWriteoffSheetOpenV417\(!1\),a\(/);
+  assert.match(patch, /!source\.includes\(newClose\) && !source\.includes\(lifecycleClose\) && !source\.includes\(guardedLifecycleClose\)/);
 });
