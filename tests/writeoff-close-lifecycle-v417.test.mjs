@@ -27,9 +27,11 @@ test("write-off lifecycle fix is included in versioned release references", asyn
   }
 });
 
-test("desktop browser QA still requires the write-off shell to detach", async () => {
+test("desktop browser QA waits for the write-off shell and body lock to release", async () => {
   const qa = await readFile(new URL("scripts/mobile-navigation-qa-v269.cjs", root), "utf8");
   assert.match(qa, /await shell\.waitFor\(\{ state: "detached" \}\)/);
+  assert.match(qa, /await page\.waitForFunction\([\s\S]*getComputedStyle\(document\.body\)\.overflow !== "hidden"/);
+  assert.match(qa, /fullscreenCount:[\s\S]*notFoundCount:[\s\S]*confirmCount:/);
 });
 
 test("legacy write-off navigation patch preserves the hardened close lifecycle", async () => {

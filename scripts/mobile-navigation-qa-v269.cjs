@@ -1508,7 +1508,22 @@ async function writeoffFlow(browser, profile) {
     throw new Error(`${profile.name}: custom Close did not clear write-off state: ${JSON.stringify(await page.evaluate(() => ({ url: location.href, close: window.__bdWriteoffCloseV271 })))}`);
   }
   await shell.waitFor({ state: "detached" });
-  assert.notEqual(await page.evaluate(() => getComputedStyle(document.body).overflow), "hidden", `${profile.name}: unsaved guard leaked body scroll lock`);
+  try {
+    await page.waitForFunction(
+      () => getComputedStyle(document.body).overflow !== "hidden",
+      undefined,
+      { timeout: 3_000 },
+    );
+  } catch {
+    const lockState = await page.evaluate(() => ({
+      overflow: getComputedStyle(document.body).overflow,
+      bodyClass: document.body.className,
+      fullscreenCount: document.querySelectorAll(".bd-writeoff-fullscreen-v271").length,
+      notFoundCount: document.querySelectorAll(".bd-writeoff-not-found-v271").length,
+      confirmCount: document.querySelectorAll(".bd-writeoff-confirm-v271").length,
+    }));
+    throw new Error(`${profile.name}: unsaved guard leaked body scroll lock: ${JSON.stringify(lockState)}`);
+  }
 
   await page.getByRole("button", { name: "+ Новое", exact: true }).click();
   await page.getByLabel("Причина списания").selectOption("staff_meal");
