@@ -93,13 +93,11 @@ function createSale(source: JsonRecord, menuItemId: string, rawName: string, qua
 function postSale(source: JsonRecord, menuItemId: string, rawName: string, quantity: number, id: string) {
   const saved = createSale(source, menuItemId, rawName, quantity, id);
   assert.equal(saved.ok, true);
-  if (!saved.ok) throw new Error(saved.error);
   const posted = postSalesBatch({
     batches: saved.batches, batchId: saved.batch.id, assortment: source, mappings: [], warehouseRoutes: [],
     stockMovements: receipts, venueId: 1, actor, now: "2026-09-06T12:01:00.000Z",
   });
   assert.equal(posted.ok, true);
-  if (!posted.ok) throw new Error(posted.error);
   return { saved, posted };
 }
 

@@ -385,7 +385,7 @@ test("integration return preserves foreign same-key stock, document, expense and
   database.seed(account.id, MOVEMENTS, [foreignMovement]);
   database.seed(account.id, RETURNS, [foreignDocument]);
   database.seed(account.id, EXPENSES, [foreignExpense]);
-  const frozen = [foreignBalance, foreignDocument, foreignExpense, foreignMovement].map(JSON.stringify);
+  const frozen = [foreignBalance, foreignDocument, foreignExpense, foreignMovement].map((value) => JSON.stringify(value));
   const data = {
     date: "2026-09-08",
     direction: "from_customer",
