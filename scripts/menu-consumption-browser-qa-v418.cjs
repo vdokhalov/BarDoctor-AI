@@ -715,6 +715,7 @@ async function waitForCatalog(page) {
 }
 
 async function openItem(page, baseUrl, tab, itemId, venueId = activeVenueId) {
+  await waitForModalHistory(page);
   const response = await page.goto(
     `${baseUrl}/catalog?venue=${venueId}&tab=${tab}&itemId=${encodeURIComponent(itemId)}`,
     { waitUntil: "domcontentloaded", timeout: 60_000 },
@@ -815,7 +816,7 @@ async function closeRecipeEditor(editor) {
   await editor.waitFor({ state: "detached", timeout: 10_000 });
 }
 
-async function reloadCatalog(page) {
+async function waitForModalHistory(page) {
   // Modal removal schedules history.back() in requestAnimationFrame. A document
   // reload must wait for that history entry to stop referencing a removed layer.
   await page.waitForFunction(() => {
@@ -825,6 +826,10 @@ async function reloadCatalog(page) {
       element.getAttribute("data-bd-transient-id") === id && element.getClientRects().length > 0
     ));
   });
+}
+
+async function reloadCatalog(page) {
+  await waitForModalHistory(page);
   const onDialog = async (dialog) => {
     console.error("Phase 3 reload dialog", JSON.stringify({ type: dialog.type(), message: dialog.message() }));
     await dialog.dismiss();
