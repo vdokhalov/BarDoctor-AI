@@ -6,17 +6,14 @@ import {
   procurementPricePoints,
   type ProcurementPricePoint,
 } from "./procurement-analytics";
-import {
-  canonicalTechCardForOwner,
-  reconcileTechCards,
-} from "./tech-card-reconciliation";
+import { reconcileTechCards } from "./tech-card-reconciliation";
 import {
   formatMenuSaleSize,
   menuSaleSizeUnitOptions,
   resolveMenuItemSaleSize,
-  resolveReadyProductConsumption,
 } from "./menu-sale-size";
 import { COST_BASIS_METHOD, resolveCostBasis } from "./cost-basis";
+import { CONSUMPTION_MODES, resolveMenuConsumption, type ConsumptionMode } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
 type BaseUnit = "ml" | "g" | "pcs";
@@ -224,6 +221,61 @@ function productKeyResolver(value: JsonRecord) {
     }
     return current;
   };
+}
+
+function venueScopedAssortment(value: JsonRecord, venueId?: number): JsonRecord {
+  if (!venueId) return value;
+  const scoped = { ...value };
+  const collectionKeys = [
+    "groups",
+    "subgroups",
+    "menuItems",
+    "recipes",
+    "nomenclature",
+    "stockBalances",
+    "warehouses",
+    "inventoryProductAliases",
+    "canonicalProductAliases",
+    "supplierProductMappings",
+    "techCardIngredientAliases",
+    "priceHistory",
+    "sources",
+  ];
+  for (const key of collectionKeys) {
+    if (!Array.isArray(scoped[key])) continue;
+    scoped[key] = array(scoped[key]).map(record).filter((item) => {
+      const itemVenueId = number(item.venueId);
+      return !itemVenueId || itemVenueId === venueId;
+    });
+  }
+  return scoped;
+}
+
+function exactVenueNomenclatureProductKey(
+  assortment: JsonRecord,
+  nomenclatureItemId: unknown,
+  venueId?: number,
+): string {
+  const requestedId = text(nomenclatureItemId, "", 300);
+  if (!requestedId) return "";
+  const candidate = [
+    ...array(assortment.nomenclature),
+    ...array(assortment.stockBalances),
+  ].map(record).find((product) => {
+    const productVenueId = number(product.venueId);
+    return product.active !== false
+      && product.archived !== true
+      && text(product.status, "", 30) !== "archived"
+      && (!venueId || !productVenueId || productVenueId === venueId)
+      && [text(product.id, "", 300), text(product.nomenclatureItemId, "", 300)].includes(requestedId);
+  });
+  return candidate
+    ? text(candidate.productKey ?? candidate.key ?? candidate.id, "", 300)
+    : "";
+}
+
+function exactProductKey(value: unknown): string {
+  return text(value, "", 300);
 }
 
 function ingredientProductKey(ingredient: JsonRecord, resolveProductKey: (value: unknown) => string): string {
@@ -548,17 +600,19 @@ function signedMoney(value: number, currency: string): string {
   return `${sign}${amount} ${currency === "RUB" ? "₽" : currency}`;
 }
 
-function itemStatus(
-  item: JsonRecord,
-  recipe: JsonRecord | undefined,
-  costComplete: boolean,
-  directReadyProduct = false,
-) {
-  if (text(item.type) === "service") return nonNegative(item.salePrice) ? "ready" : "attention";
-  if (directReadyProduct) return costComplete ? "ready" : "attention";
-  if (!recipe) return "missing_recipe";
-  if (text(recipe.reviewStatus) !== "approved") return "review";
-  return costComplete ? "ready" : "attention";
+function itemStatus(input: {
+  item: JsonRecord;
+  mode: ConsumptionMode | "NEEDS_REVIEW";
+  consumptionOk: boolean;
+  recipe?: JsonRecord;
+  costComplete: boolean;
+}) {
+  if (!input.consumptionOk || input.mode === "NEEDS_REVIEW") return "review";
+  if (input.mode === "NONE") return nonNegative(input.item.salePrice) ? "ready" : "attention";
+  if (input.mode === "RECIPE" && !input.recipe) return "missing_recipe";
+  if (input.mode === "RECIPE" && text(input.recipe?.reviewStatus) !== "approved") return "review";
+  if (["DIRECT_ITEM", "FIXED_QUANTITY"].includes(input.mode)) return input.costComplete ? "ready" : "attention";
+  return input.costComplete ? "ready" : "attention";
 }
 
 export function buildAssortmentAnalytics(input: {
@@ -574,8 +628,9 @@ export function buildAssortmentAnalytics(input: {
 }) {
   const now = input.now ?? new Date();
   const period = periodWindow(input.period, now);
+  const scopedInput = venueScopedAssortment(record(input.assortment), input.venueId);
   const reconciliation = reconcileTechCards({
-    assortment: input.assortment,
+    assortment: scopedInput,
     purchaseDocuments: input.purchaseDocuments,
     venueId: input.venueId,
     now,
@@ -590,10 +645,6 @@ export function buildAssortmentAnalytics(input: {
   const activeReviewCards = recipes.filter((recipe) =>
     recipe.currentDraft === true && text(recipe.reviewStatus) === "requires_review"
   );
-  const recipeByMenuId = new Map(menuItems.map((item) => [
-    text(item.id),
-    canonicalTechCardForOwner(item.id, recipes),
-  ]));
   const resolveProductKey = productKeyResolver(assortment);
   const aliases = productAliases(assortment);
   const balances = balanceMap(assortment, resolveProductKey);
@@ -606,6 +657,50 @@ export function buildAssortmentAnalytics(input: {
   });
   const currentPrices = latestPoints(pricePoints);
   const priceHistory = pointHistory(pricePoints);
+  const exactPriceHistory = pointHistory(procurementPricePoints(input.purchaseDocuments ?? [], {
+    venueId: input.venueId,
+    includePriceLists: false,
+    includeUnmappedExact: true,
+    supplierProductMappings: assortment.supplierProductMappings,
+  }));
+  const costProducts = new Map<string, JsonRecord>();
+  for (const value of [
+    ...array(assortment.stockBalances),
+    ...array(assortment.nomenclature),
+  ]) {
+    const product = record(value);
+    const productVenueId = number(product.venueId);
+    if (input.venueId && productVenueId && productVenueId !== input.venueId) continue;
+    const key = exactProductKey(product.productKey ?? product.key ?? product.id);
+    if (!key || product.active === false || product.archived === true) continue;
+    costProducts.set(key, { ...costProducts.get(key), ...product, productKey: key });
+  }
+  const nomenclatureCosts = [...costProducts.entries()].map(([key, product]) => {
+    const nomenclatureItemId = text(product.nomenclatureItemId ?? product.id, key, 320);
+    const cost = ingredientCost(
+      {
+        id: `nomenclature-cost:${nomenclatureItemId}`,
+        name: text(product.name, "Складская позиция", 240),
+        quantity: 1,
+        unit: product.unit ?? product.baseUnit,
+        purchaseProductKey: key,
+        nomenclatureItemId,
+      },
+      exactPriceHistory,
+      exactProductKey,
+      null,
+      input.stockMovements ?? [],
+      input.venueId ?? 0,
+      now.toISOString(),
+    );
+    return {
+      ...cost,
+      id: `nomenclature-cost:${nomenclatureItemId}`,
+      nomenclatureItemId,
+      productKey: key,
+      name: text(product.name, "Складская позиция", 240),
+    };
+  });
   const sales = confirmedSales(input.salesDocuments ?? [], input.venueId);
   const salesBatches = new Map(deduplicated(input.salesBatches ?? [], input.venueId)
     .filter((batch) => ["POSTED", "PARTIALLY_BLOCKED"].includes(text(batch.status)))
@@ -662,29 +757,76 @@ export function buildAssortmentAnalytics(input: {
 
   const itemAnalytics = menuItems.map((item) => {
     const id = text(item.id, crypto.randomUUID(), 120);
-    const recipe = recipeByMenuId.get(id);
-    const directReadyProduct = resolveReadyProductConsumption(item, assortment);
-    const resolvedSaleSize = resolveMenuItemSaleSize(item, assortment);
-    const salePackageLabel = formatMenuSaleSize(resolvedSaleSize);
     const ownerCards = recipes.filter((candidate) =>
       text(candidate.menuItemId ?? candidate.ownerId, "", 120) === id
+      && text(candidate.lifecycleStatus, "", 40) !== "superseded"
+      && candidate.current !== false
     );
+    const consumption = resolveMenuConsumption(item, assortment, { venueId: input.venueId });
+    const storedMode = text(item.consumptionMode, "", 40);
+    const requestedMode = (CONSUMPTION_MODES as readonly string[]).includes(storedMode)
+      ? storedMode as ConsumptionMode
+      : null;
+    const consumptionMode: ConsumptionMode | "NEEDS_REVIEW" = consumption.ok
+      ? consumption.mode
+      : requestedMode ?? "NEEDS_REVIEW";
+    const consumptionAmbiguous = !consumption.ok
+      && (consumption.status === "NEEDS_REVIEW" || consumption.code === "CONSUMPTION_MODE_CONFLICT");
+    const recipe = consumption.ok && consumption.mode === "RECIPE"
+      ? record(consumption.recipe)
+      : !consumptionAmbiguous
+        && (consumptionMode === "RECIPE" || consumptionMode === "NEEDS_REVIEW")
+        && ownerCards.length === 1
+        ? ownerCards[0]
+        : undefined;
+    const stockTarget = consumption.ok
+      && (consumption.mode === "DIRECT_ITEM" || consumption.mode === "FIXED_QUANTITY")
+      ? consumption.nomenclature
+      : null;
+    // Sale/package size remains a read-only costing hint for legacy one-line recipes.
+    // Inventory posting is still governed exclusively by `consumption` above.
+    const resolvedSaleSize = resolveMenuItemSaleSize(item, assortment);
+    const salePackageLabel = formatMenuSaleSize(resolvedSaleSize);
     const pendingDraft = ownerCards.find((candidate) => candidate.currentDraft === true);
-    const ingredients = recipe
+    const ingredients = (consumptionMode === "RECIPE" || consumptionMode === "NEEDS_REVIEW") && recipe
       ? array(recipe.ingredients).map(record)
-      : directReadyProduct
+      : stockTarget
         ? [{
             id: `ready-product:${id}`,
-            name: directReadyProduct.productName,
-            quantity: directReadyProduct.quantityPerSale,
-            unit: directReadyProduct.baseUnit,
-            normalizedQuantity: directReadyProduct.quantityPerSale,
-            normalizedUnit: directReadyProduct.baseUnit,
+            name: stockTarget.productName,
+            quantity: stockTarget.inputQuantity,
+            unit: stockTarget.inputUnit,
+            normalizedQuantity: stockTarget.quantityPerSale,
+            normalizedUnit: stockTarget.baseUnit,
             unitResolutionStatus: "exact_compatible",
-            purchaseProductKey: directReadyProduct.productKey,
-            nomenclatureItemId: directReadyProduct.nomenclatureItemId,
+            purchaseProductKey: stockTarget.productKey,
+            nomenclatureItemId: stockTarget.nomenclatureItemId,
           }]
         : [];
+    const exactCosting = consumption.ok
+      && consumption.source === "explicit"
+      && consumption.mode !== "NONE";
+    const costingIngredients = exactCosting
+      ? ingredients.map((ingredient) => {
+          const exactKey = consumption.mode === "RECIPE"
+            ? exactVenueNomenclatureProductKey(
+                assortment,
+                ingredient.nomenclatureItemId,
+                input.venueId,
+              )
+            : stockTarget?.productKey ?? "";
+          return exactKey
+            ? {
+                ...ingredient,
+                purchaseProductKey: exactKey,
+                productKey: exactKey,
+                canonicalProductKey: exactKey,
+              }
+            : ingredient;
+        })
+      : ingredients;
+    const costingHistory = exactCosting ? exactPriceHistory : priceHistory;
+    const resolveCostProductKey = exactCosting ? exactProductKey : resolveProductKey;
     const saleSize = record(resolvedSaleSize);
     const salePackageHint = ingredients.length === 1
       && nonNegative(saleSize.baseQuantity) != null
@@ -695,7 +837,7 @@ export function buildAssortmentAnalytics(input: {
           label: salePackageLabel,
         }
       : null;
-    const ingredientRows = ingredients.map((ingredient) => ({
+    const ingredientRows = costingIngredients.map((ingredient) => ({
       id: text(ingredient.id, crypto.randomUUID(), 120),
       name: text(
         ingredient.matchedName ?? ingredient.canonicalName ?? ingredient.name,
@@ -706,33 +848,41 @@ export function buildAssortmentAnalytics(input: {
       quantity: nonNegative(ingredient.quantity),
       ...ingredientCost(
         ingredient,
-        priceHistory,
-        resolveProductKey,
+        costingHistory,
+        resolveCostProductKey,
         salePackageHint,
         input.stockMovements ?? [],
         input.venueId ?? 0,
         now.toISOString(),
       ),
     }));
-    const isService = text(item.type) === "service";
-    const reviewStatus = recipe
-      ? text(recipe.reviewStatus, "requires_review", 40)
-      : directReadyProduct
-        ? "approved"
-        : "missing";
-    const costComplete = !isService
-      && reviewStatus === "approved"
-      && ingredientRows.length > 0
-      && ingredientRows.every((ingredient) => ingredient.complete);
+    const reviewStatus = consumption.ok
+      ? consumption.mode === "RECIPE"
+        ? text(recipe?.reviewStatus, "requires_review", 40)
+        : "approved"
+      : consumption.status === "NEEDS_REVIEW"
+        ? "needs_review"
+        : "requires_review";
+    const costEligible = !consumptionAmbiguous && (consumptionMode === "NEEDS_REVIEW"
+      ? text(recipe?.reviewStatus, "requires_review", 40) === "approved"
+      : reviewStatus === "approved");
+    const costComplete = consumption.ok && consumption.mode === "NONE"
+      || (costEligible
+        && ingredientRows.length > 0
+        && ingredientRows.every((ingredient) => ingredient.complete));
     const costCurrencies = new Set(
       ingredientRows.filter((ingredient) => ingredient.complete).map((ingredient) => ingredient.currency),
     );
-    const costCurrency = costCurrencies.size === 1 ? [...costCurrencies][0] : null;
-    const recipeCost = costComplete && costCurrency
-      ? rounded(ingredientRows.reduce((sum, ingredient) => sum + (ingredient.cost ?? 0), 0), 2)
-      : null;
     const salePrice = nonNegative(item.salePrice);
     const saleCurrency = text(item.currency, "RUB", 12).toUpperCase();
+    const costCurrency = consumption.ok && consumption.mode === "NONE"
+      ? saleCurrency
+      : costCurrencies.size === 1 ? [...costCurrencies][0] : null;
+    const recipeCost = consumption.ok && consumption.mode === "NONE"
+      ? 0
+      : costComplete && costCurrency
+        ? rounded(ingredientRows.reduce((sum, ingredient) => sum + (ingredient.cost ?? 0), 0), 2)
+        : null;
     const comparableCurrency = recipeCost !== null && costCurrency === saleCurrency;
     const costPercent = comparableCurrency && salePrice != null && salePrice > 0
       ? rounded(recipeCost / salePrice * 100, 1)
@@ -740,7 +890,7 @@ export function buildAssortmentAnalytics(input: {
     const unitGrossProfit = comparableCurrency && salePrice != null
       ? rounded(salePrice - recipeCost, 2)
       : null;
-    const history = historicalRecipeCosts(ingredients, priceHistory, resolveProductKey);
+    const history = historicalRecipeCosts(costingIngredients, costingHistory, resolveCostProductKey);
     const currentHistory = history[history.length - 1];
     const previousHistory = history[history.length - 2];
     const costChangePercent = currentHistory && previousHistory && previousHistory.cost > 0
@@ -748,12 +898,12 @@ export function buildAssortmentAnalytics(input: {
       : null;
     const costDrivers = currentHistory && previousHistory
       ? recipeCostDrivers(
-          ingredients,
-          priceHistory,
+          costingIngredients,
+          costingHistory,
           previousHistory.date,
           currentHistory.date,
           currentHistory.currency,
-          resolveProductKey,
+          resolveCostProductKey,
         )
       : [];
     const metric = salesMetrics.get(id);
@@ -776,17 +926,33 @@ export function buildAssortmentAnalytics(input: {
       portionSize: formatMenuSaleSize(resolvedSaleSize) || null,
       salePrice: salePrice && salePrice > 0 ? salePrice : null,
       currency: saleCurrency,
-      recipeId: text(recipe?.id, "", 120) || (directReadyProduct ? `ready-product:${id}` : null),
-      recipeStatus: recipe ? text(recipe.status, "draft", 30) : directReadyProduct ? "confirmed" : "missing",
+      consumptionMode,
+      consumptionSource: consumption.ok ? consumption.source : null,
+      consumptionStatus: consumption.ok ? "CONFIGURED" : consumption.status,
+      consumptionIssueCode: consumption.ok ? null : consumption.code,
+      consumptionError: consumption.ok ? null : consumption.error,
+      consumptionSummary: consumption.ok
+        ? consumption.mode === "DIRECT_ITEM"
+          ? `При продаже 1 шт. будет списана 1 шт. «${consumption.nomenclature.productName}».`
+          : consumption.mode === "FIXED_QUANTITY"
+            ? `При продаже будет списано ${consumption.nomenclature.inputQuantity} ${consumption.nomenclature.inputUnit} «${consumption.nomenclature.productName}».`
+            : consumption.mode === "RECIPE"
+              ? "При продаже будут списаны ингредиенты техкарты."
+              : "Складской расход не требуется."
+        : consumption.error,
+      recipeId: consumptionMode === "RECIPE" ? text(recipe?.id, "", 120) || null : null,
+      recipeStatus: consumptionMode === "RECIPE"
+        ? recipe ? text(recipe.status, "draft", 30) : "missing"
+        : "not_applicable",
       techCardStatus: reviewStatus,
-      techCardSource: recipe ? text(recipe.source, "manual", 30) : directReadyProduct ? "ready_product" : null,
-      techCardVersion: recipe ? number(recipe.version) ?? 1 : directReadyProduct ? 1 : null,
+      techCardSource: consumptionMode === "RECIPE" && recipe ? text(recipe.source, "manual", 30) : null,
+      techCardVersion: consumptionMode === "RECIPE" && recipe ? number(recipe.version) ?? 1 : null,
       techCardUpdatedAt: recipe ? latestStamp(recipe) || null : null,
-      ownerLinkStatus: recipe ? text(recipe.ownerLinkStatus, "linked", 40) : directReadyProduct ? "linked" : "missing",
-      hasPendingDraft: Boolean(pendingDraft && pendingDraft.id !== recipe?.id),
-      pendingDraftId: pendingDraft ? text(pendingDraft.id, "", 120) || null : null,
-      pendingDraftStatus: pendingDraft ? text(pendingDraft.reviewStatus, "requires_review", 40) : null,
-      status: itemStatus(item, recipe, costComplete, Boolean(directReadyProduct)),
+      ownerLinkStatus: consumptionMode === "RECIPE" && recipe ? text(recipe.ownerLinkStatus, "linked", 40) : "not_applicable",
+      hasPendingDraft: consumptionMode === "RECIPE" && Boolean(pendingDraft && pendingDraft.id !== recipe?.id),
+      pendingDraftId: consumptionMode === "RECIPE" && pendingDraft ? text(pendingDraft.id, "", 120) || null : null,
+      pendingDraftStatus: consumptionMode === "RECIPE" && pendingDraft ? text(pendingDraft.reviewStatus, "requires_review", 40) : null,
+      status: itemStatus({ item, mode: consumptionMode, consumptionOk: consumption.ok, recipe, costComplete }),
       ingredientCount: ingredients.length,
       mappedIngredientCount: ingredients.filter((ingredient) =>
         Boolean(text(ingredient.purchaseProductKey ?? ingredient.productKey))
@@ -800,6 +966,7 @@ export function buildAssortmentAnalytics(input: {
       missingPriceCount: ingredientRows.filter((ingredient) => ingredient.reason === "price").length,
       ingredientRows,
       recipeCost,
+      recipeCostStatus: consumption.ok && consumption.mode === "NONE" ? "KNOWN_ZERO" : costComplete ? "KNOWN" : "UNKNOWN",
       costCurrency,
       costPercent,
       unitGrossProfit,
@@ -833,8 +1000,11 @@ export function buildAssortmentAnalytics(input: {
   const requiredChecks: Array<{ id: string; complete: boolean }> = [];
   for (const item of itemAnalytics) {
     requiredChecks.push({ id: `${item.id}:sale-price`, complete: item.salePrice !== null });
-    if (item.type === "service") continue;
-    requiredChecks.push({ id: `${item.id}:recipe`, complete: item.techCardStatus === "approved" });
+    requiredChecks.push({ id: `${item.id}:consumption`, complete: item.consumptionStatus === "CONFIGURED" });
+    if (item.consumptionStatus !== "CONFIGURED" || item.consumptionMode === "NONE") continue;
+    if (item.consumptionMode === "RECIPE") {
+      requiredChecks.push({ id: `${item.id}:recipe`, complete: item.techCardStatus === "approved" });
+    }
     requiredChecks.push({ id: `${item.id}:units`, complete: item.ingredientCount > 0 && item.invalidUnitCount === 0 });
     requiredChecks.push({ id: `${item.id}:mapping`, complete: item.ingredientCount > 0 && item.unmappedIngredientCount === 0 });
     requiredChecks.push({ id: `${item.id}:prices`, complete: item.ingredientCount > 0 && item.missingPriceCount === 0 });
@@ -844,10 +1014,14 @@ export function buildAssortmentAnalytics(input: {
     ? Math.round(completedChecks / requiredChecks.length * 100)
     : 0;
 
-  const missingRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.recipeStatus === "missing");
-  const aiDraftRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.techCardStatus === "ai_draft");
-  const reviewRecipes = itemAnalytics.filter((item) => item.type !== "service" && item.techCardStatus === "requires_review");
+  const missingRecipes = itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.recipeStatus === "missing");
+  const aiDraftRecipes = itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "ai_draft");
+  const reviewRecipes = itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "requires_review");
   const draftRecipes = [...aiDraftRecipes, ...reviewRecipes];
+  const consumptionReviewItems = itemAnalytics.filter((item) => item.consumptionStatus !== "CONFIGURED");
+  const recipeModeIds = new Set(itemAnalytics.filter((item) => item.consumptionMode === "RECIPE").map((item) => item.id));
+  const visibleAiDraftCards = activeAiDraftCards.filter((recipe) => recipeModeIds.has(text(recipe.menuItemId ?? recipe.ownerId, "", 120)));
+  const visibleReviewCards = activeReviewCards.filter((recipe) => recipeModeIds.has(text(recipe.menuItemId ?? recipe.ownerId, "", 120)));
   const unmappedItems = itemAnalytics.filter((item) => item.unmappedIngredientCount > 0);
   const invalidUnitItems = itemAnalytics.filter((item) => item.invalidUnitCount > 0);
   const missingPriceItems = itemAnalytics.filter((item) => item.missingPriceCount > 0);
@@ -861,6 +1035,7 @@ export function buildAssortmentAnalytics(input: {
   const attentionIds = new Set([
     ...missingRecipes,
     ...draftRecipes,
+    ...consumptionReviewItems,
     ...unmappedItems,
     ...invalidUnitItems,
     ...missingPriceItems,
@@ -878,6 +1053,16 @@ export function buildAssortmentAnalytics(input: {
     filter: string;
     itemId: string | null;
   }> = [];
+  if (consumptionReviewItems.length) signals.push({
+    id: "consumption-mode-review",
+    type: "consumption_review",
+    tone: "red",
+    title: `${consumptionReviewItems.length} ${plural(consumptionReviewItems.length, "позиция требует выбора списания", "позиции требуют выбора списания", "позиций требуют выбора списания")}`,
+    detail: "BarDoctor не выбирает источник складского расхода автоматически",
+    tab: "menu",
+    filter: "attention",
+    itemId: consumptionReviewItems[0].id,
+  });
   if (missingRecipes.length) signals.push({
     id: "missing-recipes",
     type: "recipe_missing",
@@ -898,15 +1083,15 @@ export function buildAssortmentAnalytics(input: {
     filter: "review",
     itemId: draftRecipes[0].id,
   });
-  if (activeAiDraftCards.length) signals.push({
+  if (visibleAiDraftCards.length) signals.push({
     id: "ai-draft-recipes",
     type: "recipe_ai_draft",
     tone: "orange",
-    title: `${activeAiDraftCards.length} ${plural(activeAiDraftCards.length, "AI-черновик", "AI-черновика", "AI-черновиков")}`,
+    title: `${visibleAiDraftCards.length} ${plural(visibleAiDraftCards.length, "AI-черновик", "AI-черновика", "AI-черновиков")}`,
     detail: "AI-предложения существуют и привязаны к позициям, но ещё не утверждены",
     tab: "recipes",
     filter: "ai_draft",
-    itemId: text(activeAiDraftCards[0].menuItemId, "", 120) || null,
+    itemId: text(visibleAiDraftCards[0].menuItemId, "", 120) || null,
   });
   if (unmappedItems.length) signals.push({
     id: "ingredient-mapping",
@@ -1041,7 +1226,12 @@ export function buildAssortmentAnalytics(input: {
     basis: Set<string>;
   }>();
   const needIssues: string[] = [];
-  for (const item of itemAnalytics.filter((candidate) => candidate.type !== "service")) {
+  for (const item of itemAnalytics) {
+    if (item.consumptionMode === "NONE") continue;
+    if (item.consumptionStatus !== "CONFIGURED") {
+      needIssues.push(`${item.name}: способ складского списания требует проверки`);
+      continue;
+    }
     let projectedPortions: number | null = null;
     let basis = "";
     if (item.plannedSales != null && item.plannedSales > 0) {
@@ -1058,7 +1248,7 @@ export function buildAssortmentAnalytics(input: {
       needIssues.push(`${item.name}: нет плана и недостаточно истории продаж`);
       continue;
     }
-    if (item.techCardStatus !== "approved") {
+    if (item.consumptionMode === "RECIPE" && item.techCardStatus !== "approved") {
       needIssues.push(`${item.name}: техкарта не подтверждена`);
       continue;
     }
@@ -1133,7 +1323,7 @@ export function buildAssortmentAnalytics(input: {
     summary: {
       menuItems: itemAnalytics.length,
       readinessPercent,
-      readyRecipes: itemAnalytics.filter((item) => item.techCardStatus === "approved").length,
+      readyRecipes: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "approved").length,
       attentionItems: attentionIds.size,
     },
     readiness: {
@@ -1143,10 +1333,11 @@ export function buildAssortmentAnalytics(input: {
       formula: "Выполненные обязательные проверки ÷ все применимые обязательные проверки",
       mandatory: [
         { id: "sale_price", label: "Актуальная цена продажи", complete: itemAnalytics.filter((item) => item.salePrice !== null).length, total: itemAnalytics.length },
-        { id: "recipe", label: "Подтверждённая техкарта", complete: itemAnalytics.filter((item) => item.type === "service" || item.techCardStatus === "approved").length, total: itemAnalytics.length },
-        { id: "units", label: "Нормализованные единицы", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.invalidUnitCount === 0)).length, total: itemAnalytics.length },
-        { id: "mapping", label: "Связь ингредиентов с закупками", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.unmappedIngredientCount === 0)).length, total: itemAnalytics.length },
-        { id: "purchase_price", label: "Подтверждённая стоимость ингредиентов", complete: itemAnalytics.filter((item) => item.type === "service" || (item.ingredientCount > 0 && item.missingPriceCount === 0)).length, total: itemAnalytics.length },
+        { id: "consumption", label: "Однозначный способ складского списания", complete: itemAnalytics.filter((item) => item.consumptionStatus === "CONFIGURED").length, total: itemAnalytics.length },
+        { id: "recipe", label: "Подтверждённая техкарта", complete: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "approved").length, total: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE").length },
+        { id: "units", label: "Нормализованные единицы", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.invalidUnitCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
+        { id: "mapping", label: "Связь расхода с номенклатурой", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.unmappedIngredientCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
+        { id: "purchase_price", label: "Подтверждённая стоимость расхода", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.missingPriceCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
       ],
       desirable: [
         {
@@ -1172,11 +1363,12 @@ export function buildAssortmentAnalytics(input: {
     },
     counts: {
       activeItems: itemAnalytics.length,
-      confirmedRecipes: itemAnalytics.filter((item) => item.techCardStatus === "approved").length,
+      confirmedRecipes: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "approved").length,
       draftRecipes: draftRecipes.length,
-      aiDraftRecipes: activeAiDraftCards.length,
-      reviewRecipes: activeReviewCards.length,
+      aiDraftRecipes: visibleAiDraftCards.length,
+      reviewRecipes: visibleReviewCards.length,
       missingRecipes: missingRecipes.length,
+      consumptionNeedsReview: consumptionReviewItems.length,
       incompleteIngredientLinks: itemAnalytics.filter((item) => item.unmappedIngredientCount > 0).length,
       orphanRecipes: reconciliation.report.orphan,
       ambiguousRecipes: reconciliation.report.ambiguous,
@@ -1192,9 +1384,10 @@ export function buildAssortmentAnalytics(input: {
     },
     signals: signals.slice(0, 8),
     costChanges: costChanges.slice(0, 20),
+    nomenclatureCosts,
     sections: [...sectionMap.values()].sort((left, right) => right.total - left.total),
     menuItems: itemAnalytics,
-    recipes: itemAnalytics.filter((item) => item.type !== "service"),
+    recipes: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" || item.consumptionMode === "NEEDS_REVIEW"),
     economics: {
       available: revenue > 0,
       revenue: revenue > 0 ? revenue : null,

@@ -1622,7 +1622,7 @@
   function loadApplication() {
     var script = document.createElement("script");
     script.type = "module";
-    script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-20260906-home-reviews-auth-v415";
+    script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-20260906-home-reviews-auth-v415-20260907-menu-consumption-sot-v418";
     script.addEventListener("error", function () { bdRecoverStartupV341("module-load"); }, { once: true });
     document.head.appendChild(script);
     if (bdStartupPathV341()) {

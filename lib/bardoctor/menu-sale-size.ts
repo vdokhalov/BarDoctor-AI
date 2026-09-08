@@ -304,12 +304,19 @@ export function normalizeMenuItemSaleSizeRecord(
   assortment?: unknown,
 ): JsonRecord {
   const item = { ...record(value) };
+  const consumptionMode = text(item.consumptionMode, "", 40);
+  if (["DIRECT_ITEM", "RECIPE", "NONE"].includes(consumptionMode)) {
+    return item;
+  }
+  if (consumptionMode === "FIXED_QUANTITY") {
+    const structured = record(item.saleSize);
+    const normalized = canonicalSize(structured.quantity, structured.unit, "manual", structured as Partial<MenuSaleSize>);
+    if (normalized) item.saleSize = normalized;
+    return item;
+  }
   if (text(item.type, "composite", 30) === "service") {
-    delete item.saleSize;
-    delete item.portionSize;
-    delete item.legacyPortionSize;
-    delete item.readyProduct;
-    delete item.readyProductLink;
+    // Legacy fields may be needed if the user later reviews or restores a mode.
+    // The active consumptionMode, not destructive cleanup, decides whether they post.
     return item;
   }
   const resolved = resolveMenuItemSaleSize(item, assortment);
@@ -330,6 +337,16 @@ export function validateMenuItemSaleSize(value: unknown, assortment?: unknown): 
   error?: string;
 } {
   const item = record(value);
+  const consumptionMode = text(item.consumptionMode, "", 40);
+  if (["DIRECT_ITEM", "RECIPE", "NONE"].includes(consumptionMode)) return { ok: true };
+  if (consumptionMode === "FIXED_QUANTITY") {
+    const structured = record(item.saleSize);
+    const normalized = canonicalSize(structured.quantity, structured.unit);
+    if (!normalized) {
+      return { ok: false, code: "SALE_SIZE_REQUIRED", error: "Укажите количество и единицу списания." };
+    }
+    return { ok: true };
+  }
   if (text(item.type, "composite", 30) === "service") return { ok: true };
   const size = resolveMenuItemSaleSize(item, assortment);
   if (!size) return { ok: false, code: "SALE_SIZE_REQUIRED", error: "Укажите количество и единицу продажи." };

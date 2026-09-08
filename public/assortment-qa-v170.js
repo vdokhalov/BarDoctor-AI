@@ -43,6 +43,7 @@
       department: groupId,
       category: category,
       type: "composite",
+      consumptionMode: "RECIPE",
       portionSize: "1 порция",
       salePrice: price,
       currency: "RUB",
@@ -78,7 +79,7 @@
     menuItem("item-whiskey", "Whiskey Cola", "bar", "Крепкий алкоголь", 480, { subgroupId: "bar-spirits" }),
     menuItem("item-caesar", "Caesar Salad", "kitchen", "Салаты", 590),
     menuItem("item-burger", state === "long" ? "Фирменный бургер BarDoctor с говядиной, карамелизированным луком и авторским соусом" : "Бургер BBQ", "kitchen", "Бургеры", state === "incomplete" ? "" : 690),
-    menuItem("item-hookah", "Кальян классический", "hookah", "Кальяны", 900, { type: "service" }),
+    menuItem("item-hookah", "Кальян классический", "hookah", "Кальяны", 900, { type: "service", consumptionMode: "NONE" }),
   ];
   var recipes = state === "empty" ? [] : venueId === 502 ? [
     { id: "recipe-lemonade", menuItemId: "item-lemonade", status: "confirmed", ingredients: [ingredient("ing-lemon", "Лимон", 80, "g", "product:lemon"), ingredient("ing-syrup", "Сироп", 30, "ml", "product:syrup")], updatedAt: "2026-08-09T10:00:00.000Z" },
@@ -88,6 +89,22 @@
     { id: "recipe-caesar", menuItemId: "item-caesar", status: state === "incomplete" ? "draft" : "confirmed", ingredients: [ingredient("ing-chicken", "Куриное филе", 140, "g", "product:chicken"), ingredient("ing-salad", "Салат романо", 80, "g", state === "incomplete" ? "" : "product:salad"), ingredient("ing-cheese", "Пармезан", 20, "g", "product:parmesan")], updatedAt: "2026-08-09T10:00:00.000Z" },
     { id: "recipe-burger", menuItemId: "item-burger", status: "draft", ingredients: [ingredient("ing-beef", "Говядина", 180, "g", "product:beef"), ingredient("ing-bun", "Булочка", 1, "pcs", "")], updatedAt: "2026-08-09T10:00:00.000Z" },
   ];
+  recipes = recipes.map(function (recipe) {
+    return Object.assign({}, recipe, {
+      ownerId: recipe.menuItemId,
+      ownerType: "menu_item",
+      venueId: venueId,
+      current: true,
+      lifecycleStatus: "current",
+      reviewStatus: recipe.status === "confirmed" ? "approved" : "requires_review",
+      ingredients: recipe.ingredients.map(function (row) {
+        return Object.assign({}, row, {
+          venueId: venueId,
+          nomenclatureItemId: row.purchaseProductKey || undefined,
+        });
+      }),
+    });
+  });
 
   var catalog = {
     version: 2,
@@ -111,7 +128,11 @@
     ],
     updatedAt: "2026-08-12T12:00:00.000Z",
   };
-  catalog.nomenclature = Array.from({ length: 125 }, function (_, index) {
+  catalog.nomenclature = [
+    { id: "product:kozel", productKey: "product:kozel", venueId: venueId, name: "Пиво Kozel Dark бутылка 0.5", unit: "pcs", packageSize: "0,5 л", active: true },
+    { id: "product:whiskey", productKey: "product:whiskey", venueId: venueId, name: "Whisky Jameson", unit: "ml", packageSize: "1 л", active: true },
+    { id: "product:coffee", productKey: "product:coffee", venueId: venueId, name: "Coffee beans", unit: "g", packageSize: "1 кг", active: true },
+  ].concat(Array.from({ length: 125 }, function (_, index) {
     var target = index === 117;
     return {
       id: "qa-nom-" + index,
@@ -122,7 +143,7 @@
       packageSize: target ? "1,25 л" : "",
       active: true,
     };
-  });
+  }));
 
   var purchaseProducts = {
     "product:aperol": { name: "Aperol", supplier: "ВПРОК", unit: "ml", current: 0.81 },
@@ -136,6 +157,8 @@
     "product:salad": { name: "Салат романо", supplier: "Рынок", unit: "g", current: 0.25 },
     "product:parmesan": { name: "Пармезан", supplier: "ВПРОК", unit: "g", current: 0.9 },
     "product:beef": { name: "Говядина", supplier: "Рынок", unit: "g", current: 0.58 },
+    "product:kozel": { name: "Пиво Kozel Dark бутылка 0.5", supplier: "ВПРОК", unit: "pcs", current: 10 },
+    "product:coffee": { name: "Coffee beans", supplier: "ВПРОК", unit: "g", current: 0.1 },
   };
 
   function purchaseDocument(id, date, priceFactor) {
@@ -183,6 +206,11 @@
       portionSize: item.portionSize,
       salePrice: Number(item.salePrice) || null,
       currency: "RUB",
+      consumptionMode: item.consumptionMode || (item.type === "service" ? "NONE" : "RECIPE"),
+      consumptionStatus: "CONFIGURED",
+      consumptionSummary: item.consumptionMode === "NONE"
+        ? "Складской расход не требуется."
+        : "При продаже списываются ингредиенты техкарты.",
       recipeId: recipes.find(function (recipe) { return recipe.menuItemId === item.id; }) && recipes.find(function (recipe) { return recipe.menuItemId === item.id; }).id || null,
       recipeStatus: status === "missing_recipe" ? "missing" : status === "review" ? "draft" : "confirmed",
       techCardStatus: status === "missing_recipe" ? "missing" : status === "review" ? "requires_review" : "approved",
@@ -242,6 +270,22 @@
       var sectionRows = rows.filter(function (row) { return row.groupId === group.id; });
       return { id: group.id, name: group.name, total: sectionRows.length, calculated: sectionRows.filter(function (row) { return row.status === "ready"; }).length, attention: sectionRows.filter(function (row) { return row.status !== "ready"; }).length };
     }).filter(function (section) { return section.total > 0; });
+    var nomenclatureCosts = Object.keys(purchaseProducts).map(function (key) {
+      var product = purchaseProducts[key];
+      return {
+        id: "nomenclature-cost:" + key,
+        nomenclatureItemId: key,
+        productKey: key,
+        purchaseProductKey: key,
+        name: product.name,
+        unit: product.unit,
+        unitPrice: product.current,
+        cost: product.current,
+        currency: "RUB",
+        complete: true,
+        costStatus: product.current === 0 ? "KNOWN_ZERO" : "KNOWN",
+      };
+    });
     return {
       version: "assortment-analytics-v1",
       period: { key: "2026-08", previousKey: "2026-07", comparisonBasis: "same_elapsed_days" },
@@ -250,9 +294,10 @@
       counts: { activeItems: rows.length, confirmedRecipes: ready, draftRecipes: drafts, missingRecipes: missing, attentionItems: attention, unmappedIngredients: state === "incomplete" ? 2 : 1, invalidUnits: 0, missingPurchasePrices: 0, missingSalePrices: rows.filter(function (row) { return row.salePrice == null; }).length },
       signals: signals,
       costChanges: rows.filter(function (row) { return row.costChangePercent != null; }).map(function (row) { return { id: row.id, name: row.name, costChangePercent: row.costChangePercent, currentCost: row.recipeCost, previousCost: row.costHistory[0] && row.costHistory[0].cost || null, currency: "RUB", primaryReason: row.costChangeBasis || "Подтверждённая закупочная цена" }; }),
+      nomenclatureCosts: nomenclatureCosts,
       sections: sections,
       menuItems: rows,
-      recipes: rows.filter(function (row) { return row.type !== "service"; }),
+      recipes: rows.filter(function (row) { return row.consumptionMode === "RECIPE" || row.consumptionMode === "NEEDS_REVIEW"; }),
       economics: venueId === 502 ? { available: false, revenue: null, costOfGoods: null, costPercent: null, grossMargin: null, comparison: null, insufficientReason: "Недостаточно item-level продаж за период" } : { available: true, revenue: 52280, costOfGoods: 7861.2, costPercent: 15, grossMargin: 44418.8, comparison: { basis: "равный прошедший интервал" }, insufficientReason: null },
       needs: venueId === 502 ? { horizonDays: 7, rows: [], issues: ["Недостаточно истории продаж"], completeRows: 0, forecastStatus: "insufficient_data", formula: "Остатки + техкарты + продажи или план" } : { horizonDays: 7, rows: [{ productKey: "product:aperol", name: "Aperol", unit: "ml", currentStock: 4000, projectedNeed: 5040, shortage: 1040, recommendedAmount: 2000, estimatedCost: 1620, currency: "RUB", supplierName: "ВПРОК", complete: true }], issues: ["Булочка: требуется подтверждённый mapping", "Mojito: техкарта не создана"], completeRows: 1, forecastStatus: "partial", formula: "Остатки + подтверждённые техкарты + фактические продажи за 28 дней" },
       sources: catalog.sources,

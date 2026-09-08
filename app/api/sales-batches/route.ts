@@ -131,7 +131,7 @@ function auditStatement(input: {
 function activeMenu(assortment: JsonRecord, venueId: number) {
   return array(assortment.menuItems).map(record).filter((item) => {
     const rowVenueId = numeric(item.venueId);
-    return item.active !== false && item.type !== "service" && (!rowVenueId || rowVenueId === venueId);
+    return item.active !== false && (!rowVenueId || rowVenueId === venueId);
   }).map((item) => ({
     id: text(item.id, "", 160),
     name: text(item.name, "Позиция меню"),
@@ -400,7 +400,7 @@ async function postOnce(request: Request): Promise<Response> {
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: result.batch.status === "POSTED" ? "sales_batch.posted" : "sales_batch.partially_posted", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано immutable SALE_CONSUMPTION движений: ${result.batch.movementIds.length}; отражено строк: ${result.batch.postedLineCount}/${result.batch.lines.length}`, now }),
     ], now);
-    return Response.json({ ok: true, idempotent: false, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, postedNow: result.postedNow, stockChanged: true }, { status: 201 });
+    return Response.json({ ok: true, idempotent: false, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, postedNow: result.postedNow, stockChanged: result.stockChanged }, { status: 201 });
   }
 
   if (action === "reverse") {
@@ -416,7 +416,7 @@ async function postOnce(request: Request): Promise<Response> {
       upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: "sales_batch.reversed", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано SALE_REVERSAL движений: ${result.batch.reversalMovementIds.length}; исходные движения не удалены`, now }),
     ], now);
-    return Response.json({ ok: true, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: true });
+    return Response.json({ ok: true, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: result.stockChanged });
   }
 
   if (action === "cancel") {
@@ -446,10 +446,6 @@ async function postOnce(request: Request): Promise<Response> {
     draft.externalBatchId = text(requested.externalBatchId ?? body.externalBatchId, "", 180) || undefined;
   }
   if (!draft.lines.length) return Response.json({ ok: false, code: "SALES_LINES_REQUIRED", error: "Добавьте хотя бы одну проданную позицию" }, { status: 422 });
-  if (!batchId && draft.externalBatchId) {
-    const duplicate = salesBatches(stores.batches, account.venueId).find((batch) => batch.source === draft.source && batch.externalBatchId === draft.externalBatchId && batch.status !== "CANCELLED");
-    if (duplicate) return Response.json({ ok: true, idempotent: true, batch: duplicate, stockChanged: false });
-  }
   const result = createOrUpdateSalesBatch({
     batches: stores.batches,
     batchId: batchId || undefined,
@@ -464,6 +460,9 @@ async function postOnce(request: Request): Promise<Response> {
     now,
   });
   if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_READ_ONLY" ? 409 : 422 });
+  if (result.duplicate) {
+    return Response.json({ ok: true, idempotent: true, batch: result.batch, stockChanged: false });
+  }
   await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
     auditStatement({ database, accountId: account.id, action: before ? "sales_batch.draft_updated" : "sales_batch.draft_created", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Черновик сохранён server-side; источник ${result.batch.source}; склад не изменён`, now }),

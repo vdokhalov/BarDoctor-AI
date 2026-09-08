@@ -12,6 +12,7 @@ import {
   repairInventoryBalanceMetadata,
   repairInventoryPurchaseAmounts,
   resolveInventoryProductKey,
+  restoreInventoryProduct,
   removePurchaseFromInventory,
   revisePurchaseInInventory,
   updateInventoryProductDefinition,
@@ -2371,4 +2372,315 @@ test("inventory count resolves a historical product key through aliases", () => 
   assert.equal(result.summary.unresolvedLines.length, 0);
   assert.equal(result.items[0]?.productKey, "new-key");
   assert.equal(result.movements[0]?.productKey, "new-key");
+});
+
+test("inventory count preserves a foreign last-wins same-key balance byte-for-byte", () => {
+  const foreignBalance = {
+    id: "count-foreign",
+    productKey: "shared-count-key",
+    venueId: 2,
+    name: "Foreign stock",
+    current: 99,
+    unit: "pcs",
+    inventoryValue: 321,
+    marker: { preserve: true },
+  };
+  const result = applyInventoryCount({
+    assortment: {
+      stockBalances: [
+        { id: "count-local", productKey: "shared-count-key", venueId: 1, name: "Local stock", current: 5, unit: "pcs" },
+        foreignBalance,
+      ],
+    },
+    stockMovements: [],
+    venueId: 1,
+    snapshot: {
+      id: "count-shared-key",
+      date: "2026-09-08",
+      items: [{ id: "line-local", productKey: "shared-count-key", actual: 7 }],
+    },
+    now: "2026-09-08T10:00:00.000Z",
+  });
+
+  assert.equal(result.summary.unresolvedLines.length, 0);
+  const balances = result.assortment.stockBalances as Array<Record<string, unknown>>;
+  assert.equal(balances.find((item) => item.id === "count-local")?.current, 7);
+  assert.equal(JSON.stringify(balances.find((item) => item.id === "count-foreign")), JSON.stringify(foreignBalance));
+  assert.equal(result.movements[0]?.venueId, 1);
+});
+
+test("archive and restore ignore a foreign alias that shadows a local product reference", () => {
+  const aliases = [
+    { from: "local-reference", to: "local-target", venueId: 1 },
+    { from: "local-reference", to: "local-decoy", venueId: 2, marker: { preserve: true } },
+  ];
+  const archived = archiveInventoryProduct({
+    assortment: {
+      stockBalances: [
+        { id: "archive-target", productKey: "local-target", venueId: 1, name: "Target", current: 0, unit: "pcs", inventoryValue: 0 },
+        { id: "archive-decoy", productKey: "local-decoy", venueId: 1, name: "Decoy", current: 0, unit: "pcs", inventoryValue: 0 },
+      ],
+      nomenclature: [
+        { id: "archive-target-item", productKey: "local-target", venueId: 1, name: "Target", active: true },
+        { id: "archive-decoy-item", productKey: "local-decoy", venueId: 1, name: "Decoy", active: true },
+      ],
+      inventoryProductAliases: aliases,
+    },
+    productKey: "local-reference",
+    venueId: 1,
+    now: "2026-09-08T10:00:00.000Z",
+  });
+
+  assert.equal(archived.ok, true);
+  const archivedBalances = archived.assortment.stockBalances as Array<Record<string, unknown>>;
+  assert.equal(archivedBalances.find((item) => item.id === "archive-target")?.archived, true);
+  assert.equal(archivedBalances.find((item) => item.id === "archive-decoy")?.archived, undefined);
+  assert.equal(JSON.stringify(archived.assortment.inventoryProductAliases), JSON.stringify(aliases));
+
+  const restored = restoreInventoryProduct({
+    assortment: archived.assortment,
+    productKey: "local-reference",
+    venueId: 1,
+    now: "2026-09-08T11:00:00.000Z",
+  });
+  assert.equal(restored.ok, true);
+  const restoredBalances = restored.assortment.stockBalances as Array<Record<string, unknown>>;
+  assert.equal(restoredBalances.find((item) => item.id === "archive-target")?.active, true);
+  assert.equal(restoredBalances.find((item) => item.id === "archive-target")?.archived, false);
+  assert.equal(restoredBalances.find((item) => item.id === "archive-decoy")?.archived, undefined);
+  assert.equal(JSON.stringify(restored.assortment.inventoryProductAliases), JSON.stringify(aliases));
+});
+
+test("inventory restore is venue-scoped and clears only the restored identity tombstones", () => {
+  const foreignBalance = {
+    id: "balance-foreign",
+    nomenclatureItemId: "nom-foreign",
+    productKey: "shared-key",
+    venueId: 2,
+    active: false,
+    archived: true,
+    archivedAt: "2026-09-01T10:00:00.000Z",
+    marker: { preserve: "balance" },
+  };
+  const foreignNomenclature = {
+    id: "nom-foreign",
+    productKey: "shared-key",
+    venueId: 2,
+    active: false,
+    archived: true,
+    archivedAt: "2026-09-01T10:00:00.000Z",
+    marker: { preserve: "nomenclature" },
+  };
+  const assortment = {
+    stockBalances: [{
+      id: "balance-local",
+      nomenclatureItemId: "nom-local",
+      productKey: "shared-key",
+      venueId: 1,
+      active: false,
+      archived: true,
+      archivedAt: "2026-09-01T10:00:00.000Z",
+    }, foreignBalance],
+    nomenclature: [{
+      id: "nom-local",
+      productKey: "shared-key",
+      venueId: 1,
+      active: false,
+      archived: true,
+      archivedAt: "2026-09-01T10:00:00.000Z",
+      externalProductKeys: ["local-external"],
+    }, foreignNomenclature],
+    inventoryProductAliases: [
+      { from: "local-alias", to: "shared-key" },
+      { from: "foreign-alias", to: "foreign-only" },
+    ],
+    archivedInventoryProductKeys: [
+      "nom-local",
+      "balance-local",
+      "shared-key",
+      "local-external",
+      "local-alias",
+      "foreign-only",
+      "foreign-alias",
+      "unrelated-tombstone",
+    ],
+  };
+  const frozenForeignBalance = JSON.stringify(foreignBalance);
+  const frozenForeignNomenclature = JSON.stringify(foreignNomenclature);
+
+  const result = restoreInventoryProduct({
+    assortment,
+    productKey: "local-alias",
+    venueId: 1,
+    now: "2026-09-08T09:00:00.000Z",
+  });
+
+  assert.equal(result.ok, true);
+  const balances = result.assortment.stockBalances as Array<Record<string, unknown>>;
+  const nomenclature = result.assortment.nomenclature as Array<Record<string, unknown>>;
+  const localBalance = balances.find((value) => value.id === "balance-local");
+  const localItem = nomenclature.find((value) => value.id === "nom-local");
+  assert.equal(localBalance?.active, true);
+  assert.equal(localBalance?.archived, false);
+  assert.equal(localBalance?.archivedAt, undefined);
+  assert.equal(localItem?.active, true);
+  assert.equal(localItem?.archived, false);
+  assert.equal(localItem?.archivedAt, undefined);
+  assert.equal(JSON.stringify(balances.find((value) => value.id === "balance-foreign")), frozenForeignBalance);
+  assert.equal(JSON.stringify(nomenclature.find((value) => value.id === "nom-foreign")), frozenForeignNomenclature);
+  assert.deepEqual(result.assortment.inventoryProductAliases, assortment.inventoryProductAliases);
+  assert.deepEqual(result.assortment.archivedInventoryProductKeys, [
+    "foreign-only",
+    "foreign-alias",
+    "unrelated-tombstone",
+  ]);
+});
+
+test("inventory restore cannot resolve a foreign-venue product as a local one", () => {
+  const assortment = {
+    stockBalances: [{
+      id: "foreign-balance",
+      nomenclatureItemId: "foreign-item",
+      productKey: "shared-key",
+      venueId: 2,
+      active: false,
+      archived: true,
+    }],
+    nomenclature: [{
+      id: "foreign-item",
+      productKey: "shared-key",
+      venueId: 2,
+      active: false,
+      archived: true,
+    }],
+    archivedInventoryProductKeys: ["shared-key"],
+  };
+  const before = JSON.stringify(assortment);
+
+  const result = restoreInventoryProduct({ assortment, productKey: "shared-key", venueId: 1 });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "PRODUCT_NOT_FOUND");
+  assert.equal(JSON.stringify(result.assortment), before);
+});
+
+test("warehouse product editor updates only the authenticated venue when product keys overlap", () => {
+  const foreignBalance = {
+    id: "balance-foreign",
+    nomenclatureItemId: "nom-foreign",
+    productKey: "shared-key",
+    venueId: 2,
+    name: "Foreign syrup",
+    current: 250,
+    unit: "pcs",
+    packageSize: "1 шт.",
+    marker: { preserve: "balance" },
+  };
+  const foreignNomenclature = {
+    id: "nom-foreign",
+    productKey: "shared-key",
+    venueId: 2,
+    name: "Foreign syrup",
+    unit: "pcs",
+    packageSize: "1 шт.",
+    marker: { preserve: "nomenclature" },
+  };
+  const foreignRecipe = {
+    id: "recipe-foreign",
+    venueId: 2,
+    name: "Foreign recipe",
+    ingredients: [{
+      id: "ingredient-foreign",
+      venueId: 2,
+      nomenclatureItemId: "nom-foreign",
+      name: "Foreign syrup",
+      quantity: 1,
+      unit: "шт.",
+    }],
+    marker: { preserve: "recipe" },
+  };
+  const aliases = [
+    { from: "edit-alias", to: "shared-key", venueId: 1, marker: "local" },
+    { from: "edit-alias", to: "foreign-only-key", venueId: 2, marker: "foreign" },
+  ];
+  const stockMovements = [{
+    id: "movement-foreign",
+    venueId: 2,
+    productKey: "shared-key",
+    type: "receipt",
+    amount: 250,
+    marker: { preserve: "movement" },
+  }];
+  const assortment = {
+    stockBalances: [{
+      id: "balance-local",
+      nomenclatureItemId: "nom-local",
+      productKey: "shared-key",
+      venueId: 1,
+      name: "Local syrup",
+      current: 0,
+      unit: "pcs",
+      packageSize: "1 шт.",
+    }, foreignBalance],
+    nomenclature: [{
+      id: "nom-local",
+      productKey: "shared-key",
+      venueId: 1,
+      name: "Local syrup",
+      unit: "pcs",
+      packageSize: "1 шт.",
+    }, foreignNomenclature],
+    recipes: [{
+      id: "recipe-local",
+      venueId: 1,
+      name: "Local recipe",
+      ingredients: [{
+        id: "ingredient-local",
+        venueId: 1,
+        nomenclatureItemId: "nom-local",
+        name: "Local syrup",
+        quantity: 10,
+        unit: "шт.",
+      }],
+    }, foreignRecipe],
+    inventoryProductAliases: aliases,
+  };
+  const frozenForeignBalance = JSON.stringify(foreignBalance);
+  const frozenForeignNomenclature = JSON.stringify(foreignNomenclature);
+  const frozenForeignRecipe = JSON.stringify(foreignRecipe);
+  const frozenAliases = JSON.stringify(aliases);
+  const frozenMovements = JSON.stringify(stockMovements);
+
+  const result = updateInventoryProductDefinition({
+    assortment,
+    stockMovements,
+    venueId: 1,
+    update: {
+      productKey: "edit-alias",
+      name: "Local syrup, renamed",
+      unit: "ml",
+      packageSize: "1 л",
+      displayUnit: "l",
+    },
+    now: "2026-09-08T10:00:00.000Z",
+  });
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.product.id, "balance-local");
+  assert.equal(result.product.name, "Local syrup, renamed");
+  assert.equal(result.product.unit, "ml");
+  assert.equal(result.linkedRecipes, 1);
+  const balances = result.assortment.stockBalances as Array<Record<string, unknown>>;
+  const nomenclature = result.assortment.nomenclature as Array<Record<string, unknown>>;
+  const recipes = result.assortment.recipes as Array<Record<string, unknown>>;
+  assert.equal(JSON.stringify(balances.find((value) => value.id === "balance-foreign")), frozenForeignBalance);
+  assert.equal(JSON.stringify(nomenclature.find((value) => value.id === "nom-foreign")), frozenForeignNomenclature);
+  assert.equal(JSON.stringify(recipes.find((value) => value.id === "recipe-foreign")), frozenForeignRecipe);
+  assert.equal(JSON.stringify(result.assortment.inventoryProductAliases), frozenAliases);
+  assert.equal(JSON.stringify(stockMovements), frozenMovements);
+  const localRecipe = recipes.find((value) => value.id === "recipe-local");
+  const localIngredients = localRecipe?.ingredients as Array<Record<string, unknown>>;
+  assert.equal(localIngredients[0]?.purchaseProductKey, "shared-key");
+  assert.equal(localIngredients[0]?.unit, "мл");
 });

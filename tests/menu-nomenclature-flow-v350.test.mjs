@@ -31,7 +31,7 @@ test("a ready menu item can create, select and link canonical nomenclature in pl
   const start = bundle.indexOf("function bdCatMenuEditor");
   const end = bundle.indexOf("function bdCatStructureManager", start);
   const editor = bundle.slice(start, end);
-  assert.match(editor, /Найти товар, например Спрайт/);
+  assert.match(editor, /Найти товар, например Whisky/);
   assert.match(editor, /Создать «/);
   assert.match(editor, /в номенклатуре/);
   assert.match(editor, /context:"menu"/);
@@ -57,12 +57,12 @@ test("menu nomenclature creation stays visible before the existing-product list"
 test("menu quick create keeps the authoritative product and link after save", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdMenuNomenclatureLinkVersion="v352"/);
-  assert.match(bundle, /M\(L\.product,L\.assortment\)/);
   assert.match(bundle, /onCreated:\(P,c,bdMenuAssortmentV352\)/);
   assert.match(bundle, /bdMenuOnNomenclatureCreatedV352\?\.\(bdMenuAssortmentV352,I\)/);
-  assert.match(bundle, /bdCatMatchingProductsV258\(s,bdCatPurchaseProducts\(u\)\),\[s,u\]/);
-  assert.match(bundle, /ie=async p=>\{const c=bdCatState\(xr\(bdCatalogStoreKey\)\|\|s\)/);
-  assert.match(bundle, /bdMenuExactProductsV352/);
+  assert.match(bundle, /readyProduct:\{nomenclatureItemId:I\.id\|\|I\.nomenclatureItemId\|\|I\.key,productKey:I\.key/);
+  assert.match(bundle, /onSave:ie,recipes:s\.recipes,venueId:s\.activeVenueId/);
+  assert.match(bundle, /p\.consumptionMode==="RECIPE"&&!W\.length/);
+  assert.doesNotMatch(bundle, /bdMenuExactProductsV352=/);
   assert.match(bundle, /!_&&i\.jsx\("button",\{type:"button",className:"bd-menu-create-nomenclature-v350"/);
   const html = await read("public/app.html");
   const response = await read("app/bar-doctor-response.ts");

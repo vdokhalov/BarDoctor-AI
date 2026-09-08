@@ -10,6 +10,7 @@ export type MappingCandidate = {
   unit?: string;
   packageSize?: string;
   barcode?: string;
+  identityAmbiguous?: boolean;
 };
 
 export type MappingDecision = {
@@ -34,6 +35,41 @@ function text(value: unknown, fallback = "", max = 300): string {
   return typeof value === "string" && value.trim()
     ? value.trim().slice(0, max)
     : fallback;
+}
+
+function number(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function belongsToVenue(value: JsonRecord, venueId: number): boolean {
+  const candidateVenueId = number(value.venueId);
+  return candidateVenueId <= 0 || candidateVenueId === venueId;
+}
+
+function stableCandidate(left: MappingCandidate, right: MappingCandidate): number {
+  return left.name.localeCompare(right.name, "ru")
+    || (left.unit ?? "").localeCompare(right.unit ?? "", "ru")
+    || (left.packageSize ?? "").localeCompare(right.packageSize ?? "", "ru")
+    || (left.barcode ?? "").localeCompare(right.barcode ?? "", "ru");
+}
+
+function addIdentityCandidate(
+  result: Map<string, MappingCandidate[]>,
+  candidate: MappingCandidate,
+): void {
+  result.set(candidate.id, [...(result.get(candidate.id) ?? []), candidate]);
+}
+
+function resolvedIdentityCandidates(
+  result: Map<string, MappingCandidate[]>,
+): MappingCandidate[] {
+  return [...result.values()].map((matches) => {
+    const [candidate] = [...matches].sort(stableCandidate);
+    return matches.length > 1
+      ? { ...candidate, identityAmbiguous: true }
+      : candidate;
+  }).sort((a, b) => a.name.localeCompare(b.name, "ru") || a.id.localeCompare(b.id, "ru"));
 }
 
 const CYRILLIC_TO_LATIN: Record<string, string> = {
@@ -127,26 +163,28 @@ function candidateScore(external: MappingCandidate, candidate: MappingCandidate)
 export function candidatesFromAssortment(
   assortment: unknown,
   type: MappingEntityType,
+  venueId: number,
 ): MappingCandidate[] {
   const root = record(assortment);
-  const result = new Map<string, MappingCandidate>();
+  const result = new Map<string, MappingCandidate[]>();
   if (type === "menu_item") {
     for (const value of list(root.menuItems)) {
       const item = record(value);
-      if (item.active === false) continue;
+      if (item.active === false || !belongsToVenue(item, venueId)) continue;
       const id = text(item.id);
       const name = text(item.name);
-      if (id && name) result.set(id, { id, name });
+      if (id && name) addIdentityCandidate(result, { id, name });
     }
-    return [...result.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+    return resolvedIdentityCandidates(result);
   }
 
   for (const value of list(root.stockBalances)) {
     const item = record(value);
+    if (!belongsToVenue(item, venueId)) continue;
     const id = text(item.key ?? item.productKey);
     const name = text(item.name);
     if (!id || !name) continue;
-    result.set(id, {
+    addIdentityCandidate(result, {
       id,
       name,
       unit: text(item.unit) || undefined,
@@ -156,12 +194,14 @@ export function candidatesFromAssortment(
   }
   for (const recipeValue of list(root.recipes)) {
     const recipe = record(recipeValue);
+    if (!belongsToVenue(recipe, venueId)) continue;
     for (const ingredientValue of list(recipe.ingredients)) {
       const ingredient = record(ingredientValue);
+      if (!belongsToVenue(ingredient, venueId)) continue;
       const id = text(ingredient.purchaseProductKey);
       const name = text(ingredient.name);
       if (id && name && !result.has(id)) {
-        result.set(id, {
+        addIdentityCandidate(result, {
           id,
           name,
           unit: text(ingredient.unit) || undefined,
@@ -170,7 +210,7 @@ export function candidatesFromAssortment(
       }
     }
   }
-  return [...result.values()].sort((a, b) => a.name.localeCompare(b.name, "ru"));
+  return resolvedIdentityCandidates(result);
 }
 
 export function decideMapping(
@@ -191,6 +231,15 @@ export function decideMapping(
       candidate: null,
       alternatives: [],
       reason: "Подходящей позиции BarDoctor не найдено",
+    };
+  }
+  if (best.candidate.identityAmbiguous) {
+    return {
+      status: "suggested",
+      confidence: best.score,
+      candidate: best.candidate,
+      alternatives,
+      reason: "В заведении найдено несколько позиций с одним внутренним ID — требуется исправить дубликаты",
     };
   }
   const requiredLead = best.score === 100 ? 4 : 8;

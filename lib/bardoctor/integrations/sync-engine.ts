@@ -128,10 +128,11 @@ async function resolveProduct(input: {
     externalId: input.external.externalId,
   });
   if (saved?.status === "confirmed" && saved.internal_id) {
-    const targetExists = input.candidates.some((candidate) => candidate.id === saved.internal_id);
+    const target = input.candidates.find((candidate) => candidate.id === saved.internal_id);
+    const targetExists = Boolean(target && !target.identityAmbiguous);
     const intentionalCreate = type === "stock_product"
       && saved.reason?.includes("создать складскую позицию");
-    if (targetExists || intentionalCreate) {
+    if (targetExists || (intentionalCreate && !target)) {
       return { internalId: saved.internal_id, mappingId: saved.id, issue: false };
     }
     await markMappingConflict({
@@ -149,7 +150,12 @@ async function resolveProduct(input: {
     packageSize: input.external.packageSize,
     barcode: input.external.barcode,
   }, input.candidates);
-  if (input.autoCreate && type === "stock_product" && decision.status !== "confirmed") {
+  if (
+    input.autoCreate
+    && type === "stock_product"
+    && decision.status !== "confirmed"
+    && decision.candidate?.identityAmbiguous !== true
+  ) {
     const sourceHash = await payloadHash(`${input.connectionId}|${input.external.externalId}`);
     const internalId = `integration-${sourceHash.slice(0, 32)}`;
     const mapping = await saveMappingProposal({
@@ -448,8 +454,8 @@ export async function runIntegrationSync(input: {
     retryOfRunId: input.retryOfRunId,
   });
   const assortment = await currentAssortment(input.account.id);
-  const stockCandidates = candidatesFromAssortment(assortment, "stock_product");
-  const menuCandidates = candidatesFromAssortment(assortment, "menu_item");
+  const stockCandidates = candidatesFromAssortment(assortment, "stock_product", input.account.venueId);
+  const menuCandidates = candidatesFromAssortment(assortment, "menu_item", input.account.venueId);
   const errors: SyncRunResult["errors"] = [];
   const seen = new Set<string>();
   let created = 0;
@@ -626,7 +632,7 @@ export async function runIntegrationSync(input: {
   for (const envelope of input.records) {
     const payloadJson = JSON.stringify(envelope);
     const hash = await payloadHash(envelope);
-    const dedupeKey = `${envelope.entityType}:${envelope.externalId}`;
+    const dedupeKey = integrationRecordDedupeKey(envelope);
     if (seen.has(dedupeKey)) {
       skipped += 1;
       await createSyncItem({
@@ -916,6 +922,12 @@ export async function runIntegrationSync(input: {
     errors,
     mappingIssues,
   };
+}
+
+export function integrationRecordDedupeKey(
+  envelope: Pick<CanonicalEnvelope, "venueId" | "entityType" | "externalId">,
+): string {
+  return `${envelope.venueId}:${envelope.entityType}:${envelope.externalId}`;
 }
 
 export function newStockProductId(external: ExternalProductReference): string {

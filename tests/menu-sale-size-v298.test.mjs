@@ -20,15 +20,17 @@ test("menu create and edit use controlled numeric quantity plus canonical unit p
   );
 });
 
-test("ready product editor links canonical nomenclature packaging", async () => {
+test("ready and fixed consumption link canonical nomenclature by explicit ID", async () => {
   const bundle = await readFile(bundleUrl, "utf8");
   assert.match(bundle, /label:"Номенклатура"/);
-  assert.match(bundle, /Найти товар, например Спрайт/);
-  assert.match(bundle, /label:"Упаковка продажи"/);
+  assert.match(bundle, /Найти товар, например Whisky/);
+  assert.match(bundle, /Связано по ID:/);
   assert.match(bundle, /packagesPerSale:1/);
-  assert.match(bundle, /bdMenuStructuredSizeV298\(n\.quantity,n\.unit,"packaging"/);
-  assert.match(bundle, /return e&&\(t\?\.unit==="pcs"\|\|t\?\.baseUnit==="pcs"\)/);
-  assert.match(bundle, /Одна продажа спишет одну связанную складскую упаковку/);
+  assert.match(bundle, /bdMenuStructuredSizeV298\(e,t,n="manual",r=\{\}\)/);
+  assert.match(bundle, /h\.consumptionMode==="FIXED_QUANTITY"&&i\.jsx\(bdMenuSaleSizeControlV298/);
+  assert.match(bundle, /При продаже 1 шт\. будет списана 1 шт\./);
+  assert.match(bundle, /При продаже будет списано /);
+  assert.doesNotMatch(bundle, /label:"Упаковка продажи"/);
 });
 
 test("legacy menu portion is preserved for review and never guessed", async () => {
@@ -37,7 +39,8 @@ test("legacy menu portion is preserved for review and never guessed", async () =
   assert.match(bundle, /Прежнее значение/);
   assert.match(bundle, /legacyPortionSize/);
   assert.match(bundle, /bdMenuCleanItemV298/);
-  assert.equal(bundle.match(/menuItems\.every\(bdMenuImportSizeValidV298\)/g)?.length, 2);
+  assert.equal(bundle.match(/menuItems\.every\(bdMenuImportSizeValidV298\)/g)?.length, 1);
+  assert.match(bundle, /e\.menuItems\.length>0&&e\.menuItems\.every\(N\)/);
 });
 
 test("authoritative assortment persistence normalizes changed items and rejects invalid DTOs", async () => {

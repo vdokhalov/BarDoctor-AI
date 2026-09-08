@@ -17,25 +17,27 @@ test("catalog workflow v353 exposes the three connected domains", () => {
 });
 
 test("ready menu products cannot be saved without nomenclature", () => {
-  assert.match(bundle, /h\.type==="ready"\?Boolean\(_&&k\):Boolean\(k\)/);
+  assert.match(bundle, /bdMenuValidV418=bdMenuModeConfiguredV418&&/);
+  assert.match(bundle, /h\.consumptionMode==="DIRECT_ITEM"\|\|h\.consumptionMode==="FIXED_QUANTITY"/);
   assert.match(bundle, /Выберите товар из номенклатуры или создайте его здесь/);
-  assert.match(bundle, /Готовый товар · продаётся без приготовления/);
+  assert.match(bundle, /Готовый товар/);
   assert.match(bundle, /onNomenclatureCreated:P=>/);
   assert.match(bundle, /bdCatState\(xr\(bdCatalogStoreKey\)\|\|E\)/);
 });
 
 test("prepared menu products continue directly to their recipe", () => {
-  assert.match(bundle, /!P&&w\.type==="composite"&&\(f\("recipes"\),v\("all"\),z\(w\)\)/);
-  assert.match(bundle, /После сохранения сразу откроется техкарта этой позиции/);
-  assert.match(bundle, /Выбрать позицию без техкарты/);
+  assert.match(bundle, /w\.consumptionMode==="RECIPE"&&\(f\("recipes"\),v\("all"\),z\(w\)\)/);
+  assert.match(bundle, /После сохранения откроется одна техкарта этой позиции/);
+  assert.match(bundle, /Без списания/);
   assert.doesNotMatch(bundle, /De=\(\)=>\{const w=he\.recipes\?\.find/);
 });
 
 test("recipe confirmation is gated by canonical links", () => {
   assert.match(bundle, /bdTechInvalidCount=/);
-  assert.match(bundle, /disabled:!bdTechCanConfirm/);
+  assert.match(bundle, /disabled:bdRecipeSavingV418\|\|!bdTechCanConfirm/);
   assert.match(bundle, /Завершите обязательные связи/);
-  assert.match(bundle, /Складские параметры \(необязательно\)/);
+  assert.match(bundle, /Текущая себестоимость техкарты/);
+  assert.doesNotMatch(bundle, /Складские параметры \(необязательно\)/);
   assert.match(bundle, /версия /);
 });
 

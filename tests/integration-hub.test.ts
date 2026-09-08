@@ -159,7 +159,7 @@ test("mapping auto-confirms only a unique strong product match", () => {
       { key: "cola|1l", name: "Coca Cola 1l", packageSize: "1 л" },
     ],
     menuItems: [{ id: "menu-cola", name: "Кола", active: true }],
-  }, "stock_product");
+  }, "stock_product", 17);
   const exact = decideMapping(
     { id: "external-cola", name: "Coca-Cola 0.5", packageSize: "0,5 л" },
     candidates,

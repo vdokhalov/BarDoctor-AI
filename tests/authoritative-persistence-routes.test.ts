@@ -28,6 +28,16 @@ test("generic writes cannot mutate immutable movement ledger or bootstrap over h
   assert.match(source, /AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED/);
   assert.match(source, /INVENTORY_SNAPSHOT_STORE_KEY/);
   assert.doesNotMatch(source, /repairInventoryPurchaseAmounts|repairedStockMovements/);
+  assert.match(source, /protectedSalesBatchMutations\(before, after\)/);
+  assert.match(source, /DUPLICATE_SALES_BATCH_ID/);
+  assert.match(source, /DUPLICATE_BALANCE_IDENTITY/);
+  assert.match(source, /MALFORMED_BALANCE_IDENTITY/);
+  assert.match(source, /DUPLICATE_MENU_ITEM_ID/);
+  const duplicateMenuGuard = source.indexOf("const repeatedMenuItemIds = duplicateMenuItemIds(after)");
+  const balanceIdentityGuard = source.indexOf("const balanceMutations = directBalanceMutations(before, after)");
+  const consumptionGuard = source.indexOf("const consumptionIssues = changedConsumptionModeIssues(before, after");
+  assert.ok(duplicateMenuGuard >= 0 && duplicateMenuGuard < consumptionGuard);
+  assert.ok(balanceIdentityGuard >= 0 && balanceIdentityGuard < consumptionGuard);
 });
 
 test("generic store writes reject a stale snapshot instead of overwriting a concurrent update", async () => {
@@ -47,6 +57,19 @@ test("purchase posting and inventory finalization stop at a missing authoritativ
   assert.match(purchase, /INVENTORY_SNAPSHOT_STORE_KEY/);
   assert.match(counts, /assortmentExists/);
   assert.match(counts, /AUTHORITATIVE_BACKFILL_APPROVAL_REQUIRED/);
+});
+
+test("inventory product route scopes create and rejects deactivation that invalidates consumption", async () => {
+  const source = await readFile(new URL("../app/api/inventory/products/route.ts", import.meta.url), "utf8");
+  assert.match(source, /const product: JsonRecord = \{[\s\S]*?venueId: account\.venueId/);
+  assert.match(source, /belongsToVenue\(value, account\.venueId\)[\s\S]*?inventoryProductKey\(value\) === productKey/);
+  assert.equal((source.match(/changedConsumptionModeIssues\(assortment, (?:root|updatedRoot), account\.venueId\)/g) ?? []).length, 2);
+  const stockUpdate = source.indexOf("const updatedRoot = record(updated.assortment)");
+  const activeMutation = source.indexOf("active: requestedActive", stockUpdate);
+  const consumptionGuard = source.indexOf("changedConsumptionModeIssues(assortment, updatedRoot", activeMutation);
+  const persistence = source.indexOf("await database.batch", consumptionGuard);
+  assert.ok(stockUpdate >= 0 && activeMutation > stockUpdate && consumptionGuard > activeMutation && persistence > consumptionGuard);
+  assert.match(source.slice(consumptionGuard, persistence), /code: "PRODUCT_IN_USE"/);
 });
 
 test("confirmed purchases persist the canonical product resolved by the stock receipt", async () => {

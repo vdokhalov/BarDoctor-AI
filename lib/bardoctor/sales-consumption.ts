@@ -1,17 +1,24 @@
 import {
   resolveInventoryProductKey,
-  toInventoryBaseAmount,
   type BaseInventoryUnit,
   type StockMovement,
 } from "./inventory";
-import { canonicalTechCardForOwner } from "./tech-card-reconciliation";
-import { resolveConsumptionMode } from "./consumption-mode";
+import {
+  resolveMenuConsumption,
+  resolveRecipeIngredientQuantity,
+  type ConsumptionMode,
+} from "./consumption-mode";
 import { COST_BASIS_METHOD, resolveCostBasis, type CostBasisStatus } from "./cost-basis";
-import { resolveReadyProductConsumption } from "./menu-sale-size";
 
 export const SALES_BATCH_STORE_KEY = "bd_sales_batches";
 export const SALES_MAPPING_STORE_KEY = "bd_sales_mappings";
 export const SALES_WAREHOUSE_ROUTE_STORE_KEY = "bd_sales_warehouse_routes";
+
+export type ProtectedSalesBatchMutation = {
+  batchId: string;
+  status: string;
+  code?: "DUPLICATE_SALES_BATCH_ID";
+};
 
 export const SALES_SOURCES = [
   "MANUAL_GRID",
@@ -40,7 +47,7 @@ export type SalesMappingStatus =
   | "INVALID_QUANTITY"
   | "UNIT_ERROR";
 export type SalesLineProcessingStatus = "DRAFT" | "READY" | "BLOCKED" | "POSTED" | "REVERSED";
-export type RecipeConsumptionMode = "DIRECT_INGREDIENTS" | "PREPARED_ITEM" | "READY_PRODUCT";
+export type RecipeConsumptionMode = ConsumptionMode | "DIRECT_INGREDIENTS" | "PREPARED_ITEM" | "READY_PRODUCT";
 
 export type SaleLineModifier = {
   id: string;
@@ -218,6 +225,86 @@ function rounded(value: number, digits = 3): number {
   return Math.round(value * factor) / factor;
 }
 function money(value: number): number { return rounded(value, 2); }
+
+function salesBatchHasImmutableHistory(batch: JsonRecord): boolean {
+  if (["POSTED", "REVERSED"].includes(text(batch.status, "", 40).toUpperCase())) return true;
+  return array(batch.lines).map(record).some((line) =>
+    ["POSTED", "REVERSED"].includes(text(line.processingStatus, "", 40).toUpperCase())
+  );
+}
+
+/**
+ * Generic store PUTs must never rewrite snapshots that were fixed by the sales
+ * lifecycle. Dedicated post/reverse endpoints remain the only writers.
+ */
+export function protectedSalesBatchMutations(
+  beforeValue: unknown,
+  afterValue: unknown,
+): ProtectedSalesBatchMutation[] {
+  const before = array(beforeValue).map(record);
+  const after = array(afterValue).map(record);
+  const venueId = (batch: JsonRecord): number | null => {
+    const parsed = Number(batch.venueId);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+  };
+  const groupedById = (values: JsonRecord[]) => {
+    const grouped = new Map<string, JsonRecord[]>();
+    for (const batch of values) {
+      const id = text(batch.id, "", 160);
+      if (!id) continue;
+      grouped.set(id, [...(grouped.get(id) ?? []), batch]);
+    }
+    return grouped;
+  };
+  const beforeGroups = groupedById(before);
+  const afterGroups = groupedById(after);
+  const duplicateIds = new Set(
+    [...new Set([...beforeGroups.keys(), ...afterGroups.keys()])].filter((id) =>
+      [beforeGroups.get(id) ?? [], afterGroups.get(id) ?? []].some((group) => {
+        const venues = group.map(venueId);
+        const unscoped = venues.filter((value) => value === null).length;
+        return unscoped
+          ? group.length > 1
+          : new Set(venues).size < venues.length;
+      })
+    ),
+  );
+  const malformedProtected = [...before, ...after].filter((batch) =>
+    !text(batch.id, "", 160) && salesBatchHasImmutableHistory(batch)
+  );
+  const identity = (batch: JsonRecord): string => {
+    const id = text(batch.id, "", 160);
+    const venue = venueId(batch);
+    return id ? `${venue ?? "unscoped"}:${id}` : "";
+  };
+  const previous = new Map(before.flatMap((batch) => {
+    const id = text(batch.id, "", 160);
+    return id && !duplicateIds.has(id) ? [[identity(batch), batch] as const] : [];
+  }));
+  const next = new Map(after.flatMap((batch) => {
+    const id = text(batch.id, "", 160);
+    return id && !duplicateIds.has(id) ? [[identity(batch), batch] as const] : [];
+  }));
+  const issues: ProtectedSalesBatchMutation[] = malformedProtected.map((batch) => ({
+    batchId: "<missing>",
+    status: text(batch.status, "UNKNOWN", 40),
+  }));
+  for (const id of duplicateIds) {
+    issues.push({ batchId: id, status: "DUPLICATE", code: "DUPLICATE_SALES_BATCH_ID" });
+  }
+  for (const key of new Set([...previous.keys(), ...next.keys()])) {
+    const left = previous.get(key);
+    const right = next.get(key);
+    if (!salesBatchHasImmutableHistory(left ?? {}) && !salesBatchHasImmutableHistory(right ?? {})) continue;
+    if (JSON.stringify(left) === JSON.stringify(right)) continue;
+    issues.push({
+      batchId: text(right?.id ?? left?.id, "<missing>", 160),
+      status: text(right?.status ?? left?.status, "UNKNOWN", 40),
+    });
+  }
+  return issues;
+}
+
 function validBusinessDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
@@ -344,8 +431,21 @@ function tokenSimilarity(left: string, right: string): number {
 function activeMenu(assortment: JsonRecord, venueId: number): JsonRecord[] {
   return array(assortment.menuItems).map(record).filter((item) => {
     const itemVenueId = numeric(item.venueId);
-    return item.active !== false && item.type !== "service" && (!itemVenueId || itemVenueId === venueId);
+    return item.active !== false && (!itemVenueId || itemVenueId === venueId);
   });
+}
+
+function duplicateActiveMenuItemIds(assortment: JsonRecord, venueId: number): string[] {
+  const counts = new Map<string, number>();
+  for (const item of activeMenu(assortment, venueId)) {
+    const id = text(item.id, "", 160);
+    if (!id) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id)
+    .sort();
 }
 
 function mappingsFor(values: unknown[], venueId: number, currentSource: SalesSource): SalesNameMapping[] {
@@ -392,6 +492,14 @@ function venueBalances(assortment: JsonRecord, venueId: number): JsonRecord[] {
     const rowVenueId = numeric(balance.venueId);
     return !rowVenueId || rowVenueId === venueId;
   });
+}
+
+function liveVenueBalances(assortment: JsonRecord, venueId: number): JsonRecord[] {
+  return venueBalances(assortment, venueId).filter((balance) =>
+    balance.active !== false
+    && balance.archived !== true
+    && text(balance.status, "", 30) !== "archived"
+  );
 }
 
 function warehouseList(assortment: JsonRecord, warehouses: unknown[], venueId: number): JsonRecord[] {
@@ -451,28 +559,36 @@ function ingredientBase(ingredient: JsonRecord): {
   source: RecipeIngredientSnapshot["conversion"]["source"];
   factor: number;
 } {
-  const normalizedQuantity = numeric(ingredient.normalizedQuantity, Number.NaN);
-  const normalizedUnit = text(ingredient.normalizedUnit, "", 20) as BaseInventoryUnit;
-  if (
-    Number.isFinite(normalizedQuantity)
-    && normalizedQuantity > 0
-    && ["ml", "g", "pcs"].includes(normalizedUnit)
-    && ["exact_compatible", "packaging_compatible"].includes(text(ingredient.unitResolutionStatus, "", 50))
-  ) {
-    const inputQuantity = numeric(ingredient.quantity, 0);
-    return {
-      amount: normalizedQuantity,
-      unit: normalizedUnit,
-      source: "recipe_normalized",
-      factor: inputQuantity > 0 ? normalizedQuantity / inputQuantity : 1,
-    };
-  }
-  const converted = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
-  return {
-    ...converted,
+  return resolveRecipeIngredientQuantity(ingredient) ?? {
+    amount: 0,
+    unit: "unknown",
     source: "canonical_unit_conversion",
-    factor: numeric(ingredient.quantity) > 0 ? converted.amount / numeric(ingredient.quantity) : 1,
+    factor: 1,
   };
+}
+
+function exactVenueNomenclatureProductKey(
+  assortment: JsonRecord,
+  nomenclatureItemId: string,
+  venueId: number,
+): string {
+  if (!nomenclatureItemId) return "";
+  const live = (item: JsonRecord) => item.active !== false
+    && item.archived !== true
+    && text(item.status, "", 30) !== "archived";
+  const sameVenue = (item: JsonRecord) => {
+    const itemVenueId = numeric(item.venueId);
+    return !itemVenueId || itemVenueId === venueId;
+  };
+  const exact = [
+    ...array(assortment.nomenclature).map(record),
+    ...array(assortment.stockBalances).map(record),
+  ].find((item) =>
+    live(item)
+    && sameVenue(item)
+    && [text(item.id, "", 320), text(item.nomenclatureItemId, "", 320)].includes(nomenclatureItemId)
+  );
+  return exact ? text(exact.productKey ?? exact.key ?? exact.id, "", 320) : "";
 }
 
 function snapshotFor(input: {
@@ -486,11 +602,39 @@ function snapshotFor(input: {
   asOf: string;
   now: string;
 }): { snapshot?: RecipeSnapshot; errorCode?: string; errorMessage?: string; cost: number | null; currency?: string } {
-  const consumptionMode = resolveConsumptionMode(input.menuItem, input.assortment);
-  if (!consumptionMode.ok) {
-    return { errorCode: consumptionMode.code, errorMessage: consumptionMode.error, cost: null };
+  const consumption = resolveMenuConsumption(input.menuItem, input.assortment, {
+    venueId: input.venueId,
+    forPosting: true,
+  });
+  if (!consumption.ok) {
+    const errorCode = ["CONSUMPTION_REFERENCE_REQUIRED", "CONSUMPTION_REFERENCE_NOT_FOUND", "CONSUMPTION_REFERENCE_MISMATCH", "CONSUMPTION_RECIPE_INCOMPLETE"].includes(consumption.code)
+      ? "INGREDIENT_NOMENCLATURE_REQUIRED"
+      : ["CONSUMPTION_QUANTITY_INVALID", "CONSUMPTION_UNIT_INVALID"].includes(consumption.code)
+        ? "UNIT_ERROR"
+        : consumption.code;
+    return { errorCode, errorMessage: consumption.error, cost: null };
   }
-  const readyProduct = resolveReadyProductConsumption(input.menuItem, input.assortment);
+  if (consumption.mode === "NONE") {
+    return {
+      snapshot: {
+        recipeId: `none:${text(input.menuItem.id, "", 160)}`,
+        recipeVersion: 1,
+        capturedAt: input.now,
+        consumptionMode: "NONE",
+        menuItem: {
+          id: text(input.menuItem.id, "", 160),
+          name: text(input.menuItem.name, "Позиция меню"),
+          department: text(input.menuItem.department, "", 100) || undefined,
+          category: text(input.menuItem.category, "", 120) || undefined,
+        },
+        ingredients: [],
+      },
+      cost: 0,
+    };
+  }
+  const readyProduct = consumption.mode === "DIRECT_ITEM" || consumption.mode === "FIXED_QUANTITY"
+    ? consumption.nomenclature
+    : null;
   if (readyProduct) {
     const warehouse = resolveWarehouse({ ...input, menuItem: input.menuItem });
     if (!warehouse.id) {
@@ -500,7 +644,7 @@ function snapshotFor(input: {
         cost: null,
       };
     }
-    const balance = venueBalances(input.assortment, input.venueId).find((candidate) =>
+    const balance = liveVenueBalances(input.assortment, input.venueId).find((candidate) =>
       balanceKey(candidate) === readyProduct.productKey
     );
     if (!balance) {
@@ -546,10 +690,10 @@ function snapshotFor(input: {
     const totalCost = unitCost === null ? null : money(unitCost * baseQuantityTotal);
     return {
       snapshot: {
-        recipeId: `ready-product:${text(input.menuItem.id, "", 160)}`,
+        recipeId: `${consumption.mode === "DIRECT_ITEM" ? "direct-item" : "fixed-quantity"}:${text(input.menuItem.id, "", 160)}`,
         recipeVersion: 1,
         capturedAt: input.now,
-        consumptionMode: "READY_PRODUCT",
+        consumptionMode: consumption.mode,
         menuItem: {
           id: text(input.menuItem.id, "", 160),
           name: text(input.menuItem.name, "Позиция меню"),
@@ -561,8 +705,8 @@ function snapshotFor(input: {
           name: readyProduct.productName,
           nomenclatureItemId: readyProduct.nomenclatureItemId,
           productKey: readyProduct.productKey,
-          recipeQuantity: readyProduct.quantityPerSale,
-          recipeUnit: readyProduct.baseUnit,
+          recipeQuantity: readyProduct.inputQuantity,
+          recipeUnit: readyProduct.inputUnit,
           baseQuantityPerPortion: readyProduct.quantityPerSale,
           baseQuantityTotal,
           baseUnit: readyProduct.baseUnit,
@@ -576,9 +720,9 @@ function snapshotFor(input: {
           costEffectiveDate: basis.effectiveDate,
           currency,
           conversion: {
-            inputQuantity: 1,
-            inputUnit: "sale",
-            factor: readyProduct.quantityPerSale,
+            inputQuantity: readyProduct.inputQuantity,
+            inputUnit: readyProduct.inputUnit,
+            factor: rounded(readyProduct.quantityPerSale / readyProduct.inputQuantity, 6),
             outputUnit: readyProduct.baseUnit,
             source: "canonical_unit_conversion",
           },
@@ -588,20 +732,24 @@ function snapshotFor(input: {
       currency,
     };
   }
-  const recipe = canonicalTechCardForOwner(input.menuItem.id, input.assortment.recipes);
-  if (!recipe || text(recipe.status, "", 30) !== "confirmed" || text(recipe.reviewStatus, "", 40) !== "approved") {
-    return { errorCode: "NO_RECIPE", errorMessage: "Нет подтверждённой canonical техкарты", cost: null };
-  }
+  const recipe = consumption.mode === "RECIPE" ? consumption.recipe : undefined;
+  if (!recipe) return { errorCode: "NO_RECIPE", errorMessage: "Нет подтверждённой canonical техкарты", cost: null };
   const ingredients = array(recipe.ingredients).map(record);
   if (!ingredients.length) return { errorCode: "NO_RECIPE", errorMessage: "В техкарте нет ингредиентов", cost: null };
   const warehouse = resolveWarehouse({ ...input, menuItem: input.menuItem });
   if (!warehouse.id) return { errorCode: "WAREHOUSE_MAPPING_REQUIRED", errorMessage: warehouse.error ?? "Не определён склад расхода", cost: null };
-  const balances = venueBalances(input.assortment, input.venueId);
+  const balances = liveVenueBalances(input.assortment, input.venueId);
   const byKey = new Map(balances.map((balance) => [balanceKey(balance), balance]));
   const snapshots: RecipeIngredientSnapshot[] = [];
   for (const [index, ingredient] of ingredients.entries()) {
-    const requestedKey = text(ingredient.nomenclatureItemId ?? ingredient.purchaseProductKey ?? ingredient.productKey, "", 320);
-    const productKey = resolveInventoryProductKey(input.assortment, requestedKey) || requestedKey;
+    const nomenclatureItemId = text(ingredient.nomenclatureItemId, "", 320);
+    const requestedKey = text(nomenclatureItemId || ingredient.purchaseProductKey || ingredient.productKey, "", 320);
+    // Explicit RECIPE mode was already validated by exact nomenclature ID.
+    // Resolve that same persisted object directly so a legacy alias whose
+    // `from` happens to equal the ID cannot redirect the immutable snapshot.
+    const productKey = consumption.source === "explicit"
+      ? exactVenueNomenclatureProductKey(input.assortment, nomenclatureItemId, input.venueId)
+      : resolveInventoryProductKey(input.assortment, requestedKey) || requestedKey;
     if (!productKey) {
       return { errorCode: "INGREDIENT_NOMENCLATURE_REQUIRED", errorMessage: `Ингредиент «${text(ingredient.name, `Ингредиент ${index + 1}`)}» не связан с canonical Номенклатурой`, cost: null };
     }
@@ -666,9 +814,7 @@ function snapshotFor(input: {
       recipeId: text(recipe.id, "", 160),
       recipeVersion: Math.max(1, Math.round(numeric(recipe.version, 1))),
       capturedAt: input.now,
-      consumptionMode: text(recipe.consumptionMode, "DIRECT_INGREDIENTS", 40) === "PREPARED_ITEM"
-        ? "PREPARED_ITEM"
-        : "DIRECT_INGREDIENTS",
+      consumptionMode: "RECIPE",
       menuItem: {
         id: text(input.menuItem.id, "", 160),
         name: text(input.menuItem.name, "Позиция меню"),
@@ -812,6 +958,61 @@ export function salesBatches(values: unknown[], venueId: number): SalesBatch[] {
   ).map(summarizeBatch);
 }
 
+function fullSalesBatchCollection(values: unknown[]): SalesBatch[] {
+  return [...values] as SalesBatch[];
+}
+
+function replaceSalesBatchInFullCollection(values: unknown[], replacement: SalesBatch): SalesBatch[] {
+  return [
+    replacement,
+    ...values.filter((value) => {
+      const candidate = record(value);
+      return text(candidate.id, "", 160) !== replacement.id
+        || numeric(candidate.venueId) !== replacement.venueId;
+    }),
+  ] as SalesBatch[];
+}
+
+function duplicateSalesLineIds(values: unknown[]): string[] {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const id = text(record(value).id, "", 160);
+    if (!id) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id)
+    .sort();
+}
+
+function hasMissingSalesLineId(values: unknown[]): boolean {
+  return values.some((value) => !text(record(value).id, "", 160));
+}
+
+function duplicateSalesBatchIds(values: unknown[], venueId: number): string[] {
+  const counts = new Map<string, number>();
+  for (const value of values) {
+    const batch = record(value);
+    if (numeric(batch.venueId) !== venueId) continue;
+    const id = text(batch.id, "", 160);
+    if (!id) continue;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return [...counts]
+    .filter(([, count]) => count > 1)
+    .map(([id]) => id)
+    .sort();
+}
+
+function duplicateSalesBatchError(ids: string[]): { ok: false; code: string; error: string } {
+  return {
+    ok: false,
+    code: "DUPLICATE_SALES_BATCH_ID",
+    error: `Документы продаж содержат повторяющиеся ID: ${ids.slice(0, 5).join(", ")}`,
+  };
+}
+
 export function createOrUpdateSalesBatch(input: {
   batches: unknown[];
   draft: NormalizedSalesDraft;
@@ -826,15 +1027,78 @@ export function createOrUpdateSalesBatch(input: {
   now?: string;
 }): { ok: true; batch: SalesBatch; batches: SalesBatch[]; duplicate?: boolean } | { ok: false; code: string; error: string } {
   const now = input.now ?? new Date().toISOString();
+  const duplicateBatchIds = duplicateSalesBatchIds(input.batches, input.venueId);
+  if (duplicateBatchIds.length) return duplicateSalesBatchError(duplicateBatchIds);
+  const assortment = record(input.assortment);
+  const duplicateMenuIds = duplicateActiveMenuItemIds(assortment, input.venueId);
+  if (duplicateMenuIds.length) {
+    return {
+      ok: false,
+      code: "DUPLICATE_MENU_ITEM_ID",
+      error: `Активное меню содержит повторяющиеся ID: ${duplicateMenuIds.slice(0, 5).join(", ")}`,
+    };
+  }
   const existingBatches = salesBatches(input.batches, input.venueId);
   const requestedExternalBatchId = text(input.draft.externalBatchId, "", 180);
+  const requestedSource = source(input.draft.source);
   const existing = input.batchId
     ? existingBatches.find((batch) => batch.id === input.batchId)
     : requestedExternalBatchId
-      ? existingBatches.find((batch) => batch.externalBatchId === requestedExternalBatchId)
+      ? existingBatches.find((batch) =>
+          batch.externalBatchId === requestedExternalBatchId
+          && batch.source === requestedSource
+          && batch.status !== "CANCELLED"
+        )
       : undefined;
+  const requestedLines = input.draft.lines.slice(0, 5_000);
+  if (hasMissingSalesLineId(existing?.lines ?? []) || hasMissingSalesLineId(requestedLines)) {
+    return {
+      ok: false,
+      code: "SALES_LINE_ID_REQUIRED",
+      error: "Каждая строка продажи должна иметь устойчивый ID.",
+    };
+  }
+  const hasImmutableLineHistory = existing?.lines.some((line) =>
+    line.processingStatus === "POSTED" || line.processingStatus === "REVERSED"
+  ) ?? false;
+  if (existing && hasImmutableLineHistory) {
+    const requestedHeader = {
+      businessDate: text(input.draft.businessDate, existing.businessDate, 10),
+      source: source(input.draft.source ?? existing.source),
+      externalBatchId: text(input.draft.externalBatchId, existing.externalBatchId ?? "", 180),
+      shiftId: text(input.draft.shiftId, existing.shiftId ?? "", 160),
+      sourceReference: text(input.draft.sourceReference, existing.sourceReference ?? "", 240),
+    };
+    const immutableHeader = {
+      businessDate: existing.businessDate,
+      source: existing.source,
+      externalBatchId: existing.externalBatchId ?? "",
+      shiftId: existing.shiftId ?? "",
+      sourceReference: existing.sourceReference ?? "",
+    };
+    if (JSON.stringify(requestedHeader) !== JSON.stringify(immutableHeader)) {
+      return {
+        ok: false,
+        code: "SALES_BATCH_HISTORY_LOCKED",
+        error: "После проведения строки нельзя менять дату, источник, смену или внешнюю идентичность документа.",
+      };
+    }
+  }
+  const duplicateLineIds = [
+    ...new Set([
+      ...duplicateSalesLineIds(existing?.lines ?? []),
+      ...duplicateSalesLineIds(requestedLines),
+    ]),
+  ];
+  if (duplicateLineIds.length) {
+    return {
+      ok: false,
+      code: "DUPLICATE_SALES_LINE_ID",
+      error: `Строки продажи содержат повторяющиеся ID: ${duplicateLineIds.slice(0, 5).join(", ")}`,
+    };
+  }
   if (!input.batchId && existing && requestedExternalBatchId) {
-    return { ok: true, batch: existing, batches: existingBatches, duplicate: true };
+    return { ok: true, batch: existing, batches: fullSalesBatchCollection(input.batches), duplicate: true };
   }
   if (existing && ["POSTED", "REVERSED", "CANCELLED"].includes(existing.status)) {
     return { ok: false, code: "SALES_BATCH_READ_ONLY", error: "Проведённый, отменённый или сторнированный документ нельзя изменить" };
@@ -843,12 +1107,10 @@ export function createOrUpdateSalesBatch(input: {
   if (!validBusinessDate(businessDate)) return { ok: false, code: "INVALID_BUSINESS_DATE", error: "Укажите корректную дату продаж" };
   const currentSource = source(input.draft.source ?? existing?.source);
   const batchId = existing?.id ?? input.batchId ?? crypto.randomUUID();
-  const assortment = record(input.assortment);
   const currentMappings = mappingsFor(input.mappings, input.venueId, currentSource);
   const routes = input.warehouseRoutes.map((value) => value as SalesWarehouseRoute).filter((route) => route.venueId === input.venueId && route.active !== false);
   const warehouses = warehouseList(assortment, input.warehouses ?? [], input.venueId);
   const existingById = new Map((existing?.lines ?? []).map((line) => [line.id, line]));
-  const requestedLines = input.draft.lines.slice(0, 5_000);
   const lines = requestedLines.map((line) => prepareLine({
     line,
     batchId,
@@ -891,11 +1153,15 @@ export function createOrUpdateSalesBatch(input: {
     unresolvedQuantity: 0,
   };
   const batch = summarizeBatch(base);
-  return { ok: true, batch, batches: [batch, ...existingBatches.filter((item) => item.id !== batch.id)] };
+  return { ok: true, batch, batches: replaceSalesBatchInFullCollection(input.batches, batch) };
 }
 
-function movementIdentity(batchId: string, lineId: string, ingredientId: string): string {
+function legacyMovementIdentity(batchId: string, lineId: string, ingredientId: string): string {
   return `sale-consumption:${batchId}:${lineId}:${ingredientId}`;
+}
+
+function movementIdentity(venueId: number, batchId: string, lineId: string, ingredientId: string): string {
+  return `sale-consumption:${venueId}:${batchId}:${lineId}:${ingredientId}`;
 }
 
 function updateWarehouseBalance(balance: JsonRecord, warehouseId: string, amountDelta: number, costDelta: number | null, now: string) {
@@ -930,16 +1196,41 @@ export function postSalesBatch(input: {
   actor: SalesBatch["createdBy"];
   now?: string;
 }):
-  | { ok: true; idempotent: boolean; batch: SalesBatch; batches: SalesBatch[]; assortment: JsonRecord; stockMovements: StockMovement[]; postedNow: number }
+  | { ok: true; idempotent: boolean; stockChanged: boolean; batch: SalesBatch; batches: SalesBatch[]; assortment: JsonRecord; stockMovements: StockMovement[]; postedNow: number }
   | { ok: false; code: string; error: string } {
   const now = input.now ?? new Date().toISOString();
+  const duplicateBatchIds = duplicateSalesBatchIds(input.batches, input.venueId);
+  if (duplicateBatchIds.length) return duplicateSalesBatchError(duplicateBatchIds);
+  const duplicateMenuIds = duplicateActiveMenuItemIds(record(input.assortment), input.venueId);
+  if (duplicateMenuIds.length) {
+    return {
+      ok: false,
+      code: "DUPLICATE_MENU_ITEM_ID",
+      error: `Активное меню содержит повторяющиеся ID: ${duplicateMenuIds.slice(0, 5).join(", ")}`,
+    };
+  }
   const batches = salesBatches(input.batches, input.venueId);
   const existing = batches.find((batch) => batch.id === input.batchId);
   if (!existing) return { ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ продаж не найден" };
+  if (hasMissingSalesLineId(existing.lines)) {
+    return {
+      ok: false,
+      code: "SALES_LINE_ID_REQUIRED",
+      error: "Документ содержит строку без устойчивого ID.",
+    };
+  }
+  const duplicateLineIds = duplicateSalesLineIds(existing.lines);
+  if (duplicateLineIds.length) {
+    return {
+      ok: false,
+      code: "DUPLICATE_SALES_LINE_ID",
+      error: `Документ содержит повторяющиеся ID строк: ${duplicateLineIds.slice(0, 5).join(", ")}`,
+    };
+  }
   if (existing.status === "REVERSED" || existing.status === "CANCELLED") return { ok: false, code: "SALES_BATCH_READ_ONLY", error: "Сторнированный или отменённый документ нельзя провести" };
-  if (existing.status === "POSTED") return { ok: true, idempotent: true, batch: existing, batches, assortment: record(input.assortment), stockMovements: input.stockMovements as StockMovement[], postedNow: 0 };
+  if (existing.status === "POSTED") return { ok: true, idempotent: true, stockChanged: false, batch: existing, batches: fullSalesBatchCollection(input.batches), assortment: record(input.assortment), stockMovements: input.stockMovements as StockMovement[], postedNow: 0 };
   const refreshed = createOrUpdateSalesBatch({
-    batches,
+    batches: input.batches,
     draft: {
       source: existing.source,
       sourceReference: existing.sourceReference,
@@ -974,7 +1265,7 @@ export function postSalesBatch(input: {
     return { ok: false, code: "SALES_BATCH_BLOCKED", error: batch.blockedLineCount ? "Нет строк, готовых к отражению на складе. Исправьте Data Quality ошибки." : "В документе нет продаж для проведения" };
   }
   const assortment = record(structuredClone(input.assortment));
-  const balances = venueBalances(assortment, input.venueId);
+  const balances = liveVenueBalances(assortment, input.venueId);
   const byKey = new Map(balances.map((balance) => [balanceKey(balance), balance]));
   const currentMovements = input.stockMovements.map((value) => value as StockMovement);
   const newMovements: StockMovement[] = [];
@@ -982,8 +1273,12 @@ export function postSalesBatch(input: {
   for (const line of ready) {
     const movementIds: string[] = [];
     for (const ingredient of line.recipeSnapshot!.ingredients) {
-      const identity = movementIdentity(batch.id, line.id, ingredient.ingredientId);
-      const duplicate = currentMovements.find((movement) => movement.idempotencyKey === identity);
+      const identity = movementIdentity(input.venueId, batch.id, line.id, ingredient.ingredientId);
+      const legacyIdentity = legacyMovementIdentity(batch.id, line.id, ingredient.ingredientId);
+      const duplicate = currentMovements.find((movement) =>
+        movement.venueId === input.venueId
+        && (movement.idempotencyKey === identity || movement.idempotencyKey === legacyIdentity)
+      );
       if (duplicate) {
         movementIds.push(duplicate.id);
         continue;
@@ -1051,13 +1346,13 @@ export function postSalesBatch(input: {
     ...next,
     status: next.blockedLineCount || next.postedLineCount < next.lines.length ? "PARTIALLY_BLOCKED" : "POSTED",
   };
-  assortment.stockBalances = balances;
   assortment.updatedAt = now;
   return {
     ok: true,
-    idempotent: newMovements.length === 0,
+    idempotent: false,
+    stockChanged: newMovements.length > 0,
     batch: completed,
-    batches: [completed, ...batches.filter((item) => item.id !== completed.id)],
+    batches: replaceSalesBatchInFullCollection(input.batches, completed),
     assortment,
     stockMovements: [...newMovements, ...currentMovements].slice(0, 20_000),
     postedNow: postedLines.size,
@@ -1073,13 +1368,15 @@ export function reverseSalesBatch(input: {
   actor: SalesBatch["createdBy"];
   now?: string;
 }):
-  | { ok: true; idempotent: boolean; batch: SalesBatch; batches: SalesBatch[]; assortment: JsonRecord; stockMovements: StockMovement[] }
+  | { ok: true; idempotent: boolean; stockChanged: boolean; batch: SalesBatch; batches: SalesBatch[]; assortment: JsonRecord; stockMovements: StockMovement[] }
   | { ok: false; code: string; error: string } {
   const now = input.now ?? new Date().toISOString();
+  const duplicateBatchIds = duplicateSalesBatchIds(input.batches, input.venueId);
+  if (duplicateBatchIds.length) return duplicateSalesBatchError(duplicateBatchIds);
   const batches = salesBatches(input.batches, input.venueId);
   const batch = batches.find((item) => item.id === input.batchId);
   if (!batch) return { ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ продаж не найден" };
-  if (batch.status === "REVERSED") return { ok: true, idempotent: true, batch, batches, assortment: record(input.assortment), stockMovements: input.stockMovements as StockMovement[] };
+  if (batch.status === "REVERSED") return { ok: true, idempotent: true, stockChanged: false, batch, batches: fullSalesBatchCollection(input.batches), assortment: record(input.assortment), stockMovements: input.stockMovements as StockMovement[] };
   if (!batch.postedLineCount) return { ok: false, code: "SALES_BATCH_NOT_POSTED", error: "В документе нет проведённых строк" };
   const assortment = record(structuredClone(input.assortment));
   const balances = venueBalances(assortment, input.venueId);
@@ -1091,7 +1388,29 @@ export function reverseSalesBatch(input: {
     && movement.salesBatchId === batch.id
     && movement.status !== "cancelled"
   );
-  const existingReversals = currentMovements.filter((movement) => movement.type === "sale_reversal" && movement.salesBatchId === batch.id);
+  const reversalProductKeys = new Set(originals.map((movement) => movement.productKey));
+  const balanceKeyCounts = new Map<string, number>();
+  for (const balance of balances) {
+    const key = balanceKey(balance);
+    if (!key || !reversalProductKeys.has(key)) continue;
+    balanceKeyCounts.set(key, (balanceKeyCounts.get(key) ?? 0) + 1);
+  }
+  const ambiguousBalanceKeys = [...balanceKeyCounts]
+    .filter(([, count]) => count > 1)
+    .map(([key]) => key)
+    .sort();
+  if (ambiguousBalanceKeys.length) {
+    return {
+      ok: false,
+      code: "DUPLICATE_BALANCE_IDENTITY",
+      error: `Нельзя сторнировать продажу: складские позиции имеют повторяющиеся ключи: ${ambiguousBalanceKeys.slice(0, 5).join(", ")}`,
+    };
+  }
+  const existingReversals = currentMovements.filter((movement) =>
+    movement.venueId === input.venueId
+    && movement.type === "sale_reversal"
+    && movement.salesBatchId === batch.id
+  );
   const reversedOriginalIds = new Set(existingReversals.map((movement) => movement.originalMovementId).filter(Boolean));
   const reversals: StockMovement[] = [];
   for (const original of originals) {
@@ -1124,7 +1443,7 @@ export function reverseSalesBatch(input: {
       sourceLineId: `reversal:${original.sourceLineId}`,
       originalMovementId: original.id,
       reversalReason: "SalesBatch сторнирован",
-      idempotencyKey: `sale-reversal:${original.id}`,
+      idempotencyKey: `sale-reversal:${input.venueId}:${original.id}`,
       actorAccountId: input.actor.accountId,
       createdAt: now,
     });
@@ -1140,13 +1459,13 @@ export function reverseSalesBatch(input: {
       : line),
   });
   const finalBatch = { ...reversed, status: "REVERSED" as const };
-  assortment.stockBalances = balances;
   assortment.updatedAt = now;
   return {
     ok: true,
-    idempotent: reversals.length === 0,
+    idempotent: false,
+    stockChanged: reversals.length > 0,
     batch: finalBatch,
-    batches: [finalBatch, ...batches.filter((item) => item.id !== batch.id)],
+    batches: replaceSalesBatchInFullCollection(input.batches, finalBatch),
     assortment,
     stockMovements: [...reversals, ...currentMovements].slice(0, 20_000),
   };
@@ -1155,14 +1474,16 @@ export function reverseSalesBatch(input: {
 export function cancelSalesDraft(input: { batches: unknown[]; batchId: string; venueId: number; now?: string }):
   | { ok: true; batch: SalesBatch; batches: SalesBatch[] }
   | { ok: false; code: string; error: string } {
+  const duplicateBatchIds = duplicateSalesBatchIds(input.batches, input.venueId);
+  if (duplicateBatchIds.length) return duplicateSalesBatchError(duplicateBatchIds);
   const batches = salesBatches(input.batches, input.venueId);
   const batch = batches.find((item) => item.id === input.batchId);
   if (!batch) return { ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ продаж не найден" };
   if (batch.postedLineCount) return { ok: false, code: "SALES_BATCH_REVERSE_REQUIRED", error: "Проведённые продажи отменяются только через сторно" };
-  if (batch.status === "CANCELLED") return { ok: true, batch, batches };
+  if (batch.status === "CANCELLED") return { ok: true, batch, batches: fullSalesBatchCollection(input.batches) };
   const now = input.now ?? new Date().toISOString();
   const cancelled = { ...batch, status: "CANCELLED" as const, cancelledAt: now, updatedAt: now };
-  return { ok: true, batch: cancelled, batches: [cancelled, ...batches.filter((item) => item.id !== batch.id)] };
+  return { ok: true, batch: cancelled, batches: replaceSalesBatchInFullCollection(input.batches, cancelled) };
 }
 
 export function upsertSalesMapping(input: {

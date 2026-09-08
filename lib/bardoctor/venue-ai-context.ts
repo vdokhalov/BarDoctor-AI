@@ -4,10 +4,8 @@ import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
 import { accountingCurrencyFromProfile } from "./currency";
 import { resolveAccountingMoney } from "./accounting-money";
-import {
-  canonicalTechCardForOwner,
-  reconcileTechCards,
-} from "./tech-card-reconciliation";
+import { reconcileTechCards } from "./tech-card-reconciliation";
+import { resolveMenuConsumption } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -594,10 +592,12 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
 
 function summariseMenu(sources: VenueAIContextSources, now: Date) {
   const stored = store(sources, "bd_assortment_v1");
+  const venueId = number(sources.accountProfile.venueId) ?? number(record(stored?.data).venueId) ?? undefined;
   const purchaseDocuments = array(store(sources, "bd_purchase_documents")?.data);
   const reconciliation = reconcileTechCards({
     assortment: stored?.data,
     purchaseDocuments,
+    venueId,
     now,
   });
   const root = record(reconciliation.assortment);
@@ -606,24 +606,36 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
   const groups = array(root.groups).map(record);
   const subgroups = array(root.subgroups).map(record);
   const activeItems = menuItems.filter((item) => item.active !== false);
-  const recipeByMenuItem = new Map(activeItems.map((item) => [
+  const resolutionByMenuItem = new Map(activeItems.map((item) => [
     text(item.id),
-    canonicalTechCardForOwner(item.id, recipes),
+    resolveMenuConsumption(item, root, { venueId }),
   ]));
-  const confirmedRecipes = recipes.filter((recipe) =>
-    recipe.current === true && text(recipe.reviewStatus) === "approved"
+  const recipeByMenuItem = new Map(activeItems.flatMap((item) => {
+    const result = resolutionByMenuItem.get(text(item.id));
+    return result?.ok && result.mode === "RECIPE"
+      ? [[text(item.id), record(result.recipe)] as const]
+      : [];
+  }));
+  const recipeRequiredItems = activeItems.filter((item) => {
+    const result = resolutionByMenuItem.get(text(item.id));
+    return result?.ok && result.mode === "RECIPE";
+  });
+  const confirmedRecipes = [...recipeByMenuItem.values()].filter((recipe) =>
+    text(recipe.reviewStatus) === "approved"
   );
-  const recipeRequiredItems = activeItems.filter((item) => text(item.type) !== "service");
   const prices = activeItems.map((item) => number(item.salePrice)).filter((value): value is number => value !== null);
   const samples = activeItems
     .map((item) => {
       const recipe = recipeByMenuItem.get(text(item.id));
+      const consumption = resolutionByMenuItem.get(text(item.id));
       return {
         name: text(item.name, "Позиция", 120),
         department: text(item.department, "other", 40),
         category: text(item.category, "Без подраздела", 80),
         salePrice: number(item.salePrice),
         plannedSales: number(item.plannedSales),
+        consumptionMode: consumption?.ok ? consumption.mode : "NEEDS_REVIEW",
+        consumptionStatus: consumption?.ok ? "CONFIGURED" : consumption?.status ?? "NEEDS_REVIEW",
         recipeStatus: text(recipe?.status, recipe ? "draft" : "missing", 30),
         techCardStatus: text(recipe?.reviewStatus, recipe ? "requires_review" : "missing", 40),
         ingredientCount: array(recipe?.ingredients).length,
@@ -632,7 +644,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     .sort((left, right) => (right.plannedSales ?? 0) - (left.plannedSales ?? 0))
     .slice(0, 15);
   const missingRecipeNames = activeItems
-    .filter((item) => text(item.type) !== "service" && !recipeByMenuItem.has(text(item.id)))
+    .filter((item) => text(item.consumptionMode) === "RECIPE" && !recipeByMenuItem.has(text(item.id)))
     .slice(0, 12)
     .map((item) => text(item.name, "Позиция", 120));
   const analytics = buildAssortmentAnalytics({
@@ -641,6 +653,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     salesDocuments: array(store(sources, "bd_sales_documents")?.data),
     salesBatches: array(store(sources, "bd_sales_batches")?.data),
     financeRevenue: array(store(sources, "bd_finance_revenue")?.data),
+    venueId,
     now,
   });
 

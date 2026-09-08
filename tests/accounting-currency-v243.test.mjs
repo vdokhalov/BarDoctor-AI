@@ -93,7 +93,7 @@ test("new menu items default to the active venue currency", async () => {
   assert.match(bundle, /currency:bdMenuVenueCurrency\|\|"RUB",saleQuantityInput:"",saleUnit:"ml"/);
   assert.match(bundle, /onManageStructure:[^}]+currency:r\?\.currency\|\|s\.venues\.find/);
   assert.match(bundle, /bdOwnerUATFixesV289="owner-uat-v289"/);
-  assert.match(bundle, /onSave:Ae,onManageStructure:.*?currency:r\?\.currency\|\|s\.venues\.find/s);
+  assert.match(bundle, /onSave:Ae,recipes:E\.recipes,venueId:s\.activeVenueId,onManageStructure:.*?currency:r\?\.currency\|\|s\.venues\.find/s);
 });
 
 test("saved venue catalog remains authoritative while server analytics refreshes", async () => {
@@ -106,7 +106,9 @@ test("saved venue catalog remains authoritative while server analytics refreshes
 test("catalog sync captures the server base before updating its local cache", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV291="owner-uat-v291"/);
-  assert.match(bundle, /_\(P\);const c=await qr\(bdCatalogStoreKey,P\),p=bdCatState\(xr\(bdCatalogStoreKey\)\|\|P\);_\(p\),Kse\(bdCatalogStoreKey,p\)/);
+  assert.match(bundle, /bdPhase3SaveRejectedV418=E,bdPhase3QueueBeforeV418=Gc\(\)\[bdCatalogStoreKey\];_\(P\);try\{const c=await qr\(bdCatalogStoreKey,P\)/);
+  assert.match(bundle, /const p=bdCatState\(xr\(bdCatalogStoreKey\)\|\|P\);return _\(p\),Kse\(bdCatalogStoreKey,p\)/);
+  assert.match(bundle, /catch\(c\)\{const p=bdCatState\(xr\(bdCatalogStoreKey\)\|\|bdPhase3SaveRejectedV418\);throw _\(p\),Kse\(bdCatalogStoreKey,p\)/);
   assert.doesNotMatch(bundle, /_\(P\),Kse\(bdCatalogStoreKey,P\);const c=await qr\(bdCatalogStoreKey,P\)/);
 });
 
@@ -114,8 +116,9 @@ test("assortment prefers the populated server read model and labels confirmed fa
   const bundle = await read("public/assets/index-BQGspy0I.js");
   assert.match(bundle, /bdOwnerUATFixesV292="owner-uat-v292"/);
   assert.match(bundle, /he=V\?\.menuItems\?\.length\?V:bdAssortmentLocal\.menuItems\.length/);
-  assert.match(bundle, /approved=Boolean\(h&&\(h\.reviewStatus==="approved"\|\|h\.status==="confirmed"\)\)/);
-  assert.match(bundle, /techCardStatus:h\?approved\?"approved"/);
+  assert.match(bundle, /approved=bdModeV418==="RECIPE"\?Boolean\(h&&\(h\.reviewStatus==="approved"\|\|h\.status==="confirmed"\)\):\["DIRECT_ITEM","FIXED_QUANTITY","NONE"\]\.includes\(bdModeV418\)/);
+  assert.match(bundle, /techCardStatus:bdModeV418==="RECIPE"\?\(h\?approved\?"approved"/);
+  assert.match(bundle, /bdModeV418==="NEEDS_REVIEW"\?"needs_review":"not_applicable"/);
 });
 
 test("assortment renders canonical base units in owner-facing Russian labels", async () => {

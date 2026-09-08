@@ -1812,9 +1812,13 @@
 
   .bd-menu-position-editor-v400 .bd-catalog-field input,
   .bd-menu-position-editor-v400 .bd-catalog-field select,
-  .bd-menu-position-editor-v400 .bd-catalog-field textarea {
+  .bd-menu-position-editor-v400 .bd-catalog-field textarea,
+  .bd-tech-card-editor-v354 input,
+  .bd-tech-card-editor-v354 select,
+  .bd-tech-card-editor-v354 textarea {
     min-width: 0;
     max-width: 100%;
+    font-size: 16px;
   }
 
   .bd-menu-position-editor-v400 .bd-catalog-sheet-actions {
@@ -1831,3 +1835,10 @@
     box-shadow: 0 -9px 24px rgba(24, 29, 53, .08);
   }
 }
+
+
+/* bd-menu-consumption-sot-v418 */
+.bd-menu-recipe-review-v418{display:grid;gap:6px;min-width:0}.bd-menu-recipe-review-v418 select{width:100%;min-width:0}.bd-menu-recipe-review-v418 small{color:#697087;line-height:1.4}
+@media(max-width:520px){.bd-menu-recipe-review-v418{width:100%;max-width:100%;min-width:0}}
+.bd-menu-consumption-fieldset-v418{border:0;margin:0;padding:0;min-width:0}.bd-menu-consumption-fieldset-v418 legend{font-size:14px;font-weight:800;margin-bottom:10px}.bd-menu-consumption-grid-v418{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;min-width:0}.bd-menu-consumption-option-v418{min-width:0;text-align:left;border:1px solid #dfe3ec;border-radius:12px;background:#fff;padding:12px;display:grid;gap:4px;color:#24293a}.bd-menu-consumption-option-v418 strong{font-size:14px}.bd-menu-consumption-option-v418 span{font-size:12px;line-height:1.35;color:#697087}.bd-menu-consumption-option-v418.is-selected{border-color:#4a55df;background:#f1f2ff;box-shadow:0 0 0 1px #4a55df}.bd-menu-consumption-review-v418{grid-column:1/-1;border:1px solid #e8a53a;background:#fff8e8;border-radius:12px;padding:11px;display:grid;gap:3px}.bd-menu-consumption-review-v418 span{font-size:12px;line-height:1.4}.bd-menu-consumption-summary-v418{min-width:0;overflow-wrap:anywhere}.bd-tech-cost-row-v418,.bd-tech-card-total-v418{border-radius:10px;background:#f5f6fa;padding:9px 11px;display:flex;justify-content:space-between;gap:12px;align-items:center;min-width:0}.bd-tech-cost-row-v418 span,.bd-tech-card-total-v418 span{font-size:12px;color:#697087}.bd-tech-cost-row-v418 strong,.bd-tech-card-total-v418 strong{text-align:right;font-size:13px}.bd-tech-card-total-v418{margin-top:8px;background:#eef8f2;border:1px solid #cce7d6}
+@media(max-width:520px){.bd-menu-consumption-grid-v418{grid-template-columns:minmax(0,1fr)}.bd-menu-consumption-fieldset-v418,.bd-menu-consumption-grid-v418,.bd-menu-consumption-option-v418,.bd-tech-cost-row-v418,.bd-tech-card-total-v418{width:100%;max-width:100%;min-width:0}.bd-tech-cost-row-v418,.bd-tech-card-total-v418{align-items:flex-start;flex-direction:column}.bd-tech-cost-row-v418 strong,.bd-tech-card-total-v418 strong{text-align:left}.bd-menu-position-editor-v400>.bd-catalog-form{overflow-x:hidden}.bd-menu-position-editor-v400 .bd-catalog-sheet-actions{position:fixed}}

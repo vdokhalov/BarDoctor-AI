@@ -13,6 +13,7 @@ import {
   normalizeInventoryDisplayUnit,
   repairInventoryBalanceMetadata,
   repairInventoryPurchaseAmounts,
+  restoreInventoryProduct,
   STOCK_MOVEMENT_STORE_KEY,
   updateInventoryProductDefinition,
 } from "../../../../lib/bardoctor/inventory";
@@ -34,6 +35,7 @@ import {
   canonicalTaxonomyForAssortment,
   materializeMenuTaxonomy,
 } from "../../../../lib/bardoctor/nomenclature-taxonomy";
+import { changedConsumptionModeIssues } from "../../../../lib/bardoctor/consumption-mode";
 
 type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
@@ -62,6 +64,11 @@ function text(value: unknown, fallback = "", max = 300): string {
   return typeof value === "string" && value.trim()
     ? value.trim().slice(0, max)
     : fallback;
+}
+
+function belongsToVenue(value: JsonRecord, venueId: number): boolean {
+  const recordVenueId = Number(value.venueId);
+  return !Number.isFinite(recordVenueId) || recordVenueId <= 0 || recordVenueId === venueId;
 }
 
 function upsertStore(
@@ -159,44 +166,34 @@ export async function POST(request: Request): Promise<Response> {
   if (action === "restore") {
     const productKey = text(body.productKey, "", 300);
     const root = record(assortment);
-    const restore = (value: unknown): JsonRecord[] => (Array.isArray(value) ? value : []).map(record).map((item) => {
-      if (text(item.productKey ?? item.key ?? item.id, "", 300) !== productKey) return item;
-      const next: JsonRecord = { ...item, active: true, archived: false, restoredAt: now, updatedAt: now };
-      delete next.archivedAt;
-      return next;
-    });
     const before = [...(Array.isArray(root.nomenclature) ? root.nomenclature : []), ...(Array.isArray(root.stockBalances) ? root.stockBalances : [])]
       .map(record)
-      .find((item) => text(item.productKey ?? item.key ?? item.id, "", 300) === productKey);
-    root.nomenclature = restore(root.nomenclature);
-    root.stockBalances = restore(root.stockBalances);
-    const restoredProduct = [...(Array.isArray(root.nomenclature) ? root.nomenclature : []), ...(Array.isArray(root.stockBalances) ? root.stockBalances : [])]
-      .map(record)
-      .find((item) => text(item.productKey ?? item.key ?? item.id, "", 300) === productKey);
-    if (!restoredProduct) {
-      return Response.json({ ok: false, code: "PRODUCT_NOT_FOUND", error: "Позиция не найдена" }, { status: 404 });
+      .find((item) => text(item.productKey ?? item.key ?? item.id, "", 300) === productKey
+        && (!item.venueId || Number(item.venueId) === account.venueId));
+    const restored = restoreInventoryProduct({ assortment, productKey, venueId: account.venueId, now });
+    if (!restored.ok || !restored.product) {
+      return Response.json(restored, { status: 404 });
     }
-    root.updatedAt = now;
     await database.batch([
-      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
+      upsertStore(database, account.id, ASSORTMENT_STORE_KEY, restored.assortment, now),
       auditUpdate(database, {
         accountId: account.id,
         entityId: productKey,
-        entityLabel: text(restoredProduct.name, "Складская позиция", 240),
+        entityLabel: text(restored.product.name, "Складская позиция", 240),
         before,
-        after: restoredProduct,
+        after: restored.product,
         actorName,
         actorRole: account.role,
         reason: "Восстановление canonical-позиции из архива",
         createdAt: now,
       }),
     ]);
-    return Response.json({ ok: true, assortment: root, product: restoredProduct, restored: true });
+    return Response.json({ ok: true, assortment: restored.assortment, product: restored.product, restored: true });
   }
 
   if (action === "archive") {
     const productKey = text(body.productKey, "", 300);
-    const archived = archiveInventoryProduct({ assortment, productKey, now });
+    const archived = archiveInventoryProduct({ assortment, productKey, venueId: account.venueId, now });
     if (!archived.ok) {
       const status = archived.code === "PRODUCT_NOT_FOUND" ? 404 : 409;
       return Response.json(archived, { status });
@@ -397,7 +394,8 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const duplicate = [...balances, ...nomenclature].find((value) =>
-      inventoryProductKey(value) === productKey
+      belongsToVenue(value, account.venueId)
+      && inventoryProductKey(value) === productKey
     );
     if (duplicate) {
       return Response.json(
@@ -500,6 +498,7 @@ export async function POST(request: Request): Promise<Response> {
       id: productKey,
       key: productKey,
       productKey,
+      venueId: account.venueId,
       name,
       preferredDisplayName: name,
       preferredDisplayNameSource: "manual_create",
@@ -580,10 +579,16 @@ export async function POST(request: Request): Promise<Response> {
   const previousRoot = record(assortment);
   const previousNomenclature = (Array.isArray(previousRoot.nomenclature) ? previousRoot.nomenclature : [])
     .map(record)
-    .find((value) => text(value.productKey ?? value.key, "", 300) === productKey) ?? null;
+    .find((value) =>
+      text(value.productKey ?? value.key, "", 300) === productKey
+      && belongsToVenue(value, account.venueId)
+    ) ?? null;
   const previousProduct = previousNomenclature ?? (Array.isArray(previousRoot.stockBalances) ? previousRoot.stockBalances : [])
     .map(record)
-    .find((value) => text(value.productKey ?? value.key, "", 300) === productKey) ?? null;
+    .find((value) =>
+      text(value.productKey ?? value.key, "", 300) === productKey
+      && belongsToVenue(value, account.venueId)
+    ) ?? null;
   const requestedName = text(body.name, "", 240);
   const requestedCategory = text(body.category, text(previousProduct?.category, "products", 80), 80);
   const requestedClassification = manualClassification(body);
@@ -595,7 +600,10 @@ export async function POST(request: Request): Promise<Response> {
     }
     const root = record(assortment);
     const nomenclature = Array.isArray(root.nomenclature) ? root.nomenclature.map(record) : [];
-    const item = nomenclature.find((value) => text(value.productKey ?? value.key, "", 300) === productKey);
+    const item = nomenclature.find((value) =>
+      text(value.productKey ?? value.key, "", 300) === productKey
+      && belongsToVenue(value, account.venueId)
+    );
     if (!item) {
       return Response.json({ ok: false, code: "PRODUCT_NOT_FOUND", error: "Позиция номенклатуры не найдена" }, { status: 404 });
     }
@@ -620,6 +628,11 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     root.updatedAt = now;
+    const consumptionIssues = changedConsumptionModeIssues(assortment, root, account.venueId);
+    if (consumptionIssues.length) {
+      const issue = consumptionIssues[0];
+      return Response.json({ ok: false, code: "PRODUCT_IN_USE", error: issue.error }, { status: 409 });
+    }
     await database.batch([
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
       auditUpdate(database, {
@@ -666,6 +679,7 @@ export async function POST(request: Request): Promise<Response> {
         120,
       ),
     },
+    venueId: account.venueId,
     now,
   });
   if (!updated.ok) {
@@ -680,19 +694,27 @@ export async function POST(request: Request): Promise<Response> {
   const updatedNomenclature = Array.isArray(updatedRoot.nomenclature)
     ? updatedRoot.nomenclature.map(record)
     : [];
+  const updatedProductKey = text(updated.product.productKey ?? updated.product.key, productKey, 300);
   const updatedItem = updatedNomenclature.find((value) =>
-    text(value.productKey ?? value.key, "", 300) === productKey
+    text(value.productKey ?? value.key, "", 300) === updatedProductKey
+    && belongsToVenue(value, account.venueId)
   );
   if (updatedItem) Object.assign(updatedItem, { category: requestedCategory, active: requestedActive, ...requestedClassification });
   const updatedBalances = Array.isArray(updatedRoot.stockBalances)
     ? updatedRoot.stockBalances.map(record)
     : [];
   const updatedBalance = updatedBalances.find((value) =>
-    text(value.productKey ?? value.key, "", 300) === productKey
+    text(value.productKey ?? value.key, "", 300) === updatedProductKey
+    && belongsToVenue(value, account.venueId)
   );
   if (updatedBalance) Object.assign(updatedBalance, { category: requestedCategory, active: requestedActive, ...requestedClassification });
   updatedRoot.nomenclature = updatedNomenclature;
   updatedRoot.stockBalances = updatedBalances;
+  const consumptionIssues = changedConsumptionModeIssues(assortment, updatedRoot, account.venueId);
+  if (consumptionIssues.length) {
+    const issue = consumptionIssues[0];
+    return Response.json({ ok: false, code: "PRODUCT_IN_USE", error: issue.error }, { status: 409 });
+  }
   if (Object.keys(requestedClassification).length) {
     updatedRoot.nomenclatureRules = rememberNomenclatureCorrection(
       updatedRoot.nomenclatureRules,

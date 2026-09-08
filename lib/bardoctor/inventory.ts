@@ -298,8 +298,20 @@ export function resolveInventoryProductKey(assortment: unknown, requestedValue: 
     visited.add(resolved);
     resolved = aliases.get(resolved) ?? resolved;
   }
+  const nomenclature = array(root.nomenclature).map(record);
+  const linkedNomenclature = nomenclature.find((value) =>
+    text(value.id, "", 300) === resolved
+    || text(value.nomenclatureItemId, "", 300) === resolved
+  );
+  if (linkedNomenclature) {
+    return text(linkedNomenclature.productKey ?? linkedNomenclature.key ?? linkedNomenclature.id, resolved, 300);
+  }
   const balances = array(root.stockBalances).map(record);
-  const direct = balances.find((value) => text(value.productKey ?? value.key, "", 300) === resolved);
+  const direct = balances.find((value) =>
+    text(value.id, "", 300) === resolved
+    || text(value.nomenclatureItemId, "", 300) === resolved
+    || text(value.productKey ?? value.key, "", 300) === resolved
+  );
   if (direct) return text(direct.productKey ?? direct.key, resolved, 300);
   const external = balances.find((value) =>
     array(value.externalProductKeys).some((key) => text(key, "", 300) === requested)
@@ -1201,6 +1213,7 @@ function isGenericInventoryName(value: unknown): boolean {
 export function repairInventoryBalanceMetadata(input: {
   assortment: unknown;
   stockMovements?: unknown;
+  venueId?: number;
   now?: string;
 }): {
   assortment: JsonRecord;
@@ -1208,15 +1221,21 @@ export function repairInventoryBalanceMetadata(input: {
 } {
   const now = input.now ?? new Date().toISOString();
   const parts = assortmentParts(input.assortment);
+  const belongsToVenue = (value: JsonRecord) => {
+    const venueId = number(value.venueId);
+    return !input.venueId || venueId <= 0 || venueId === input.venueId;
+  };
   const candidates = new Map<string, Array<{
     name: string;
     unit: BaseInventoryUnit;
     recipeId: string;
   }>>();
   for (const recipe of parts.recipes) {
+    if (!belongsToVenue(recipe)) continue;
     const recipeId = text(recipe.id, "", 100);
     for (const value of array(recipe.ingredients)) {
       const ingredient = record(value);
+      if (!belongsToVenue(ingredient)) continue;
       const key = recipeIngredientProductKey(ingredient);
       const name = text(ingredient.name, "", 240);
       const unit = toInventoryBaseAmount(ingredient.quantity, ingredient.unit).unit;
@@ -1228,7 +1247,9 @@ export function repairInventoryBalanceMetadata(input: {
   }
   const movementKeys = new Set(
     array(input.stockMovements)
-      .map((value) => text(record(value).productKey, "", 300))
+      .map(record)
+      .filter(belongsToVenue)
+      .map((value) => text(value.productKey, "", 300))
       .filter(Boolean),
   );
   let repaired = 0;
@@ -1236,6 +1257,10 @@ export function repairInventoryBalanceMetadata(input: {
   const balances: JsonRecord[] = [];
   for (const original of parts.balances) {
     const balance = cloneRecord(original);
+    if (!belongsToVenue(balance)) {
+      balances.push(balance);
+      continue;
+    }
     const key = text(balance.productKey ?? balance.key, "", 300);
     const matches = candidates.get(key) ?? [];
     const names = [...new Map(matches.map((match) => [
@@ -2070,6 +2095,7 @@ export function repairInventoryPurchaseAmounts(input: {
 export function archiveInventoryProduct(input: {
   assortment: unknown;
   productKey: string;
+  venueId?: number;
   now?: string;
 }): {
   ok: boolean;
@@ -2078,17 +2104,41 @@ export function archiveInventoryProduct(input: {
   assortment: JsonRecord;
   product?: JsonRecord;
   linkedRecipes: number;
+  linkedMenuItems?: number;
 } {
   const now = input.now ?? new Date().toISOString();
   const parts = assortmentParts(input.assortment);
   const requestedKey = text(input.productKey, "", 300);
-  const resolvedKey = resolveInventoryProductKey(parts.root, requestedKey);
+  const belongsToVenue = (value: JsonRecord) => {
+    const venueId = number(value.venueId);
+    return !input.venueId || venueId <= 0 || venueId === input.venueId;
+  };
+  const scopedRoot = {
+    ...parts.root,
+    stockBalances: parts.balances.filter(belongsToVenue),
+    nomenclature: array(parts.root.nomenclature).map(record).filter(belongsToVenue),
+    inventoryProductAliases: array(parts.root.inventoryProductAliases)
+      .map(record)
+      .filter(belongsToVenue),
+  };
+  const resolvedKey = resolveInventoryProductKey(scopedRoot, requestedKey);
+  if (!requestedKey || !resolvedKey) {
+    return {
+      ok: false,
+      code: "PRODUCT_NOT_FOUND",
+      error: "Позиция не найдена",
+      assortment: parts.root,
+      linkedRecipes: 0,
+    };
+  }
   const balance = parts.balances.find((value) =>
     text(value.productKey ?? value.key, "", 300) === resolvedKey
+    && belongsToVenue(value)
   );
   const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
   const item = nomenclature.find((value) =>
     text(value.productKey ?? value.key, "", 300) === resolvedKey
+    && belongsToVenue(value)
   );
   const product = balance ?? item;
   if (!product) {
@@ -2111,20 +2161,49 @@ export function archiveInventoryProduct(input: {
     };
   }
   const linkedRecipes = parts.recipes.filter((recipe) =>
-    array(recipe.ingredients).some((value) => {
+    belongsToVenue(recipe)
+    && recipe.current !== false
+    && text(recipe.lifecycleStatus, "", 40) !== "superseded"
+    && array(recipe.ingredients).some((value) => {
       const ingredient = record(value);
-      const ingredientKey = text(ingredient.purchaseProductKey ?? ingredient.productKey, "", 300);
-      return ingredientKey && resolveInventoryProductKey(parts.root, ingredientKey) === resolvedKey;
+      if (!belongsToVenue(ingredient)) return false;
+      const ingredientKey = text(
+        ingredient.nomenclatureItemId ?? ingredient.purchaseProductKey ?? ingredient.productKey,
+        "",
+        300,
+      );
+      return ingredientKey && resolveInventoryProductKey(scopedRoot, ingredientKey) === resolvedKey;
     })
   ).length;
-  if (linkedRecipes > 0) {
+  const linkedMenuItems = array(parts.root.menuItems).map(record).filter((menuItem) => {
+    if (menuItem.active === false) return false;
+    const menuVenueId = number(menuItem.venueId);
+    if (input.venueId && menuVenueId > 0 && menuVenueId !== input.venueId) return false;
+    const mode = text(menuItem.consumptionMode, "", 40);
+    if (mode && !["DIRECT_ITEM", "FIXED_QUANTITY"].includes(mode)) return false;
+    const link = record(menuItem.readyProduct ?? menuItem.readyProductLink);
+    const reference = text(
+      link.nomenclatureItemId
+        ?? link.productKey
+        ?? link.key
+        ?? menuItem.nomenclatureItemId
+        ?? menuItem.readyProductKey,
+      "",
+      300,
+    );
+    return Boolean(reference) && resolveInventoryProductKey(scopedRoot, reference) === resolvedKey;
+  }).length;
+  if (linkedRecipes > 0 || linkedMenuItems > 0) {
     return {
       ok: false,
       code: "PRODUCT_IN_USE",
-      error: "Позиция используется в техкарте. Сначала замените ингредиент",
+      error: linkedMenuItems > 0
+        ? "Позиция используется активным способом списания меню. Сначала выберите другой складской товар или режим"
+        : "Позиция используется в техкарте. Сначала замените ингредиент",
       assortment: parts.root,
       product: cloneRecord(product),
       linkedRecipes,
+      linkedMenuItems,
     };
   }
   const archived = {
@@ -2145,9 +2224,21 @@ export function archiveInventoryProduct(input: {
   ].filter(Boolean);
   parts.root.stockBalances = parts.balances;
   parts.root.nomenclature = nomenclature;
+  const fullRoot = { ...parts.root, stockBalances: parts.balances, nomenclature };
+  const canonicalArchiveKey = resolveInventoryProductKey(fullRoot, resolvedKey);
+  const sharedAcrossVenues = Boolean(input.venueId) && [...parts.balances, ...nomenclature].some((value) => {
+    if (belongsToVenue(value)) return false;
+    const foreignReference = text(
+      value.productKey ?? value.key ?? value.nomenclatureItemId ?? value.id,
+      "",
+      300,
+    );
+    return Boolean(foreignReference)
+      && resolveInventoryProductKey(fullRoot, foreignReference) === canonicalArchiveKey;
+  });
   parts.root.archivedInventoryProductKeys = [...new Set([
     ...array(parts.root.archivedInventoryProductKeys).map((value) => text(value, "", 300)),
-    ...tombstoneKeys,
+    ...(sharedAcrossVenues ? [] : tombstoneKeys),
   ].filter(Boolean))].slice(-5_000);
   parts.root.updatedAt = now;
   return {
@@ -2158,34 +2249,153 @@ export function archiveInventoryProduct(input: {
   };
 }
 
+export function restoreInventoryProduct(input: {
+  assortment: unknown;
+  productKey: string;
+  venueId?: number;
+  now?: string;
+}): {
+  ok: boolean;
+  code?: "PRODUCT_NOT_FOUND";
+  error?: string;
+  assortment: JsonRecord;
+  product?: JsonRecord;
+} {
+  const now = input.now ?? new Date().toISOString();
+  const parts = assortmentParts(input.assortment);
+  const requestedKey = text(input.productKey, "", 300);
+  const belongsToVenue = (value: JsonRecord) => {
+    const venueId = number(value.venueId);
+    return !input.venueId || venueId <= 0 || venueId === input.venueId;
+  };
+  const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
+  const scopedRoot = {
+    ...parts.root,
+    stockBalances: parts.balances.filter(belongsToVenue),
+    nomenclature: nomenclature.filter(belongsToVenue),
+    inventoryProductAliases: array(parts.root.inventoryProductAliases)
+      .map(record)
+      .filter(belongsToVenue),
+  };
+  const resolvedKey = resolveInventoryProductKey(scopedRoot, requestedKey);
+  const matches = (value: JsonRecord) => {
+    if (!belongsToVenue(value)) return false;
+    const reference = text(
+      value.nomenclatureItemId ?? value.id ?? value.productKey ?? value.key,
+      "",
+      300,
+    );
+    return Boolean(reference) && resolveInventoryProductKey(scopedRoot, reference) === resolvedKey;
+  };
+  const balance = parts.balances.find(matches);
+  const item = nomenclature.find(matches);
+  if (!requestedKey || !resolvedKey || (!balance && !item)) {
+    return {
+      ok: false,
+      code: "PRODUCT_NOT_FOUND",
+      error: "Позиция не найдена",
+      assortment: parts.root,
+    };
+  }
+  const restored = {
+    active: true,
+    archived: false,
+    restoredAt: now,
+    updatedAt: now,
+  };
+  for (const value of parts.balances.filter(matches)) {
+    Object.assign(value, restored);
+    delete value.archivedAt;
+  }
+  for (const value of nomenclature.filter(matches)) {
+    Object.assign(value, restored);
+    delete value.archivedAt;
+  }
+  parts.root.stockBalances = parts.balances;
+  parts.root.nomenclature = nomenclature;
+  const restoredRoot = {
+    ...scopedRoot,
+    stockBalances: parts.balances.filter(belongsToVenue),
+    nomenclature: nomenclature.filter(belongsToVenue),
+  };
+  const restoredKeys = new Set([
+    requestedKey,
+    resolvedKey,
+    ...[balance, item].filter(Boolean).flatMap((value) => [
+      text(value?.id, "", 300),
+      text(value?.nomenclatureItemId, "", 300),
+      text(value?.productKey ?? value?.key, "", 300),
+      ...array(value?.externalProductKeys).map((key) => text(key, "", 300)),
+      ...array(value?.mergedFromProductKeys).map((key) => text(key, "", 300)),
+    ]),
+    ...array(parts.root.inventoryProductAliases).map(record).filter(belongsToVenue).flatMap((alias) => {
+      const from = text(alias.from, "", 300);
+      return from && resolveInventoryProductKey(restoredRoot, from) === resolvedKey ? [from] : [];
+    }),
+  ].filter(Boolean));
+  parts.root.archivedInventoryProductKeys = array(parts.root.archivedInventoryProductKeys)
+    .map((value) => text(value, "", 300))
+    .filter((value) => value && !restoredKeys.has(value));
+  parts.root.updatedAt = now;
+  return {
+    ok: true,
+    assortment: parts.root,
+    product: cloneRecord(balance ?? item),
+  };
+}
+
 export function updateInventoryProductDefinition(input: {
   assortment: unknown;
   stockMovements?: unknown;
   update: InventoryProductUpdate;
+  venueId?: number;
   now?: string;
 }): InventoryProductUpdateResult {
   const now = input.now ?? new Date().toISOString();
   const repaired = repairInventoryBalanceMetadata({
     assortment: input.assortment,
     stockMovements: input.stockMovements,
+    venueId: input.venueId,
     now,
   });
   const parts = assortmentParts(repaired.assortment);
-  const productKey = text(input.update.productKey, "", 300);
+  const belongsToVenue = (value: JsonRecord) => {
+    const venueId = number(value.venueId);
+    return !input.venueId || venueId <= 0 || venueId === input.venueId;
+  };
+  const scopedRoot = {
+    ...parts.root,
+    stockBalances: parts.balances.filter(belongsToVenue),
+    nomenclature: array(parts.root.nomenclature).map(record).filter(belongsToVenue),
+    recipes: parts.recipes.filter(belongsToVenue),
+    inventoryProductAliases: array(parts.root.inventoryProductAliases)
+      .map(record)
+      .filter(belongsToVenue),
+  };
+  const requestedProductKey = text(input.update.productKey, "", 300);
+  const productKey = resolveInventoryProductKey(scopedRoot, requestedProductKey);
   const name = text(input.update.name, "", 240);
   const requestedUnit = baseUnit(input.update.unit);
   const displayUnit = normalizeInventoryDisplayUnit(input.update.displayUnit, requestedUnit);
   const packageSize = text(input.update.packageSize, "", 120);
-  if (!productKey || !name || requestedUnit === "unknown" || !packageSize || !displayUnit) {
+  if (!requestedProductKey || !productKey || !name || requestedUnit === "unknown" || !packageSize || !displayUnit) {
     return {
       ok: false,
       code: "INVALID_PRODUCT",
       error: "Укажите название, складскую единицу и фасовку товара.",
     };
   }
-  const balance = parts.balances.find((value) =>
-    text(value.productKey ?? value.key, "", 300) === productKey
-  );
+  const matchesProduct = (value: JsonRecord) => {
+    if (!belongsToVenue(value)) return false;
+    const reference = text(
+      value.nomenclatureItemId ?? value.id ?? value.productKey ?? value.key,
+      "",
+      300,
+    );
+    return Boolean(reference)
+      && resolveInventoryProductKey(scopedRoot, reference) === productKey;
+  };
+  const balance = parts.balances.find(matchesProduct);
   if (!balance) {
     return { ok: false, code: "PRODUCT_NOT_FOUND", error: "Складская позиция не найдена." };
   }
@@ -2255,9 +2465,12 @@ export function updateInventoryProductDefinition(input: {
     };
   }
   const previousUnit = baseUnit(balance.unit);
-  const hasMovement = array(input.stockMovements).some((value) =>
-    text(record(value).productKey, "", 300) === productKey
-  );
+  const hasMovement = array(input.stockMovements).map(record).some((movement) => {
+    if (!belongsToVenue(movement)) return false;
+    const movementKey = text(movement.productKey, "", 300);
+    return Boolean(movementKey)
+      && resolveInventoryProductKey(scopedRoot, movementKey) === productKey;
+  });
   if (
     previousUnit !== "unknown"
     && previousUnit !== requestedUnit
@@ -2272,10 +2485,17 @@ export function updateInventoryProductDefinition(input: {
 
   let linkedRecipes = 0;
   for (const recipe of parts.recipes) {
+    if (!belongsToVenue(recipe)) continue;
     let linked = false;
     recipe.ingredients = array(recipe.ingredients).map((value) => {
       const ingredient = cloneRecord(value);
-      if (recipeIngredientProductKey(ingredient) !== productKey) return ingredient;
+      if (!belongsToVenue(ingredient)) return ingredient;
+      const ingredientKey = text(ingredient.nomenclatureItemId, "", 300)
+        || recipeIngredientProductKey(ingredient);
+      if (
+        !ingredientKey
+        || resolveInventoryProductKey(scopedRoot, ingredientKey) !== productKey
+      ) return ingredient;
       ingredient.purchaseProductKey = productKey;
       if (previousUnit !== requestedUnit) {
         ingredient.unit = baseUnitInputLabel(requestedUnit);
@@ -2322,9 +2542,7 @@ export function updateInventoryProductDefinition(input: {
   );
   balance.updatedAt = now;
   const nomenclature = array(parts.root.nomenclature).map(cloneRecord);
-  const nomenclatureItem = nomenclature.find((value) =>
-    text(value.key ?? value.productKey, "", 300) === productKey
-  );
+  const nomenclatureItem = nomenclature.find(matchesProduct);
   if (nomenclatureItem) {
     Object.assign(nomenclatureItem, {
       name,
@@ -2842,7 +3060,20 @@ export function applyInventoryCount(input: {
   const snapshotId = text(snapshot.id, crypto.randomUUID(), 100);
   const date = text(snapshot.date, now.slice(0, 10), 10);
   const parts = assortmentParts(input.assortment);
-  const indexedBalances = balanceIndex(parts.balances);
+  const belongsToVenue = (value: JsonRecord) => {
+    const venueId = number(value.venueId);
+    return !input.venueId || venueId <= 0 || venueId === input.venueId;
+  };
+  const scopedBalances = parts.balances.filter(belongsToVenue);
+  const scopedRoot = {
+    ...parts.root,
+    stockBalances: scopedBalances,
+    nomenclature: array(parts.root.nomenclature).map(record).filter(belongsToVenue),
+    inventoryProductAliases: array(parts.root.inventoryProductAliases)
+      .map(record)
+      .filter(belongsToVenue),
+  };
+  const indexedBalances = balanceIndex(scopedBalances);
   const movements: StockMovement[] = [];
   const items: InventoryCountLine[] = [];
   const unresolvedLines: InventoryCountSummary["unresolvedLines"] = [];
@@ -2852,8 +3083,15 @@ export function applyInventoryCount(input: {
     const requested = record(value);
     const lineId = sourceLineId(requested, index);
     const originalProductKey = text(requested.productKey, "", 300);
-    const productKey = resolveInventoryProductKey(parts.root, originalProductKey);
-    const balance = indexedBalances.get(productKey);
+    const productKey = resolveInventoryProductKey(scopedRoot, originalProductKey);
+    const matchingBalances = input.venueId
+      ? scopedBalances.filter((candidate) =>
+          text(candidate.productKey ?? candidate.key, "", 300) === productKey
+        )
+      : [];
+    const balance = input.venueId
+      ? matchingBalances.length === 1 ? matchingBalances[0] : undefined
+      : indexedBalances.get(productKey);
     const requestedName = text(requested.productName ?? requested.name, `Позиция ${index + 1}`);
     if (!originalProductKey || !productKey || !balance) {
       unresolvedLines.push({

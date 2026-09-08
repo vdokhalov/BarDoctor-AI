@@ -343,7 +343,7 @@ test("Data Quality separates missing, AI draft, review and approved cards", () =
   assert.equal(draftAnalytics.counts.confirmedRecipes, 0);
 });
 
-test("old cards remain accessible and item detail read model exposes status, source and version", () => {
+test("ambiguous old cards remain persisted and the item enters controlled consumption review", () => {
   const assortment = baseAssortment();
   assortment.recipes = [
     approvedRecipe({ id: "approved-v2", version: 2 }),
@@ -356,8 +356,8 @@ test("old cards remain accessible and item detail read model exposes status, sou
   const result = reconcileTechCards({ assortment, venueId: 1, now });
   assert.equal((result.assortment.recipes as unknown[]).length, 2);
   const analytics = buildAssortmentAnalytics({ assortment: result.assortment, venueId: 1, now });
-  assert.equal(analytics.menuItems[0].recipeId, "approved-v2");
-  assert.equal(analytics.menuItems[0].techCardSource, "manual");
-  assert.equal(analytics.menuItems[0].techCardVersion, 2);
-  assert.equal(analytics.techCardReconciliation.superseded, 1);
+  assert.equal(analytics.menuItems[0].recipeId, null);
+  assert.equal(analytics.menuItems[0].consumptionMode, "NEEDS_REVIEW");
+  assert.equal(analytics.menuItems[0].consumptionStatus, "NEEDS_REVIEW");
+  assert.equal(analytics.techCardReconciliation.superseded, 0);
 });

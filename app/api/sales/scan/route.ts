@@ -93,7 +93,7 @@ async function activeMenuNames(accountId: number): Promise<string[]> {
     const assortment = record(JSON.parse(row.data_json) as unknown);
     return (Array.isArray(assortment.menuItems) ? assortment.menuItems : [])
       .map(record)
-      .filter((item) => item.active !== false && item.type !== "service")
+      .filter((item) => item.active !== false)
       .map((item) => String(item.name ?? "").trim())
       .filter(Boolean);
   } catch {

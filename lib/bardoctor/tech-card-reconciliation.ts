@@ -6,6 +6,7 @@ import {
   type IngredientMatchCandidate,
   type IngredientUnitResolution,
 } from "./tech-card-ingredient-matching";
+import { legacyConsumptionConflicts, resolveMenuConsumption } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -524,11 +525,16 @@ function recipePriority(recipe: JsonRecord): number {
   return 0;
 }
 
-function annotateVersions(recipes: JsonRecord[]): { recipes: JsonRecord[]; duplicates: number } {
+function annotateVersions(
+  recipes: JsonRecord[],
+  protectedLegacyOwners: ReadonlySet<string> = new Set(),
+): { recipes: JsonRecord[]; duplicates: number } {
   const grouped = new Map<string, JsonRecord[]>();
   for (const recipe of recipes) {
     const key = text(recipe.menuItemId, "", 160);
     if (!key || !["linked", "auto_linked"].includes(text(recipe.ownerLinkStatus))) continue;
+    if (recipe.current === false || text(recipe.lifecycleStatus) === "inactive") continue;
+    if (protectedLegacyOwners.has(key)) continue;
     grouped.set(key, [...(grouped.get(key) ?? []), recipe]);
   }
   const replacements = new Map<string, JsonRecord>();
@@ -707,7 +713,20 @@ export function reconcileTechCards(input: {
     return after;
   });
 
-  const versioned = annotateVersions(recipes);
+  const preVersionAssortment = { ...source, recipes };
+  const protectedLegacyOwners = new Set([
+    ...legacyConsumptionConflicts(preVersionAssortment, input.venueId).items.map((item) => item.menuItemId),
+    ...menuItems.flatMap((menuItem) => {
+      if (!sameVenue(menuItem, input.venueId)) return [];
+      const resolution = resolveMenuConsumption(menuItem, preVersionAssortment, {
+        venueId: input.venueId,
+      });
+      return !resolution.ok && resolution.code === "CONSUMPTION_MODE_CONFLICT"
+        ? [text(menuItem.id, "", 160)]
+        : [];
+    }),
+  ].filter(Boolean));
+  const versioned = annotateVersions(recipes, protectedLegacyOwners);
   recipes = versioned.recipes;
   counters.aiDrafts = recipes.filter((recipe) => text(recipe.reviewStatus) === "ai_draft").length;
   counters.requiresReview = recipes.filter((recipe) => text(recipe.reviewStatus) === "requires_review").length;

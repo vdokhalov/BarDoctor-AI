@@ -72,8 +72,8 @@ export async function GET(request: Request): Promise<Response> {
     `).bind(account.venueId, account.id).all<DeliveryOverview>(),
   ]);
   const assortment = parse(assortmentRow?.data_json, {});
-  const stockCandidates = candidatesFromAssortment(assortment, "stock_product");
-  const menuCandidates = candidatesFromAssortment(assortment, "menu_item");
+  const stockCandidates = candidatesFromAssortment(assortment, "stock_product", account.venueId);
+  const menuCandidates = candidatesFromAssortment(assortment, "menu_item", account.venueId);
   const latestAgent = new Map<string, (typeof agents)[number]>();
   for (const agent of agents) if (!latestAgent.has(agent.connection_id)) latestAgent.set(agent.connection_id, agent);
   const latestRun = new Map<string, (typeof runs)[number]>();

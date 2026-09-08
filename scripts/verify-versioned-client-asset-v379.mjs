@@ -22,6 +22,9 @@ for (const marker of [
   "function bdHomeReviewsCardV409",
   "bdHomeReviewsCardV409,{state:bdHomeReviewState,onNavigate:g}",
   "bd-manual-nomenclature-cost-fallback-v409",
+  'const bdMenuConsumptionSotVersionV418="v418";',
+  "bd-menu-consumption-grid-v418",
+  "bd-tech-card-total-v418",
 ]) {
   assert.ok(asset.includes(marker), `The packaged client asset is stale: ${marker} is missing`);
 }

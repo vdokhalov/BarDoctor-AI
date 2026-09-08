@@ -78,6 +78,149 @@ test("recipe save cannot mutate current stock through an assortment write", () =
   assert.deepEqual(directBalanceMutations(before, { stockBalances: [{ productKey: "coffee", current: 1_000, unit: "g", safety: 100 }] }), []);
 });
 
+test("balance write guard rejects duplicate and malformed identities before last-wins comparison", () => {
+  const before = {
+    stockBalances: [{ productKey: "coffee", venueId: 1, current: 1_000, unit: "g" }],
+  };
+  for (const duplicated of [
+    [
+      { productKey: "coffee", venueId: 1, current: 900, unit: "g" },
+      { productKey: "coffee", venueId: 1, current: 1_000, unit: "g" },
+    ],
+    [
+      { productKey: "coffee", venueId: 1, current: 1_000, unit: "g" },
+      { productKey: "coffee", venueId: 1, current: 900, unit: "g" },
+    ],
+  ]) {
+    assert.deepEqual(directBalanceMutations(before, { stockBalances: duplicated }), [{
+      productKey: "coffee",
+      before: 1,
+      after: 2,
+      code: "DUPLICATE_BALANCE_IDENTITY",
+    }]);
+  }
+
+  assert.deepEqual(directBalanceMutations(before, {
+    stockBalances: [{ name: "Identity-free balance", current: 1_000, unit: "g" }],
+  }), [{
+    productKey: "<missing>",
+    before: 0,
+    after: 1,
+    code: "MALFORMED_BALANCE_IDENTITY",
+  }, {
+    productKey: "coffee",
+    before: 1_000,
+    after: 0,
+  }]);
+});
+
+test("same balance product key remains valid in distinct explicit venues", () => {
+  const balances = [
+    { productKey: "shared", venueId: 1, current: 10, unit: "pcs" },
+    { productKey: "shared", venueId: 2, current: 20, unit: "pcs" },
+  ];
+  assert.deepEqual(directBalanceMutations({ stockBalances: balances }, {
+    stockBalances: [...balances].reverse(),
+  }), []);
+  assert.deepEqual(directBalanceMutations({ stockBalances: balances }, {
+    stockBalances: [
+      balances[0],
+      balances[1],
+      { productKey: "shared", current: 0, unit: "pcs" },
+    ],
+  }), [{
+    productKey: "shared",
+    before: 2,
+    after: 3,
+    code: "DUPLICATE_BALANCE_IDENTITY",
+  }]);
+});
+
+test("unchanged legacy malformed and duplicate balances do not block unrelated assortment edits", () => {
+  const legacyBalances = [
+    { productKey: "duplicate", venueId: 1, current: 10, unit: "pcs", name: "First legacy row" },
+    { productKey: "duplicate", venueId: 1, current: 5, unit: "pcs", name: "Second legacy row" },
+    { venueId: 1, current: 3, unit: "pcs", name: "Identity-free legacy row" },
+  ];
+  const before = { menuItems: [{ id: "menu", name: "Before" }], stockBalances: legacyBalances };
+  const after = {
+    menuItems: [{ id: "menu", name: "After" }],
+    stockBalances: structuredClone(legacyBalances),
+  };
+  assert.deepEqual(directBalanceMutations(before, after), []);
+
+  const reorderedDuplicates = structuredClone(after);
+  reorderedDuplicates.stockBalances = [legacyBalances[1], legacyBalances[0], legacyBalances[2]];
+  assert.deepEqual(directBalanceMutations(before, reorderedDuplicates), [{
+    productKey: "duplicate",
+    before: 2,
+    after: 2,
+    code: "DUPLICATE_BALANCE_IDENTITY",
+  }]);
+
+  const collisionBypass = structuredClone(after);
+  collisionBypass.stockBalances.unshift({
+    productKey: "duplicate",
+    venueId: 1,
+    current: 4,
+    unit: "pcs",
+    name: "Injected balance",
+  });
+  assert.deepEqual(directBalanceMutations(before, collisionBypass), [{
+    productKey: "duplicate",
+    before: 2,
+    after: 3,
+    code: "DUPLICATE_BALANCE_IDENTITY",
+  }]);
+});
+
+test("balance guard uses the same productKey precedence as sale posting", () => {
+  const balances = [
+    { id: "first", key: "legacy-first", productKey: "shared-runtime-key", venueId: 1, current: 10 },
+    { id: "second", key: "legacy-second", productKey: "shared-runtime-key", venueId: 1, current: 20 },
+  ];
+  assert.deepEqual(directBalanceMutations({ stockBalances: balances }, { stockBalances: structuredClone(balances) }), []);
+  assert.deepEqual(directBalanceMutations({ stockBalances: balances }, { stockBalances: [...balances].reverse() }), [{
+    productKey: "shared-runtime-key",
+    before: 2,
+    after: 2,
+    code: "DUPLICATE_BALANCE_IDENTITY",
+  }]);
+});
+
+test("balance write guard rejects nested warehouse quantity changes without a movement", () => {
+  const before = {
+    stockBalances: [{
+      productKey: "coffee",
+      venueId: 1,
+      current: 100,
+      warehouseBalances: {
+        bar: { current: 60, marker: "before" },
+        kitchen: { quantity: 30 },
+        reserve: { onHand: 10 },
+      },
+    }],
+  };
+  const metadataOnly = structuredClone(before);
+  metadataOnly.stockBalances[0].warehouseBalances.bar.marker = "after";
+  assert.deepEqual(directBalanceMutations(before, metadataOnly), []);
+
+  for (const [warehouseId, field] of [
+    ["bar", "current"],
+    ["kitchen", "quantity"],
+    ["reserve", "onHand"],
+  ] as const) {
+    const mutated = structuredClone(before);
+    const warehouse = mutated.stockBalances[0].warehouseBalances[warehouseId] as Record<string, unknown>;
+    warehouse[field] = Number(warehouse[field]) - 1;
+    assert.deepEqual(directBalanceMutations(before, mutated), [{
+      productKey: `coffee@warehouse:${warehouseId}`,
+      before: Number((before.stockBalances[0].warehouseBalances[warehouseId] as Record<string, unknown>)[field]),
+      after: Number(warehouse[field]),
+    }]);
+  }
+});
+
 test("explicit inventory adjustment creates a canonical movement", () => {
   const result = applyInventoryCount({
     assortment: { stockBalances: [{ productKey: "coffee", name: "Coffee", current: 1_000, unit: "g", averageUnitCost: 0.1, inventoryValue: 100, currency: "RUB" }] },
@@ -159,16 +302,16 @@ test("sales import identity is content-, parser-, and venue-scoped and duplicate
   assert.equal(duplicate.batch.id, first.batch.id);
 });
 
-test("conflicting consumption modes are rejected while a service resolves to NONE", () => {
+test("legacy conflicting consumption modes require review while a service resolves to NONE", () => {
   const conflicting = {
     menuItems: [{ id: "espresso", type: "ready", readyProduct: { productKey: "coffee", packagesPerSale: 1 } }],
     nomenclature: [{ id: "coffee", productKey: "coffee", unit: "g" }],
     stockBalances: [{ productKey: "coffee", unit: "g" }],
     recipes: [{ id: "recipe-1", menuItemId: "espresso", status: "confirmed", reviewStatus: "approved", current: true, ingredients: [] }],
   };
-  assert.equal(resolveConsumptionMode(conflicting.menuItems[0], conflicting).code, "CONSUMPTION_MODE_CONFLICT");
+  assert.equal(resolveConsumptionMode(conflicting.menuItems[0], conflicting).code, "CONSUMPTION_MODE_NEEDS_REVIEW");
   assert.equal(changedConsumptionModeIssues({ menuItems: [], recipes: [] }, conflicting).length, 1);
-  assert.deepEqual(resolveConsumptionMode({ id: "service", type: "service" }, { recipes: [] }), { ok: true, mode: "NONE" });
+  assert.deepEqual(resolveConsumptionMode({ id: "service", type: "service" }, { recipes: [] }), { ok: true, mode: "NONE", source: "legacy" });
 });
 
 test("explicit zero cost remains known zero while missing cost remains unknown", () => {

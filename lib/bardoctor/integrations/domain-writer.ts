@@ -25,6 +25,11 @@ import {
   WRITE_OFF_STORE_KEY,
   writeOffDisplayNumber,
 } from "../write-offs";
+import {
+  changedConsumptionModeIssues,
+  consumptionRecipeCandidates,
+  resolveMenuConsumption,
+} from "../consumption-mode";
 
 const EMPLOYEE_STORE_KEY = "bd_employees";
 export const WAREHOUSE_STORE_KEY = "bd_warehouses";
@@ -178,6 +183,114 @@ function inputPriority(envelope: CanonicalEnvelope): number {
   return Number.isFinite(value) ? Math.max(-100, Math.min(100, Math.round(value))) : 0;
 }
 
+function belongsToVenue(value: JsonRecord, venueId: number): boolean {
+  const recordVenueId = number(value.venueId);
+  return recordVenueId <= 0 || recordVenueId === venueId;
+}
+
+function venueScopedInventoryAssortment(assortment: JsonRecord, venueId: number): JsonRecord {
+  return {
+    ...assortment,
+    stockBalances: array(assortment.stockBalances).filter((item) => belongsToVenue(item, venueId)),
+    nomenclature: array(assortment.nomenclature).filter((item) => belongsToVenue(item, venueId)),
+    inventoryProductAliases: array(assortment.inventoryProductAliases)
+      .filter((item) => belongsToVenue(item, venueId)),
+  };
+}
+
+type VenueProductResolution = {
+  ok: true;
+  productKey: string;
+  assortment: JsonRecord;
+} | {
+  ok: false;
+  result: BusinessWriteResult;
+};
+
+function resolveVenueInventoryReference(
+  assortment: JsonRecord,
+  requestedValue: unknown,
+  venueId: number,
+): VenueProductResolution {
+  const requested = text(requestedValue);
+  if (!requested) {
+    return {
+      ok: false,
+      result: { ok: false, code: "MAPPING_TARGET_NOT_FOUND", error: "Не указана складская позиция" },
+    };
+  }
+  const scoped = venueScopedInventoryAssortment(assortment, venueId);
+  const aliases = array(scoped.inventoryProductAliases);
+  let cursor = requested;
+  const visited = new Set<string>();
+  while (!visited.has(cursor) && visited.size < 20) {
+    visited.add(cursor);
+    const targets = [...new Set(aliases
+      .filter((alias) => text(alias.from) === cursor)
+      .map((alias) => text(alias.to))
+      .filter(Boolean))];
+    if (targets.length > 1) {
+      return {
+        ok: false,
+        result: {
+          ok: false,
+          code: "INVENTORY_REFERENCE_AMBIGUOUS",
+          error: "Складская ссылка неоднозначна внутри заведения",
+        },
+      };
+    }
+    if (!targets.length) break;
+    cursor = targets[0];
+  }
+  const exactNomenclature = array(scoped.nomenclature).filter((item) =>
+    text(item.id) === cursor || text(item.nomenclatureItemId) === cursor
+  );
+  if (exactNomenclature.length > 1) {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        code: "INVENTORY_REFERENCE_AMBIGUOUS",
+        error: "ID номенклатуры неоднозначен внутри заведения",
+      },
+    };
+  }
+  const exactBalances = array(scoped.stockBalances).filter((item) =>
+    text(item.id) === cursor || text(item.nomenclatureItemId) === cursor
+  );
+  if (!exactNomenclature.length && exactBalances.length > 1) {
+    return {
+      ok: false,
+      result: {
+        ok: false,
+        code: "INVENTORY_REFERENCE_AMBIGUOUS",
+        error: "ID складской позиции неоднозначен внутри заведения",
+      },
+    };
+  }
+  const productKey = resolveInventoryProductKey(scoped, requested) || requested;
+  return { ok: true, productKey, assortment: scoped };
+}
+
+function exactVenueBalances(
+  assortment: JsonRecord,
+  productKey: string,
+  venueId: number,
+): JsonRecord[] {
+  return array(assortment.stockBalances).filter((item) =>
+    belongsToVenue(item, venueId)
+    && text(item.productKey ?? item.key) === productKey
+  );
+}
+
+function ambiguousBalanceFailure(): BusinessWriteResult {
+  return {
+    ok: false,
+    code: "INVENTORY_REFERENCE_AMBIGUOUS",
+    error: "В заведении найдено несколько складских позиций с одним ключом",
+  };
+}
+
 function closedMonthFailure(store: Map<string, string>, date: string): BusinessWriteResult | null {
   const monthKey = date.slice(0, 7);
   if (!/^\d{4}-\d{2}$/.test(monthKey)) return null;
@@ -195,12 +308,48 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
   const balances = array(assortment.stockBalances);
   const value = record(input.data);
   const requestedProductKey = input.internalId;
-  const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
-  const index = balances.findIndex((item) => text(item.productKey ?? item.key) === productKey);
+  const resolution = resolveVenueInventoryReference(
+    assortment,
+    requestedProductKey,
+    input.account.venueId,
+  );
+  if (!resolution.ok) return resolution.result;
+  const productKey = resolution.productKey;
+  const candidateIndexes = balances.flatMap((item, index) =>
+    belongsToVenue(item, input.account.venueId)
+      && text(item.productKey ?? item.key) === productKey
+      ? [index]
+      : []
+  );
+  if (candidateIndexes.length > 1) return ambiguousBalanceFailure();
+  const index = candidateIndexes[0] ?? -1;
   const before = index >= 0 ? { ...balances[index] } : undefined;
   const previous = index >= 0 ? balances[index] : {};
   if (index >= 0 && number(previous.sourcePriority) > inputPriority(input.envelope)) {
     return { ok: true, internalId: productKey, duplicate: true };
+  }
+  if (index >= 0 && value.active === false && previous.active !== false) {
+    const prospective = structuredClone(assortment);
+    for (const key of ["stockBalances", "nomenclature"] as const) {
+      for (const candidate of array(prospective[key])) {
+        if (
+          belongsToVenue(candidate, input.account.venueId)
+          && text(candidate.productKey ?? candidate.key) === productKey
+        ) candidate.active = false;
+      }
+    }
+    const consumptionIssues = changedConsumptionModeIssues(
+      assortment,
+      prospective,
+      input.account.venueId,
+    );
+    if (consumptionIssues.length) {
+      return {
+        ok: false,
+        code: "PRODUCT_IN_USE",
+        error: consumptionIssues[0].error,
+      };
+    }
   }
   const packageDetails = inventoryPackageAmount(value.packageSize, value.unit);
   const created = index < 0;
@@ -208,6 +357,7 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
     ...previous,
     key: productKey,
     productKey,
+    venueId: input.account.venueId,
     name: created ? text(value.name, "Товар") : text(previous.name, text(value.name, "Товар")),
     externalName: text(value.name, "Товар"),
     aliases: [...new Set([
@@ -271,10 +421,18 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   const locked = closedMonthFailure(loaded, date);
   if (locked) return locked;
   const requestedProductKey = text(value.productKey);
-  const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
+  const resolution = resolveVenueInventoryReference(
+    assortment,
+    requestedProductKey,
+    input.account.venueId,
+  );
+  if (!resolution.ok) return resolution.result;
+  const productKey = resolution.productKey;
   const warehouseExternalId = text(value.warehouseExternalId, "__venue__", 180);
   const balances = array(assortment.stockBalances);
-  let balance = balances.find((item) => text(item.productKey ?? item.key) === productKey);
+  const balanceCandidates = exactVenueBalances(assortment, productKey, input.account.venueId);
+  if (balanceCandidates.length > 1) return ambiguousBalanceFailure();
+  let balance = balanceCandidates[0];
   const actual = toInventoryBaseAmount(value.quantity, value.unit);
   if (actual.unit === "unknown" || actual.amount < 0) {
     return { ok: false, code: "INVENTORY_UNIT_INVALID", error: "Не удалось привести остаток к складской единице" };
@@ -283,6 +441,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
     balance = {
       key: productKey,
       productKey,
+      venueId: input.account.venueId,
       name: text(value.productName, "Товар"),
       unit: actual.unit,
       current: 0,
@@ -334,7 +493,17 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
     return { ok: false, code: "INVENTORY_REVIEW_REQUIRED", error: inventory.summary.unresolvedLines[0].reason };
   }
   const snapshots = array(parse(loaded.get(INVENTORY_SNAPSHOT_STORE_KEY), []));
-  const existingIndex = snapshots.findIndex((item) => text(item.id) === input.internalId);
+  const snapshotIndexes = snapshots.flatMap((item, index) =>
+    text(item.id) === input.internalId && belongsToVenue(item, input.account.venueId)
+      ? [index]
+      : []
+  );
+  if (snapshotIndexes.length > 1) return {
+    ok: false,
+    code: "INVENTORY_REFERENCE_AMBIGUOUS",
+    error: "В заведении найдено несколько снимков остатка с одним ID",
+  };
+  const existingIndex = snapshotIndexes[0] ?? -1;
   const before = existingIndex >= 0 ? { ...snapshots[existingIndex] } : undefined;
   const snapshot = {
     id: input.internalId,
@@ -469,12 +638,19 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   if (locked) return locked;
   const assortment = record(parse(loaded.get(ASSORTMENT_STORE_KEY), {}));
   const balances = array(assortment.stockBalances);
-  const byKey = new Map(balances.map((balance) => [text(balance.productKey ?? balance.key), balance]));
   const prepared: Array<{ item: JsonRecord; balance: JsonRecord; amount: number; unit: BaseInventoryUnit; cost: number }> = [];
   for (const original of array(value.items)) {
     const requestedProductKey = text(original.productKey);
-    const productKey = resolveInventoryProductKey(assortment, requestedProductKey) || requestedProductKey;
-    const balance = byKey.get(productKey);
+    const resolution = resolveVenueInventoryReference(
+      assortment,
+      requestedProductKey,
+      input.account.venueId,
+    );
+    if (!resolution.ok) return resolution.result;
+    const productKey = resolution.productKey;
+    const balanceCandidates = exactVenueBalances(assortment, productKey, input.account.venueId);
+    if (balanceCandidates.length > 1) return ambiguousBalanceFailure();
+    const balance = balanceCandidates[0];
     if (!balance) return { ok: false, code: "MAPPING_TARGET_NOT_FOUND", error: `Складская позиция «${text(original.name, "Товар") }» не найдена` };
     const base = toInventoryBaseAmount(original.quantity, original.unit);
     if (base.unit === "unknown" || base.amount <= 0 || text(balance.unit) !== base.unit) {
@@ -501,6 +677,7 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
     balance.lastReturnAt = date;
     movements.push({
       id: crypto.randomUUID(),
+      venueId: input.account.venueId,
       type: "return",
       date,
       productKey: text(item.productKey),
@@ -517,7 +694,17 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   assortment.stockBalances = balances;
   assortment.updatedAt = now;
   const documents = array(parse(loaded.get(documentStoreKey), []));
-  const existingIndex = documents.findIndex((item) => text(item.id) === input.internalId);
+  const documentIndexes = documents.flatMap((item, index) =>
+    text(item.id) === input.internalId && belongsToVenue(item, input.account.venueId)
+      ? [index]
+      : []
+  );
+  if (documentIndexes.length > 1) return {
+    ok: false,
+    code: "INVENTORY_REFERENCE_AMBIGUOUS",
+    error: "В заведении найдено несколько возвратов с одним ID",
+  };
+  const existingIndex = documentIndexes[0] ?? -1;
   const before = existingIndex >= 0 ? { ...documents[existingIndex] } : undefined;
   const total = rounded(prepared.reduce((sum, item) => sum + item.cost, 0), 2);
   const document = {
@@ -555,9 +742,20 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   if (total > 0) {
     const expenses = array(parse(loaded.get(EXPENSE_STORE_KEY), []));
     const expenseId = `integration:${input.internalId}`;
-    const expenseIndex = expenses.findIndex((item) => text(item.id) === expenseId);
+    const expenseIndexes = expenses.flatMap((item, index) =>
+      text(item.id) === expenseId && belongsToVenue(item, input.account.venueId)
+        ? [index]
+        : []
+    );
+    if (expenseIndexes.length > 1) return {
+      ok: false,
+      code: "INVENTORY_REFERENCE_AMBIGUOUS",
+      error: "В заведении найдено несколько расходов возврата с одним ID",
+    };
+    const expenseIndex = expenseIndexes[0] ?? -1;
     const expense = {
       id: expenseId,
+      venueId: input.account.venueId,
       date,
       accountingMonth: date.slice(0, 7),
       category: "returns",
@@ -583,11 +781,62 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
   const now = new Date().toISOString();
   const loaded = await stores(input.account.id, [ASSORTMENT_STORE_KEY]);
   const assortment = record(parse(loaded.get(ASSORTMENT_STORE_KEY), {}));
+  const originalAssortment = structuredClone(assortment);
   const recipes = array(assortment.recipes);
   const balances = array(assortment.stockBalances);
   const value = record(input.data);
   const menuItemId = text(value.menuItemId);
-  const existingIndex = recipes.findIndex((item) => text(item.menuItemId) === menuItemId);
+  const menuItems = array(assortment.menuItems);
+  const localMenuOwners = menuItems.filter((item) =>
+    text(item.id) === menuItemId && belongsToVenue(item, input.account.venueId)
+  );
+  if (localMenuOwners.length > 1) {
+    return {
+      ok: false,
+      code: "DUPLICATE_MENU_ITEM_ID",
+      error: "В заведении найдено несколько позиций меню с одним ID. Требуется ручная проверка.",
+    };
+  }
+  const menuItem = localMenuOwners[0];
+  if (!menuItem) {
+    const foreignOwner = menuItems.some((item) =>
+      text(item.id) === menuItemId
+      && number(item.venueId) > 0
+      && number(item.venueId) !== input.account.venueId
+    );
+    if (foreignOwner) {
+      return { ok: false, code: "CONSUMPTION_VENUE_MISMATCH", error: "Позиция меню относится к другому заведению." };
+    }
+    return { ok: false, code: "RECIPE_OWNER_REQUIRED", error: "Позиция меню для техкарты не найдена." };
+  }
+  const explicitMode = text(menuItem.consumptionMode, "", 40);
+  if (!explicitMode) {
+    return {
+      ok: false,
+      code: "CONSUMPTION_MODE_REQUIRED",
+      error: "Сначала явно выберите для позиции меню режим «По техкарте».",
+    };
+  }
+  if (explicitMode !== "RECIPE") {
+    return {
+      ok: false,
+      code: "CONSUMPTION_MODE_CONFLICT",
+      error: "Техкарту можно синхронизировать только для позиции с режимом «По техкарте».",
+    };
+  }
+  const recipeOwnerIndexes = consumptionRecipeCandidates(
+    assortment,
+    menuItemId,
+    input.account.venueId,
+  ).map((item) => recipes.indexOf(item)).filter((index) => index >= 0);
+  if (recipeOwnerIndexes.length > 1) {
+    return {
+      ok: false,
+      code: "CONSUMPTION_MODE_CONFLICT",
+      error: "Для позиции найдено несколько активных техкарт. Требуется ручная проверка.",
+    };
+  }
+  const existingIndex = recipeOwnerIndexes[0] ?? -1;
   const before = existingIndex >= 0 ? { ...recipes[existingIndex] } : undefined;
   if (before && number(before.sourcePriority) > inputPriority(input.envelope)) {
     return { ok: true, internalId: text(before.id, input.internalId), duplicate: true };
@@ -595,19 +844,102 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
   if (before && before.source !== "integration" && text(before.externalId) !== input.envelope.externalId) {
     return { ok: false, code: "MANUAL_RECIPE_PROTECTED", error: "У позиции уже есть ручная техкарта. Она не перезаписана; сравните версии вручную." };
   }
-  const resolvedIngredients = array(value.ingredients).map((ingredient) => {
-    const requested = text(ingredient.purchaseProductKey);
-    const resolved = resolveInventoryProductKey(assortment, requested) || requested;
-    return requested && resolved !== requested
-      ? { ...ingredient, purchaseProductKey: resolved }
-      : ingredient;
-  });
+  const resolvedIngredients: JsonRecord[] = [];
+  for (const [index, ingredient] of array(value.ingredients).entries()) {
+    const nomenclatureRows = array(assortment.nomenclature);
+    const candidates = [...nomenclatureRows, ...balances];
+    const local = (candidate: JsonRecord) => {
+      const candidateVenueId = number(candidate.venueId);
+      return candidateVenueId <= 0 || candidateVenueId === input.account.venueId;
+    };
+    const scopedAssortment = {
+      ...assortment,
+      nomenclature: nomenclatureRows.filter(local),
+      stockBalances: balances.filter(local),
+      inventoryProductAliases: array(assortment.inventoryProductAliases).filter(local),
+    };
+    const requestedNomenclatureId = text(ingredient.nomenclatureItemId);
+    const requested = requestedNomenclatureId
+      || text(ingredient.purchaseProductKey ?? ingredient.productKey);
+    let nomenclature: JsonRecord | undefined;
+    let resolved = "";
+    if (requestedNomenclatureId) {
+      const exactNomenclatureMatches = nomenclatureRows.filter((candidate) =>
+        text(candidate.id) === requestedNomenclatureId
+        || text(candidate.nomenclatureItemId) === requestedNomenclatureId
+      );
+      const exactLocalNomenclature = exactNomenclatureMatches.filter(local);
+      if (exactLocalNomenclature.length > 1) {
+        return { ok: false, code: "CONSUMPTION_REFERENCE_MISMATCH", error: "ID ингредиента неоднозначен внутри заведения." };
+      }
+      if (!exactLocalNomenclature.length && exactNomenclatureMatches.length) {
+        return { ok: false, code: "CONSUMPTION_VENUE_MISMATCH", error: "Ингредиент относится к другому заведению." };
+      }
+      const exactLocalBalances = balances.filter((candidate) =>
+        local(candidate)
+        && (text(candidate.id) === requestedNomenclatureId
+          || text(candidate.nomenclatureItemId) === requestedNomenclatureId)
+      );
+      if (!exactLocalNomenclature.length && !exactNomenclatureMatches.length && exactLocalBalances.length > 1) {
+        return { ok: false, code: "CONSUMPTION_REFERENCE_MISMATCH", error: "ID ингредиента неоднозначен внутри заведения." };
+      }
+      nomenclature = exactLocalNomenclature[0]
+        ?? (!exactNomenclatureMatches.length ? exactLocalBalances[0] : undefined);
+      resolved = nomenclature
+        ? text(nomenclature.productKey ?? nomenclature.key ?? nomenclature.id ?? requestedNomenclatureId)
+        : "";
+    } else if (requested) {
+      resolved = resolveInventoryProductKey(scopedAssortment, requested);
+      const matching = candidates.filter((candidate) => {
+        const reference = text(candidate.id ?? candidate.nomenclatureItemId ?? candidate.productKey ?? candidate.key);
+        return local(candidate)
+          && reference
+          && resolveInventoryProductKey(scopedAssortment, reference) === resolved;
+      });
+      nomenclature = matching.find((candidate) => nomenclatureRows.includes(candidate)) ?? matching[0];
+      const foreignMatching = candidates.filter((candidate) => {
+        const candidateVenueId = number(candidate.venueId);
+        if (candidateVenueId <= 0 || candidateVenueId === input.account.venueId) return false;
+        const reference = text(candidate.id ?? candidate.nomenclatureItemId ?? candidate.productKey ?? candidate.key);
+        return reference && resolveInventoryProductKey(assortment, reference) === requested;
+      });
+      if (!nomenclature && foreignMatching.length) {
+        return { ok: false, code: "CONSUMPTION_VENUE_MISMATCH", error: "Ингредиент относится к другому заведению." };
+      }
+    }
+    if (!requested || !resolved || !nomenclature || nomenclature.active === false || nomenclature.archived === true) {
+      return {
+        ok: false,
+        code: "CONSUMPTION_REFERENCE_NOT_FOUND",
+        error: `Ингредиент «${text(ingredient.name, "без названия")}» не связан с активной номенклатурой.`,
+      };
+    }
+    const productVenueId = number(nomenclature.venueId);
+    if (productVenueId > 0 && productVenueId !== input.account.venueId) {
+      return { ok: false, code: "CONSUMPTION_VENUE_MISMATCH", error: "Ингредиент относится к другому заведению." };
+    }
+    resolvedIngredients.push({
+      ...ingredient,
+      id: text(ingredient.id, `${input.internalId}:ingredient:${index + 1}`, 160),
+      nomenclatureItemId: text(nomenclature.nomenclatureItemId ?? nomenclature.id, resolved, 320),
+      purchaseProductKey: resolved,
+      venueId: input.account.venueId,
+    });
+  }
   const recipe = {
     ...before,
     ...value,
     id: existingIndex >= 0 ? text(before?.id, input.internalId) : input.internalId,
     menuItemId,
+    ownerId: menuItemId,
+    ownerType: "menu_item",
+    ownerLinkStatus: "linked",
+    venueId: input.account.venueId,
     status: "confirmed",
+    reviewStatus: "approved",
+    lifecycleStatus: "current",
+    current: true,
+    currentDraft: false,
     confidence: 1,
     warnings: [],
     ingredients: resolvedIngredients,
@@ -615,29 +947,25 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
     createdAt: text(before?.createdAt, now, 40),
     updatedAt: now,
   };
-  if (existingIndex >= 0) recipes[existingIndex] = recipe;
-  else recipes.unshift(recipe);
-  for (const ingredient of resolvedIngredients) {
-    const productKey = text(ingredient.purchaseProductKey);
-    if (!productKey || balances.some((item) => text(item.productKey ?? item.key) === productKey)) continue;
-    const base = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
-    if (base.unit === "unknown") continue;
-    balances.unshift({
-      key: productKey,
-      productKey,
-      name: text(ingredient.name, "Ингредиент"),
-      unit: base.unit,
-      current: 0,
-      averageUnitCost: 0,
-      inventoryValue: 0,
-      metadataSource: "integration_recipe",
-      createdAt: now,
-      updatedAt: now,
-    });
+  const nextRecipes = [...recipes];
+  if (existingIndex >= 0) nextRecipes[existingIndex] = recipe;
+  else nextRecipes.unshift(recipe);
+  const prospective = { ...assortment, recipes: nextRecipes };
+  const recipeValidation = resolveMenuConsumption(
+    { ...menuItem, consumptionMode: "RECIPE" },
+    prospective,
+    { venueId: input.account.venueId, forPosting: true },
+  );
+  if (!recipeValidation.ok) {
+    return { ok: false, code: recipeValidation.code, error: recipeValidation.error };
   }
-  assortment.recipes = recipes;
-  assortment.stockBalances = balances;
+  assortment.recipes = nextRecipes;
   assortment.updatedAt = now;
+  const consumptionIssues = changedConsumptionModeIssues(originalAssortment, assortment, input.account.venueId);
+  if (consumptionIssues.length) {
+    const issue = consumptionIssues[0];
+    return { ok: false, code: issue.code, error: issue.error };
+  }
   await database.batch([
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     auditStatement(database, {

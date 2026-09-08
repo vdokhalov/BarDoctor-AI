@@ -9,7 +9,7 @@ for (const path of ["public/app.html", "app/bar-doctor-response.ts"]) {
   test(`${path} starts the cached shell with the compact v397 bootstrap`, async () => {
     const source = await readFile(new URL(path, root), "utf8");
     assert.match(source, /bd-shell-first-startup" content="v397/);
-    assert.match(source, /src="\/bardoctor-preview-v397\.js\?v=shell-first-startup-v397-[^"]*home-reviews-auth-v415" defer/);
+    assert.match(source, /src="\/bardoctor-preview-v397\.js\?v=shell-first-startup-v397-[^"]*home-reviews-auth-v415-[^"]*menu-consumption-sot-v418" defer/);
     assert.match(source, /modulepreload" href="\/assets\/index-BQGspy0I\.js\?v=[^"]*startup-performance-v343/);
     assert.doesNotMatch(source, /<script src="\/server-migration-discovery-v262\.js[^>]*><\/script>-/);
   });

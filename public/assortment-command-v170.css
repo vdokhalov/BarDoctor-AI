@@ -22,6 +22,11 @@
   font-family: Manrope, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+@media (max-width: 520px) {
+  .bd-assortment-import-review-v170 input,
+  .bd-assortment-import-review-v170 select { font-size: 16px; }
+}
+
 .bd-assortment-command-v170 {
   width: 100%;
   min-height: 100dvh;

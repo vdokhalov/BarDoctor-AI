@@ -1,4 +1,5 @@
 import { inventoryPackageAmount, resolveInventoryProductKey, toInventoryBaseAmount } from "./inventory";
+import { legacyConsumptionConflicts } from "./consumption-mode";
 import { auditCanonicalNomenclature, canonicalSupplierMappings } from "./nomenclature-identity";
 import { purchaseAffectsInventory } from "./purchases";
 import { reconcileTechCards, validateTechCardVenueIsolation } from "./tech-card-reconciliation";
@@ -89,9 +90,16 @@ export function auditDataIntegrity(input: {
   const writeOffs = (input.writeOffDocuments ?? []).map(record).filter((item) => sameVenue(item, input.venueId));
   const sales = salesBatches(input.salesBatches ?? [], input.venueId ?? 0);
   const salesQuality = salesDataQuality(sales, input.venueId ?? 0);
+  const rawConsumptionReview = legacyConsumptionConflicts(assortment, input.venueId);
   const canonicalAudit = auditCanonicalNomenclature({ assortment, purchaseDocuments: purchases, venueId: input.venueId });
   const techResult = reconcileTechCards({ assortment, purchaseDocuments: purchases, venueId: input.venueId, now: input.now ?? new Date(0) });
   const tech = techResult.report;
+  const reconciledConsumptionReview = legacyConsumptionConflicts(techResult.assortment, input.venueId);
+  const consumptionItems = new Map(
+    [...rawConsumptionReview.items, ...reconciledConsumptionReview.items]
+      .map((item) => [item.menuItemId, item] as const),
+  );
+  const consumptionReview = { total: consumptionItems.size, items: [...consumptionItems.values()] };
   const mappings = canonicalSupplierMappings(assortment);
   const canonicalKeys = new Set(nomenclature.filter((item) => sameVenue(item, input.venueId)).map(keyOf).filter(Boolean));
   const balanceKeys = new Set(balances.filter((item) => sameVenue(item, input.venueId)).map(keyOf).filter(Boolean));
@@ -121,7 +129,9 @@ export function auditDataIntegrity(input: {
     && activeMovement(movement) && text(movement.type) === "sale_consumption");
   const salesBatchIds = new Set(sales.map((batch) => batch.id));
   const postedSalesWithoutMovements = sales.flatMap((batch) => batch.lines
-    .filter((line) => line.processingStatus === "POSTED" && !saleConsumptionMovements.some((movement) =>
+    .filter((line) => line.processingStatus === "POSTED"
+      && text(record(line.recipeSnapshot).consumptionMode, "", 40) !== "NONE"
+      && !saleConsumptionMovements.some((movement) =>
       text(movement.salesBatchId ?? movement.sourceDocumentId, "", 160) === batch.id
       && text(movement.salesBatchLineId ?? movement.sourceLineId, "", 160) === line.id
     ))
@@ -187,6 +197,7 @@ export function auditDataIntegrity(input: {
     finding("CANONICAL_DUPLICATE", "high", Array(numeric(canonicalAudit.suspectedCanonicalDuplicates)).fill("canonical duplicate candidate"), "Canonical identity was derived from mutable invoice labels instead of a stable canonical boundary."),
     finding("SUPPLIER_MAPPING_STALE_OR_ORPHAN", "high", staleMappings, "Supplier mappings lacked one-source-key uniqueness and a live canonical target invariant."),
     finding("TECH_CARD_ORPHAN_OR_AMBIGUOUS", "high", Array(tech.orphan + tech.ambiguous + tech.duplicateCandidates).fill("tech-card relationship"), "Tech cards predate stable owner identity or multiple active versions were retained."),
+    finding("LEGACY_CONSUMPTION_MODE_NEEDS_REVIEW", "high", consumptionReview.items.map((item) => `${item.menuItemId}:${item.reasons.join("+")}`), "Legacy menu items retain more than one possible inventory source and require an explicit non-destructive mode selection."),
     finding("HIGH_MATCH_UNLINKED", "medium", highUnlinked, "A high semantic suggestion was stored without a canonical link, often because an approved manual card is protected."),
     finding("UNIT_OR_PACKAGE_CONFLICT", "high", [...unitConflicts, ...duplicatePackages], "Packaging metadata has no normalized uniqueness and unit-compatibility invariant."),
     finding("STOCK_WITHOUT_COST_BASIS", "high", missingCost, "Quantity was accepted while accounting cost was missing, incompatible, or inherited from an unvalued balance."),
@@ -209,7 +220,7 @@ export function auditDataIntegrity(input: {
     finding("STALE_OR_SUPERSEDED_ALIAS", "medium", staleAliases, "Canonical supersession aliases are additive but not uniformly validated by historical readers."),
   ].filter((value): value is DataIntegrityFinding => Boolean(value));
   const highConfidenceAutomatic = numeric(canonicalAudit.safeMergeCandidates);
-  const ambiguous = numeric(canonicalAudit.ambiguousCandidates) + tech.ambiguous + tech.duplicateCandidates + tech.mediumConfidenceNeedsReview;
+  const ambiguous = numeric(canonicalAudit.ambiguousCandidates) + tech.ambiguous + tech.duplicateCandidates + tech.mediumConfidenceNeedsReview + consumptionReview.total;
   const affectedRecords = findings.reduce((sum, value) => sum + value.count, 0);
   return {
     version: "data-integrity-v261", mode: "read_only_dry_run", venueId: input.venueId ?? null,
@@ -227,6 +238,7 @@ export function auditDataIntegrity(input: {
       salesLines: sales.reduce((sum, batch) => sum + batch.lines.length, 0),
       unresolvedSalesLines: salesQuality.affectedLineCount,
       unresolvedSalesQuantity: salesQuality.affectedQuantity,
+      legacyConsumptionConflicts: consumptionReview.total,
       dataQualityIssues: affectedRecords,
     },
     findings,

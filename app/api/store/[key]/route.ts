@@ -40,7 +40,15 @@ import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/
 import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomenclature";
 import { materializeMenuTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 import { directBalanceMutations } from "../../../../lib/bardoctor/inventory-write-guard";
-import { changedConsumptionModeIssues } from "../../../../lib/bardoctor/consumption-mode";
+import {
+  changedConsumptionModeIssues,
+  duplicateMenuItemIds,
+  legacyConsumptionConflicts,
+} from "../../../../lib/bardoctor/consumption-mode";
+import {
+  protectedSalesBatchMutations,
+  SALES_BATCH_STORE_KEY,
+} from "../../../../lib/bardoctor/sales-consumption";
 import {
   normalizeVenueCurrencyArrayUpdates,
   VENUE_CURRENCY_ARRAY_STORE_KEYS,
@@ -92,6 +100,9 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     source: row ? "server_d1" : "missing",
     authoritative: Boolean(row),
     legacyImportRequired: !row && [ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY].includes(key),
+    consumptionReview: key === ASSORTMENT_STORE_KEY
+      ? legacyConsumptionConflicts(data, account.venueId)
+      : undefined,
   });
 }
 
@@ -184,6 +195,29 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
   let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
+    const repeatedMenuItemIds = duplicateMenuItemIds(after);
+    if (repeatedMenuItemIds.length) {
+      return Response.json({
+        ok: false,
+        code: "DUPLICATE_MENU_ITEM_ID",
+        error: "В меню обнаружены повторяющиеся ID позиций. Сохранение остановлено до безопасного разбора конфликта.",
+        issues: repeatedMenuItemIds.slice(0, 50).map((id) => ({ menuItemId: id })),
+      }, { status: 409 });
+    }
+    const balanceMutations = directBalanceMutations(before, after);
+    if (balanceMutations.length) {
+      const identityIssue = balanceMutations.find((issue) => issue.code);
+      return Response.json({
+        ok: false,
+        code: identityIssue?.code ?? "USE_INVENTORY_LIFECYCLE_API",
+        error: identityIssue?.code === "DUPLICATE_BALANCE_IDENTITY"
+          ? "Обнаружены повторяющиеся складские идентификаторы. Сохранение остановлено до безопасного разбора конфликта."
+          : identityIssue?.code === "MALFORMED_BALANCE_IDENTITY"
+            ? "У складской позиции отсутствует устойчивый идентификатор. Исправьте номенклатуру до сохранения."
+            : "Фактический остаток изменяется только явной складской операцией с движением.",
+        issues: balanceMutations.slice(0, 50),
+      }, { status: 409 });
+    }
     const currencyNormalization = normalizeAssortmentMenuCurrencyUpdates(
       before,
       after,
@@ -267,6 +301,18 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
         { status: 409 },
       );
     }
+    const consumptionIssues = changedConsumptionModeIssues(before, after, account.venueId);
+    if (consumptionIssues.length) {
+      const needsReview = consumptionIssues.some((issue) => issue.code === "CONSUMPTION_MODE_NEEDS_REVIEW");
+      return Response.json({
+        ok: false,
+        code: needsReview ? "CONSUMPTION_MODE_NEEDS_REVIEW" : "MENU_CONSUMPTION_INVALID",
+        error: needsReview
+          ? "Выберите один способ списания для legacy-позиции перед изменением её складской конфигурации."
+          : "Не удалось сохранить способ списания. Проверьте номенклатуру, количество, единицу и техкарту.",
+        issues: consumptionIssues.slice(0, 50),
+      }, { status: 422 });
+    }
     const related = await db
       .select()
       .from(domainData)
@@ -287,34 +333,42 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       now: new Date(now),
     });
     after = enrichCanonicalSupplierSummary(techCards.assortment);
+    const reconciledConsumptionIssues = changedConsumptionModeIssues(before, after, account.venueId);
+    if (reconciledConsumptionIssues.length) {
+      const needsReview = reconciledConsumptionIssues.some((issue) => issue.code === "CONSUMPTION_MODE_NEEDS_REVIEW");
+      return Response.json({
+        ok: false,
+        code: needsReview ? "CONSUMPTION_MODE_NEEDS_REVIEW" : "MENU_CONSUMPTION_INVALID",
+        error: needsReview
+          ? "После сверки обнаружена неоднозначная legacy-конфигурация списания. Выберите один активный режим."
+          : "Сверка техкарты создала недопустимую конфигурацию списания. Исправьте указанные связи.",
+        issues: reconciledConsumptionIssues.slice(0, 50),
+      }, { status: 422 });
+    }
     record(after).nomenclatureIdentityReport = auditCanonicalNomenclature({
       assortment: after,
       purchaseDocuments,
       venueId: account.venueId,
     });
     techCardReconciliation = techCards.report;
-    const consumptionIssues = changedConsumptionModeIssues(before, after);
-    if (consumptionIssues.length) {
-      return Response.json({
-        ok: false,
-        code: "CONSUMPTION_MODE_CONFLICT",
-        error: "Нельзя сохранить позицию с несколькими активными способами списания.",
-        issues: consumptionIssues.slice(0, 50),
-      }, { status: 422 });
-    }
-    const balanceMutations = directBalanceMutations(before, after);
-    if (balanceMutations.length) {
-      return Response.json({
-        ok: false,
-        code: "USE_INVENTORY_LIFECYCLE_API",
-        error: "Фактический остаток изменяется только явной складской операцией с движением.",
-        issues: balanceMutations.slice(0, 50),
-      }, { status: 409 });
-    }
   }
   const auditBefore = before == null && Array.isArray(after) ? [] : before;
   const auditAfter = after == null && Array.isArray(before) ? [] : after;
   const mutations = compareStoreData(auditBefore, auditAfter);
+  if (key === SALES_BATCH_STORE_KEY) {
+    const protectedMutations = protectedSalesBatchMutations(before, after);
+    if (protectedMutations.length) {
+      const hasDuplicateIds = protectedMutations.some((issue) => issue.code === "DUPLICATE_SALES_BATCH_ID");
+      return Response.json({
+        ok: false,
+        code: hasDuplicateIds ? "DUPLICATE_SALES_BATCH_ID" : "USE_SALES_LIFECYCLE_API",
+        error: hasDuplicateIds
+          ? "В списке продаж обнаружены повторяющиеся ID. Сохранение остановлено до безопасного разбора конфликта."
+          : "Проведённые и сторнированные продажи изменяются только через безопасные lifecycle-действия.",
+        issues: protectedMutations.slice(0, 50),
+      }, { status: 409 });
+    }
+  }
   if (!canWriteStore(account, key, mutations)) {
     return Response.json(
       { ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для этого изменения" },
@@ -501,5 +555,8 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     mergedConflicts: merge.conflicts,
     data: after,
     techCardReconciliation,
+    consumptionReview: key === ASSORTMENT_STORE_KEY
+      ? legacyConsumptionConflicts(after, account.venueId)
+      : undefined,
   });
 }

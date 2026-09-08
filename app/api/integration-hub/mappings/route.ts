@@ -43,7 +43,7 @@ export async function PUT(request: Request): Promise<Response> {
   let assortment: unknown = {};
   try { assortment = row ? JSON.parse(row.data_json) : {}; } catch { assortment = {}; }
   const type = mapping.entity_type === "menu_item" ? "menu_item" : "stock_product";
-  const candidates = candidatesFromAssortment(assortment, type);
+  const candidates = candidatesFromAssortment(assortment, type, account.venueId);
   const createNew = body.createNew === true;
   let internalId = typeof body.internalId === "string" ? body.internalId.trim() : "";
   let internalName = "";
@@ -53,10 +53,25 @@ export async function PUT(request: Request): Promise<Response> {
     }
     internalName = mapping.external_name;
     internalId = inventoryProductKey({ name: mapping.external_name, packageSize: mapping.external_unit });
+    const candidate = candidates.find((item) => item.id === internalId);
+    if (candidate?.identityAmbiguous) {
+      return noStore(Response.json({
+        ok: false,
+        code: "MAPPING_TARGET_AMBIGUOUS",
+        error: "В заведении найдено несколько позиций с этим ID. Сначала исправьте дубликаты.",
+      }, { status: 409 }));
+    }
   } else {
     const candidate = candidates.find((item) => item.id === internalId);
     if (!candidate) {
       return noStore(Response.json({ ok: false, error: "Выбранная позиция больше недоступна" }, { status: 422 }));
+    }
+    if (candidate.identityAmbiguous) {
+      return noStore(Response.json({
+        ok: false,
+        code: "MAPPING_TARGET_AMBIGUOUS",
+        error: "В заведении найдено несколько позиций с этим ID. Сначала исправьте дубликаты.",
+      }, { status: 409 }));
     }
     internalName = candidate.name;
   }

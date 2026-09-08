@@ -38,6 +38,8 @@ function assortment(overrides: Record<string, unknown> = {}) {
       category: "Коктейли",
       name: "Виски-кола",
       type: "composite",
+      venueId: 1,
+      consumptionMode: "RECIPE",
       salePrice: 300,
       currency: "RUB",
       plannedSales: 10,
@@ -46,14 +48,29 @@ function assortment(overrides: Record<string, unknown> = {}) {
     recipes: [{
       id: "recipe-1",
       menuItemId: "whisky-cola",
+      ownerId: "whisky-cola",
+      venueId: 1,
       status: "confirmed",
+      reviewStatus: "approved",
+      lifecycleStatus: "current",
+      current: true,
       ingredients: [{
         id: "ingredient-1",
         name: "Виски",
         quantity: 50,
         unit: "мл",
+        nomenclatureItemId: "nom-whisky",
         purchaseProductKey: "product:whisky",
+        venueId: 1,
       }],
+    }],
+    nomenclature: [{
+      id: "nom-whisky",
+      productKey: "product:whisky",
+      name: "Виски 1 л",
+      unit: "ml",
+      venueId: 1,
+      active: true,
     }],
     stockBalances: [{
       key: "product:whisky",
@@ -74,8 +91,8 @@ test("readiness is transparent and optional stock/sales do not change its denomi
     now: new Date("2026-08-12T12:00:00.000Z"),
   });
 
-  assert.equal(analytics.readiness.requiredChecks, 5);
-  assert.equal(analytics.readiness.completedRequiredChecks, 5);
+  assert.equal(analytics.readiness.requiredChecks, 6);
+  assert.equal(analytics.readiness.completedRequiredChecks, 6);
   assert.equal(analytics.summary.readinessPercent, 100);
   assert.equal(analytics.readiness.desirable[0].affectsScore, false);
   assert.match(analytics.readiness.formula, /обязательные проверки/i);
@@ -94,6 +111,83 @@ test("current recipe cost uses the latest confirmed purchase instead of the inve
   assert.equal(item.unitGrossProfit, 250);
   assert.equal(item.ingredientRows[0].source, "latest_confirmed_purchase");
   assert.match(analytics.valuation.currentCostRule, /Последняя подтверждённая/);
+});
+
+test("legacy direct-plus-recipe NEEDS_REVIEW does not project an arbitrary recipe cost", () => {
+  const analytics = buildAssortmentAnalytics({
+    assortment: assortment({
+      menuItems: [{
+        id: "whisky-cola",
+        groupId: "bar",
+        department: "bar",
+        category: "Коктейли",
+        name: "Виски-кола",
+        type: "ready",
+        venueId: 1,
+        readyProduct: {
+          nomenclatureItemId: "nom-whisky",
+          productKey: "product:whisky",
+          packagesPerSale: 1,
+        },
+        salePrice: 300,
+        currency: "RUB",
+        active: true,
+      }],
+    }),
+    purchaseDocuments: [purchase()],
+    venueId: 1,
+    now: new Date("2026-08-12T12:00:00.000Z"),
+  });
+  const item = analytics.menuItems[0];
+
+  assert.equal(item.consumptionMode, "NEEDS_REVIEW");
+  assert.equal(item.consumptionStatus, "NEEDS_REVIEW");
+  assert.equal(item.consumptionSource, null);
+  assert.deepEqual(item.ingredientRows, []);
+  assert.equal(item.recipeCost, null);
+  assert.equal(item.recipeCostStatus, "UNKNOWN");
+  assert.equal(item.costCurrency, null);
+  assert.equal(item.costPercent, null);
+  assert.equal(item.unitGrossProfit, null);
+  assert.deepEqual(item.costHistory, []);
+  assert.deepEqual(item.costDrivers, []);
+  assert.equal(item.costChangeBasis, null);
+  assert.equal(
+    analytics.aiContext.confirmedMenuEconomics.some((candidate) => candidate.id === "whisky-cola"),
+    false,
+  );
+});
+
+test("legacy NONE-plus-recipe NEEDS_REVIEW also keeps current cost unknown", () => {
+  const analytics = buildAssortmentAnalytics({
+    assortment: assortment({
+      menuItems: [{
+        id: "whisky-cola",
+        groupId: "bar",
+        department: "bar",
+        category: "Услуги",
+        name: "Дегустация",
+        type: "service",
+        venueId: 1,
+        salePrice: 300,
+        currency: "RUB",
+        active: true,
+      }],
+    }),
+    purchaseDocuments: [purchase()],
+    venueId: 1,
+    now: new Date("2026-08-12T12:00:00.000Z"),
+  });
+  const item = analytics.menuItems[0];
+
+  assert.equal(item.consumptionMode, "NEEDS_REVIEW");
+  assert.equal(item.consumptionStatus, "NEEDS_REVIEW");
+  assert.deepEqual(item.ingredientRows, []);
+  assert.equal(item.recipeCost, null);
+  assert.equal(item.recipeCostStatus, "UNKNOWN");
+  assert.equal(item.costCurrency, null);
+  assert.equal(item.costPercent, null);
+  assert.equal(item.unitGrossProfit, null);
 });
 
 test("linked nomenclature name is shown but a balance average is not used as a purchase price", () => {
@@ -156,6 +250,8 @@ test("ready product economics use canonical packaging without conflating sale si
         category: "Безалкогольные напитки",
         name: "Кола 1,25 л",
         type: "ready",
+        venueId: 1,
+        consumptionMode: "DIRECT_ITEM",
         salePrice: 90,
         currency: "RUB",
         plannedSales: 4,
@@ -208,8 +304,10 @@ test("ready product economics use canonical packaging without conflating sale si
   });
   const item = analytics.menuItems[0];
   assert.equal(item.portionSize, "1,25 л");
-  assert.equal(item.recipeStatus, "confirmed");
-  assert.equal(item.techCardSource, "ready_product");
+  assert.equal(item.recipeStatus, "not_applicable");
+  assert.equal(item.recipeId, null);
+  assert.equal(item.techCardSource, null);
+  assert.equal(item.consumptionMode, "DIRECT_ITEM");
   assert.equal(item.recipeCost, 40);
   assert.equal(item.status, "ready");
   assert.deepEqual(analytics.saleSizeUnits.map((unit) => unit.code), ["ml", "l", "g", "kg", "pcs"]);
@@ -808,7 +906,7 @@ test("menu economics stay insufficient when one sold item has no trustworthy cos
   assert.match(analytics.economics.insufficientReason ?? "", /Недостаточно/);
 });
 
-test("service items without factual cost never become zero-cost or 100% margin", () => {
+test("explicit NONE has known-zero current inventory cost without fabricating historical COGS", () => {
   const analytics = buildAssortmentAnalytics({
     assortment: assortment({
       menuItems: [{
@@ -818,6 +916,8 @@ test("service items without factual cost never become zero-cost or 100% margin",
         category: "Сервис",
         name: "Сервисный сбор",
         type: "service",
+        venueId: 1,
+        consumptionMode: "NONE",
         salePrice: 100,
         currency: "RUB",
         active: true,
@@ -843,9 +943,10 @@ test("service items without factual cost never become zero-cost or 100% margin",
   });
 
   assert.equal(analytics.menuItems[0].status, "ready");
-  assert.equal(analytics.menuItems[0].recipeCost, null);
-  assert.equal(analytics.menuItems[0].costPercent, null);
-  assert.equal(analytics.menuItems[0].unitGrossProfit, null);
+  assert.equal(analytics.menuItems[0].recipeCost, 0);
+  assert.equal(analytics.menuItems[0].recipeCostStatus, "KNOWN_ZERO");
+  assert.equal(analytics.menuItems[0].costPercent, 0);
+  assert.equal(analytics.menuItems[0].unitGrossProfit, 100);
   assert.equal(analytics.economics.costOfGoods, null);
   assert.equal(analytics.economics.grossMargin, null);
 });
@@ -883,7 +984,8 @@ test("venue A documents never affect venue B assortment analytics", () => {
     now: new Date("2026-08-12T12:00:00.000Z"),
   });
 
-  assert.equal(analytics.menuItems[0].recipeCost, null);
+  assert.equal(analytics.summary.menuItems, 0);
+  assert.deepEqual(analytics.menuItems, []);
   assert.equal(analytics.aiContext.freshness.latestConfirmedPurchaseAt, null);
 });
 
@@ -903,4 +1005,231 @@ test("current partial month compares only equal elapsed days", () => {
   assert.equal(analytics.period.previousEnd, "2026-07-12");
   assert.equal(analytics.economics.comparison?.previousRevenue, 800);
   assert.equal(analytics.economics.comparison?.revenueChangePercent, 25);
+});
+
+function costingReceipt(input: {
+  id: string;
+  productKey: string;
+  amount: number;
+  costAmount: number;
+  unit: "ml" | "g" | "pcs";
+}) {
+  return {
+    ...input,
+    venueId: 1,
+    type: "receipt",
+    status: "active",
+    date: "2026-08-10",
+    businessDate: "2026-08-10",
+    costStatus: "KNOWN",
+    currency: "RUB",
+    sourceDocumentId: `purchase:${input.id}`,
+    sourceLineId: `line:${input.id}`,
+    createdAt: "2026-08-10T12:00:00.000Z",
+  };
+}
+
+test("explicit RECIPE costing cannot be redirected by an alias shadowing its product key", () => {
+  const analytics = buildAssortmentAnalytics({
+    assortment: assortment({
+      inventoryProductAliases: [{ from: "product:whisky", to: "product:decoy" }],
+      nomenclature: [
+        { id: "nom-whisky", productKey: "product:whisky", name: "Виски", unit: "ml", venueId: 1, active: true },
+        { id: "nom-decoy", productKey: "product:decoy", name: "Чужая стоимость", unit: "ml", venueId: 1, active: true },
+      ],
+      stockBalances: [
+        { id: "balance-whisky", nomenclatureItemId: "nom-whisky", productKey: "product:whisky", name: "Виски", current: 2_000, unit: "ml", venueId: 1, currency: "RUB" },
+        { id: "balance-decoy", nomenclatureItemId: "nom-decoy", productKey: "product:decoy", name: "Чужая стоимость", current: 2_000, unit: "ml", venueId: 1, currency: "RUB" },
+      ],
+    }),
+    purchaseDocuments: [],
+    stockMovements: [
+      costingReceipt({ id: "whisky", productKey: "product:whisky", amount: 1_000, costAmount: 1_000, unit: "ml" }),
+      costingReceipt({ id: "decoy", productKey: "product:decoy", amount: 1_000, costAmount: 9_000, unit: "ml" }),
+    ],
+    venueId: 1,
+    now: new Date("2026-08-12T12:00:00.000Z"),
+  });
+
+  const item = analytics.menuItems[0];
+  assert.equal(item.consumptionMode, "RECIPE");
+  assert.equal(item.ingredientRows[0].productKey, "product:whisky");
+  assert.equal(item.ingredientRows[0].cost, 50);
+  assert.equal(item.ingredientRows[0].purchaseDocumentId, "purchase:whisky");
+  assert.equal(item.recipeCost, 50);
+  assert.equal(
+    analytics.nomenclatureCosts.find((row) => row.nomenclatureItemId === "nom-whisky")?.productKey,
+    "product:whisky",
+  );
+});
+
+test("explicit DIRECT_ITEM and FIXED_QUANTITY costing keep their exact ID target under a shadow alias", () => {
+  const cases = [
+    {
+      mode: "DIRECT_ITEM",
+      unit: "pcs" as const,
+      menu: {
+        id: "menu-item",
+        name: "Готовый товар",
+        type: "ready",
+        venueId: 1,
+        active: true,
+        consumptionMode: "DIRECT_ITEM",
+        readyProduct: { nomenclatureItemId: "nom-item", productKey: "stock-item", packagesPerSale: 1 },
+        salePrice: 100,
+        currency: "RUB",
+      },
+      receiptAmount: 10,
+      receiptCost: 20,
+      expectedCost: 2,
+    },
+    {
+      mode: "FIXED_QUANTITY",
+      unit: "ml" as const,
+      menu: {
+        id: "menu-item",
+        name: "Порция товара",
+        type: "ready",
+        venueId: 1,
+        active: true,
+        consumptionMode: "FIXED_QUANTITY",
+        readyProduct: { nomenclatureItemId: "nom-item", productKey: "stock-item", packagesPerSale: 1 },
+        saleSize: { quantity: 0.05, unit: "l" },
+        salePrice: 100,
+        currency: "RUB",
+      },
+      receiptAmount: 1_000,
+      receiptCost: 100,
+      expectedCost: 5,
+    },
+  ];
+
+  for (const candidate of cases) {
+    const analytics = buildAssortmentAnalytics({
+      assortment: {
+        menuItems: [candidate.menu],
+        recipes: [],
+        inventoryProductAliases: [{ from: "stock-item", to: "stock-decoy" }],
+        nomenclature: [
+          { id: "nom-item", productKey: "stock-item", name: "Точный товар", unit: candidate.unit, venueId: 1, active: true },
+          { id: "nom-decoy", productKey: "stock-decoy", name: "Чужая стоимость", unit: candidate.unit, venueId: 1, active: true },
+        ],
+        stockBalances: [
+          { id: "balance-item", nomenclatureItemId: "nom-item", productKey: "stock-item", name: "Точный товар", current: candidate.receiptAmount, unit: candidate.unit, venueId: 1, currency: "RUB" },
+          { id: "balance-decoy", nomenclatureItemId: "nom-decoy", productKey: "stock-decoy", name: "Чужая стоимость", current: candidate.receiptAmount, unit: candidate.unit, venueId: 1, currency: "RUB" },
+        ],
+      },
+      purchaseDocuments: [],
+      stockMovements: [
+        costingReceipt({ id: "item", productKey: "stock-item", amount: candidate.receiptAmount, costAmount: candidate.receiptCost, unit: candidate.unit }),
+        costingReceipt({ id: "decoy", productKey: "stock-decoy", amount: candidate.receiptAmount, costAmount: candidate.receiptCost * 9, unit: candidate.unit }),
+      ],
+      venueId: 1,
+      now: new Date("2026-08-12T12:00:00.000Z"),
+    });
+
+    const item = analytics.menuItems[0];
+    assert.equal(item.consumptionMode, candidate.mode);
+    assert.equal(item.ingredientRows[0].productKey, "stock-item");
+    assert.equal(item.ingredientRows[0].cost, candidate.expectedCost);
+    assert.equal(item.ingredientRows[0].purchaseDocumentId, "purchase:item");
+    assert.equal(item.recipeCost, candidate.expectedCost);
+  }
+});
+
+test("analytics scopes same menu, recipe, nomenclature IDs and product keys to the requested venue", () => {
+  const analytics = buildAssortmentAnalytics({
+    assortment: {
+      menuItems: [
+        {
+          id: "shared-menu",
+          name: "Foreign espresso",
+          venueId: 2,
+          active: true,
+          consumptionMode: "NONE",
+          salePrice: 999,
+          currency: "RUB",
+        },
+        {
+          id: "shared-menu",
+          name: "Local espresso",
+          venueId: 1,
+          active: true,
+          consumptionMode: "RECIPE",
+          salePrice: 100,
+          currency: "RUB",
+        },
+      ],
+      recipes: [
+        {
+          id: "shared-recipe",
+          menuItemId: "shared-menu",
+          ownerId: "shared-menu",
+          venueId: 2,
+          status: "confirmed",
+          reviewStatus: "approved",
+          current: true,
+          ingredients: [{
+            id: "shared-line",
+            nomenclatureItemId: "shared-nom",
+            purchaseProductKey: "shared-product",
+            name: "Foreign beans",
+            quantity: 100,
+            unit: "g",
+            venueId: 2,
+          }],
+        },
+        {
+          id: "shared-recipe",
+          menuItemId: "shared-menu",
+          ownerId: "shared-menu",
+          venueId: 1,
+          status: "confirmed",
+          reviewStatus: "approved",
+          current: true,
+          ingredients: [{
+            id: "shared-line",
+            nomenclatureItemId: "shared-nom",
+            purchaseProductKey: "shared-product",
+            name: "Local beans",
+            quantity: 8,
+            unit: "g",
+            venueId: 1,
+          }],
+        },
+      ],
+      nomenclature: [
+        { id: "shared-nom", productKey: "shared-product", name: "Foreign beans", unit: "g", venueId: 2, active: true },
+        { id: "shared-nom", productKey: "shared-product", name: "Local beans", unit: "g", venueId: 1, active: true },
+      ],
+      stockBalances: [
+        { id: "foreign-balance", nomenclatureItemId: "shared-nom", productKey: "shared-product", name: "Foreign beans", unit: "g", current: 1_000, venueId: 2, currency: "RUB" },
+        { id: "local-balance", nomenclatureItemId: "shared-nom", productKey: "shared-product", name: "Local beans", unit: "g", current: 1_000, venueId: 1, currency: "RUB" },
+      ],
+    },
+    stockMovements: [
+      {
+        id: "foreign-receipt", venueId: 2, type: "receipt", status: "active", date: "2026-08-10",
+        productKey: "shared-product", productName: "Foreign beans", amount: 1_000, unit: "g", costAmount: 10_000,
+        costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "foreign-purchase", sourceLineId: "foreign-line",
+        createdAt: "2026-08-10T10:00:00.000Z",
+      },
+      {
+        id: "local-receipt", venueId: 1, type: "receipt", status: "active", date: "2026-08-10",
+        productKey: "shared-product", productName: "Local beans", amount: 1_000, unit: "g", costAmount: 100,
+        costStatus: "KNOWN", currency: "RUB", sourceDocumentId: "local-purchase", sourceLineId: "local-line",
+        createdAt: "2026-08-10T10:00:00.000Z",
+      },
+    ],
+    venueId: 1,
+    now: new Date("2026-08-12T12:00:00.000Z"),
+  });
+
+  assert.equal(analytics.summary.menuItems, 1);
+  assert.equal(analytics.menuItems[0]?.name, "Local espresso");
+  assert.equal(analytics.menuItems[0]?.recipeId, "shared-recipe");
+  assert.equal(analytics.menuItems[0]?.consumptionStatus, "CONFIGURED");
+  assert.equal(analytics.menuItems[0]?.ingredientRows[0]?.name, "Local beans");
+  assert.equal(analytics.menuItems[0]?.ingredientRows[0]?.amount, 8);
+  assert.equal(analytics.menuItems[0]?.recipeCost, 0.8);
 });
