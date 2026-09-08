@@ -866,9 +866,28 @@ async function phase4ConversionFlow(browser, viewport) {
   await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Unsaved QA");
   page.once("dialog", (dialog) => dialog.accept());
-  await editor.getByRole("button", { name: "Отмена", exact: true }).click();
+  await editor.getByRole("button", { name: "Не сохранять", exact: true }).click();
   await editor.waitFor({ state: "detached" });
+  await page.waitForFunction(() => {
+    const nodes = [document.documentElement, document.body];
+    return nodes.every((node) => !["hidden", "clip"].includes(getComputedStyle(node).overflowY)
+      && getComputedStyle(node).position !== "fixed")
+      && !document.body.classList.contains("bd-transient-layer-open-v247")
+      && document.documentElement.getAttribute("data-bd-shell-mode") !== "fullscreen-owned";
+  });
+  assert.equal(await page.locator('.bd-procurement-sheet-backdrop, [role="dialog"][aria-modal="true"]:visible').count(), 0,
+    "Discard must remove the modal and its blocking overlay");
   assert.deepEqual(store.reload(), saved, "Closing an unsaved row must not write inventory");
+  await procurementTab(page, "Закупки").click();
+  assert.equal(await page.locator(".bd-proc-purchase-row-v168").count(), saved.documents.length);
+  assert.doesNotMatch(await page.locator("body").innerText(), /Unsaved QA/);
+  await page.reload({ waitUntil: "networkidle" });
+  await procurementTab(page, "Закупки").click();
+  assert.equal(await page.locator(".bd-proc-purchase-row-v168").count(), saved.documents.length);
+  assert.doesNotMatch(await page.locator("body").innerText(), /Unsaved QA/);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(sessionStorage.getItem("bd_phase4_purchase_qa")).documents), saved.documents,
+    "Discarded changes must remain absent after browser reload");
+  assert.deepEqual(store.reload(), saved, "Discard and reload must preserve all persisted stock and purchase state");
   results.push({ name: run.name, viewport, issues: run.issues });
   await run.context.close();
   store.close();
