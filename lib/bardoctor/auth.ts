@@ -27,6 +27,7 @@ import {
   classifyAuthBootstrap,
 } from "./bootstrap-state";
 import { venueIdentityFromJson } from "./venue-identity";
+import { observedAwait, observedScope } from "./request-observability";
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
 const SERVER_SESSION_COOKIE = "bd_server_session";
@@ -77,7 +78,7 @@ export async function ensureAuthSchema(): Promise<void> {
       throw error;
     });
   }
-  await authSchemaReady;
+  await observedAwait("auth.schema", () => authSchemaReady);
 }
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -302,7 +303,9 @@ export async function revokeOtherAuthenticatedSessions(
 }
 
 export async function authenticateIdentityRequest(request: Request): Promise<Account | null> {
-  return (await sessionForRequest(request))?.account ?? null;
+  const account = (await observedAwait("auth.identity", () => sessionForRequest(request)))?.account ?? null;
+  observedScope(Boolean(account));
+  return account;
 }
 
 function venueName(account: Account): string {
@@ -430,7 +433,8 @@ export async function venueContextForAccount(
 export async function authenticateRequest(
   request: Request,
 ): Promise<AuthenticatedAccount | null> {
-  const identitySession = await sessionForRequest(request);
+  const identitySession = await observedAwait("auth.identity", () => sessionForRequest(request));
+  observedScope(Boolean(identitySession));
   if (!identitySession) return null;
   const requestedHeader = request.headers.get("x-venue-id");
   const requestedValue = Number(requestedHeader);
@@ -445,8 +449,9 @@ export async function authenticateRequest(
     : requestedHeader == null
       ? identitySession.activeVenueId
       : null;
-  const context = await venueContextForAccount(identitySession.account, requestedVenueId);
+  const context = await observedAwait("auth.memberships", () => venueContextForAccount(identitySession.account, requestedVenueId));
   if (!context) return null;
+  observedScope(true, true);
   const role = context.role as AccessRole;
   return {
     ...context.dataAccount,

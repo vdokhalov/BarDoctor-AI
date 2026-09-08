@@ -8,6 +8,7 @@ import { normalizePurchaseDocument } from "../lib/bardoctor/purchases";
 import { preparePurchaseConversions } from "../lib/bardoctor/purchase-conversion";
 import { applyPurchaseToInventory } from "../lib/bardoctor/inventory";
 import { queryCanonicalNomenclature } from "../lib/bardoctor/nomenclature-selector";
+import { observedAwait } from "../lib/bardoctor/request-observability";
 
 type Element = { type: string; props: Record<string, unknown> };
 type Row = Record<string, unknown>;
@@ -115,6 +116,7 @@ test("actual authenticated nomenclature GET projects persisted stock-other witho
       eq: (column: string, value: unknown) => ({ column, value }),
       and: (...conditions: unknown[]) => conditions,
       queryCanonicalNomenclature,
+      observedAwait,
       getDb: () => ({ select: () => ({ from: () => ({ where: (conditions: unknown[]) => {
         assert.deepEqual(conditions, [{ column: "account_id", value: 7 }, { column: "store_key", value: "bd_assortment_v1" }]);
         return { limit: async () => {

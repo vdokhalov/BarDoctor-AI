@@ -5,6 +5,7 @@ import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { ASSORTMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { queryCanonicalNomenclature } from "../../../../lib/bardoctor/nomenclature-selector";
+import { observedAwait } from "../../../../lib/bardoctor/request-observability";
 
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
@@ -12,10 +13,10 @@ export async function GET(request: Request): Promise<Response> {
   if (!hasPermission(account, "inventory.view")) {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Номенклатура недоступна" }, { status: 403 });
   }
-  const [row] = await getDb().select().from(domainData).where(and(
+  const [row] = await observedAwait("selector.load", () => getDb().select().from(domainData).where(and(
     eq(domainData.accountId, account.id),
     eq(domainData.storeKey, ASSORTMENT_STORE_KEY),
-  )).limit(1);
+  )).limit(1));
   const url = new URL(request.url);
   const page = queryCanonicalNomenclature({
     assortment: row ? JSON.parse(row.dataJson) : {},

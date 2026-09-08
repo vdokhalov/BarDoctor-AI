@@ -5,6 +5,7 @@ import {
   sessionResponse,
 } from "../../../../lib/bardoctor/auth";
 import { importLegacyAccount } from "../../../../lib/bardoctor/legacy-import";
+import { observedAwait, observedBoundary } from "../../../../lib/bardoctor/request-observability";
 
 export async function POST(request: Request): Promise<Response> {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: Request): Promise<Response> {
     const existingToken = request.headers.get("x-session-token");
     if (existingSession && existingToken) {
       return sessionResponse(
-        await authResult(existingSession, existingToken, request),
+        await observedAwait("auth.result", () => authResult(existingSession, existingToken, request)),
         existingToken,
         request,
       );
@@ -22,14 +23,14 @@ export async function POST(request: Request): Promise<Response> {
     const legacyToken = request.headers.get("x-session-token");
     if (legacyEmail?.trim() && legacyToken) {
       try {
-        const account = await importLegacyAccount({
+        const account = await observedAwait("auth.legacy_import", () => importLegacyAccount({
           request,
           email: legacyEmail,
           token: legacyToken,
-        });
-        const token = await issueSession(account);
+        }));
+        const token = await observedAwait("auth.issue_session", () => issueSession(account));
         return sessionResponse({
-          ...(await authResult(account, token, request)),
+          ...(await observedAwait("auth.result", () => authResult(account, token, request))),
           migrated: true,
           migrationSummary: account.migrationSummaryJson
             ? JSON.parse(account.migrationSummaryJson)
@@ -48,6 +49,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 401 },
     );
   } catch {
+    observedBoundary();
     return Response.json(
       { ok: false, error: "Не удалось подготовить локальную сессию" },
       { status: 500 },

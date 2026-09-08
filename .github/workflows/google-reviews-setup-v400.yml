@@ -42,6 +42,8 @@ jobs:
         run: npm test
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Observability real bootstrap D1 and mobile desktop correlation QA
+        run: BD_OBSERVABILITY_BROWSER_QA=1 node --test tests/request-observability-runtime.test.mjs
       - name: Phase 3 menu consumption browser QA
         run: npm run test:menu-consumption-browser
       - name: Phase 4 purchase units mobile and desktop QA

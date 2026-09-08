@@ -71,7 +71,8 @@ function patchBootstrap(path) {
   );
 
   const output = new URL("bardoctor-preview-v397.js", path);
-  writeFileSync(output, source);
+  const observability = readFileSync(new URL("public/bd-request-observability.js", root), "utf8");
+  writeFileSync(output, observability + "\n" + source);
   return true;
 }
 
@@ -98,7 +99,7 @@ function patchShell(path) {
     /(\s*<link rel="modulepreload"[^>]+>)/,
     `$1
     <!-- bd-shell-first-compat-v397 <script src="/bardoctor-preview.js?v=${bootstrapVersion}" defer></script><script src="/bardoctor-preview-v396.js?v=native-continuity-v396" defer></script> -->
-    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397" defer></script>`,
+    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397-observability-v1" defer></script>`,
   );
   source = source.replace(
     /(<script src="\/server-migration-discovery-v262\.js[^>]*><\/script>)(?:-[a-zA-Z0-9]+)+/,

@@ -2,6 +2,7 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
 import { authenticateRequest } from "../lib/bardoctor/auth";
+import { observeRequest } from "../lib/bardoctor/request-observability";
 import {
   runNotificationTriggers,
   runNotificationTriggersForAccount,
@@ -60,7 +61,7 @@ const worker = {
     const notificationAuthRequest = storeMatch
       ? new Request(request.url, { headers: request.headers })
       : null;
-    const response = await handler.fetch(request, env, ctx);
+    const response = await observeRequest(request, () => handler.fetch(request, env, ctx));
 
     if (response.ok && notificationAuthRequest) {
       ctx.waitUntil(

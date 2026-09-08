@@ -2,6 +2,7 @@ import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { AUTHORITATIVE_STORE_KEYS } from "../../../lib/bardoctor/authoritative-persistence";
 import { canReadStore } from "../../../lib/bardoctor/data-trust";
+import { observedAwait } from "../../../lib/bardoctor/request-observability";
 
 type StoreRow = { store_key: string; data_json: string; updated_at: string };
 
@@ -9,11 +10,11 @@ type StoreRow = { store_key: string; data_json: string; updated_at: string };
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
-  const result = await getD1().prepare(`
+  const result = await observedAwait("store.load", () => getD1().prepare(`
     SELECT store_key, data_json, updated_at
     FROM domain_data
     WHERE account_id = ?
-  `).bind(account.id).all<StoreRow>();
+  `).bind(account.id).all<StoreRow>());
   const entries: Record<string, { data: unknown; updatedAt: string; source: "server_d1" }> = {};
   for (const row of result.results ?? []) {
     if (!canReadStore(account, row.store_key)) continue;
