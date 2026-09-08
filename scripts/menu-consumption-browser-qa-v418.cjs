@@ -1082,7 +1082,7 @@ async function runProfile(browser, baseUrl, profile) {
 
     await openItem(page, baseUrl, "menu", espressoMenuId);
     let recipeEditor = await openRecipeEditor(page);
-    assert.match(await recipeEditor.innerText(), /Меню → Техкарта[\s\S]*Espresso/);
+    assert.match(await recipeEditor.innerText(), /МЕНЮ → ТЕХКАРТА[\s\S]*Espresso/);
     const quantity = recipeEditor.getByLabel("Количество на порцию").first();
     assert.equal(await quantity.inputValue(), "8");
     await quantity.fill("9");
