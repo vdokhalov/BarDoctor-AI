@@ -4,3 +4,26 @@
 [data-bd-purchase-units="v421"] .bd-procurement-form-grid > * { min-width: 0; }
 [data-bd-purchase-units="v421"] [role="alert"], [data-bd-purchase-units="v421"] [role="status"] { overflow-wrap: anywhere; font-size: 14px; }
 @media (max-width: 480px) { [data-bd-purchase-units="v421"] input, [data-bd-purchase-units="v421"] select { font-size: 16px; max-width: 100%; box-sizing: border-box; } }
+
+/* A modal overflow lock changes the sticky scroll container. Keep the existing
+   shell header in viewport coordinates without resetting the user's scroll. */
+html:not([data-bd-embedded="true"]) body:has(.bd-receiving-workspace-v357) > bd-app-header {
+  position: fixed;
+  top: 0;
+  z-index: var(--bd-layer-overlay-header, 910);
+  pointer-events: none;
+}
+html:not([data-bd-embedded="true"]) body:has(> bd-app-header) .bd-procurement-sheet-backdrop:has(> .bd-receiving-workspace-v357) {
+  top: calc(var(--bd-header-total, 60px) + 1px);
+}
+@media (max-width: 767px) {
+  html:not([data-bd-embedded="true"]) body:has(> bd-app-header) .bd-receiving-workspace-v357 {
+    height: calc(100dvh - var(--bd-header-total, 60px) - 1px);
+    max-height: calc(100dvh - var(--bd-header-total, 60px) - 1px);
+  }
+}
+@media (min-width: 768px) {
+  html:not([data-bd-embedded="true"]) body:has(> bd-app-header) .bd-receiving-workspace-v357 {
+    max-height: calc(100dvh - var(--bd-header-total, 64px) - 65px) !important;
+  }
+}

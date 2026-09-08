@@ -106,7 +106,7 @@ async function viewportAudit(page, label) {
     };
   });
   assert.ok(audit.scrollWidth <= audit.clientWidth + 1, `${label}: document has horizontal overflow (${audit.scrollWidth}/${audit.clientWidth})`);
-  assert.ok(audit.header && audit.header.top >= -1, `${label}: stable header is missing or displaced`);
+  assert.ok(audit.header && audit.header.top >= -1, `${label}: stable header is missing or displaced: ${JSON.stringify(audit.header)}`);
   assert.deepEqual(audit.undersizedCriticalTargets, [], `${label}: critical touch targets are smaller than 40px`);
   return audit;
 }
@@ -776,8 +776,22 @@ async function phase4ConversionFlow(browser, viewport) {
   await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
   await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
   const editor = page.locator(".bd-procurement-sheet");
+  async function assertPurchaseHeader() {
+    const layout = await page.evaluate(() => {
+      const header = document.querySelector("bd-app-header");
+      const formHeader = document.querySelector(".bd-receiving-head-v357");
+      const rect = header.getBoundingClientRect(), form = formHeader.getBoundingClientRect();
+      const style = getComputedStyle(header);
+      return { top: rect.top, bottom: rect.bottom, height: rect.height, formTop: form.top, formBottom: form.bottom,
+        visible: style.display !== "none" && style.visibility === "visible" && Number(style.opacity) > 0 };
+    });
+    assert.equal(layout.visible, true, "Purchase shell header must remain visible");
+    assert.ok(Math.abs(layout.top) <= 1 && layout.height > 0, `Purchase header must stay at viewport top: ${JSON.stringify(layout)}`);
+    assert.ok(layout.formTop >= layout.bottom - 1 && layout.formBottom < viewport.height, "Purchase title must remain visible below shell header");
+  }
   const units = editor.locator('[data-bd-purchase-units="v421"]');
   await editor.waitFor({ state: "visible" });
+  await assertPurchaseHeader();
   assert.equal(await units.count(), 0, "auto is unresolved, not an implicitly selected stock category");
   await editor.getByLabel("Поиск поставщика", { exact: true }).fill("ВПРОК");
   await editor.locator(".bd-purchase-supplier-results-v356 button").filter({ hasText: "ВПРОК" }).first().click();
@@ -813,6 +827,9 @@ async function phase4ConversionFlow(browser, viewport) {
   assert.match(await units.innerText(), /285[,.]714/);
   assert.equal(await editor.locator("button.bd-procurement-primary").isEnabled(), true, "Explicit package content can be confirmed");
   await viewportAudit(page, `Phase 4 purchase ${viewport.width}`);
+  await assertPurchaseHeader();
+  await editor.locator(".bd-procurement-form").evaluate((node) => { node.scrollTop = node.scrollHeight; });
+  await assertPurchaseHeader();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
   await shot(page, `phase4-purchase-${viewport.width}.png`);
   await units.getByLabel("Товар пришёл упаковками").uncheck();
