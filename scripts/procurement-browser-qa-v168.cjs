@@ -32,6 +32,7 @@ async function openPage(browser, {
   extras = {},
   viewport = { width: 393, height: 852 },
   name,
+  setupRoutes,
 }) {
   const context = await browser.newContext({
     viewport,
@@ -48,6 +49,7 @@ async function openPage(browser, {
     body: "",
   }));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
+  if (setupRoutes) await setupRoutes(context);
   const page = await context.newPage();
   const issues = [];
   page.on("pageerror", (error) => issues.push({ type: "pageerror", message: error.message }));
@@ -759,17 +761,35 @@ async function withBrowser(run) {
 }
 
 async function phase4ConversionFlow(browser, viewport) {
-  const run = await openPage(browser, { state: "e2e", extras: { tab: "overview", qaScenario: "default", venue: "401" }, viewport, name: `phase4-${viewport.width}` });
+  const store = require("./purchase-units-qa-store.cjs")();
+  const run = await openPage(browser, { state: "e2e", extras: { tab: "overview", qaScenario: "phase4-conversion", venue: "401" }, viewport, name: `phase4-${viewport.width}`,
+    setupRoutes: async (context) => {
+      await context.route("**/api/tech-cards/nomenclature?*", (route) => {
+        const q = new URL(route.request().url()).searchParams.get("q").toLowerCase();
+        return route.fulfill(jsonResponse({ ok: true, items: store.products.filter((p) => p.name.toLowerCase().includes(q)), nextCursor: null }));
+      });
+      await context.route("**/api/purchases/confirm", (route) => route.fulfill(jsonResponse(store.confirm(route.request().postDataJSON().document), 201)));
+    },
+  });
   const { page } = run;
   await procurementTab(page, "Обзор").click();
   await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
   await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
   const editor = page.locator(".bd-procurement-sheet");
   const units = editor.locator('[data-bd-purchase-units="v421"]');
-  await units.waitFor({ state: "visible" });
+  await editor.waitFor({ state: "visible" });
+  assert.equal(await units.count(), 0, "auto is unresolved, not an implicitly selected stock category");
   await editor.getByLabel("Поиск поставщика", { exact: true }).fill("ВПРОК");
   await editor.locator(".bd-purchase-supplier-results-v356 button").filter({ hasText: "ВПРОК" }).first().click();
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Phase 4 QA");
+  async function mapProduct(name, change = false) {
+    await editor.locator(".bd-invoice-mapping-v356").getByRole("button", { name: change ? "Изменить" : "Сопоставить", exact: true }).click();
+    await editor.getByLabel("Поиск номенклатуры для строки накладной").fill(name);
+    await editor.locator(".bd-invoice-mapping-results-v356 button").filter({ hasText: name }).click();
+    await editor.locator(".bd-invoice-mapping-v356.is-linked").filter({ hasText: name }).waitFor();
+  }
+  await mapProduct("Phase 4 bottles");
+  await units.waitFor({ state: "visible" });
   await units.getByLabel("Количество", { exact: true }).fill("24");
   await units.getByLabel("Единица прихода", { exact: true }).selectOption("pcs");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена за единицу" }).locator("input").fill("15");
@@ -783,6 +803,8 @@ async function phase4ConversionFlow(browser, viewport) {
   await units.getByLabel("Единица содержимого", { exact: true }).selectOption("pcs");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена упаковки" }).locator("input").fill("180");
   assert.match(await units.innerText(), /24.*pcs.*15/);
+  // A liquid purchase must explicitly select a liquid stock item, not reuse the pcs identity.
+  await mapProduct("Phase 4 whisky", true);
   await units.getByLabel("Количество упаковок", { exact: true }).fill("6");
   await units.getByLabel("Количество в упаковке", { exact: true }).fill("0.7");
   await units.getByLabel("Единица содержимого", { exact: true }).selectOption("l");
@@ -795,11 +817,44 @@ async function phase4ConversionFlow(browser, viewport) {
   await shot(page, `phase4-purchase-${viewport.width}.png`);
   await units.getByLabel("Товар пришёл упаковками").uncheck();
   assert.equal(await units.getByLabel("Количество в упаковке").count(), 0);
+  await units.getByLabel("Товар пришёл упаковками").check();
+  await units.getByLabel("Количество в упаковке", { exact: true }).fill("0.7");
+  await units.getByLabel("Единица содержимого", { exact: true }).selectOption("l");
+  await editor.locator("button.bd-procurement-primary").click();
+  await editor.waitFor({ state: "detached" });
+  const saved = store.reload();
+  const line = saved.documents.at(-1).items[0];
+  assert.equal(line.purchaseProductKey, "qa-liquid");
+  assert.equal(line.category, "alcohol");
+  assert.equal(line.purchaseConversion.canonicalQuantity, 4.2);
+  assert.equal(line.purchaseConversion.canonicalUnit, "l");
+  assert.equal(line.purchaseConversion.totalCost, 1200);
+  assert.ok(Math.abs(line.purchaseConversion.normalizedUnitCost - 1200 / 4.2) < 1e-10);
+  assert.equal(saved.stockMovements.length, 1);
+  assert.equal(saved.stockMovements[0].amount, 4.2);
+  assert.equal(saved.stockMovements[0].unit, "l");
+  assert.equal(saved.assortment.stockBalances[0].current, 4.2);
+  await page.reload({ waitUntil: "networkidle" });
+  await procurementTab(page, "Закупки").click();
+  await page.locator(".bd-proc-purchase-main-v168").first().click();
+  assert.match(await visibleText(page.locator(".bd-proc-sheet-v168").last()), /Phase 4 QA/);
+  const reloaded = await page.evaluate(() => JSON.parse(sessionStorage.getItem("bd_phase4_purchase_qa")));
+  assert.deepEqual(reloaded.documents, saved.documents);
+  assert.deepEqual(reloaded.stockMovements, saved.stockMovements);
+  assert.deepEqual(store.reload(), saved, "Reload must not repost or mutate conversion history");
+  // Retain the original unsaved-close regression in addition to the new save path.
+  await closeSheet(page);
+  await procurementTab(page, "Обзор").click();
+  await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
+  await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Unsaved QA");
   page.once("dialog", (dialog) => dialog.accept());
   await editor.getByRole("button", { name: "Отмена", exact: true }).click();
   await editor.waitFor({ state: "detached" });
+  assert.deepEqual(store.reload(), saved, "Closing an unsaved row must not write inventory");
   results.push({ name: run.name, viewport, issues: run.issues });
   await run.context.close();
+  store.close();
 }
 
 (async () => {

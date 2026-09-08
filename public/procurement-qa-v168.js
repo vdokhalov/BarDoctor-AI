@@ -322,6 +322,15 @@
     };
   }
 
+  // Only this opt-in scenario uses the real-domain SQLite browser test backend.
+  if (scenario === "phase4-conversion") {
+    var savedPhase4 = JSON.parse(sessionStorage.getItem("bd_phase4_purchase_qa") || "null");
+    if (savedPhase4) {
+      documents = savedPhase4.documents;
+      assortment = savedPhase4.assortment;
+      movements = savedPhase4.stockMovements;
+    }
+  }
   localStorage.setItem("bd_session", email);
   localStorage.setItem("bd_session_token", "qa-local-token");
   localStorage.setItem("bd_session_userid", "qa-procurement-user");
@@ -347,6 +356,19 @@
   var originalFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : input && input.url || "";
+    if (scenario === "phase4-conversion" && url.indexOf("/api/purchases/confirm") >= 0) {
+      return originalFetch(input, init).then(function (response) {
+        return response.clone().json().then(function (result) {
+          if (result.ok) {
+            documents = result.documents;
+            assortment = result.assortment;
+            movements = result.stockMovements;
+            sessionStorage.setItem("bd_phase4_purchase_qa", JSON.stringify(result));
+          }
+          return response;
+        });
+      });
+    }
     if (url.indexOf("/api/auth/bootstrap") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-procurement-user", token: "qa-local-token", firstName: "QA", lastName: "Procurement", phone: null, role: "owner", permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-procurement-workspace", activeVenueIsPrimary: venueId === 401, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     }

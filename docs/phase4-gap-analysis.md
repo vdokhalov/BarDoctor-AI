@@ -192,3 +192,25 @@ deployment or Phase 5 changes are included. OCR receives only the validated
 conversion contract; OCR/matching redesign remains for Phase 5.
 
 **NOT RELEASE-READY until the complete new-commit CI and required UI checks pass.**
+
+### Mobile purchase blocker follow-up
+
+Product decision: a manual row starts with `category=auto` (unresolved), not an
+implicitly chosen physical category. The existing "Сопоставить" action searches
+nomenclature or offers creation. Its actual selection handler sets the explicit
+product ID and category; only then are canonical purchase/package controls
+relevant. No production dead-end was found in this path and no production
+contract or category inference was changed to satisfy QA.
+
+The browser scenario now performs that real selection, including changing from
+a pcs item to a distinct liter item before the liquid example. Existing strict
+unit/package, invalid-content, cost and overflow assertions remain. Confirmation
+uses an isolated SQLite test backend calling the production normalization,
+conversion and posting functions, with persist/reload before posting and another
+reload afterwards. Browser reload checks the same captured document and movement
+and verifies no repost. This is not a deployed D1 HTTP acceptance claim.
+
+Focused tests: 50/50 PASS, including the actual mapping callback and canonical
+SQLite receipt test. Syntax and diff whitespace checks pass. No local
+Windows/Miniflare browser loop was repeated; the normal complete GitHub CI must
+still confirm both 390×844 and 1280×720 purchase flows and all release gates.

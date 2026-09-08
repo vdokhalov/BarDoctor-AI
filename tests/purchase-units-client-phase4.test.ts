@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { createRequire } from "node:module";
 import { normalizePurchaseQuantity } from "../lib/bardoctor/stock-units";
 
 type Element = { type: string; props: Record<string, unknown> };
@@ -12,11 +13,13 @@ function runtime() {
   const end = source.indexOf("/* purchase-units-v421:end */", start);
   assert.ok(start >= 0 && end > start);
   const jsx = (type: string, props: Row): Element => ({ type, props });
-  return runInNewContext(source.slice(start, end) + ";({render:bdPurchaseUnitsV421,preview:bdPurchasePreviewV421})", {
+  const mapping = source.slice(source.indexOf("function bdInvoiceLineMappingV356"), source.indexOf("function bdInvoiceReviewPriorityV4"));
+  return runInNewContext(source.slice(start, end) + mapping + ";({render:bdPurchaseUnitsV421,preview:bdPurchasePreviewV421,mapping:bdInvoiceLineMappingV356})", {
+    S: { useState: (value: unknown) => [value, () => {}], useEffect: () => {} },
     structuredClone, i: { jsx, jsxs: jsx }, bdProcField: "field", bdCatArray: (v: unknown) => Array.isArray(v) ? v : [],
     bdWarehouseRecord: (v: unknown) => v ?? {}, xr: () => ({}), bdCatNumber: Number,
     bdProcFormatAmountV221: (amount: number, unit: string) => `${amount} ${unit}`,
-  }) as { render: (input: { line: Row; onChange: (patch: Row) => void }) => Element; preview: (line: Row) => { ok: boolean; snapshot: Row } };
+  }) as { render: (input: { line: Row; onChange: (patch: Row) => void }) => Element; preview: (line: Row) => { ok: boolean; snapshot: Row }; mapping: (input: { line: Row; onSelect: (patch: Row) => void }) => Element };
 }
 function all(value: unknown): Element[] {
   if (Array.isArray(value)) return value.flatMap(all);
@@ -24,6 +27,36 @@ function all(value: unknown): Element[] {
   const element = value as Element;
   return element.props ? [element, ...all(element.props.children)] : [];
 }
+
+test("manual auto row becomes stock only through explicit nomenclature selection, then persists canonical receipt", () => {
+  const store = createRequire(import.meta.url)("../scripts/purchase-units-qa-store.cjs")();
+  try {
+    const api = runtime();
+    let line: Row = { id: "line", name: "Invoice name", category: "auto", quantity: 6, unit: "pcs", unitPrice: 200,
+      lineTotal: 1200, packageContent: { quantity: 0.7, unit: "l" }, mappingCandidates: [store.products[1]] };
+    const render = () => api.render({ line, onChange: (patch) => { line = { ...line, ...patch }; } });
+    assert.equal(all(render()).some((e) => e.props["data-bd-purchase-units"]), false);
+    const mapping = api.mapping({ line, onSelect: (patch) => { line = { ...line, ...patch }; } });
+    const suggestion = all(mapping).find((e) => e.type === "button" && all(e).some((child) => child.props.children === "Phase 4 whisky"));
+    assert.ok(suggestion, "Unresolved row must offer the real nomenclature selection action");
+    (suggestion.props.onClick as () => void)();
+    assert.equal(line.category, "alcohol");
+    assert.equal(line.purchaseProductKey, "qa-liquid");
+    assert.equal(line.name, "Invoice name", "Explicit ID mapping must not depend on display name");
+    assert.equal(all(render()).some((e) => e.props["data-bd-purchase-units"] === "v421"), true);
+    store.confirm({ id: "purchase", venueId: 401, date: "2026-09-08", currency: "RUB", total: 1200, items: [line] });
+    const saved = store.reload();
+    assert.equal(saved.documents[0].items[0].purchaseConversion.canonicalQuantity, 4.2);
+    assert.equal(saved.documents[0].items[0].purchaseConversion.canonicalUnit, "l");
+    assert.equal(saved.stockMovements.length, 1);
+    assert.equal(saved.stockMovements[0].amount, 4.2);
+    assert.equal(saved.stockMovements[0].costAmount, 1200);
+    assert.equal(saved.assortment.stockBalances[0].current, 4.2);
+    assert.deepEqual(store.reload(), saved);
+    line = { ...line, category: "services" };
+    assert.equal(all(render()).some((e) => e.props["data-bd-purchase-units"]), false, "Services must not gain inventory controls");
+  } finally { store.close(); }
+});
 
 test("actual purchase component toggles relevant fields and produces canonical persisted request inputs", () => {
   const api = runtime();
