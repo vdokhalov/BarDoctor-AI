@@ -1524,6 +1524,15 @@ async function writeoffFlow(browser, profile) {
     }));
     throw new Error(`${profile.name}: unsaved guard leaked body scroll lock: ${JSON.stringify(lockState)}`);
   }
+  const releasedLocks = await page.evaluate(() => ({
+    bodyLocked: getComputedStyle(document.body).overflow === "hidden",
+    htmlLocked: getComputedStyle(document.documentElement).overflow === "hidden",
+    overlays: document.querySelectorAll(".bd-writeoff-fullscreen-v271,.bd-writeoff-fullscreen-backdrop-v271,.bd-writeoff-confirm-backdrop-v271,.bd-writeoff-not-found-v271").length,
+    lockClasses: document.body.matches(".bd-writeoff-dialog-open-v271,.bd-transient-layer-open-v247"),
+    writeoff: new URLSearchParams(location.search).get("writeoff"),
+  }));
+  assert.deepEqual(releasedLocks, { bodyLocked: false, htmlLocked: false, overlays: 0, lockClasses: false, writeoff: null },
+    `${profile.name}: closing an unsaved form must release every modal owner`);
 
   await page.getByRole("button", { name: "+ Новое", exact: true }).click();
   await page.getByLabel("Причина списания").selectOption("staff_meal");

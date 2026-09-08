@@ -91,6 +91,12 @@
   function queryScreen(url) {
     var path = url.pathname;
     var query = url.searchParams;
+    // The URL owns write-off forms/details and their nested confirmations.
+    // A second transient history entry can race Close and reopen a prior
+    // document after React has already unmounted the unsaved form.
+    if (path === "/warehouse" && query.has("writeoff")) {
+      return { type: "fullscreen", title: "Списание", parent: clean(url, ["writeoff"]), shell: "fullscreen-owned", bottomNav: false, headerMode: "owned" };
+    }
     if (path === "/warehouse" && (query.has("inventory") || query.get("add") === "inventory")) {
       return { type: "fullscreen", title: "Инвентаризация", parent: clean(url, ["inventory", "add"]), shell: "fullscreen-owned", bottomNav: false, headerMode: "owned" };
     }

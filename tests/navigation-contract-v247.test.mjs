@@ -67,3 +67,78 @@ test("modal, sheet, header and print regressions keep explicit exit paths", asyn
   assert.match(route, /Инвентаризация не найдена/);
   assert.match(route, /Нет доступа/);
 });
+
+test("new and persisted write-off routes own their fullscreen lifecycle and preserve venue on close", async () => {
+  const contract = await loadContract();
+  for (const id of ["new", "posted-document", "draft-document"]) {
+    const screen = contract.resolve("https://bardoctor.test/warehouse?venue=901&tab=writeoffs&writeoff=" + id);
+    assert.equal(screen.type, "fullscreen");
+    assert.equal(screen.parent, "/warehouse?venue=901&tab=writeoffs");
+    assert.equal(screen.shell, "fullscreen-owned");
+    assert.equal(screen.bottomNav, false);
+  }
+});
+
+test("delayed unsaved-confirmation cleanup cannot reopen a prior write-off or retain scroll locks", async () => {
+  const contractSource = await readFile(new URL("../public/navigation-contract-v247.js", import.meta.url), "utf8");
+  const transientSource = await readFile(new URL("../public/navigation-transient-v247.js", import.meta.url), "utf8");
+  for (const route of ["/warehouse?venue=901&tab=writeoffs&writeoff=new", "/warehouse?venue=901&tab=writeoffs&writeoff=draft"]) {
+    let backCalls = 0;
+    let pushCalls = 0;
+    let restoredFullscreen = 0;
+    const frames = [];
+    const classes = new Set();
+    const classList = { add: (name) => classes.add(name), remove: (name) => classes.delete(name) };
+    class Element {
+      isConnected = true;
+      hidden = false;
+      dataset = {};
+      getAttribute() { return null; }
+      closest() { return null; }
+      focus() {}
+      contains() { return false; }
+      querySelectorAll() { return [close]; }
+      querySelector() { return close; }
+    }
+    const close = new Element();
+    close.textContent = "Отмена";
+    const confirm = new Element();
+    const document = {
+      activeElement: close,
+      body: { style: { overflow: "" }, classList },
+      documentElement: { style: { overflow: "" }, setAttribute() {} },
+      querySelectorAll: () => confirm.isConnected ? [confirm] : [],
+      addEventListener() {},
+    };
+    const window = {
+      location: new URL("https://bardoctor.test" + route),
+      history: {
+        state: {},
+        pushState(state) { pushCalls++; this.state = state; },
+        back() { backCalls++; restoredFullscreen++; },
+      },
+      getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }),
+      requestAnimationFrame: (callback) => frames.push(callback),
+      setTimeout() {},
+      addEventListener() {},
+    };
+    const context = { window, document, URL, URLSearchParams, HTMLElement: Element,
+      MutationObserver: class { observe() {} } };
+    vm.runInNewContext(contractSource, context);
+    vm.runInNewContext(transientSource, context);
+    assert.equal(document.body.style.overflow, "hidden", "visible confirmation must remain modal");
+    while (frames.length) frames.shift()();
+    // The React close callback wins the race before the observer's next frame.
+    confirm.isConnected = false;
+    window.location = new URL("https://bardoctor.test/warehouse?venue=901&tab=writeoffs");
+    window.bdTransientNavigationV247.scan();
+    while (frames.length) frames.shift()();
+    assert.equal(pushCalls, 0, "URL-owned confirmation must not add a second history owner");
+    assert.equal(backCalls, 0, "cleanup must not navigate to the previous document");
+    assert.equal(restoredFullscreen, 0);
+    assert.equal(document.body.style.overflow, "");
+    assert.equal(document.documentElement.style.overflow, "");
+    assert.equal(classes.size, 0);
+    assert.equal(document.querySelectorAll().length, 0);
+  }
+});
