@@ -535,6 +535,12 @@ function patchImportApplyHandler(source) {
 }
 
 function finalizePhase3Bundle(source) {
+  // Closing a URL-owned item sheet means removing itemId, not visiting an
+  // arbitrary previous catalog URL (which can own the same sheet again).
+  const closeDetail = 'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),e(w,{replace:!0})}';
+  if (!source.includes(closeDetail)) source = replaceOnce(source,
+    'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),window.bdNavigateBack(w)}',
+    closeDetail, 'deterministic item detail close');
   const malformedImportClosure = ']},h.id)})})}),e.menuItems.length>l&&i.jsx("button",{type:"button",className:"load-more"';
   const validImportClosure = ']},h.id)})}),e.menuItems.length>l&&i.jsx("button",{type:"button",className:"load-more"';
   if (source.includes(malformedImportClosure)) {

@@ -15,6 +15,35 @@ const command = bundle.slice(bundle.indexOf("function bdAssortmentCommandPageV17
 const importReview = bundle.slice(bundle.indexOf("function bdAssortmentImportReviewV170"), bundle.indexOf("function bdAssortmentHomeSignalsV170"));
 const fallbackRuntime = bundle.slice(bundle.indexOf("function bdTechCostUnitV376"), bundle.indexOf("function bdAssortmentHeaderV170"));
 
+test("closing a catalog detail removes its URL ownership instead of reopening history", () => {
+  const handler = command.slice(command.indexOf("be=()=>{"), command.indexOf(",Ne=async", command.indexOf("be=()=>{")));
+  const queryStart = bundle.indexOf("function bdAssortmentQueryUrlV170");
+  const queryEnd = bundle.indexOf("\n", queryStart);
+  for (const tab of ["menu", "recipes"]) {
+    let selected = "sprite";
+    let current = `/catalog?venue=1&tab=${tab}&itemId=sprite&returnTo=nomenclature&q=Sprite&filter=all`;
+    const previous = `/catalog?venue=1&tab=recipes&itemId=sprite`;
+    const calls = [];
+    const context = {
+      URLSearchParams,
+      window: { location: { search: current.slice(current.indexOf("?")) },
+        bdNavigateBack: () => { current = previous; calls.push("back"); } },
+      se: (value) => { selected = value; },
+      e: (url, options) => { current = url; calls.push(options.replace ? "replace" : "push"); },
+    };
+    runInNewContext(`${bundle.slice(queryStart, queryEnd)};const ${handler};be();`, context);
+    const url = new URL(current, "https://bardoctor.test");
+    assert.equal(selected, null);
+    assert.equal(url.searchParams.has("itemId"), false, "close must not return to a prior detail URL");
+    assert.equal(url.searchParams.get("tab"), tab);
+    assert.equal(url.searchParams.get("venue"), "1");
+    assert.equal(url.searchParams.get("returnTo"), "nomenclature");
+    assert.equal(url.searchParams.get("q"), "Sprite");
+    assert.equal(url.searchParams.get("filter"), "all");
+    assert.deepEqual(calls, ["replace"]);
+  }
+});
+
 test("production recipe mount accepts an unambiguous legacy recipe without rewriting its menu", () => {
   const helperStart = bundle.indexOf("function bdLegacyRecipeCanOpenV418");
   const helperEnd = bundle.indexOf("function bdCatalogPage", helperStart);

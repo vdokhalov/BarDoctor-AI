@@ -958,6 +958,8 @@ async function runProfile(browser, baseUrl, profile) {
   try {
     const legacyBefore = clone(catalogFor(state));
     const writesBeforeLegacyOpen = state.writes.length;
+    // A prior same-catalog detail URL must not be mistaken for the close target.
+    await openItem(page, baseUrl, "recipes", legacyMenu.id);
     for (const entryTab of ["menu", "recipes"]) {
       await openItem(page, baseUrl, entryTab, legacyMenu.id);
       const legacyEditor = await openRecipeEditor(page);
@@ -965,6 +967,18 @@ async function runProfile(browser, baseUrl, profile) {
       assert.equal(await legacyEditor.getByLabel("Количество на порцию").first().inputValue(), "8");
       audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: legacy recipe from ${entryTab}`));
       await closeRecipeEditor(legacyEditor);
+      await waitForModalHistory(page);
+      const legacyDetail = page.locator(".bd-assortment-sheet-v170.detail");
+      await legacyDetail.getByRole("button", { name: "Закрыть", exact: true }).click();
+      await legacyDetail.waitFor({ state: "detached", timeout: 15_000 });
+      await waitForModalHistory(page);
+      const closedUrl = new URL(page.url());
+      assert.equal(closedUrl.searchParams.has("itemId"), false, "closing must remove detail route ownership");
+      assert.equal(closedUrl.searchParams.get("tab"), entryTab);
+      assert.equal(closedUrl.searchParams.get("venue"), String(activeVenueId));
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await waitForCatalog(page);
+      assert.equal(await page.locator(".bd-assortment-sheet-v170.detail").count(), 0, "closed detail must stay closed after reload");
     }
     assert.equal(state.writes.length, writesBeforeLegacyOpen, "opening legacy recipes must not write or migrate production-shaped data");
     assert.deepEqual(catalogFor(state), legacyBefore);
