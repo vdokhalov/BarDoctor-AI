@@ -305,11 +305,17 @@ function createMutableState() {
     stores: new Map([
       [activeVenueId, new Map([
         ["bd_assortment_v1", buildAssortment(activeVenueId)],
+        ["bd_finance_revenue", []],
+        ["bd_finance_expenses", []],
+        ["bd_finance_gap_reasons", []],
         ["bd_purchase_documents", []],
         ["bd_sales_documents", buildHistoricalSales(activeVenueId)],
       ])],
       [passiveVenueId, new Map([
         ["bd_assortment_v1", buildAssortment(passiveVenueId)],
+        ["bd_finance_revenue", []],
+        ["bd_finance_expenses", []],
+        ["bd_finance_gap_reasons", []],
         ["bd_purchase_documents", []],
         ["bd_sales_documents", buildHistoricalSales(passiveVenueId)],
       ])],
@@ -563,7 +569,9 @@ async function configureContext(context, state, baseUrl) {
         if (storeKey === "bd_assortment_v1") {
           const foreignRows = validateVenueScopedCatalog(body?.data || {}, venueId);
           const catalogVenueId = Number(body?.data?.venueId);
-          if (catalogVenueId !== Number(venueId) || foreignRows.length) {
+          // The store API selects its venue from authenticated request context,
+          // not from an optional catalog envelope field. Every row is still validated.
+          if ((body?.data?.venueId != null && catalogVenueId !== Number(venueId)) || foreignRows.length) {
             console.error("Phase 3 fixture rejected catalog", JSON.stringify({ venueId, catalogVenueId, foreignRows }));
             return route.fulfill(jsonResponse({
               ok: false,
@@ -574,6 +582,7 @@ async function configureContext(context, state, baseUrl) {
           }
         }
         const persisted = clone(body?.data);
+        if (storeKey === "bd_assortment_v1") persisted.venueId = Number(venueId);
         venueStores.set(storeKey, persisted);
         state.writes.push({ venueId, storeKey, data: clone(persisted) });
         return route.fulfill(jsonResponse({ ok: true, data: clone(persisted) }));
