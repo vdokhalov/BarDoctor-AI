@@ -816,6 +816,15 @@ async function closeRecipeEditor(editor) {
 }
 
 async function reloadCatalog(page) {
+  // Modal removal schedules history.back() in requestAnimationFrame. A document
+  // reload must wait for that history entry to stop referencing a removed layer.
+  await page.waitForFunction(() => {
+    const id = window.history.state?.bdTransientLayer;
+    if (!id) return true;
+    return [...document.querySelectorAll("[data-bd-transient-id]")].some((element) => (
+      element.getAttribute("data-bd-transient-id") === id && element.getClientRects().length > 0
+    ));
+  });
   const onDialog = async (dialog) => {
     console.error("Phase 3 reload dialog", JSON.stringify({ type: dialog.type(), message: dialog.message() }));
     await dialog.dismiss();
