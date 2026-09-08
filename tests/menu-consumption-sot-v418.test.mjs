@@ -99,6 +99,29 @@ test("v418 production bundle is valid and carries one release marker", () => {
   assert.equal(bundle.split('const bdMenuConsumptionSotVersionV418="v418";').length - 1, 1);
 });
 
+test("taxonomy initialization resets only an untouched menu baseline and never erases user edits", () => {
+  const start = menu.indexOf("S.useEffect(()=>{if(bdMenuTaxLoadingV350)return;");
+  const end = menu.indexOf("const M=async()=>", start);
+  assert.ok(start >= 0 && end > start);
+  for (const loading of [true, false]) {
+    for (const touched of [true, false]) {
+      let frame;
+      let marked = 0;
+      const surface = {};
+      const ref = { current: false };
+      runInNewContext(menu.slice(start, end), {
+        S: { useEffect: (effect) => effect() }, bdMenuTaxLoadingV350: loading,
+        bdMenuInteractedRefV418: ref, bdMenuDialogRefV418: { current: surface },
+        requestAnimationFrame: (callback) => { frame = callback; return 1; }, cancelAnimationFrame: () => {},
+        window: { bdMarkNavigationClean: (target) => { assert.equal(target, surface); marked++; } },
+      });
+      ref.current = touched; // An edit arriving before the scheduled baseline is retained.
+      frame?.();
+      assert.equal(marked, !loading && !touched ? 1 : 0);
+    }
+  }
+});
+
 test("Menu asks one business question and conditionally configures one consumption source", () => {
   for (const phrase of [
     "Как списывать эту позицию со склада?",
