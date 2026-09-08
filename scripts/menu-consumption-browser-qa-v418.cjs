@@ -899,6 +899,15 @@ async function authoritativeCatalogReload(page, state, venueId, expectedItemId, 
 
 async function runProfile(browser, baseUrl, profile) {
   const state = createMutableState();
+  // Production legacy records predate consumptionMode. Keep a persisted fixture
+  // in that shape; analytics may resolve RECIPE but opening must not migrate it.
+  const legacyCatalog = catalogFor(state);
+  const legacyMenu = { ...clone(legacyCatalog.menuItems.find((item) => item.name === "Espresso")), id: "legacy-recipe-menu", name: "Legacy Sprite" };
+  delete legacyMenu.consumptionMode;
+  const legacyRecipe = { ...clone(legacyCatalog.recipes[0]), id: "legacy-persisted-recipe", menuItemId: legacyMenu.id, ownerId: legacyMenu.id };
+  legacyRecipe.ingredients = legacyRecipe.ingredients.map((ingredient, index) => ({ ...ingredient, id: `legacy-ingredient-${index}` }));
+  legacyCatalog.menuItems.push(legacyMenu);
+  legacyCatalog.recipes.push(legacyRecipe);
   const passiveBefore = clone(catalogFor(state, passiveVenueId));
   const historicalBefore = new Map([
     [activeVenueId, clone(state.stores.get(activeVenueId).get("bd_sales_documents"))],
@@ -947,6 +956,18 @@ async function runProfile(browser, baseUrl, profile) {
   const authoritativeReadbacks = [];
 
   try {
+    const legacyBefore = clone(catalogFor(state));
+    const writesBeforeLegacyOpen = state.writes.length;
+    for (const entryTab of ["menu", "recipes"]) {
+      await openItem(page, baseUrl, entryTab, legacyMenu.id);
+      const legacyEditor = await openRecipeEditor(page);
+      assert.match(await legacyEditor.innerText(), /Legacy Sprite/);
+      assert.equal(await legacyEditor.getByLabel("Количество на порцию").first().inputValue(), "8");
+      audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: legacy recipe from ${entryTab}`));
+      await closeRecipeEditor(legacyEditor);
+    }
+    assert.equal(state.writes.length, writesBeforeLegacyOpen, "opening legacy recipes must not write or migrate production-shaped data");
+    assert.deepEqual(catalogFor(state), legacyBefore);
     await openItem(page, baseUrl, "menu", directMenuId);
     let detail = page.locator(".bd-assortment-sheet-v170.detail");
     assert.equal(

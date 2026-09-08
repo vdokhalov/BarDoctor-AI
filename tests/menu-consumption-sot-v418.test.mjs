@@ -15,6 +15,32 @@ const command = bundle.slice(bundle.indexOf("function bdAssortmentCommandPageV17
 const importReview = bundle.slice(bundle.indexOf("function bdAssortmentImportReviewV170"), bundle.indexOf("function bdAssortmentHomeSignalsV170"));
 const fallbackRuntime = bundle.slice(bundle.indexOf("function bdTechCostUnitV376"), bundle.indexOf("function bdAssortmentHeaderV170"));
 
+test("production recipe mount accepts an unambiguous legacy recipe without rewriting its menu", () => {
+  const helperStart = bundle.indexOf("function bdLegacyRecipeCanOpenV418");
+  const helperEnd = bundle.indexOf("function bdCatalogPage", helperStart);
+  const gate = command.match(/((?:D\?\.consumptionMode==="RECIPE"|D&&\(!D\.venueId.*?))&&!O&&!B&&!L&&i.jsx\(bdCatRecipeEditor/);
+  assert.ok(gate, "execute the actual production recipe mount condition");
+  const menuItem = { id: "legacy-sprite", venueId: 1, type: "composite" };
+  const activeRecipe = { id: "persisted-recipe", menuItemId: menuItem.id, venueId: 1, current: true, status: "confirmed" };
+  const original = JSON.stringify({ menuItem, activeRecipe });
+  const canMount = (item, recipes = [activeRecipe], overlays = {}) => runInNewContext(
+    `${bundle.slice(helperStart, helperEnd)};Boolean(${gate[1]}&&!O&&!B&&!L)`,
+    { D: item, E: { recipes }, s: { activeVenueId: 1 }, O: null, B: null, L: null,
+      bdCatArray: (value) => Array.isArray(value) ? value : [], ...overlays },
+  );
+  assert.equal(canMount(menuItem), true, "a legacy persisted recipe must open from its detail");
+  assert.equal(canMount({ ...menuItem, consumptionMode: "RECIPE" }), true);
+  for (const consumptionMode of ["DIRECT_ITEM", "FIXED_QUANTITY", "NONE", "NEEDS_REVIEW"]) {
+    assert.equal(canMount({ ...menuItem, consumptionMode }), false, consumptionMode);
+  }
+  assert.equal(canMount({ ...menuItem, readyProduct: { productKey: "stock:sprite" } }), false, "dual legacy link remains blocked");
+  assert.equal(canMount(menuItem, [activeRecipe, { ...activeRecipe, id: "conflicting-recipe" }]), false);
+  assert.equal(canMount(menuItem, [{ ...activeRecipe, current: false, lifecycleStatus: "inactive" }]), false);
+  assert.equal(canMount({ ...menuItem, venueId: 2 }), false, "foreign venue cannot mount");
+  assert.equal(canMount(menuItem, [activeRecipe], { O: {} }), false, "another editor remains exclusive");
+  assert.equal(JSON.stringify({ menuItem, activeRecipe }), original, "opening must not migrate legacy data");
+});
+
 function runFallbackFixture(state, purchases) {
   const number = (value, fallback = 0) => {
     const parsed = typeof value === "string"

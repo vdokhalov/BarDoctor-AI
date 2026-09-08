@@ -374,6 +374,12 @@ function syncConsumptionPersistencePaths(source) {
   const recipeSave = String.raw`ke=async(w,R)=>{const P=bdCatState(E),X=P.recipes.find(p=>p.id===w.id),ce=Number(X?.version||w.version)||1,Qe={...X,...w,id:X?.id||w.id||crypto.randomUUID(),menuItemId:w.menuItemId,ownerId:w.menuItemId,ownerType:"menu_item",venueId:Number(s.activeVenueId)||w.venueId,version:ce,current:!0,currentDraft:w.status!=="confirmed",lifecycleStatus:"current",reviewStatus:w.status==="confirmed"?"approved":w.source==="ai"?"ai_draft":"requires_review"},At=P.recipes.some(p=>p.id===Qe.id)?P.recipes.map(p=>p.id===Qe.id?Qe:p):[Qe,...P.recipes],c=await Ne(w.status==="confirmed"?"Техкарта подтверждена":"Черновик сохранён",{...P,recipes:At},w.status==="confirmed"),p=bdCatArray(c.state.recipes).find(Ce=>Ce.id===Qe.id&&Ce.reviewStatus==="approved");if(w.status==="confirmed"&&(!c.synced||!p)){c.synced&&a({variant:"error",title:"Техкарта требует проверки",description:"Подтвердите связь и единицу каждого ингредиента."});return!1}return z(null),!0}`;
   value = value.slice(0, recipeStart) + recipeSave + value.slice(recipeEnd);
   value = value.replace('D&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor', 'D?.consumptionMode==="RECIPE"&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor');
+  // Raw persisted legacy menu items lack consumptionMode even when the read model
+  // resolves their single recipe. Use the existing non-mutating eligibility rule.
+  const recipeGate = 'D&&(!D.venueId||Number(D.venueId)===Number(s.activeVenueId))&&bdLegacyRecipeCanOpenV418(D,E.recipes)&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor';
+  if (!value.includes(recipeGate)) value = replaceOnce(value,
+    'D?.consumptionMode==="RECIPE"&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor',
+    recipeGate, 'legacy recipe editor eligibility');
   source = source.slice(0, command.start) + value + source.slice(command.end);
 
   const legacy = scope(source, "function bdCatalogPage", "function bdAssortmentTextV170", "legacy consumption persistence sync");
@@ -584,7 +590,7 @@ function verifyBundle(source) {
     "bdSelectableImportProductsV418",
     'inactiveReason:bdActivateImportedRecipeV418?void 0:bdOtherActiveRecipesV418.length?"existing_recipe_requires_review":"menu_consumption_mode"',
     "bdRequireServerV418",
-    'D?.consumptionMode==="RECIPE"',
+    'bdLegacyRecipeCanOpenV418(D,E.recipes)',
     "bdImportSavedV418",
   ];
   for (const token of required) if (!source.includes(token)) throw new Error(`${releaseToken}: bundle invariant missing: ${token}`);
