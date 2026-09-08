@@ -34,7 +34,6 @@ function purchase(quantity: number, unit: string, price: number, stockUnit: stri
       category: "products", packageContent }] };
   const prepared = preparePurchaseConversions(normalizePurchaseDocument(raw, "purchase"), raw, assortment);
   assert.equal(prepared.ok, true, JSON.stringify(prepared));
-  if (!prepared.ok) throw new Error(prepared.error);
   const document = persisted(prepared.document);
   const result = persisted(applyPurchaseToInventory({ assortment: persisted(assortment), document,
     accountingCurrency: "RUB", stockMovements: [], now }));
@@ -228,7 +227,7 @@ test("I: canonical count 4 x 0.7 l against 3 l adjusts only -0.2 l", () => {
 test("50 ml write-off persists -0.05 l and canonical cost", () => {
   const input = purchase(1, "l", 400, "l");
   const result = postWriteOffDocument({ documents: [], assortment: input.assortment, stockMovements: input.movements,
-    venueId: 1, actor, now, draft: { id: "wo", date: "2026-09-08", reasonCode: "spoilage",
+    venueId: 1, actor, now, allowNegativeStock: false, draft: { id: "wo", date: "2026-09-08", reasonCode: "spoilage",
       items: [{ productKey: "product", quantity: 50, unit: "ml" }] } });
   assert.equal(result.ok, true, JSON.stringify(result));
   if (!result.ok) return;
@@ -241,7 +240,7 @@ test("50 ml write-off persists -0.05 l and canonical cost", () => {
 test("sub-gram write-off retains canonical precision rather than rounding a physical amount to zero", () => {
   const input = purchase(1, "kg", 300, "kg");
   const result = postWriteOffDocument({ documents: [], assortment: input.assortment, stockMovements: input.movements,
-    venueId: 1, actor, now, draft: { id: "fine", date: "2026-09-08", reasonCode: "spoilage",
+    venueId: 1, actor, now, allowNegativeStock: false, draft: { id: "fine", date: "2026-09-08", reasonCode: "spoilage",
       items: [{ productKey: "product", quantity: 0.5, unit: "g" }] } });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -259,7 +258,6 @@ test("J: identical template IDs in persisted venue-owned states post only each v
         lineTotal: 360, purchaseProductKey: "same-key", packagingTemplateId: "same-template" }] };
     const prepared = preparePurchaseConversions(normalizePurchaseDocument(raw, raw.id), raw, root);
     assert.equal(prepared.ok, true);
-    if (!prepared.ok) throw new Error(prepared.error);
     const result = persisted(applyPurchaseToInventory({ assortment: root, document: persisted(prepared.document),
       stockMovements: [], accountingCurrency: "RUB", now }));
     assert.deepEqual(result.summary.unresolvedLines, []);
