@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
@@ -191,6 +192,11 @@ async function postOnce(request: Request): Promise<Response> {
     STOCK_MOVEMENT_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  const scopeIssue = purchaseVenueScopeIssue(
+    account.venueId,
+    ...[...stores.values()].map((value) => json(value, null)),
+  );
+  if (scopeIssue) return Response.json(scopeIssue, { status: 422 });
   let documents = array(stores.get(PURCHASE_STORE_KEY));
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));

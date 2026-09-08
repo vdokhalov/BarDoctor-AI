@@ -9,6 +9,7 @@ import { PURCHASE_STOCK_CATEGORIES } from "./purchases";
 import { resolvePurchaseLineAccountingCost } from "./valuation";
 import { explicitCostStatus } from "./cost-knowledge";
 import { COST_BASIS_METHOD, normalizeBaseUnitCost, resolveCostBasis } from "./cost-basis";
+import { purchaseVenueScopeIssue } from "./purchase-venue-scope";
 
 export const ASSORTMENT_STORE_KEY = "bd_assortment_v1";
 export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
@@ -204,7 +205,7 @@ export type PurchaseInventoryRevision =
   }
   | {
     ok: false;
-    code: "PURCHASE_HAS_LATER_SALES" | "PURCHASE_HAS_LATER_MOVEMENTS" | "PURCHASE_REVERSAL_INVALID" | "INVENTORY_REVIEW_REQUIRED";
+    code: "PURCHASE_HAS_LATER_SALES" | "PURCHASE_HAS_LATER_MOVEMENTS" | "PURCHASE_REVERSAL_INVALID" | "INVENTORY_REVIEW_REQUIRED" | "PURCHASE_VENUE_SCOPE_NEEDS_REVIEW";
     error: string;
     unresolvedLines?: InventoryUpdateSummary["unresolvedLines"];
   };
@@ -2693,6 +2694,17 @@ export function applyPurchaseToInventory(input: {
 } {
   const now = input.now ?? new Date().toISOString();
   const document = record(input.document);
+  const scopeIssue = purchaseVenueScopeIssue(document.venueId, document, input.assortment, input.stockMovements);
+  if (scopeIssue) {
+    return {
+      assortment: structuredClone(record(input.assortment)),
+      movements: [],
+      summary: {
+        postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0,
+        unresolvedLines: [{ id: text(document.id), name: "Приход", reason: scopeIssue.error }],
+      },
+    };
+  }
   const documentId = text(document.id, crypto.randomUUID(), 100);
   const date = text(document.date, now.slice(0, 10), 10);
   const currency = text(document.currency, "", 12).toUpperCase();
@@ -3294,6 +3306,9 @@ export function revisePurchaseInInventory(input: {
   const now = input.now ?? new Date().toISOString();
   const previous = record(input.previousDocument);
   const next = record(input.nextDocument);
+  const scopeIssue = purchaseVenueScopeIssue(next.venueId ?? previous.venueId,
+    previous, next, input.assortment, input.stockMovements);
+  if (scopeIssue) return scopeIssue;
   const previousId = text(previous.id, "", 100);
   const movementHistory = input.stockMovements.map(record).filter((movement) =>
     text(movement.status, "active", 20) === "cancelled" || Boolean(movement.reversedAt)
