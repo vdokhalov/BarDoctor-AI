@@ -134,7 +134,7 @@ test("actual authenticated nomenclature GET projects persisted stock-other witho
       const response = await get(new Request("https://example.test/api/tech-cards/nomenclature?q=Спрайт&limit=12"));
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("Cache-Control"), "private, no-store");
-      const result = await response.json();
+      const result = await response.json() as ReturnType<typeof queryCanonicalNomenclature> & { venueId: number };
       assert.equal(result.venueId, 401);
       assert.deepEqual(result.items, store.select("Спрайт").items);
       assert.equal(result.items.length, 1);
