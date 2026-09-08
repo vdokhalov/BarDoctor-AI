@@ -564,6 +564,7 @@ async function configureContext(context, state, baseUrl) {
           const foreignRows = validateVenueScopedCatalog(body?.data || {}, venueId);
           const catalogVenueId = Number(body?.data?.venueId);
           if (catalogVenueId !== Number(venueId) || foreignRows.length) {
+            console.error("Phase 3 fixture rejected catalog", JSON.stringify({ venueId, catalogVenueId, foreignRows }));
             return route.fulfill(jsonResponse({
               ok: false,
               code: "VENUE_SCOPE_MISMATCH",
@@ -1344,6 +1345,12 @@ async function runProfile(browser, baseUrl, profile) {
       audits,
     };
   } catch (error) {
+    console.error("Phase 3 browser failure context", JSON.stringify({
+      profile: profile.name, runtimeIssues,
+      requests: state.requests.slice(-20), writes: state.writes.length,
+      unexpectedRequests: state.unexpectedRequests,
+      editorText: await page.locator(".bd-menu-position-editor-v400").innerText({ timeout: 1000 }).catch(() => "No menu editor"),
+    }));
     await page.screenshot({
       path: path.join(outputDir, `${profile.name}-failure.png`),
       fullPage: true,
