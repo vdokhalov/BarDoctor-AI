@@ -100,16 +100,15 @@ function bdTechCostLineAmountV393(row){const packageLabel=String(row?.packageLab
   const analyticsCall = "rows=g.map(item=>bdTechCostRowV376(item,maps,canonical))";
   const packageAwareAnalyticsCallV386 = "rows=g.map(item=>bdTechCostRowV376(item,maps,canonical,g.length===1?m:null))";
   const packageAwareAnalyticsCall = 'rows=g.map(item=>bdTechCostRowV376(item,maps,canonical,g.length===1?m:null,g.length===1?bdMenuSaleSizeTextV298(m.saleSize||bdMenuLegacySizeV298(m.legacyPortionSize||m.portionSize)):""))';
-  if (source.includes(analyticsCall)) source = source.replace(analyticsCall, packageAwareAnalyticsCall);
-  else if (source.includes(packageAwareAnalyticsCallV386)) source = source.replace(packageAwareAnalyticsCallV386, packageAwareAnalyticsCall);
-  else if (!source.includes(packageAwareAnalyticsCall)) {
+  function hasPhase3CostingCall(source) {
     // Phase 3 supplies explicit ingredient quantities and exact nomenclature IDs.
     // Do not replace that call with the legacy single-ingredient portion heuristic.
     const phase3Call = 'rows=g.map(item=>{const bdExplicitCostV418=bdStoredModeV418&&["DIRECT_ITEM","FIXED_QUANTITY","RECIPE"].includes(bdModeV418);if(!bdExplicitCostV418)return bdTechCostRowV376(item,maps,canonical);const id=String(item?.nomenclatureItemId||""),product=id?bdProductsV418.find(p=>[p?.id,p?.nomenclatureItemId].map(String).includes(id)):void 0,expected=product?bdExplicitCostKeyV418(product.productKey||product.key||product.id):"",configured=String(item?.purchaseProductKey||item?.productKey||""),row=bdTechCostRowV376({...item,purchaseProductKey:expected,productKey:expected},bdExplicitCostMapsV418,bdExplicitCostKeyV418);return id&&product&&expected&&(!configured||configured===expected)&&row.productKey===expected?row:{...row,complete:!1,reason:"mapping",productKey:expected||"",unitPrice:null,cost:null,currency:""}})';
-    if (!source.includes('const bdMenuConsumptionSotVersionV418="v418";') || !source.includes(phase3Call)) {
-      throw new Error("Package-aware menu costing call not found");
-    }
+    return source.includes('const bdMenuConsumptionSotVersionV418="v418";') && source.includes(phase3Call);
   }
+  if (source.includes(analyticsCall)) source = source.replace(analyticsCall, packageAwareAnalyticsCall);
+  else if (source.includes(packageAwareAnalyticsCallV386)) source = source.replace(packageAwareAnalyticsCallV386, packageAwareAnalyticsCall);
+  else if (!source.includes(packageAwareAnalyticsCall) && !hasPhase3CostingCall(source)) throw new Error("Package-aware menu costing call not found");
 
   const ingredientSummary = 'i.jsxs("span",{children:[i.jsx("strong",{children:g.name}),i.jsxs("small",{children:[g.quantity!=null?g.quantity:"—"," ",bdAssortmentUnitLabelV293(g.unit)]})]})';
   const previousIngredientTrace = 'i.jsxs("span",{children:[i.jsx("strong",{children:g.name}),i.jsxs("small",{children:[g.quantity!=null?g.quantity:"—"," ",bdAssortmentUnitLabelV293(g.unit)]}),g.complete&&g.purchaseDate&&i.jsxs("small",{className:"bd-cost-source-v386",children:["Основание: последний приход ",bdProcDateV168(g.purchaseDate),g.supplierName?" · "+g.supplierName:"",g.purchaseDocumentNumber?" · №"+g.purchaseDocumentNumber:"",g.purchasePackageSize?" · "+g.purchasePackageSize:""]})]})';
@@ -137,7 +136,7 @@ function bdTechCostLineAmountV393(row){const packageLabel=String(row?.packageLab
     );
     if (distSource.includes(analyticsCall)) distSource = distSource.replace(analyticsCall, packageAwareAnalyticsCall);
     else if (distSource.includes(packageAwareAnalyticsCallV386)) distSource = distSource.replace(packageAwareAnalyticsCallV386, packageAwareAnalyticsCall);
-    else if (!distSource.includes(packageAwareAnalyticsCall)) throw new Error("Packaged package-aware menu costing call not found");
+    else if (!distSource.includes(packageAwareAnalyticsCall) && !hasPhase3CostingCall(distSource)) throw new Error("Packaged package-aware menu costing call not found");
     if (distSource.includes(ingredientSummary)) distSource = distSource.replace(ingredientSummary, ingredientTrace);
     else if (distSource.includes(previousIngredientTrace)) distSource = distSource.replace(previousIngredientTrace, ingredientTrace);
     else if (distSource.includes(priorIngredientTrace)) distSource = distSource.replace(priorIngredientTrace, ingredientTrace);
