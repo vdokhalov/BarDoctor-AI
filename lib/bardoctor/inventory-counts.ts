@@ -1,4 +1,5 @@
 import { COST_BASIS_METHOD, resolveCostBasis, type CostBasisStatus } from "./cost-basis";
+import { convertStockQuantity, normalizePurchaseQuantity } from "./stock-units";
 
 export const INVENTORY_COUNT_STORE_KEY = "bd_inventory_snapshots";
 
@@ -20,7 +21,7 @@ export type InventoryCountLine = {
   id: string;
   productKey: string;
   productName: string;
-  unit: "ml" | "g" | "pcs";
+  unit: "ml" | "g" | "pcs" | "l" | "kg";
   entryUnit: string;
   entryFactor: number;
   packageSize?: string;
@@ -180,7 +181,7 @@ export function deleteInventoryCountDocument(input: {
   };
 }
 
-function rounded(value: number, digits = 3): number {
+function rounded(value: number, digits = 6): number {
   const factor = 10 ** digits;
   return Math.round((value + Number.EPSILON) * factor) / factor;
 }
@@ -242,7 +243,7 @@ function inventoryEligibleBalances(assortment: unknown): JsonRecord[] {
   const categoryById = new Map(hierarchy.categories.map((value) => [value.id, value]));
   const subcategoryById = new Map(hierarchy.subcategories.map((value) => [value.id, value]));
   return activeStockBalances(assortment).filter((balance) => {
-    if (!["ml", "g", "pcs"].includes(text(balance.unit, "", 20))) return false;
+    if (!["ml", "g", "pcs", "l", "kg"].includes(text(balance.unit, "", 20))) return false;
     const sectionId = text(balance.sectionId, "", 100);
     const categoryId = text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100);
     const subcategoryId = text(balance.subcategoryId, "", 100);
@@ -316,6 +317,8 @@ function entryDefinition(balance: JsonRecord): { entryUnit: string; entryFactor:
   }
   if (unit === "ml") return { entryUnit: "л", entryFactor: 1_000 };
   if (unit === "g") return { entryUnit: "кг", entryFactor: 1_000 };
+  if (unit === "l") return { entryUnit: "л", entryFactor: 1 };
+  if (unit === "kg") return { entryUnit: "кг", entryFactor: 1 };
   return { entryUnit: "шт.", entryFactor: 1 };
 }
 
@@ -526,7 +529,7 @@ export function createInventoryCountDocument(input: {
     .map((balance, index): InventoryCountLine | null => {
       const key = productKey(balance);
       const unit = text(balance.unit, "", 20);
-      if (!key || !["ml", "g", "pcs"].includes(unit)) return null;
+      if (!key || !["ml", "g", "pcs", "l", "kg"].includes(unit)) return null;
       const hierarchy = hierarchyFor(balance, input.assortment);
       const entry = entryDefinition(balance);
       const valuation = costBasis({
@@ -601,7 +604,16 @@ export function updateInventoryCountDocument(input: {
   const items = input.document.items.map((line) => {
     const requested = requestedItems.get(line.productKey);
     if (!requested) return line;
-    const rawActual = requested.actual;
+    let rawActual = requested.actual;
+    if (requested.quantity !== undefined) {
+      const content = requested.packageContent == null ? undefined : record(requested.packageContent);
+      const zero = numeric(requested.quantity) === 0;
+      const normalized = normalizePurchaseQuantity({ quantity: zero ? 1 : requested.quantity, unit: requested.unit,
+        stockUnit: line.unit, price: 0, packageContent: content ? { quantity: content.quantity, unit: content.unit } : undefined });
+      if (!normalized.ok) throw new Error(normalized.error);
+      // Legacy count snapshots retain their captured ml/g basis.
+      rawActual = convertStockQuantity(zero ? 0 : normalized.snapshot.canonicalQuantity, normalized.snapshot.canonicalUnit, line.unit);
+    }
     const actual = rawActual === null || rawActual === undefined || rawActual === ""
       ? null
       : numeric(rawActual);

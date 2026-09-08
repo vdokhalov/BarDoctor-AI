@@ -1,0 +1,61 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { stripTypeScriptTypes } from "node:module";
+
+const path = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
+let source = (await readFile(path, "utf8")).replace(/\r\n/g, "\n");
+const startMarker = "/* purchase-units-v421:start */";
+const endMarker = "/* purchase-units-v421:end */";
+const domain = stripTypeScriptTypes(await readFile(new URL("../lib/bardoctor/stock-units.ts", import.meta.url), "utf8"))
+  .replace(/\bexport\s+/g, "").replace(/[ \t]+$/gm, "");
+const fragment = await readFile(new URL("./fragments/purchase-units-v421.fragment.txt", import.meta.url), "utf8");
+const helpers = `${startMarker}\nconst bdStockUnitsV421=(()=>{${domain};return {physicalUnit,canonicalStockUnit,convertStockQuantity,normalizePurchaseQuantity,validatePurchaseConversionSnapshot};})();\n${fragment}\n${endMarker}\n`;
+if (source.includes(startMarker)) {
+  const start = source.indexOf(startMarker), end = source.indexOf(endMarker, start);
+  if (end < 0) throw new Error("Unterminated canonical purchase helpers");
+  source = source.slice(0,start)+helpers+source.slice(end+endMarker.length).replace(/^\r?\n/,"");
+} else {
+  source=helpers+source;
+}
+if (!source.includes('i.jsx(bdPurchaseUnitsV421,{line,onChange:patch=>u(line.id,patch)})')) {
+  const before = 'i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Количество",children:i.jsx("input",{type:"number",step:"0.001",inputMode:"decimal",value:line.quantity';
+  const start = source.indexOf(before);
+  const end = source.indexOf('i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Цена за единицу"',start);
+  if(start<0||end<start)throw new Error("Canonical purchase editor boundary missing");
+  source=source.slice(0,start)+'i.jsx(bdPurchaseUnitsV421,{line,onChange:patch=>u(line.id,patch)}),'+source.slice(end);
+  const oldName='onChange:event=>{const value=event.target.value,pack=bdProcSuggestedPackageV209(value,bdProcCurrentPackageV209(line));u(line.id,{name:value,...pack!==bdProcCurrentPackageV209(line)?bdProcPackageUpdateV209(pack):{}})}';
+  if(!source.includes(oldName))throw new Error("Purchase name handler missing");
+  source=source.replace(oldName,'onChange:event=>u(line.id,{name:event.target.value})');
+  source=source.replace('label:"Цена за единицу",children:i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:line.unitPrice','label:bdPurchaseContentV421(line)?"Цена упаковки":"Цена за единицу",children:i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:line.unitPrice');
+}
+if (!source.includes('i.jsx(bdPurchaseUnitsV421,{line,onChange:patch=>u(line.id,patch)})')) throw new Error("Canonical purchase editor not connected");
+if(!source.includes('children:"В чём учитывать остаток?"')){
+  const quick=source.indexOf('function bdNomenclatureQuickCreateV336(');
+  const start=source.indexOf('i.jsxs("div",{className:"bd-quick-grid-v336",children:[i.jsxs("label",{children:[i.jsx("span",{children:"Базовая единица"})',quick);
+  const end=source.indexOf('i.jsxs("label",{children:[i.jsx("span",{children:"Последняя цена, если известна"})',start);
+  if(quick<0||start<quick||end<start)throw new Error("Nomenclature stock unit editor missing");
+  source=source.slice(0,start)+'i.jsxs("label",{children:[i.jsx("span",{children:"В чём учитывать остаток?"}),i.jsx("select",{"aria-label":"В чём учитывать остаток?",value:bdStockUnitsV421.canonicalStockUnit(h.unit)||"pcs",onChange:L=>g(B=>({...B,unit:L.target.value,displayUnit:L.target.value,packageSize:""})),children:[["pcs","Штуки"],["l","Литры"],["kg","Килограммы"]].map(([value,label])=>i.jsx("option",{value,children:label},value))})]}),'+source.slice(end);
+}
+source=source.replaceAll('if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,3)+" "+bdWarehouseUnit(e.unit);', '');
+for(const [prefix,guard] of [
+  ['function bdProcStockPreviewV221(e){','if(e?.purchaseConversion?.version===4)return bdProcFormatAmountV221(e.purchaseConversion.canonicalQuantity,e.purchaseConversion.canonicalUnit);if(e?.purchaseUnitModel===4){const p=bdPurchasePreviewV421(e);return p.ok?bdProcFormatAmountV221(p.snapshot.canonicalQuantity,p.snapshot.canonicalUnit):"Проверьте количество и единицы";}'],
+  ['function bdWarehouseEffectiveDisplayUnit(e,t){','if(e?.unitModelVersion===4)return bdStockUnitsV421.canonicalStockUnit(e.unit)||"unknown";'],
+  ['function bdWarehouseDisplayAmount(e,t){','if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,6)+" "+bdWarehouseUnit(e.unit);'],
+]){
+  if(!source.includes(prefix+guard)){
+    if(!source.includes(prefix))throw new Error("Canonical warehouse display hook missing");
+    source=source.replace(prefix,prefix+guard);
+  }
+}
+const costAnchor='      const total=Math.max(0,bdAssortmentNumberV170(line?.lineTotal,0)||bdAssortmentNumberV170(line?.unitPrice,0)*quantity);';
+const readyAnchor='const bdCanPostV357=bdSupplierReady&&bdLinesReady&&';
+const readyGuard='const bdCanPostV357=e.items.filter(bdPurchaseStockLineV421).every(line=>bdPurchasePreviewV421(line).ok)&&bdSupplierReady&&bdLinesReady&&';
+if(!source.includes(readyGuard)){
+  if(!source.includes(readyAnchor))throw new Error("Purchase validation control missing");
+  source=source.replace(readyAnchor,readyGuard);
+}
+const costGuard='      if(line?.purchaseConversion!=null){const snapshot=bdStockUnitsV421.validatePurchaseConversionSnapshot(line.purchaseConversion);if(!snapshot)continue;const viewUnit=bdTechCostUnitV376(snapshot.canonicalUnit).unit,converted=bdStockUnitsV421.convertStockQuantity(snapshot.canonicalQuantity,snapshot.canonicalUnit,viewUnit);if(converted===null)continue;resolved={unit:viewUnit,factor:1};baseAmount=converted;}\n';
+if(!source.includes(costGuard.trim())){
+  if(!source.includes(costAnchor))throw new Error("Canonical purchase cost projection hook missing");
+  source=source.replace(costAnchor,costGuard+costAnchor);
+}
+await writeFile(path,source);

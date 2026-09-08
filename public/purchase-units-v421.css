@@ -1,0 +1,6 @@
+[data-bd-purchase-units="v421"] { min-width: 0; display: grid; gap: 12px; }
+.bd-purchase-package-toggle-v421 { display: flex !important; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; }
+.bd-purchase-package-toggle-v421 input[type="checkbox"] { width: 20px !important; height: 20px !important; min-height: 20px !important; flex: 0 0 20px; margin: 0; }
+[data-bd-purchase-units="v421"] .bd-procurement-form-grid > * { min-width: 0; }
+[data-bd-purchase-units="v421"] [role="alert"], [data-bd-purchase-units="v421"] [role="status"] { overflow-wrap: anywhere; font-size: 14px; }
+@media (max-width: 480px) { [data-bd-purchase-units="v421"] input, [data-bd-purchase-units="v421"] select { font-size: 16px; max-width: 100%; box-sizing: border-box; } }

@@ -35,7 +35,7 @@ export type ProcurementPricePoint = {
   mappingStatus: "confirmed" | "unconfirmed";
   quantity: number;
   baseAmount: number;
-  baseUnit: "ml" | "g" | "pcs";
+  baseUnit: "ml" | "g" | "pcs" | "l" | "kg";
   normalizedUnitPrice: number;
   normalizedDisplayPrice: number;
   normalizedDisplayUnit: "л" | "кг" | "шт.";
@@ -125,7 +125,9 @@ function deduplicatedDocuments(values: unknown[], venueId?: number): JsonRecord[
   return [...byId.values()];
 }
 
-function baseDisplay(unit: "ml" | "g" | "pcs", unitPrice: number) {
+function baseDisplay(unit: ProcurementPricePoint["baseUnit"], unitPrice: number) {
+  if (unit === "l") return { price: rounded(unitPrice, 2), unit: "л" as const };
+  if (unit === "kg") return { price: rounded(unitPrice, 2), unit: "кг" as const };
   if (unit === "ml") return { price: rounded(unitPrice * 1_000, 2), unit: "л" as const };
   if (unit === "g") return { price: rounded(unitPrice * 1_000, 2), unit: "кг" as const };
   return { price: rounded(unitPrice, 2), unit: "шт." as const };
@@ -429,7 +431,7 @@ export function procurementComparisons(
     const difference = alternative
       ? Math.max(0, current.normalizedUnitPrice - alternative.normalizedUnitPrice)
       : 0;
-    const displayMultiplier = current.baseUnit === "pcs" ? 1 : 1_000;
+    const displayMultiplier = current.baseUnit === "ml" || current.baseUnit === "g" ? 1_000 : 1;
     const estimatedMonthlySaving = alternative && enoughVolumeHistory
       ? rounded(difference * observedBaseAmount / purchaseMonths.size, 2)
       : null;

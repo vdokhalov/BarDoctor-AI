@@ -193,8 +193,9 @@ function productKey(value: JsonRecord): string {
 }
 
 function baseUnit(value: JsonRecord): BaseInventoryUnit {
+  if (value.unitModelVersion === 4 && ["l", "kg", "pcs"].includes(text(value.unit))) return text(value.unit) as BaseInventoryUnit;
   const direct = text(value.baseUnit, "", 30);
-  if (["ml", "g", "pcs"].includes(direct)) return direct as BaseInventoryUnit;
+  if (["ml", "g", "pcs", "l", "kg"].includes(direct)) return direct as BaseInventoryUnit;
   const packaged = inventoryPackageAmount(value.packageSize, value.unit);
   if (packaged.unit !== "unknown") return packaged.unit;
   return toInventoryBaseAmount(1, value.unit).unit;
@@ -489,7 +490,8 @@ export function reconcileIngredientQuantity(input: {
   candidate: IngredientMatchCandidate;
 }): IngredientUnitResolution {
   const ingredient = record(input.ingredient);
-  const ingredientAmount = toInventoryBaseAmount(ingredient.quantity ?? 1, ingredient.unit);
+  const ingredientAmount = toInventoryBaseAmount(ingredient.quantity ?? 1, ingredient.unit,
+    ["l", "kg"].includes(input.candidate.baseUnit) ? input.candidate.baseUnit : undefined);
   const candidateUnit = input.candidate.baseUnit;
   const base = {
     ingredientUnit: ingredientAmount.unit,

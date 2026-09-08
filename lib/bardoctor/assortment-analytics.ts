@@ -13,10 +13,10 @@ import {
   resolveMenuItemSaleSize,
 } from "./menu-sale-size";
 import { COST_BASIS_METHOD, resolveCostBasis } from "./cost-basis";
-import { CONSUMPTION_MODES, resolveMenuConsumption, type ConsumptionMode } from "./consumption-mode";
+import { CONSUMPTION_MODES, resolveMenuConsumption, resolveRecipeIngredientQuantity, type ConsumptionMode } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
-type BaseUnit = "ml" | "g" | "pcs";
+type BaseUnit = "ml" | "g" | "pcs" | "l" | "kg";
 
 export const ASSORTMENT_COST_CHANGE_THRESHOLD_PERCENT = 5;
 
@@ -320,7 +320,7 @@ function resolvedIngredientAmount(ingredient: JsonRecord): {
   const normalizedUnit = text(ingredient.normalizedUnit, "", 20);
   if (
     normalizedAmount !== null
-    && ["g", "ml", "pcs"].includes(normalizedUnit)
+    && ["g", "ml", "pcs", "l", "kg"].includes(normalizedUnit)
     && ["exact_compatible", "packaging_compatible"].includes(text(ingredient.unitResolutionStatus))
   ) {
     return {
@@ -683,6 +683,8 @@ export function buildAssortmentAnalytics(input: {
         name: text(product.name, "Складская позиция", 240),
         quantity: 1,
         unit: product.unit ?? product.baseUnit,
+        ...(product.unitModelVersion === 4 ? { normalizedQuantity: 1,
+          normalizedUnit: product.unit, unitResolutionStatus: "exact_compatible" } : {}),
         purchaseProductKey: key,
         nomenclatureItemId,
       },
@@ -815,12 +817,18 @@ export function buildAssortmentAnalytics(input: {
                 input.venueId,
               )
             : stockTarget?.productKey ?? "";
+          const product = costProducts.get(exactKey);
+          const canonicalQuantity = product?.unitModelVersion === 4
+            ? resolveRecipeIngredientQuantity(ingredient, product.unit)
+            : null;
           return exactKey
             ? {
                 ...ingredient,
                 purchaseProductKey: exactKey,
                 productKey: exactKey,
                 canonicalProductKey: exactKey,
+                ...(canonicalQuantity ? { normalizedQuantity: canonicalQuantity.amount,
+                  normalizedUnit: canonicalQuantity.unit, unitResolutionStatus: "exact_compatible" } : {}),
               }
             : ingredient;
         })
@@ -1279,7 +1287,7 @@ export function buildAssortmentAnalytics(input: {
     const onOrder = balanceUnit === requirement.unit ? nonNegative(balance?.onOrder) ?? 0 : 0;
     const point = currentPrices.get(pointKey(requirement.productKey, requirement.unit));
     const packageValue = point
-      ? inventoryPackageAmount(point.packageSize, point.baseUnit === "pcs" ? "шт." : point.baseUnit)
+      ? inventoryPackageAmount(point.packageSize, point.baseUnit === "pcs" ? "шт." : point.baseUnit, requirement.unit)
       : { amount: 0, unit: "unknown" as const };
     const packageAmount = packageValue.unit === requirement.unit ? packageValue.amount : 0;
     const shortage = currentStock === null

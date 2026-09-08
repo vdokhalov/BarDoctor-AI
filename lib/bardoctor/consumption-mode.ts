@@ -5,6 +5,7 @@ import {
   type InventoryUnitCode,
 } from "./inventory";
 import { readyProductLink, resolveReadyProductConsumption } from "./menu-sale-size";
+import { physicalUnit } from "./stock-units";
 
 export const CONSUMPTION_MODES = ["DIRECT_ITEM", "FIXED_QUANTITY", "RECIPE", "NONE"] as const;
 export type ConsumptionMode = (typeof CONSUMPTION_MODES)[number];
@@ -111,6 +112,8 @@ function productKey(value: JsonRecord): string {
 }
 
 function productBaseUnit(value: JsonRecord): Exclude<BaseInventoryUnit, "unknown"> | null {
+  const stored = physicalUnit(value.unit ?? value.baseUnit);
+  if (stored && value.unitModelVersion === 4) return stored;
   const definition = inventoryUnitDefinition(value.unit ?? value.baseUnit);
   const candidate = definition?.baseUnit ?? text(value.baseUnit ?? value.unit, "", 20);
   return (["ml", "g", "pcs"] as string[]).includes(candidate)
@@ -231,7 +234,7 @@ export type ResolvedRecipeIngredientQuantity = {
   factor: number;
 };
 
-export function resolveRecipeIngredientQuantity(value: unknown): ResolvedRecipeIngredientQuantity | null {
+export function resolveRecipeIngredientQuantity(value: unknown, targetUnit?: unknown): ResolvedRecipeIngredientQuantity | null {
   const ingredient = record(value);
   const inputQuantity = numeric(ingredient.quantity);
   const normalizedQuantity = numeric(ingredient.normalizedQuantity);
@@ -239,19 +242,22 @@ export function resolveRecipeIngredientQuantity(value: unknown): ResolvedRecipeI
   if (
     normalizedQuantity !== null
     && normalizedQuantity > 0
-    && ["ml", "g", "pcs"].includes(normalizedUnit)
+    && ["ml", "g", "pcs", "l", "kg"].includes(normalizedUnit)
     && ["exact_compatible", "packaging_compatible"].includes(text(ingredient.unitResolutionStatus, "", 50))
   ) {
+    const converted = targetUnit === undefined ? { amount: normalizedQuantity, unit: normalizedUnit }
+      : toInventoryBaseAmount(normalizedQuantity, normalizedUnit, targetUnit);
+    if (converted.unit === "unknown") return null;
     return {
-      amount: rounded(normalizedQuantity),
-      unit: normalizedUnit,
+      amount: rounded(converted.amount),
+      unit: converted.unit,
       source: "recipe_normalized",
-      factor: inputQuantity !== null && inputQuantity > 0 ? normalizedQuantity / inputQuantity : 1,
+      factor: inputQuantity !== null && inputQuantity > 0 ? converted.amount / inputQuantity : 1,
     };
   }
   if (inputQuantity === null || inputQuantity <= 0) return null;
-  const converted = toInventoryBaseAmount(inputQuantity, ingredient.unit);
-  if (!(converted.amount > 0) || !["ml", "g", "pcs"].includes(converted.unit)) return null;
+  const converted = toInventoryBaseAmount(inputQuantity, ingredient.unit, targetUnit);
+  if (!(converted.amount > 0) || !["ml", "g", "pcs", "l", "kg"].includes(converted.unit)) return null;
   return {
     amount: rounded(converted.amount),
     unit: converted.unit,
@@ -339,7 +345,7 @@ function directOrFixed(input: {
     return invalid("CONSUMPTION_QUANTITY_INVALID", "Количество списания должно быть больше нуля.");
   }
   if (!definition) return invalid("CONSUMPTION_UNIT_INVALID", "Выберите поддерживаемую единицу списания.");
-  const converted = toInventoryBaseAmount(quantity, definition.code);
+  const converted = toInventoryBaseAmount(quantity, definition.code, baseUnit);
   if (converted.unit !== baseUnit || !(converted.amount > 0)) {
     return invalid("CONSUMPTION_UNIT_INVALID", "Единица порции несовместима со складской единицей выбранного товара.");
   }
@@ -422,11 +428,12 @@ function recipeConsumption(input: {
       if (configuredKey && configuredKey !== productKey(product)) {
         return invalid("CONSUMPTION_REFERENCE_MISMATCH", `ID и складской ключ ингредиента «${text(ingredient.name, "без названия", 180)}» указывают на разные товары.`);
       }
-      const quantity = resolveRecipeIngredientQuantity(ingredient);
-      if (!quantity) {
+      const originalQuantity = resolveRecipeIngredientQuantity(ingredient);
+      if (!originalQuantity) {
         return invalid("CONSUMPTION_QUANTITY_INVALID", `Количество ингредиента «${text(ingredient.name, "без названия", 180)}» должно быть больше нуля.`);
       }
-      if (quantity.unit !== productBaseUnit(product)) {
+      const quantity = resolveRecipeIngredientQuantity(ingredient, productBaseUnit(product));
+      if (!quantity || quantity.unit !== productBaseUnit(product)) {
         return invalid("CONSUMPTION_UNIT_INVALID", `Единица ингредиента «${text(ingredient.name, "без названия", 180)}» несовместима с номенклатурой.`);
       }
     }

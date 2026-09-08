@@ -1,4 +1,8 @@
-# Phase 4 gap analysis — incomplete, NOT release-ready
+# Phase 4 gap analysis and implementation evidence
+
+The first sections below preserve the original baseline audit. The latest
+implementation status is recorded in **Phase 4 implementation, 2026-09-08** at
+the end. Release readiness remains withheld until the complete CI gate passes.
 
 Audited baseline: `06111cd4114040af5ec5fbe49ad6d2cbb1e3ba4e`.
 Baseline full CI: https://github.com/vdokhalov/BarDoctor-AI/actions/runs/34242588083
@@ -121,3 +125,70 @@ CI test glob without exclusions. The broader Phase 4 gaps above remain open.
    viewport UIs; execute the requested full checks and normal GitHub CI.
 5. Only then assess full Phase 4 release readiness. Production requires separate
    authorization; Phase 5 remains excluded.
+
+## Phase 4 implementation, 2026-09-08
+
+Resumed from `14001c5e6f64cdfa428ef862f13949b42bee3f3a`, full CI
+https://github.com/vdokhalov/BarDoctor-AI/actions/runs/34245855345 (success).
+This is the predecessor's CI, not validation of the new implementation.
+
+| Contract | Implementation and proof |
+| --- | --- |
+| Canonical stock model | `stock-units.ts`: strict pcs/l/kg, ml/l and g/kg dimension conversion; no name/price inference, incompatible dimensions rejected. New receipts and products carry unitModelVersion 4. Old ml/g history remains readable. |
+| Optional packaging | Shared purchase component: quantity/unit/price; optional package count/content toggle. Nomenclature quick-create asks “В чём учитывать остаток?” and has no mandatory package field. Non-stock purchases retain their quantity/unit controls. |
+| Conversion snapshots | Confirm/update compute from original input before ledger mutations. Snapshots capture count, content, unit, factor, total, unit cost and provenance. Repost validates and reuses captured conversion, never the current template. |
+| Historical safety | Template edits do not rewrite confirmed snapshots. Legacy repair/consolidation cannot reinterpret v4/mixed-basis history. Old movements stay in their captured unit; compatibility readers/reversals convert amounts to the current balance basis. |
+| Posting/costing | DIRECT_ITEM, FIXED_QUANTITY, RECIPE, NONE; canonical CostBasisResolver, procurement display costs, recipe analytics and client recipe-cost projection consume normalized quantities. No purchase packaging is required for sales. |
+| Counts/write-offs | Count command accepts validated quantity/unit/content and persists canonical actual; write-offs normalize to the balance unit. Six-decimal operational precision preserves sub-gram quantities. No stock transfer posting endpoint was found; payment “transfer” is not a stock transfer. |
+| Venue isolation | Template selection requires exact template + venue + nomenclature IDs. Equal IDs in separately persisted venue-owned states produce each venue's quantity. Existing mixed-store preflight remains fail-closed; no foreign rows are silently removed. |
+| UI/interaction verification | Actual purchase component events and actual client recipe costing run in VM tests. Normal CI adds 390×844 and 1280×720 purchase flows with package validation, confirmation eligibility, overflow and console/network checks. Browser validation is still pending until that CI step completes. |
+
+### Acceptance evidence
+
+`tests/stock-units-phase4.test.ts` uses in-memory SQLite persistence/reload with
+the production normalization/posting/costing functions, not selector-only tests.
+It is domain integration, not a claim that all scenarios ran through a deployed
+D1 HTTP server. Browser QA uses the existing isolated procurement fixture; no
+production state is used or changed.
+
+| Scenario | Persisted result asserted |
+| --- | --- |
+| A | 24 pcs, cost 15/pcs, receipt snapshot and procurement cost display |
+| B | 2 × 12 pcs = 24 pcs; total 360; cost 15/pcs |
+| C | 6 × 0.7 l = 4.2 l; total 1200; cost 1200/4.2 per l |
+| D | Saved sale batch: 10 × 8 g leaves 0.92 kg; recipe cost 2.4 and canonical ingredient 0.008 kg |
+| E | Saved sale batch: 4 × 50 ml leaves 0.8 l |
+| F | 12 pcs remains 12 pcs, never 12000 |
+| G | Captured 24 pcs unchanged after template update/reload and repost preparation; repair/consolidation leave captured history unchanged |
+| H | Incompatible conversion rejected; actual confirm/update HTTP handlers return 422 before writes, migrations or consolidation |
+| I | Create count → persist → update using 4 × 0.7 l → reload → post: actual 2.8 l, movement −0.2 l |
+| J | Identical template/product IDs in two persisted venue-owned states: 24 vs 48 pcs with matching movement/snapshot venue; foreign template selection rejected |
+
+Additional tests cover legacy literal packaging, unknown box rejection,
+warehouse quantity conversion without money/history changes, DIRECT_ITEM/NONE,
+50 ml write-off, sub-gram precision, and historical receipt cost conversion.
+
+### Validation status before CI
+
+- Focused domain, costing, purchases, sales, write-off, inventory, selector,
+  analytics, venue/history and access-control suite: 244/244 PASS, including
+  18 Phase 4 domain cases and 2 actual-client behavioral cases.
+- Purchase artifact/interaction regressions: 24/24 PASS.
+- Full source patch chain (`pretest:artifact`): PASS after normalizing Windows
+  line endings; currency-lock and all existing protection patches remain enabled.
+- JavaScript syntax checks: PASS. No local full browser matrix was repeated.
+- Local build/typecheck/lint/full artifact checks are not claimed as PASS:
+  this checkout lacks locked build dependencies/bash/tsc and `dist`. Full artifact
+  tests encounter missing dependency/build outputs. The normal Linux GitHub CI
+  must perform the verified build, content-versioned artifact test, typecheck,
+  lint, full regressions and browser checks without exclusions.
+
+### Legacy limits and scope boundary
+
+No production conflict census was performed; a production count is unknown.
+Ambiguous legacy conversion or mixed-venue stores remain controlled review,
+not automatic cleanup. No schema/destructive/history migration, production
+deployment or Phase 5 changes are included. OCR receives only the validated
+conversion contract; OCR/matching redesign remains for Phase 5.
+
+**NOT RELEASE-READY until the complete new-commit CI and required UI checks pass.**

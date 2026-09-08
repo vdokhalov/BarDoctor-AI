@@ -4,6 +4,7 @@ import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import { preparePurchaseConversions } from "../../../../lib/bardoctor/purchase-conversion";
 import {
   applyPurchaseToInventory,
   ASSORTMENT_STORE_KEY,
@@ -185,7 +186,7 @@ async function postOnce(request: Request): Promise<Response> {
       error: "Повторное проведение заблокировано: сначала зафиксируйте историческую конвертацию в валюту учёта.",
     }, { status: 422 });
   }
-  const repostDocument = accounting.document;
+  let repostDocument = accounting.document;
 
   const linkedPayments = expenses.filter((expense) => isPurchasePayment(expense, documentId));
   if (linkedPayments.length && !hasPermission(account, "finance.manage")) {
@@ -218,6 +219,9 @@ async function postOnce(request: Request): Promise<Response> {
 
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const conversion = preparePurchaseConversions(repostDocument, previous, assortment, true);
+  if (!conversion.ok) return Response.json(conversion, { status: 422 });
+  repostDocument = conversion.document;
   const inventory = purchaseAffectsInventory(repostDocument)
     ? applyPurchaseToInventory({
       assortment,

@@ -1,3 +1,4 @@
+import { convertStockQuantity, physicalUnit } from "./stock-units";
 import {
   resolveInventoryProductKey,
   type BaseInventoryUnit,
@@ -220,7 +221,7 @@ function numeric(value: unknown, fallback = 0): number {
   const parsed = typeof value === "string" ? Number(value.replace(/\s/g, "").replace(",", ".")) : Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
-function rounded(value: number, digits = 3): number {
+function rounded(value: number, digits = 6): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
@@ -553,13 +554,13 @@ function resolveWarehouse(input: {
   return { id: "__venue__", name: "Склад заведения" };
 }
 
-function ingredientBase(ingredient: JsonRecord): {
+function ingredientBase(ingredient: JsonRecord, targetUnit?: unknown): {
   amount: number;
   unit: BaseInventoryUnit;
   source: RecipeIngredientSnapshot["conversion"]["source"];
   factor: number;
 } {
-  return resolveRecipeIngredientQuantity(ingredient) ?? {
+  return resolveRecipeIngredientQuantity(ingredient, targetUnit) ?? {
     amount: 0,
     unit: "unknown",
     source: "canonical_unit_conversion",
@@ -757,7 +758,7 @@ function snapshotFor(input: {
     if (!balance) {
       return { errorCode: "INGREDIENT_NOMENCLATURE_REQUIRED", errorMessage: `Canonical позиция «${text(ingredient.name, productKey)}» отсутствует на складе этого заведения`, cost: null };
     }
-    const base = ingredientBase(ingredient);
+    const base = ingredientBase(ingredient, balance.unit);
     if (!(base.amount > 0) || base.unit === "unknown") {
       return { errorCode: "UNIT_ERROR", errorMessage: `Для ингредиента «${text(ingredient.name, "без названия") }» нет безопасного пересчёта единицы`, cost: null };
     }
@@ -1417,13 +1418,15 @@ export function reverseSalesBatch(input: {
     if (reversedOriginalIds.has(original.id)) continue;
     const balance = byKey.get(original.productKey);
     if (!balance) return { ok: false, code: "INGREDIENT_NOMENCLATURE_REQUIRED", error: `Нельзя сторнировать: «${original.productName}» отсутствует в canonical Номенклатуре` };
-    const amount = Math.abs(original.amount);
+    const converted = convertStockQuantity(Math.abs(original.amount), original.unit, balance.unit);
+    if (converted === null) return { ok: false, code: "INGREDIENT_NOMENCLATURE_REQUIRED", error: "Единица исторического списания несовместима с остатком." };
+    const amount = converted;
     const cost = original.costAmount == null ? null : Math.abs(original.costAmount);
     updateWarehouseBalance(balance, original.warehouseId ?? "__venue__", amount, null, now);
     const currentBasis = resolveCostBasis({
       venueId: input.venueId,
       warehouseId: original.warehouseId,
-      nomenclatureItem: { productKey: original.productKey, unit: original.unit },
+      nomenclatureItem: { productKey: original.productKey, unit: balance.unit },
       asOf: now,
       receipts: currentMovements,
       accountingCurrency: balance.accountingCurrency ?? balance.currency,
@@ -1438,6 +1441,7 @@ export function reverseSalesBatch(input: {
       id: crypto.randomUUID(),
       type: "sale_reversal",
       amount,
+      unit: physicalUnit(balance.unit) ?? original.unit,
       costAmount: cost === null ? undefined : cost,
       costStatus: cost === null ? "UNKNOWN" : cost === 0 ? "KNOWN_ZERO" : "KNOWN",
       sourceLineId: `reversal:${original.sourceLineId}`,

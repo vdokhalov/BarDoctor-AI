@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { preparePurchaseConversions } from "../../../../lib/bardoctor/purchase-conversion";
 import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -277,6 +278,9 @@ async function postOnce(request: Request): Promise<Response> {
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const conversion = preparePurchaseConversions({ ...document, venueId: account.venueId }, requestedDocument, assortment);
+  if (!conversion.ok) return Response.json(conversion, { status: 422 });
+  document = conversion.document;
   const invoiceMappings = array(stores.get(INVOICE_MAPPING_STORE_KEY)) as SupplierItemMapping[];
   const ledgerMigration = migratePurchaseLedger({
     documents,

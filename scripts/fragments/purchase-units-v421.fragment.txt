@@ -1,0 +1,33 @@
+function bdPurchaseStockLineV421(line){return ["products","alcohol","food","consumables","hookah","household"].includes(line.category||"products")}
+function bdPurchaseContentV421(line){
+  if(line.packageContent)return line.packageContent;
+  if(bdStockUnitsV421.physicalUnit(line.unit)!=="pcs")return null;
+  const m=String(line.packageSize||"").trim().match(/^(\d+(?:[.,]\d+)?)\s*(.+)$/);
+  if(!m)return null;
+  const unit=bdStockUnitsV421.physicalUnit(m[2]),quantity=Number(m[1].replace(",","."));
+  return unit&&!(unit==="pcs"&&quantity===1)?{quantity,unit}:null;
+}
+function bdPurchasePreviewV421(line){
+  const root=bdWarehouseRecord(xr("bd_assortment_v1")),ref=line.purchaseProductKey||line.nomenclatureId;
+  const product=[...bdCatArray(root.nomenclature),...bdCatArray(root.stockBalances)].find(p=>ref&&[p.key,p.productKey,p.id].includes(ref));
+  const content=bdPurchaseContentV421(line);
+  return bdStockUnitsV421.normalizePurchaseQuantity({quantity:line.quantity,unit:line.unit,price:line.unitPrice,
+    totalCost:line.lineTotal,stockUnit:product?.unit||content?.unit||line.unit,packageContent:content||void 0});
+}
+function bdPurchaseUnitsV421({line,onChange}){
+  if(!bdPurchaseStockLineV421(line))return i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Количество",children:i.jsx("input",{type:"number",step:"any",value:line.quantity,onChange:e=>onChange({quantity:e.target.value})})}),i.jsx(bdProcField,{label:"Единица",children:i.jsx("input",{value:line.unit||"",onChange:e=>onChange({unit:e.target.value})})})]});
+  const content=bdPurchaseContentV421(line),pack=Boolean(content),preview=bdPurchasePreviewV421(line);
+  const labels=[["pcs","шт."],["l","л"],["ml","мл"],["kg","кг"],["g","г"]];
+  const change=patch=>onChange({...patch,purchaseConversion:void 0,purchaseUnitModel:4});
+  const field=(label,child)=>i.jsx(bdProcField,{label,children:child});
+  const select=(value,change,label)=>i.jsx("select",{"aria-label":label,value:value||"pcs",onChange:e=>change(e.target.value),children:labels.map(([value,label])=>i.jsx("option",{value,children:label},value))});
+  return i.jsxs("div",{"data-bd-purchase-units":"v421",children:[
+    i.jsxs("div",{className:"bd-procurement-form-grid",children:[
+      field(pack?"Количество упаковок":"Количество",i.jsx("input",{"aria-label":pack?"Количество упаковок":"Количество",type:"number",min:"0",step:"any",inputMode:"decimal",value:line.quantity,onChange:e=>change({quantity:e.target.value})})),
+      !pack&&field("Единица",select(bdStockUnitsV421.physicalUnit(line.unit),unit=>change({unit,quantityMode:unit==="pcs"?"count":"measure",packageSize:"",packageContent:void 0}),"Единица прихода"))]}),
+    i.jsxs("label",{className:"bd-purchase-package-toggle-v421",children:[i.jsx("input",{type:"checkbox",checked:pack,onChange:e=>change(e.target.checked?{unit:"pcs",quantityMode:"count",packageSize:"",packageContent:{quantity:"",unit:"pcs"}}:{unit:content?.unit||"pcs",quantityMode:content?.unit==="pcs"?"count":"measure",packageContent:void 0,packageSize:""})}),"Товар пришёл упаковками"]}),
+    pack&&i.jsxs("div",{className:"bd-procurement-form-grid",children:[
+      field("В одной упаковке",i.jsx("input",{"aria-label":"Количество в упаковке",type:"number",min:"0",step:"any",inputMode:"decimal",value:content.quantity,onChange:e=>change({packageContent:{...content,quantity:e.target.value},packageSize:""})})),
+      field("Единица содержимого",select(bdStockUnitsV421.physicalUnit(content.unit),unit=>change({packageContent:{...content,unit},packageSize:""}),"Единица содержимого"))]}),
+    i.jsx("div",{className:"bd-procurement-stock-preview-v221",role:preview.ok?"status":"alert",children:preview.ok?"На склад поступит "+bdProcFormatAmountV221(preview.snapshot.canonicalQuantity,preview.snapshot.canonicalUnit)+" · себестоимость "+bdCatNumber(preview.snapshot.normalizedUnitCost).toLocaleString("ru",{maximumFractionDigits:4})+" / "+preview.snapshot.canonicalUnit:preview.error})]});
+}

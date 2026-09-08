@@ -6,6 +6,7 @@ import * as inventory from "../lib/bardoctor/inventory";
 import * as purchases from "../lib/bardoctor/purchases";
 import { resolveCostBasis } from "../lib/bardoctor/cost-basis";
 import { purchaseVenueScopeIssue } from "../lib/bardoctor/purchase-venue-scope";
+import { preparePurchaseConversions } from "../lib/bardoctor/purchase-conversion";
 
 const reload = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const now = "2026-09-08T12:00:00.000Z";
@@ -149,4 +150,42 @@ for (const action of ["confirm", "update", "repost"]) {
       assert.equal(JSON.stringify(result).includes("Beer"), false);
     });
   }
+}
+
+for (const action of ["confirm", "update"]) {
+  test(`${action} HTTP rejects kg/l conversion before migrations and every write`, async () => {
+    const document = { id: "invalid", date: "2026-09-08", venueId: 1, currency: "RUB", total: 20,
+      items: [{ id: "line", name: "Weight", purchaseProductKey: "weight", quantity: 2, unit: "l",
+        unitPrice: 10, lineTotal: 20, category: "products" }] };
+    const stores = [{ store_key: inventory.ASSORTMENT_STORE_KEY, data_json: JSON.stringify({
+      nomenclature: [{ id: "weight", key: "weight", unit: "kg", unitModelVersion: 4, venueId: 1 }], stockBalances: [] }) },
+      { store_key: purchases.PURCHASE_STORE_KEY, data_json: JSON.stringify([document]) }];
+    const before = structuredClone(stores);
+    let mutations = 0;
+    const forbidden = () => { mutations++; throw new Error("Conversion must reject before mutations"); };
+    const dependencies = { ...inventory, ...purchases, purchaseVenueScopeIssue, preparePurchaseConversions,
+      INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots", INVOICE_MAPPING_STORE_KEY: "bd_invoice_mappings",
+      authenticateRequest: async () => ({ id: 1, venueId: 1, role: "owner" }), hasPermission: () => true,
+      accountingCurrencyFromRestaurantJson: () => "RUB", readStoreSnapshots: async () => [],
+      withStoreCasRetries: (request: Request, post: (request: Request) => Promise<Response>) => post(request),
+      migratePurchaseLedger: forbidden, consolidateInventoryDuplicates: forbidden, runStoreCasBatch: forbidden,
+      getD1: () => ({ prepare: (sql: string) => {
+        assert.match(sql, /^\s*SELECT/);
+        return { bind: () => ({ all: async () => ({ results: stores }) }) };
+      }, batch: forbidden }),
+    };
+    const source = await readFile(new URL(`../app/api/purchases/${action}/route.ts`, import.meta.url), "utf8");
+    const body = stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, ""))
+      .replace("export async function POST", "async function POST");
+    const post = new Function("dependencies", "const {" + Object.keys(dependencies).join(",")
+      + "}=dependencies;\n" + body + "\nreturn POST;")(dependencies) as (request: Request) => Promise<Response>;
+    const response = await post(new Request(`https://example.test/api/purchases/${action}`, {
+      method: "POST", body: JSON.stringify({ document, documentId: document.id }),
+    }));
+    assert.equal(response.status, 422);
+    const result = await response.json() as Record<string, unknown>;
+    assert.equal(result.code, "PURCHASE_CONVERSION_NEEDS_REVIEW");
+    assert.equal(mutations, 0);
+    assert.deepEqual(stores, before);
+  });
 }

@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { canonicalStockUnit } from "../../../../lib/bardoctor/stock-units";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import {
@@ -357,11 +358,7 @@ export async function POST(request: Request): Promise<Response> {
     const name = text(body.name, "", 240);
     const kind = text(body.kind, "stock", 20) === "service" ? "service" : "stock";
     const sourceUnit = kind === "stock" ? inventoryUnitDefinition(body.sourceUnit ?? body.unit) : null;
-    const unit = text(
-      body.unit,
-      kind === "service" ? "service" : sourceUnit?.baseUnit ?? "pcs",
-      20,
-    ) as BaseInventoryUnit;
+    const unit = (kind === "service" ? "unknown" : canonicalStockUnit(body.sourceUnit ?? body.unit) ?? "unknown") as BaseInventoryUnit;
     const defaultPackageSize = kind === "service"
       ? "1 усл."
       : sourceUnit?.code === "kg"
@@ -380,9 +377,9 @@ export async function POST(request: Request): Promise<Response> {
       120,
     );
     const displayUnit = kind === "stock"
-      ? normalizeInventoryDisplayUnit(body.displayUnit ?? sourceUnit?.code, unit)
+      ? normalizeInventoryDisplayUnit(unit, unit)
       : null;
-    if (!name || (kind === "stock" && (!["ml", "g", "pcs"].includes(unit) || !displayUnit))) {
+    if (!name || (kind === "stock" && (!["l", "kg", "pcs"].includes(unit) || !displayUnit))) {
       return Response.json(
         { ok: false, error: "Укажите название и единицу учёта" },
         { status: 422 },
@@ -427,7 +424,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     const packageDetails = kind === "stock"
-      ? inventoryPackageAmount(packageSize, unit)
+      ? inventoryPackageAmount(packageSize, unit, unit)
       : { amount: 1, unit: "unknown" as BaseInventoryUnit };
     if (kind === "stock" && (packageDetails.amount <= 0 || packageDetails.unit !== unit)) {
       return Response.json(
@@ -442,7 +439,7 @@ export async function POST(request: Request): Promise<Response> {
       ? text(body.displayPackageSize, packageSize, 120)
       : "";
     const displayPackageDetails = usesPackageAsDisplayUnit
-      ? inventoryPackageAmount(displayPackageSize, unit)
+      ? inventoryPackageAmount(displayPackageSize, unit, unit)
       : { amount: 0, unit };
     if (
       usesPackageAsDisplayUnit
@@ -463,7 +460,7 @@ export async function POST(request: Request): Promise<Response> {
       ? text(body.purchasePackageSize, displayPackageSize || packageSize, 120)
       : "";
     const purchasePackageDetails = usesPackageAsPurchaseUnit
-      ? inventoryPackageAmount(purchasePackageSize, unit)
+      ? inventoryPackageAmount(purchasePackageSize, unit, unit)
       : { amount: 0, unit };
     if (
       usesPackageAsPurchaseUnit
@@ -525,6 +522,7 @@ export async function POST(request: Request): Promise<Response> {
       kind,
       itemType,
       unit,
+      ...(kind === "stock" ? { unitModelVersion: 4 } : {}),
       ...(displayUnit ? { displayUnit } : {}),
       ...(usesPackageAsDisplayUnit
         ? {

@@ -7,6 +7,7 @@ import {
 } from "./accounting-money";
 import type { AccountingCurrency } from "./currency";
 import { explicitCostStatus, type CostKnowledgeStatus } from "./cost-knowledge";
+import { validatePurchaseConversionSnapshot, type PurchaseConversionSnapshot } from "./stock-units";
 
 export const PURCHASE_STORE_KEY = "bd_purchase_documents";
 export const SUPPLIER_STORE_KEY = "bd_suppliers";
@@ -74,6 +75,11 @@ export function purchaseUnitForPackage(packageSizeValue: unknown): string {
 export type PurchaseDocumentType = "receipt" | "invoice" | "price_list";
 
 export type PurchaseItem = {
+  purchaseConversion?: PurchaseConversionSnapshot;
+  conversionReviewRequired?: boolean;
+  purchaseUnitModel?: 4;
+  packageContent?: { quantity: number; unit: string };
+  packagingTemplateId?: string;
   id: string;
   purchaseProductKey?: string;
   nomenclatureId?: string;
@@ -724,7 +730,8 @@ export function normalizePurchaseItem(
   if (!unitPrice && lineTotal) unitPrice = lineTotal / quantity;
   const requestedCategory = text(input.category, "", 32);
   const inferredCategory = inferPurchaseCategory(name);
-  const packageSize = inferPurchasePackageSize(name, input.packageSize, input.unit);
+  const packageSize = input.purchaseUnitModel === 4 || input.purchaseConversion != null
+    ? text(input.packageSize, "", 120) : inferPurchasePackageSize(name, input.packageSize, input.unit);
   const explicitUnit = text(input.unit, "", 32);
   const requestedUnit = /усл/i.test(packageSize)
     ? "усл."
@@ -744,6 +751,14 @@ export function normalizePurchaseItem(
     quantity: Math.round(quantity * 1_000) / 1_000,
     unit: requestedUnit,
     quantityMode,
+    purchaseConversion: validatePurchaseConversionSnapshot(input.purchaseConversion) ?? undefined,
+    conversionReviewRequired: input.conversionReviewRequired === true || (input.purchaseConversion != null
+      && !validatePurchaseConversionSnapshot(input.purchaseConversion)) || undefined,
+    ...(input.purchaseUnitModel === 4 ? { purchaseUnitModel: 4 as const } : {}),
+    ...(input.packageContent != null ? { packageContent: {
+      quantity: number(record(input.packageContent).quantity), unit: text(record(input.packageContent).unit, "", 40),
+    } } : {}),
+    packagingTemplateId: text(input.packagingTemplateId, "", 160) || undefined,
     packageSize,
     unitPrice: Math.round(unitPrice * 100) / 100,
     lineTotal: Math.round(lineTotal * 100) / 100,

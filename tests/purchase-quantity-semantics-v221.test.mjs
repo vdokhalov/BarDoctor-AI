@@ -6,7 +6,7 @@ const bundle = fs.readFileSync("public/assets/index-BQGspy0I.js", "utf8");
 const css = fs.readFileSync("public/suppliers.css", "utf8");
 
 test("purchase review separates quantity unit from package and previews warehouse amount", () => {
-  assert.match(bundle, /Единица количества/);
+  assert.match(bundle, /Единица прихода/);
   assert.match(bundle, /На склад поступит/);
   assert.match(bundle, /bdProcStockPreviewV221/);
   assert.match(bundle, /function bdProcPackageUpdateV209\(e\)\{return e&&typeof e==="object"\?e:\{packageSize:e\}\}/);
@@ -16,6 +16,6 @@ test("purchase review separates quantity unit from package and previews warehous
 
 test("purchase document details explain count times package but do not multiply measured totals", () => {
   assert.match(bundle, /bdProcPurchaseLineLabelV221/);
-  assert.match(bundle, /quantityMode:bdProcQuantityModeV221/);
+  assert.match(bundle, /purchaseConversion\.canonicalQuantity/);
   assert.doesNotMatch(bundle, /Number\(o\.quantity\)\|\|0," × ",o\.packageSize/);
 });

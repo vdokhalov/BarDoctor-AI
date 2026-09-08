@@ -10,12 +10,13 @@ import { resolvePurchaseLineAccountingCost } from "./valuation";
 import { explicitCostStatus } from "./cost-knowledge";
 import { COST_BASIS_METHOD, normalizeBaseUnitCost, resolveCostBasis } from "./cost-basis";
 import { purchaseVenueScopeIssue } from "./purchase-venue-scope";
+import { convertStockQuantity, physicalUnit, validatePurchaseConversionSnapshot, type PurchaseConversionSnapshot } from "./stock-units";
 
 export const ASSORTMENT_STORE_KEY = "bd_assortment_v1";
 export const STOCK_MOVEMENT_STORE_KEY = "bd_stock_movements";
 export const SALES_DOCUMENT_STORE_KEY = "bd_sales_documents";
 
-export type BaseInventoryUnit = "ml" | "g" | "pcs" | "unknown";
+export type BaseInventoryUnit = "ml" | "g" | "pcs" | "l" | "kg" | "unknown";
 export type InventoryDisplayUnit = "auto" | "ml" | "l" | "g" | "kg" | "pcs";
 
 export type InventoryMeasurementDimension = "volume" | "mass" | "count";
@@ -55,6 +56,7 @@ export function inventoryUnitDefinition(value: unknown) {
 }
 
 export type StockMovement = {
+  purchaseConversion?: PurchaseConversionSnapshot;
   id: string;
   venueId?: number;
   type:
@@ -235,7 +237,7 @@ function number(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function rounded(value: number, digits = 3): number {
+function rounded(value: number, digits = 6): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
@@ -349,10 +351,15 @@ export function inventoryProductKey(value: unknown): string {
   return legacyGeneratedInventoryProductKey(item);
 }
 
-export function toInventoryBaseAmount(quantity: unknown, unit: unknown): {
+export function toInventoryBaseAmount(quantity: unknown, unit: unknown, targetUnit?: unknown): {
   amount: number;
   unit: BaseInventoryUnit;
 } {
+  if (targetUnit !== undefined) {
+    const target = physicalUnit(targetUnit);
+    const amount = convertStockQuantity(quantity, unit, target);
+    return target && amount !== null && amount >= 0 ? { amount, unit: target } : { amount: 0, unit: "unknown" };
+  }
   const value = Math.max(0, number(quantity));
   const normalized = normalizeInventoryText(unit);
   if (/^(л|l|литр)/.test(normalized)) return { amount: value * 1_000, unit: "ml" };
@@ -365,10 +372,14 @@ export function toInventoryBaseAmount(quantity: unknown, unit: unknown): {
   return { amount: value, unit: "unknown" };
 }
 
-export function inventoryPackageAmount(packageSize: unknown, fallbackUnit: unknown): {
+export function inventoryPackageAmount(packageSize: unknown, fallbackUnit: unknown, targetUnit?: unknown): {
   amount: number;
   unit: BaseInventoryUnit;
 } {
+  if (targetUnit !== undefined) {
+    const legacy = inventoryPackageAmount(packageSize, fallbackUnit);
+    return toInventoryBaseAmount(legacy.amount, legacy.unit, targetUnit);
+  }
   const value = text(packageSize, "", 120).toLocaleLowerCase("ru").replace(/,/g, ".");
   const multiplied = value.match(
     /(\d+(?:\.\d+)?)\s*[xх×*]\s*(\d+(?:\.\d+)?)\s*(мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт|pcs)/i,
@@ -393,6 +404,12 @@ export function purchaseLineBaseAmount(value: unknown): {
   unit: BaseInventoryUnit;
 } {
   const item = record(value);
+  if (item.purchaseConversion != null) {
+    const snapshot = validatePurchaseConversionSnapshot(item.purchaseConversion);
+    return snapshot ? { amount: snapshot.canonicalQuantity, unit: snapshot.canonicalUnit }
+      : { amount: 0, unit: "unknown" };
+  }
+  if (item.conversionReviewRequired === true) return { amount: 0, unit: "unknown" };
   const quantity = Math.max(0, number(item.quantity));
   const quantityAmount = toInventoryBaseAmount(quantity, item.unit);
   const quantityMode = text(item.quantityMode, "", 20);
@@ -914,6 +931,15 @@ export function consolidateInventoryDuplicates(input: {
   const now = input.now ?? new Date().toISOString();
   const parts = assortmentParts(input.assortment);
   const sourceMovements = array(input.stockMovements).map(cloneRecord);
+  // Legacy reconciliation was written for ml/g balances and may remap history.
+  // Canonical v4 records are explicit identities, not candidates for automatic
+  // package/name deduplication. A separate reviewed cleanup is out of Phase 4.
+  if (parts.balances.some((balance) => balance.unitModelVersion === 4)
+    || sourceMovements.some((movement) => movement.purchaseConversion != null)) {
+    return { assortment: structuredClone(record(input.assortment)), stockMovements: sourceMovements,
+      aliases: {}, summary: { mergedBalances: 0, mergedNomenclature: 0, remappedMovements: 0,
+        remappedRecipes: 0, skippedCurrencyConflicts: 0, changed: false } };
+  }
   const aliases = new Map<string, string>();
   const blockedCanonicalKeys = new Set<string>();
   const balanceGroups = new Map<string, JsonRecord[]>();
@@ -1173,12 +1199,14 @@ function assortmentParts(value: unknown) {
 
 function baseUnit(value: unknown): BaseInventoryUnit {
   const requested = text(value, "", 20);
-  return ["ml", "g", "pcs"].includes(requested)
+  return ["ml", "g", "pcs", "l", "kg"].includes(requested)
     ? requested as BaseInventoryUnit
     : "unknown";
 }
 
 function baseUnitInputLabel(value: BaseInventoryUnit): string {
+  if (value === "l") return "л";
+  if (value === "kg") return "кг";
   if (value === "ml") return "мл";
   if (value === "g") return "г";
   if (value === "pcs") return "шт.";
@@ -1194,6 +1222,7 @@ export function normalizeInventoryDisplayUnit(
   if (base === "ml" && (requested === "ml" || requested === "l" || requested === "pcs")) return requested;
   if (base === "g" && (requested === "g" || requested === "kg" || requested === "pcs")) return requested;
   if (base === "pcs" && requested === "pcs") return requested;
+  if ((base === "l" || base === "kg") && (requested === "pcs" || convertStockQuantity(1, requested, base) !== null)) return requested;
   return null;
 }
 
@@ -1348,7 +1377,10 @@ export function reviewLegacyPurchaseConversions(input: {
       // templates, names and financial ratios cannot prove physical quantity.
       const literalPackage = /^(?:\d+(?:[.,]\d+)?\s*[xх×*]\s*)?\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт\.?|pcs)\s*$/i.test(packageSize);
       let expected = { amount: 0, unit: "unknown" as BaseInventoryUnit };
-      if (unit && Number.isFinite(quantity) && quantity > 0) {
+      const snapshot = validatePurchaseConversionSnapshot(item.purchaseConversion);
+      if (snapshot) {
+        expected = { amount: snapshot.canonicalQuantity, unit: snapshot.canonicalUnit };
+      } else if (unit && Number.isFinite(quantity) && quantity > 0) {
         if (unit.dimension !== "count" || item.quantityMode === "measure" || !packageSize) {
           expected = toInventoryBaseAmount(quantity, item.unit);
         } else if (literalPackage) {
@@ -1372,7 +1404,8 @@ export function reviewLegacyPurchaseConversions(input: {
       if (expected.unit === "unknown" || !Number.isFinite(expected.amount) || expected.amount <= 0
         || parsed.unit !== expected.unit || Math.abs(parsed.amount - expected.amount) > 0.0001
         || contradictoryCount
-        || [...linked, ...linkedBalances].some((entry) => baseUnit(entry.unit) !== expected.unit)) {
+        || linked.some((entry) => convertStockQuantity(entry.amount, entry.unit, expected.unit) === null)
+        || linkedBalances.some((entry) => convertStockQuantity(entry.current, entry.unit, expected.unit) === null)) {
         issues.push({
           status: "NEEDS_REVIEW", code: "LEGACY_PURCHASE_CONVERSION_UNPROVEN",
           documentId, lineId, venueId: document.venueId,
@@ -1410,6 +1443,18 @@ export function repairInventoryPurchaseAmounts(input: {
         evidenceDocuments: 0, evidenceMatches: 0, linkedShadowBalances: 0,
         diagnostics: conversionIssues, changed: false,
       },
+    };
+  }
+  // The legacy repair algorithm assumes a single ml/g ledger basis. Never
+  // reinterpret immutable v4 receipts or mixed-basis historical movements.
+  if (parts.balances.some((balance) => balance.unitModelVersion === 4)
+    || input.stockMovements.some((value) => record(value).purchaseConversion != null)) {
+    return {
+      assortment: structuredClone(record(input.assortment)),
+      stockMovements: structuredClone(input.stockMovements).map(record),
+      summary: { repairedMovements: 0, restoredMovements: 0, reconciledBalances: 0,
+        correctedProducts: 0, correctedAmount: 0, evidenceDocuments: 0,
+        evidenceMatches: 0, linkedShadowBalances: 0, diagnostics: [], changed: false },
     };
   }
   const referencedDocumentIds = new Set(parts.balances
@@ -2402,12 +2447,12 @@ export function updateInventoryProductDefinition(input: {
   const name = text(input.update.name, "", 240);
   const requestedUnit = baseUnit(input.update.unit);
   const displayUnit = normalizeInventoryDisplayUnit(input.update.displayUnit, requestedUnit);
-  const packageSize = text(input.update.packageSize, "", 120);
-  if (!requestedProductKey || !productKey || !name || requestedUnit === "unknown" || !packageSize || !displayUnit) {
+  const packageSize = text(input.update.packageSize, "1 " + baseUnitInputLabel(requestedUnit), 120);
+  if (!requestedProductKey || !productKey || !name || requestedUnit === "unknown" || !displayUnit) {
     return {
       ok: false,
       code: "INVALID_PRODUCT",
-      error: "Укажите название, складскую единицу и фасовку товара.",
+      error: "Укажите название и складскую единицу товара.",
     };
   }
   const matchesProduct = (value: JsonRecord) => {
@@ -2428,7 +2473,7 @@ export function updateInventoryProductDefinition(input: {
     && packageSize === "Несколько фасовок";
   const parsedPackage = keepsMultiplePackages
     ? { amount: 0, unit: requestedUnit }
-    : inventoryPackageAmount(packageSize, baseUnitInputLabel(requestedUnit));
+    : inventoryPackageAmount(packageSize, baseUnitInputLabel(requestedUnit), requestedUnit);
   if (!keepsMultiplePackages && (parsedPackage.amount <= 0 || parsedPackage.unit !== requestedUnit)) {
     return {
       ok: false,
@@ -2449,7 +2494,7 @@ export function updateInventoryProductDefinition(input: {
     )
     : "";
   const parsedDisplayPackage = usesPackageAsDisplayUnit
-    ? inventoryPackageAmount(displayPackageSize, baseUnitInputLabel(requestedUnit))
+    ? inventoryPackageAmount(displayPackageSize, baseUnitInputLabel(requestedUnit), requestedUnit)
     : { amount: 0, unit: requestedUnit };
   if (
     usesPackageAsDisplayUnit
@@ -2477,7 +2522,7 @@ export function updateInventoryProductDefinition(input: {
     )
     : "";
   const parsedPurchasePackage = usesPackageAsPurchaseUnit
-    ? inventoryPackageAmount(purchasePackageSize, baseUnitInputLabel(requestedUnit))
+    ? inventoryPackageAmount(purchasePackageSize, baseUnitInputLabel(requestedUnit), requestedUnit)
     : { amount: 0, unit: requestedUnit };
   if (
     usesPackageAsPurchaseUnit
@@ -2740,7 +2785,7 @@ export function applyPurchaseToInventory(input: {
     const item = record(value);
     const itemId = sourceLineId(item, index);
     const sourceName = text(item.name, `Позиция ${index + 1}`);
-    const received = purchaseLineBaseAmount(item);
+    let received = purchaseLineBaseAmount(item);
     const canonicalResolution = resolveCanonicalPurchaseItem({
       assortment: { ...parts.root, supplierProductMappings },
       document,
@@ -2795,7 +2840,22 @@ export function applyPurchaseToInventory(input: {
     const previousBalance = indexedBalances.get(productKey)
       ?? indexedBalances.get(legacyGeneratedInventoryProductKey(item));
     const previous = previousBalance ?? {};
-    const incomingPackageSize = text(item.packageSize ?? item.unit, "", 120);
+    const previousUnit = physicalUnit(previous.unit);
+    const incomingSnapshot = validatePurchaseConversionSnapshot(item.purchaseConversion);
+    if (previous.unitModelVersion === 4 && previousUnit && !incomingSnapshot) {
+      // Compatibility posting uses the proven literal legacy quantity, not
+      // current package metadata. Keep the established canonical balance unit.
+      const canonicalAmount = convertStockQuantity(received.amount, received.unit, previousUnit);
+      if (canonicalAmount !== null) received = { amount: canonicalAmount, unit: previousUnit };
+    }
+    if (previousUnit && convertStockQuantity(1, previousUnit, received.unit) === null) {
+      unresolvedLines.push({ id: itemId, name, reason: "Единица прихода несовместима со складской единицей." });
+      return;
+    }
+    const capturedContent = incomingSnapshot?.input.packageContent;
+    const incomingPackageSize = capturedContent
+      ? `${capturedContent.quantity} ${capturedContent.unit}`
+      : text(item.packageSize ?? item.unit, "", 120);
     const packageOptions = packageOptionLabels({
       unit: received.unit,
       packageOptions: [
@@ -2816,6 +2876,7 @@ export function applyPurchaseToInventory(input: {
       );
     const nomenclatureItem: JsonRecord = {
       ...(previousNomenclature ?? {}),
+      ...(incomingSnapshot ? { unitModelVersion: 4 } : {}),
       ...automaticClassification,
       id: text(previousNomenclature?.id, productKey, 300),
       key: productKey,
@@ -2854,7 +2915,9 @@ export function applyPurchaseToInventory(input: {
       return;
     }
 
-    const previousCurrent = number(previous.current);
+    const previousCurrent = previousUnit
+      ? convertStockQuantity(previous.current ?? 0, previousUnit, received.unit) ?? 0
+      : number(previous.current);
     const previousInventoryValue = Math.max(0, valueOfBalance(previous));
     const previousCurrency = text(previous.currency, accountingCurrency || currency, 12).toUpperCase();
     const resolvedCost = resolvePurchaseLineAccountingCost({
@@ -2891,7 +2954,7 @@ export function applyPurchaseToInventory(input: {
         accountingCurrency: accountingCurrency || undefined,
       });
     }
-    const packageDetails = inventoryPackageAmount(item.packageSize, item.unit);
+    const packageDetails = inventoryPackageAmount(incomingPackageSize, item.unit);
     const next: JsonRecord = {
       ...previous,
       key: productKey,
@@ -2907,8 +2970,18 @@ export function applyPurchaseToInventory(input: {
       multiplePackageSizes: hasMultiplePackageSizes || undefined,
       unit: received.unit,
       current: nextCurrent,
-      onOrder: Math.max(0, rounded(number(previous.onOrder) - received.amount)),
-      packageAmount: hasMultiplePackageSizes ? 0 : packageDetails.amount,
+      onOrder: Math.max(0, rounded((previousUnit ? convertStockQuantity(previous.onOrder ?? 0, previousUnit, received.unit) ?? 0 : number(previous.onOrder)) - received.amount)),
+      packageAmount: hasMultiplePackageSizes ? 0 : convertStockQuantity(packageDetails.amount, packageDetails.unit, received.unit) ?? 0,
+      ...(incomingSnapshot ? { unitModelVersion: 4, displayUnit: received.unit } : {}),
+      ...(previousUnit && previousUnit !== received.unit && previous.warehouseBalances ? {
+        warehouseBalances: Object.fromEntries(Object.entries(record(previous.warehouseBalances)).map(([key, value]) => {
+          const warehouse = { ...record(value) };
+          for (const field of ["current", "quantity", "onHand", "onOrder"]) {
+            if (warehouse[field] != null) warehouse[field] = convertStockQuantity(warehouse[field], previousUnit, received.unit);
+          }
+          return [key, warehouse];
+        })),
+      } : {}),
       // Transitional persisted aliases: new operational readers use
       // CostBasisResolver over receipt movements, never this mutable field.
       averageUnitCost: nextUnitCost,
@@ -2947,6 +3020,7 @@ export function applyPurchaseToInventory(input: {
       venueId: number(document.venueId, 0) || undefined,
       type: "receipt",
       date,
+      ...(incomingSnapshot ? { purchaseConversion: incomingSnapshot } : {}),
       productKey,
       productName: name,
       amount: received.amount,
@@ -2968,6 +3042,12 @@ export function applyPurchaseToInventory(input: {
       status: "active",
     });
   });
+
+  if (unresolvedLines.length && (array(document.items).some((value) => record(value).purchaseConversion != null)
+    || parts.balances.some((balance) => balance.unitModelVersion === 4))) {
+    return { assortment: structuredClone(record(input.assortment)), movements: [],
+      summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines } };
+  }
 
   // A newly confirmed receipt can be backdated. Re-project every touched
   // balance from the actual latest applicable active receipt instead of from
@@ -3057,7 +3137,9 @@ function movementRecord(value: unknown): StockMovement | null {
     productKey,
     productName: text(item.productName, "Товар"),
     amount: number(item.amount),
-    unit: ["ml", "g", "pcs"].includes(text(item.unit))
+    venueId: number(item.venueId, 0) || undefined,
+    purchaseConversion: validatePurchaseConversionSnapshot(item.purchaseConversion) ?? undefined,
+    unit: ["ml", "g", "pcs", "l", "kg"].includes(text(item.unit))
       ? text(item.unit) as BaseInventoryUnit
       : "unknown",
     costAmount: item.costAmount == null ? undefined : number(item.costAmount),
@@ -3146,7 +3228,7 @@ export function applyInventoryCount(input: {
       });
       return;
     }
-    const unit = ["ml", "g", "pcs"].includes(text(balance.unit))
+    const unit = ["ml", "g", "pcs", "l", "kg"].includes(text(balance.unit))
       ? text(balance.unit) as BaseInventoryUnit
       : "unknown";
     if (unit === "unknown") {
@@ -3425,7 +3507,9 @@ export function revisePurchaseInInventory(input: {
       };
     }
     const current = number(balance.current);
-    const nextCurrent = rounded(current - movement.amount);
+    const receiptAmount = convertStockQuantity(movement.amount, movement.unit, balance.unit);
+    if (receiptAmount === null) return { ok: false, code: "PURCHASE_REVERSAL_INVALID", error: "Единицы исторического прихода и остатка несовместимы." };
+    const nextCurrent = rounded(current - receiptAmount);
     if (nextCurrent < -0.001) {
       return {
         ok: false,

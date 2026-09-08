@@ -1,4 +1,5 @@
 import type { BaseInventoryUnit, StockMovement } from "./inventory";
+import { convertStockQuantity } from "./stock-units";
 
 export const COST_BASIS_METHOD = "latest_confirmed_receipt" as const;
 
@@ -138,7 +139,10 @@ export function resolveCostBasis(input: {
   );
   const receipt = scoped[0];
   if (!receipt) return { ...base, reason: "NO_APPLICABLE_RECEIPT" };
-  if (requestedUnit && receipt.unit !== requestedUnit) {
+  const receiptQuantity = requestedUnit
+    ? convertStockQuantity(receipt.amount, receipt.unit, requestedUnit)
+    : receipt.amount;
+  if (receiptQuantity === null) {
     return {
       ...base,
       sourceDocumentId: receipt.sourceDocumentId,
@@ -149,11 +153,11 @@ export function resolveCostBasis(input: {
     };
   }
   const normalized = normalizeBaseUnitCost({
-    baseQuantity: receipt.amount,
+    baseQuantity: receiptQuantity,
     totalCost: receipt.costAmount,
     costStatus: receipt.costStatus,
     currency: receipt.currency,
-    baseUnit: receipt.unit,
+    baseUnit: requestedUnit ?? receipt.unit,
   });
   const accountingCurrency = normalizedCurrency(input.accountingCurrency);
   if (normalized.known && accountingCurrency && normalized.currency !== accountingCurrency) {

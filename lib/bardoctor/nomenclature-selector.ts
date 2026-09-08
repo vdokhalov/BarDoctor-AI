@@ -115,7 +115,7 @@ function selectorItem(
     id: text(item.id ?? item.nomenclatureItemId, key, 160),
     key,
     name: text(item.name ?? item.productName ?? item.canonicalName, "Без названия", 300),
-    unit: text(item.baseUnit ?? item.unit, "unknown", 40),
+    unit: text(item.unitModelVersion === 4 ? item.unit : item.baseUnit ?? item.unit, "unknown", 40),
     packageSize: text(item.packageSize ?? item.displayPackageSize ?? item.purchasePackageSize, "", 120),
     category: text(item.category ?? item.subcategory, "", 160),
     kind: text(item.kind, "stock", 20) === "service" ? "service" : "stock",

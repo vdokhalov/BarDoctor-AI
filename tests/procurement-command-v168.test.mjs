@@ -90,13 +90,13 @@ test("Procurement list uses operational states and item-level review", async () 
   assert.match(purchaseReview, /Определить автоматически/);
   assert.match(purchaseReview, /Провести приход/);
   assert.match(bundle, /bdProcPackageGroupsV209/);
-  assert.match(purchaseReview, /Фасовка одной единицы/);
+  assert.match(purchaseReview, /bdPurchaseUnitsV421/);
   assert.match(bundle, /Штучная и упаковки/);
   assert.match(bundle, /Объём/);
   assert.match(bundle, /Вес/);
   assert.match(bundle, /0,9 л/);
   assert.match(bundle, /1 кг/);
-  assert.match(purchaseReview, /Своя фасовка/);
+  assert.match(bundle, /Товар пришёл упаковками/);
   assert.match(procurementFragment, /bdProcManualDraftV207/);
   assert.match(procurementFragment, /recordPayment/);
   assert.match(procurementFragment, /Задолженность поставщикам/);

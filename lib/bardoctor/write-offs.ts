@@ -1,3 +1,4 @@
+import { convertStockQuantity, physicalUnit } from "./stock-units";
 import {
   inventoryPackageAmount,
   resolveInventoryProductKey,
@@ -143,7 +144,7 @@ function number(value: unknown, fallback = 0): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function rounded(value: number, digits = 3): number {
+function rounded(value: number, digits = 6): number {
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
 }
@@ -218,9 +219,11 @@ function lineBaseQuantity(line: JsonRecord, balance: JsonRecord):
     if (parsed.amount <= 0 || parsed.unit === "unknown") {
       return { ok: false, code: "WRITE_OFF_PACKAGE_INVALID", error: `Для фасовки «${packagingLabel}» не задан коэффициент пересчёта` };
     }
-    return { ok: true, amount: rounded(quantity * parsed.amount), unit: parsed.unit, packagingLabel };
+    const converted = toInventoryBaseAmount(quantity * parsed.amount, parsed.unit, balance.unit);
+    if (converted.unit === "unknown") return { ok: false, code: "WRITE_OFF_UNIT_INVALID", error: "Единицы упаковки и товара несовместимы." };
+    return { ok: true, amount: rounded(converted.amount), unit: converted.unit, packagingLabel };
   }
-  const parsed = toInventoryBaseAmount(quantity, line.unit);
+  const parsed = toInventoryBaseAmount(quantity, line.unit, balance.unit);
   if (parsed.amount <= 0 || parsed.unit === "unknown") {
     return { ok: false, code: "WRITE_OFF_UNIT_INVALID", error: `Единица списания для «${name}» не поддерживается` };
   }
@@ -509,12 +512,14 @@ export function cancelPostedWriteOff(input: {
     const balance = byKey.get(item.productKey);
     if (!balance) return { ok: false, code: "WRITE_OFF_PRODUCT_NOT_FOUND", error: `Нельзя отменить: «${item.productName}» отсутствует в номенклатуре` };
     const current = number(balance.current);
-    const nextCurrent = rounded(current + item.baseQuantity);
+    const reversalAmount = convertStockQuantity(item.baseQuantity, item.baseUnit, balance.unit);
+    if (reversalAmount === null) return { ok: false, code: "WRITE_OFF_UNIT_INVALID", error: "Единицы исторического списания и остатка несовместимы." };
+    const nextCurrent = rounded(current + reversalAmount);
     balance.current = nextCurrent;
     const currentBasis = resolveCostBasis({
       venueId: input.venueId,
       warehouseId: text(balance.warehouseId, "", 160) || undefined,
-      nomenclatureItem: { productKey: item.productKey, unit: item.baseUnit },
+      nomenclatureItem: { productKey: item.productKey, unit: balance.unit },
       asOf: now,
       receipts: input.stockMovements,
       accountingCurrency: balance.accountingCurrency ?? balance.currency,
@@ -528,7 +533,7 @@ export function cancelPostedWriteOff(input: {
     balance.updatedAt = now;
     reversals.push({
       id: crypto.randomUUID(), venueId: input.venueId, type: "return", date: now.slice(0, 10), productKey: item.productKey,
-      productName: item.productName, amount: item.baseQuantity, unit: item.baseUnit,
+      productName: item.productName, amount: reversalAmount, unit: physicalUnit(balance.unit) ?? item.baseUnit,
       costAmount: item.totalCost ?? undefined, currency: item.currency,
       sourceDocumentId: existing.id, sourceLineId: `reversal:${item.id}`, createdAt: now, status: "active",
     });

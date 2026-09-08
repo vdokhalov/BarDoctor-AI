@@ -273,8 +273,7 @@ async function manualPurchaseCreationFlow(browser) {
   await editor.locator(".bd-purchase-supplier-results-v356 button").filter({ hasText: "ВПРОК" }).first().click();
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Лайм 1 кг");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Количество" }).locator("input").fill("3");
-  await editor.locator("label.bd-procurement-field").filter({ hasText: "Единица количества" }).locator("select").selectOption("кг");
-  await editor.locator("input[aria-label='Своя фасовка']").fill("1 кг");
+  await editor.getByLabel("Единица прихода", { exact: true }).selectOption("kg");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена за единицу" }).locator("input").fill("200");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Сумма строки" }).locator("input").fill("600");
   assert.equal(await editor.getByLabel("Итог документа", { exact: true }).inputValue(), "600");
@@ -759,10 +758,58 @@ async function withBrowser(run) {
   }
 }
 
+async function phase4ConversionFlow(browser, viewport) {
+  const run = await openPage(browser, { state: "e2e", extras: { tab: "overview", qaScenario: "default", venue: "401" }, viewport, name: `phase4-${viewport.width}` });
+  const { page } = run;
+  await procurementTab(page, "Обзор").click();
+  await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
+  await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
+  const editor = page.locator(".bd-procurement-sheet");
+  const units = editor.locator('[data-bd-purchase-units="v421"]');
+  await units.waitFor({ state: "visible" });
+  await editor.getByLabel("Поиск поставщика", { exact: true }).fill("ВПРОК");
+  await editor.locator(".bd-purchase-supplier-results-v356 button").filter({ hasText: "ВПРОК" }).first().click();
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Phase 4 QA");
+  await units.getByLabel("Количество", { exact: true }).fill("24");
+  await units.getByLabel("Единица прихода", { exact: true }).selectOption("pcs");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена за единицу" }).locator("input").fill("15");
+  await units.getByRole("status").filter({ hasText: "24" }).waitFor();
+  assert.equal(await editor.locator("button.bd-procurement-primary").isEnabled(), true, "Simple pcs purchase needs no packaging");
+  assert.equal(await units.getByLabel("Количество в упаковке").count(), 0);
+  await units.getByLabel("Товар пришёл упаковками").check();
+  assert.equal(await editor.locator("button.bd-procurement-primary").isEnabled(), false, "Unknown package content must block confirmation");
+  await units.getByLabel("Количество упаковок", { exact: true }).fill("2");
+  await units.getByLabel("Количество в упаковке", { exact: true }).fill("12");
+  await units.getByLabel("Единица содержимого", { exact: true }).selectOption("pcs");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена упаковки" }).locator("input").fill("180");
+  assert.match(await units.innerText(), /24.*pcs.*15/);
+  await units.getByLabel("Количество упаковок", { exact: true }).fill("6");
+  await units.getByLabel("Количество в упаковке", { exact: true }).fill("0.7");
+  await units.getByLabel("Единица содержимого", { exact: true }).selectOption("l");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена упаковки" }).locator("input").fill("200");
+  await units.getByRole("status").filter({ hasText: /4[,.]2/ }).waitFor();
+  assert.match(await units.innerText(), /285[,.]714/);
+  assert.equal(await editor.locator("button.bd-procurement-primary").isEnabled(), true, "Explicit package content can be confirmed");
+  await viewportAudit(page, `Phase 4 purchase ${viewport.width}`);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
+  await shot(page, `phase4-purchase-${viewport.width}.png`);
+  await units.getByLabel("Товар пришёл упаковками").uncheck();
+  assert.equal(await units.getByLabel("Количество в упаковке").count(), 0);
+  page.once("dialog", (dialog) => dialog.accept());
+  await editor.getByRole("button", { name: "Отмена", exact: true }).click();
+  await editor.waitFor({ state: "detached" });
+  results.push({ name: run.name, viewport, issues: run.issues });
+  await run.context.close();
+}
+
 (async () => {
   browserPath = await resolveBrowserExecutable(browserPath);
   assert.ok(fs.existsSync(browserPath), `Browser executable not found: ${browserPath}`);
   try {
+    if (process.env.BD_QA_SCENARIO === "phase4-conversion") {
+      await withBrowser((browser) => phase4ConversionFlow(browser, { width: 390, height: 844 }));
+      await withBrowser((browser) => phase4ConversionFlow(browser, { width: 1280, height: 720 }));
+    } else {
     await withBrowser((browser) => mobileReferenceFlow(browser));
     await withBrowser((browser) => manualPurchaseCreationFlow(browser));
     await withBrowser((browser) => draftDeletionFlow(browser));
@@ -813,6 +860,7 @@ async function withBrowser(run) {
       "desktop-finance-purchase-delete-menu.png",
     ));
     await withBrowser((browser) => desktopFlow(browser));
+    }
   } catch (error) {
     failures.push(error instanceof Error ? { message: error.message, stack: error.stack } : { message: String(error) });
   }
