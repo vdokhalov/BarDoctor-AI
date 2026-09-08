@@ -10,7 +10,7 @@ test("v354 allows only one primary assortment workspace", () => {
   assert.match(bundle, /bdModalWorkspaceVersion="v354"/);
   assert.match(bundle, /ge&&!O&&!D&&!L&&!B&&!A&&/);
   assert.match(bundle, /O&&!D&&!B&&!L&&/);
-  assert.match(bundle, /D\?\.consumptionMode==="RECIPE"&&!O&&!B&&!L&&/);
+  assert.match(bundle, /D&&\(!D\.venueId\|\|Number\(D\.venueId\)===Number\(s\.activeVenueId\)\)&&bdLegacyRecipeCanOpenV418\(D,E\.recipes\)&&!O&&!B&&!L&&/);
   assert.match(bundle, /B&&!O&&!D&&!L&&/);
   assert.match(bundle, /L&&!O&&!D&&!B&&/);
 });

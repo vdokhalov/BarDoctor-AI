@@ -37,7 +37,9 @@ test("production recipe mount accepts an unambiguous legacy recipe without rewri
   assert.equal(canMount(menuItem, [activeRecipe, { ...activeRecipe, id: "conflicting-recipe" }]), false);
   assert.equal(canMount(menuItem, [{ ...activeRecipe, current: false, lifecycleStatus: "inactive" }]), false);
   assert.equal(canMount({ ...menuItem, venueId: 2 }), false, "foreign venue cannot mount");
-  assert.equal(canMount(menuItem, [activeRecipe], { O: {} }), false, "another editor remains exclusive");
+  for (const overlay of ["O", "B", "L"]) {
+    assert.equal(canMount(menuItem, [activeRecipe], { [overlay]: {} }), false, `${overlay}: another editor remains exclusive`);
+  }
   assert.equal(JSON.stringify({ menuItem, activeRecipe }), original, "opening must not migrate legacy data");
 });
 
