@@ -18,15 +18,19 @@ test("diagnosis context covers every requested management direction without send
     salePrice: 100 + index * 10,
     plannedSales: 40 - index,
     type: "composite",
+    consumptionMode: "RECIPE",
     active: true,
   }));
   const stores = new Map<string, StoredVenueValue>([
     ["bd_assortment_v1", stored({
       menuItems,
+      nomenclature: [{ id: "ingredient", productKey: "ingredient-stock", name: "Ингредиент", unit: "pcs", active: true }],
       recipes: menuItems.slice(0, 20).map((item) => ({
+        id: `recipe-${item.id}`,
         menuItemId: item.id,
         status: "confirmed",
-        ingredients: [{ name: "Ингредиент", quantity: 1, unit: "шт." }],
+        reviewStatus: "approved",
+        ingredients: [{ nomenclatureItemId: "ingredient", purchaseProductKey: "ingredient-stock", name: "Ингредиент", quantity: 1, unit: "шт." }],
       })),
       groups: [{ id: "bar" }, { id: "kitchen" }],
       subgroups: [{ id: "cocktails" }, { id: "snacks" }],

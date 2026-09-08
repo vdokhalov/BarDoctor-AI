@@ -618,7 +618,9 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
   }));
   const recipeRequiredItems = activeItems.filter((item) => {
     const result = resolutionByMenuItem.get(text(item.id));
-    return result?.ok && result.mode === "RECIPE";
+    return (result?.ok && result.mode === "RECIPE")
+      || item.consumptionMode === "RECIPE"
+      || (!text(item.consumptionMode) && item.type === "composite");
   });
   const confirmedRecipes = [...recipeByMenuItem.values()].filter((recipe) =>
     text(recipe.reviewStatus) === "approved"
