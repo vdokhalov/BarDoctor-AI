@@ -1519,7 +1519,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.doesNotMatch(mainBundle, /Dt=tt-vt-Ct-Nt-je/);
   assert.match(mainBundle, /tt=y-k-q-O-\(ae\?B\+U:\$\)/);
   assert.match(mainBundle, /JSON\.stringify\(\{data:n,baseData:r\}\)/);
-  assert.match(mainBundle, /Object\.prototype\.hasOwnProperty\.call\(a,"data"\)/);
+  assert.match(mainBundle, /Object\.prototype\.hasOwnProperty\.call\(s,"data"\)\?s\.data:n/);
   assert.match(mainBundle, /inventoryMismatch:bdInventoryMismatch/);
   assert.match(mainBundle, /Остатки не сходятся/);
   assert.match(mainBundle, /"aria-label":"Дата смены"/);
