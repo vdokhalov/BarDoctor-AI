@@ -338,8 +338,8 @@ test("a legacy-stock balance is reconciled from the confirmed purchase line valu
   assert.equal(balance.averageUnitCost, 0.2377);
 });
 
-test("invoice value and bottle evidence repair a legacy synthetic 100 litre spirit line", () => {
-  const repaired = repairInventoryPurchaseAmounts({
+test("synthetic quantity with only current bottle evidence requires review", () => {
+  const input = {
     assortment: { stockBalances: [{
       key: "stock:коньяк нистру|ml",
       productKey: "stock:коньяк нистру|ml",
@@ -380,16 +380,21 @@ test("invoice value and bottle evidence repair a legacy synthetic 100 litre spir
       amount: 100_000,
       unit: "ml",
     }],
-  });
-  const balance = (repaired.assortment.stockBalances as Array<Record<string, unknown>>)[0];
-  assert.equal(repaired.summary.repairedMovements, 1);
-  assert.equal(repaired.stockMovements[0].amount, 10_000);
-  assert.equal(balance.current, 10_000);
-  assert.equal(balance.inventoryValue, 2_377);
+  };
+  const before = structuredClone(input);
+  const repaired = repairInventoryPurchaseAmounts(input);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.correctedAmount, 0);
+  assert.equal(repaired.summary.linkedShadowBalances, 0);
+  assert.deepEqual(repaired.stockMovements, before.stockMovements);
+  assert.deepEqual(repaired.assortment, before.assortment);
+  assert.deepEqual(input, before);
+  assert.ok(repaired.summary.diagnostics.every((issue) => issue.status === "NEEDS_REVIEW"));
 });
 
-test("confirmed purchase evidence collapses a zero cross-unit shadow into the stocked card", () => {
-  const repaired = repairInventoryPurchaseAmounts({
+test("conflicting confirmed volume and piece receipt require review before shadow linking", () => {
+  const input = {
     assortment: {
       stockBalances: [
         {
@@ -444,21 +449,21 @@ test("confirmed purchase evidence collapses a zero cross-unit shadow into the st
       amount: 20,
       unit: "pcs",
     }],
-  });
-  assert.equal(repaired.summary.changed, true);
-  const consolidated = consolidateInventoryDuplicates({
-    assortment: repaired.assortment,
-    stockMovements: repaired.stockMovements,
-  });
-  const balances = consolidated.assortment.stockBalances as Array<Record<string, unknown>>;
-  assert.equal(balances.length, 1);
-  assert.equal(balances[0].name, "Пиво Tuborg");
-  assert.equal(balances[0].current, 20);
-  assert.equal(balances[0].unit, "pcs");
+  };
+  const before = structuredClone(input);
+  const repaired = repairInventoryPurchaseAmounts(input);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.correctedAmount, 0);
+  assert.equal(repaired.summary.linkedShadowBalances, 0);
+  assert.deepEqual(repaired.stockMovements, before.stockMovements);
+  assert.deepEqual(repaired.assortment, before.assortment);
+  assert.deepEqual(input, before);
+  assert.ok(repaired.summary.diagnostics.every((issue) => issue.status === "NEEDS_REVIEW"));
 });
 
-test("legacy evidence links an unkeyed zero beer card to the receipt-backed master", () => {
-  const repaired = repairInventoryPurchaseAmounts({
+test("unkeyed cross-unit legacy card requires review without merging", () => {
+  const input = {
     assortment: {
       stockBalances: [
         {
@@ -508,16 +513,17 @@ test("legacy evidence links an unkeyed zero beer card to the receipt-backed mast
       amount: 20,
       unit: "pcs",
     }],
-  });
-  assert.equal(repaired.summary.linkedShadowBalances, 1);
-  const consolidated = consolidateInventoryDuplicates({
-    assortment: repaired.assortment,
-    stockMovements: repaired.stockMovements,
-  });
-  const balances = consolidated.assortment.stockBalances as Array<Record<string, unknown>>;
-  assert.equal(balances.length, 1);
-  assert.equal(balances[0].name, "Пиво Tuborg");
-  assert.equal(balances[0].current, 20);
+  };
+  const before = structuredClone(input);
+  const repaired = repairInventoryPurchaseAmounts(input);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.correctedAmount, 0);
+  assert.equal(repaired.summary.linkedShadowBalances, 0);
+  assert.deepEqual(repaired.stockMovements, before.stockMovements);
+  assert.deepEqual(repaired.assortment, before.assortment);
+  assert.deepEqual(input, before);
+  assert.ok(repaired.summary.diagnostics.every((issue) => issue.status === "NEEDS_REVIEW"));
 });
 
 test("an empty incompatible-unit card follows the exact movement name to its stocked master", () => {
@@ -646,8 +652,8 @@ test("legacy spirit total saved as a synthetic package is not squared", () => {
   });
 });
 
-test("legacy receipt with a lost source line is relinked by product and corrected", () => {
-  const repaired = repairInventoryPurchaseAmounts({
+test("ambiguous synthetic legacy receipt retains its original source line", () => {
+  const input = {
     assortment: { stockBalances: [{
       key: "stock:коньяк нистру|ml",
       productKey: "stock:коньяк нистру|ml",
@@ -682,14 +688,21 @@ test("legacy receipt with a lost source line is relinked by product and correcte
       amount: 100_000,
       unit: "ml",
     }],
-  });
-  assert.equal(repaired.stockMovements[0].sourceLineId, "real-line");
-  assert.equal(repaired.stockMovements[0].amount, 10_000);
-  assert.equal((repaired.assortment.stockBalances as Array<Record<string, unknown>>)[0].current, 10_000);
+  };
+  const before = structuredClone(input);
+  const repaired = repairInventoryPurchaseAmounts(input);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.correctedAmount, 0);
+  assert.equal(repaired.summary.linkedShadowBalances, 0);
+  assert.deepEqual(repaired.stockMovements, before.stockMovements);
+  assert.deepEqual(repaired.assortment, before.assortment);
+  assert.deepEqual(input, before);
+  assert.ok(repaired.summary.diagnostics.every((issue) => issue.status === "NEEDS_REVIEW"));
 });
 
-test("piece-only invoice line uses the retained bottle size and financial total", () => {
-  const repaired = repairInventoryPurchaseAmounts({
+test("piece-only invoice cannot use a current bottle size to rewrite history", () => {
+  const input = {
     assortment: { stockBalances: [{
       key: "stock:коньяк нистру|ml",
       productKey: "stock:коньяк нистру|ml",
@@ -727,11 +740,17 @@ test("piece-only invoice line uses the retained bottle size and financial total"
       amount: 100_000,
       unit: "ml",
     }],
-  });
-
-  assert.equal(repaired.stockMovements[0].amount, 10_000);
-  assert.equal((repaired.assortment.stockBalances as Array<Record<string, unknown>>)[0].current, 10_000);
-  assert.equal(repaired.summary.correctedAmount, 90_000);
+  };
+  const before = structuredClone(input);
+  const repaired = repairInventoryPurchaseAmounts(input);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.correctedAmount, 0);
+  assert.equal(repaired.summary.linkedShadowBalances, 0);
+  assert.deepEqual(repaired.stockMovements, before.stockMovements);
+  assert.deepEqual(repaired.assortment, before.assortment);
+  assert.deepEqual(input, before);
+  assert.ok(repaired.summary.diagnostics.every((issue) => issue.status === "NEEDS_REVIEW"));
 });
 
 test("unique financial evidence repairs Nistru after its last document link was lost", () => {

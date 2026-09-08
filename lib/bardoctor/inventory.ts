@@ -149,6 +149,7 @@ export type InventoryMetadataRepairSummary = {
 };
 
 export type InventoryPurchaseAmountRepairSummary = {
+  reviewState?: "NEEDS_REVIEW";
   repairedMovements: number;
   restoredMovements: number;
   reconciledBalances: number;
@@ -1318,6 +1319,71 @@ export function repairInventoryBalanceMetadata(input: {
   return { assortment: parts.root, summary: { repaired, removed } };
 }
 
+export function reviewLegacyPurchaseConversions(input: {
+  assortment: unknown;
+  purchaseDocuments: unknown[];
+  stockMovements: unknown[];
+}): JsonRecord[] {
+  const balances = array(record(input.assortment).stockBalances).map(record);
+  const movements = input.stockMovements.map(record);
+  const issues: JsonRecord[] = [];
+  const sameVenue = (a: JsonRecord, b: JsonRecord) => !number(a.venueId)
+    || !number(b.venueId) || number(a.venueId) === number(b.venueId);
+  for (const value of input.purchaseDocuments) {
+    const document = record(value);
+    const documentId = text(document.id, "", 100);
+    if (!documentId || document.status === "cancelled") continue;
+    const referenced = balances.some((balance) => sameVenue(balance, document)
+      && balance.lastDocumentId === documentId);
+    if (document.status !== "confirmed" && !document.confirmedAt && !referenced) continue;
+    array(document.items).forEach((value, index) => {
+      const item = record(value);
+      if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return;
+      const lineId = sourceLineId(item, index);
+      const unit = inventoryUnitDefinition(item.unit);
+      const quantity = number(item.quantity, Number.NaN);
+      const packageSize = text(item.packageSize, "", 120);
+      // Only literal invoice content is evidence. Product IDs, current
+      // templates, names and financial ratios cannot prove physical quantity.
+      const literalPackage = /^(?:\d+(?:[.,]\d+)?\s*[xх×*]\s*)?\d+(?:[.,]\d+)?\s*(?:мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт\.?|pcs)\s*$/i.test(packageSize);
+      let expected = { amount: 0, unit: "unknown" as BaseInventoryUnit };
+      if (unit && Number.isFinite(quantity) && quantity > 0) {
+        if (unit.dimension !== "count" || item.quantityMode === "measure" || !packageSize) {
+          expected = toInventoryBaseAmount(quantity, item.unit);
+        } else if (literalPackage) {
+          const content = inventoryPackageAmount(packageSize, "unknown");
+          expected = { amount: quantity * content.amount, unit: content.unit };
+        }
+      }
+      const parsed = purchaseLineBaseAmount(item);
+      const linked = movements.filter((movement) => sameVenue(movement, document)
+        && movement.type === "receipt" && movement.status !== "cancelled" && !movement.reversedAt
+        && movement.sourceDocumentId === documentId && movement.sourceLineId === lineId);
+      const requestedKey = text(item.purchaseProductKey ?? item.productKey, "", 300);
+      const linkedBalances = balances.filter((balance) => sameVenue(balance, document)
+        && number(balance.current) !== 0 && balance.active !== false && balance.archived !== true
+        && ((requestedKey && (balance.productKey ?? balance.key) === requestedKey)
+          || linked.some((movement) => movement.productKey === (balance.productKey ?? balance.key))));
+      const price = number(item.unitPrice);
+      const total = number(item.lineTotal);
+      const contradictoryCount = unit?.dimension === "count" && price > 0 && total > 0
+        && Math.abs(quantity * price - total) > Math.max(0.01, total * 0.005);
+      if (expected.unit === "unknown" || !Number.isFinite(expected.amount) || expected.amount <= 0
+        || parsed.unit !== expected.unit || Math.abs(parsed.amount - expected.amount) > 0.0001
+        || contradictoryCount
+        || [...linked, ...linkedBalances].some((entry) => baseUnit(entry.unit) !== expected.unit)) {
+        issues.push({
+          status: "NEEDS_REVIEW", code: "LEGACY_PURCHASE_CONVERSION_UNPROVEN",
+          documentId, lineId, venueId: document.venueId,
+          name: text(item.name, "Позиция накладной"),
+          reason: "Не доказана историческая конверсия. Проверьте исходную накладную; текущая фасовка не применяется к истории.",
+        });
+      }
+    });
+  }
+  return issues;
+}
+
 export function repairInventoryPurchaseAmounts(input: {
   assortment: unknown;
   purchaseDocuments: unknown[];
@@ -1330,6 +1396,21 @@ export function repairInventoryPurchaseAmounts(input: {
 } {
   const now = input.now ?? new Date().toISOString();
   const parts = assortmentParts(input.assortment);
+  const conversionIssues = reviewLegacyPurchaseConversions(input);
+  if (conversionIssues.length) {
+    // Fail atomically, including balance-only reconciliation and missing
+    // receipt restoration. A review is not permission to repair history.
+    return {
+      assortment: structuredClone(record(input.assortment)),
+      stockMovements: structuredClone(input.stockMovements).map(record),
+      summary: {
+        reviewState: "NEEDS_REVIEW", repairedMovements: 0, restoredMovements: 0,
+        reconciledBalances: 0, correctedProducts: 0, correctedAmount: 0,
+        evidenceDocuments: 0, evidenceMatches: 0, linkedShadowBalances: 0,
+        diagnostics: conversionIssues, changed: false,
+      },
+    };
+  }
   const referencedDocumentIds = new Set(parts.balances
     .map((balance) => text(balance.lastDocumentId, "", 100))
     .filter(Boolean));
@@ -1370,66 +1451,9 @@ export function repairInventoryPurchaseAmounts(input: {
     number(item.lineTotal) || number(item.unitPrice) * Math.max(0, number(item.quantity)),
   ), 2);
 
-  const packageEvidenceAmount = (
-    item: JsonRecord,
-    balance: JsonRecord,
-    unit: BaseInventoryUnit,
-  ): number => {
-    const candidates = [
-      item.packageSize,
-      item.purchaseProductKey,
-      item.productKey,
-      ...array(item.packageOptions),
-      balance.packageSize,
-      ...array(balance.packageOptions),
-      ...array(balance.externalProductKeys),
-      ...array(balance.mergedFromProductKeys),
-    ];
-    const amounts = candidates
-      .map((candidate) => text(candidate, "", 300)
-        .replace(/(\d)\s+(\d+)\s*(мл|ml|л|l|г|g|кг|kg)/gi, "$1.$2 $3"))
-      .filter((candidate) => /\d/.test(candidate))
-      .map((candidate) => inventoryPackageAmount(candidate, unit))
-      .filter((candidate) => candidate.unit === unit && candidate.amount > 0)
-      // A purchase price for bottled/bar stock is a price per retail package.
-      // Larger values are totals or synthetic legacy labels, not bottle sizes.
-      .filter((candidate) => unit === "pcs" || candidate.amount <= 5_000)
-      .map((candidate) => candidate.amount);
-    return amounts.length ? Math.min(...amounts) : 0;
-  };
-
-  const reconciliationLineBaseAmount = (
-    item: JsonRecord,
-    balance: JsonRecord,
-  ): { amount: number; unit: BaseInventoryUnit } => {
-    const parsed = purchaseLineBaseAmount(item);
-    const balanceUnit = baseUnit(balance.unit);
-    const lineTotal = purchaseLineValue(item);
-    const unitPrice = Math.max(0, number(item.unitPrice));
-    if (!lineTotal || !unitPrice || balanceUnit === "unknown") return parsed;
-    const pricedPackages = lineTotal / unitPrice;
-    if (
-      pricedPackages <= 0
-      || Math.abs(pricedPackages - Math.round(pricedPackages)) > 0.01
-    ) return parsed;
-    // The broken legacy import stored the invoice line as pieces, while the
-    // stock master retained the real bottle size (for example 0.5 l) in its
-    // external product key. Derive the physical unit from the balance instead
-    // of trusting that corrupted line unit. Financial equality proves the
-    // number of purchased packages before any quantity is rewritten.
-    const packageAmount = packageEvidenceAmount(item, balance, balanceUnit);
-    if (!packageAmount) return parsed;
-    const inferred = rounded(Math.round(pricedPackages) * packageAmount);
-    if (inferred <= 0) return parsed;
-    if (parsed.unit !== balanceUnit) return { amount: inferred, unit: balanceUnit };
-    if (parsed.amount <= inferred) return parsed;
-    const multiplier = parsed.amount / inferred;
-    return multiplier >= 5
-        && multiplier <= 1_000
-        && Math.abs(multiplier - Math.round(multiplier)) < 0.0001
-      ? { amount: inferred, unit: balanceUnit }
-      : parsed;
-  };
+  // Historical conversion uses only the confirmed invoice line, never a
+  // current package template, product key, or inferred price-per-bottle.
+  const reconciliationLineBaseAmount = (item: JsonRecord) => purchaseLineBaseAmount(item);
 
   const movementIdentityScore = (movement: JsonRecord, item: JsonRecord): number => {
     const expected = purchaseLineBaseAmount(item);
@@ -1473,7 +1497,7 @@ export function repairInventoryPurchaseAmounts(input: {
     if (!productKey || archivedProductKeys.has(productKey)) return;
     const balance = balances.get(productKey);
     if (!balance || balance.archived === true || balance.active === false) return;
-    const expected = reconciliationLineBaseAmount(item, balance);
+    const expected = reconciliationLineBaseAmount(item);
     if (
       expected.amount <= 0
       || expected.unit === "unknown"
@@ -1602,7 +1626,7 @@ export function repairInventoryPurchaseAmounts(input: {
       .map((value, index) => ({ item: record(value), lineId: sourceLineId(record(value), index) }))
       .filter(({ item }) => PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80)))
       .filter(({ item }) => {
-        const expected = reconciliationLineBaseAmount(item, balance);
+        const expected = reconciliationLineBaseAmount(item);
         return expected.amount > 0
           && expected.unit === baseUnit(balance.unit)
           && lineFinanciallyExplainsBalance(balance, item)
@@ -1611,7 +1635,7 @@ export function repairInventoryPurchaseAmounts(input: {
     if (documentItems.length !== 1) continue;
     const matched = documentItems[0];
     evidenceMatches += 1;
-    const expected = reconciliationLineBaseAmount(matched.item, balance);
+    const expected = reconciliationLineBaseAmount(matched.item);
     const current = rounded(number(balance.current));
     const ratio = expected.amount > 0 ? current / expected.amount : 0;
     const legacyMultiplier = ratio >= 5
@@ -1673,7 +1697,7 @@ export function repairInventoryPurchaseAmounts(input: {
       return array(document.items).flatMap((value, index) => {
         const item = record(value);
         if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return [];
-        const expected = reconciliationLineBaseAmount(item, balance);
+        const expected = reconciliationLineBaseAmount(item);
         if (
           expected.amount <= 0
           || expected.unit !== balanceUnit
@@ -1942,7 +1966,7 @@ export function repairInventoryPurchaseAmounts(input: {
           sourceLineId(line, index) === text(movement.sourceLineId, "", 100)
         );
         if (item) {
-          const expected = reconciliationLineBaseAmount(item, balance);
+          const expected = reconciliationLineBaseAmount(item);
           if (expected.amount > 0 && expected.unit === balanceUnit) {
             const lineValue = Math.max(0, number(item.lineTotal)
               || number(item.unitPrice) * Math.max(0, number(item.quantity)));

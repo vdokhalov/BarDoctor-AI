@@ -13,6 +13,7 @@ import {
   normalizeInventoryDisplayUnit,
   repairInventoryBalanceMetadata,
   repairInventoryPurchaseAmounts,
+  reviewLegacyPurchaseConversions,
   restoreInventoryProduct,
   STOCK_MOVEMENT_STORE_KEY,
   updateInventoryProductDefinition,
@@ -265,6 +266,16 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   if (action === "repair") {
+    const conversionIssues = reviewLegacyPurchaseConversions({ assortment, purchaseDocuments, stockMovements });
+    if (conversionIssues.length) {
+      return Response.json({
+        ok: false,
+        code: "LEGACY_PURCHASE_CONVERSION_UNPROVEN",
+        reviewState: "NEEDS_REVIEW",
+        error: "Историческая конверсия требует проверки по исходной накладной. Остатки и движения не изменены.",
+        issues: conversionIssues,
+      }, { status: 422 });
+    }
     const consolidated = consolidateInventoryDuplicates({ assortment, stockMovements, now });
     const amountRepair = repairInventoryPurchaseAmounts({
       assortment: consolidated.assortment,
@@ -272,6 +283,13 @@ export async function POST(request: Request): Promise<Response> {
       stockMovements: consolidated.stockMovements,
       now,
     });
+    if (amountRepair.summary.reviewState === "NEEDS_REVIEW") {
+      return Response.json({
+        ok: false, code: "LEGACY_PURCHASE_CONVERSION_UNPROVEN", reviewState: "NEEDS_REVIEW",
+        error: "Историческая конверсия требует проверки. Остатки и движения не изменены.",
+        issues: amountRepair.summary.diagnostics,
+      }, { status: 422 });
+    }
     const reconciled = consolidateInventoryDuplicates({
       assortment: amountRepair.assortment,
       stockMovements: amountRepair.stockMovements,
