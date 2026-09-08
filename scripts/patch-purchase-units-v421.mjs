@@ -8,7 +8,8 @@ const endMarker = "/* purchase-units-v421:end */";
 const domain = stripTypeScriptTypes(await readFile(new URL("../lib/bardoctor/stock-units.ts", import.meta.url), "utf8"))
   .replace(/\bexport\s+/g, "").replace(/[ \t]+$/gm, "");
 const fragment = await readFile(new URL("./fragments/purchase-units-v421.fragment.txt", import.meta.url), "utf8");
-const helpers = `${startMarker}\nconst bdStockUnitsV421=(()=>{${domain};return {physicalUnit,canonicalStockUnit,convertStockQuantity,normalizePurchaseQuantity,validatePurchaseConversionSnapshot};})();\n${fragment}\n${endMarker}\n`;
+const stockContract = stripTypeScriptTypes(await readFile(new URL("../lib/bardoctor/purchase-stock-contract.ts", import.meta.url), "utf8")).replace(/\bexport\s+/g, "");
+const helpers = `${startMarker}\n${stockContract}\nconst bdStockUnitsV421=(()=>{${domain};return {physicalUnit,canonicalStockUnit,convertStockQuantity,normalizePurchaseQuantity,validatePurchaseConversionSnapshot};})();\n${fragment}\n${endMarker}\n`;
 if (source.includes(startMarker)) {
   const start = source.indexOf(startMarker), end = source.indexOf(endMarker, start);
   if (end < 0) throw new Error("Unterminated canonical purchase helpers");
@@ -47,6 +48,12 @@ for(const [prefix,guard] of [
   }
 }
 const costAnchor='      const total=Math.max(0,bdAssortmentNumberV170(line?.lineTotal,0)||bdAssortmentNumberV170(line?.unitPrice,0)*quantity);';
+const mappingOld='category:k.category||e.category||"products",requiresReview:!1,mappingSource:"manual"';
+const mappingNew='category:stockPurchaseCategory(k.kind,k.purchaseCategory||k.category)||e.category||"products",matchedBaseUnit:k.unit,requiresReview:!1,mappingSource:"manual"';
+if(!source.includes(mappingNew)){
+  if(!source.includes(mappingOld))throw new Error("Purchase nomenclature selection contract missing");
+  source=source.replace(mappingOld,mappingNew);
+}
 const readyAnchor='const bdCanPostV357=bdSupplierReady&&bdLinesReady&&';
 const readyGuard='const bdCanPostV357=e.items.filter(bdPurchaseStockLineV421).every(line=>bdPurchasePreviewV421(line).ok)&&bdSupplierReady&&bdLinesReady&&';
 if(!source.includes(readyGuard)){

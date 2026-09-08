@@ -766,7 +766,7 @@ async function phase4ConversionFlow(browser, viewport) {
     setupRoutes: async (context) => {
       await context.route("**/api/tech-cards/nomenclature?*", (route) => {
         const q = new URL(route.request().url()).searchParams.get("q").toLowerCase();
-        return route.fulfill(jsonResponse({ ok: true, items: store.products.filter((p) => p.name.toLowerCase().includes(q)), nextCursor: null }));
+        return route.fulfill(jsonResponse({ ok: true, ...store.select(q) }));
       });
       await context.route("**/api/purchases/confirm", (route) => route.fulfill(jsonResponse(store.confirm(route.request().postDataJSON().document), 201)));
     },
@@ -802,7 +802,7 @@ async function phase4ConversionFlow(browser, viewport) {
     await editor.locator(".bd-invoice-mapping-results-v356 button").filter({ hasText: name }).click();
     await editor.locator(".bd-invoice-mapping-v356.is-linked").filter({ hasText: name }).waitFor();
   }
-  await mapProduct("Phase 4 bottles");
+  await mapProduct("Спрайт 0,5л.");
   await units.waitFor({ state: "visible" });
   await units.getByLabel("Количество", { exact: true }).fill("24");
   await units.getByLabel("Единица прихода", { exact: true }).selectOption("pcs");
@@ -865,6 +865,16 @@ async function phase4ConversionFlow(browser, viewport) {
   await page.locator(".bd-proc-quick-grid-v168 button").filter({ hasText: "Добавить покупку" }).click();
   await page.locator(".bd-proc-source-grid-v168 button").filter({ hasText: "Вручную" }).click();
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Unsaved QA");
+  await mapProduct("Спрайт 0,5л.");
+  await units.waitFor({ state: "visible" });
+  await units.getByLabel("Товар пришёл упаковками").check();
+  await units.getByLabel("Количество упаковок", { exact: true }).fill("2");
+  await units.getByLabel("Количество в упаковке", { exact: true }).fill("12");
+  await units.getByLabel("Единица содержимого", { exact: true }).selectOption("pcs");
+  await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена упаковки" }).locator("input").fill("180");
+  assert.match(await units.innerText(), /24.*pcs.*15/);
+  await assertPurchaseHeader();
+  await viewportAudit(page, `Phase 4 persisted stock-other discard ${viewport.width}`);
   page.once("dialog", (dialog) => dialog.accept());
   await editor.getByRole("button", { name: "Не сохранять", exact: true }).click();
   await editor.waitFor({ state: "detached" });

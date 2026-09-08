@@ -1,0 +1,20 @@
+{
+  "id": "stock:спрайт 0 5л|pcs",
+  "key": "stock:спрайт 0 5л|pcs",
+  "productKey": "stock:спрайт 0 5л|pcs",
+  "name": "Спрайт 0,5л.",
+  "category": "other",
+  "kind": "stock",
+  "unit": "pcs",
+  "packageSize": "1 шт.",
+  "packageOptions": ["1 шт."],
+  "source": "manual",
+  "active": true,
+  "sectionId": "bar",
+  "taxonomyCategoryId": "soft-drinks",
+  "subcategoryId": "water-soda",
+  "storageLocationId": "bar-store",
+  "classificationStatus": "confirmed",
+  "classificationConfidence": 1,
+  "classificationSource": "manual"
+}

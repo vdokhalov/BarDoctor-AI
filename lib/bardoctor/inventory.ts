@@ -2750,6 +2750,24 @@ export function applyPurchaseToInventory(input: {
       },
     };
   }
+  // Defense in depth for callers bypassing purchase conversion (including old
+  // documents): never silently turn an explicitly linked stock item into a service.
+  const kindConflicts = array(document.items).flatMap((value, index) => {
+    const item = record(value);
+    const reference = text(item.purchaseProductKey ?? item.nomenclatureId ?? item.nomenclatureItemId);
+    const linked = array(record(input.assortment).nomenclature).map(record).filter((product) =>
+      reference && [product.key, product.productKey, product.id].includes(reference)
+      && (product.venueId == null || product.venueId === document.venueId));
+    const stockCategory = PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80));
+    return linked.some((product) => product.kind === "stock" && !stockCategory
+      || product.kind === "service" && stockCategory)
+      ? [{ id: sourceLineId(item, index), name: text(item.name), reason: "Тип связанной номенклатуры не соответствует складскому проведению. Проверьте закупку." }]
+      : [];
+  });
+  if (kindConflicts.length) return {
+    assortment: structuredClone(record(input.assortment)), movements: [],
+    summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines: kindConflicts },
+  };
   const documentId = text(document.id, crypto.randomUUID(), 100);
   const date = text(document.date, now.slice(0, 10), 10);
   const currency = text(document.currency, "", 12).toUpperCase();
@@ -2882,8 +2900,8 @@ export function applyPurchaseToInventory(input: {
       key: productKey,
       productKey,
       name,
-      category,
-      kind: PURCHASE_STOCK_CATEGORIES.has(category) ? "stock" : "service",
+      category: previousNomenclature?.kind === "stock" ? previousNomenclature.category : category,
+      kind: previousNomenclature?.kind ?? (PURCHASE_STOCK_CATEGORIES.has(category) ? "stock" : "service"),
       unit: received.unit,
       packageSize: displayedPackageSize,
       packageOptions,

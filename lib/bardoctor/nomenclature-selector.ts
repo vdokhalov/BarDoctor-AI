@@ -1,3 +1,5 @@
+import { stockPurchaseCategory } from "./purchase-stock-contract";
+
 type JsonRecord = Record<string, unknown>;
 
 export type NomenclatureSelectorItem = {
@@ -7,6 +9,7 @@ export type NomenclatureSelectorItem = {
   unit: string;
   packageSize: string;
   category: string;
+  purchaseCategory: string;
   kind: "stock" | "service";
   supplierName: string;
   archived: boolean;
@@ -118,6 +121,7 @@ function selectorItem(
     unit: text(item.unitModelVersion === 4 ? item.unit : item.baseUnit ?? item.unit, "unknown", 40),
     packageSize: text(item.packageSize ?? item.displayPackageSize ?? item.purchasePackageSize, "", 120),
     category: text(item.category ?? item.subcategory, "", 160),
+    purchaseCategory: stockPurchaseCategory(item.kind, text(item.category ?? item.subcategory, "", 160)),
     kind: text(item.kind, "stock", 20) === "service" ? "service" : "stock",
     supplierName: text(item.supplierSummary ?? item.supplierName, "", 240),
     archived: item.active === false || text(item.status).toLocaleLowerCase("en-US") === "archived",

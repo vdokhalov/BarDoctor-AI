@@ -6,12 +6,15 @@ const { DatabaseSync } = require("node:sqlite");
 const { normalizePurchaseDocument } = require("../lib/bardoctor/purchases.ts");
 const { preparePurchaseConversions } = require("../lib/bardoctor/purchase-conversion.ts");
 const { applyPurchaseToInventory } = require("../lib/bardoctor/inventory.ts");
+const { queryCanonicalNomenclature } = require("../lib/bardoctor/nomenclature-selector.ts");
 
 module.exports = function purchaseQaStore() {
   const db = new DatabaseSync(":memory:");
   db.exec("CREATE TABLE state (id TEXT PRIMARY KEY, data TEXT NOT NULL)");
   const products = [
-    { id: "qa-pcs", key: "qa-pcs", productKey: "qa-pcs", name: "Phase 4 bottles", unit: "pcs", category: "products", venueId: 401, unitModelVersion: 4 },
+    // Exact disclosed nomenclature fields from the user's production screenshots.
+    // No invented category/ID/venue or conversion metadata added to this record.
+    require("../tests/fixtures/purchase-stock-other-production.json"),
     { id: "qa-liquid", key: "qa-liquid", productKey: "qa-liquid", name: "Phase 4 whisky", unit: "l", category: "alcohol", venueId: 401, unitModelVersion: 4 },
   ];
   const save = (value) => db.prepare("INSERT OR REPLACE INTO state VALUES (?, ?)").run("state", JSON.stringify(value));
@@ -19,6 +22,9 @@ module.exports = function purchaseQaStore() {
   save({ documents: [], assortment: { nomenclature: products, stockBalances: [] }, stockMovements: [] });
   return {
     products, reload, close: () => db.close(),
+    select(query, venueId = 401) {
+      return queryCanonicalNomenclature({ assortment: reload().assortment, query, venueId, limit: 12 });
+    },
     confirm(raw) {
       assert.equal(raw.venueId, 401);
       const before = reload();

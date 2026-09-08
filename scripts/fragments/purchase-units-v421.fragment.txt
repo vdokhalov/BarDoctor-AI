@@ -12,7 +12,7 @@ function bdPurchasePreviewV421(line){
   const product=[...bdCatArray(root.nomenclature),...bdCatArray(root.stockBalances)].find(p=>ref&&[p.key,p.productKey,p.id].includes(ref));
   const content=bdPurchaseContentV421(line);
   return bdStockUnitsV421.normalizePurchaseQuantity({quantity:line.quantity,unit:line.unit,price:line.unitPrice,
-    totalCost:line.lineTotal,stockUnit:product?.unit||content?.unit||line.unit,packageContent:content||void 0});
+    totalCost:line.lineTotal,stockUnit:product?.unit||line.matchedBaseUnit||content?.unit||line.unit,packageContent:content||void 0});
 }
 function bdPurchaseUnitsV421({line,onChange}){
   if(!bdPurchaseStockLineV421(line))return i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Количество",children:i.jsx("input",{type:"number",step:"any",value:line.quantity,onChange:e=>onChange({quantity:e.target.value})})}),i.jsx(bdProcField,{label:"Единица",children:i.jsx("input",{value:line.unit||"",onChange:e=>onChange({unit:e.target.value})})})]});
