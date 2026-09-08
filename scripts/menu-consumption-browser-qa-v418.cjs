@@ -698,15 +698,16 @@ async function startQaServer() {
 
 async function waitForCatalog(page) {
   await page.locator(".bd-assortment-command-v170").waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForFunction(() => (
-    document.querySelector(".bd-assortment-content-v170")?.getAttribute("data-analytics-state") !== "loading"
-  ));
+  await page.waitForFunction(() => {
+    const content = document.querySelector(".bd-assortment-content-v170");
+    return content !== null && content.getAttribute("data-analytics-state") !== "loading";
+  });
 }
 
 async function openItem(page, baseUrl, tab, itemId, venueId = activeVenueId) {
   const response = await page.goto(
     `${baseUrl}/catalog?venue=${venueId}&tab=${tab}&itemId=${encodeURIComponent(itemId)}`,
-    { waitUntil: "networkidle", timeout: 60_000 },
+    { waitUntil: "domcontentloaded", timeout: 60_000 },
   );
   assert.equal(response?.status(), 200, `${tab}/${itemId}: catalog route must return 200`);
   await waitForCatalog(page);
@@ -805,7 +806,7 @@ async function closeRecipeEditor(editor) {
 }
 
 async function reloadCatalog(page) {
-  const response = await page.reload({ waitUntil: "networkidle", timeout: 60_000 });
+  const response = await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
   assert.equal(response?.status(), 200, "catalog reload must return 200");
   await waitForCatalog(page);
 }
