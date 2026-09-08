@@ -218,6 +218,7 @@ test("explicit ID costing cannot be redirected by a legacy product-key alias", (
       {
         id: "recipe-menu",
         name: "Recipe",
+        saleSize: { quantity: 50, unit: "l" }, // Inactive legacy portion must not override the ingredient quantity.
         venueId: 1,
         active: true,
         type: "composite",

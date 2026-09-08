@@ -94,7 +94,9 @@ test("v386 bundle is valid and exposes package-aware purchase trace", () => {
   assert.doesNotThrow(() => parse(bundle, { ecmaVersion: "latest", sourceType: "script" }));
   assert.match(bundle, /bd-unit-product-costing-v386/);
   assert.match(bundle, /Основание: последний приход/);
-  assert.match(bundle, /g\.length===1\?m:null/);
+  const fallback = bundle.slice(bundle.indexOf("function bdAssortmentFallbackAnalyticsV170"), bundle.indexOf("function bdAssortmentHeaderV170"));
+  assert.match(fallback, /bdTechCostRowV376\(\{\.\.\.item,purchaseProductKey:expected,productKey:expected\},bdExplicitCostMapsV418,bdExplicitCostKeyV418\)/);
+  assert.doesNotMatch(fallback, /g\.length===1\?m:null/);
 });
 
 test("Borjomi 0.5 uses invoice 379 price even when a later 1 L receipt costs 52", () => {
