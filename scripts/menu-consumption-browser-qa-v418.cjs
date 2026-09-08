@@ -816,7 +816,20 @@ async function closeRecipeEditor(editor) {
 }
 
 async function reloadCatalog(page) {
-  const response = await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+  const onDialog = async (dialog) => {
+    console.error("Phase 3 reload dialog", JSON.stringify({ type: dialog.type(), message: dialog.message() }));
+    await dialog.dismiss();
+  };
+  const onFailed = (request) => console.error("Phase 3 reload request failed", request.url(), request.failure());
+  page.on("dialog", onDialog);
+  page.on("requestfailed", onFailed);
+  let response;
+  try {
+    response = await page.reload({ waitUntil: "domcontentloaded", timeout: 60_000 });
+  } finally {
+    page.off("dialog", onDialog);
+    page.off("requestfailed", onFailed);
+  }
   assert.equal(response?.status(), 200, "catalog reload must return 200");
   await waitForCatalog(page);
 }
@@ -1393,6 +1406,7 @@ async function runProfile(browser, baseUrl, profile) {
     console.log(JSON.stringify(summary, null, 2));
   } finally {
     if (browser) await browser.close();
+    if (fs.existsSync(server.logPath)) console.log("Phase 3 server log tail\n" + fs.readFileSync(server.logPath, "utf8").split(/\r?\n/).slice(-40).join("\n"));
     await server.stop();
   }
 })().catch((error) => {
