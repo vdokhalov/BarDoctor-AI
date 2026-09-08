@@ -1210,7 +1210,7 @@ async function runProfile(browser, baseUrl, profile) {
     ));
     await openItem(page, baseUrl, "recipes", directMenuId);
     recipeEditor = await openRecipeEditor(page);
-    assert.match(await recipeEditor.innerText(), /Меню → Техкарта[\s\S]*Kozel Dark 0\.5/);
+    assert.match(await recipeEditor.innerText(), /МЕНЮ → ТЕХКАРТА[\s\S]*Kozel Dark 0\.5/);
     assert.equal(
       await recipeEditor.locator(".bd-menu-nomenclature-picker-v350").count(),
       0,
