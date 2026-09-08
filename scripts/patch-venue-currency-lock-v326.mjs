@@ -90,11 +90,12 @@ if (!source.includes('const bdPurchaseReviewUxVersion="v356"')) {
     "supplier choice cannot override venue currency",
   );
 }
+const phase3Menu = source.includes('const bdMenuConsumptionSotVersionV418="v418";');
 replaceInSection(
   "function bdCatMenuEditor(",
   "function bdCatRecipeEditor(",
-  's({...K,groupId:h.groupId,',
-  's({...K,currency:bdAccountingCurrencyV243(bdMenuVenueCurrency)||"RUB",groupId:h.groupId,',
+  phase3Menu ? 'ce={...K,venueId:Number(bdMenuVenueId)||K.venueId,groupId:h.groupId,' : 's({...K,groupId:h.groupId,',
+  phase3Menu ? 'ce={...K,venueId:Number(bdMenuVenueId)||K.venueId,currency:bdAccountingCurrencyV243(bdMenuVenueCurrency)||"RUB",groupId:h.groupId,' : 's({...K,currency:bdAccountingCurrencyV243(bdMenuVenueCurrency)||"RUB",groupId:h.groupId,',
   "menu save uses venue currency",
 );
 

@@ -57,6 +57,42 @@ function runFallbackFixture(state, purchases) {
   return JSON.parse(JSON.stringify(context.runFallbackV418(state, purchases, "2026-09")));
 }
 
+test("menu save locks venue currency across modes and ignores stale item currency and venue", async () => {
+  const start = menu.indexOf("const M=async()=>");
+  const end = menu.indexOf("return i.jsx(\"div\"", start);
+  assert.ok(start >= 0 && end > start, "production save handler must be executable");
+  for (const mode of ["DIRECT_ITEM", "FIXED_QUANTITY", "RECIPE", "NONE"]) {
+    for (const [venueId, currency] of [[1, "MDL"], [2, "PMR_RUB"]]) {
+      const original = { id: "menu", name: "Item", sectionId: "section", taxonomyCategoryId: "category", groupId: "group", venueId: 99, currency: "USD", consumptionMode: mode, salePrice: 20, saleQuantityInput: 0.05, saleUnit: "l" };
+      const before = JSON.stringify(original);
+      let persisted;
+      let closed = false;
+      const context = {
+        h: original, u: [{ id: "group" }], d: [],
+        _: { id: "stock-id", key: "stock-key" },
+        bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs",
+        bdMenuFixedCompatibleV418: true, bdMenuRecipeChoiceRequiredV418: false,
+        bdMenuQuantityV418: 0.05, bdMenuVenueId: venueId, bdMenuVenueCurrency: currency,
+        bdAccountingCurrencyV243: (value) => value,
+        bdCatNumber: (value) => Number(value) || 0,
+        bdSetMenuSavingV418: () => {}, j: (message) => assert.equal(message, ""),
+        s: async (value) => { persisted = JSON.parse(JSON.stringify(value)); },
+        a: () => { closed = true; },
+      };
+      await runInNewContext(`${menu.slice(start, end)};M()`, context);
+      assert.equal(persisted.currency, currency);
+      assert.equal(persisted.venueId, venueId);
+      assert.equal(persisted.consumptionMode, mode);
+      assert.equal(persisted.salePrice, 20);
+      assert.equal(closed, true);
+      assert.equal(JSON.stringify(original), before, "saved historical input is unchanged");
+      if (mode === "DIRECT_ITEM" || mode === "FIXED_QUANTITY") assert.equal(persisted.readyProduct.nomenclatureItemId, "stock-id");
+      else assert.equal(persisted.readyProduct, undefined);
+      assert.equal(persisted.saleSize?.quantity, mode === "FIXED_QUANTITY" ? 0.05 : undefined);
+    }
+  }
+});
+
 test("v418 production bundle is valid and carries one release marker", () => {
   const checked = spawnSync(process.execPath, ["--check", fileURLToPath(bundleUrl)], { encoding: "utf8" });
   assert.equal(checked.status, 0, checked.stderr);
