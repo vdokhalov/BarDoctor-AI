@@ -3,6 +3,7 @@ import { getDb } from "../../../../db";
 import { auditLog, domainData } from "../../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { isAllowedStoreKey } from "../../../../lib/bardoctor/constants";
+import { eventRevenueMutation } from "../../../../lib/bardoctor/sales-events";
 import {
   canReadStore,
   canWriteStore,
@@ -174,6 +175,9 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     ? mergeConcurrentStoreData(body.baseData ?? null, body.data ?? null, before)
     : { data: body.data ?? null, conflicts: 0 };
   let after = merge.data;
+  if (key === "bd_finance_revenue" && eventRevenueMutation(array(before), array(after))) {
+    return Response.json({ ok:false, code:"SALES_EVENT_REVENUE_PROTECTED", error:"Выручка продаж изменяется только проведением или полным возвратом продажи. Смену продаж закройте в разделе ввода продаж." },{status:409});
+  }
   const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
   if (VENUE_CURRENCY_ARRAY_STORE_KEYS.has(key)) {
     const currencyNormalization = normalizeVenueCurrencyArrayUpdates({

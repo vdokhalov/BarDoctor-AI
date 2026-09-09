@@ -120,6 +120,10 @@ export function closeShiftWithCanonicalWriteOffs(input: {
   const revenueInput = record(input.request.revenueRecord);
   const date = dateKey(revenueInput.date);
   if (!date) return { ok: false, code: "SHIFT_DATE_INVALID", error: "Укажите корректную дату смены" };
+  if (input.current.revenues.some(value => {
+    const row = record(value);
+    return row.revenueSource === "sales_events_v1" && row.date === date && row.venueId === input.venueId;
+  })) return { ok:false,code:"SALES_EVENT_REVENUE_PROTECTED",error:"На эту дату есть выручка отдельных продаж. Закройте смену в разделе ввода продаж; списания проводятся отдельно." };
   const current = clone(input.current);
   const legacyWriteOffs = current.writeOffs.filter((value) => !Array.isArray(record(value).items));
   const previousRevenue = current.revenues.map(record).find((row) => text(row.shiftCloseId, "", 140) === shiftCloseId);

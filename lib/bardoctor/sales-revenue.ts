@@ -39,6 +39,11 @@ export function reconcileSalesRevenue(input: {
   document: SalesDocument;
   now: string;
 }): SalesRevenueReconciliation {
+  if (input.revenues.some(value => {
+    const row = record(value);
+    return row?.revenueSource === "sales_events_v1" && row.date === input.document.date
+      && (input.document.venueId == null || row.venueId === input.document.venueId);
+  })) return { ok:false,code:"REVENUE_DATE_CONFLICT",error:"За эту дату уже проведены отдельные продажи. Дневной POS-отчёт требует проверки, чтобы не удвоить выручку." };
   const byId = new Map<string, JsonRecord>();
   for (const value of [...input.salesDocuments, input.document]) {
     const item = record(value);

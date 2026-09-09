@@ -13,12 +13,12 @@ export async function GET(request: Request): Promise<Response> {
   const result = await observedAwait("store.load", () => getD1().prepare(`
     SELECT store_key, data_json, updated_at
     FROM domain_data
-    WHERE account_id = ? AND store_key != ?
-  `).bind(account.id, "bd_opening_stock_v1").all<StoreRow>());
+    WHERE account_id = ? AND store_key NOT IN (?, ?)
+  `).bind(account.id, "bd_opening_stock_v1", "bd_sales_events_v1").all<StoreRow>());
   const entries: Record<string, { data: unknown; updatedAt: string; source: "server_d1" }> = {};
   for (const row of result.results ?? []) {
     // Opening documents are read only through the venue-scoped domain endpoint.
-    if (row.store_key === "bd_opening_stock_v1") continue;
+    if (["bd_opening_stock_v1", "bd_sales_events_v1"].includes(row.store_key)) continue;
     if (!canReadStore(account, row.store_key)) continue;
     entries[row.store_key] = {
       data: JSON.parse(row.data_json),

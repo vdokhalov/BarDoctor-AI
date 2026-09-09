@@ -656,7 +656,11 @@ function snapshotFor(input: {
       };
     }
     const balanceUnit = text(balance.unit, "unknown", 20) as BaseInventoryUnit;
-    if (balanceUnit !== readyProduct.baseUnit) {
+    // Snapshots and movements must use the unit of the balance they update.
+    const baseQuantityPerPortion = convertStockQuantity(
+      readyProduct.quantityPerSale, readyProduct.baseUnit, balanceUnit,
+    );
+    if (baseQuantityPerPortion === null || baseQuantityPerPortion <= 0) {
       return {
         errorCode: "UNIT_ERROR",
         errorMessage: `Фасовка «${readyProduct.productName}» несовместима со складской единицей`,
@@ -678,13 +682,13 @@ function snapshotFor(input: {
     const basis = resolveCostBasis({
       venueId: input.venueId,
       warehouseId: warehouse.id,
-      nomenclatureItem: { productKey: readyProduct.productKey, unit: readyProduct.baseUnit },
+      nomenclatureItem: { productKey: readyProduct.productKey, unit: balanceUnit },
       asOf: input.asOf,
       receipts: input.stockMovements,
       accountingCurrency: balance.accountingCurrency ?? balance.currency,
     });
     const unitCost = basis.known ? rounded(basis.value ?? 0, 6) : null;
-    const baseQuantityTotal = rounded(readyProduct.quantityPerSale * input.quantity);
+    const baseQuantityTotal = rounded(baseQuantityPerPortion * input.quantity);
     const currency = unitCost === null
       ? undefined
       : basis.currency;
@@ -708,9 +712,9 @@ function snapshotFor(input: {
           productKey: readyProduct.productKey,
           recipeQuantity: readyProduct.inputQuantity,
           recipeUnit: readyProduct.inputUnit,
-          baseQuantityPerPortion: readyProduct.quantityPerSale,
+          baseQuantityPerPortion,
           baseQuantityTotal,
-          baseUnit: readyProduct.baseUnit,
+          baseUnit: balanceUnit,
           warehouseId: warehouse.id,
           unitCost,
           totalCost,
@@ -723,8 +727,8 @@ function snapshotFor(input: {
           conversion: {
             inputQuantity: readyProduct.inputQuantity,
             inputUnit: readyProduct.inputUnit,
-            factor: rounded(readyProduct.quantityPerSale / readyProduct.inputQuantity, 6),
-            outputUnit: readyProduct.baseUnit,
+            factor: rounded(baseQuantityPerPortion / readyProduct.inputQuantity, 6),
+            outputUnit: balanceUnit,
             source: "canonical_unit_conversion",
           },
         }],
@@ -1026,6 +1030,7 @@ export function createOrUpdateSalesBatch(input: {
   venueId: number;
   actor: SalesBatch["createdBy"];
   now?: string;
+  costAsOf?: string;
 }): { ok: true; batch: SalesBatch; batches: SalesBatch[]; duplicate?: boolean } | { ok: false; code: string; error: string } {
   const now = input.now ?? new Date().toISOString();
   const duplicateBatchIds = duplicateSalesBatchIds(input.batches, input.venueId);
@@ -1122,7 +1127,7 @@ export function createOrUpdateSalesBatch(input: {
     routes,
       warehouses,
       stockMovements: input.stockMovements ?? [],
-      asOf: businessDate,
+      asOf: input.costAsOf ?? businessDate,
       now,
     existing: existingById.get(text(line.id, "", 160)),
   }));
@@ -1196,6 +1201,7 @@ export function postSalesBatch(input: {
   venueId: number;
   actor: SalesBatch["createdBy"];
   now?: string;
+  costAsOf?: string;
 }):
   | { ok: true; idempotent: boolean; stockChanged: boolean; batch: SalesBatch; batches: SalesBatch[]; assortment: JsonRecord; stockMovements: StockMovement[]; postedNow: number }
   | { ok: false; code: string; error: string } {
@@ -1231,6 +1237,7 @@ export function postSalesBatch(input: {
   if (existing.status === "REVERSED" || existing.status === "CANCELLED") return { ok: false, code: "SALES_BATCH_READ_ONLY", error: "Сторнированный или отменённый документ нельзя провести" };
   if (existing.status === "POSTED") return { ok: true, idempotent: true, stockChanged: false, batch: existing, batches: fullSalesBatchCollection(input.batches), assortment: record(input.assortment), stockMovements: input.stockMovements as StockMovement[], postedNow: 0 };
   const refreshed = createOrUpdateSalesBatch({
+    costAsOf: input.costAsOf,
     batches: input.batches,
     draft: {
       source: existing.source,

@@ -12,7 +12,7 @@ import * as http from "../../lib/bardoctor/http";
 import * as trust from "../../lib/bardoctor/data-trust";
 
 /** Real route + real CAS SQL on isolated SQLite. Auth fixture never enters production code. */
-export function openingRuntime() {
+export function openingRuntime(route = new URL("../../app/api/inventory/opening/route.ts", import.meta.url), extraDependencies: Record<string, unknown> = {}) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`CREATE TABLE domain_data (account_id INTEGER, store_key TEXT, data_json TEXT NOT NULL, updated_at TEXT, PRIMARY KEY(account_id, store_key));
     CREATE TABLE audit_log (account_id INTEGER, store_key TEXT, action TEXT, entity_id TEXT, entity_label TEXT, month_key TEXT, before_json TEXT, after_json TEXT, changed_fields_json TEXT, actor_name TEXT, actor_role TEXT, reason TEXT, created_at TEXT);`);
@@ -39,8 +39,8 @@ export function openingRuntime() {
   const dependencies = { ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust,
     getD1: () => db as unknown as D1Database,
     authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), role: "owner", firstName: "QA", lastName: "", restaurantJson: '{"currency":"MDL"}' } : null,
-    unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed };
-  const source = readFileSync(new URL("../../app/api/inventory/opening/route.ts", import.meta.url), "utf8");
+    unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };
+  const source = readFileSync(route, "utf8");
   const compiled = stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "")).replace(/export async function /g, "async function ");
   const api = new Function("dependencies", `const {${Object.keys(dependencies).join(",")}} = dependencies;\n${compiled}\nreturn {GET,POST};`)(dependencies) as { GET(request: Request): Promise<Response>; POST(request: Request): Promise<Response> };
   return { api, sqlite, close: () => sqlite.close(), batches: () => batches,
