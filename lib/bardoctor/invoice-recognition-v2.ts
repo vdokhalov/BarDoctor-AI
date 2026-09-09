@@ -1028,6 +1028,25 @@ export function matchInvoiceLine(input: {
   mappings: SupplierItemMapping[];
   nomenclature: NomenclatureCandidate[];
 }): ParsedInvoiceLine {
+  // A repeated recognition pass may review arithmetic, but must not remap
+  // an identity explicitly selected by the operator.
+  if (input.line.mappingSource === "manual") {
+    const selected = input.nomenclature.find((candidate) =>
+      input.line.nomenclatureId
+        ? candidate.id === input.line.nomenclatureId || candidate.key === input.line.nomenclatureId
+        : candidate.key === input.line.purchaseProductKey);
+    return {
+      ...input.line,
+      ...(selected ? {
+        nomenclatureId: selected.id,
+        nomenclatureName: selected.name,
+        purchaseProductKey: selected.key,
+      } : {}),
+      requiresReview: input.line.requiresReview || !selected || !invoiceCommercialArithmeticIsValid(
+        input.line.quantity, input.line.unitPrice, input.line.lineTotal,
+      ),
+    };
+  }
   const linePackage = packageFingerprint(`${input.line.rawName} ${input.line.packageSize ?? ""}`);
   const compatiblePurchaseUnit = (mapping: SupplierItemMapping) => {
     if (!mapping.purchaseUnit || !input.line.unit) return true;

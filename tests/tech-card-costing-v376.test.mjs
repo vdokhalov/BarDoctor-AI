@@ -59,17 +59,19 @@ test("fallback costing shows linked nomenclature and calculates espresso from th
       lineTotal: 340,
     }],
   }], canonical);
+  for (const recipeName of ["Эспрессо", "Американо"]) {
   const row = context.api.row({
     id: "coffee",
-    name: "Эспрессо",
+    name: recipeName,
     matchedName: "Кофе зерновой",
     quantity: 0.01,
     unit: "кг",
     purchaseProductKey: "coffee-beans",
   }, maps, canonical);
   assert.equal(row.name, "Кофе зерновой");
-  assert.equal(row.recipeName, "Эспрессо");
+  assert.equal(row.recipeName, recipeName);
   assert.equal(row.cost, 3.4);
   assert.equal(row.source, "latest_confirmed_purchase");
   assert.equal(row.supplierName, "Поставщик кофе");
+  }
 });

@@ -141,7 +141,7 @@ export function createInvoiceAIBatches(input: {
   jobId: string;
 }): InvoiceAIBatch[] {
   const unresolved = input.document.items
-    .filter((line) => line.requiresReview && Boolean(line.mappingCandidates?.length))
+    .filter((line) => line.mappingSource !== "manual" && line.requiresReview && Boolean(line.mappingCandidates?.length))
     .map(linePayload);
   const batches: InvoiceAIBatch[] = [];
   let current: InvoiceAIBatchLine[] = [];
@@ -271,7 +271,7 @@ function applyProposals(document: ParsedInvoiceDocument, proposals: InvoiceAIMat
   return {
     ...document,
     items: document.items.map((line) => {
-      if (!line.requiresReview) return line;
+      if (line.mappingSource === "manual" || !line.requiresReview) return line;
       const proposal = byLine.get(line.id);
       if (!proposal?.nomenclatureId) return line;
       const selected = line.mappingCandidates?.find((candidate) =>

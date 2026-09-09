@@ -278,9 +278,24 @@ async function postOnce(request: Request): Promise<Response> {
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  // Return persisted results before checking today's nomenclature/templates.
+  // A retry must not reinterpret an already committed receipt or run repairs.
+  const persistedDuplicate = documents.find((item) => {
+    const value = record(item);
+    return value?.id === document.id || value?.idempotencyKey === idempotencyKey;
+  });
+  const duplicateResponse = () => {
+    return Response.json({
+      ok: true, duplicate: true, document: persistedDuplicate,
+      payment: findPurchaseExpense(expenses, String(record(persistedDuplicate)?.id ?? document.id)),
+      documents, suppliers, expenses, assortment, stockMovements,
+    });
+  };
+  if (persistedDuplicate && ["confirmed", "cancelled"].includes(String(record(persistedDuplicate)?.status))) return duplicateResponse();
   const conversion = preparePurchaseConversions({ ...document, venueId: account.venueId }, requestedDocument, assortment);
   if (!conversion.ok) return Response.json(conversion, { status: 422 });
   document = conversion.document;
+  if (persistedDuplicate) return duplicateResponse();
   const invoiceMappings = array(stores.get(INVOICE_MAPPING_STORE_KEY)) as SupplierItemMapping[];
   const ledgerMigration = migratePurchaseLedger({
     documents,
@@ -294,23 +309,6 @@ async function postOnce(request: Request): Promise<Response> {
   assortment = inventoryRepair.assortment;
   stockMovements = inventoryRepair.stockMovements;
 
-  const duplicateById = documents.find((item) => {
-    const value = record(item);
-    return value?.id === document.id || value?.idempotencyKey === idempotencyKey;
-  });
-  if (duplicateById) {
-    return Response.json({
-      ok: true,
-      duplicate: true,
-      document: duplicateById,
-      payment: findPurchaseExpense(expenses, document.id),
-      documents,
-      suppliers,
-      expenses,
-      assortment,
-      stockMovements,
-    });
-  }
   if (
     document.documentType !== "price_list"
     && !stores.has(ASSORTMENT_STORE_KEY)

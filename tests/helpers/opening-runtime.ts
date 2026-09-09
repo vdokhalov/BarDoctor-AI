@@ -40,10 +40,14 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
     getD1: () => db as unknown as D1Database,
     authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), role: "owner", firstName: "QA", lastName: "", restaurantJson: '{"currency":"MDL"}' } : null,
     unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };
-  const source = readFileSync(route, "utf8");
-  const compiled = stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "")).replace(/export async function /g, "async function ");
-  const api = new Function("dependencies", `const {${Object.keys(dependencies).join(",")}} = dependencies;\n${compiled}\nreturn {GET,POST};`)(dependencies) as { GET(request: Request): Promise<Response>; POST(request: Request): Promise<Response> };
-  return { api, sqlite, close: () => sqlite.close(), batches: () => batches,
+  function loadRoute(route: URL, extra: Record<string, unknown> = {}) {
+    const injected = { ...dependencies, ...extra };
+    const source = readFileSync(route, "utf8");
+    const compiled = stripTypeScriptTypes(source.replace(/^import[\s\S]*?from "[^"]+";\r?\n/gm, "")).replace(/export async function /g, "async function ");
+    return new Function("dependencies", `const {${Object.keys(injected).join(",")}} = dependencies;\n${compiled}\nreturn {GET: typeof GET === 'function' ? GET : undefined,POST};`)(injected) as { GET(request: Request): Promise<Response>; POST(request: Request): Promise<Response> };
+  }
+  const api = loadRoute(route);
+  return { api, loadRoute, sqlite, close: () => sqlite.close(), batches: () => batches,
     setAllowed: (value: boolean) => { allowed = value; }, setSignedIn: (value: boolean) => { signedIn = value; },
     beforeBatch: (hook: () => void) => { beforeBatch = hook; }, failAt: (index: number) => { failAt = index; },
     put(key: string, value: unknown) { sqlite.prepare("INSERT INTO domain_data VALUES (7, ?, ?, 'test') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(key, JSON.stringify(value)); },

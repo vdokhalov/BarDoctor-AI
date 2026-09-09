@@ -938,6 +938,9 @@ export function consolidateInventoryDuplicates(input: {
   // Canonical v4 records are explicit identities, not candidates for automatic
   // package/name deduplication. A separate reviewed cleanup is out of Phase 4.
   if (parts.balances.some((balance) => balance.unitModelVersion === 4)
+    || parts.recipes.some((recipe) => array(recipe.ingredients).some((value) =>
+      Boolean(record(value).nomenclatureItemId)))
+    || parts.menuItems.some((item) => Boolean(record(item.readyProduct).nomenclatureItemId))
     || sourceMovements.some((movement) => movement.purchaseConversion != null)) {
     return { assortment: structuredClone(record(input.assortment)), stockMovements: sourceMovements,
       aliases: {}, summary: { mergedBalances: 0, mergedNomenclature: 0, remappedMovements: 0,
@@ -3142,6 +3145,11 @@ function movementRecord(value: unknown): StockMovement | null {
   }) || requestedProductKey;
   if (!id || !sourceDocumentId || !productKey) return null;
   const requestedType = text(item.type, "receipt", 40);
+  // Posted event records carry immutable linkage and cost snapshots. Legacy
+  // receipt normalization must not reinterpret them during purchase edits.
+  if (["opening_balance", "sale_consumption", "sale_reversal"].includes(requestedType)) {
+    return structuredClone(item) as StockMovement;
+  }
   const type: StockMovement["type"] = [
     "receipt",
     "sale",
