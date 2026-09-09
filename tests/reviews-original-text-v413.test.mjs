@@ -47,7 +47,7 @@ test("review reply remains scoped by authenticated venue context", async () => {
   assert.match(route, /requireLocalAccount\(request, "reviews\.manage"\)/);
   assert.match(reply, /loadVenueAIContext\(account, "reviews", body\)/);
   assert.match(context, /\.where\(eq\(domainData\.accountId, account\.id\)\)/);
-  assert.match(auth, /const context = await venueContextForAccount\(identitySession\.account, requestedVenueId\)/);
+  assert.match(auth, /const context = await observedAwait\("auth\.memberships", \(\) => venueContextForAccount\(identitySession\.account, requestedVenueId\)\)/);
   assert.match(auth, /\.\.\.context\.dataAccount/);
   assert.match(auth, /venueId: context\.venue\.id/);
 });

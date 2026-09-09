@@ -53,6 +53,15 @@ test("observability survives real Worker/D1 concurrent bootstrap, store and sele
       if(path.endsWith("nomenclature")){assert.equal(body.items[0].key,fixture.key);assert.equal(body.items[0].purchaseCategory,"products");}
     }));
     const events=await (await mf.dispatchFetch("http://localhost/__test_events")).json();
+    // Real HTTP protection must still reject invalid sessions and foreign venues.
+    for(const path of ["/api/store","/api/tech-cards/nomenclature"]){
+      for(const scope of [{token,venue:"999"},{token:"invalid-test-session",venue:"1"}]){
+        const denied=await mf.dispatchFetch(`http://localhost${path}`,{headers:{
+          "x-session-email":"private@example.invalid","x-session-token":scope.token,"x-venue-id":scope.venue},signal:AbortSignal.timeout(30000)});
+        assert.equal(denied.status,401);
+        assert.doesNotMatch(await denied.text(),/Спрайт|stock:|Private venue/);
+      }
+    }
     for(const id of correlations){
       const rows=events.filter(e=>e.correlationId===id);
       assert.equal(rows[0].event,"request.start");assert.equal(rows.at(-1).event,"request.end");
