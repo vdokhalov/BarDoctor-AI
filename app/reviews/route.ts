@@ -12,7 +12,7 @@ return `<!doctype html>
     <meta name="theme-color" content="#f7f8fc" />
     <title>Отзывы гостей — BarDoctor</title>
     <link rel="stylesheet" href="/integrations.css?v=20260813-navigation-v180" />
-    <link rel="stylesheet" href="/reviews.css?v=20260903-home-reviews-ux-v409" />
+    <link rel="stylesheet" href="/reviews.css?v=20260909-sources-layout-v427" />
     <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297" />
     <link rel="stylesheet" href="/navigation.css?v=20260811-navigation-v85" />
     <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87" />

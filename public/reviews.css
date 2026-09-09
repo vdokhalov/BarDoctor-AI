@@ -47,7 +47,9 @@
 .honest-state { padding: 14px; border-radius: 14px; color: #666c80; background: #f6f7fb; font-size: 11px; line-height: 1.5; }
 
 .review-source-list { display: grid; gap: 10px; margin-top: 14px; }
-.review-source-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 16px; }
+.review-source-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 11px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 16px; }
+.review-source-row > div { min-width: 0; }
+.review-source-row .source-actions { grid-column: 2; justify-content: flex-start; }
 .source-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; color: #514acb; background: var(--violet-soft); font-size: 12px; font-weight: 900; }
 .source-mark.google { background: #f7f9ff; }
 .source-mark img { width: 20px; height: 20px; }

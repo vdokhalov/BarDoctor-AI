@@ -2335,6 +2335,13 @@ function bdPrepareEmbeddedPage(e,t){
     d.preventDefault();
     d.stopPropagation();
     d.stopImmediatePropagation();
+    if(h.pathname==="/sales-entry"){
+      const venue=new URL(window.location.href).searchParams.get("venue");
+      if(venue&&!h.searchParams.has("venue"))h.searchParams.set("venue",venue);
+      h.searchParams.delete("embedded");
+      window.location.assign(h.pathname+h.search+h.hash);
+      return
+    }
     t(h.pathname+h.search+h.hash)
   },true)
 }

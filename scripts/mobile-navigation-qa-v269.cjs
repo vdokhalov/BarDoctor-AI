@@ -1149,6 +1149,16 @@ async function homeReviewsFlow(browser, profile) {
     throw new Error(`${profile.name}: Reviews module did not become ready: ${JSON.stringify({ frameUrl: reviewFrame.url(), body: (await reviewFrame.locator("body").textContent())?.replace(/\s+/g, " ").slice(0, 900), issues: run.issues })}`);
   }
   assert.match(await reviewFrame.locator("body").textContent(), /105.*3,19 \/ 5.*Google Business Profile/s);
+  const sourceLayout = await reviewFrame.locator(".review-source-row").first().evaluate(row => {
+    const copy = row.children[1].getBoundingClientRect();
+    const actions = row.querySelector(".source-actions").getBoundingClientRect();
+    return { copyWidth: copy.width, copyBottom: copy.bottom, actionsTop: actions.top,
+      overflow: document.documentElement.scrollWidth > window.innerWidth };
+  });
+  assert.ok(sourceLayout.copyWidth >= 140, `${profile.name}: source text squeezed: ${JSON.stringify(sourceLayout)}`);
+  assert.ok(sourceLayout.actionsTop >= sourceLayout.copyBottom, `${profile.name}: actions overlap source text`);
+  assert.equal(sourceLayout.overflow, false, `${profile.name}: Reviews horizontal overflow`);
+  await page.screenshot({ path: path.join(outputDir, `${profile.name}-reviews-sources-v427.png`), fullPage: true });
   const allItems = reviewFrame.locator(".review-item");
   assert.equal(await allItems.count(), 105, `${profile.name}: 105-review dataset was not rendered`);
   await reviewFrame.getByRole("button", { name: /Без ответа · 7/ }).click();

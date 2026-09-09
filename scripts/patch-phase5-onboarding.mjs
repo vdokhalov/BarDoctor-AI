@@ -13,5 +13,20 @@ if (!source.includes('label:"Начальный остаток"')) {
   if (source.split(movement).length !== 2) throw new Error("Phase 5: movement presentation anchor required");
   source = source.replace(movement, movement + 'e==="opening_balance"?{label:"Начальный остаток",color:"#059669",sign:"+"}:');
 }
+// Sales entry is a server-rendered document, absent from the legacy SPA router.
+// Keep the embedded navigation bridge, but hand this one route to the browser.
+const salesNavigation = 'if(h.pathname==="/sales-entry"){';
+if (!source.includes(salesNavigation)) {
+  const anchor = '    t(h.pathname+h.search+h.hash)';
+  if (source.split(anchor).length !== 2) throw new Error("Phase 5: unique embedded navigation anchor required");
+  source = source.replace(anchor, `    ${salesNavigation}
+      const venue=new URL(window.location.href).searchParams.get("venue");
+      if(venue&&!h.searchParams.has("venue"))h.searchParams.set("venue",venue);
+      h.searchParams.delete("embedded");
+      window.location.assign(h.pathname+h.search+h.hash);
+      return
+    }
+${anchor}`);
+}
 fs.writeFileSync(file, source);
 console.log("Phase 5 onboarding entry and opening movement label applied");

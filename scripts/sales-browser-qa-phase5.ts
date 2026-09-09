@@ -14,6 +14,12 @@ const { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cj
 const source=readFileSync(new URL("../app/sales-entry/route.ts",import.meta.url),"utf8");
 const compiled=stripTypeScriptTypes(source.replace(/^import[^\n]+\n/gm,"")).replace("export function GET","function GET");
 const render=new Function("canonicalUserShellAssets",compiled+";return GET;")(canonicalUserShellAssets) as ()=>Response;
+const bundle=readFileSync(new URL("../public/assets/index-BQGspy0I.js",import.meta.url),"utf8");
+const bridge=bundle.slice(bundle.indexOf("const bdEmbeddedPagePaths="),bundle.indexOf("function bdEmbeddedPage({"));
+assert.ok(bridge.includes("function bdPrepareEmbeddedPage"));
+const importSource=readFileSync(new URL("../app/sales-import/route.ts",import.meta.url),"utf8");
+const entryLink=importSource.match(/<a href="\/sales-entry">[^<]+<\/a>/)?.[0];
+assert.ok(entryLink,"use the actual production sales link");
 const assets=new Set(["/sales-entry.js","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
 const executablePath=await resolveBrowserExecutable(chromium.executablePath());
 const browser=await chromium.launch({executablePath,headless:true,args:process.platform==="win32"?[]:chromiumArgs});
@@ -36,6 +42,9 @@ try {
         } else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":"text/css"}});
         else if(path==="/favicon.ico")response=new Response(null,{status:204});
         else if(path==="/sales-entry")response=render();
+        else if(path==="/sales-import")response=new Response(`<!doctype html><html><body>${entryLink}</body></html>`,{headers:{"Content-Type":"text/html; charset=utf-8"}});
+        else if(path==="/embedded-host")response=new Response(`<!doctype html><html><body><iframe src="/sales-import?embedded=1" onload="bdPrepareEmbeddedPage(event,function(){document.body.textContent='SPA 404';})"></iframe><script>${bridge}</script></body></html>`,{headers:{"Content-Type":"text/html"}});
+        else if(path==="/embedded-shell-v269.css")response=new Response(readFileSync(new URL("../public/embedded-shell-v269.css",import.meta.url)),{headers:{"Content-Type":"text/css"}});
         else if(path==="/home")response=new Response('<!doctype html><html><body><a href="/sales-entry">Sales entry</a></body></html>',{headers:{"Content-Type":"text/html"}});
         else response=new Response("Not found",{status:404});
         res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
@@ -48,7 +57,10 @@ try {
     page.on("console",message=>{if(message.type()==="error")errors.push(message.text());});
     try {
       await page.addInitScript(()=>{if(!localStorage.getItem("bd_active_venue_id"))localStorage.setItem("bd_active_venue_id","1");});
-      await page.goto(`http://127.0.0.1:${address.port}/sales-entry`);
+      await page.goto(`http://127.0.0.1:${address.port}/embedded-host?venue=1`);
+      await page.frameLocator("iframe").getByRole("link",{name:"Ввести продажу с выручкой и складским расходом"}).click();
+      await page.waitForURL(url=>url.pathname==="/sales-entry"&&url.searchParams.get("venue")==="1");
+      assert.equal(new URL(page.url()).searchParams.has("embedded"),false);
       await page.locator("#work:not([hidden])").waitFor();
       await page.selectOption("[data-menu]","whisky");await page.fill("[data-quantity]","2");
       await page.getByRole("button",{name:"Проверить продажу",exact:true}).click();
