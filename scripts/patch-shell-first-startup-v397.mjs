@@ -11,6 +11,32 @@ const bootstrapPaths = [
   new URL("dist/client/bardoctor-preview-v396.js", root),
 ];
 
+// A fresh embedded browser may have no session. The SPA renders /login rather
+// than Home; release the launch overlay only after that auth surface commits.
+function patchAuthHandoff(path) {
+  if (!existsSync(path)) return false;
+  const source = readFileSync(path, "utf8");
+  if (source.includes("bd-auth-splash-handoff-v423")) return false;
+  const original = 'function bdAuthPageLifecycle(){S.useEffect(()=>{document.body.classList.add("bd-auth-active");return()=>document.body.classList.remove("bd-auth-active")},[])}';
+  if (!source.includes(original)) throw new Error("Auth page lifecycle contract missing");
+  const replacement = `function bdAuthPageLifecycle(){
+S.useLayoutEffect(()=>{
+  /* bd-auth-splash-handoff-v423: a committed login is a valid startup result. */
+  if(!["/login","/register"].includes(window.location.pathname))return;
+  if(!document.querySelector('main[data-bd-auth="split-v1"]'))return;
+  if(document.documentElement.getAttribute("data-bd-startup-pending")!=="v201")return;
+  document.documentElement.removeAttribute("data-bd-startup-pending");
+  document.documentElement.removeAttribute("data-bd-startup-completing");
+  document.querySelector('[data-bd-static-startup="v201"]')?.remove();
+  window.__bdSplashReleasedV396=true;
+  window.dispatchEvent(new CustomEvent("bd:startup-complete",{detail:{version:"auth-handoff-v423"}}));
+},[]);
+S.useEffect(()=>{document.body.classList.add("bd-auth-active");return()=>document.body.classList.remove("bd-auth-active")},[])};
+`;
+  writeFileSync(path, source.replace(original, replacement));
+  return true;
+}
+
 function legacyModuleSource() {
   const source = readFileSync(new URL("public/bardoctor-preview-v396.js", root), "utf8");
   const match = source.match(/script\.src = "(\/assets\/index-BQGspy0I\.js\?v=[^"]+)"/);
@@ -40,7 +66,7 @@ function patchBootstrap(path) {
   );
   source = source.replace(
     /script\.src = "\/assets\/index-BQGspy0I\.js\?v=[^"]+";/,
-    'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397";',
+    'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-auth-handoff-v423";',
   );
   source = source.replace(
     /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
@@ -99,7 +125,7 @@ function patchShell(path) {
     /(\s*<link rel="modulepreload"[^>]+>)/,
     `$1
     <!-- bd-shell-first-compat-v397 <script src="/bardoctor-preview.js?v=${bootstrapVersion}" defer></script><script src="/bardoctor-preview-v396.js?v=native-continuity-v396" defer></script> -->
-    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397-observability-v1" defer></script>`,
+    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397-observability-v1-auth-handoff-v423" defer></script>`,
   );
   source = source.replace(
     /(<script src="\/server-migration-discovery-v262\.js[^>]*><\/script>)(?:-[a-zA-Z0-9]+)+/,
@@ -119,4 +145,5 @@ function patchShell(path) {
   return true;
 }
 
-console.log(`Shell-first startup v397 applied to ${bootstrapPaths.filter(patchBootstrap).length} bootstrap(s) and ${shellPaths.filter(patchShell).length} shell(s).`);
+const authBundles = [new URL("public/assets/index-BQGspy0I.js", root), new URL("dist/client/assets/index-BQGspy0I.js", root)];
+console.log(`Shell-first startup v397 applied to ${authBundles.filter(patchAuthHandoff).length} auth handoff(s), ${bootstrapPaths.filter(patchBootstrap).length} bootstrap(s) and ${shellPaths.filter(patchShell).length} shell(s).`);

@@ -50,6 +50,8 @@ jobs:
         run: BD_QA_SCENARIO=phase4-conversion npm run test:procurement-browser
       - name: Startup recovery browser QA
         run: npm run test:startup-recovery
+      - name: Anonymous mobile desktop startup handoff
+        run: node --test tests/auth-splash-handoff-v423.test.mjs
       - name: Mobile and desktop navigation QA
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
