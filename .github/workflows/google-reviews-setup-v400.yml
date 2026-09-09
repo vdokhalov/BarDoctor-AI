@@ -48,6 +48,8 @@ jobs:
         run: npm run test:menu-consumption-browser
       - name: Phase 4 purchase units mobile and desktop QA
         run: BD_QA_SCENARIO=phase4-conversion npm run test:procurement-browser
+      - name: Phase 5 opening stock and CSV mobile desktop persisted HTTP QA
+        run: node --import tsx scripts/opening-browser-qa-phase5.ts
       - name: Startup recovery browser QA
         run: npm run test:startup-recovery
       - name: Anonymous mobile desktop startup handoff

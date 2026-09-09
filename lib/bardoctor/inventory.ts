@@ -56,11 +56,14 @@ export function inventoryUnitDefinition(value: unknown) {
 }
 
 export type StockMovement = {
+  openingValuation?: unknown;
+  openingConversion?: unknown;
   purchaseConversion?: PurchaseConversionSnapshot;
   id: string;
   venueId?: number;
   type:
     | "receipt"
+    | "opening_balance"
     | "sale"
     | "sale_consumption"
     | "sale_reversal"
