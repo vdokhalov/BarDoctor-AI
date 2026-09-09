@@ -52,6 +52,8 @@ jobs:
         run: npm run test:startup-recovery
       - name: Anonymous mobile desktop startup handoff
         run: node --test tests/auth-splash-handoff-v423.test.mjs
+      - name: Existing venue root startup without reload
+        run: node --test tests/venue-root-splash-handoff.test.mjs
       - name: Mobile and desktop navigation QA
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA

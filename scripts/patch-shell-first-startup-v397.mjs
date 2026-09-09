@@ -66,7 +66,7 @@ function patchBootstrap(path) {
   );
   source = source.replace(
     /script\.src = "\/assets\/index-BQGspy0I\.js\?v=[^"]+";/,
-    'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-auth-handoff-v423";',
+    'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-auth-handoff-v423-root-handoff-v424";',
   );
   source = source.replace(
     /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
@@ -125,7 +125,7 @@ function patchShell(path) {
     /(\s*<link rel="modulepreload"[^>]+>)/,
     `$1
     <!-- bd-shell-first-compat-v397 <script src="/bardoctor-preview.js?v=${bootstrapVersion}" defer></script><script src="/bardoctor-preview-v396.js?v=native-continuity-v396" defer></script> -->
-    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397-observability-v1-auth-handoff-v423" defer></script>`,
+    <script src="/bardoctor-preview-v397.js?v=shell-first-startup-v397-observability-v1-auth-handoff-v423-root-handoff-v424" defer></script>`,
   );
   source = source.replace(
     /(<script src="\/server-migration-discovery-v262\.js[^>]*><\/script>)(?:-[a-zA-Z0-9]+)+/,
