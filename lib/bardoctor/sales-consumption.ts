@@ -1571,7 +1571,13 @@ export function salesBatchKpis(batchesValue: unknown[], venueId: number) {
     needsMapping: lines.filter((line) => line.errorCode === "NEEDS_MAPPING").length,
     noRecipe: lines.filter((line) => line.errorCode === "NO_RECIPE").length,
     errors: lines.filter((line) => line.processingStatus === "BLOCKED" && !["NEEDS_MAPPING", "NO_RECIPE"].includes(line.errorCode ?? "")).length,
-    theoreticalCost: money(batches.reduce((sum, batch) => sum + (batch.totalTheoreticalCost ?? 0), 0)),
+    // A partial sum is not the cost of all sales. Preserve UNKNOWN through
+    // aggregate readers; explicit known zero remains a valid measured value.
+    theoreticalCost: batches.length > 0 && batches.every((batch) =>
+      typeof batch.totalTheoreticalCost === "number" && Number.isFinite(batch.totalTheoreticalCost)
+        && batch.totalTheoreticalCost >= 0)
+      ? money(batches.reduce((sum, batch) => sum + batch.totalTheoreticalCost!, 0))
+      : null,
     batches: batches.length,
   };
 }
