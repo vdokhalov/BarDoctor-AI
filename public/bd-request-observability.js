@@ -15,6 +15,27 @@
     catch { return "error"; }
   }
   function log(value) { try { console.info(JSON.stringify(value)); } catch { /* telemetry cannot break fetch */ } }
+  // ErrorEvent supplies location without exposing error messages or raw stacks.
+  // Do not cancel the event: native console reporting and other handlers remain.
+  if (typeof window.addEventListener === "function") window.addEventListener("error", function (event) {
+    try {
+      var source = "unknown", file = null;
+      if (event.filename) {
+        var location = new URL(event.filename, window.location.href);
+        if (location.origin !== window.location.origin) source = "external";
+        else if (location.pathname.indexOf("/cdn-cgi/") === 0) source = "platform";
+        else if (/^\/assets\/index-BQGspy0I(?:-[a-f0-9]{12})?\.js$/.test(location.pathname)) { source = "app_bundle"; file = location.pathname; }
+        else if (["/bardoctor-preview-v397.js", "/bardoctor-preview-v396.js", "/bardoctor-preview.js", "/navigation-contract-v247.js", "/app-shell-v185.js", "/navigation-transient-v247.js", "/catalog-accounting-v207.js", "/modern-polish.js", "/venue-switcher.js"].includes(location.pathname)) { source = "app_script"; file = location.pathname; }
+        else source = "same_origin_other";
+      }
+      log({ telemetry: "bd-runtime-observability-v1", event: "client.error.location",
+        timestamp: new Date().toISOString(), source: source, file: file,
+        line: Number.isSafeInteger(event.lineno) && event.lineno > 0 ? event.lineno : null,
+        column: Number.isSafeInteger(event.colno) && event.colno > 0 ? event.colno : null,
+        errorType: ["TypeError", "ReferenceError", "RangeError", "SyntaxError", "Error"].includes(event.error && event.error.name) ? event.error.name : "unknown",
+        category: typeof event.message === "string" && event.message.includes("MutationObserver") && event.message.includes("not of type 'Node'") ? "mutation_observer_target" : "runtime" });
+    } catch { /* error diagnostics must never replace or suppress the error */ }
+  });
   var tracedFetch = function (input, init) {
     var id, label, signal, started, options;
     try {

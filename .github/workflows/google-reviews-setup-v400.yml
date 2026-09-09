@@ -54,6 +54,8 @@ jobs:
         run: node --test tests/auth-splash-handoff-v423.test.mjs
       - name: Existing venue root startup without reload
         run: node --test tests/venue-root-splash-handoff.test.mjs
+      - name: Purchase direct load and reload runtime
+        run: node --test tests/purchase-reload-runtime.test.mjs
       - name: Mobile and desktop navigation QA
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
