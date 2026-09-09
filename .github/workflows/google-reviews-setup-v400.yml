@@ -40,6 +40,8 @@ jobs:
         run: npm run lint
       - name: Full regression and verified build
         run: npm test
+      - name: Phase 5 repeated artifact preparation and receipt cost behavior
+        run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
       - name: Observability real bootstrap D1 and mobile desktop correlation QA

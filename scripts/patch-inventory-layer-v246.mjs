@@ -3,7 +3,9 @@ import fs from "node:fs";
 const assetPath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 const fragmentPath = new URL("./fragments/inventory-workflow-v245.fragment.txt", import.meta.url);
 let source = fs.readFileSync(assetPath, "utf8");
-let fragment = fs.readFileSync(fragmentPath, "utf8").trim();
+// Template lines have the same syntax in LF and Windows CRLF checkouts.
+// Normalize the input template only; never normalize the generated bundle for comparison.
+let fragment = fs.readFileSync(fragmentPath, "utf8").replace(/\r\n/g, "\n").trim();
 
 const lockAnchor = 'S.useEffect(()=>{if(phase!=="setup")return;';
 const scrollLock = 'S.useEffect(()=>{const o=document.body,l=document.documentElement;return o.classList.add("bd-inventory-overlay-open-v246"),l.classList.add("bd-inventory-overlay-open-v246"),()=>{o.classList.remove("bd-inventory-overlay-open-v246"),l.classList.remove("bd-inventory-overlay-open-v246")}},[]);\n';

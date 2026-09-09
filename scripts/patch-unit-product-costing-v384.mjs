@@ -1,18 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { replaceLegacyCostingSegment as replaceSegment } from "./lib/legacy-costing-segment.mjs";
 
 const root = process.cwd();
 const bundlePath = path.join(root, "public/assets/index-BQGspy0I.js");
 const marker = "bd-unit-product-costing-v384";
 let source = fs.readFileSync(bundlePath, "utf8");
-
-function replaceSegment(input, start, end, replacement, label) {
-  const startIndex = input.indexOf(start);
-  if (startIndex < 0) throw new Error(label + ": start marker not found");
-  const endIndex = input.indexOf(end, startIndex + start.length);
-  if (endIndex < 0) throw new Error(label + ": end marker not found");
-  return input.slice(0, startIndex) + replacement + input.slice(endIndex);
-}
 
 {
   const replacement = String.raw`/* bd-unit-product-costing-v384 */

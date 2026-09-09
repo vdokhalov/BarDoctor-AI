@@ -3,7 +3,8 @@ import fs from "node:fs";
 const assetPath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 const fragmentPath = new URL("./fragments/writeoff-workflow-v271.fragment.txt", import.meta.url);
 let source = fs.readFileSync(assetPath, "utf8");
-const fragment = fs.readFileSync(fragmentPath, "utf8").trim() + "\n";
+// Downstream source anchors use LF, independently of the checkout's line endings.
+const fragment = fs.readFileSync(fragmentPath, "utf8").replace(/\r\n/g, "\n").trim() + "\n";
 const marker = 'const bdWriteoffWorkflowVersionV271="canonical-document-v271";';
 const functionStart = source.includes(marker) ? source.indexOf(marker) : source.indexOf("function bdWriteoffSheet(");
 const navigationStart = source.indexOf("function bdWarehouseNavigationUrlV247", functionStart);
