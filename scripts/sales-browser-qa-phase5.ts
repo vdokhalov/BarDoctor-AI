@@ -35,7 +35,9 @@ try {
           }
         } else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":"text/css"}});
         else if(path==="/favicon.ico")response=new Response(null,{status:204});
-        else response=render();
+        else if(path==="/sales-entry")response=render();
+        else if(path==="/home")response=new Response('<!doctype html><html><body><a href="/sales-entry">Sales entry</a></body></html>',{headers:{"Content-Type":"text/html"}});
+        else response=new Response("Not found",{status:404});
         res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
       }catch(error){errors.push(String(error));res.writeHead(500);res.end("QA failure");}
     });
@@ -78,9 +80,21 @@ try {
       const layout=await page.evaluate(()=>({width:document.documentElement.scrollWidth,body:document.body.scrollWidth,overflow:getComputedStyle(document.body).overflow}));
       assert.ok(layout.width<=viewport.width&&layout.body<=viewport.width,JSON.stringify(layout));assert.notEqual(layout.overflow,"hidden");
       const writes=runtime.batches();
-      await page.evaluate(()=>{localStorage.setItem("bd_active_venue_id","2");window.dispatchEvent(new StorageEvent("storage",{key:"bd_active_venue_id",newValue:"2"}));});
-      assert.equal(await page.locator("#work").isVisible(),false);assert.equal(runtime.batches(),writes);
-      await page.reload();await page.locator("#work:not([hidden])").waitFor();assert.match(await page.locator("#events").innerText(),/Продаж ещё нет/);
+      // The real switcher owns this navigation. Observe it before dispatching
+      // storage; a second reload races location.replace in Chromium on CI.
+      const [,frozen]=await Promise.all([
+        page.waitForURL(url=>url.pathname==="/home"&&url.searchParams.get("venue")==="2"),
+        page.evaluate(()=>{
+          localStorage.setItem("bd_active_venue_id","2");
+          window.dispatchEvent(new StorageEvent("storage",{key:"bd_active_venue_id",newValue:"2"}));
+          return document.getElementById("work")?.hidden;
+        }),
+      ]);
+      assert.equal(frozen,true);assert.equal(runtime.batches(),writes);
+      await page.getByRole("link",{name:"Sales entry",exact:true}).click();
+      await page.locator("#work:not([hidden])").waitFor();assert.match(await page.locator("#events").innerText(),/Продаж ещё нет/);
+      assert.equal(await page.locator("[data-menu] option").count(),1,"foreign menu must not leak");
+      assert.equal(runtime.batches(),writes,"venue transition must not write stock or revenue");
       assert.equal(errors.filter(e=>/503/.test(e)).length,1,"one deliberately lost success response");
       assert.deepEqual(errors.filter(e=>!/503/.test(e)),[]);
       console.log(`Phase 5 sales ${viewport.width}x${viewport.height}: HTTP/SQLite units/cancel/post/lost-response/reload/retry/reverse/shifts/venue PASS`);
