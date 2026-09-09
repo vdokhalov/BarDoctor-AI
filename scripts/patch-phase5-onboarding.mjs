@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import "./patch-phase5-receipt-cost.mjs";
 const file = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 let source = fs.readFileSync(file, "utf8");
 const marker = '"data-bd-opening-phase5"';

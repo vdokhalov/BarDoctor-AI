@@ -1,4 +1,5 @@
 import { getD1 } from "../../../../db";
+import { manualReferencePrice } from "../../../../lib/bardoctor/manual-reference-price";
 import { canonicalStockUnit } from "../../../../lib/bardoctor/stock-units";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -507,8 +508,10 @@ export async function POST(request: Request): Promise<Response> {
       .has(itemTypeValue)
       ? itemTypeValue
       : kind === "service" ? "other" : "product";
-    const purchasePrice = Number(body.purchasePrice);
     const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
+    // Keep cached quick-create clients compatible, but never forge a receipt price.
+    const referencePrice = manualReferencePrice(body.purchasePrice, accountingCurrency, now);
+    if (!referencePrice.ok) return Response.json({ ok: false, code: "REFERENCE_PRICE_INVALID", error: referencePrice.error }, { status: 422 });
     const product: JsonRecord = {
       id: productKey,
       key: productKey,
@@ -543,9 +546,8 @@ export async function POST(request: Request): Promise<Response> {
       onOrder: 0,
       averageUnitCost: 0,
       inventoryValue: 0,
-      ...(Number.isFinite(purchasePrice) && purchasePrice >= 0
-        ? { lastPurchasePrice: purchasePrice, ...(accountingCurrency ? { currency: accountingCurrency } : {}) }
-        : {}),
+      ...referencePrice.fields,
+      costStatus: "UNKNOWN",
       active: true,
       metadataSource: "manual",
       ...classification,

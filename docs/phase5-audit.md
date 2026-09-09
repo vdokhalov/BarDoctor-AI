@@ -70,3 +70,15 @@ Manual and CSV UTF-8 flows share the same command. CSV is the initial supported 
 Validation to date: full unit 913/913 PASS before the final two added guard tests; focused domain/API/SQLite tests cover idempotency, failure rollback, concurrent CAS replay, historical receipts, taxonomy ambiguity, cost UNKNOWN and independent opening valuation. Local mobile 390x844 and desktop 1280x720 browser QA passed with actual page/shell assets and actual HTTP handler/SQLite, including packages, cancellation without writes/locks, confirm/reload and explicit invalid-row skip. TypeScript and full lint passed before the final guard additions; final reruns and full GitHub CI are the next gate. Existing two lint warnings remain unchanged. Windows Bash/build limitation remains; verified build runs in unchanged CI alongside the added opening browser step.
 
 Still not complete: manual nomenclature API's legacy lastPurchasePrice input and old client fallback need separation from authoritative receipt costing; sales event/revenue/shift foundation and minimum sales entry remain to implement. No production changes, deployment or Phase 6 work.
+
+Slice 2 final gate: commit e273619604c7f16b6b6a35b92f4b6a599b59f9ba; full GitHub CI run 34352406341 GREEN, including verified build, all regression, opening HTTP/SQLite mobile and desktop, Phase 3/4 affected flows, bootstrap and general navigation/Home/Reviews. No deployment.
+
+## Slice 3 — manual estimate is not receipt cost
+
+New catalogue creation keeps the cached client's purchasePrice input compatible as separate manualReferencePrice metadata with currency, source and timestamp. It does not set lastPurchasePrice, opening valuation or receipt history. Invalid/absent input is not coerced to known zero; created stock costStatus is UNKNOWN. Existing legacy records are not rewritten.
+
+The legacy client cost helper no longer returns manual catalogue prices as recipe cost. Current UI shows a clearly labelled reference price; without confirmed purchase, cost remains unavailable. Regression preserves actual confirmed receipt calculation and rejects manual price fallback for liquid and piece stock. The existing UI's unvalued row contract is complete=false/reason=price with no cost property, not a fabricated numeric zero.
+
+Readonly clean-start audit confirms existing ensureOwnerVenue/createVenueForOwner already use emptyAuthoritativeVenueStores with conflict-safe insertion. No duplicate setup mechanism or speculative auth/bootstrap changes added. Sales event/revenue/shift implementation is still pending. Slice 3 full validation/CI pending.
+
+Slice 3 local validation: full unit 917/917 PASS, no skipped/cancelled; typecheck PASS; full lint PASS with the same two existing warnings; prebuild PASS; local opening HTTP/SQLite browser scenarios PASS at 390x844 and 1280x720; diff check PASS. Windows sandbox tsx/os.userInfo failure occurred before test execution; authorized unsandboxed local run passed. Verified build and full regression/browser pipeline remain required in GitHub CI; no local Miniflare loop or production use.

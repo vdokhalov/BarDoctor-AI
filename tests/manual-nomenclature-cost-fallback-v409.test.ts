@@ -77,18 +77,17 @@ function ingredient(overrides: Record<string, unknown> = {}) {
   };
 }
 
-test("manual nomenclature price is used only when no posted receipt exists", () => {
+test("Phase 5: legacy manual price without a receipt remains UNKNOWN", () => {
   assert.match(bundle, /bd-manual-nomenclature-cost-fallback-v409/);
   const api = costingApi();
   const state = { nomenclature: [manualProduct()] };
   const canonical = api.canonical(state);
   const maps = api.maps(state, [], canonical);
   const row = api.row(ingredient(), maps, canonical);
-  assert.equal(row.complete, true, JSON.stringify(row));
-  assert.equal(row.cost, 15);
-  assert.equal(row.unitPrice, 0.3);
-  assert.equal(row.currency, "PMR_RUB");
-  assert.equal(row.source, "manual_nomenclature_price");
+  assert.equal(row.complete, false, JSON.stringify(row));
+  assert.equal(row.reason, "price");
+  assert.equal(Object.hasOwn(row, "cost"), false, "unvalued legacy UI row must not expose a numeric cost");
+  assert.notEqual(row.source, "manual_nomenclature_price");
 });
 
 test("latest posted receipt overrides the manual nomenclature price", () => {
@@ -119,7 +118,7 @@ test("latest posted receipt overrides the manual nomenclature price", () => {
   assert.equal(row.purchaseDocumentNumber, "1");
 });
 
-test("manual package price converts through base units for piece items", () => {
+test("Phase 5: manual piece price cannot become operational cost either", () => {
   const api = costingApi();
   const state = { nomenclature: [manualProduct({
     productKey: "manual-piece",
@@ -138,9 +137,9 @@ test("manual package price converts through base units for piece items", () => {
     quantity: 1,
     unit: "шт.",
   }), maps, canonical);
-  assert.equal(row.complete, true, JSON.stringify(row));
-  assert.equal(row.cost, 25);
-  assert.equal(row.source, "manual_nomenclature_price");
+  assert.equal(row.complete, false, JSON.stringify(row));
+  assert.equal(Object.hasOwn(row, "cost"), false, "unvalued legacy UI row must not expose a numeric cost");
+  assert.equal(row.reason, "price");
 });
 
 test("missing manual price remains unknown and an incompatible posted receipt never falls back to stale manual price", () => {
