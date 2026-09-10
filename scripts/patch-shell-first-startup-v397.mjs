@@ -65,8 +65,8 @@ function patchBootstrap(path) {
     '  var bdStartupRecoveryVersionV341 = "shell-first-startup-v397";',
   );
   source = source.replace(
-    /script\.src = "\/assets\/index-BQGspy0I\.js\?v=[^"]+";/,
-    'script.src = "/assets/index-BQGspy0I.js?v=startup-performance-v343-shell-first-v397-auth-handoff-v423-root-handoff-v424";',
+    /script\.src = "(\/assets\/index-BQGspy0I(?:-[a-f0-9]{12})?\.js)\?v=[^"]+";/,
+    'script.src = "$1?v=startup-performance-v343-shell-first-v397-auth-handoff-v423-root-handoff-v424";',
   );
   source = source.replace(
     /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
@@ -118,8 +118,8 @@ function patchShell(path) {
   const moduleVersion = moduleSource.split("?v=")[1];
   const bootstrapVersion = `20260821-inventory-cache-reconciliation-v235-20260822-navigation-v247-20260829-authoritative-home-v344-20260829-authenticated-home-v345-20260829-branded-startup-v346-20260829-coherent-startup-v347-${moduleVersion}`;
   source = source.replace(
-    /rel="modulepreload" href="\/assets\/index-BQGspy0I\.js\?v=[^"]+"/,
-    `rel="modulepreload" href="${moduleSource}"`,
+    /rel="modulepreload" href="(\/assets\/index-BQGspy0I(?:-[a-f0-9]{12})?\.js)\?v=[^"]+"/,
+    (_match, pathname) => `rel="modulepreload" href="${pathname}?v=${moduleVersion}"`,
   );
   source = source.replace(
     /(\s*<link rel="modulepreload"[^>]+>)/,

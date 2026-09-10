@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { verifyClientRelease } from "../scripts/lib/client-release-integrity.mjs";
 
 test("iPhone menu photos use the payload-safe preparation path", async () => {
   const bundle = await readFile(
@@ -867,7 +868,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(worker, /Локальный API \/api\/\$\{path\.join\("\/"\)\} не найден/);
   assert.match(bootstrap, /\/api\/auth\/bootstrap/);
   assert.match(authCss, /min-width:900px[^}]*\.bd-auth-login \.bd-auth-form-scroll/);
-  assert.match(bootstrap, /\/assets\/index-BQGspy0I\.js/);
+  const release = verifyClientRelease(process.cwd());
+  assert.equal(bootstrap.match(/\bscript\.src\s*=\s*["'](\/assets\/index-BQGspy0I-[a-f0-9]{12}\.js)/)?.[1], `/assets/${release.name}`);
   assert.match(bootstrap, /randomUUIDFallback/);
   assert.match(bootstrap, /var standaloneRoutes = \["\/forgot-password"\]/);
   assert.match(bootstrap, /navigateInApplication/);

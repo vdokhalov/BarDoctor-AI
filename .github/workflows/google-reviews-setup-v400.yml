@@ -44,6 +44,8 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Actual compiled Worker and static client release integrity mobile desktop
+        run: node --test tests/client-release-browser.test.mjs
       - name: Observability real bootstrap D1 and mobile desktop correlation QA
         run: BD_OBSERVABILITY_BROWSER_QA=1 node --test tests/request-observability-runtime.test.mjs
       - name: Phase 3 menu consumption browser QA

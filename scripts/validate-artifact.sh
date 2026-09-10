@@ -33,6 +33,9 @@ node --input-type=module - "${worker}" "${hosting}" "${connector_zip}" "${connec
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import { verifyClientRelease } from "./scripts/lib/client-release-integrity.mjs";
+
+verifyClientRelease(process.cwd());
 
 const [workerPath, hostingPath, connectorPath, checksumPath] = process.argv.slice(2);
 const hosting = JSON.parse(await readFile(hostingPath, "utf8"));

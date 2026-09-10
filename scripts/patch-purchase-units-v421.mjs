@@ -78,11 +78,30 @@ patchNomenclatureFunction("bdNomenclatureSheetV237", [
   ['i.jsx("option",{value:"ml",children:"Миллилитрах — жидкость"}),i.jsx("option",{value:"g",children:"Граммах — вес"}),i.jsx("option",{value:"pcs",children:"Штуках"})',
     'i.jsx("option",{value:"ml",children:"Миллилитрах — жидкость"}),i.jsx("option",{value:"l",children:"Литрах — жидкость"}),i.jsx("option",{value:"g",children:"Граммах — вес"}),i.jsx("option",{value:"kg",children:"Килограммах — вес"}),i.jsx("option",{value:"pcs",children:"Штуках"})'],
 ]);
+// Warehouse opens a separate legacy editor. Preserve physical base units there
+// too, including when the user changes only a name or package description.
+patchNomenclatureFunction("bdWarehouseProductSheet", [
+  ['y=["ml","g","pcs"].includes(e.unit)?e.unit:"pcs"', 'y=["ml","g","pcs","kg","l"].includes(e.unit)?e.unit:"pcs"'],
+  ['v.unit==="ml"', '["ml","l"].includes(v.unit)'],
+  ['v.unit==="g"', '["g","kg"].includes(v.unit)'],
+  ['e.unit==="ml"', '["ml","l"].includes(e.unit)'],
+  ['e.unit==="g"', '["g","kg"].includes(e.unit)'],
+  ['unit:B.target.value,displayUnit:"auto",displayPackageSize:U.packageSize',
+    'unit:B.target.value,displayUnit:"auto",packageSize:["ml","l"].includes(B.target.value)?"1 л":["g","kg"].includes(B.target.value)?"1 кг":"1 шт.",displayPackageSize:["ml","l"].includes(B.target.value)?"1 л":["g","kg"].includes(B.target.value)?"1 кг":"1 шт."'],
+  ['i.jsx("option",{value:"ml",children:"Жидкость"}),i.jsx("option",{value:"g",children:"Вес"}),i.jsx("option",{value:"pcs",children:"Поштучно"})',
+    'i.jsx("option",{value:"ml",children:"Жидкость (мл)"}),i.jsx("option",{value:"l",children:"Жидкость (л)"}),i.jsx("option",{value:"g",children:"Вес (г)"}),i.jsx("option",{value:"kg",children:"Вес (кг)"}),i.jsx("option",{value:"pcs",children:"Поштучно"})'],
+]);
+// Display preferences are available in both cards. Convert canonical kg/l in
+// their own dimension instead of applying the legacy g/ml divide-by-1000 rule.
+const displayUnitGuard = 'if(e?.unitModelVersion===4){const base=bdStockUnitsV421.canonicalStockUnit(e.unit),display=String(e.displayUnit||"auto"),pack=bdWarehouseNumber(e.displayPackageAmount||e.packageAmount);if(display==="pcs"&&base!=="pcs"&&pack>0)return"pcs";if(display!=="auto"&&bdStockUnitsV421.convertStockQuantity(1,base,display)!==null)return display;return base||"unknown";}';
+const displayAmountGuard = 'if(e?.unitModelVersion===4){const amount=bdWarehouseNumber(t),unit=bdWarehouseEffectiveDisplayUnit(e,amount),pack=bdWarehouseNumber(e.displayPackageAmount||e.packageAmount),converted=unit==="pcs"&&e.unit!=="pcs"&&pack>0?amount/pack:bdStockUnitsV421.convertStockQuantity(amount,e.unit,unit);return bdWarehouseDecimal(converted===null?amount:converted,6)+" "+bdWarehouseUnit(unit);}';
+source=source.replace('if(e?.unitModelVersion===4)return bdStockUnitsV421.canonicalStockUnit(e.unit)||"unknown";',displayUnitGuard);
+source=source.replace('if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,6)+" "+bdWarehouseUnit(e.unit);',displayAmountGuard);
 source=source.replaceAll('if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,3)+" "+bdWarehouseUnit(e.unit);', '');
 for(const [prefix,guard] of [
   ['function bdProcStockPreviewV221(e){','if(e?.purchaseConversion?.version===4)return bdProcFormatAmountV221(e.purchaseConversion.canonicalQuantity,e.purchaseConversion.canonicalUnit);if(e?.purchaseUnitModel===4){const p=bdPurchasePreviewV421(e);return p.ok?bdProcFormatAmountV221(p.snapshot.canonicalQuantity,p.snapshot.canonicalUnit):"Проверьте количество и единицы";}'],
-  ['function bdWarehouseEffectiveDisplayUnit(e,t){','if(e?.unitModelVersion===4)return bdStockUnitsV421.canonicalStockUnit(e.unit)||"unknown";'],
-  ['function bdWarehouseDisplayAmount(e,t){','if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,6)+" "+bdWarehouseUnit(e.unit);'],
+  ['function bdWarehouseEffectiveDisplayUnit(e,t){',displayUnitGuard],
+  ['function bdWarehouseDisplayAmount(e,t){',displayAmountGuard],
 ]){
   if(!source.includes(prefix+guard)){
     if(!source.includes(prefix))throw new Error("Canonical warehouse display hook missing");

@@ -237,13 +237,20 @@ test("actual tech-card client reads canonical receipt snapshot without another p
   assert.equal(result.purchaseDocumentId, "purchase");
 });
 
-function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: Request) => Promise<Response>) {
+function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: Request) => Promise<Response>, warehouse = false, movements: Row[] = []) {
   const source = readFileSync("public/assets/index-BQGspy0I.js", "utf8");
   const units = source.slice(source.indexOf("/* purchase-units-v421:start */"), source.indexOf("/* purchase-units-v421:end */"));
   const initialStart = source.indexOf("function bdNomenclatureInitialFormV213(");
-  const initial = source.slice(initialStart, source.indexOf("\nfunction ", initialStart + 1));
+  const initial = warehouse ? "" : source.slice(initialStart, source.indexOf("\nfunction ", initialStart + 1));
   const cardStart = source.indexOf("function bdNomenclatureInitialFormV237(");
-  const card = source.slice(cardStart, source.indexOf("\nbdNomenclatureSheet=", cardStart));
+  const definition = (name: string) => {
+    const start = source.indexOf("function " + name + "(");
+    const end = source.indexOf("\nfunction ", start + 1);
+    assert.ok(start >= 0 && end > start, name);
+    return source.slice(start, end);
+  };
+  const card = warehouse ? ["bdWarehouseUnit", "bdWarehouseDecimal", "bdWarehouseEffectiveDisplayUnit", "bdWarehouseDisplayAmount", "bdWarehouseDisplayPreferenceLabel", "bdWarehouseProductSheet"].map(definition).join("\n")
+    : source.slice(cardStart, source.indexOf("\nbdNomenclatureSheet=", cardStart));
   assert.ok(initialStart >= 0 && cardStart >= 0 && card.length > 1000);
   const tree = { sections: [{ id: "kitchen", name: "Kitchen" }],
     categories: [{ id: "food", name: "Food", parentId: "kitchen" }],
@@ -253,7 +260,7 @@ function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: 
   let saved: Row | undefined;
   const requests: Row[] = [];
   const jsx = (type: string, props: Row): Element => ({ type, props });
-  const api = runInNewContext(units + initial + card + ";({render:bdNomenclatureSheetV237})", {
+  const api = runInNewContext(units + initial + card + (warehouse ? ";({render:bdWarehouseProductSheet,amount:bdWarehouseDisplayAmount})" : ";({render:bdNomenclatureSheetV237})"), {
     i: { jsx, jsxs: jsx }, structuredClone, Error,
     S: { useState: (initial: unknown) => {
       const index = cursor++;
@@ -263,6 +270,9 @@ function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: 
     bdWarehouseKey: (value: Row) => String(value?.productKey ?? value?.key ?? ""),
     bdNomenclatureTree: () => tree, bdWarehouseRecord: (value: unknown) => value ?? {},
     bdCatArray: (value: unknown) => Array.isArray(value) ? value : [], bdWarehouseNumber: Number,
+    W: { div: "div", section: "section" }, sn: () => ({ toast: () => {} }), sg: String,
+    bdWarehouseMoney: (value: unknown) => String(value ?? 0),
+    window: { confirm: () => { throw new Error("No archive/delete allowed in unit-preservation checks"); } },
     bdServiceExpenseOptionsV359: () => [], bdSectionPathLabelV365: (_: unknown, item: Row) => item?.name ?? "",
     bdPurchaseTypeLabelV362: () => "Products", bdNomenclatureSaveHintV362: () => "", ca: () => ({ "X-Venue-Id": "1" }), Ot: () => null,
     fetch: async (url: string, options: RequestInit) => {
@@ -270,8 +280,8 @@ function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: 
       requests.push(JSON.parse(String(options.body)) as Row);
       return post(new Request("http://localhost" + url, options));
     },
-  }) as { render: (props: Row) => Element };
-  const render = () => { cursor = 0; return api.render({ product, assortment, canEdit: true,
+  }) as { render: (props: Row) => Element; amount?: (product: Row, quantity: number) => string };
+  const render = () => { cursor = 0; return api.render({ product, assortment, movements, canEdit: true,
     onClose: () => {}, onSaved: (result: Row) => { saved = result; } }); };
   const control = (label: string, kind: "input" | "select") => {
     const parent = all(render()).find(element => element.type === "label"
@@ -280,7 +290,13 @@ function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: 
     assert.ok(element, `Missing ${kind}: ${label}`);
     return element;
   };
-  return { render, control, requests, result: () => saved,
+  const initialTree = render();
+  if (warehouse) {
+    const edit = all(initialTree).find(element => element.type === "button" && element.props.children === "Редактировать");
+    assert.ok(edit);
+    (edit.props.onClick as () => void)();
+  }
+  return { render, control, requests, initialTree, amount: api.amount, result: () => saved,
     change(label: string, kind: "input" | "select", value: string) {
       (control(label, kind).props.onChange as (event: { target: { value: string } }) => void)({ target: { value } });
     },
@@ -292,6 +308,79 @@ function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: 
       assert.ok(saved, "Real product update must succeed; card errors: " + JSON.stringify(all(render()).filter(element => element.props.className === "bd-inventory-error").map(element => element.props.children)));
     },
   };
+}
+
+for (const scenario of [
+  { unit: "kg", displayUnit: "kg", packageSize: "1 г", packageAmount: 0.001, current: 1.09, type: "Вес", display: "g", displayed: "1\u00a0090 г", packaged: "1\u00a0090 шт." },
+  { unit: "l", displayUnit: "l", packageSize: "0,7 л", packageAmount: 0.7, current: 4.2, type: "Жидкость", display: "ml", displayed: "4\u00a0200 мл", packaged: "6 шт." },
+  { unit: "pcs", displayUnit: "pcs", packageSize: "1 шт.", packageAmount: 1, current: 12, type: "Поштучно", display: "pcs", displayed: "12 шт.", packaged: "12 шт." },
+  { unit: "g", displayUnit: "kg", packageSize: "1 кг", packageAmount: 1000, current: 2000, type: "Вес", display: "kg", displayed: "2 кг", packaged: "2 шт." },
+  { unit: "ml", displayUnit: "l", packageSize: "0,5 л", packageAmount: 500, current: 1000, type: "Жидкость", display: "l", displayed: "1 л", packaged: "2 шт." },
+  { unit: "kg", displayUnit: "kg", packageSize: "1 кг", packageAmount: 1, current: 0, type: "Вес", display: "kg", displayed: "0 кг", packaged: "0 шт." },
+]) {
+  test(`warehouse card ${scenario.unit}/${scenario.current}: actual save, reload and display keep physical units and immutable movements`, async () => {
+    const r = openingRuntime();
+    const products = r.loadRoute(new URL("../app/api/inventory/products/route.ts", import.meta.url), {
+      canonicalStockUnit, manualReferencePrice, PURCHASE_STORE_KEY, ...nomenclatureIdentity, changedConsumptionModeIssues,
+    });
+    try {
+      const product: Row = { id: "warehouse-card", key: "warehouse-card", productKey: "warehouse-card", name: "Warehouse TEST", venueId: 1,
+        kind: "stock", itemType: "ingredient", category: "products", active: true, currency: "MDL", onOrder: 0,
+        unit: scenario.unit, displayUnit: scenario.displayUnit, packageSize: scenario.packageSize, packageAmount: scenario.packageAmount, current: scenario.current,
+        ...(["kg", "l", "pcs"].includes(scenario.unit) ? { unitModelVersion: 4 } : {}),
+      };
+      const movements = [{ id: "prior-warehouse-movement", venueId: 1, type: "receipt", status: "active", productKey: product.productKey,
+        unit: scenario.unit, amount: scenario.current, costAmount: 100, currency: "MDL", sourceDocumentId: "prior", sourceLineId: "line", date: "2026-09-08" }];
+      r.put("bd_assortment_v1", { nomenclature: [product], stockBalances: [product], recipes: [], menuItems: [] });
+      r.put("bd_stock_movements", movements);
+      const before = r.sqlite.prepare("SELECT data_json FROM domain_data WHERE store_key='bd_stock_movements'").get();
+      const open = () => {
+        const assortment = r.get("bd_assortment_v1") as Row;
+        return nomenclatureCardRuntime((assortment.nomenclature as Row[])[0], assortment, products.POST, true, movements);
+      };
+      const card = open();
+      assert.ok(all(card.initialTree).some(element => element.type === "dd" && element.props.children === scenario.type));
+      const base = card.control("Тип складского учёта", "select");
+      assert.equal(base.props.value, scenario.unit);
+      assert.equal(base.props.disabled, true, "Prior movements lock the base unit even at zero stock");
+      assert.ok(all(base).some(option => option.type === "option" && option.props.value === scenario.unit));
+      card.change("Название товара", "input", "Warehouse TEST renamed");
+      await card.save();
+      assert.equal(card.requests[0].unit, scenario.unit);
+      for (const key of ["nomenclature", "stockBalances"]) {
+        const item = (r.get("bd_assortment_v1") as Record<string, Row[]>)[key][0];
+        for (const field of ["unit", "unitModelVersion", "current", "packageSize", "packageAmount", "displayUnit"]) assert.equal(item[field], product[field], `${key}.${field}`);
+        assert.equal(item.name, "Warehouse TEST renamed");
+      }
+      const reopened = open();
+      assert.equal(reopened.control("Тип складского учёта", "select").props.value, scenario.unit);
+      reopened.change("Показывать остаток", "select", scenario.display);
+      await reopened.save();
+      const measure = (r.get("bd_assortment_v1") as Record<string, Row[]>).nomenclature[0];
+      assert.equal(reopened.amount!(measure, scenario.current), scenario.displayed);
+      const packaged = open();
+      packaged.change("Показывать остаток", "select", "pcs");
+      await packaged.save();
+      const stored = (r.get("bd_assortment_v1") as Record<string, Row[]>).nomenclature[0];
+      assert.equal(packaged.amount!(stored, scenario.current), scenario.packaged);
+      assert.equal(stored.unit, scenario.unit);
+      assert.equal(stored.current, scenario.current);
+      assert.deepEqual(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE store_key='bd_stock_movements'").get(), before);
+    } finally { r.close(); }
+  });
+}
+
+for (const unit of ["kg", "l"]) {
+  test(`empty warehouse card ${unit}: explicit unit selection resets only draft package defaults`, () => {
+    const product = { productKey: "empty", name: "Empty TEST", unit: "pcs", packageSize: "1 шт.", current: 0 };
+    const card = nomenclatureCardRuntime(product, {}, async () => { throw new Error("Draft edit must not save"); }, true);
+    assert.equal(card.control("Тип складского учёта", "select").props.disabled, false);
+    card.change("Тип складского учёта", "select", unit);
+    const amount = inventoryPackageAmount(card.control("Фасовка прихода", "input").props.value, unit, unit);
+    assert.equal(amount.unit, unit);
+    assert.equal(amount.amount, 1);
+    assert.equal(card.requests.length, 0);
+  });
 }
 
 for (const scenario of [

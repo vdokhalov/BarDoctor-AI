@@ -4,6 +4,7 @@ const bundlePath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url
 const bootstrapPaths = [
   new URL("../public/bardoctor-preview.js", import.meta.url),
   new URL("../public/bardoctor-preview-v397.js", import.meta.url),
+  ...["bardoctor-preview.js", "bardoctor-preview-v397.js"].map(file => new URL("../dist/client/" + file, import.meta.url)).filter(file => fs.existsSync(file)),
 ];
 const appHtmlPath = new URL("../public/app.html", import.meta.url);
 const responsePath = new URL("../app/bar-doctor-response.ts", import.meta.url);
@@ -129,5 +130,11 @@ fs.writeFileSync(bundlePath, source);
 for (const [bootstrapPath, bootstrap] of bootstraps) fs.writeFileSync(bootstrapPath, bootstrap);
 fs.writeFileSync(appHtmlPath, appHtml);
 fs.writeFileSync(responsePath, response);
+const emittedHtmlPath = new URL("../dist/client/app.html", import.meta.url);
+if (fs.existsSync(emittedHtmlPath)) {
+  let emittedHtml = fs.readFileSync(emittedHtmlPath, "utf8");
+  if (!new RegExp(`bardoctor-preview-v397\\.js\\?v=[^\"]*${cacheToken}`).test(emittedHtml)) emittedHtml = emittedHtml.replace(/(src="\/bardoctor-preview-v397\.js\?v=[^"]+)"/, `$1-${cacheToken}"`);
+  fs.writeFileSync(emittedHtmlPath, emittedHtml);
+}
 await import("./patch-latest-cost-copy-v412.mjs");
 console.log("Home + Reviews UX v409 applied");

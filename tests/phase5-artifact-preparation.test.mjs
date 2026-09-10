@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { patchReceiptCost } from "../scripts/lib/phase5-receipt-cost.mjs";
 import { replaceLegacyCostingSegment } from "../scripts/lib/legacy-costing-segment.mjs";
+import { verifyClientRelease } from "../scripts/lib/client-release-integrity.mjs";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const bundlePath = "public/assets/index-BQGspy0I.js";
 const current = fs.readFileSync(path.join(root, bundlePath), "utf8");
@@ -118,10 +119,26 @@ test("full declared test/build artifact preparation twice preserves behavior and
     assert.equal(build.length, 2, "verified build compiler boundary must be unique");
     const buildCommands = block => [...block.matchAll(/^node "\$\{script_dir\}\/([a-z0-9-]+\.mjs)"\r?$/gm)].map(match => "scripts/" + match[1]);
     const checkBehavior = () => run(["--import", "tsx", "--test", "tests/manual-nomenclature-cost-fallback-v409.test.ts", "tests/manual-reference-price-phase5.test.ts"]);
+    const releaseSnapshot = () => Object.fromEntries([bundlePath, "dist/client/app.html", "dist/client/bardoctor-preview.js", "dist/client/bardoctor-preview-v396.js", "dist/client/bardoctor-preview-v397.js", "dist/server/index.js"]
+      .map(file => [file, fs.readFileSync(path.join(temporary, file))]));
+    const assertReleaseBytes = (actual, expected, label) => {
+      for (const [file, before] of Object.entries(expected)) {
+        const after = actual[file];
+        if (before.equals(after)) continue;
+        let offset = 0;
+        while (offset < Math.min(before.length, after.length) && before[offset] === after[offset]) offset++;
+        assert.fail(label + ": " + JSON.stringify({ file, offset, beforeLength: before.length, afterLength: after.length,
+          before: before.subarray(Math.max(0, offset - 120), offset + 240).toString(), after: after.subarray(Math.max(0, offset - 120), offset + 240).toString() }));
+      }
+    };
+    let builtRelease;
     const prepareBuildArtifact = () => {
       for (const command of buildCommands(build[0])) run([command]);
       // Model only the compiler's public-file copy; actual compilation stays in the full CI build gate.
       fs.cpSync(path.join(temporary, "public"), path.join(temporary, "dist/client"), { recursive: true });
+      // Model the compiled HTML string too; real Worker compilation is the CI gate.
+      fs.mkdirSync(path.join(temporary, "dist/server"), { recursive: true });
+      fs.writeFileSync(path.join(temporary, "dist/server/index.js"), "export const html=" + JSON.stringify(fs.readFileSync(path.join(temporary, "public/app.html"), "utf8")) + ";");
       for (const command of buildCommands(build[1])) run([command]);
       const html = fs.readFileSync(path.join(temporary, "dist/client/app.html"), "utf8");
       const asset = html.match(/\/assets\/(index-BQGspy0I-[a-f0-9]{12}\.js)/);
@@ -130,8 +147,9 @@ test("full declared test/build artifact preparation twice preserves behavior and
       assert.equal(patchReceiptCost(published), published);
       assert.equal(published, fs.readFileSync(path.join(temporary, bundlePath), "utf8"), "packaged and canonical costing must agree");
       checkBehavior();
+      builtRelease = releaseSnapshot();
     };
-    let previous;
+    let previous, previousEntrypoints;
     for (let cycle = 0; cycle < 2; cycle++) {
       for (const phase of ["pretest:artifact", "prebuild", "verified-build-preparation", "pretest:artifact"]) {
         if (phase === "verified-build-preparation") { prepareBuildArtifact(); continue; }
@@ -140,8 +158,10 @@ test("full declared test/build artifact preparation twice preserves behavior and
           assert.ok(match, `unsupported preparation command: ${command}`);
           run([match[1]]);
         }
+        if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);
       }
       const prepared = fs.readFileSync(path.join(temporary, bundlePath), "utf8");
+      assertReleaseBytes(releaseSnapshot(), builtRelease, "Post-build test preparation must preserve built release bytes");
       assert.equal(patchReceiptCost(prepared), prepared);
       checkBehavior();
       if (previous && prepared !== previous) {
@@ -150,6 +170,9 @@ test("full declared test/build artifact preparation twice preserves behavior and
         assert.fail("second full preparation must be byte-stable: " + JSON.stringify({ offset, previousLength: previous.length, preparedLength: prepared.length, before: previous.slice(Math.max(0, offset - 100), offset + 600), after: prepared.slice(Math.max(0, offset - 100), offset + 600) }));
       }
       previous = prepared;
+      const entrypoints = releaseSnapshot();
+      if (previousEntrypoints) assertReleaseBytes(entrypoints, previousEntrypoints, "Full repeated preparation must preserve emitted loader, HTML and Worker bytes");
+      previousEntrypoints = entrypoints;
     }
   } finally {
     // Never follow the shared dependency junction during temporary copy cleanup.

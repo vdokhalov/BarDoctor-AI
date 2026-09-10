@@ -11,8 +11,8 @@ const marker = 'const bdMenuNomenclatureLinkVersion="v352"';
 function refreshShellCache() {
   for (const shellPath of shellPaths) {
     const current = readFileSync(shellPath, "utf8");
-    const next = current.replaceAll(
-      "20260829-menu-nomenclature-action-v351",
+    const next = current.replace(
+      /20260829-menu-nomenclature-action-v351(?!-menu-link-v352)/g,
       "20260829-menu-nomenclature-action-v351-menu-link-v352",
     );
     if (next !== current) writeFileSync(shellPath, next);

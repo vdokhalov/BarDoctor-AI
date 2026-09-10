@@ -116,7 +116,7 @@ function patchBundle(path) {
 function patchBootstrap(path) {
   if (!existsSync(path)) return false;
   let source = readFileSync(path, "utf8");
-  source = source.replace(/\n  \/\* bd-startup-frame-trace-v395 \*\/[\s\S]*?  \/\* \/bd-startup-frame-trace-v395 \*\//, "");
+  source = source.replace(/\r?\n(?:\r?\n)?  \/\* bd-startup-frame-trace-v395 \*\/[\s\S]*?  \/\* \/bd-startup-frame-trace-v395 \*\//, "");
   source = source.replace('  "use strict";', `  "use strict";\n\n${frameTraceBootstrap}`);
   source = source.replace(/var bdStartupRecoveryVersionV341 = "[^"]+";/, 'var bdStartupRecoveryVersionV341 = "single-splash-v395";');
   source = source.replace(/\s*\|\| Boolean\(document\.querySelector\('\[data-bd-root-splash\], \[data-bd-splash\]'\)\)/, "");
