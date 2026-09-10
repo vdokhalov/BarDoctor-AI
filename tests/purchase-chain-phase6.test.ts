@@ -130,3 +130,56 @@ test("Phase 6 HTTP unit matrix: create, reopen, edit, retry and safe cancel pres
     } finally { r.close(); }
   }
 });
+
+test("Phase 6 a persisted receipt retry survives changed or missing current conversion targets without writes", async () => {
+  for (const change of ["unit-changed", "target-removed"] as const) {
+    const r = openingRuntime();
+    const confirm = r.loadRoute(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), {
+      ...purchases, ...conversion, ...scope, ...matching, INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots",
+    });
+    const original = { id: `persisted-${change}`, venueId: 1, documentType: "invoice", supplierId: "supplier",
+      supplierName: "Test", date: "2026-09-08", currency: "MDL", paymentMethod: "unknown", total: 120,
+      items: [{ id: "stable-line", name: "Test bottles", purchaseProductKey: "bottles", nomenclatureId: "bottles",
+        quantity: 12, unit: "pcs", unitPrice: 10, lineTotal: 120, category: "products", mappingSource: "manual" }] };
+    const send = async (expectedStatus: 200 | 201) => {
+      const response = await confirm.POST(new Request("http://localhost/api/purchases/confirm", {
+        method: "POST", headers: { "Content-Type": "application/json", "X-Venue-Id": "1" },
+        body: JSON.stringify({ document: original }),
+      }));
+      const result = await response.json() as { duplicate?: boolean; document: purchases.PurchaseDocument };
+      assert.equal(response.status, expectedStatus, `${change}: ${JSON.stringify(result)}`);
+      return result;
+    };
+    try {
+      const product = { id: "bottles", key: "bottles", productKey: "bottles", name: "Test bottles",
+        unit: "pcs", kind: "stock", unitModelVersion: 4, venueId: 1, current: 0, currency: "MDL" };
+      r.put("bd_assortment_v1", { nomenclature: [product], stockBalances: [product] });
+      r.put("bd_suppliers", [{ id: "supplier", name: "Test", venueId: 1 }]);
+      const first = await send(201);
+      assert.equal(first.document.status, "confirmed");
+      assert.ok(first.document.items[0].purchaseConversion);
+      const persisted = r.get("bd_assortment_v1") as Record<string, unknown>;
+      const changed = change === "target-removed"
+        ? { ...persisted, nomenclature: [], stockBalances: [] }
+        : { ...persisted,
+          nomenclature: (persisted.nomenclature as Record<string, unknown>[]).map(item => ({ ...item, unit: "kg" })),
+          stockBalances: (persisted.stockBalances as Record<string, unknown>[]).map(item => ({ ...item, unit: "kg" })),
+        };
+      r.put("bd_assortment_v1", changed);
+      const attemptedConversion = conversion.preparePurchaseConversions(
+        { ...purchases.normalizePurchaseDocument(original, original.id), venueId: 1 }, original, changed,
+      );
+      assert.equal(attemptedConversion.ok, false, `${change} must make a fresh conversion invalid`);
+      const before = r.sqlite.prepare("SELECT * FROM domain_data ORDER BY account_id, store_key").all();
+      const auditBefore = r.sqlite.prepare("SELECT * FROM audit_log ORDER BY rowid").all();
+      const batchesBefore = r.batches();
+      const retry = await send(200);
+      assert.equal(retry.duplicate, true);
+      assert.deepEqual(retry.document, first.document);
+      assert.equal(r.batches(), batchesBefore);
+      // Raw data_json strings enforce byte stability, including captured conversion and movements.
+      assert.deepEqual(r.sqlite.prepare("SELECT * FROM domain_data ORDER BY account_id, store_key").all(), before);
+      assert.deepEqual(r.sqlite.prepare("SELECT * FROM audit_log ORDER BY rowid").all(), auditBefore);
+    } finally { r.close(); }
+  }
+});

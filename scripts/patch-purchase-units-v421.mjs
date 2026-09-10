@@ -36,6 +36,48 @@ if(!source.includes('children:"В чём учитывать остаток?"')){
   if(quick<0||start<quick||end<start)throw new Error("Nomenclature stock unit editor missing");
   source=source.slice(0,start)+'i.jsxs("label",{children:[i.jsx("span",{children:"В чём учитывать остаток?"}),i.jsx("select",{"aria-label":"В чём учитывать остаток?",value:bdStockUnitsV421.canonicalStockUnit(h.unit)||"pcs",onChange:L=>g(B=>({...B,unit:L.target.value,displayUnit:L.target.value,packageSize:""})),children:[["pcs","Штуки"],["l","Литры"],["kg","Килограммы"]].map(([value,label])=>i.jsx("option",{value,children:label},value))})]}),'+source.slice(end);
 }
+// The card still serves legacy g/ml records as well as canonical kg/l records.
+// Preserve the stored unit and patch its controls together; opening a card must
+// never turn a mass or volume into a count before the user saves another field.
+function patchNomenclatureFunction(name, replacements) {
+  const prefix = `function ${name}(`;
+  const start = source.indexOf(prefix);
+  const endMarker = name === "bdNomenclatureSheetV237" ? "\nbdNomenclatureSheet=" : "\nfunction ";
+  const end = source.indexOf(endMarker, start + prefix.length);
+  if (start < 0 || end < start || source.indexOf(prefix, start + prefix.length) >= 0) {
+    throw new Error(`Ambiguous nomenclature function boundary: ${name}`);
+  }
+  let body = source.slice(start, end);
+  for (const [before, after] of replacements) {
+    if (body.includes(before) && body.includes(after)) {
+      throw new Error(`Mixed nomenclature unit patch state: ${name}`);
+    }
+    if (body.includes(before)) body = body.replaceAll(before, after);
+    else if (!body.includes(after)) throw new Error(`Nomenclature unit anchor missing: ${name}: ${before}`);
+  }
+  source = source.slice(0, start) + body + source.slice(end);
+}
+patchNomenclatureFunction("bdTaxBaseUnitV336", [
+  ['/мл|ml|(?:^|\\s)л|литр/', '/мл|ml|(?:^|\\s)л|литр|(?:^|\\s)l(?:$|\\s)/'],
+]);
+patchNomenclatureFunction("bdTaxDisplayUnitV336", [
+  ['/(^|\\s)л|литр/', '/(^|\\s)л|литр|(?:^|\\s)l(?:$|\\s)/'],
+]);
+patchNomenclatureFunction("bdNomenclatureInitialFormV213", [
+  ['unit:["ml","g","pcs"].includes(e?.unit)?e.unit:"pcs"', 'unit:["ml","g","pcs","kg","l"].includes(e?.unit)?e.unit:"pcs"'],
+]);
+patchNomenclatureFunction("bdNomenclatureInitialFormV237", [
+  ['n.unit==="ml"', '["ml","l"].includes(n.unit)'],
+  ['n.unit==="g"', '["g","kg"].includes(n.unit)'],
+]);
+patchNomenclatureFunction("bdNomenclatureSheetV237", [
+  ['u.unit==="ml"', '["ml","l"].includes(u.unit)'],
+  ['u.unit==="g"', '["g","kg"].includes(u.unit)'],
+  ['C==="ml"', '["ml","l"].includes(C)'],
+  ['C==="g"', '["g","kg"].includes(C)'],
+  ['i.jsx("option",{value:"ml",children:"Миллилитрах — жидкость"}),i.jsx("option",{value:"g",children:"Граммах — вес"}),i.jsx("option",{value:"pcs",children:"Штуках"})',
+    'i.jsx("option",{value:"ml",children:"Миллилитрах — жидкость"}),i.jsx("option",{value:"l",children:"Литрах — жидкость"}),i.jsx("option",{value:"g",children:"Граммах — вес"}),i.jsx("option",{value:"kg",children:"Килограммах — вес"}),i.jsx("option",{value:"pcs",children:"Штуках"})'],
+]);
 source=source.replaceAll('if(e?.unitModelVersion===4)return bdWarehouseDecimal(t,3)+" "+bdWarehouseUnit(e.unit);', '');
 for(const [prefix,guard] of [
   ['function bdProcStockPreviewV221(e){','if(e?.purchaseConversion?.version===4)return bdProcFormatAmountV221(e.purchaseConversion.canonicalQuantity,e.purchaseConversion.canonicalUnit);if(e?.purchaseUnitModel===4){const p=bdPurchasePreviewV421(e);return p.ok?bdProcFormatAmountV221(p.snapshot.canonicalQuantity,p.snapshot.canonicalUnit):"Проверьте количество и единицы";}'],

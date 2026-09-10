@@ -3,13 +3,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { createRequire, stripTypeScriptTypes } from "node:module";
-import { normalizePurchaseQuantity } from "../lib/bardoctor/stock-units";
-import { normalizePurchaseDocument } from "../lib/bardoctor/purchases";
+import { canonicalStockUnit, normalizePurchaseQuantity } from "../lib/bardoctor/stock-units";
+import { normalizePurchaseDocument, PURCHASE_STORE_KEY } from "../lib/bardoctor/purchases";
 import { preparePurchaseConversions } from "../lib/bardoctor/purchase-conversion";
-import { applyPurchaseToInventory } from "../lib/bardoctor/inventory";
+import { applyPurchaseToInventory, inventoryPackageAmount } from "../lib/bardoctor/inventory";
 import { queryCanonicalNomenclature } from "../lib/bardoctor/nomenclature-selector";
 import { observedAwait } from "../lib/bardoctor/request-observability";
 
+import { openingRuntime } from "./helpers/opening-runtime";
+import { manualReferencePrice } from "../lib/bardoctor/manual-reference-price";
+import * as nomenclatureIdentity from "../lib/bardoctor/nomenclature-identity";
+import { changedConsumptionModeIssues } from "../lib/bardoctor/consumption-mode";
 type Element = { type: string; props: Record<string, unknown> };
 type Row = Record<string, unknown>;
 function runtime() {
@@ -232,3 +236,226 @@ test("actual tech-card client reads canonical receipt snapshot without another p
   assert.equal(result.cost, 14.29);
   assert.equal(result.purchaseDocumentId, "purchase");
 });
+
+function nomenclatureCardRuntime(product: Row, assortment: Row, post: (request: Request) => Promise<Response>) {
+  const source = readFileSync("public/assets/index-BQGspy0I.js", "utf8");
+  const units = source.slice(source.indexOf("/* purchase-units-v421:start */"), source.indexOf("/* purchase-units-v421:end */"));
+  const initialStart = source.indexOf("function bdNomenclatureInitialFormV213(");
+  const initial = source.slice(initialStart, source.indexOf("\nfunction ", initialStart + 1));
+  const cardStart = source.indexOf("function bdNomenclatureInitialFormV237(");
+  const card = source.slice(cardStart, source.indexOf("\nbdNomenclatureSheet=", cardStart));
+  assert.ok(initialStart >= 0 && cardStart >= 0 && card.length > 1000);
+  const tree = { sections: [{ id: "kitchen", name: "Kitchen" }],
+    categories: [{ id: "food", name: "Food", parentId: "kitchen" }],
+    subcategories: [{ id: "grocery", name: "Grocery", parentId: "food" }], locations: [] };
+  const hooks: unknown[] = [];
+  let cursor = 0;
+  let saved: Row | undefined;
+  const requests: Row[] = [];
+  const jsx = (type: string, props: Row): Element => ({ type, props });
+  const api = runInNewContext(units + initial + card + ";({render:bdNomenclatureSheetV237})", {
+    i: { jsx, jsxs: jsx }, structuredClone, Error,
+    S: { useState: (initial: unknown) => {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = typeof initial === "function" ? initial() : initial;
+      return [hooks[index], (next: unknown) => { hooks[index] = typeof next === "function" ? next(hooks[index]) : next; }];
+    } },
+    bdWarehouseKey: (value: Row) => String(value?.productKey ?? value?.key ?? ""),
+    bdNomenclatureTree: () => tree, bdWarehouseRecord: (value: unknown) => value ?? {},
+    bdCatArray: (value: unknown) => Array.isArray(value) ? value : [], bdWarehouseNumber: Number,
+    bdServiceExpenseOptionsV359: () => [], bdSectionPathLabelV365: (_: unknown, item: Row) => item?.name ?? "",
+    bdPurchaseTypeLabelV362: () => "Products", bdNomenclatureSaveHintV362: () => "", ca: () => ({ "X-Venue-Id": "1" }), Ot: () => null,
+    fetch: async (url: string, options: RequestInit) => {
+      assert.equal(url, "/api/inventory/products");
+      requests.push(JSON.parse(String(options.body)) as Row);
+      return post(new Request("http://localhost" + url, options));
+    },
+  }) as { render: (props: Row) => Element };
+  const render = () => { cursor = 0; return api.render({ product, assortment, canEdit: true,
+    onClose: () => {}, onSaved: (result: Row) => { saved = result; } }); };
+  const control = (label: string, kind: "input" | "select") => {
+    const parent = all(render()).find(element => element.type === "label"
+      && all(element).some(child => child.type === "span" && child.props.children === label));
+    const element = all(parent).find(child => child.type === kind);
+    assert.ok(element, `Missing ${kind}: ${label}`);
+    return element;
+  };
+  return { render, control, requests, result: () => saved,
+    change(label: string, kind: "input" | "select", value: string) {
+      (control(label, kind).props.onChange as (event: { target: { value: string } }) => void)({ target: { value } });
+    },
+    async save() {
+      const button = all(render()).find(element => element.type === "button" && element.props.children === "Сохранить");
+      assert.ok(button);
+      assert.equal(button.props.disabled, false, "A metadata-only rename must remain saveable");
+      await (button.props.onClick as () => Promise<void>)();
+      assert.ok(saved, "Real product update must succeed; card errors: " + JSON.stringify(all(render()).filter(element => element.props.className === "bd-inventory-error").map(element => element.props.children)));
+    },
+  };
+}
+
+for (const scenario of [
+  { unit: "kg", displayUnit: "kg", packageSize: "1 кг", amount: 1.09, measure: "килограммах", displayOptions: ["kg", "g", "pcs"] },
+  { unit: "l", displayUnit: "l", packageSize: "1 л", amount: 2.5, measure: "литрах", displayOptions: ["l", "ml", "pcs"] },
+  { unit: "pcs", displayUnit: "pcs", packageSize: "1 шт.", amount: 12, measure: "штуках", displayOptions: ["pcs"] },
+  { unit: "g", displayUnit: "kg", packageSize: "1 кг", amount: 1090, measure: "килограммах", displayOptions: ["kg", "g", "pcs"] },
+  { unit: "ml", displayUnit: "l", packageSize: "1 л", amount: 2500, measure: "литрах", displayOptions: ["l", "ml", "pcs"] },
+]) {
+  test(`Phase 6 real nomenclature card ${scenario.unit}: rename, API save and reload preserve units, packages, stock and movements`, async () => {
+    const r = openingRuntime();
+    const products = r.loadRoute(new URL("../app/api/inventory/products/route.ts", import.meta.url), {
+      canonicalStockUnit, manualReferencePrice, PURCHASE_STORE_KEY, ...nomenclatureIdentity, changedConsumptionModeIssues,
+    });
+    try {
+      const product: Row = { id: `card-${scenario.unit}`, key: `card-${scenario.unit}`, productKey: `card-${scenario.unit}`,
+        name: "TEST card", venueId: 1, kind: "stock", itemType: "ingredient", category: "products",
+        unit: scenario.unit, displayUnit: scenario.displayUnit, packageSize: scenario.packageSize,
+        packageAmount: ["g", "ml"].includes(scenario.unit) ? 1000 : 1, purchaseMode: "document",
+        current: scenario.amount, onOrder: 0, currency: "MDL", active: true,
+        sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "grocery",
+        ...(["kg", "l", "pcs"].includes(scenario.unit) ? { unitModelVersion: 4 } : {}),
+      };
+      const movements = [{ id: `receipt-${scenario.unit}`, type: "receipt", status: "active", venueId: 1,
+        sourceDocumentId: "prior-receipt", sourceLineId: "line", productKey: product.productKey,
+        productName: product.name, amount: scenario.amount, unit: scenario.unit, costAmount: 100, currency: "MDL",
+        date: "2026-09-08", createdAt: "2026-09-08T12:00:00.000Z" }];
+      r.put("bd_assortment_v1", { nomenclature: [product], stockBalances: [product], recipes: [], menuItems: [] });
+      r.put("bd_stock_movements", movements);
+      const beforeMovements = r.sqlite.prepare("SELECT data_json FROM domain_data WHERE store_key='bd_stock_movements'").get();
+      const persisted = r.get("bd_assortment_v1") as Row;
+      const card = nomenclatureCardRuntime((persisted.nomenclature as Row[])[0], persisted, products.POST);
+      const base = card.control("Склад считает в", "select");
+      assert.equal(base.props.value, scenario.unit, "Opening the card must not coerce kg/l or legacy g/ml into pcs");
+      assert.ok(all(base).some(option => option.type === "option" && option.props.value === scenario.unit), "Persisted base unit must exist in select options");
+      const display = card.control("Показывать остаток", "select");
+      assert.equal(display.props.value, scenario.displayUnit);
+      for (const value of scenario.displayOptions) assert.ok(all(display).some(option => option.type === "option" && option.props.value === value), `Missing compatible display unit ${value}`);
+      const intake = card.control("Приходовать в", "select");
+      assert.equal(all(intake).find(option => option.type === "option" && option.props.value === "measure")?.props.children, "В " + scenario.measure);
+      card.change("Название", "input", "TEST card renamed");
+      await card.save();
+      assert.equal(card.requests.length, 1);
+      assert.equal(card.requests[0].unit, scenario.unit);
+      assert.equal(card.requests[0].packageSize, scenario.packageSize);
+      const after = r.get("bd_assortment_v1") as Row;
+      for (const store of ["nomenclature", "stockBalances"]) {
+        const item = (after[store] as Row[]).find(item => item.productKey === product.productKey);
+        assert.ok(item);
+        assert.equal(item.name, "TEST card renamed");
+        for (const key of ["unit", "unitModelVersion", "displayUnit", "packageSize", "packageAmount", "current"]) assert.equal(item[key], product[key], `${store}.${key} must remain stable`);
+      }
+      assert.deepEqual(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE store_key='bd_stock_movements'").get(), beforeMovements);
+      const reopened = nomenclatureCardRuntime((after.nomenclature as Row[])[0], after, products.POST);
+      assert.equal(reopened.control("Склад считает в", "select").props.value, scenario.unit);
+      assert.equal(reopened.control("Основная фасовка", "input").props.value, scenario.packageSize);
+      assert.deepEqual(r.get("bd_stock_movements"), movements);
+    } finally { r.close(); }
+  });
+}
+
+for (const unit of ["kg", "l"]) {
+  test(`Phase 6 nomenclature ${unit} unit-change handler keeps package defaults in the same physical dimension`, () => {
+    const product = { id: "new-card", productKey: "new-card", name: "TEST card", kind: "stock",
+      unit: "pcs", displayUnit: "auto", packageSize: "1 шт.", current: 0,
+      sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "grocery" };
+    const card = nomenclatureCardRuntime(product, { nomenclature: [product], stockBalances: [product] },
+      async () => { throw new Error("Unit editing alone must not save metadata"); });
+    card.change("Склад считает в", "select", unit);
+    assert.equal(card.control("Склад считает в", "select").props.value, unit);
+    const packageSize = card.control("Основная фасовка", "input").props.value;
+    const converted = inventoryPackageAmount(packageSize, unit, unit);
+    assert.equal(converted.unit, unit, `Default ${String(packageSize)} must not turn a measured product into pieces`);
+    assert.ok(converted.amount > 0);
+    const intake = card.control("Приходовать в", "select");
+    assert.equal(all(intake).find(option => option.type === "option" && option.props.value === "measure")?.props.children,
+      "В " + (unit === "kg" ? "килограммах" : "литрах"));
+    const display = card.control("Показывать остаток", "select");
+    assert.ok(all(display).some(option => option.type === "option" && option.props.value === unit));
+    assert.equal(card.requests.length, 0);
+  });
+}
+
+function quickNomenclatureRuntime(unit: string, post: (request: Request) => Promise<Response>) {
+  const source = readFileSync("public/assets/index-BQGspy0I.js", "utf8");
+  let code = source.slice(source.indexOf("/* purchase-units-v421:start */"), source.indexOf("/* purchase-units-v421:end */"));
+  for (const name of ["bdTaxBaseUnitV336", "bdTaxDisplayUnitV336", "bdNomenclatureQuickCreateV336"]) {
+    const start = source.indexOf(`function ${name}(`);
+    const end = source.indexOf("\nfunction ", start + 1);
+    assert.ok(start >= 0 && end > start);
+    code += source.slice(start, end);
+  }
+  const hooks: unknown[] = [];
+  let cursor = 0;
+  let created: Row | undefined;
+  const requests: Row[] = [];
+  const jsx = (type: string, props: Row): Element => ({ type, props });
+  const api = runInNewContext(code + ";({render:bdNomenclatureQuickCreateV336})", {
+    i: { jsx, jsxs: jsx }, ug: { createPortal: (element: Element) => element }, document: { body: {} },
+    S: { useEffect: () => {}, useState: (initial: unknown) => {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = typeof initial === "function" ? initial() : initial;
+      return [hooks[index], (next: unknown) => { hooks[index] = typeof next === "function" ? next(hooks[index]) : next; }];
+    } },
+    Error, structuredClone, ca: () => ({ "X-Venue-Id": "1" }), Ot: () => null, Kse: () => {},
+    fetch: async (url: string, options: RequestInit) => {
+      assert.equal(url, "/api/inventory/products");
+      requests.push(JSON.parse(String(options.body)) as Row);
+      return post(new Request("http://localhost" + url, options));
+    },
+  }) as { render: (props: Row) => Element };
+  // Taxonomy is supplied in the prefill. Only asynchronous suggestion loading is
+  // omitted; unit initialization, the visible selector, submit, and HTTP save are real.
+  const render = () => { cursor = 0; return api.render({ initialName: `TEST quick ${unit}`, context: "receipt",
+    prefill: { unit, packageSize: "", sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "grocery" },
+    onClose: () => {}, onCreated: (_: Row, product: Row) => { created = product; } }); };
+  const select = all(render()).find(element => element.type === "select" && element.props["aria-label"] === "В чём учитывать остаток?");
+  assert.ok(select);
+  return { requests, visibleUnit: select.props.value,
+    async create() {
+      const button = all(render()).find(element => element.type === "button" && element.props.children === "Создать и добавить");
+      assert.ok(button);
+      assert.equal(button.props.disabled, false);
+      await (button.props.onClick as () => Promise<void>)();
+      assert.ok(created, "Quick-create must succeed; errors: " + JSON.stringify(all(render()).filter(element => element.props.role === "alert").map(element => element.props.children)));
+      return created;
+    },
+  };
+}
+
+for (const unit of ["l", "kg", "pcs", "ml", "g"]) {
+  test(`Phase 6 real invoice quick-create ${unit}: source unit survives actual submit and product API persistence`, async () => {
+    const r = openingRuntime();
+    const products = r.loadRoute(new URL("../app/api/inventory/products/route.ts", import.meta.url), {
+      canonicalStockUnit, manualReferencePrice, PURCHASE_STORE_KEY, ...nomenclatureIdentity, changedConsumptionModeIssues,
+    });
+    try {
+      r.put("bd_assortment_v1", { nomenclature: [], stockBalances: [], recipes: [], menuItems: [], nomenclatureStructure: {
+        sections: [{ id: "kitchen", name: "Kitchen", order: 10, active: true }],
+        categories: [{ id: "food", name: "Food", parentId: "kitchen", order: 10, active: true }],
+        subcategories: [{ id: "grocery", name: "Grocery", parentId: "food", order: 10, active: true }], locations: [],
+      } });
+      r.put("bd_stock_movements", []);
+      const card = quickNomenclatureRuntime(unit, products.POST);
+      const created = await card.create();
+      assert.equal(card.requests.length, 1);
+      const expected = canonicalStockUnit(unit);
+      assert.equal(created.unit, expected, "A measured invoice unit must not create a piece-count product");
+      assert.equal(card.visibleUnit, expected, "Visible canonical unit must agree with the source physical dimension");
+      assert.equal(canonicalStockUnit(card.requests[0].unit), expected);
+      assert.equal(created.displayUnit, expected);
+      assert.equal(created.unitModelVersion, 4);
+      assert.equal(created.current, 0);
+      const packageAmount = inventoryPackageAmount(created.packageSize, expected, expected);
+      assert.equal(packageAmount.unit, expected);
+      assert.equal(created.packageAmount, packageAmount.amount);
+      assert.equal(created.packageAmount, ["g", "ml"].includes(unit) ? 0.001 : 1);
+      const after = r.get("bd_assortment_v1") as Row;
+      for (const store of ["nomenclature", "stockBalances"]) {
+        assert.equal((after[store] as Row[]).length, 1);
+        const persisted = (after[store] as Row[])[0];
+        for (const key of ["unit", "displayUnit", "unitModelVersion", "packageSize", "packageAmount", "current"]) assert.equal(persisted[key], created[key]);
+      }
+      assert.deepEqual(r.get("bd_stock_movements"), []);
+    } finally { r.close(); }
+  });
+}

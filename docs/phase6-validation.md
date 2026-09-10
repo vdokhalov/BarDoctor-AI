@@ -1,55 +1,85 @@
 # Phase 6 — Purchases / costing / warehouse integrity
 
 Baseline: production v427 VERIFIED, source e66d2c2fba8647de538196cff682b5da38184509.
-Status: IN PROGRESS. No production writes, migrations or deployment authorized or performed in Phase 6.
+Status: IN PROGRESS / NOT READY FOR DEPLOYMENT (2026-09-10).
 
-## Findings and fixes under validation
+No Phase 6 deployment, schema change, destructive migration or write to a working venue. The owner authorized actual recognition in an existing isolated TEST venue. This created TEST uploads/jobs, one supplier, one ingredient and its supplier mapping; no receipt was posted and stock remained zero. Production secrets were neither read nor changed. The browser was restored to the original working venue. Photo, ground truth and raw diagnostics remain outside Git.
+
+## Findings and fixes
 
 ### Manual invoice matching
-- CAUSE: deterministic matching ignored `mappingSource: manual`; AI batching used the generic review flag even when only arithmetic needed review.
-- BUSINESS IMPACT: re-recognition could replace an explicit tea selection with an incorrect exact alias and post against the wrong item.
-- FIX: preserve operator-selected identity; missing targets and arithmetic issues still require review; manual identity is excluded from AI batching and proposal application.
-- VERIFICATION: two tests failed against baseline; four targeted tests pass after the change. Existing AI matching tests also passed (12 combined tests).
+- CAUSE: deterministic rematching ignored manual identity; AI batching used generic review status even when only arithmetic needed review.
+- BUSINESS IMPACT: an explicit tea selection could be replaced by an incorrect alias.
+- FIX: preserve manual identity through deterministic matching, AI batching and proposal application. Missing targets and arithmetic still require review.
+- VERIFICATION: fail-first tests preceded the fix. Tests cover a queued AI response arriving after manual correction, including outstanding arithmetic review. Existing AI tests pass.
 
-### Purchase retry after canonicalization
-- CAUSE: confirmation checked current conversion metadata and performed legacy canonicalization before checking the persisted document identity.
-- BUSINESS IMPACT: a retry of an already committed receipt could return conversion review instead of the saved result.
-- FIX: return the persisted duplicate after authorization and venue checks, before conversion and reconciliation; no writes on retry.
-- VERIFICATION: isolated real HTTP/SQLite chain exercises repeated confirmation and byte-equal movements.
+### Receipt retry after nomenclature changes
+- CAUSE: conversion/canonicalization ran before persisted-document lookup.
+- BUSINESS IMPACT: retry could fail against current units despite an already committed receipt.
+- FIX: return confirmed/cancelled persisted duplicates after authorization and venue checks, before conversion or reconciliation; unconfirmed rows still validate.
+- VERIFICATION: actual HTTP/SQLite retries after unit change or target removal preserve document, raw JSON, movements and audit with no CAS writes. An invalid-unit regression in the first implementation was fixed without weakening the existing test.
 
-### Explicit menu/recipe identity
-- CAUSE: legacy duplicate consolidation could replace nomenclature IDs while explicit ingredient and ready-product IDs still referenced the originals.
-- BUSINESS IMPACT: a purchase could make a previously valid recipe unpostable.
-- FIX: extend the existing protected-identity guard to explicit recipe and ready-product references. No automatic legacy merge for these records.
-- VERIFICATION: the integrated receipt-to-recipe-sale test now reaches posting successfully; broad regression pending.
+### Explicit menu and recipe identity
+- CAUSE: legacy duplicate consolidation could replace IDs still referenced by ingredients or ready products.
+- BUSINESS IMPACT: a purchase could make a valid recipe unpostable.
+- FIX: extend protected-identity guard to explicit recipe and ready-product references; no automatic merge for these records.
+- VERIFICATION: integrated receipt-to-recipe-sale test passes. Espresso/americano keep coffee-bean identity and latest receipt cost. Tea ambiguities remain reviewable.
 
-### Purchase edits corrupting sales movement types
-- CAUSE: legacy `movementRecord` defaulted unrecognized types to receipt, stripping sale batch linkage and snapshots during purchase edits.
-- BUSINESS IMPACT: full refund could report success without restoring stock (observed 2.92 kg instead of 3 kg).
-- FIX: preserve immutable opening, sale-consumption and sale-reversal records through legacy normalization.
-- VERIFICATION: real HTTP/SQLite chain now restores 3 kg and asserts unchanged sale movement data after purchase edit. Unsafe cancellation after later movements returns 409 without mutations. A separate unused receipt can be cancelled once, restoring prior last purchase price.
+### Purchase edits corrupting sale movements
+- CAUSE: legacy movement normalization defaulted modern types to receipt, stripping sale links/snapshots.
+- BUSINESS IMPACT: full refund could report success without restoring stock (2.92 kg instead of 3 kg observed).
+- FIX: preserve immutable opening, sale-consumption and sale-reversal records.
+- VERIFICATION: actual HTTP/SQLite chain restores 3 kg and asserts unchanged sale movements. Unsafe receipt cancellation after later movements returns 409 without mutations; safe cancellation restores prior last price exactly once.
 
-## Executed and pending gates
+### Card coerces kg/l into pieces
+- CAUSE: legacy initializer/select accepted only g/ml/pcs; kg/l package and display branches also defaulted to pieces.
+- BUSINESS IMPACT: opening a measured item displayed pieces and unrelated metadata save sent the wrong unit.
+- FIX: active v421 owner preserves kg/l and legacy g/ml, adds compatible options and uses mass/volume families for defaults and controls. No stored record migration.
+- VERIFICATION: four baseline assertions failed. After the fix actual card -> products HTTP -> SQLite -> reopened card preserves units, packages, stock and raw movement JSON for kg/l/pcs/g/ml. Full suite after this card fix: 943 PASS, zero failures/cancellations/skips.
 
-- Baseline targeted purchases, units, costing, invoice AI and ingredient matching: 54 PASS, none skipped.
-- Current Phase 6 targeted tests: 5 PASS (four matching, one multi-operation HTTP/SQLite chain).
-- Full unit suite, typecheck, lint and strict replay launched; results pending. Do not infer PASS.
-- Windows sandbox tsx fails before test loading with uv_os_get_passwd ENOMEM. Targeted tests actually ran outside sandbox successfully.
-- Standard build attempted: prebuild succeeded, build blocked because Bash is unavailable. Independent GitHub CI build remains required.
-- UI purchases/edit/reopen/unit matrix, full mobile/desktop regression and real invoice OCR/Hybrid scenario remain pending.
-- Existing invoice 394 representative runner uses a simulated AI provider; it must not be presented as a real OCR/provider result.
-- Commit, push, GitHub synchronization and fresh full CI remain pending. NOT READY FOR DEPLOYMENT.
+### Quick-create misreads Latin l
+- CAUSE: existing helpers recognize Cyrillic litres but omit canonical Latin l from the invoice selector.
+- BUSINESS IMPACT: actual quick-create submit persisted a litre ingredient as pcs.
+- FIX: recognize the standalone Latin litre token in base/display helpers through active v421 owner.
+- VERIFICATION: fail-first actual submit/API test persisted pcs for l; kg/pcs/ml/g controls passed. After correction all 18 combined card/quick-create/API tests pass, zero skipped. Direct second patch application preserves exact bundle bytes.
 
-## Verification checkpoint — 2026-09-10
+A 1 g package for an item stocked in kg is valid as 0.001 kg. Direct measured receipt quantity is not converted through that package again; count-to-mass without explicit contents remains blocked. No speculative package cleanup was performed.
 
-- Full unit suite after fixes: 934 PASS, 0 FAIL, 0 skipped. The first full run found one invalid-unit regression (932/933); it was fixed without weakening the existing assertion. Early duplicate return now requires confirmed/cancelled status; unconfirmed rows still undergo conversion validation.
-- Full typecheck: PASS. Full lint: PASS, zero errors and two pre-existing warnings.
-- HTTP unit matrix: pcs, kg/g, l/ml and packs; actual create/edit/retry/cancel calls with SQLite persistence. Stable line ID and expected quantities asserted, including 12 pieces remaining 12.
-- Recipe sale costing: 10 portions at 8 g cost 8 MDL from a 100 MDL/kg receipt; a new 200 MDL/kg receipt changes the next preview to 16 MDL. Historical event remains unchanged.
-- Espresso and americano both retain the coffee-bean identity and calculate 3.4 from the latest receipt in the existing client costing test.
-- Phase 5 sales browser: 390x844 and 1280x720 PASS (HTTP/SQLite, cancel/post/lost response/reload/retry/reverse/shifts/venue).
-- Purchase UI: 390x844 and 1280x720 PASS, no reported issues; both screenshots visually inspected. Includes manual remapping, explicit package content, save and reload. This browser fixture uses production conversion/posting functions; the separate HTTP chain tests actual endpoint transactions.
-- Representative invoice 394 SIMULATED-provider result: 15 rows, 12 correct automatic links, 3 manual searches, 0 false links. After correction: 15 correct historical links, no AI requests. Not a live OCR/provider proof.
-- User will supply an invoice photo. Real OCR/Hybrid verification remains pending.
-- Sandbox replay was interrupted after prolonged lack of output; retried unchanged outside sandbox. Do not count interrupted run as PASS. Sandbox helper also reproduced spawn_ready timeout while reading a test file; targeted work continued outside sandbox.
-- General navigation, Home/Reviews, unsandboxed strict replay and independent GitHub build/CI still pending at this checkpoint. No publication.
+## Cost and stock evidence
+
+- Actual HTTP/SQLite create/edit/retry/cancel matrix covers pcs, kg/g, l/ml and packs, stable line IDs and 12 pieces remaining 12.
+- Receipt at 100 MDL/kg -> 10 portions at 8 g cost 8 MDL; next receipt at 200 MDL/kg -> next preview cost 16 MDL. Historical sale event/cost snapshot stays unchanged.
+- Opening + receipts - consumption + reversals equals expected stock across sequential operations, receipt edit and reload. No duplicate posting/movements/reversal on retry.
+- Safe cancellation restores the prior latest purchase price; unsafe cancellation after later movements rejects without mutation. Weighted average is not the current-cost model.
+
+## Actual invoice / Hybrid evidence
+
+- Private manually checked ground truth: 15 photo rows. The old representative synthetic fixture is not photo ground truth.
+- Ordinary configured legacy AI-vision/Hybrid flow in isolated TEST: first recognition 15 rows, 0 automatic links, 15 manual, 0 false links; numeric values and order match the photo.
+- One appropriate ingredient was explicitly created/selected, then the draft discarded. Fresh upload: 15 rows, 1 semantically correct supplier-history link, 14 manual, 0 false links; corrected identity and numeric values remain stable.
+- Existing owner-only QA selector then exercised configured real OCR without exposing secrets. Completed server job: invoice_recognition_v2, primary mode, ocr_space:engine3, ocrSuccess=true, 136 detected text lines, 23 duplicates, 15 parsed item rows. All 15 rows match the photo and ordinary flow.
+- Primary OCR: 1 historical link, 14 manual, 0 false links. QA ai-unavailable intentionally makes zero fallback requests; AI_FALLBACK_UNAVAILABLE and VALIDATION_REQUIRED are expected and retained. This is not proof of successful high-confidence AI fallback proposals.
+- No purchase was posted. Reload showed zero TEST purchases and zero stock for the new ingredient. Card-unit issue was inspected then cancelled without saving; fixes remain local.
+- Earlier OCR_NOT_CONFIGURED/browser timeout attempts remain failures, superseded for actual OCR coverage by the completed TEST-provider evidence. No secret workaround was used.
+
+## Gate checkpoint
+
+Completed before final Latin-litre correction:
+- Full suite 936 PASS after two review-gap tests; 943 PASS after card tests. Zero failures/skips. Full typecheck PASS; lint zero errors, two pre-existing unused-variable warnings.
+- Strict extended replay before new card fixes: 5/5 PASS, exit 0. LF/CRLF equivalence, marker ownership, fail-closed anchors and two full declared preparation cycles remain strict.
+- Sales browser 390x844/1280x720 PASS with real HTTP/SQLite; purchase browser same sizes PASS, including mapping, pack contents, save/reload and discard.
+- Home/Reviews five viewports PASS. General navigation hit a missing-iframe timing failure; unchanged embedded retry and full unchanged desktop profile then passed (6/6). Failed evidence retained. Existing data-control fixture has an unmocked audit response, so this does not prove the audit API.
+
+Final source:
+- Targeted card/quick-create/API: 18 PASS. Full unit: 948 PASS, zero failures/cancellations/skips (exit 0, 848176 ms). Full typecheck PASS; full lint PASS with zero errors and the same two existing warnings.
+- Final-source sales and purchase browser checks PASS at 390x844 and 1280x720. Purchase screenshots visually inspected. General navigation and strict replay remain RUNNING/PENDING.
+- Private card browser attempts encountered local startup timing and incorrect private locators before save assertions. Failure evidence is retained; corrected private harness is still running and is not PASS.
+- Existing generated-client regression batch: 19 PASS, 1 FAIL because dist/client/app.html is absent. The failed packaged-release assertion remains a build-dependent gate; no artifact was fabricated or assertion removed.
+- Standard npm build previously reached prebuild then lacked Bash. Private Windows adapter executed all 80 unchanged precompiler stages in an isolated current-source copy, then FAILED at the original 3-minute compiler limit (VINEXT_BUILD_TIMEOUT). RSC stage 1, analyze client references, did not reach stage 2. No post-build/final validation ran. The caught Git HEAD warning is nonfatal; no syntax/module/OOM error was emitted. Host contention versus compiler stall is unresolved. Independent unchanged Linux GitHub build is required; this attempt is not PASS.
+- Sandbox failures happen before loading tests (uv_os_get_passwd ENOMEM / spawn_ready timeout). Only completed executions outside that sandbox are reported as results.
+
+## Git and publication gate
+
+Initial Phase 6 commit: 46217567e3b8cdd79646de3d3fd48c09c1663ed5. Follow-up unit fixes/tests remain uncommitted. Exclude photo, raw evidence and old private resume report.
+
+Automatic approval review rejected push to confirmed PUBLIC vdokhalov/BarDoctor-AI pending explicit public source-disclosure approval. No Phase 6 push or fresh GitHub CI has occurred; GitHub is not yet synchronized/GREEN for Phase 6. Full Linux CI and final user deployment confirmation remain required. Production v427 stays deployed.
