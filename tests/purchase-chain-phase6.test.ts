@@ -131,20 +131,26 @@ test("Phase 6 HTTP unit matrix: create, reopen, edit, retry and safe cancel pres
   }
 });
 
-test("Phase 6 a persisted receipt retry survives changed or missing current conversion targets without writes", async () => {
-  for (const change of ["unit-changed", "target-removed"] as const) {
+test("Phase 6 a persisted receipt retry survives changed or missing current conversion targets without writes", async (t) => {
+  const cases = (["unit-changed", "target-removed"] as const).flatMap(change =>
+    (["document-id", "idempotency-key"] as const).flatMap(identity =>
+      (["confirmed", "cancelled"] as const).map(status => ({ change, identity, status }))));
+  for (const { change, identity, status } of cases) await t.test(`${change}/${identity}/${status}`, async () => {
     const r = openingRuntime();
-    const confirm = r.loadRoute(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), {
+    const dependencies = {
       ...purchases, ...conversion, ...scope, ...matching, INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots",
-    });
-    const original = { id: `persisted-${change}`, venueId: 1, documentType: "invoice", supplierId: "supplier",
+    };
+    const confirm = r.loadRoute(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), dependencies);
+    const cancel = r.loadRoute(new URL("../app/api/purchases/cancel/route.ts", import.meta.url), dependencies);
+    const originalKey = `persisted-key-${change}-${identity}-${status}`;
+    const original = { id: `persisted-${change}-${identity}-${status}`, venueId: 1, documentType: "invoice", supplierId: "supplier",
       supplierName: "Test", date: "2026-09-08", currency: "MDL", paymentMethod: "unknown", total: 120,
       items: [{ id: "stable-line", name: "Test bottles", purchaseProductKey: "bottles", nomenclatureId: "bottles",
         quantity: 12, unit: "pcs", unitPrice: 10, lineTotal: 120, category: "products", mappingSource: "manual" }] };
-    const send = async (expectedStatus: 200 | 201) => {
+    const send = async (expectedStatus: 200 | 201, document = original, idempotencyKey = originalKey) => {
       const response = await confirm.POST(new Request("http://localhost/api/purchases/confirm", {
         method: "POST", headers: { "Content-Type": "application/json", "X-Venue-Id": "1" },
-        body: JSON.stringify({ document: original }),
+        body: JSON.stringify({ document, idempotencyKey }),
       }));
       const result = await response.json() as { duplicate?: boolean; document: purchases.PurchaseDocument };
       assert.equal(response.status, expectedStatus, `${change}: ${JSON.stringify(result)}`);
@@ -157,7 +163,19 @@ test("Phase 6 a persisted receipt retry survives changed or missing current conv
       r.put("bd_suppliers", [{ id: "supplier", name: "Test", venueId: 1 }]);
       const first = await send(201);
       assert.equal(first.document.status, "confirmed");
+      assert.equal(first.document.idempotencyKey, originalKey);
       assert.ok(first.document.items[0].purchaseConversion);
+      let expectedDocument = first.document;
+      if (status === "cancelled") {
+        const response = await cancel.POST(new Request("http://localhost/api/purchases/cancel", {
+          method: "POST", headers: { "Content-Type": "application/json", "X-Venue-Id": "1" },
+          body: JSON.stringify({ documentId: original.id, reason: "Safe isolated receipt cancellation" }),
+        }));
+        const result = await response.json() as { document: purchases.PurchaseDocument };
+        assert.equal(response.status, 200, JSON.stringify(result));
+        expectedDocument = result.document;
+      }
+      assert.equal(expectedDocument.status, status);
       const persisted = r.get("bd_assortment_v1") as Record<string, unknown>;
       const changed = change === "target-removed"
         ? { ...persisted, nomenclature: [], stockBalances: [] }
@@ -173,13 +191,18 @@ test("Phase 6 a persisted receipt retry survives changed or missing current conv
       const before = r.sqlite.prepare("SELECT * FROM domain_data ORDER BY account_id, store_key").all();
       const auditBefore = r.sqlite.prepare("SELECT * FROM audit_log ORDER BY rowid").all();
       const batchesBefore = r.batches();
-      const retry = await send(200);
+      // Make the other identifier different so neither identity branch can mask a missing one.
+      const retryDocument = identity === "document-id" ? original : { ...original, id: `${original.id}-new-request-id` };
+      const retryKey = identity === "document-id" ? `${originalKey}-new-request-key` : originalKey;
+      assert.equal(retryDocument.id === expectedDocument.id, identity === "document-id");
+      assert.equal(retryKey === expectedDocument.idempotencyKey, identity === "idempotency-key");
+      const retry = await send(200, retryDocument, retryKey);
       assert.equal(retry.duplicate, true);
-      assert.deepEqual(retry.document, first.document);
+      assert.deepEqual(retry.document, expectedDocument);
       assert.equal(r.batches(), batchesBefore);
       // Raw data_json strings enforce byte stability, including captured conversion and movements.
       assert.deepEqual(r.sqlite.prepare("SELECT * FROM domain_data ORDER BY account_id, store_key").all(), before);
       assert.deepEqual(r.sqlite.prepare("SELECT * FROM audit_log ORDER BY rowid").all(), auditBefore);
     } finally { r.close(); }
-  }
+  });
 });

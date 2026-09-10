@@ -43,6 +43,12 @@ No Phase 6 deployment, schema change, destructive migration or write to a workin
 - FIX: recognize the standalone Latin litre token in base/display helpers through active v421 owner.
 - VERIFICATION: fail-first actual submit/API test persisted pcs for l; kg/pcs/ml/g controls passed. After correction all 18 combined card/quick-create/API tests pass, zero skipped. Direct second patch application preserves exact bundle bytes.
 
+### Legacy CI assertion coupled to an identifier
+- CAUSE: the first fresh Phase 6 CI still required the old variable name `duplicateById`; the unchanged ID-or-idempotency-key predicate had moved before conversion under a new name.
+- BUSINESS IMPACT: the assertion blocked CI after a successful Linux build. It did not demonstrate a runtime idempotency regression; deployment remained blocked pending complete verification.
+- FIX: replace the variable-name assertion with checks for both identity comparisons and expand the actual HTTP/SQLite retry matrix to eight separately reported cases: ID-only/key-only, confirmed/cancelled, and changed/removed nomenclature. No application or workflow change.
+- VERIFICATION: the complete procurement file passes 8/8; the receipt chain passes 11/11 including all eight new subcases. The complete 421-test artifact batch passes 421/421 against the real built artifact, zero failures/skips. Full typecheck and lint pass (the same two pre-existing warnings). Raw store JSON, audit and CAS no-write assertions remain. Independent private mutations removing either identity branch each fail exactly its four cases while the other four pass; canonical source is unchanged.
+
 A 1 g package for an item stocked in kg is valid as 0.001 kg. Direct measured receipt quantity is not converted through that package again; count-to-mass without explicit contents remains blocked. No speculative package cleanup was performed.
 
 ## Cost and stock evidence
@@ -83,6 +89,6 @@ Final source:
 
 ## Git and publication gate
 
-Phase 6 implementation commits: 46217567e3b8cdd79646de3d3fd48c09c1663ed5 and 60fff2e538661230324132dc7ad79f03a1ec1379. This report records the completed local validation checkpoint before public push and independent CI. Photo, raw evidence and old private resume report are excluded. Independent review of all Phase 6 changes found no actionable defects.
+Phase 6 implementation commits: 46217567e3b8cdd79646de3d3fd48c09c1663ed5 and 60fff2e538661230324132dc7ad79f03a1ec1379, followed by the local validation checkpoint 27f2dcf8a5a8244c455c894d646f699aa3375477. Photo, raw evidence and old private resume report are excluded. Independent review of all Phase 6 application changes found no actionable defects.
 
-Automatic approval review rejected push to confirmed PUBLIC vdokhalov/BarDoctor-AI pending explicit public source-disclosure approval. No Phase 6 push or fresh GitHub CI has occurred; GitHub is not yet synchronized/GREEN for Phase 6. Full Linux CI and final user deployment confirmation remain required. Production v427 stays deployed.
+The owner explicitly approved public source disclosure, resolving the earlier automatic approval rejection. All three commits were pushed to PUBLIC vdokhalov/BarDoctor-AI, branch fix/product-inventory-phase1. The first fresh CI on 27f2dcf is [run 34451936206](https://github.com/vdokhalov/BarDoctor-AI/actions/runs/34451936206): typecheck, lint, real Linux build and artifact validation succeeded; the artifact suite then failed 1/421 on the legacy variable-name assertion described above. The remaining workflow steps were skipped and are not PASS. A new complete CI on the corrected test commit is required; production v427 stays deployed pending that gate and final deployment approval.

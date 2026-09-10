@@ -162,7 +162,9 @@ test("canonical purchase lifecycle separates documents, payments and reversals",
     readFile(new URL("../app/api/store/[key]/route.ts", import.meta.url), "utf8"),
   ]);
 
-  assert.match(confirm, /duplicateById/);
+  // Check both persisted identity contracts; actual no-write retries are exercised over HTTP/SQLite in Phase 6.
+  assert.match(confirm, /\.id\s*===\s*document\.id/);
+  assert.match(confirm, /\.idempotencyKey\s*===\s*idempotencyKey/);
   assert.match(confirm, /duplicateBySourceFile/);
   assert.match(confirm, /purchaseIdempotencyKey/);
   assert.match(confirm, /IDEMPOTENCY_KEY_REQUIRED/);
