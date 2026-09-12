@@ -1171,6 +1171,7 @@ test("user-confirmed mapping is reused and remains isolated from another venue",
 test("V2 draft keeps canonical references and enters the existing Purchase/Inventory pipeline", () => {
   const document = normalizePurchaseDocument({
     id: "invoice-v2",
+    venueId: 10,
     documentType: "invoice",
     supplierName: "ВПРОК",
     date: "2026-08-26",
@@ -1196,9 +1197,18 @@ test("V2 draft keeps canonical references and enters the existing Purchase/Inven
   });
   assert.equal(document.items[0].rawName, "КОКА КОЛА ПЭТ 1,25");
   assert.equal(document.items[0].purchaseProductKey, "stock:cola-125|ml");
-  const result = applyPurchaseToInventory({ assortment: { stockBalances: [] }, document, accountingCurrency: "RUB" });
+  const missingAssortment = { stockBalances: [] };
+  const beforeMissing = JSON.stringify(missingAssortment);
+  const missing = applyPurchaseToInventory({ assortment: missingAssortment, document, accountingCurrency: "RUB" });
+  assert.equal(missing.movements.length, 0);
+  assert.equal(missing.summary.unresolvedLines.length, 1);
+  assert.equal(JSON.stringify(missing.assortment), beforeMissing);
+  assert.equal(JSON.stringify(missingAssortment), beforeMissing);
+  const result = applyPurchaseToInventory({ assortment: { nomenclature: nomenclature.nomenclature.filter(product => product.venueId === 10), stockBalances: [] }, document, accountingCurrency: "RUB" });
+  assert.deepEqual(result.summary.unresolvedLines, []);
   assert.equal(result.movements.length, 1);
-  assert.equal(result.movements[0].productKey, "stock:coca cola 1 25 л|ml");
+  assert.equal(result.movements[0].productKey, "stock:cola-125|ml");
+  assert.equal(result.movements[0].unit, "ml");
   assert.equal(result.movements[0].amount, 2_500);
 });
 
@@ -1421,7 +1431,7 @@ test("route keeps legacy, limits AI to unresolved lines and returns manual conti
   assert.match(bundle, /e\.source==="manual"\|\|\(!line\.requiresReview/);
   assert.match(bundle, /C=bdCatArray\(e\.mappingCandidates\)/);
   assert.match(bundle, /context:"receipt"/);
-  assert.match(bundle, /onCreated:k=>\{O\(k\),bdSetQuickOpenV356\(!1\)\}/);
+  assert.match(bundle, /onCreated:\(k,product\)=>\{O\(\{\.\.\.product,\.\.\.k\}\),bdSetQuickOpenV356\(!1\)\}/);
   assert.match(bootstrap, /index-BQGspy0I\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /catalog\.css\?v=[^\"]*20260826-invoice-create-canonical-v297/);
   assert.match(appHtml, /bardoctor-preview\.js\?v=[^\"]*20260826-invoice-create-canonical-v297/);

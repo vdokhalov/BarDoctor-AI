@@ -83,13 +83,13 @@ test("CostBasisResolver preserves venue and warehouse isolation", () => {
 
 test("purchase packaging normalizes base quantity and cost on the same unit basis", () => {
   const pieces = applyPurchaseToInventory({
-    assortment: { stockBalances: [], nomenclature: [], recipes: [] },
+    assortment: { stockBalances: [], nomenclature: [{ id: "bottle", key: "bottle", productKey: "bottle", name: "Bottle", kind: "stock", unit: "pcs", venueId: 1, active: true, packageSize: "1 шт." }], recipes: [] },
     document: { id: "packages", venueId: 1, date: "2026-09-01", currency: "RUB", items: [{ id: "line", name: "Bottle", purchaseProductKey: "bottle", quantity: 2, unit: "шт.", packageSize: "12 x 1 шт", quantityMode: "count", lineTotal: 240, unitPrice: 120, category: "products" }] },
     accountingCurrency: "RUB",
     now: "2026-09-01T10:00:00.000Z",
   });
   const litres = applyPurchaseToInventory({
-    assortment: { stockBalances: [], nomenclature: [], recipes: [] },
+    assortment: { stockBalances: [], nomenclature: [{ id: "water", key: "water", productKey: "water", name: "Water", kind: "stock", unit: "ml", venueId: 1, active: true, packageSize: "1.25 л" }], recipes: [] },
     document: { id: "litres", venueId: 1, date: "2026-09-01", currency: "RUB", items: [{ id: "line", name: "Water", purchaseProductKey: "water", quantity: 6, unit: "шт.", packageSize: "1.25 л", quantityMode: "count", lineTotal: 150, unitPrice: 25, category: "products" }] },
     accountingCurrency: "RUB",
     now: "2026-09-01T10:00:00.000Z",

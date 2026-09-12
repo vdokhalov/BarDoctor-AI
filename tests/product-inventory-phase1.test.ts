@@ -237,7 +237,7 @@ test("CAS rejects a stale lifecycle write and deterministic replay preserves bot
   const database = new FakeD1();
   const accountId = 1;
   const keys = ["purchases", "assortment", "movements"];
-  const initial = { nomenclature: [], stockBalances: [], recipes: [], menuItems: [] };
+  const initial = { nomenclature: [{ id: "cola", key: "cola", productKey: "cola", name: "Cola", venueId: 7, kind: "stock", unit: "pcs", current: 0, active: true }], stockBalances: [], recipes: [], menuItems: [] };
   const seededAt = "2026-09-01T09:00:00.000Z";
   await database.batch([upsert(database, accountId, "purchases", [], seededAt), upsert(database, accountId, "assortment", initial, seededAt), upsert(database, accountId, "movements", [], seededAt)]);
   const firstSnapshot = await readStoreSnapshots(database as unknown as D1Database, accountId, keys);
@@ -248,6 +248,7 @@ test("CAS rejects a stale lifecycle write and deterministic replay preserves bot
     const assortment = database.value(accountId, "assortment");
     const movements = database.value(accountId, "movements") as unknown[];
     const applied = applyPurchaseToInventory({ assortment, document, accountingCurrency: "RUB", now });
+    assert.deepEqual(applied.summary.unresolvedLines, []);
     await runStoreCasBatch(database as unknown as D1Database, accountId, snapshot, [
       upsert(database, accountId, "purchases", [document, ...documents], now),
       upsert(database, accountId, "assortment", applied.assortment, now),
@@ -256,8 +257,10 @@ test("CAS rejects a stale lifecycle write and deterministic replay preserves bot
   };
 
   await writePurchase(purchase("purchase-a", 10), firstSnapshot, "2026-09-01T10:00:00.000Z");
+  const beforeRejected = await readStoreSnapshots(database as unknown as D1Database, accountId, keys);
   await assert.rejects(() => writePurchase(purchase("purchase-b", 14), secondSnapshot, "2026-09-01T10:00:01.000Z"), StoreWriteConflictError);
   const fresh = await readStoreSnapshots(database as unknown as D1Database, accountId, keys);
+  assert.deepEqual(fresh, beforeRejected);
   await writePurchase(purchase("purchase-b", 14), fresh, "2026-09-01T10:00:02.000Z");
 
   assert.deepEqual((database.value(accountId, "purchases") as Array<{ id: string }>).map((item) => item.id), ["purchase-b", "purchase-a"]);

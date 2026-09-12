@@ -309,7 +309,7 @@ async function postOnce(request: Request): Promise<Response> {
     venueId: account.venueId,
     items: document.items.map((item) => ({
       ...item,
-      purchaseProductKey: inventoryProductKey(item),
+      purchaseProductKey: item.purchaseProductKey ?? (item.nomenclatureId ? undefined : inventoryProductKey(item)),
     })),
     supplierId: String(supplier.id),
     supplierName: String(supplier.name),
@@ -389,6 +389,17 @@ async function postOnce(request: Request): Promise<Response> {
     );
   }
 
+  if (previousDocument.status !== "cancelled" && nextAffectsInventory) {
+    const receiptKeys = new Map<string, string>(inventory.movements.flatMap(value => {
+      const movement = record(value);
+      return movement?.type === "receipt" && movement.sourceDocumentId === updatedDocument.id && movement.status !== "cancelled"
+        ? [[String(movement.sourceLineId ?? ""), String(movement.productKey ?? "")] as [string, string]] : [];
+    }));
+    updatedDocument.items = updatedDocument.items.map(item => {
+      const key = receiptKeys.get(item.id);
+      return key ? { ...item, purchaseProductKey: key, canonicalProductKey: key } : item;
+    });
+  }
   documents[documentIndex] = updatedDocument;
   const payments = linkedPayments;
 

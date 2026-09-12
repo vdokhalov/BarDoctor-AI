@@ -62,6 +62,7 @@ type SyncTestEnvironment = {
   assortment: unknown;
   connection: JsonRecord | null;
   mapping: JsonRecord | null;
+  mappingLookups: JsonRecord[];
   savedMappings: JsonRecord[];
   markedConflicts: JsonRecord[];
   syncItems: JsonRecord[];
@@ -75,6 +76,7 @@ const syncEnvironment: SyncTestEnvironment = {
   assortment: {},
   connection: null,
   mapping: null,
+  mappingLookups: [],
   savedMappings: [],
   markedConflicts: [],
   syncItems: [],
@@ -121,7 +123,7 @@ const syncModule = (async (): Promise<SyncModule> => {
             export async function connectionForTenant() { return state().connection; }
             export async function createSyncRun() { return "run-venue-isolation"; }
             export async function entityLink() { return null; }
-            export async function mappingForExternal() { return state().mapping; }
+            export async function mappingForExternal(input) { state().mappingLookups.push(input); return state().mapping; }
             export async function claimEntityLink(input) {
               state().claims.push(input);
               return { claimed: true };
@@ -207,6 +209,7 @@ function resetSyncEnvironment(input: {
     }),
   };
   syncEnvironment.mapping = input.mapping ?? null;
+  syncEnvironment.mappingLookups = [];
   syncEnvironment.savedMappings = [];
   syncEnvironment.markedConflicts = [];
   syncEnvironment.syncItems = [];
@@ -331,6 +334,43 @@ test("batch dedupe includes venue so a foreign-first record cannot suppress the 
   assert.equal(writes.length, 1);
   assert.equal((writes[0].envelope as JsonRecord).venueId, 1);
   assert.deepEqual(syncEnvironment.syncItems.map((item) => item.status), ["failed", "success"]);
+});
+
+test("connector purchase resolves a confirmed external identity before the purchase writer", async () => {
+  const sync = await syncModule;
+  const key = "stock:коньяк нистру|ml";
+  const assortment = { stockBalances: [{ id: key, key, productKey: key, venueId: 1, name: "Коньяк Нистру",
+    preferredDisplayName: "Коньяк Нистру", unit: "ml", current: 10_000, active: true }] };
+  const before = JSON.stringify(assortment);
+  resetSyncEnvironment({ entityType: "purchase_document", assortment,
+    mapping: { id: "nistru-mapping", status: "confirmed", internal_id: key, reason: "Подтверждено вручную" } });
+  const writes: JsonRecord[] = [];
+  const record = envelope("purchase_document", "connector-nistru", 1, {
+    id: "connector-nistru", date: "2026-08-21", supplierName: "Supplier", currency: "RUB", total: 119,
+    items: [{ id: "connector-line", purchaseProductKey: "1c-nistru", name: "Коньяк Nistru", category: "alcohol",
+      quantity: 0.5, unit: "л", packageSize: "1 л", unitPrice: 238, lineTotal: 119,
+      externalProduct: { externalId: "1c-nistru", name: "Коньяк Nistru", unit: "л", packageSize: "1 л" } }],
+  });
+  record.sourceType = "local_connector";
+  const result = await sync.runIntegrationSync({ account, connectionId: "connection-1", trigger: "file",
+    dataType: "purchase_document", records: [record], writer: { async write(input) {
+      writes.push(input); return { ok: true, internalId: String(input.internalId) };
+    } } });
+  assert.equal(result.status, "success");
+  assert.equal(result.created, 1);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.mappingIssues, 0);
+  assert.equal(writes.length, 1);
+  const data = writes[0].data as JsonRecord;
+  const line = (data.items as JsonRecord[])[0];
+  assert.equal(line.purchaseProductKey, key);
+  assert.equal((line.externalProduct as JsonRecord).externalId, "1c-nistru");
+  assert.equal(line.name, "Коньяк Nistru");
+  assert.equal(data.venueId, 1);
+  assert.deepEqual(syncEnvironment.mappingLookups, [{ tenant: account, connectionId: "connection-1", entityType: "stock_product", externalId: "1c-nistru" }]);
+  assert.deepEqual(syncEnvironment.savedMappings, []);
+  assert.deepEqual(syncEnvironment.markedConflicts, []);
+  assert.equal(JSON.stringify(assortment), before);
 });
 
 test("auto-create fails closed when the venue has duplicate stock identities", async () => {

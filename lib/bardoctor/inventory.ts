@@ -1734,6 +1734,7 @@ export function repairInventoryPurchaseAmounts(input: {
   // financial and product match. This deliberately requires a unique result
   // so similarly named variants (for example two Nistru cognacs) are never
   // collapsed by name alone.
+  const ambiguousFinancialReceipts: Array<Record<string, unknown>> = [];
   for (const balance of parts.balances) {
     if (balance.archived === true || balance.active === false) continue;
     if (text(balance.lastInventoryDocumentId, "", 100)) continue;
@@ -1766,7 +1767,16 @@ export function repairInventoryPurchaseAmounts(input: {
           : [];
       });
     });
-    if (candidates.length !== 1) continue;
+    if (candidates.length !== 1) {
+      // Competing explanations of an existing legacy balance are not proof
+      // that these receipts are absent. Do not re-add them in the recovery pass.
+      if (candidates.length > 1) ambiguousFinancialReceipts.push({
+        code: "AMBIGUOUS_RECEIPT_EVIDENCE", productKey,
+        reason: "Несколько строк подтверждённых накладных объясняют существующий остаток. Требуется ручная проверка.",
+        candidates: candidates.map(candidate => ({ documentId: candidate.documentId, lineId: candidate.lineId })),
+      });
+      continue;
+    }
     const matched = candidates[0];
     balance.current = matched.expected.amount;
     const inventoryValue = rounded(Math.max(0, valueOfBalance(balance)), 2);
@@ -1805,6 +1815,17 @@ export function repairInventoryPurchaseAmounts(input: {
     correctedAmount += Math.abs(current - matched.expected.amount);
     correctedProducts.add(productKey);
   }
+
+  if (ambiguousFinancialReceipts.length) return {
+    assortment: structuredClone(record(input.assortment)),
+    stockMovements: structuredClone(input.stockMovements).map(record),
+    summary: {
+      reviewState: "NEEDS_REVIEW", repairedMovements: 0, restoredMovements: 0,
+      reconciledBalances: 0, correctedProducts: 0, correctedAmount: 0,
+      evidenceDocuments: 0, evidenceMatches: 0, linkedShadowBalances: 0,
+      diagnostics: ambiguousFinancialReceipts, changed: false,
+    },
+  };
 
   // A zero card can survive next to a stocked card when an old importer used
   // the package unit for one identity and pieces for another. Link the empty
@@ -2732,6 +2753,44 @@ function sourceLineId(item: JsonRecord, index: number): string {
   return text(item.id, `line-${index + 1}`, 100);
 }
 
+/** A selected purchase target is an existing identity, not a name/package hint. */
+function purchaseStockTarget(assortment: unknown, item: JsonRecord, venueId: unknown):
+  { key: string; unit: NonNullable<ReturnType<typeof physicalUnit>>; name: string } | { error: string } | null {
+  const primary = text(item.purchaseProductKey ?? item.productKey ?? item.canonicalProductKey, "", 300);
+  const referenceId = text(item.nomenclatureId ?? item.nomenclatureItemId, "", 300);
+  const references = [...new Set([primary, referenceId].filter(Boolean))];
+  if (!references.length) return null;
+  const root = record(assortment);
+  const collections = [array(root.nomenclature), array(root.stockBalances)].map(values => values.map(record)
+    .filter(product => product.venueId == null || number(product.venueId) === number(venueId)));
+  const products = collections.flat();
+  const targets = references.map(reference => {
+    const resolved = resolveInventoryProductKey(root, reference);
+    return products.filter(product => (product.venueId == null || number(product.venueId) === number(venueId))
+      && [product.key, product.productKey, product.id].some(value => value === reference || value === resolved));
+  });
+  const linked = targets.flat();
+  const keys = new Set(linked.map(product => text(product.productKey ?? product.key, "", 300)));
+  if (targets.some(matches => !matches.length) || keys.size !== 1 || keys.has("")
+    || linked.some(product => product.active === false || product.archived === true
+      || product.status === "archived" || product.kind === "service")) {
+    return { error: "Не удалось подтвердить выбранную складскую номенклатуру. Сопоставьте строку заново." };
+  }
+  const key = [...keys][0];
+  const selected = collections.map(values => values.filter(product => text(product.productKey ?? product.key, "", 300) === key));
+  if (selected.some(values => values.length > 1)) {
+    return { error: "Выбранная складская номенклатура неоднозначна: обнаружены повторные записи. Проверьте номенклатуру." };
+  }
+  const units = selected.flat().map(product => physicalUnit(product.unit));
+  const unit = units[0];
+  const keyUnit = key.startsWith("stock:") ? physicalUnit(key.slice(key.lastIndexOf("|") + 1)) : null;
+  if (!unit || units.some(other => !other || convertStockQuantity(1, other, unit) === null)
+    || (keyUnit && convertStockQuantity(1, keyUnit, unit) === null)) {
+    return { error: "Идентификатор и единица выбранного складского товара несовместимы. Проверьте номенклатуру." };
+  }
+  return { key, unit, name: text(linked[0].name, text(item.name), 240) };
+}
+
 export function applyPurchaseToInventory(input: {
   assortment: unknown;
   document: unknown;
@@ -2774,6 +2833,19 @@ export function applyPurchaseToInventory(input: {
     assortment: structuredClone(record(input.assortment)), movements: [],
     summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines: kindConflicts },
   };
+  const explicitTargets = new Map<number, Exclude<ReturnType<typeof purchaseStockTarget>, { error: string } | null>>();
+  const identityConflicts = array(document.items).flatMap((value, index) => {
+    const item = record(value);
+    if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return [];
+    const target = purchaseStockTarget(input.assortment, item, document.venueId);
+    if (target && "error" in target) return [{ id: sourceLineId(item, index), name: text(item.name), reason: target.error }];
+    if (target) explicitTargets.set(index, target);
+    return [];
+  });
+  if (identityConflicts.length) return {
+    assortment: structuredClone(record(input.assortment)), movements: [],
+    summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines: identityConflicts },
+  };
   const documentId = text(document.id, crypto.randomUUID(), 100);
   const date = text(document.date, now.slice(0, 10), 10);
   const currency = text(document.currency, "", 12).toUpperCase();
@@ -2804,16 +2876,18 @@ export function applyPurchaseToInventory(input: {
   let sourceMappingsUpserted = 0;
   let canonicalItemsReused = 0;
   let sourceMappingsNeedingReview = 0;
+  let identityValidationFailed = false;
 
   array(document.items).forEach((value, index) => {
     const item = record(value);
     const itemId = sourceLineId(item, index);
     const sourceName = text(item.name, `Позиция ${index + 1}`);
     let received = purchaseLineBaseAmount(item);
+    let explicitTarget = explicitTargets.get(index);
     const canonicalResolution = resolveCanonicalPurchaseItem({
       assortment: { ...parts.root, supplierProductMappings },
       document,
-      item: { ...item, unit: received.unit },
+      item: { ...item, ...(explicitTarget ? { purchaseProductKey: explicitTarget.key } : {}), unit: received.unit },
       canonicalItems: [...nomenclature, ...parts.balances],
       now,
     });
@@ -2827,6 +2901,20 @@ export function applyPurchaseToInventory(input: {
       });
       return;
     }
+    if (!explicitTarget && PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))
+      && ["stable_mapping", "high_confidence"].includes(canonicalResolution.status)) {
+      const target = purchaseStockTarget({ ...parts.root, nomenclature, stockBalances: parts.balances },
+        { purchaseProductKey: canonicalResolution.canonicalProductKey }, document.venueId);
+      if (target && "error" in target) {
+        identityValidationFailed = true;
+        unresolvedLines.push({ id: itemId, name, reason: target.error });
+        return;
+      }
+      if (target) {
+        explicitTarget = target;
+        explicitTargets.set(index, target);
+      }
+    }
     const sourceRequestedKey = text(
       item.purchaseProductKey ?? item.productKey ?? item.canonicalProductKey,
       "",
@@ -2835,14 +2923,34 @@ export function applyPurchaseToInventory(input: {
     const canonicalHint = ["stable_mapping", "explicit", "high_confidence"].includes(canonicalResolution.status)
       ? canonicalResolution.canonicalProductKey
       : sourceRequestedKey || canonicalResolution.canonicalProductKey;
-    const identity = incomingInventoryProductKey(parts.root, parts.balances, {
+    const incomingSnapshot = validatePurchaseConversionSnapshot(item.purchaseConversion);
+    const directUnit = physicalUnit(incomingSnapshot?.input.unit);
+    const blankPiecePackage = incomingSnapshot && !incomingSnapshot.input.packageContent && directUnit && directUnit !== "pcs"
+      && /^1(?:[.,]0+)?\s*(?:шт\.?|pcs|piece)$/i.test(text(item.packageSize).trim());
+    const identity = explicitTarget ? { key: explicitTarget.key, requestedKey: explicitTarget.key } : incomingInventoryProductKey(parts.root, parts.balances, {
       ...item,
+      packageSize: blankPiecePackage ? `1 ${received.unit}` : item.packageSize,
       name,
       purchaseProductKey: canonicalHint,
       unit: received.unit,
       currency,
     });
     const productKey = identity.key;
+    // A "new" name match can still resolve through the legacy direct/alias
+    // lookup. Validate that existing target before any posting or reactivation.
+    if (!explicitTarget && (nomenclatureByKey.has(productKey) || indexedBalances.has(productKey))) {
+      const target = purchaseStockTarget({ ...parts.root, nomenclature, stockBalances: parts.balances },
+        { purchaseProductKey: productKey }, document.venueId);
+      if (target && "error" in target) {
+        identityValidationFailed = true;
+        unresolvedLines.push({ id: itemId, name, reason: target.error });
+        return;
+      }
+      if (target) {
+        explicitTarget = target;
+        explicitTargets.set(index, target);
+      }
+    }
     supplierProductMappings = upsertSupplierProductMapping(supplierProductMappings, {
       ...canonicalResolution.sourceMapping,
       canonicalProductKey: productKey,
@@ -2862,24 +2970,42 @@ export function applyPurchaseToInventory(input: {
     const category = text(item.category, "products", 80);
     const previousNomenclature = nomenclatureByKey.get(productKey);
     const previousBalance = indexedBalances.get(productKey)
-      ?? indexedBalances.get(legacyGeneratedInventoryProductKey(item));
+      ?? (explicitTarget ? undefined : indexedBalances.get(legacyGeneratedInventoryProductKey(item)));
     const previous = previousBalance ?? {};
     const previousUnit = physicalUnit(previous.unit);
-    const incomingSnapshot = validatePurchaseConversionSnapshot(item.purchaseConversion);
     if (previous.unitModelVersion === 4 && previousUnit && !incomingSnapshot) {
       // Compatibility posting uses the proven literal legacy quantity, not
       // current package metadata. Keep the established canonical balance unit.
       const canonicalAmount = convertStockQuantity(received.amount, received.unit, previousUnit);
       if (canonicalAmount !== null) received = { amount: canonicalAmount, unit: previousUnit };
     }
-    if (previousUnit && convertStockQuantity(1, previousUnit, received.unit) === null) {
+    if ((previousUnit && convertStockQuantity(1, previousUnit, received.unit) === null)
+      || (explicitTarget && convertStockQuantity(1, explicitTarget.unit, received.unit) === null)) {
       unresolvedLines.push({ id: itemId, name, reason: "Единица прихода несовместима со складской единицей." });
       return;
     }
     const capturedContent = incomingSnapshot?.input.packageContent;
-    const incomingPackageSize = capturedContent
+    let incomingPackageSize = capturedContent
       ? `${capturedContent.quantity} ${capturedContent.unit}`
       : text(item.packageSize ?? item.unit, "", 120);
+    if (explicitTarget || incomingSnapshot) {
+      const packageUnit = inventoryPackageAmount(incomingPackageSize, received.unit).unit;
+      if (convertStockQuantity(1, packageUnit, received.unit) === null) {
+        // The old blank invoice row starts with "1 шт.". It is not package
+        // content for a directly measured litre/kilogram receipt. Keep the
+        // original text on the document, never on the canonical stock item.
+        const placeholder = /^1(?:[.,]0+)?\s*(?:шт\.?|pcs|piece)$/i.test(incomingPackageSize.trim());
+        const directUnit = physicalUnit(incomingSnapshot?.input.unit ?? item.unit);
+        if (capturedContent || !placeholder || !directUnit || directUnit === "pcs"
+          || convertStockQuantity(1, directUnit, received.unit) === null) {
+          unresolvedLines.push({ id: itemId, name, reason: "Фасовка прихода несовместима с выбранным складским товаром." });
+          return;
+        }
+        incomingPackageSize = [...packageOptionLabels(previousNomenclature), ...packageOptionLabels(previous)]
+          .find(label => inventoryPackageAmount(label, received.unit, received.unit).unit === received.unit)
+          ?? `1 ${received.unit}`;
+      }
+    }
     const packageOptions = packageOptionLabels({
       unit: received.unit,
       packageOptions: [
@@ -3031,7 +3157,7 @@ export function applyPurchaseToInventory(input: {
     };
     if (!previousBalance) parts.balances.push(next);
     else Object.assign(previousBalance, next);
-    indexedBalances.set(productKey, next);
+    indexedBalances.set(productKey, previousBalance ?? next);
 
     const alias = normalizeInventoryText(name);
     if (alias) {
@@ -3067,7 +3193,7 @@ export function applyPurchaseToInventory(input: {
     });
   });
 
-  if (unresolvedLines.length && (array(document.items).some((value) => record(value).purchaseConversion != null)
+  if (unresolvedLines.length && (identityValidationFailed || explicitTargets.size > 0 || array(document.items).some((value) => record(value).purchaseConversion != null)
     || parts.balances.some((balance) => balance.unitModelVersion === 4))) {
     return { assortment: structuredClone(record(input.assortment)), movements: [],
       summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines } };
@@ -3138,6 +3264,10 @@ function movementRecord(value: unknown): StockMovement | null {
   const id = text(item.id, "", 100);
   const sourceDocumentId = text(item.sourceDocumentId, "", 100);
   const requestedProductKey = text(item.productKey, "", 300);
+  if (id && sourceDocumentId && requestedProductKey && item.type === "receipt"
+    && validatePurchaseConversionSnapshot(item.purchaseConversion)) {
+    return structuredClone(item) as StockMovement;
+  }
   const productKey = inventoryProductKey({
     ...item,
     productKey: requestedProductKey,
@@ -3368,7 +3498,7 @@ export function applyInventoryCount(input: {
   };
 }
 
-function purchaseMaterialFromDocument(value: unknown): Array<{
+function purchaseMaterialFromDocument(value: unknown, assortment: unknown): Array<{
   productKey: string;
   amount: number;
   unit: BaseInventoryUnit;
@@ -3379,8 +3509,9 @@ function purchaseMaterialFromDocument(value: unknown): Array<{
   ).map((line) => {
     const item = record(line);
     const base = purchaseLineBaseAmount(item);
+    const target = purchaseStockTarget(assortment, item, record(value).venueId);
     return {
-      productKey: inventoryProductKey(item),
+      productKey: target && "key" in target ? target.key : inventoryProductKey(item),
       amount: rounded(base.amount),
       unit: base.unit,
       costAmount: rounded(
@@ -3420,6 +3551,12 @@ export function revisePurchaseInInventory(input: {
   const scopeIssue = purchaseVenueScopeIssue(next.venueId ?? previous.venueId,
     previous, next, input.assortment, input.stockMovements);
   if (scopeIssue) return scopeIssue;
+  for (const value of array(next.items)) {
+    const item = record(value);
+    if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) continue;
+    const target = purchaseStockTarget(input.assortment, item, next.venueId ?? previous.venueId);
+    if (target && "error" in target) return { ok: false, code: "INVENTORY_REVIEW_REQUIRED", error: target.error };
+  }
   const previousId = text(previous.id, "", 100);
   const movementHistory = input.stockMovements.map(record).filter((movement) =>
     text(movement.status, "active", 20) === "cancelled" || Boolean(movement.reversedAt)
@@ -3431,7 +3568,7 @@ export function revisePurchaseInInventory(input: {
     movement.type === "receipt" && movement.sourceDocumentId === previousId
   );
   const previousMaterial = purchaseMaterialFromMovements(previousReceipts);
-  const nextMaterial = purchaseMaterialFromDocument(next);
+  const nextMaterial = purchaseMaterialFromDocument(next, input.assortment);
   const materialChanged = JSON.stringify(previousMaterial) !== JSON.stringify(nextMaterial);
 
   if (!materialChanged) {
@@ -3460,7 +3597,8 @@ export function revisePurchaseInInventory(input: {
       const item = nextByLine.get(receipt.sourceLineId);
       balance.lastPurchaseAt = nextDate || receipt.date;
       if (item) {
-        balance.name = text(item.name, text(balance.name, "Товар"));
+        const target = purchaseStockTarget(input.assortment, item, next.venueId ?? previous.venueId);
+        balance.name = target && !("error" in target) ? target.name : text(item.name, text(balance.name, "Товар"));
         balance.lastPurchasePrice = Math.max(0, number(item.unitPrice));
       }
       balance.updatedAt = now;

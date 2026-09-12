@@ -16,7 +16,7 @@ import * as nomenclatureIdentity from "../lib/bardoctor/nomenclature-identity";
 import { changedConsumptionModeIssues } from "../lib/bardoctor/consumption-mode";
 type Element = { type: string; props: Record<string, unknown> };
 type Row = Record<string, unknown>;
-function runtime() {
+function runtime(openQuickCreate = false) {
   const source = readFileSync("public/assets/index-BQGspy0I.js", "utf8");
   const start = source.indexOf("/* purchase-units-v421:start */");
   const end = source.indexOf("/* purchase-units-v421:end */", start);
@@ -24,7 +24,8 @@ function runtime() {
   const jsx = (type: string, props: Row): Element => ({ type, props });
   const mapping = source.slice(source.indexOf("function bdInvoiceLineMappingV356"), source.indexOf("function bdInvoiceReviewPriorityV4"));
   return runInNewContext(source.slice(start, end) + mapping + ";({render:bdPurchaseUnitsV421,preview:bdPurchasePreviewV421,mapping:bdInvoiceLineMappingV356})", {
-    S: { useState: (value: unknown) => [value, () => {}], useEffect: () => {} },
+    S: { useState: (value: unknown) => [value === false && openQuickCreate ? true : value, () => {}], useEffect: () => {} },
+    bdNomenclatureQuickCreateV336: "quick-create",
     structuredClone, i: { jsx, jsxs: jsx }, bdProcField: "field", bdCatArray: (v: unknown) => Array.isArray(v) ? v : [],
     bdWarehouseRecord: (v: unknown) => v ?? {}, xr: () => ({}), bdCatNumber: Number,
     bdProcFormatAmountV221: (amount: number, unit: string) => `${amount} ${unit}`,
@@ -36,6 +37,24 @@ function all(value: unknown): Element[] {
   const element = value as Element;
   return element.props ? [element, ...all(element.props.children)] : [];
 }
+
+test("Native new receipt quick-create callback exposes canonical stock controls without a manual category workaround", () => {
+  const api = runtime(true);
+  let line: Row = { id: "quick-auto", name: "TEST new liquid", rawName: "TEST new liquid", category: "auto",
+    quantity: 2, unit: "l", packageSize: "1 шт.", unitPrice: 25, lineTotal: 50 };
+  const compact = { id: "new-liquid", key: "stock:test new liquid|ml", name: "TEST new liquid", unit: "l", baseUnit: "l", packageSize: "1 l", archived: false };
+  const product = { ...compact, productKey: compact.key, kind: "stock", category: "products", venueId: 1 };
+  const tree = api.mapping({ line, onSelect: patch => { line = { ...line, ...patch }; } });
+  const quick = all(tree).find(element => element.type === "quick-create");
+  assert.ok(quick);
+  (quick.props.onCreated as (compact: Row, product: Row) => void)(compact, product);
+  assert.equal(line.category, "products"); assert.equal(line.purchaseProductKey, compact.key);
+  assert.equal(line.nomenclatureId, compact.id); assert.equal(line.mappingSource, "manual");
+  assert.equal(line.packageSize, "1 шт.", "Preserve the invoice input while sanitizing only canonical metadata");
+  const rendered = api.render({ line, onChange: patch => { line = { ...line, ...patch }; } });
+  assert.equal(all(rendered).some(element => element.props["data-bd-purchase-units"] === "v421"), true);
+  assert.equal(api.preview(line).snapshot.canonicalQuantity, 2);
+});
 
 test("production stock/other record: SQLite reload → API selector → actual mapping → canonical receipt → reload", () => {
   const store = createRequire(import.meta.url)("../scripts/purchase-units-qa-store.cjs")();
@@ -464,7 +483,7 @@ for (const unit of ["kg", "l"]) {
   });
 }
 
-function quickNomenclatureRuntime(unit: string, post: (request: Request) => Promise<Response>) {
+function quickNomenclatureRuntime(unit: string, post: (request: Request) => Promise<Response>, packageSize = "") {
   const source = readFileSync("public/assets/index-BQGspy0I.js", "utf8");
   let code = source.slice(source.indexOf("/* purchase-units-v421:start */"), source.indexOf("/* purchase-units-v421:end */"));
   for (const name of ["bdTaxBaseUnitV336", "bdTaxDisplayUnitV336", "bdNomenclatureQuickCreateV336"]) {
@@ -495,7 +514,7 @@ function quickNomenclatureRuntime(unit: string, post: (request: Request) => Prom
   // Taxonomy is supplied in the prefill. Only asynchronous suggestion loading is
   // omitted; unit initialization, the visible selector, submit, and HTTP save are real.
   const render = () => { cursor = 0; return api.render({ initialName: `TEST quick ${unit}`, context: "receipt",
-    prefill: { unit, packageSize: "", sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "grocery" },
+    prefill: { unit, packageSize, sectionId: "kitchen", taxonomyCategoryId: "food", subcategoryId: "grocery" },
     onClose: () => {}, onCreated: (_: Row, product: Row) => { created = product; } }); };
   const select = all(render()).find(element => element.type === "select" && element.props["aria-label"] === "В чём учитывать остаток?");
   assert.ok(select);
@@ -511,8 +530,12 @@ function quickNomenclatureRuntime(unit: string, post: (request: Request) => Prom
   };
 }
 
-for (const unit of ["l", "kg", "pcs", "ml", "g"]) {
-  test(`Phase 6 real invoice quick-create ${unit}: source unit survives actual submit and product API persistence`, async () => {
+const quickCreateCases = ["l", "kg", "pcs", "ml", "g"].flatMap(unit => ["", "1 шт.", "1 pcs"]
+  .map(packageSize => ({ unit, packageSize, expectedAmount: ["g", "ml"].includes(unit) ? 0.001 : 1 })));
+quickCreateCases.push({ unit: "kg", packageSize: "500 г", expectedAmount: 0.5 },
+  { unit: "l", packageSize: "0.7 л", expectedAmount: 0.7 }, { unit: "pcs", packageSize: "12 шт.", expectedAmount: 12 });
+for (const { unit, packageSize, expectedAmount } of quickCreateCases) {
+  test(`Real invoice quick-create ${unit}/${packageSize || "empty"}: initial prefill survives actual submit and product API persistence without selector changes`, async () => {
     const r = openingRuntime();
     const products = r.loadRoute(new URL("../app/api/inventory/products/route.ts", import.meta.url), {
       canonicalStockUnit, manualReferencePrice, PURCHASE_STORE_KEY, ...nomenclatureIdentity, changedConsumptionModeIssues,
@@ -524,7 +547,7 @@ for (const unit of ["l", "kg", "pcs", "ml", "g"]) {
         subcategories: [{ id: "grocery", name: "Grocery", parentId: "food", order: 10, active: true }], locations: [],
       } });
       r.put("bd_stock_movements", []);
-      const card = quickNomenclatureRuntime(unit, products.POST);
+      const card = quickNomenclatureRuntime(unit, products.POST, packageSize);
       const created = await card.create();
       assert.equal(card.requests.length, 1);
       const expected = canonicalStockUnit(unit);
@@ -537,7 +560,7 @@ for (const unit of ["l", "kg", "pcs", "ml", "g"]) {
       const packageAmount = inventoryPackageAmount(created.packageSize, expected, expected);
       assert.equal(packageAmount.unit, expected);
       assert.equal(created.packageAmount, packageAmount.amount);
-      assert.equal(created.packageAmount, ["g", "ml"].includes(unit) ? 0.001 : 1);
+      assert.equal(created.packageAmount, expectedAmount);
       const after = r.get("bd_assortment_v1") as Row;
       for (const store of ["nomenclature", "stockBalances"]) {
         assert.equal((after[store] as Row[]).length, 1);

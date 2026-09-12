@@ -895,6 +895,12 @@ test("global financial repair leaves repeated matching invoices untouched", () =
   assert.equal(repaired.summary.reconciledBalances, 0);
   assert.equal(balance.current, 100_000);
   assert.equal(balance.quantityRepairEvidenceDocumentId, undefined);
+  assert.equal(repaired.summary.restoredMovements, 0);
+  assert.deepEqual(repaired.stockMovements, []);
+  assert.equal(balance.inventoryValue, 2_377);
+  assert.equal(repaired.summary.reviewState, "NEEDS_REVIEW");
+  assert.equal(repaired.summary.changed, false);
+  assert.equal(repaired.summary.diagnostics[0].code, "AMBIGUOUS_RECEIPT_EVIDENCE");
 });
 
 test("a financially verified repaired receipt fixes a stale balance after invoice evidence is lost", () => {
@@ -1347,7 +1353,7 @@ test("identity reconciliation handles a large catalog in one pass", () => {
   assert.equal(result.summary.mergedBalances, 100);
 });
 
-test("a confirmed Cyrillic purchase name outranks later connector spelling", () => {
+test("a confirmed Cyrillic purchase name outranks connector spelling after external identity mapping", () => {
   const manual = applyPurchaseToInventory({
     assortment: { stockBalances: [], nomenclature: [] },
     document: {
@@ -1366,7 +1372,7 @@ test("a confirmed Cyrillic purchase name outranks later connector spelling", () 
     },
     now: "2026-08-20T09:00:00.000Z",
   });
-  const imported = applyPurchaseToInventory({
+  const unmapped = applyPurchaseToInventory({
     assortment: manual.assortment,
     document: {
       id: "connector-nistru",
@@ -1386,6 +1392,23 @@ test("a confirmed Cyrillic purchase name outranks later connector spelling", () 
     now: "2026-08-21T09:00:00.000Z",
   });
 
+  assert.deepEqual(unmapped.movements, []);
+  assert.deepEqual(unmapped.assortment, manual.assortment);
+  assert.equal(unmapped.summary.unresolvedLines.length, 1);
+  // Integration sync resolves external IDs before invoking the purchase writer.
+  // The sync-to-writer contract has its own executable regression test.
+  const imported = applyPurchaseToInventory({
+    assortment: manual.assortment,
+    document: { id: "connector-nistru", sourceType: "local_connector", date: "2026-08-21", currency: "RUB",
+      items: [{ id: "connector-line", purchaseProductKey: "stock:коньяк нистру|ml", name: "Коньяк Nistru",
+        externalProduct: { externalId: "1c-nistru" }, category: "alcohol", quantity: 0.5, packageSize: "1 л", lineTotal: 119 }] },
+    now: "2026-08-21T09:00:00.000Z",
+  });
+  assert.deepEqual(imported.summary.unresolvedLines, []);
+  assert.equal(imported.movements.length, 1);
+  assert.equal(imported.movements[0].amount, 500);
+  assert.equal(imported.movements[0].productKey, "stock:коньяк нистру|ml");
+
   const result = consolidateInventoryDuplicates({
     assortment: imported.assortment,
     now: "2026-08-21T09:01:00.000Z",
@@ -1398,7 +1421,8 @@ test("a confirmed Cyrillic purchase name outranks later connector spelling", () 
   assert.equal(balances[0].preferredDisplayName, "Коньяк Нистру");
   assert.equal(nomenclature.length, 1);
   assert.equal(nomenclature[0].name, "Коньяк Нистру");
-  assert.equal(resolveInventoryProductKey(result.assortment, "1c-nistru"), "stock:коньяк нистру|ml");
+  assert.equal(balances[0].current, 10_500);
+  assert.equal(resolveInventoryProductKey(result.assortment, "1c-nistru"), "1c-nistru");
 });
 
 test("stale Latin nomenclature merges even after the stock balance is already canonical", () => {

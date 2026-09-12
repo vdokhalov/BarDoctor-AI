@@ -1,4 +1,7 @@
 function bdPurchaseStockLineV421(line){return ["products","alcohol","food","consumables","hookah","household"].includes(line.category||"products")}
+// Blank legacy receipt rows carry a one-piece placeholder, not package content.
+// Preserve real packaging (including incompatible dimensions for API review).
+function bdPurchaseQuickPackageV421(value,unit){const label=String(value||"");return ["kg","l"].includes(bdStockUnitsV421.canonicalStockUnit(unit))&&/^1(?:[.,]0+)?\s*(?:шт\.?|pcs|piece)$/i.test(label.trim())?"":label}
 function bdPurchaseContentV421(line){
   if(line.packageContent)return line.packageContent;
   if(bdStockUnitsV421.physicalUnit(line.unit)!=="pcs")return null;

@@ -63,6 +63,13 @@ patchNomenclatureFunction("bdTaxBaseUnitV336", [
 patchNomenclatureFunction("bdTaxDisplayUnitV336", [
   ['/(^|\\s)л|литр/', '/(^|\\s)л|литр|(?:^|\\s)l(?:$|\\s)/'],
 ]);
+patchNomenclatureFunction("bdNomenclatureQuickCreateV336", [
+  ['packageSize:t?.packageSize||""', 'packageSize:bdPurchaseQuickPackageV421(t?.packageSize,t?.unit)'],
+  ['packageSize:M.packageSize||L.packageSize', 'packageSize:bdPurchaseQuickPackageV421(M.packageSize||L.packageSize,M.unit)'],
+]);
+patchNomenclatureFunction("bdInvoiceLineMappingV356", [
+  ['onCreated:k=>{O(k),bdSetQuickOpenV356(!1)}', 'onCreated:(k,product)=>{O({...product,...k}),bdSetQuickOpenV356(!1)}'],
+]);
 patchNomenclatureFunction("bdNomenclatureInitialFormV213", [
   ['unit:["ml","g","pcs"].includes(e?.unit)?e.unit:"pcs"', 'unit:["ml","g","pcs","kg","l"].includes(e?.unit)?e.unit:"pcs"'],
 ]);

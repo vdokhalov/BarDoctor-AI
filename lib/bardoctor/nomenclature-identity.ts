@@ -259,15 +259,15 @@ export function resolveCanonicalPurchaseItem(input: {
   let visibleName = canonicalName;
   let suggestions: CanonicalIdentitySuggestion[] = [];
 
-  if (stable && candidateByKey.has(stable.canonicalProductKey)) {
-    status = "stable_mapping";
-    confidence = 1;
-    canonicalProductKey = stable.canonicalProductKey;
-    visibleName = text(candidateByKey.get(canonicalProductKey)?.name, canonicalName, 240);
-  } else if (requestedKey && candidateByKey.has(requestedKey)) {
+  if (requestedKey && candidateByKey.has(requestedKey)) {
     status = "explicit";
     confidence = 1;
     canonicalProductKey = requestedKey;
+    visibleName = text(candidateByKey.get(canonicalProductKey)?.name, canonicalName, 240);
+  } else if (stable && candidateByKey.has(stable.canonicalProductKey)) {
+    status = "stable_mapping";
+    confidence = 1;
+    canonicalProductKey = stable.canonicalProductKey;
     visibleName = text(candidateByKey.get(canonicalProductKey)?.name, canonicalName, 240);
   } else {
     suggestions = candidates.map((candidate) => {
