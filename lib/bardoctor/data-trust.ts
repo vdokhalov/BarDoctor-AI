@@ -178,7 +178,11 @@ function requiredWritePermissions(
   if (storeKey === "bd_month_closings") {
     required.clear();
     required.add(
-      mutations.some((mutation) => recordStatus(mutation.after) === "reopened")
+      mutations.some((mutation) => recordStatus(mutation.after) === "reopened"
+        || (recordStatus(mutation.before) === "closed"
+          && (recordStatus(mutation.after) !== "closed"
+            || !isRecord(mutation.before) || !isRecord(mutation.after)
+            || mutation.before.monthKey !== mutation.after.monthKey)))
         ? "month.reopen"
         : "month.close",
     );
@@ -351,8 +355,9 @@ function recordLabel(value: unknown): string | null {
   return candidate == null ? null : String(candidate).slice(0, 180);
 }
 
-export function monthKeyFromValue(value: unknown): string | null {
-  if (!isRecord(value)) return null;
+export function monthKeysFromValue(value: unknown): string[] {
+  if (Array.isArray(value)) return [...new Set(value.flatMap(monthKeysFromValue))];
+  if (!isRecord(value)) return [];
   const candidates = [
     value.monthKey,
     value.accountingMonth,
@@ -360,11 +365,80 @@ export function monthKeyFromValue(value: unknown): string | null {
     value.date,
     value.periodStart,
     value.shiftStart,
+    value.businessDate,
   ];
+  const months = new Set<string>();
   for (const candidate of candidates) {
     if (typeof candidate !== "string") continue;
     const match = candidate.match(/^(\d{4})-(\d{2})/);
-    if (match) return `${match[1]}-${match[2]}`;
+    if (match) months.add(`${match[1]}-${match[2]}`);
+  }
+  return [...months];
+}
+
+export function monthKeyFromValue(value: unknown): string | null {
+  return monthKeysFromValue(value)[0] ?? null;
+}
+
+/** Audit's display month is not enough to protect a transfer between periods. */
+export function firstClosedMutation(mutations: DataMutation[], closedMonths: Set<string>) {
+  for (const mutation of mutations) {
+    const monthKey = firstClosedPeriod(mutation.before, mutation.after, closedMonths);
+    if (monthKey) return { mutation, monthKey };
+  }
+  return null;
+}
+
+export function firstClosedPeriod(before: unknown, after: unknown, closedMonths: Set<string>): string | null {
+  return [...monthKeysFromValue(before), ...monthKeysFromValue(after)]
+    .find(monthKey => closedMonths.has(monthKey)) ?? null;
+}
+
+export function hasDuplicateStoreRecordIds(value: unknown): boolean {
+  return Array.isArray(value) && new Set(value.map(recordId)).size !== value.length;
+}
+
+export function requiresExplicitPeriodReopen(before: unknown, after: unknown): boolean {
+  const closed = Array.isArray(before) ? before.filter(row => recordStatus(row) === "closed") : [];
+  const next = Array.isArray(after) ? after : [];
+  return closed.some(row => {
+    const month = isRecord(row) ? row.monthKey : null;
+    return !next.some(candidate => isRecord(candidate) && candidate.monthKey === month
+      && ["closed", "reopened"].includes(recordStatus(candidate)));
+  });
+}
+
+/** A signed close can only change its reopen metadata until a separate reopen is saved. */
+export function firstChangedClosedSnapshot(before: unknown, after: unknown): string | null {
+  const previous = Array.isArray(before) ? before : [];
+  const next = Array.isArray(after) ? after : [];
+  const closedMonths = closedMonthsFromStore(before);
+  const reopenFields = new Set(["status", "reopenedAt", "reopenedBy", "reopenReason", "reopenHistory", "updatedAt"]);
+  for (const [index, row] of previous.entries()) {
+    if (!isRecord(row) || typeof row.monthKey !== "string" || !closedMonths.has(row.monthKey)) continue;
+    const sameMonth = next.filter(candidate => isRecord(candidate) && candidate.monthKey === row.monthKey);
+    const previousMonth = previous.filter(candidate => isRecord(candidate) && candidate.monthKey === row.monthKey);
+    // An additional identity can shadow the signed record in the monthly report.
+    if (sameMonth.length !== previousMonth.length) return row.monthKey;
+    const remainingClosed = sameMonth.filter(value => recordStatus(value) === "closed").map(recordId);
+    const originalOrder = previousMonth.filter(value => recordStatus(value) === "closed")
+      .map(recordId).filter(id => remainingClosed.includes(id));
+    // Legacy timestamp ties are resolved by array order in the actual reader.
+    if (!valuesEqual(remainingClosed, originalOrder)) return row.monthKey;
+    const candidate = next.find((value, nextIndex) => recordId(value, nextIndex) === recordId(row, index));
+    if (!isRecord(candidate) || candidate.monthKey !== row.monthKey) return row.monthKey;
+    const fields = changedFields(row, candidate);
+    if (fields.length === 0) continue;
+    const onlyReopenFields = fields.every(field => reopenFields.has(field)
+      // The existing UI save hook fills a missing legacy creation timestamp.
+      || (field === "createdAt" && !row.createdAt && typeof candidate.createdAt === "string"
+        && candidate.createdAt === candidate.updatedAt));
+    if (row.status === "closed" && candidate.status === "reopened" && onlyReopenFields) {
+      const history = Array.isArray(row.reopenHistory) ? row.reopenHistory : [];
+      const nextHistory = Array.isArray(candidate.reopenHistory) ? candidate.reopenHistory : [];
+      if (nextHistory.length >= history.length && history.every((entry, i) => valuesEqual(entry, nextHistory[i]))) continue;
+    }
+    return row.monthKey;
   }
   return null;
 }

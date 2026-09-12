@@ -135,8 +135,8 @@ function bdMonthlyChainV165({ report }) {
       i.jsx("summary", { children: "Как считаются результаты" }),
       i.jsxs("div", { children: [
         i.jsx("p", { children: "Денежный итог: выручка минус фактические оплаты поставщикам, ФОТ, списания, прочие расходы, налоги и коммунальные услуги." }),
-        i.jsx("p", { children: "До себестоимости: закупки запасов не вычитаются целиком; их проданная часть определяется после остатков." }),
-        i.jsx("p", { children: "Чистая прибыль: результат после себестоимости проданного, ФОТ, списаний, остальных расходов, налогов и коммунальных услуг." }),
+        i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "До себестоимости: закупки запасов не вычитаются целиком; стоимость проданного берётся из сохранённых продаж." : "До себестоимости: закупки запасов не вычитаются целиком; их проданная часть определяется после остатков." }),
+        i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "Чистая прибыль: выручка минус сохранённая себестоимость продаж, ФОТ, списания, прочие расходы, налоги и коммунальные услуги; недостачи уменьшают результат, излишки увеличивают." : "Чистая прибыль: результат после себестоимости проданного, ФОТ, списаний, остальных расходов, налогов и коммунальных услуг." }),
       ] }),
     ] }),
   ] });
@@ -145,10 +145,11 @@ function bdMonthlyChainV165({ report }) {
 function bdMonthlyProfitStructureV165({ report }) {
   const values = [
     { key: "revenue", label: "Выручка", amount: Number(report.revenue || 0), tone: "revenue" },
-    { key: "cogs", label: "Себестоимость проданного", amount: Number(report.costOfGoods || 0), tone: "cost" },
+    { key: "cogs", label: "Себестоимость проданного", amount: report.costOfGoods == null ? null : Number(report.costOfGoods), tone: "cost" },
     { key: "payroll", label: "ФОТ", amount: Number(report.payroll || 0), tone: "payroll" },
     { key: "other", label: "Прочие расходы и списания", amount: Number(report.otherExpenses || 0) + Number(report.writeoffs || 0), tone: "other" },
     { key: "recurring", label: "Налоги и коммунальные", amount: Number(report.taxes || 0) + Number(report.utilities || 0), tone: "recurring" },
+    ...(report.costBasis === "historical_sales_snapshots" ? [{ key: "inventory", label: Number(report.inventoryLoss) < 0 ? "Излишки инвентаризации (− расход)" : "Потери инвентаризации", amount: report.inventoryLoss, tone: Number(report.inventoryLoss) < 0 ? "profit" : "other" }] : []),
     { key: "profit", label: "Чистая прибыль", amount: report.operatingResult, tone: Number(report.operatingResult || 0) >= 0 ? "profit" : "loss" },
   ];
   const scale = Math.max(1, Number(report.revenue || 0), ...values.map((entry) => Math.abs(Number(entry.amount || 0))));
@@ -164,7 +165,7 @@ function bdMonthlyProfitStructureV165({ report }) {
       i.jsxs("header", { children: [i.jsx("span", { children: entry.label }), i.jsx("strong", { children: entry.amount === null ? "—" : bdMoney2(entry.amount) })] }),
       i.jsx("div", { className: "bd-monthly-profit-track-v165", title: entry.label + ": " + bdMoney2(entry.amount), children: i.jsx("i", { className: entry.tone, style: { width: Math.max(entry.amount === 0 ? 0 : 3, Math.min(100, Math.abs(Number(entry.amount || 0)) / scale * 100)) + "%" } }) }),
     ] }, entry.key)) }),
-    i.jsx("p", { className: "bd-monthly-method-note-v165", children: "Прочие расходы здесь включают только списания и операционные расходы. Закупки запасов не вычитаются повторно после себестоимости." }),
+    i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Прочие расходы включают списания и операционные расходы; инвентаризация показана отдельно. Положительная сумма потерь уменьшает прибыль, отрицательная сумма излишков увеличивает её. Закупки запасов не вычитаются повторно после себестоимости." : "Прочие расходы здесь включают только списания и операционные расходы. Закупки запасов не вычитаются повторно после себестоимости." }),
   ] });
 }
 
@@ -176,18 +177,20 @@ function bdMonthlyCostV165({ report }) {
       i.jsxs("span", { children: [i.jsx("small", { children: "Себестоимость проданного" }), i.jsx("strong", { children: report.costOfGoods === null ? "Пока недоступна" : bdMoney2(report.costOfGoods) })] }),
       i.jsx("b", { children: bdMonthlyRatioLabelV165(ratio) }),
     ] }),
-    i.jsx("p", { className: "bd-monthly-formula-v165", children: "Начальные остатки + закупки − конечные остатки − списания" }),
+    i.jsx("p", { className: "bd-monthly-formula-v165", children: report.costBasis === "historical_sales_snapshots" ? "Себестоимость сохранённых продаж с учётом возвратов. Остатки и переоценка показаны отдельно." : "Начальные остатки + закупки − конечные остатки − списания" }),
     i.jsxs("details", { className: "bd-monthly-details-v165", children: [
       i.jsx("summary", { children: "Показать расчёт" }),
       i.jsxs("div", { children: [
         i.jsx(bdReportLine, { label: "Остатки на начало · " + (report.openingSnapshot ? sg(report.openingSnapshot.date) : sg(report.meta.start)), value: report.openingInventory !== null ? bdMoney2(report.openingInventory) : "Не внесены" }),
-        i.jsx(bdReportLine, { label: "+ Закупки", value: bdMoney2(report.purchases) }),
-        i.jsx(bdReportLine, { label: "− Остатки на конец · " + (report.closingSnapshot ? sg(report.closingSnapshot.date) : sg(report.meta.nextStart)), value: report.closingInventory !== null ? bdMoney2(report.closingInventory) : "Не внесены" }),
-        i.jsx(bdReportLine, { label: "− Списания", value: bdMoney2(report.writeoffs) }),
-        i.jsx(bdReportLine, { label: "= Себестоимость проданного", value: report.costOfGoods !== null ? bdMoney2(report.costOfGoods) : "Пока недоступна", strong: true }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Приходы по документам" : "+ Закупки", value: bdMoney2(report.purchases) }),
+        i.jsx(bdReportLine, { label: (report.costBasis === "historical_sales_snapshots" ? "Остатки на конец · " : "− Остатки на конец · ") + (report.closingSnapshot ? sg(report.closingSnapshot.date) : sg(report.meta.nextStart)), value: report.closingInventory !== null ? bdMoney2(report.closingInventory) : "Не внесены" }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Списания" : "− Списания", value: bdMoney2(report.writeoffs) }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам" : "= Себестоимость проданного", value: report.costOfGoods !== null ? bdMoney2(report.costOfGoods) : "Пока недоступна", strong: true }),
+        report.costBasis === "historical_sales_snapshots" && i.jsx(bdReportLine, { label: "Инвентаризация: потери (+), излишки (−)", value: report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss) }),
+        report.costBasis === "historical_sales_snapshots" && i.jsx(bdReportLine, { label: "Переоценка остатков (не расход)", value: report.inventoryRevaluation == null ? "Пока недоступна" : bdMoney2(report.inventoryRevaluation) }),
         report.sections.map((section) => i.jsxs("article", { className: "bd-monthly-section-math-v165", children: [
           i.jsx("strong", { children: section.section }),
-          i.jsx("p", { children: "Начало " + bdMoney2(section.opening) + " + закупки " + bdMoney2(section.purchases) + " − конец " + bdMoney2(section.closing) + " − списания " + bdMoney2(section.writeoffs) + (section.cost !== null ? " = " + bdMoney2(section.cost) : "") }),
+          i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "Начало " + bdMoney2(section.opening) + " · приходы " + bdMoney2(section.purchases) + " · конец " + bdMoney2(section.closing) + " · списания " + bdMoney2(section.writeoffs) : "Начало " + bdMoney2(section.opening) + " + закупки " + bdMoney2(section.purchases) + " − конец " + bdMoney2(section.closing) + " − списания " + bdMoney2(section.writeoffs) + (section.cost !== null ? " = " + bdMoney2(section.cost) : "") }),
         ] }, section.section)),
       ] }),
     ] }),
@@ -262,7 +265,7 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
   const best = ordered[0];
   const worst = ordered[ordered.length - 1];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-shifts-v165", children: [
-    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? "Себестоимость распределена пропорционально выручке" : "Показан результат без себестоимости", action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
+    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? (report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам каждой смены" : "Себестоимость распределена пропорционально выручке") : "Показан результат без себестоимости", action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
     i.jsx("div", { className: "bd-monthly-shift-summary-v165", children: [
       { key: "all", label: "Завершено", value: shifts.length },
       { key: "profit", label: "Прибыльных", value: profitable },
@@ -278,7 +281,7 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
         i.jsx("b", { className: Number(result) >= 0 ? "is-positive" : "is-negative", children: bdMoney2(result) }),
       ] }, shift.date);
     }) }),
-    i.jsx("p", { className: "bd-monthly-method-note-v165", children: "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
+    i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
   ] });
 }
 

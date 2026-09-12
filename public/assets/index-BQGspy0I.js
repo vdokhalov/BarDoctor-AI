@@ -667,7 +667,7 @@ function bdWarehouseUnit(e){return e==="ml"?"мл":e==="l"?"л":e==="g"?"г":e==
 function bdWarehouseDecimal(e,t=2){return new Intl.NumberFormat("ru-RU",{maximumFractionDigits:t}).format(bdWarehouseNumber(e))}
 function bdWarehouseMoney(e,t="MDL"){return bdWarehouseDecimal(e,2)+" "+String(t||"MDL").toUpperCase()}
 function bdWarehouseCurrency(e){return String(e||"").trim().toUpperCase()}
-function bdWarehouseInventoryValueLine(e,t){const n=bdWarehouseCurrency(t),r=bdWarehouseNumber(e?.current,Number.NaN),a=String(e?.unit||"unknown").trim().toLowerCase(),s=bdWarehouseCurrency(e?.accountingCurrency||e?.normalizedCostCurrency||e?.currency),l=bdWarehouseNumber(e?.accountingInventoryValue??e?.normalizedInventoryValue,Number.NaN),u=bdWarehouseCurrency(e?.accountingCurrency||e?.normalizedCostCurrency),d=bdWarehouseNumber(e?.inventoryValue,Number.NaN),f=Math.max(0,bdWarehouseNumber(e?.averageUnitCost)),m=Number.isFinite(l)&&l>=0&&u===n?l:Number.isFinite(d)&&d>0?d:r>0&&f>0?r*f:0,h=String(e?.costReviewReason||e?.valuationReason||"");if(e?.archived===!0||e?.deleted===!0||e?.active===!1)return{status:"excluded",value:0};if(!Number.isFinite(r))return{status:"unvalued",value:0,reason:"invalid_quantity"};if(Math.abs(r)<1e-7)return{status:"zero",value:0};if(r<0)return{status:"unvalued",value:0,reason:"negative_stock"};if(!["ml","g","pcs"].includes(a))return{status:"unvalued",value:0,reason:"broken_base_unit"};if(!n)return{status:"unvalued",value:0,reason:"missing_cost_currency"};if(e?.costNeedsReview===!0)return{status:"unvalued",value:0,reason:h==="missing_fx"?"missing_fx":h==="currency_mismatch"?"currency_mismatch":h||"cost_basis_requires_review"};if(!(m>0)){const g=String(e?.source||e?.metadataSource||"").toLocaleLowerCase("ru");return{status:"unvalued",value:0,reason:/opening|initial|начальн|входящ/.test(g)?"opening_balance_without_cost":/import|excel|csv|1c|1с|legacy/.test(g)?"historical_import_without_cost":"missing_cost_basis"}}if(!(Number.isFinite(l)&&l>=0&&u===n)&&!s)return{status:"unvalued",value:0,reason:"missing_cost_currency"};if(!(Number.isFinite(l)&&l>=0&&u===n)&&s!==n)return{status:"unvalued",value:0,reason:"currency_mismatch"};return{status:"valued",value:Math.round(m*100)/100,reason:""}}
+function bdWarehouseInventoryValueLine(e,t){const n=bdWarehouseCurrency(t),r=bdWarehouseNumber(e?.current,Number.NaN),a=String(e?.unit||"unknown").trim().toLowerCase(),s=bdWarehouseCurrency(e?.accountingCurrency||e?.normalizedCostCurrency||e?.currency),l=bdWarehouseNumber(e?.accountingInventoryValue??e?.normalizedInventoryValue,Number.NaN),u=bdWarehouseCurrency(e?.accountingCurrency||e?.normalizedCostCurrency),d=bdWarehouseNumber(e?.inventoryValue,Number.NaN),f=Math.max(0,bdWarehouseNumber(e?.averageUnitCost)),m=Number.isFinite(l)&&l>=0&&u===n?l:Number.isFinite(d)&&d>0?d:r>0&&f>0?r*f:0,h=String(e?.costReviewReason||e?.valuationReason||"");if(e?.archived===!0||e?.deleted===!0||e?.active===!1)return{status:"excluded",value:0};if(!Number.isFinite(r))return{status:"unvalued",value:0,reason:"invalid_quantity"};if(Math.abs(r)<1e-7)return{status:"zero",value:0};if(r<0)return{status:"unvalued",value:0,reason:"negative_stock"};if(!["kg","l","g","ml","pcs"].includes(a))return{status:"unvalued",value:0,reason:"broken_base_unit"};if(!n)return{status:"unvalued",value:0,reason:"missing_cost_currency"};if(e?.costNeedsReview===!0)return{status:"unvalued",value:0,reason:h==="missing_fx"?"missing_fx":h==="currency_mismatch"?"currency_mismatch":h||"cost_basis_requires_review"};if(!(m>0)){const g=String(e?.source||e?.metadataSource||"").toLocaleLowerCase("ru");return{status:"unvalued",value:0,reason:/opening|initial|начальн|входящ/.test(g)?"opening_balance_without_cost":/import|excel|csv|1c|1с|legacy/.test(g)?"historical_import_without_cost":"missing_cost_basis"}}if(!(Number.isFinite(l)&&l>=0&&u===n)&&!s)return{status:"unvalued",value:0,reason:"missing_cost_currency"};if(!(Number.isFinite(l)&&l>=0&&u===n)&&s!==n)return{status:"unvalued",value:0,reason:"currency_mismatch"};return{status:"valued",value:Math.round(m*100)/100,reason:""}}
 function bdWarehouseInventoryValueSummary(e,t){const n=bdWarehouseCurrency(t),r=[],a={};let s=0,l=0,u=0,d=0;for(const f of Array.isArray(e)?e:[]){const m=bdWarehouseInventoryValueLine(f,n);if(m.status==="excluded")continue;if(m.status==="zero"){d+=1;continue}u+=1;if(m.status==="valued"){s+=m.value,l+=1}else{r.push({...m,productKey:String(f?.productKey||f?.key||f?.id||""),name:String(f?.name||f?.productName||"Позиция без названия")}),a[m.reason]=(a[m.reason]||0)+1}}const f=r.length,m=!n?"currency_missing":f===0?"full":l>0?"partial":"unvalued";return{baseCurrency:n,total:Math.round(s*100)/100,unresolved:f,unvaluedCount:f,valuedCount:l,denominator:u,zeroStockExcluded:d,breakdown:a,lines:r,status:m,complete:m==="full"}}
 function bdWarehouseEffectiveDisplayUnit(e,t){if(e?.unitModelVersion===4){const base=bdStockUnitsV421.canonicalStockUnit(e.unit),display=String(e.displayUnit||"auto"),pack=bdWarehouseNumber(e.displayPackageAmount||e.packageAmount);if(display==="pcs"&&base!=="pcs"&&pack>0)return"pcs";if(display!=="auto"&&bdStockUnitsV421.convertStockQuantity(1,base,display)!==null)return display;return base||"unknown";}const n=e?.unit,r=String(e?.displayUnit||"auto"),a=Math.abs(bdWarehouseNumber(t)),s=bdWarehouseNumber(e?.displayPackageAmount||e?.packageAmount);if((n==="ml"||n==="g")&&r==="pcs"&&s>0)return"pcs";if(n==="ml")return r==="l"||r==="ml"?r:a>=1e3?"l":"ml";if(n==="g")return r==="kg"||r==="g"?r:a>=1e3?"kg":"g";return"pcs"}
 function bdWarehouseDisplayPreferenceLabel(e){const t=String(e?.displayUnit||"auto");return t==="auto"?"Автоматически":t==="l"?"Литры":t==="ml"?"Миллилитры":t==="kg"?"Килограммы":t==="g"?"Граммы":e?.unit!=="pcs"&&e?.displayPackageSize?"Штуки · "+e.displayPackageSize+" за единицу":"Штуки"}
@@ -839,6 +839,7 @@ const bdInventoryScopeHierarchyVersion="scope-hierarchy-v256";
 function bdInventoryCountStatusLabel(e){return e==="completed"||e==="confirmed"?"Завершена":e==="cancelled"?"Отменена":e==="review"?"На проверке":"Подсчёт"}
 function bdInventoryCountInputValue(e){if(e?.actual===null||e?.actual===void 0)return"";const t=Math.max(.000001,bdWarehouseNumber(e.entryFactor)||1);return String(Math.round(bdWarehouseNumber(e.actual)/t*1e3)/1e3)}
 function bdInventoryCountDisplayValue(e,t){if(t===null||t===void 0)return"—";const n=Math.max(.000001,bdWarehouseNumber(e?.entryFactor)||1);return bdWarehouseDecimal(bdWarehouseNumber(t)/n,3)+" "+String(e?.entryUnit||bdWarehouseUnit(e?.unit))}
+function bdInventoryCountDifferenceValue(e,v){const t=n=>typeof n!=="number"&&typeof n!=="string"||typeof n==="string"&&!n.trim()?NaN:bdWarehouseNumber(n,NaN);if(e.valuationKnown===void 0){const n=t(e.differenceValue);return Number.isFinite(n)?n:null}if(e.valuationKnown!==!0)return null;const n=t(e.actual),r=t(e.expected),a=t(e.averageUnitCost);if(!Number.isFinite(n)||!Number.isFinite(r)||!Number.isFinite(a)||a<0)return null;if(v===1){const s=t(e.differenceValue);return Number.isFinite(s)?s:null}const s=(o,l)=>Math.round((o+Number.EPSILON)*10**l)/10**l;return s(s(n-r,6)*a,2)}
 function bdInventoryCountPayload(e,t,n){return e.map(r=>{const a=String(t[r.productKey]??"").trim(),s=a===""?null:Math.round(bdWarehouseNumber(a)*(Math.max(.000001,bdWarehouseNumber(r.entryFactor)||1))*1e3)/1e3;return{productKey:r.productKey,actual:s,note:String(n[r.productKey]||"").trim()||void 0}})}
 function bdInventoryCountSheet({balances:e,settings:t,initial:n,startEditing:r=!1,onClose:a,onSaved:s}){
 const isStored=!!n?.status,initialCompleted=["completed","confirmed"].includes(String(n?.status||"")),[doc,setDoc]=S.useState(isStored?n:null),[phase,setPhase]=S.useState(isStored?(initialCompleted?"review":r?"count":n.status==="review"?"review":"count"):"setup"),[scopes,setScopes]=S.useState([]),[scopeKey,setScopeKey]=S.useState("all:"),[date,setDate]=S.useState(n?.date||bdDateKey(new Date)),[values,setValues]=S.useState(()=>{const o={};for(const l of Array.isArray(n?.items)?n.items:[])o[l.productKey]=bdInventoryCountInputValue(l);return o}),[notes,setNotes]=S.useState(()=>{const o={};for(const l of Array.isArray(n?.items)?n.items:[])l.note&&(o[l.productKey]=String(l.note));return o}),[inventoryNote,setInventoryNote]=S.useState(n?.note||""),[query,setQuery]=S.useState(""),[filter,setFilter]=S.useState("all"),[busy,setBusy]=S.useState(!1),[loadingScopes,setLoadingScopes]=S.useState(!isStored),[error,setError]=S.useState(""),[dirty,setDirty]=S.useState(!1),scanDraft=!isStored&&n?.source==="scan"?n:null,items=Array.isArray(doc?.items)?doc.items:[],serverSummary=doc?.summary||{totalLines:items.length,countedLines:items.filter(o=>o.actual!==null&&o.actual!==void 0).length,uncountedLines:items.filter(o=>o.actual===null||o.actual===void 0).length,matchedLines:0,shortageLines:0,surplusLines:0,changedLines:0,shortageValue:0,surplusValue:0,calculatedDifferenceValue:0,netDifferenceValue:null,unvaluedDifferenceLines:0},localCount=items.filter(o=>String(values[o.productKey]??"").trim()!=="").length,summary=phase==="count"?{...serverSummary,countedLines:localCount,uncountedLines:items.length-localCount}:serverSummary,completed=["completed","confirmed"].includes(String(doc?.status||"")),currency=String(doc?.accountingCurrency||n?.currency||""),headers=()=>({"Content-Type":"application/json",...ca(Ot())});
@@ -858,7 +859,7 @@ const scopeKeyFor=o=>String(o?.type||"")+":"+String(o?.id||""),selectedScope=sco
 const shell=(o,l=null)=>ug.createPortal(i.jsxs("div",{className:"bd-inventory-layer-v246",role:"presentation",children:[i.jsx(W.div,{className:"bd-inventory-backdrop-v246",initial:{opacity:0},animate:{opacity:1},exit:{opacity:0},onClick:close}),i.jsxs(W.div,{className:"bd-inventory-sheet bd-inventory-sheet-v245 bd-inventory-sheet-v246 bg-white rounded-t-[28px] shadow-[0_-8px_40px_rgba(0,0,0,0.14)]",role:"dialog","aria-modal":"true",initial:{y:"100%"},animate:{y:0},exit:{y:"100%"},children:[i.jsx("div",{className:"bd-inventory-handle-v245"}),i.jsxs("header",{className:"bd-inventory-head-v245",children:[i.jsxs("div",{children:[i.jsx("p",{children:phase==="setup"?"Новая инвентаризация":completed?"Завершённый документ":phase==="review"?"Проверка результатов":"Слепой подсчёт"}),i.jsx("h2",{children:doc?bdInventoryDisplayLabelV270(doc):"Провести инвентаризацию"}),doc&&i.jsx("small",{children:bdInventoryCountStatusLabel(doc.status)+" · "+String(doc.scope?.label||"")})]}),i.jsxs("div",{children:[doc&&!completed&&i.jsx("button",{type:"button",className:"bd-inventory-more-v270",onClick:remove,"aria-label":"Удалить инвентаризацию",children:"⋯"}),doc&&i.jsx("button",{type:"button",onClick:openPrint,"aria-label":"Печатная ведомость",children:"Печать"}),i.jsx("button",{type:"button",onClick:close,"aria-label":"Закрыть",children:"×"})]})]}),o,l&&i.jsx("footer",{className:"bd-inventory-footer-v246",children:l})]})]}),document.body);
 if(phase==="setup")return shell(i.jsxs("main",{className:"bd-inventory-body-v245",children:[i.jsxs("section",{className:"bd-inventory-setup-v245 bd-inventory-setup-v256",children:[i.jsx("strong",{children:"Выберите охват"}),i.jsx("p",{children:"Можно посчитать весь активный склад, отдельный раздел или его часть. Состав фиксируется на момент старта."}),loadingScopes?i.jsx("div",{className:"bd-inventory-scope-loading-v256",children:"Загружаю структуру склада…"}):i.jsxs(i.Fragment,{children:[i.jsx("div",{className:"bd-inventory-scope-list-v256",role:"listbox","aria-label":"Охват инвентаризации",children:topScopes.map(o=>scopeRow(o,o.type==="section"&&scopes.some(l=>l.type==="category"&&l.parentId===o.id)))}),selectedSectionId&&i.jsxs("div",{className:"bd-inventory-scope-level-v256",children:[i.jsx("p",{children:"Уточнить охват раздела"}),scopeRow(scopes.find(o=>o.type==="section"&&o.id===selectedSectionId),!1,"Весь раздел"),categoryScopes.map(o=>scopeRow(o,scopes.some(l=>l.type==="subcategory"&&l.parentId===o.id)))]}),selectedCategoryId&&i.jsxs("div",{className:"bd-inventory-scope-level-v256 nested",children:[i.jsx("p",{children:"Уточнить категорию"}),scopeRow(scopes.find(o=>o.type==="category"&&o.id===selectedCategoryId),!1,"Вся категория"),subcategoryScopes.map(o=>scopeRow(o))]}),selectedScope&&i.jsxs("div",{className:"bd-inventory-scope-selected-v256",children:[i.jsx("span",{children:"Выбрано"}),i.jsx("strong",{children:selectedScope.label}),i.jsxs("small",{children:[selectedScope.itemCount||0," позиций попадут в snapshot"]})]})]}),i.jsxs("label",{children:[i.jsx("span",{children:"Дата начала"}),i.jsx("input",{type:"date","aria-label":"Дата инвентаризации",value:date,onChange:o=>setDate(o.target.value)})]}),scanDraft&&i.jsx("div",{className:"bd-inventory-info-v245",children:"Распознано из ведомости: "+String(scanDraft.items?.length||0)+" поз."})]}),error&&i.jsx("div",{className:"bd-inventory-error",children:error}),i.jsx("button",{type:"button",className:"bd-inventory-primary-v245",disabled:busy||loadingScopes||!selectedScope||!(Number(selectedScope.itemCount)>0),onClick:create,children:busy?"Создаю…":"Начать подсчёт"})]}));
 if(phase==="count")return shell(i.jsxs("main",{className:"bd-inventory-body-v245",children:[i.jsxs("section",{className:"bd-inventory-progress-v245",children:[i.jsxs("div",{children:[i.jsx("strong",{children:"Посчитано "+summary.countedLines+" из "+summary.totalLines}),i.jsx("span",{children:"Пустое поле не считается нулём"})]}),i.jsx("b",{children:summary.totalLines?Math.round(summary.countedLines/summary.totalLines*100)+"%":"0%"})]}),i.jsx("div",{className:"bd-inventory-blind-v245",children:"Учётный остаток и стоимость скрыты до этапа проверки."}),i.jsx("input",{className:"bd-warehouse-search",value:query,onChange:o=>setQuery(o.target.value),placeholder:"Найти позицию внутри инвентаризации…","aria-label":"Поиск по инвентаризации"}),i.jsx("div",{className:"bd-inventory-count-list bd-inventory-count-list-v245",children:groups.map((o,l)=>o.kind==="heading"?i.jsx("h3",{children:o.label},o.key):(()=>{const u=o.item,d=String(values[u.productKey]??""),f=d!==""&&Number.isFinite(bdWarehouseNumber(d,NaN))&&bdWarehouseNumber(d)>=0;return i.jsxs("article",{className:f?"counted":"",children:[i.jsxs("div",{className:"bd-inventory-count-name",children:[i.jsx("strong",{children:u.productName}),i.jsx("span",{children:[u.packageSize,Array.isArray(u.packageOptions)&&u.packageOptions.length>1?u.packageOptions.join(" · "):"",u.storageLocationName].filter(Boolean).join(" · ")||u.entryUnit})]}),i.jsxs("div",{className:"bd-inventory-entry-v245",children:[i.jsxs("label",{children:[i.jsx("span",{children:"Факт, "+u.entryUnit}),i.jsx("input",{type:"number",inputMode:"decimal",min:"0",step:"0.001",value:d,"data-inventory-input-index":l,onChange:m=>changeValue(u.productKey,m.target.value),onKeyDown:m=>{if(m.key==="Enter"){m.preventDefault();const h=document.querySelector('[data-inventory-input-index="'+(l+1)+'"]');h?.focus()}} ,placeholder:"—","aria-label":"Фактический остаток "+u.productName})]}),i.jsx("button",{type:"button",onClick:()=>changeValue(u.productKey,"0"),children:"0"})]}),i.jsx("input",{className:"bd-inventory-line-note-v245",value:String(notes[u.productKey]||""),onChange:m=>changeNote(u.productKey,m.target.value),placeholder:"Примечание (необязательно)","aria-label":"Примечание "+u.productName})]},o.key)})())}),i.jsxs("label",{className:"bd-inventory-note",children:[i.jsx("span",{children:"Комментарий к инвентаризации"}),i.jsx("textarea",{rows:2,value:inventoryNote,onChange:o=>{setInventoryNote(o.target.value),setDirty(!0)},placeholder:"Необязательно"})]}),error&&i.jsx("div",{className:"bd-inventory-error",children:error})]}),i.jsxs("div",{className:"bd-inventory-actions-v245",children:[i.jsx("button",{type:"button",disabled:busy||!dirty,onClick:()=>persist("save",!1),children:busy?"Сохраняю…":"Сохранить"}),i.jsx("button",{type:"button",disabled:busy,onClick:()=>persist("save",!0),children:"Сохранить и выйти"}),i.jsx("button",{type:"button",className:"primary",disabled:busy,onClick:()=>persist("review",!1),children:"Перейти к результатам"})]}));
-const reviewFilters=[["all","Все"],["differences","Расхождения"],["shortage","Недостачи"],["surplus","Излишки"],["uncounted","Не посчитано"]];return shell(i.jsxs("main",{className:"bd-inventory-body-v245",children:[i.jsx("section",{className:"bd-inventory-summary-v245",children:[[summary.totalLines,"Позиций"],[summary.matchedLines,"Совпало"],[summary.shortageLines,"Недостача"],[summary.surplusLines,"Излишек"],[summary.uncountedLines,"Не посчитано"]].map((o,l)=>i.jsxs("div",{className:l===4&&summary.uncountedLines?"warning":"",children:[i.jsx("strong",{children:o[0]}),i.jsx("span",{children:o[1]})]},o[1]))}),i.jsxs("section",{className:"bd-inventory-money-v245",children:[i.jsxs("div",{children:[i.jsx("span",{children:"Недостачи"}),i.jsx("strong",{className:"negative",children:bdWarehouseMoney(summary.shortageValue||0,currency||"RUB")})]}),i.jsxs("div",{children:[i.jsx("span",{children:"Излишки"}),i.jsx("strong",{className:"positive",children:"+"+bdWarehouseMoney(summary.surplusValue||0,currency||"RUB")})]}),i.jsxs("div",{children:[i.jsx("span",{children:summary.netDifferenceValue===null?"Рассчитанная часть":"Итог"}),i.jsx("strong",{children:(summary.calculatedDifferenceValue>0?"+":"")+bdWarehouseMoney(summary.calculatedDifferenceValue||0,currency||"RUB")}),summary.unvaluedDifferenceLines>0&&i.jsx("small",{children:"Без оценки: "+summary.unvaluedDifferenceLines+" поз."})]})]}),i.jsx("nav",{className:"bd-inventory-filters-v245",children:reviewFilters.map(o=>i.jsx("button",{type:"button",className:filter===o[0]?"active":"",onClick:()=>setFilter(o[0]),children:o[1]},o[0]))}),i.jsx("input",{className:"bd-warehouse-search",value:query,onChange:o=>setQuery(o.target.value),placeholder:"Найти позицию…"}),i.jsx("div",{className:"bd-inventory-review-list-v245",children:groups.map(o=>o.kind==="heading"?i.jsx("h3",{children:o.label},o.key):(()=>{const l=o.item,u=l.difference===null||l.difference===void 0?l.actual===null?null:bdWarehouseNumber(l.actual)-bdWarehouseNumber(l.expected):bdWarehouseNumber(l.difference),d=l.differenceValue===null||l.differenceValue===void 0?null:bdWarehouseNumber(l.differenceValue);return i.jsxs("article",{children:[i.jsxs("div",{children:[i.jsx("strong",{children:l.productName}),i.jsx("span",{children:l.packageSize||l.entryUnit}),l.note&&i.jsx("small",{children:l.note})]}),i.jsxs("dl",{children:[i.jsxs("div",{children:[i.jsx("dt",{children:"Учёт"}),i.jsx("dd",{children:bdInventoryCountDisplayValue(l,l.expected)})]}),i.jsxs("div",{children:[i.jsx("dt",{children:"Факт"}),i.jsx("dd",{children:bdInventoryCountDisplayValue(l,l.actual)})]}),i.jsxs("div",{children:[i.jsx("dt",{children:"Расхождение"}),i.jsx("dd",{className:u<0?"negative":u>0?"positive":"",children:u===null?"Не посчитано":(u>0?"+":"")+bdInventoryCountDisplayValue(l,u)})]}),u!==null&&Math.abs(u)>.0001&&i.jsxs("div",{children:[i.jsx("dt",{children:"Стоимость"}),i.jsx("dd",{className:d<0?"negative":d>0?"positive":"",children:d===null?"Не рассчитана":(d>0?"+":"")+bdWarehouseMoney(d,currency||"RUB")})]})]})]},o.key)})())}),error&&i.jsx("div",{className:"bd-inventory-error",children:error}),!completed&&summary.uncountedLines>0&&i.jsxs("div",{className:"bd-inventory-warning",children:[i.jsx("strong",{children:"Не посчитано: "+summary.uncountedLines+" поз."}),i.jsx("p",{children:"Пустые значения не будут превращены в ноль. Вернитесь к подсчёту и заполните их."})]})]}),i.jsxs("div",{className:"bd-inventory-actions-v245",children:[!completed&&i.jsx("button",{type:"button",onClick:()=>setPhase("count"),children:"Вернуться к подсчёту"}),i.jsx("button",{type:"button",onClick:openPrint,children:"Печатная ведомость"}),!completed&&i.jsx("button",{type:"button",className:"primary",disabled:busy||summary.uncountedLines>0,onClick:finalize,children:busy?"Завершаю…":"Завершить инвентаризацию"})]}))}
+const reviewFilters=[["all","Все"],["differences","Расхождения"],["shortage","Недостачи"],["surplus","Излишки"],["uncounted","Не посчитано"]];return shell(i.jsxs("main",{className:"bd-inventory-body-v245",children:[i.jsx("section",{className:"bd-inventory-summary-v245",children:[[summary.totalLines,"Позиций"],[summary.matchedLines,"Совпало"],[summary.shortageLines,"Недостача"],[summary.surplusLines,"Излишек"],[summary.uncountedLines,"Не посчитано"]].map((o,l)=>i.jsxs("div",{className:l===4&&summary.uncountedLines?"warning":"",children:[i.jsx("strong",{children:o[0]}),i.jsx("span",{children:o[1]})]},o[1]))}),i.jsxs("section",{className:"bd-inventory-money-v245",children:[i.jsxs("div",{children:[i.jsx("span",{children:"Недостачи"}),i.jsx("strong",{className:"negative",children:bdWarehouseMoney(summary.shortageValue||0,currency||"RUB")})]}),i.jsxs("div",{children:[i.jsx("span",{children:"Излишки"}),i.jsx("strong",{className:"positive",children:"+"+bdWarehouseMoney(summary.surplusValue||0,currency||"RUB")})]}),i.jsxs("div",{children:[i.jsx("span",{children:summary.netDifferenceValue===null?"Рассчитанная часть":"Итог"}),i.jsx("strong",{children:(summary.calculatedDifferenceValue>0?"+":"")+bdWarehouseMoney(summary.calculatedDifferenceValue||0,currency||"RUB")}),summary.unvaluedDifferenceLines>0&&i.jsx("small",{children:"Без оценки: "+summary.unvaluedDifferenceLines+" поз."})]})]}),i.jsx("nav",{className:"bd-inventory-filters-v245",children:reviewFilters.map(o=>i.jsx("button",{type:"button",className:filter===o[0]?"active":"",onClick:()=>setFilter(o[0]),children:o[1]},o[0]))}),i.jsx("input",{className:"bd-warehouse-search",value:query,onChange:o=>setQuery(o.target.value),placeholder:"Найти позицию…"}),i.jsx("div",{className:"bd-inventory-review-list-v245",children:groups.map(o=>o.kind==="heading"?i.jsx("h3",{children:o.label},o.key):(()=>{const l=o.item,u=l.difference===null||l.difference===void 0?l.actual===null?null:bdWarehouseNumber(l.actual)-bdWarehouseNumber(l.expected):bdWarehouseNumber(l.difference),d=bdInventoryCountDifferenceValue(l,doc?.financialValuationVersion);return i.jsxs("article",{children:[i.jsxs("div",{children:[i.jsx("strong",{children:l.productName}),i.jsx("span",{children:l.packageSize||l.entryUnit}),l.note&&i.jsx("small",{children:l.note})]}),i.jsxs("dl",{children:[i.jsxs("div",{children:[i.jsx("dt",{children:"Учёт"}),i.jsx("dd",{children:bdInventoryCountDisplayValue(l,l.expected)})]}),i.jsxs("div",{children:[i.jsx("dt",{children:"Факт"}),i.jsx("dd",{children:bdInventoryCountDisplayValue(l,l.actual)})]}),i.jsxs("div",{children:[i.jsx("dt",{children:"Расхождение"}),i.jsx("dd",{className:u<0?"negative":u>0?"positive":"",children:u===null?"Не посчитано":(u>0?"+":"")+bdInventoryCountDisplayValue(l,u)})]}),u!==null&&Math.abs(u)>.0001&&i.jsxs("div",{children:[i.jsx("dt",{children:"Стоимость"}),i.jsx("dd",{className:d<0?"negative":d>0?"positive":"",children:d===null?"Не рассчитана":(d>0?"+":"")+bdWarehouseMoney(d,currency||"RUB")})]})]})]},o.key)})())}),error&&i.jsx("div",{className:"bd-inventory-error",children:error}),!completed&&summary.uncountedLines>0&&i.jsxs("div",{className:"bd-inventory-warning",children:[i.jsx("strong",{children:"Не посчитано: "+summary.uncountedLines+" поз."}),i.jsx("p",{children:"Пустые значения не будут превращены в ноль. Вернитесь к подсчёту и заполните их."})]})]}),i.jsxs("div",{className:"bd-inventory-actions-v245",children:[!completed&&i.jsx("button",{type:"button",onClick:()=>setPhase("count"),children:"Вернуться к подсчёту"}),i.jsx("button",{type:"button",onClick:openPrint,children:"Печатная ведомость"}),!completed&&i.jsx("button",{type:"button",className:"primary",disabled:busy||summary.uncountedLines>0,onClick:finalize,children:busy?"Завершаю…":"Завершить инвентаризацию"})]}))}
 const bdWriteoffWorkflowVersionV271="canonical-document-v271";
 const bdWriteoffReasonFallbackV271=[{code:"spoilage",label:"Порча"},{code:"expired",label:"Истёк срок годности"},{code:"breakage",label:"Бой / разбили"},{code:"spill",label:"Пролив / просыпали"},{code:"preparation_error",label:"Ошибка приготовления"},{code:"recipe_development",label:"Проработка техкарты"},{code:"tasting",label:"Дегустация"},{code:"staff_meal",label:"Питание персонала"},{code:"guest_compliment",label:"Комплимент гостю"},{code:"loss_shortage",label:"Потеря / недостача"},{code:"other",label:"Другое"}];
 function bdWriteoffStatusV271(e){return e==="posted"||e==="confirmed"?"Проведено":e==="cancelled"?"Отменено":"Черновик"}
@@ -1029,8 +1030,8 @@ function bdMonthlyChainV165({ report }) {
       i.jsx("summary", { children: "Как считаются результаты" }),
       i.jsxs("div", { children: [
         i.jsx("p", { children: "Денежный итог: выручка минус фактические оплаты поставщикам, ФОТ, списания, прочие расходы, налоги и коммунальные услуги." }),
-        i.jsx("p", { children: "До себестоимости: закупки запасов не вычитаются целиком; их проданная часть определяется после остатков." }),
-        i.jsx("p", { children: "Чистая прибыль: результат после себестоимости проданного, ФОТ, списаний, остальных расходов, налогов и коммунальных услуг." }),
+        i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "До себестоимости: закупки запасов не вычитаются целиком; стоимость проданного берётся из сохранённых продаж." : "До себестоимости: закупки запасов не вычитаются целиком; их проданная часть определяется после остатков." }),
+        i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "Чистая прибыль: выручка минус сохранённая себестоимость продаж, ФОТ, списания, прочие расходы, налоги и коммунальные услуги; недостачи уменьшают результат, излишки увеличивают." : "Чистая прибыль: результат после себестоимости проданного, ФОТ, списаний, остальных расходов, налогов и коммунальных услуг." }),
       ] }),
     ] }),
   ] });
@@ -1039,10 +1040,11 @@ function bdMonthlyChainV165({ report }) {
 function bdMonthlyProfitStructureV165({ report }) {
   const values = [
     { key: "revenue", label: "Выручка", amount: Number(report.revenue || 0), tone: "revenue" },
-    { key: "cogs", label: "Себестоимость проданного", amount: Number(report.costOfGoods || 0), tone: "cost" },
+    { key: "cogs", label: "Себестоимость проданного", amount: report.costOfGoods == null ? null : Number(report.costOfGoods), tone: "cost" },
     { key: "payroll", label: "ФОТ", amount: Number(report.payroll || 0), tone: "payroll" },
     { key: "other", label: "Прочие расходы и списания", amount: Number(report.otherExpenses || 0) + Number(report.writeoffs || 0), tone: "other" },
     { key: "recurring", label: "Налоги и коммунальные", amount: Number(report.taxes || 0) + Number(report.utilities || 0), tone: "recurring" },
+    ...(report.costBasis === "historical_sales_snapshots" ? [{ key: "inventory", label: Number(report.inventoryLoss) < 0 ? "Излишки инвентаризации (− расход)" : "Потери инвентаризации", amount: report.inventoryLoss, tone: Number(report.inventoryLoss) < 0 ? "profit" : "other" }] : []),
     { key: "profit", label: "Чистая прибыль", amount: report.operatingResult, tone: Number(report.operatingResult || 0) >= 0 ? "profit" : "loss" },
   ];
   const scale = Math.max(1, Number(report.revenue || 0), ...values.map((entry) => Math.abs(Number(entry.amount || 0))));
@@ -1058,7 +1060,7 @@ function bdMonthlyProfitStructureV165({ report }) {
       i.jsxs("header", { children: [i.jsx("span", { children: entry.label }), i.jsx("strong", { children: entry.amount === null ? "—" : bdMoney2(entry.amount) })] }),
       i.jsx("div", { className: "bd-monthly-profit-track-v165", title: entry.label + ": " + bdMoney2(entry.amount), children: i.jsx("i", { className: entry.tone, style: { width: Math.max(entry.amount === 0 ? 0 : 3, Math.min(100, Math.abs(Number(entry.amount || 0)) / scale * 100)) + "%" } }) }),
     ] }, entry.key)) }),
-    i.jsx("p", { className: "bd-monthly-method-note-v165", children: "Прочие расходы здесь включают только списания и операционные расходы. Закупки запасов не вычитаются повторно после себестоимости." }),
+    i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Прочие расходы включают списания и операционные расходы; инвентаризация показана отдельно. Положительная сумма потерь уменьшает прибыль, отрицательная сумма излишков увеличивает её. Закупки запасов не вычитаются повторно после себестоимости." : "Прочие расходы здесь включают только списания и операционные расходы. Закупки запасов не вычитаются повторно после себестоимости." }),
   ] });
 }
 
@@ -1070,18 +1072,20 @@ function bdMonthlyCostV165({ report }) {
       i.jsxs("span", { children: [i.jsx("small", { children: "Себестоимость проданного" }), i.jsx("strong", { children: report.costOfGoods === null ? "Пока недоступна" : bdMoney2(report.costOfGoods) })] }),
       i.jsx("b", { children: bdMonthlyRatioLabelV165(ratio) }),
     ] }),
-    i.jsx("p", { className: "bd-monthly-formula-v165", children: "Начальные остатки + закупки − конечные остатки − списания" }),
+    i.jsx("p", { className: "bd-monthly-formula-v165", children: report.costBasis === "historical_sales_snapshots" ? "Себестоимость сохранённых продаж с учётом возвратов. Остатки и переоценка показаны отдельно." : "Начальные остатки + закупки − конечные остатки − списания" }),
     i.jsxs("details", { className: "bd-monthly-details-v165", children: [
       i.jsx("summary", { children: "Показать расчёт" }),
       i.jsxs("div", { children: [
         i.jsx(bdReportLine, { label: "Остатки на начало · " + (report.openingSnapshot ? sg(report.openingSnapshot.date) : sg(report.meta.start)), value: report.openingInventory !== null ? bdMoney2(report.openingInventory) : "Не внесены" }),
-        i.jsx(bdReportLine, { label: "+ Закупки", value: bdMoney2(report.purchases) }),
-        i.jsx(bdReportLine, { label: "− Остатки на конец · " + (report.closingSnapshot ? sg(report.closingSnapshot.date) : sg(report.meta.nextStart)), value: report.closingInventory !== null ? bdMoney2(report.closingInventory) : "Не внесены" }),
-        i.jsx(bdReportLine, { label: "− Списания", value: bdMoney2(report.writeoffs) }),
-        i.jsx(bdReportLine, { label: "= Себестоимость проданного", value: report.costOfGoods !== null ? bdMoney2(report.costOfGoods) : "Пока недоступна", strong: true }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Приходы по документам" : "+ Закупки", value: bdMoney2(report.purchases) }),
+        i.jsx(bdReportLine, { label: (report.costBasis === "historical_sales_snapshots" ? "Остатки на конец · " : "− Остатки на конец · ") + (report.closingSnapshot ? sg(report.closingSnapshot.date) : sg(report.meta.nextStart)), value: report.closingInventory !== null ? bdMoney2(report.closingInventory) : "Не внесены" }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Списания" : "− Списания", value: bdMoney2(report.writeoffs) }),
+        i.jsx(bdReportLine, { label: report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам" : "= Себестоимость проданного", value: report.costOfGoods !== null ? bdMoney2(report.costOfGoods) : "Пока недоступна", strong: true }),
+        report.costBasis === "historical_sales_snapshots" && i.jsx(bdReportLine, { label: "Инвентаризация: потери (+), излишки (−)", value: report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss) }),
+        report.costBasis === "historical_sales_snapshots" && i.jsx(bdReportLine, { label: "Переоценка остатков (не расход)", value: report.inventoryRevaluation == null ? "Пока недоступна" : bdMoney2(report.inventoryRevaluation) }),
         report.sections.map((section) => i.jsxs("article", { className: "bd-monthly-section-math-v165", children: [
           i.jsx("strong", { children: section.section }),
-          i.jsx("p", { children: "Начало " + bdMoney2(section.opening) + " + закупки " + bdMoney2(section.purchases) + " − конец " + bdMoney2(section.closing) + " − списания " + bdMoney2(section.writeoffs) + (section.cost !== null ? " = " + bdMoney2(section.cost) : "") }),
+          i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "Начало " + bdMoney2(section.opening) + " · приходы " + bdMoney2(section.purchases) + " · конец " + bdMoney2(section.closing) + " · списания " + bdMoney2(section.writeoffs) : "Начало " + bdMoney2(section.opening) + " + закупки " + bdMoney2(section.purchases) + " − конец " + bdMoney2(section.closing) + " − списания " + bdMoney2(section.writeoffs) + (section.cost !== null ? " = " + bdMoney2(section.cost) : "") }),
         ] }, section.section)),
       ] }),
     ] }),
@@ -1156,7 +1160,7 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
   const best = ordered[0];
   const worst = ordered[ordered.length - 1];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-shifts-v165", children: [
-    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? "Себестоимость распределена пропорционально выручке" : "Показан результат без себестоимости", action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
+    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? (report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам каждой смены" : "Себестоимость распределена пропорционально выручке") : "Показан результат без себестоимости", action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
     i.jsx("div", { className: "bd-monthly-shift-summary-v165", children: [
       { key: "all", label: "Завершено", value: shifts.length },
       { key: "profit", label: "Прибыльных", value: profitable },
@@ -1172,7 +1176,7 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
         i.jsx("b", { className: Number(result) >= 0 ? "is-positive" : "is-negative", children: bdMoney2(result) }),
       ] }, shift.date);
     }) }),
-    i.jsx("p", { className: "bd-monthly-method-note-v165", children: "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
+    i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
   ] });
 }
 
@@ -1279,10 +1283,301 @@ function bdPayrollLedgerRow({entry:e,onEdit:t,onDelete:n}){const r=e.type==="bon
 function bdSalaryEmployeePage(){const[,e]=bt(),[,t]=$f("/salaries/:id"),bdSalaryContext=bdSalaryContextV164(),bdSalaryListQuery=window.bdReadNavigationQuery("q",""),bdSalaryListSort=window.bdReadNavigationQuery("sort","balance"),bdSalaryListStatus=window.bdReadNavigationQuery("status","all"),{profile:n}=Un(),{employees:r}=_i(),{rules:a}=Do(),{revenue:s,gapReasons:l}=Ur(),{entries:u,upsertEntry:d,deleteEntry:f}=bdUsePayrollLedger(n),{toast:m}=sn(),h=S.useMemo(()=>bdRecentMonthKeys(12),[]),[g,y]=S.useState(()=>window.bdReadNavigationQuery("month",bdPayrollInitialMonth)),[j,v]=S.useState(null),bdSalaryNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({month:g,return:bdSalaryContext,q:bdSalaryListQuery||null,sort:bdSalaryListSort==="balance"?null:bdSalaryListSort,status:bdSalaryListStatus==="all"?null:bdSalaryListStatus})},[g,bdSalaryContext,bdSalaryListQuery,bdSalaryListSort,bdSalaryListStatus]),b=S.useMemo(()=>bdPayrollMonthModel(n,g,r,a,s,l,u),[n,g,r,a,s,l,u]),N=b.find(_=>_.employee.id===t?.id);const bdSalaryBackHref=bdSalaryListHrefV164({month:g,context:bdSalaryContext,query:bdSalaryListQuery,sort:bdSalaryListSort,status:bdSalaryListStatus});if(!N)return i.jsx(nt,{showBottomNav:!0,className:"pb-32",children:i.jsx($e,{className:"pt-0",children:i.jsxs("div",{className:"bd-payroll-page-v164",children:[i.jsx(bdSalaryHeaderV164,{title:"Сотрудник не найден",context:bdSalaryContext,back:bdSalaryBackHref,detail:"Карточка"}),i.jsxs("div",{className:"bd-payroll-detail-missing-v164",children:[i.jsx("p",{children:"Сотрудник отсутствует в выбранном заведении или был удалён."}),i.jsx("button",{type:"button",onClick:()=>e(bdSalaryBackHref),children:"К зарплатам"})]})]})})});const E=N.summary;function _(T){d(T),v(null),m({variant:"success",title:"Операция сохранена"})}function T(A){window.confirm("Удалить эту операцию?")&&(f(A),m({variant:"success",title:"Операция удалена"}))}return i.jsx(nt,{showBottomNav:!0,className:"pb-32",children:i.jsxs($e,{className:"pt-0 bd-payroll-detail-v164",children:[i.jsx(bdSalaryHeaderV164,{title:N.employee.name,context:bdSalaryContext,back:bdSalaryBackHref,detail:"Сотрудник",right:i.jsx("button",{type:"button",onClick:()=>v({mode:"add"}),className:"bd-payroll-header-add-v164","aria-label":"Добавить зарплатную операцию",children:i.jsx(Vt,{size:19,"aria-hidden":!0})})}),i.jsx("div",{className:"px-6 pt-4 flex gap-2 overflow-x-auto",children:h.map(A=>i.jsx("button",{type:"button",onClick:()=>y(A),className:X("flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12.5px] font-bold border",g===A?"bg-primary text-white border-primary":"bg-card border-border"),children:bdMonthDisplay(A)},A))}),i.jsxs("div",{className:"px-6 pt-4 flex flex-col gap-4",children:[i.jsxs("div",{className:"bg-card rounded-2xl border border-card-border p-4",children:[i.jsxs("div",{className:"flex items-center gap-3",children:[i.jsx(dCe,{name:N.employee.name,size:48}),i.jsxs("div",{children:[i.jsx("p",{className:"text-[15px] font-black",children:jo(N.employee)}),i.jsx("p",{className:"text-[12px] text-muted-foreground",children:N.employee.department||"Отдел не указан"})]})]}),i.jsx("p",{className:"text-[12px] font-bold text-muted-foreground uppercase tracking-wide mt-4",children:"Правило оплаты"}),i.jsx("p",{className:"text-[14px] font-bold mt-1",children:N.rule?.name||"Не назначено"}),i.jsx("p",{className:"text-[12px] text-muted-foreground mt-1 leading-relaxed",children:N.rule?Yc(N.rule.blocks):"Откройте карточку сотрудника и назначьте правило оплаты."})]}),i.jsxs("div",{className:"bg-card rounded-2xl border border-card-border p-4",children:[i.jsx("p",{className:"text-[13px] font-black uppercase tracking-wide text-muted-foreground mb-1",children:"Подробный расчёт"}),i.jsx(bdPayrollDetailLine,{label:"Начислено по сменам · "+N.shifts.length,value:Mn(E.base)}),i.jsx(bdPayrollDetailLine,{label:"+ Премии",value:Mn(E.bonus),color:"#16A34A"}),i.jsx(bdPayrollDetailLine,{label:"− Заказы в счёт зарплаты",value:Mn(E.order),color:"#DC2626"}),i.jsx(bdPayrollDetailLine,{label:"− Штрафы",value:Mn(E.fine),color:"#DC2626"}),i.jsx(bdPayrollDetailLine,{label:"− Посуда",value:Mn(E.dishware),color:"#DC2626"}),i.jsx(bdPayrollDetailLine,{label:"− Другие удержания",value:Mn(E.otherDeduction),color:"#DC2626"}),i.jsx(bdPayrollDetailLine,{label:"= Начислено к выплате",value:Mn(E.netAccrued)}),i.jsx(bdPayrollDetailLine,{label:"− Уже выплачено / авансы",value:Mn(E.paid),color:"#5B5CEB"}),i.jsx(bdPayrollDetailLine,{label:E.balance>=0?"= Осталось выдать":"= Переплата / долг сотрудника",value:Mn(E.balance),color:E.balance>=0?"#16A34A":"#DC2626"})]}),i.jsxs("div",{className:"flex flex-col gap-3",children:[i.jsx("p",{className:"text-[13px] font-black uppercase tracking-wide text-muted-foreground px-1",children:"Начисления по сменам"}),N.shifts.length?N.shifts.map(A=>i.jsxs("button",{type:"button",onClick:()=>A.id&&e("/finance/shift/"+A.id+"/payroll"),className:"bg-card border border-border rounded-2xl p-4 text-left",children:[i.jsxs("div",{className:"flex justify-between gap-3",children:[i.jsx("p",{className:"text-[14px] font-black",children:sg(A.date)}),i.jsx("p",{className:"text-[16px] font-black text-primary",children:Mn(A.total)})]}),i.jsx("p",{className:"text-[12px] text-muted-foreground mt-1",children:A.ruleName}),A.flags.length>0&&i.jsx("p",{className:"text-[11px] text-[#B45309] mt-2",children:"Есть предупреждения в расчёте — нажмите для подробностей."})]},A.id||A.date)):i.jsx("div",{className:"bg-card border border-border rounded-2xl p-4 text-[13px] text-muted-foreground",children:"В этом месяце сотрудник не указан ни в одной смене."})]}),i.jsxs("div",{className:"flex flex-col gap-3",children:[i.jsxs("div",{className:"flex items-center justify-between px-1",children:[i.jsx("p",{className:"text-[13px] font-black uppercase tracking-wide text-muted-foreground",children:"Премии, удержания и выплаты"}),i.jsx("button",{type:"button",onClick:()=>v({mode:"add"}),className:"text-[12px] font-bold text-primary",children:"Добавить"})]}),N.entries.length?N.entries.map(A=>i.jsx(bdPayrollLedgerRow,{entry:A,onEdit:()=>v({mode:"edit",entry:A}),onDelete:()=>T(A.id)},A.id)):i.jsx("div",{className:"bg-card border border-border rounded-2xl p-4 text-[13px] text-muted-foreground",children:"Дополнительных операций пока нет."})]}),i.jsx("p",{className:"text-[11px] text-muted-foreground leading-relaxed px-2",children:"Начисления по сменам считаются автоматически. Все ручные операции сохраняются с датой, суммой и комментарием, чтобы расчёт можно было проверить."})]}),i.jsx(qe,{children:j&&i.jsx(bdPayrollEntrySheet,{month:g,employees:r,initialEmployeeId:N.employee.id,initial:j.entry,onClose:()=>v(null),onSave:_},j.entry?.id||"employee-payroll-entry")})]})})}
 const bdBuildMonthlyReportBeforePayroll=bdBuildMonthlyReport;
 bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforePayroll(e,t,n,r,a,s,l),d=bdPayrollEntriesForVenue(e,bdPayrollArrayStore()).filter(M=>M.date.slice(0,7)===t),f=bdPayrollEntryTotals(d),m=n.filter(M=>M.date.slice(0,7)===t).reduce((M,D)=>M+(Number(D.payrollBreakdown?.total??D.payrollBreakdown?.totalPayroll)||0),0),h=r.filter(M=>M.date.slice(0,7)===t&&M.category==="payroll").reduce((M,D)=>M+(Number(D.amount)||0),0),g=m>0?m:h,y=g+f.bonus,j=y-f.deductions,v=j-f.paid,b=y-u.payroll,N=u.operatingResult===null?null:u.operatingResult-b,E=u.resultBeforeCost==null?null:u.resultBeforeCost-b,G=u.cashResult==null?null:u.cashResult-b,_=u.shiftEstimates.map(M=>{const D=n.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)),L=d.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)&&z.type==="bonus").reduce((z,q)=>z+(Number(q.amount)||0),0),q=m>0?D.reduce((z,q)=>z+(Number(q.payrollBreakdown?.total??q.payrollBreakdown?.totalPayroll)||0),0)+L:M.payroll+L,B=q-M.payroll;return{...M,payroll:q,resultBeforeCost:M.resultBeforeCost==null?null:M.resultBeforeCost-B,estimatedResult:M.estimatedResult==null?null:M.estimatedResult-B}});return{...u,payroll:y,payrollBase:g,payrollBonuses:f.bonus,payrollDeductions:f.deductions,payrollNet:j,payrollPaid:f.paid,payrollBalance:v,payrollSource:(m>0?"По составу смен":"По внесённым расходам")+(f.bonus>0?" + премии":""),operatingResult:N,resultBeforeCost:E,cashResult:G,shiftEstimates:_}};
+/* phase7-monthly-financial-model:start */
+const bdMonthlyFinancialModelPhase7=(()=>{// Pure readers of captured financial data. Never consult today's catalogue/prices.
+
+const row = (value         )      => value && typeof value === "object" && !Array.isArray(value) ? value        : {};
+const rows = (value         )        => Array.isArray(value) ? value.map(row) : [];
+function finite(value         )                {
+  if (typeof value !== "number" && typeof value !== "string" || typeof value === "string" && !value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+// Match the inventory ledger's persisted monetary rounding, including half cents.
+const money = (value        ) => Math.round(value * 100) / 100;
+const currency = (value         ) => String(value ?? "").trim().toUpperCase();
+// Legacy "primary" records already live inside the current venue's store.
+const scope = (value     , venueId        ) => value.venueId == null || value.venueId === "primary" || Number(value.venueId) === venueId;
+const physical = (value     ) => value.scope != null || value.internalId != null || value.status === "completed"
+  || rows(value.items).some(item => item.valuationKnown != null);
+const sameMoney = (a        , b        ) => Math.round(a * 100) === Math.round(b * 100);
+
+
+function financialSnapshot(value         )                    {
+  const source = row(value);
+  const fail = (reason        )                    => ({ known: false, total: null, sections: {}, reason });
+  if (source.status != null && !["completed", "confirmed"].includes(String(source.status))) return fail("INVENTORY_NOT_COMPLETED");
+  if (row(source.scope).type != null && row(source.scope).type !== "all") return fail("INVENTORY_SCOPE_INCOMPLETE");
+  const total = finite(source.total);
+  if (Object.hasOwn(source, "total") && total === null) return fail("INVENTORY_TOTAL_UNKNOWN");
+  const sections                         = {};
+  if (physical(source)) {
+    if (source.status !== "completed" || row(source.scope).type !== "all") return fail("INVENTORY_NOT_COMPLETED");
+    const items = rows(source.items);
+    if (!items.length) return fail("INVENTORY_ITEMS_MISSING");
+    for (const item of items) {
+      const actual = finite(item.actual);
+      const cost = finite(item.averageUnitCost);
+      if (actual === null || actual < 0) return fail("INVENTORY_QUANTITY_UNKNOWN");
+      if (actual > 0 && (item.valuationKnown !== true || cost === null || cost < 0 || item.costBasisStatus === "UNKNOWN"
+        || item.costBasisStatus === "KNOWN_ZERO" && cost !== 0)) return fail("INVENTORY_COST_UNKNOWN");
+      const documentCurrency = currency(source.accountingCurrency ?? source.currency);
+      if (actual > 0 && (!documentCurrency || currency(item.currency) !== documentCurrency)) return fail("INVENTORY_CURRENCY_UNKNOWN");
+      const section = String(item.sectionName ?? item.section ?? "").trim();
+      if (!section) return fail("INVENTORY_SECTION_UNKNOWN");
+      const value = source.financialValuationVersion === 1 ? finite(item.actualValue)
+        : actual === 0 ? 0 : money(actual * cost );
+      if (value === null || value < 0 || actual === 0 && value !== 0) return fail("INVENTORY_COST_UNKNOWN");
+      sections[section] = money((sections[section] ?? 0) + value);
+    }
+    const captured = money(Object.values(sections).reduce((sum, amount) => sum + amount, 0));
+    if (total === null || !sameMoney(captured, total)) return fail("INVENTORY_TOTAL_MISMATCH");
+    if (source.sections != null) {
+      const persisted = row(source.sections);
+      if (Object.keys(persisted).length !== Object.keys(sections).length
+        || Object.entries(sections).some(([name, amount]) => finite(persisted[name]) === null || !sameMoney(Number(persisted[name]), amount))) {
+        return fail("INVENTORY_SECTION_MISMATCH");
+      }
+    }
+    return { known: true, total: captured, sections };
+  }
+  const capturedSections = row(source.sections);
+  if (!Object.keys(capturedSections).length) return fail("INVENTORY_SECTIONS_MISSING");
+  for (const [name, amount] of Object.entries(capturedSections)) {
+    const parsed = finite(amount);
+    if (parsed === null || parsed < 0) return fail("INVENTORY_COST_UNKNOWN");
+    sections[name] = parsed;
+  }
+  const captured = money(Object.values(sections).reduce((sum, amount) => sum + amount, 0));
+  if (total !== null && !sameMoney(captured, total)) return fail("INVENTORY_TOTAL_MISMATCH");
+  return { known: true, total: captured, sections };
+}
+
+function monthlySnapshotRows(value         , venueId        )        {
+  return rows(value).filter(item => scope(item, venueId)
+    && (item.status == null || ["completed", "confirmed"].includes(String(item.status)))
+    && (row(item.scope).type == null || row(item.scope).type === "all"))
+    .map(item => {
+      const resolved = financialSnapshot(item);
+      return { ...item, total: resolved.total, sections: resolved.sections,
+        currency: physical(item) ? item.accountingCurrency ?? item.currency : item.currency ?? item.accountingCurrency,
+        phase7PhysicalSnapshot: physical(item), phase7SnapshotKnown: resolved.known,
+        phase7SnapshotReason: resolved.reason };
+    });
+}
+
+
+
+const record = (v         )             => v !== null && typeof v === "object" && !Array.isArray(v) ? v        : null;
+const array = (v         )               => Array.isArray(v) && v.every(item => record(item) !== null) ? v          : null;
+const text = (v         ) => typeof v === "string" ? v.trim() : "";
+const cents = (v        ) => Math.round(v * 100);
+const fail = (reason        )             => ({ known: false, cost: null, reason });
+/** A header FULL/total alone cannot establish a captured cost of all posted lines. */
+function capturedBatchCost(value         , venueId        , businessDate        , accountingCurrency        )             {
+  const batch = record(value), expectedCurrency = currency(accountingCurrency);
+  if (!batch || !expectedCurrency || !text(batch.id) || Number(batch.venueId) !== venueId
+    || batch.businessDate !== businessDate || batch.status !== "POSTED" || batch.costStatus !== "FULL") return fail("BATCH_CAPTURE_MISSING");
+  const lines = array(batch.lines), headerCost = finite(batch.totalTheoreticalCost);
+  if (!lines?.length || headerCost === null || headerCost < 0) return fail("BATCH_CAPTURE_MISSING");
+  if (new Set(lines.map(line => line.id)).size !== lines.length) return fail("DUPLICATE_BATCH_LINE");
+  let totalCents = 0;
+  for (const line of lines) {
+    const snapshot = record(line.recipeSnapshot), lineCost = finite(line.theoreticalCost), quantity = finite(line.quantity);
+    if (!text(line.id) || line.salesBatchId !== batch.id || line.processingStatus !== "POSTED"
+      || quantity === null || quantity <= 0 || lineCost === null || lineCost < 0 || !snapshot
+      || !text(snapshot.recipeId) || !text(snapshot.capturedAt)) return fail("LINE_CAPTURE_MISSING");
+    const ingredients = array(snapshot.ingredients);
+    if (!ingredients) return fail("INGREDIENT_CAPTURE_MISSING");
+    // This is an actual supported canonical case: no stock consumption, zero
+    // cost, empty ingredients, and no line currency returned by the writer.
+    if (snapshot.consumptionMode === "NONE") {
+      if (ingredients.length || lineCost !== 0 || line.currency != null && currency(line.currency) !== expectedCurrency) return fail("NONE_CAPTURE_INVALID");
+      continue;
+    }
+    if (!ingredients.length || currency(line.currency) !== expectedCurrency) return fail("LINE_COST_CURRENCY_UNKNOWN");
+    let ingredientTotal = 0;
+    for (const ingredient of ingredients) {
+      const amount = finite(ingredient.baseQuantityTotal), unitCost = finite(ingredient.unitCost), capturedCost = finite(ingredient.totalCost);
+      const costStatus = text(ingredient.costStatus).toUpperCase();
+      if (!text(ingredient.productKey) || amount === null || amount <= 0 || unitCost === null || unitCost < 0
+        || capturedCost === null || capturedCost < 0 || costStatus === "UNKNOWN"
+        || currency(ingredient.currency) !== expectedCurrency) return fail("INGREDIENT_COST_UNKNOWN");
+      // Existing domain cost-knowledge allows captured legacy positive values.
+      // Legacy zero without an explicit known marker must remain unknown.
+      if (capturedCost === 0 && !["KNOWN_ZERO", "KNOWN_VALUE", "KNOWN"].includes(costStatus)) return fail("INGREDIENT_ZERO_UNPROVEN");
+      if (costStatus === "KNOWN_ZERO" && capturedCost !== 0) return fail("INGREDIENT_STATUS_CONFLICT");
+      if (!sameMoney(amount * unitCost, capturedCost)) return fail("INGREDIENT_COST_MISMATCH");
+      ingredientTotal += capturedCost;
+    }
+    if (!sameMoney(ingredientTotal, lineCost)) return fail("LINE_COST_MISMATCH");
+    totalCents += cents(lineCost);
+  }
+  if (totalCents !== cents(headerCost)) return fail("BATCH_COST_MISMATCH");
+  return { known: true, cost: totalCents / 100, batchIds: [text(batch.id)] };
+}
+
+/** Join only explicit captured identities; neither date alone nor current recipes proves coverage. */
+function salesDocumentRowCost(input                                                                                                         )             {
+  const revenue = record(input.revenue), documents = array(input.documents), batches = array(input.batches);
+  const expectedCurrency = currency(input.accountingCurrency);
+  if (!revenue || !documents || !batches || !expectedCurrency || revenue.revenueSource !== "sales_documents") return fail("SALES_DOCUMENT_HISTORY_MISSING");
+  if (revenue.venueId != null && Number(revenue.venueId) !== input.venueId) return fail("REVENUE_VENUE_MISMATCH");
+  const date = text(revenue.date), revenueAmount = finite(revenue.revenue);
+  const documentIds = Array.isArray(revenue.salesDocumentIds) ? revenue.salesDocumentIds : [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || revenueAmount === null || revenueAmount < 0
+    || !documentIds.length || documentIds.some(id => !text(id)) || new Set(documentIds).size !== documentIds.length) return fail("SALES_DOCUMENT_IDENTITIES_MISSING");
+  // The actual sales-revenue.ts writer does not add row.currency. It is valid
+  // to establish currency from ALL explicitly linked document captures instead.
+  if (revenue.currency != null && currency(revenue.currency) !== expectedCurrency) return fail("REVENUE_CURRENCY_MISMATCH");
+  let revenueCents = 0, costCents = 0;
+  const batchIds = new Set        ();
+  for (const id of documentIds) {
+    const matching = documents.filter(doc => doc.id === id && (doc.venueId == null || Number(doc.venueId) === input.venueId));
+    if (matching.length !== 1) return fail("SALES_DOCUMENT_AMBIGUOUS");
+    const doc = matching[0], gross = finite(doc.totalRevenue), batchId = text(doc.salesBatchId);
+    if (doc.status !== "confirmed" || doc.date !== date || currency(doc.currency) !== expectedCurrency
+      || gross === null || gross < 0 || !batchId) return fail("SALES_DOCUMENT_CAPTURE_MISSING");
+    if (batchIds.has(batchId)) return fail("SALES_BATCH_REFERENCED_TWICE");
+    const linked = batches.filter(batch => batch.id === batchId && Number(batch.venueId) === input.venueId);
+    if (linked.length !== 1) return fail("SALES_BATCH_AMBIGUOUS");
+    const resolved = capturedBatchCost(linked[0], input.venueId, date, expectedCurrency);
+    if (!resolved.known) return resolved;
+    // A reversed batch under a still-confirmed positive revenue document is an
+    // inconsistent projection, not grounds to silently drop cost from that row.
+    batchIds.add(batchId); revenueCents += cents(gross); costCents += cents(resolved.cost);
+  }
+  if (revenueCents !== cents(revenueAmount)) return fail("SALES_DOCUMENT_REVENUE_MISMATCH");
+  return { known: true, cost: costCents / 100, batchIds: [...batchIds], documentIds: documentIds             };
+}
+
+function historicalPeriodCost(input
+
+
+
+ ) {
+  const { venueId, monthKey } = input;
+  const expectedCurrency = currency(input.accountingCurrency);
+  const revenues = rows(input.revenues).filter(item => scope(item, venueId)
+    && String(item.date ?? "").slice(0, 7) === monthKey);
+  const events = rows(input.events).filter(item => Number(item.venueId) === venueId
+    && String(item.businessDate ?? "").slice(0, 7) === monthKey);
+  const movements = rows(input.movements).filter(item => scope(item, venueId)
+    && String(item.businessDate ?? item.date ?? "").slice(0, 7) === monthKey && item.type === "inventory_adjustment");
+  const reasons           = [];
+  if (!/^(?:[A-Z]{3}|PMR_RUB)$/.test(expectedCurrency)) reasons.push("ACCOUNTING_CURRENCY_UNKNOWN");
+  const daily                                                       = {};
+  const day = (date        ) => daily[date] ?? (daily[date] = { cost: 0, adjustment: 0 });
+  if (new Set(events.map(item => item.id)).size !== events.length
+    || new Set(revenues.map(item => item.id)).size !== revenues.length
+    || new Set(movements.map(item => item.id)).size !== movements.length) reasons.push("DUPLICATE_FINANCIAL_HISTORY");
+  let cost = 0, adjustment = 0;
+  const usedBatches = new Set        ();
+  const addCost = (resolved            , date        ) => {
+    if (!resolved.known) { reasons.push(resolved.reason); return; }
+    if (resolved.batchIds.some(id => usedBatches.has(id))) { reasons.push("SALES_BATCH_REFERENCED_TWICE"); return; }
+    for (const id of resolved.batchIds) usedBatches.add(id);
+    cost += resolved.cost;
+    day(date).cost += resolved.cost;
+  };
+  for (const revenue of revenues) {
+    const amount = finite(revenue.revenue);
+    if (revenue.revenueSource === "sales_documents") {
+      addCost(salesDocumentRowCost({ revenue, documents: input.documents, batches: input.batches, venueId,
+        accountingCurrency: expectedCurrency }), String(revenue.date));
+      continue;
+    }
+    if (revenue.revenueSource !== "sales_events_v1") {
+      if (amount !== 0 || finite(revenue.receipts) !== 0) reasons.push("HISTORICAL_SALES_COST_MISSING");
+      continue;
+    }
+    const linked = events.filter(event => event.revenueRowId === revenue.id);
+    const active = linked.filter(event => event.status === "POSTED");
+    if (amount === null || currency(revenue.currency) !== expectedCurrency
+      || linked.some(event => !["POSTED", "REVERSED"].includes(String(event.status)) || event.businessDate !== revenue.date)
+      || active.some(event => finite(event.revenue) === null)
+      || !sameMoney(active.reduce((sum, event) => sum + Number(event.revenue), 0), amount)
+      || finite(revenue.receipts) !== active.length) reasons.push("SALES_REVENUE_HISTORY_MISMATCH");
+    for (const event of active) {
+      if (currency(event.currency) !== expectedCurrency) { reasons.push("HISTORICAL_SALES_COST_UNKNOWN"); continue; }
+      addCost(capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
+    }
+  }
+  if (events.some(event => !revenues.some(revenue => revenue.id === event.revenueRowId && revenue.revenueSource === "sales_events_v1"))) {
+    reasons.push("SALES_REVENUE_HISTORY_MISMATCH");
+  }
+  for (const movement of movements) {
+    if (movement.status === "cancelled" || movement.reversedAt) continue;
+    const amount = finite(movement.costAmount);
+    if (amount === null || movement.valuationStatus === "unvalued" || movement.costStatus === "UNKNOWN"
+      || amount === 0 && !["KNOWN_ZERO", "KNOWN"].includes(String(movement.costStatus))
+      || currency(movement.currency) !== expectedCurrency) { reasons.push("INVENTORY_ADJUSTMENT_COST_UNKNOWN"); continue; }
+    adjustment += amount;
+    day(String(movement.businessDate ?? movement.date)).adjustment += amount;
+  }
+  return { known: reasons.length === 0, cost: money(cost), adjustment: money(adjustment), daily,
+    reasons: [...new Set(reasons)], eventCount: events.length };
+}
+
+function reconcileMonthlyReport(input
+
+
+
+ )      {
+  const report = input.report;
+  const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
+  const authoritative = opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
+    || rows(input.revenues).some(item => scope(item, input.venueId) && ["sales_events_v1", "sales_documents"].includes(String(item.revenueSource))
+      && String(item.date ?? "").slice(0, 7) === input.monthKey)
+    || rows(input.events).some(item => Number(item.venueId) === input.venueId && String(item.businessDate ?? "").slice(0, 7) === input.monthKey);
+  if (!authoritative) {
+    if (opening.phase7SnapshotKnown === false || closing.phase7SnapshotKnown === false) {
+      return { ...report, openingInventory: opening.phase7SnapshotKnown === true ? report.openingInventory : null,
+        closingInventory: closing.phase7SnapshotKnown === true ? report.closingInventory : null,
+        costOfGoods: null, rawCostOfGoods: null, operatingResult: null, inventoryMismatch: true,
+        financialReconciliationKnown: false, financialReconciliationReasons: ["INVENTORY_BOUNDARY_COST_UNKNOWN"] };
+    }
+    return report;
+  }
+  const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
+  const snapshotsKnown = opening.phase7SnapshotKnown === true && closing.phase7SnapshotKnown === true;
+  const openingValue = opening.phase7SnapshotKnown === true ? finite(report.openingInventory) : null;
+  const closingValue = closing.phase7SnapshotKnown === true ? finite(report.closingInventory) : null;
+  const known = history.known && snapshotsKnown && Number(report.unconvertedForeignCurrencyCount ?? 0) === 0;
+  const expenses = Number(report.writeoffs ?? 0) + Number(report.payroll ?? 0) + Number(report.otherExpenses ?? 0)
+    + Number(report.taxes ?? 0) + Number(report.utilities ?? 0);
+  const reasons = [...history.reasons, ...(!snapshotsKnown ? ["INVENTORY_BOUNDARY_COST_UNKNOWN"] : []),
+    ...(Number(report.unconvertedForeignCurrencyCount ?? 0) > 0 ? ["FINANCIAL_CURRENCY_UNCONVERTED"] : [])];
+  return { ...report, openingInventory: openingValue, closingInventory: closingValue,
+    costOfGoods: known ? history.cost : null, rawCostOfGoods: known ? history.cost : null,
+    grossProfit: known ? money(Number(report.revenue) - history.cost) : null,
+    inventoryAdjustmentNet: history.known ? history.adjustment : null,
+    inventoryLoss: history.known ? money(-history.adjustment) : null,
+    costBasis: "historical_sales_snapshots", financialReconciliationKnown: known, financialReconciliationReasons: reasons,
+    inventoryMismatch: !known,
+    operatingResult: known ? money(Number(report.revenue) - history.cost + history.adjustment - expenses) : null,
+    inventoryRevaluation: known ? money(closingValue  - openingValue  - Number(report.purchases) + history.cost - history.adjustment + Number(report.writeoffs ?? 0)) : null,
+    sections: rows(report.sections).map(section => ({ ...section, cost: null })),
+    shiftEstimates: rows(report.shiftEstimates).map(shift => {
+      const captured = history.daily[String(shift.date)] ?? { cost: 0, adjustment: 0 };
+      return { ...shift, estimatedCost: known ? money(captured.cost) : null,
+        estimatedResult: known ? money(Number(shift.revenue) - captured.cost + captured.adjustment - Number(shift.writeoffs ?? 0)
+          - Number(shift.payroll ?? 0) - Number(shift.otherExpenses ?? 0) - Number(shift.recurringAllocation ?? 0)) : null };
+    }),
+  };
+}
+return{monthlySnapshotRows,reconcileMonthlyReport};})();
+function bdMonthlyClosedFieldsPhase7(value){const source=value&&typeof value==="object"&&!Array.isArray(value)?value:{},copy=(key,fallback)=>Object.prototype.hasOwnProperty.call(source,key)&&source[key]!==void 0?JSON.parse(JSON.stringify(source[key])):fallback;return{revenue:copy("revenue",null),receipts:copy("receipts",null),purchases:copy("purchases",null),purchasePayments:copy("purchasePayments",null),legacyPurchaseExpenses:copy("legacyPurchaseExpenses",null),periodExpenses:copy("periodExpenses",null),otherExpenses:copy("otherExpenses",null),writeoffs:copy("writeoffs",null),payroll:copy("payroll",null),payrollSource:copy("payrollSource",null),taxes:copy("taxes",null),taxMode:copy("taxMode",null),utilities:copy("utilities",null),utilityMode:copy("utilityMode",null),openingInventory:copy("openingInventory",null),closingInventory:copy("closingInventory",null),costOfGoods:copy("costOfGoods",null),cashResult:copy("cashResult",null),resultBeforeCost:copy("resultBeforeCost",null),plannedShifts:copy("plannedShifts",null),accountedShifts:copy("accountedShifts",null),expectedShifts:copy("expectedShifts",null),coveragePercent:copy("coveragePercent",null),expenseBreakdown:copy("expenseBreakdown",null),sections:copy("sections",[]),costBasis:copy("costBasis","legacy_closed_snapshot"),inventoryAdjustmentNet:copy("inventoryAdjustmentNet",null),inventoryLoss:copy("inventoryLoss",null),grossProfit:copy("grossProfit",null),inventoryRevaluation:copy("inventoryRevaluation",null),financialReconciliationKnown:copy("financialReconciliationKnown",null),financialReconciliationReasons:copy("financialReconciliationReasons",null),rawCostOfGoods:copy("rawCostOfGoods",null),inventoryMismatch:copy("inventoryMismatch",null),shiftEstimates:copy("shiftEstimates",[]),openingSnapshot:copy("openingSnapshot",null),closingSnapshot:copy("closingSnapshot",null),accountingCurrency:copy("accountingCurrency",null),excludedForeignCurrencyEntries:copy("excludedForeignCurrencyEntries",[]),excludedForeignCurrencyTotals:copy("excludedForeignCurrencyTotals",[]),unconvertedForeignCurrencyCount:copy("unconvertedForeignCurrencyCount",null),currencyBoundaryStatus:copy("currencyBoundaryStatus","legacy_closed_snapshot"),payrollBase:copy("payrollBase",null),payrollBonuses:copy("payrollBonuses",null),payrollDeductions:copy("payrollDeductions",null),payrollNet:copy("payrollNet",null),payrollPaid:copy("payrollPaid",null),payrollBalance:copy("payrollBalance",null),dataShiftCount:copy("dataShiftCount",null),recurringPerShift:copy("recurringPerShift",null),taxPerShift:copy("taxPerShift",null),utilityPerShift:copy("utilityPerShift",null),allocatedTaxes:copy("allocatedTaxes",null),allocatedUtilities:copy("allocatedUtilities",null),allocatedRecurring:copy("allocatedRecurring",null),unallocatedRecurring:copy("unallocatedRecurring",null),operatingResult:copy("finalProfit",copy("operatingResult",null))}}
+const bdMonthClosingSnapshotBeforePhase7=bdMonthClosingSnapshot;
+bdMonthClosingSnapshot=function(report){return{...bdMonthClosingSnapshotBeforePhase7(report),...bdMonthlyClosedFieldsPhase7(report)}};
+const bdBuildMonthlyReportBeforePhase7=bdBuildMonthlyReport;
+function bdMonthlyVenueIdPhase7(profile,settings){let active;try{active=bdProcVenueContextV168()?.activeVenueId}catch{}return[active,profile?.venueId,profile?.id,settings?.venueId,settings?.id].map(Number).find(value=>Number.isSafeInteger(value)&&value>0)??NaN}
+bdBuildMonthlyReport=function(profile,monthKey,revenues,expenses,snapshots,settings,gapReasons=[]){const venueId=bdMonthlyVenueIdPhase7(profile,settings),normalized=bdMonthlyFinancialModelPhase7.monthlySnapshotRows(snapshots,venueId),report=bdBuildMonthlyReportBeforePhase7(profile,monthKey,revenues,expenses,normalized,settings,gapReasons);return bdMonthlyFinancialModelPhase7.reconcileMonthlyReport({report,venueId,monthKey,snapshots:normalized,revenues,events:bdProcArray("bd_sales_events_v1"),movements:bdProcArray("bd_stock_movements"),documents:bdProcArray("bd_sales_documents"),batches:bdProcArray("bd_sales_batches")})};
+/* phase7-monthly-financial-model:end */
 const bdReleaseCandidateVersion="rc-v163",bdBuildMonthlyReportBeforeClosure=bdBuildMonthlyReport;
-function bdClosedMonthRecord(e,t){const n=String(e?.id||"primary");return bdArrayStore(bdMonthClosingsKey).filter(r=>r&&r.monthKey===t&&(!r.venueId||String(r.venueId)===n)).sort((r,a)=>String(a.updatedAt||a.closedAt||"").localeCompare(String(r.updatedAt||r.closedAt||""))).find(r=>r.status==="closed")||null}
+function bdClosedMonthRecord(e,t){const n=String(bdMonthlyVenueIdPhase7(null,e)||e?.id||"primary");return bdArrayStore(bdMonthClosingsKey).filter(r=>r&&r.monthKey===t&&(!r.venueId||r.venueId==="primary"||String(r.venueId)===n)).sort((r,a)=>String(a.updatedAt||a.closedAt||"").localeCompare(String(r.updatedAt||r.closedAt||""))).find(r=>r.status==="closed")||null}
 function bdClosedSnapshotValue(e,t,n){return Object.prototype.hasOwnProperty.call(e,t)?e[t]:n}
-bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforeClosure(e,t,n,r,a,s,l),d=bdClosedMonthRecord(s,t);if(!d)return{...u,status:"preliminary",isClosed:!1,closure:null};if(u.unconvertedForeignCurrencyCount>0)return{...u,closure:d,closedAt:d.closedAt||null,currencyBoundaryStatus:"unconverted_foreign_excluded"};const f=d.snapshot&&typeof d.snapshot==="object"?d.snapshot:{},m=(h,g)=>bdClosedSnapshotValue(f,h,g),p=m("finalProfit",m("operatingResult",u.operatingResult));return{...u,status:"closed",isClosed:!0,closure:d,closedAt:d.closedAt||null,revenue:m("revenue",u.revenue),receipts:m("receipts",u.receipts),purchases:m("purchases",u.purchases),purchasePayments:m("purchasePayments",m("purchases",u.purchasePayments)),legacyPurchaseExpenses:m("legacyPurchaseExpenses",u.legacyPurchaseExpenses),periodExpenses:m("periodExpenses",u.periodExpenses),expenseBreakdown:m("expenseBreakdown",u.expenseBreakdown),otherExpenses:m("otherExpenses",u.otherExpenses),writeoffs:m("writeoffs",u.writeoffs),payroll:m("payroll",u.payroll),payrollSource:m("payrollSource",u.payrollSource),taxes:m("taxes",u.taxes),taxMode:m("taxMode",u.taxMode),utilities:m("utilities",u.utilities),utilityMode:m("utilityMode",u.utilityMode),openingInventory:m("openingInventory",u.openingInventory),closingInventory:m("closingInventory",u.closingInventory),costOfGoods:m("costOfGoods",u.costOfGoods),cashResult:m("cashResult",u.cashResult),resultBeforeCost:m("resultBeforeCost",u.resultBeforeCost),operatingResult:p,plannedShifts:m("plannedShifts",u.plannedShifts),accountedShifts:m("accountedShifts",u.accountedShifts),expectedShifts:m("expectedShifts",u.expectedShifts),coveragePercent:m("coveragePercent",u.coveragePercent),sections:m("sections",u.sections)}};
+bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforeClosure(e,t,n,r,a,s,l),d=bdClosedMonthRecord(s,t);if(!d)return{...u,status:"preliminary",isClosed:!1,closure:null};const f=d.snapshot&&typeof d.snapshot==="object"?d.snapshot:{},m=(h,g)=>bdClosedSnapshotValue(f,h,g),p=m("finalProfit",m("operatingResult",u.operatingResult));return{...u,status:"closed",isClosed:!0,closure:d,closedAt:d.closedAt||null,revenue:m("revenue",u.revenue),receipts:m("receipts",u.receipts),purchases:m("purchases",u.purchases),purchasePayments:m("purchasePayments",m("purchases",u.purchasePayments)),legacyPurchaseExpenses:m("legacyPurchaseExpenses",u.legacyPurchaseExpenses),periodExpenses:m("periodExpenses",u.periodExpenses),expenseBreakdown:m("expenseBreakdown",u.expenseBreakdown),otherExpenses:m("otherExpenses",u.otherExpenses),writeoffs:m("writeoffs",u.writeoffs),payroll:m("payroll",u.payroll),payrollSource:m("payrollSource",u.payrollSource),taxes:m("taxes",u.taxes),taxMode:m("taxMode",u.taxMode),utilities:m("utilities",u.utilities),utilityMode:m("utilityMode",u.utilityMode),openingInventory:m("openingInventory",u.openingInventory),closingInventory:m("closingInventory",u.closingInventory),costOfGoods:m("costOfGoods",u.costOfGoods),cashResult:m("cashResult",u.cashResult),resultBeforeCost:m("resultBeforeCost",u.resultBeforeCost),operatingResult:p,plannedShifts:m("plannedShifts",u.plannedShifts),accountedShifts:m("accountedShifts",u.accountedShifts),expectedShifts:m("expectedShifts",u.expectedShifts),coveragePercent:m("coveragePercent",u.coveragePercent),sections:m("sections",u.sections),...bdMonthlyClosedFieldsPhase7(f)}};
 
 function bdShiftDateLabelV156(e){if(!e)return"Дата не указана";const t=new Date(e.slice(0,10)+"T12:00:00");if(Number.isNaN(t.getTime()))return e;const n=t.toLocaleDateString("ru-RU",{day:"numeric",month:"long"}),r=t.toLocaleDateString("ru-RU",{weekday:"long"});return n+" · "+r.charAt(0).toUpperCase()+r.slice(1)}
 function bdShiftRecordKindV156(e){const t=String(e?.status??"").toLowerCase();return e?.isDraft===!0||t==="draft"||t==="черновик"?"draft":"closed"}
@@ -2008,114 +2303,6 @@ function bdTechCostPackageV380(value,fallbackUnit){const label=String(value||"")
 /* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 */
 /* bd-unit-product-costing-v384 */
 /* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
-/* bd-unit-product-costing-v384 */
-/* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
 /* bd-unit-product-costing-v384 */
 /* bd-unit-product-costing-v385 bd-unit-product-costing-v386 bd-unit-product-costing-v387 bd-unit-product-costing-v389 bd-unit-product-costing-v390 bd-unit-product-costing-v391 bd-unit-product-costing-v392 bd-unit-product-costing-v393 */
 function bdTechCostNameV381(value){return String(value||"").toLocaleLowerCase("ru-RU").replace(/ё/g,"е").replace(/,/g,".").replace(/milliliters?|millilitres?|миллилитр(?:а|ов)?/g,"мл").replace(/liters?|litres?|литр(?:а|ов)?|ltr/g,"л").replace(/[^a-zа-я0-9]+/gi,"")}

@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { closedMonthsFromStore, firstClosedPeriod } from "../../../../lib/bardoctor/data-trust";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { salesImportIdentity } from "../../../../lib/bardoctor/sales-import-identity";
 import { runStoreCasBatch, storeSnapshots, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
@@ -69,11 +70,12 @@ function detectColumns(rows: unknown[][]): { headerRow: number; nameColumn: numb
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json, updated_at FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?)
-  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY, STOCK_MOVEMENT_STORE_KEY).all<StoreRow>();
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?)
+  `).bind(accountId, SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, "bd_month_closings").all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
-  const keys = [SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY];
+  const keys = [SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY, ASSORTMENT_STORE_KEY, WAREHOUSE_STORE_KEY, "bd_month_closings"];
   return {
+    closedMonths: closedMonthsFromStore(parse(stores.get("bd_month_closings"), [])),
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
@@ -156,6 +158,8 @@ async function postOnce(request: Request): Promise<Response> {
     now,
   });
   if (!result.ok) return Response.json(result, { status: 422 });
+  const monthKey = firstClosedPeriod(null, result.batch, stores.closedMonths);
+  if (!result.duplicate && monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   if (!result.duplicate) await runStoreCasBatch(database, account.id, stores.snapshots, [
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
     database.prepare(`

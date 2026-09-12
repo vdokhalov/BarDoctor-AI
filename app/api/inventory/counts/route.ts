@@ -215,7 +215,7 @@ function presentDocument(document: InventoryCountDocument) {
     ...document,
     scope: inventoryCountDocumentScope(document),
     summary: document.summary ?? inventoryCountSummary(document),
-    items: document.items.map((line) => ({ ...line, ...inventoryCountLineDifference(line) })),
+    items: document.items.map((line) => ({ ...line, ...inventoryCountLineDifference(line, document.financialValuationVersion) })),
   };
 }
 
@@ -296,7 +296,7 @@ export async function GET(request: Request): Promise<Response> {
     ok: true,
     venueId: account.venueId,
     accountingCurrency: accountingCurrencyFromRestaurantJson(account.restaurantJson),
-    scopes: inventoryCountScopes(stores.assortment),
+    scopes: inventoryCountScopes(stores.assortment, account.venueId),
     inventories: documents.map(presentDocument),
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
@@ -342,7 +342,7 @@ async function postOnce(request: Request): Promise<Response> {
         id: text(requestedScope.id, "", 100) || undefined,
         label: text(requestedScope.label, "", 120),
       };
-    const allowedScope = resolveInventoryCountScope(stores.assortment, scope as Pick<InventoryCountScope, "type" | "id">);
+    const allowedScope = resolveInventoryCountScope(stores.assortment, scope as Pick<InventoryCountScope, "type" | "id">, account.venueId);
     if (!allowedScope) {
       return Response.json({ ok: false, code: "INVALID_SCOPE", error: "Выбранный охват недоступен для текущего заведения" }, { status: 422 });
     }
@@ -381,21 +381,23 @@ async function postOnce(request: Request): Promise<Response> {
     if (document.items.length > 2_000) {
       return Response.json({ ok: false, error: "За один раз можно пересчитать до 2000 позиций" }, { status: 413 });
     }
+    const monthKey = document.date.slice(0, 7);
+    if (stores.closedMonths.has(monthKey)) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     snapshots.unshift(document);
-    await runStoreCasBatch(database, account.id, casSnapshots, [
-      upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
-      auditStatement({
-        database,
-        accountId: account.id,
-        action: "create",
-        document,
-        actorName: name,
-        actorRole: account.role,
-        reason: `Создан snapshot инвентаризации; охват: ${document.scope.label}; склад не изменён`,
-        now,
-      }),
-    ], now);
     if (!legacyFinalize) {
+      await runStoreCasBatch(database, account.id, casSnapshots, [
+        upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
+        auditStatement({
+          database,
+          accountId: account.id,
+          action: "create",
+          document,
+          actorName: name,
+          actorRole: account.role,
+          reason: `Создан snapshot инвентаризации; охват: ${document.scope.label}; склад не изменён`,
+          now,
+        }),
+      ], now);
       return Response.json({
         ok: true,
         venueId: account.venueId,
@@ -433,6 +435,8 @@ async function postOnce(request: Request): Promise<Response> {
         stockChanged: false,
       });
     }
+    const monthKey = deletion.document.date.slice(0, 7);
+    if (stores.closedMonths.has(monthKey)) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     const expectedInventoryJson = stores.inventoryJson;
     if (!expectedInventoryJson) {
       return Response.json({ ok: false, code: "INVENTORY_NOT_FOUND", error: "Инвентаризация текущего заведения не найдена" }, { status: 404 });
@@ -490,6 +494,8 @@ async function postOnce(request: Request): Promise<Response> {
   if (isCompleted(existing) || existing.status === "cancelled") {
     return Response.json({ ok: false, code: "INVENTORY_READ_ONLY", error: "Завершённую или отменённую инвентаризацию нельзя изменять" }, { status: 409 });
   }
+  const existingMonth = existing.date.slice(0, 7);
+  if (stores.closedMonths.has(existingMonth)) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: existingMonth, error: `Месяц ${existingMonth} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
 
   if (["save", "review"].includes(action)) {
     let document: InventoryCountDocument;
@@ -626,6 +632,15 @@ async function postOnce(request: Request): Promise<Response> {
   const completed: InventoryCountDocument & JsonRecord = {
     ...existing,
     status: "completed",
+    financialValuationVersion: 1,
+    items: existing.items.map((item) => {
+      const posted = result.items.find((line) => line.productKey === item.productKey);
+      return { ...item,
+        expectedValue: item.valuationKnown && posted ? posted.expectedValue : null,
+        actualValue: item.actual === 0 ? 0 : item.valuationKnown && posted ? posted.actualValue : null,
+        differenceValue: item.valuationKnown && posted ? posted.differenceValue : null,
+      };
+    }),
     completedAt: now,
     updatedAt: now,
     summary,
@@ -639,9 +654,12 @@ async function postOnce(request: Request): Promise<Response> {
       currency: movement.currency,
     })),
     total: result.summary.actualValue,
+    sections: result.sections,
     expectedTotal: result.summary.expectedValue,
     differenceTotal: summary.calculatedDifferenceValue,
   };
+  completed.summary = inventoryCountSummary(completed);
+  completed.differenceTotal = completed.summary.calculatedDifferenceValue;
   snapshots[index] = completed;
   const nextMovements = [...result.movements, ...stores.movements].slice(0, 20_000);
   await runStoreCasBatch(database, account.id, casSnapshots, [
@@ -668,7 +686,7 @@ async function postOnce(request: Request): Promise<Response> {
     snapshots: presentSnapshots(snapshots),
     assortment: result.assortment,
     stockMovements: nextMovements,
-    summary,
+    summary: completed.summary,
     stockChanged: result.movements.length > 0,
   });
 }

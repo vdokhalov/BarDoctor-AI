@@ -23,6 +23,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   return { db,snapshots,context };
 }
 function controlled(error:unknown) {
+  if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
   if (error instanceof Error && error.message.startsWith("SALES_EVENT_")) return reply({ok:false,code:error.message,error:"Продажа или смена требует проверки. Проверьте позиции, цены, состояние смены и ранее внесённую выручку. Ничего не изменено."},409);
   throw error;

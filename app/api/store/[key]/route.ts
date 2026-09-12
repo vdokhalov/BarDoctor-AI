@@ -9,6 +9,11 @@ import {
   canWriteStore,
   closedMonthsFromStore,
   compareStoreData,
+  firstChangedClosedSnapshot,
+  firstClosedMutation,
+  firstClosedPeriod,
+  hasDuplicateStoreRecordIds,
+  requiresExplicitPeriodReopen,
   mergeConcurrentStoreData,
   MONTH_LOCKED_STORE_KEYS,
 } from "../../../../lib/bardoctor/data-trust";
@@ -358,6 +363,23 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
   const auditBefore = before == null && Array.isArray(after) ? [] : before;
   const auditAfter = after == null && Array.isArray(before) ? [] : after;
+  if (key === "bd_month_closings" && JSON.stringify(auditBefore) !== JSON.stringify(auditAfter)
+    && (hasDuplicateStoreRecordIds(auditBefore) || hasDuplicateStoreRecordIds(auditAfter))) {
+    return Response.json({ ok: false, code: "DUPLICATE_STORE_RECORD_ID", error: "Повторяющиеся идентификаторы периодов не позволяют безопасно сохранить изменения." }, { status: 409 });
+  }
+  if (MONTH_LOCKED_STORE_KEYS.has(key) && JSON.stringify(auditBefore) !== JSON.stringify(auditAfter)
+    && canWriteStore(account, key, compareStoreData(auditBefore, auditAfter))
+    && (hasDuplicateStoreRecordIds(auditBefore) || hasDuplicateStoreRecordIds(auditAfter))) {
+    // Ambiguous identities must never let Map-based comparison hide a financial mutation.
+    const [closingRow] = await db.select().from(domainData).where(and(
+      eq(domainData.accountId, account.id), eq(domainData.storeKey, "bd_month_closings"),
+    )).limit(1);
+    const monthKey = firstClosedPeriod(auditBefore, auditAfter, closedMonthsFromStore(closingRow ? JSON.parse(closingRow.dataJson) : null));
+    return Response.json(monthKey
+      ? { ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }
+      : { ok: false, code: "DUPLICATE_STORE_RECORD_ID", error: "Повторяющиеся идентификаторы записей не позволяют безопасно сохранить изменения." },
+    { status: monthKey ? 423 : 409 });
+  }
   const mutations = compareStoreData(auditBefore, auditAfter);
   if (key === SALES_BATCH_STORE_KEY) {
     const protectedMutations = protectedSalesBatchMutations(before, after);
@@ -378,6 +400,17 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       { ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для этого изменения" },
       { status: 403 },
     );
+  }
+
+  if (key === "bd_month_closings" && requiresExplicitPeriodReopen(before, after)) {
+    return Response.json({ ok: false, code: "EXPLICIT_PERIOD_REOPEN_REQUIRED", error: "Закрытый месяц можно открыть только явным действием повторного открытия периода." }, { status: 409 });
+  }
+
+  if (key === "bd_month_closings") {
+    const monthKey = firstChangedClosedSnapshot(before, after);
+    if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey,
+      error: `Итоги месяца ${monthKey} зафиксированы. Сначала откройте его штатным действием повторного открытия периода.`,
+    }, { status: 423 });
   }
 
   if (key === PURCHASE_STORE_KEY) {
@@ -449,26 +482,8 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     const closedMonths = closedMonthsFromStore(
       closingRow ? JSON.parse(closingRow.dataJson) : null,
     );
-    const lockedMutation = mutations.find(
-      (mutation) => mutation.monthKey && closedMonths.has(mutation.monthKey),
-    );
+    const lockedMutation = firstClosedMutation(mutations, closedMonths);
     if (lockedMutation?.monthKey) {
-      const attemptedAt = new Date().toISOString();
-      await db.insert(auditLog).values({
-        accountId: account.id,
-        storeKey: key,
-        action: "blocked",
-        entityId: lockedMutation.entityId,
-        entityLabel: lockedMutation.entityLabel ?? `Изменение за ${lockedMutation.monthKey}`,
-        monthKey: lockedMutation.monthKey,
-        beforeJson: lockedMutation.before == null ? null : JSON.stringify(lockedMutation.before),
-        afterJson: null,
-        changedFieldsJson: JSON.stringify(lockedMutation.changedFields),
-        actorName: [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,
-        actorRole: account.role,
-        reason: `MONTH_LOCKED: сервер отклонил изменение закрытого периода ${lockedMutation.monthKey}`,
-        createdAt: attemptedAt,
-      });
       return Response.json(
         {
           ok: false,

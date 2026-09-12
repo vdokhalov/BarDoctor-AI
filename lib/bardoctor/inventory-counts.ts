@@ -40,6 +40,10 @@ export type InventoryCountLine = {
   actual: number | null;
   note?: string;
   averageUnitCost: number | null;
+  // Exact posted monetary values; draft counts keep their original price snapshot.
+  expectedValue?: number | null;
+  actualValue?: number | null;
+  differenceValue?: number | null;
   costBasisStatus?: CostBasisStatus;
   costBasisMethod?: typeof COST_BASIS_METHOD;
   costSourceDocumentId?: string;
@@ -73,6 +77,11 @@ export type InventoryCountDocument = {
   cancelledAt?: string;
   summary?: InventoryCountSummary;
   adjustmentMovementIds?: string[];
+  financialValuationVersion?: 1;
+  total?: number;
+  expectedTotal?: number;
+  differenceTotal?: number;
+  sections?: Record<string, number>;
 };
 
 export type InventoryCountSummary = {
@@ -190,13 +199,38 @@ function productKey(value: JsonRecord): string {
   return text(value.productKey ?? value.key, "", 300);
 }
 
-function activeStockBalances(assortment: unknown): JsonRecord[] {
+function activeStockBalances(assortment: unknown, venueId?: number): JsonRecord[] {
   const root = record(assortment);
-  const nomenclature = array(root.nomenclature).map(record);
+  const inVenue = (item: JsonRecord) => {
+    const itemVenueId = numeric(item.venueId, 0);
+    return venueId === undefined || itemVenueId <= 0 || itemVenueId === venueId;
+  };
+  const nomenclature = array(root.nomenclature).map(record).filter(inVenue);
   const nomenclatureByKey = new Map(nomenclature.map((item) => [productKey(item), item]));
   return array(root.stockBalances)
     .map(record)
-    .map((balance) => ({ ...balance, ...(nomenclatureByKey.get(productKey(balance)) ?? {}) }))
+    .filter(inVenue)
+    .map((balance) => {
+      const item = nomenclatureByKey.get(productKey(balance)) ?? {};
+      // Catalog rows can contain an old balance mirror. Inherit descriptive
+      // metadata only; quantity, identity and valuation stay with the balance.
+      const merged = { ...balance };
+      for (const field of [
+        "name", "kind", "active", "archived", "sectionId", "section",
+        "taxonomyCategoryId", "categoryId", "categoryName", "subcategoryId", "subcategoryName",
+        "storageLocationId", "storageLocationName",
+      ]) {
+        if (Object.hasOwn(item, field)) merged[field] = item[field];
+      }
+      // A package amount is expressed in the stock base unit. Mixing an old g/ml
+      // catalog basis with a current kg/l balance would multiply counts by 1000.
+      if (item.unit === balance.unit) {
+        for (const field of ["packageSize", "packageAmount", "displayPackageAmount", "multiplePackageSizes", "packageOptions"]) {
+          if (Object.hasOwn(item, field)) merged[field] = item[field];
+        }
+      }
+      return merged;
+    })
     .filter((balance) =>
       Boolean(productKey(balance))
       && balance.archived !== true
@@ -237,12 +271,12 @@ function inventoryHierarchyNodes(assortment: unknown) {
   };
 }
 
-function inventoryEligibleBalances(assortment: unknown): JsonRecord[] {
+function inventoryEligibleBalances(assortment: unknown, venueId?: number): JsonRecord[] {
   const hierarchy = inventoryHierarchyNodes(assortment);
   const sectionById = new Map(hierarchy.sections.map((value) => [value.id, value]));
   const categoryById = new Map(hierarchy.categories.map((value) => [value.id, value]));
   const subcategoryById = new Map(hierarchy.subcategories.map((value) => [value.id, value]));
-  return activeStockBalances(assortment).filter((balance) => {
+  return activeStockBalances(assortment, venueId).filter((balance) => {
     if (!["ml", "g", "pcs", "l", "kg"].includes(text(balance.unit, "", 20))) return false;
     const sectionId = text(balance.sectionId, "", 100);
     const categoryId = text(balance.taxonomyCategoryId ?? balance.categoryId, "", 100);
@@ -415,8 +449,8 @@ function scopeLabel(scope: InventoryCountScope, assortment: unknown): string {
   return text(scope.label, "Склад / зона", 120);
 }
 
-export function inventoryCountScopes(assortment: unknown): InventoryCountScope[] {
-  const balances = inventoryEligibleBalances(assortment);
+export function inventoryCountScopes(assortment: unknown, venueId?: number): InventoryCountScope[] {
+  const balances = inventoryEligibleBalances(assortment, venueId);
   const structure = inventoryHierarchyNodes(assortment);
   const result: InventoryCountScope[] = [{
     type: "all",
@@ -477,8 +511,9 @@ export function inventoryCountScopes(assortment: unknown): InventoryCountScope[]
 export function resolveInventoryCountScope(
   assortment: unknown,
   requested: Pick<InventoryCountScope, "type" | "id">,
+  venueId?: number,
 ): InventoryCountScope | null {
-  return inventoryCountScopes(assortment).find((scope) =>
+  return inventoryCountScopes(assortment, venueId).find((scope) =>
     scope.type === requested.type && String(scope.id ?? "") === String(requested.id ?? "")
   ) ?? null;
 }
@@ -524,7 +559,7 @@ export function createInventoryCountDocument(input: {
     : source === "import"
       ? "Импорт инвентаризационной ведомости"
       : "Вручную";
-  const items = inventoryEligibleBalances(input.assortment)
+  const items = inventoryEligibleBalances(input.assortment, input.venueId)
     .filter((balance) => scopeMatches(balance, scope, input.assortment))
     .map((balance, index): InventoryCountLine | null => {
       const key = productKey(balance);
@@ -660,7 +695,8 @@ export function inventoryCountSummary(document: InventoryCountDocument): Invento
       unvaluedDifferenceLines += 1;
       continue;
     }
-    const value = rounded(difference * line.averageUnitCost, 2);
+    const value = document.financialValuationVersion === 1 && typeof line.differenceValue === "number" && Number.isFinite(line.differenceValue)
+      ? line.differenceValue : rounded(difference * line.averageUnitCost, 2);
     calculatedDifferenceValue = rounded(calculatedDifferenceValue + value, 2);
     if (value < 0) shortageValue = rounded(shortageValue + value, 2);
     else surplusValue = rounded(surplusValue + value, 2);
@@ -681,7 +717,7 @@ export function inventoryCountSummary(document: InventoryCountDocument): Invento
   };
 }
 
-export function inventoryCountLineDifference(line: InventoryCountLine): {
+export function inventoryCountLineDifference(line: InventoryCountLine, financialValuationVersion?: number): {
   difference: number | null;
   differenceValue: number | null;
 } {
@@ -690,7 +726,8 @@ export function inventoryCountLineDifference(line: InventoryCountLine): {
   return {
     difference,
     differenceValue: line.valuationKnown && line.averageUnitCost !== null
-      ? rounded(difference * line.averageUnitCost, 2)
+      ? financialValuationVersion === 1 && typeof line.differenceValue === "number" && Number.isFinite(line.differenceValue)
+        ? line.differenceValue : rounded(difference * line.averageUnitCost, 2)
       : null,
   };
 }
@@ -700,7 +737,7 @@ export function inventoryCountConflicts(input: {
   assortment: unknown;
   stockMovements?: unknown[];
 }): Array<{ productKey: string; productName: string; reason: string; expected: number; current?: number }> {
-  const currentByKey = new Map(activeStockBalances(input.assortment).map((value) => [productKey(value), value]));
+  const currentByKey = new Map(activeStockBalances(input.assortment, input.document.venueId).map((value) => [productKey(value), value]));
   const conflicts: Array<{ productKey: string; productName: string; reason: string; expected: number; current?: number }> = [];
   for (const line of input.document.items) {
     const current = currentByKey.get(line.productKey);
@@ -714,6 +751,17 @@ export function inventoryCountConflicts(input: {
       continue;
     }
     const currentAmount = rounded(numeric(current.current, 0));
+    if (text(current.unit, "", 20) !== line.unit
+      || text(current.warehouseId, "", 100) !== (line.warehouseId ?? "")) {
+      conflicts.push({
+        productKey: line.productKey,
+        productName: line.productName,
+        reason: "Единица учёта или склад изменились после начала подсчёта",
+        expected: line.expected,
+        current: currentAmount,
+      });
+      continue;
+    }
     if (Math.abs(currentAmount - line.expected) > 0.0001) {
       conflicts.push({
         productKey: line.productKey,
@@ -735,7 +783,7 @@ export function inventoryCountConflicts(input: {
     if (
       currentCost.valuationKnown !== line.valuationKnown
       || (snapshotCost !== null && currentCost.averageUnitCost !== null
-        && Math.abs(currentCost.averageUnitCost - snapshotCost) > 0.000001)
+        && currentCost.averageUnitCost !== snapshotCost)
     ) {
       conflicts.push({
         productKey: line.productKey,

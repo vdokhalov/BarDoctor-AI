@@ -2,6 +2,7 @@ import { normalizeAccountingCurrency, type AccountingCurrency } from "./currency
 import { resolveAccountingMoney } from "./accounting-money";
 import { explicitCostStatus, type CostKnowledgeStatus } from "./cost-knowledge";
 import { COST_BASIS_METHOD, resolveCostBasis } from "./cost-basis";
+import { physicalUnit } from "./stock-units";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -110,7 +111,9 @@ function balanceLine(
   const key = productKey(balance);
   const name = String(balance.name ?? balance.productName ?? "Позиция без названия").trim().slice(0, 240);
   const rawQuantity = finite(balance.current ?? balance.quantity ?? balance.onHand);
-  const unit = String(balance.unit ?? balance.baseUnit ?? "unknown").trim().toLowerCase();
+  const rawUnit = String(balance.unit ?? balance.baseUnit ?? "unknown").trim().toLowerCase();
+  const supportedUnit = physicalUnit(rawUnit);
+  const unit = supportedUnit ?? rawUnit;
   const currency = normalizedCurrency(
     balance.accountingCurrency ?? balance.normalizedCostCurrency ?? balance.currency,
   );
@@ -123,7 +126,7 @@ function balanceLine(
   if (rawQuantity < 0) {
     return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "negative_stock" };
   }
-  if (!["ml", "g", "pcs"].includes(unit)) {
+  if (!supportedUnit) {
     return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "broken_base_unit" };
   }
   if (!accountingCurrency) {

@@ -54,8 +54,8 @@ test("scope options and creation share one canonical venue validation contract",
     read("app/api/inventory/counts/route.ts"),
     read("lib/bardoctor/inventory-counts.ts"),
   ]);
-  assert.match(route, /scopes: inventoryCountScopes\(stores\.assortment\)/);
-  assert.match(route, /resolveInventoryCountScope\(stores\.assortment/);
+  assert.match(route, /scopes: inventoryCountScopes\(stores\.assortment, account\.venueId\)/);
+  assert.match(route, /resolveInventoryCountScope\(stores\.assortment, [^\n]+, account\.venueId\)/);
   assert.match(engine, /parentId: category\.parentId/);
   assert.match(engine, /itemCount/);
   assert.doesNotMatch(engine.slice(engine.indexOf("export function inventoryCountScopes"), engine.indexOf("export function resolveInventoryCountScope")), /Склад \/ зона/);

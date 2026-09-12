@@ -138,7 +138,9 @@ test("trust center API and UI enforce venue scope, honest states and immutable p
   assert.match(client, /error\.status === 403/);
   assert.match(client, /Проверенных проблем нет/);
 
-  assert.match(store, /action: "blocked"/);
+  // Rejected period mutations preserve audit bytes (actual HTTP/SQLite cases in period-lock-http-phase7).
+  assert.doesNotMatch(store, /action: "blocked"/);
+  assert.match(store, /firstClosedMutation\(mutations, closedMonths\)/);
   assert.match(store, /code: "MONTH_LOCKED"/);
   assert.match(store, /status: 423/);
   assert.match(store, /action: "conflict"/);

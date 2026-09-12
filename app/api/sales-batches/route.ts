@@ -1,7 +1,7 @@
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
-import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
+import { closedMonthsFromStore, compareStoreData, firstClosedMutation, firstClosedPeriod } from "../../../lib/bardoctor/data-trust";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../lib/bardoctor/inventory";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import {
@@ -327,6 +327,8 @@ async function postOnce(request: Request): Promise<Response> {
       });
       if (update.ok) { nextBatches = update.batches; nextBatch = update.batch; }
     }
+    const lockedMutation = firstClosedMutation(compareStoreData(stores.batches, nextBatches), stores.closedMonths);
+    if (lockedMutation) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: lockedMutation.monthKey, error: `Месяц ${lockedMutation.monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     const statements = [
       upsertStore(database, account.id, SALES_MAPPING_STORE_KEY, mapped.mappings, now),
       database.prepare(`
@@ -382,6 +384,8 @@ async function postOnce(request: Request): Promise<Response> {
 
   const batchId = text(body.id ?? body.batchId, "", 160);
   const before = salesBatches(stores.batches, account.venueId).find((item) => item.id === batchId);
+  const originalMonth = firstClosedPeriod(before, null, stores.closedMonths);
+  if (originalMonth) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: originalMonth, error: `Месяц ${originalMonth} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
 
   if (action === "post") {
     if (before && stores.closedMonths.has(before.businessDate.slice(0, 7))) {
@@ -410,6 +414,8 @@ async function postOnce(request: Request): Promise<Response> {
     const result = reverseSalesBatch({ batches: stores.batches, batchId, assortment: stores.assortment, stockMovements: stores.stockMovements, venueId: account.venueId, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: result.code === "SALES_BATCH_NOT_FOUND" ? 404 : 409 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, batch: result.batch, stockChanged: false });
+    const lockedMutation = firstClosedMutation(compareStoreData(stores.stockMovements, result.stockMovements), stores.closedMonths);
+    if (lockedMutation) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: lockedMutation.monthKey, error: `Месяц ${lockedMutation.monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
@@ -463,6 +469,8 @@ async function postOnce(request: Request): Promise<Response> {
   if (result.duplicate) {
     return Response.json({ ok: true, idempotent: true, batch: result.batch, stockChanged: false });
   }
+  const targetMonth = firstClosedPeriod(before, result.batch, stores.closedMonths);
+  if (targetMonth) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: targetMonth, error: `Месяц ${targetMonth} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
     auditStatement({ database, accountId: account.id, action: before ? "sales_batch.draft_updated" : "sales_batch.draft_created", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Черновик сохранён server-side; источник ${result.batch.source}; склад не изменён`, now }),

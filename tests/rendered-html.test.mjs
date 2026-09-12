@@ -2864,7 +2864,8 @@ test("monthly financial report includes payroll bonuses without treating payment
   const start = bundle.indexOf(
     "const bdBuildMonthlyReportBeforePayroll=bdBuildMonthlyReport",
   );
-  const end = bundle.indexOf("function BAe(", start);
+  // Isolate the actual payroll override, before the next independent financial wrapper.
+  const end = bundle.indexOf("/* phase7-monthly-financial-model:start */", start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
 
@@ -2992,6 +2993,10 @@ test("only an explicit closing record marks a month closed and its snapshot stay
   );
   const start = bundle.indexOf('const bdReleaseCandidateVersion="rc-v163"');
   const end = bundle.indexOf("function bdShiftsPage(", start);
+  const closedFields = bundle.split("\n").filter(line => line.startsWith("function bdMonthlyClosedFieldsPhase7("));
+  assert.equal(closedFields.length, 1);
+  const venueId = bundle.split("\n").filter(line => line.startsWith("function bdMonthlyVenueIdPhase7("));
+  assert.equal(venueId.length, 1);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
 
@@ -3016,7 +3021,7 @@ test("only an explicit closing record marks a month closed and its snapshot stay
     },
   };
   vm.runInNewContext(
-    `${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
+    `${closedFields[0]}\n${venueId[0]}\n${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
     context,
   );
 
@@ -3047,6 +3052,9 @@ test("only an explicit closing record marks a month closed and its snapshot stay
   assert.equal(closedReport.taxes, 5_000);
   assert.equal(closedReport.operatingResult, 31_000);
   assert.equal(closedReport.cashResult, 29_000);
+  assert.equal(closedReport.costOfGoods, null, "Missing old captured cost must not use today's report");
+  assert.equal(closedReport.costBasis, "legacy_closed_snapshot");
+  assert.equal(closedReport.inventoryAdjustmentNet, null);
 });
 
 test("employee list opens a read-only monthly profile before editing", async () => {

@@ -1,7 +1,7 @@
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
-import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
+import { closedMonthsFromStore, firstClosedPeriod } from "../../../lib/bardoctor/data-trust";
 import {
   ASSORTMENT_STORE_KEY,
   STOCK_MOVEMENT_STORE_KEY,
@@ -212,6 +212,8 @@ async function postOnce(request: Request): Promise<Response> {
     const result = deleteWriteOffDraft({ documents: current, venueId: account.venueId, id: text(body.id ?? draft.id, "", 100) });
     if (!result.ok) return Response.json(result, { status: 409 });
     if (!result.deleted || !result.document) return Response.json({ ok: true, idempotent: true, deleted: false, writeOffs: result.documents });
+    const monthKey = firstClosedPeriod(result.document, null, stores.closedMonths);
+    if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       auditStatement({ database, accountId: account.id, action: "write_off.deleted", document: result.document, before: result.document, actorName: currentActor.name, actorRole: currentActor.role, reason: "Удалён черновик списания; склад не изменён", now }),
@@ -222,10 +224,11 @@ async function postOnce(request: Request): Promise<Response> {
   if (action === "cancel") {
     const id = text(body.id ?? draft.id, "", 100);
     const existing = current.find((item) => item.id === id);
-    if (existing && stores.closedMonths.has(existing.date.slice(0, 7))) return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${existing.date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     const result = cancelPostedWriteOff({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, id, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_NOT_FOUND" ? 404 : 409 });
     if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, stockChanged: false });
+    const monthKey = firstClosedPeriod(existing, { date: now }, stores.closedMonths);
+    if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     const expenses = syncWriteOffExpense(stores.expenses, result.document);
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
@@ -241,6 +244,8 @@ async function postOnce(request: Request): Promise<Response> {
   if (action === "save_draft") {
     const result = saveWriteOffDraft({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, draft, actor: currentActor, now });
     if (!result.ok) return Response.json(result, { status: 422 });
+    const monthKey = firstClosedPeriod(before, result.document, stores.closedMonths);
+    if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       auditStatement({ database, accountId: account.id, action: before ? "write_off.draft_updated" : "write_off.draft_created", document: result.document, before, actorName: currentActor.name, actorRole: currentActor.role, reason: "Черновик списания сохранён; склад не изменён", now }),
@@ -249,7 +254,8 @@ async function postOnce(request: Request): Promise<Response> {
   }
   if (action !== "post") return Response.json({ ok: false, error: "Неизвестное действие списания" }, { status: 400 });
   const date = text(draft.date, now.slice(0, 10), 10);
-  if (stores.closedMonths.has(date.slice(0, 7))) return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
+  const monthKey = firstClosedPeriod(before, { date }, stores.closedMonths);
+  if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey, error: `Месяц ${monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   const result = postWriteOffDocument({ documents: current, assortment: stores.assortment, stockMovements: stores.movements, venueId: account.venueId, draft, actor: currentActor, allowNegativeStock: true, now });
   if (!result.ok) return Response.json(result, { status: result.code === "WRITE_OFF_INSUFFICIENT_STOCK" ? 409 : 422 });
   if (result.idempotent) return Response.json({ ok: true, idempotent: true, writeOff: result.document, writeOffs: result.documents, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: false });

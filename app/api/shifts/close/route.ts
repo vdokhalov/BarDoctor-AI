@@ -1,7 +1,7 @@
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
-import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
+import { closedMonthsFromStore, compareStoreData, firstClosedMutation } from "../../../../lib/bardoctor/data-trust";
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { EXPENSE_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
@@ -164,6 +164,13 @@ async function postOnce(request: Request): Promise<Response> {
       stockChanged: false,
     });
   }
+  const lockedMutation = firstClosedMutation([
+    ...compareStoreData(stores.revenues, result.revenues),
+    ...compareStoreData(stores.writeOffs, result.writeOffs),
+    ...compareStoreData(stores.stockMovements, result.stockMovements),
+    ...compareStoreData(stores.expenses, result.expenses),
+  ], stores.closedMonths);
+  if (lockedMutation) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: lockedMutation.monthKey, error: `Месяц ${lockedMutation.monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   const statements: D1PreparedStatement[] = [
     upsertStore(database, account.id, REVENUE_STORE_KEY, result.revenues, now),
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.writeOffs, now),
