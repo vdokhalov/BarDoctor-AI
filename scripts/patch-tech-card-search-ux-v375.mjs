@@ -5,6 +5,7 @@ const root = process.cwd();
 const bundlePath = path.join(root, "public/assets/index-BQGspy0I.js");
 const cssPath = path.join(root, "public/catalog.css");
 const marker = "bd-tech-card-search-ux-v375";
+const pickerFocusRelease = "bd-tech-card-picker-focus-phase7";
 let source = fs.readFileSync(bundlePath, "utf8");
 
 function replaceSegment(input, start, end, replacement, label) {
@@ -57,6 +58,14 @@ if (!css.includes(".bd-tech-card-picker-v375")) css += String.raw`
 .bd-tech-card-picker-v375{display:grid;gap:9px}.bd-tech-card-picker-summary-v375{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:9px 11px;border-radius:11px;background:#f3f4f9;color:#6d7386;font-size:12px}.bd-tech-card-picker-summary-v375 strong{color:#252941}.bd-tech-card-groups-v375{display:grid;gap:10px;max-height:42vh;overflow:auto;overscroll-behavior:contain;padding-right:3px}.bd-tech-card-groups-v375 section{display:grid;gap:6px}.bd-tech-card-groups-v375 h4{position:sticky;top:0;z-index:1;margin:0;padding:7px 9px;border-radius:9px;background:#eef0ff;color:#4f46e5;font-size:11.5px;line-height:1.35}.bd-tech-card-groups-v375 section>div{display:grid;gap:6px}.bd-tech-card-groups-v375 button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:50px;padding:9px 11px;border:1px solid #dde1ec;border-radius:12px;background:#fff;text-align:left}.bd-tech-card-groups-v375 button.selected{border-color:#635bff;background:#f4f3ff}.bd-tech-card-groups-v375 button span{display:grid;gap:3px;min-width:0}.bd-tech-card-groups-v375 button strong{overflow:hidden;text-overflow:ellipsis}.bd-tech-card-groups-v375 button small{color:#777d90}.bd-tech-card-groups-v375 button>b{color:#584ff0;font-size:12px;white-space:nowrap}.bd-tech-card-filter-toggle-v375{min-height:42px;border:1px solid #d9dce7;border-radius:11px;background:#fff;color:#565c70;font-weight:800}.bd-tech-card-taxonomy-v375{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px;border-radius:12px;background:#f7f8fb}.bd-tech-card-taxonomy-v375 label{display:grid;gap:5px}.bd-tech-card-taxonomy-v375 label>span{font-size:12px;font-weight:800;color:#73788b}.bd-tech-card-taxonomy-v375 select{width:100%;min-width:0;min-height:44px}.bd-tech-card-empty-v375{display:grid;gap:9px;padding:11px;border:1px solid #e4dba9;border-radius:12px;background:#fffbed}.bd-tech-card-empty-v375 p{margin:0;color:#6e6544;font-size:12px;line-height:1.45}.bd-tech-card-empty-v375 button{width:100%;min-height:44px}
 @media(max-width:640px){.bd-tech-card-picker-summary-v375{align-items:flex-start;flex-direction:column;gap:3px}.bd-tech-card-groups-v375{max-height:36dvh}.bd-tech-card-picker-v375.is-searching .bd-tech-card-groups-v375{max-height:min(30dvh,270px)}.bd-tech-card-groups-v375 button{min-height:54px}.bd-tech-card-taxonomy-v375{grid-template-columns:1fr}.bd-tech-card-editor-v354:has(.bd-tech-card-picker-v375 input[type=search]:focus) .bd-catalog-sheet-actions{display:none}.bd-tech-card-editor-v354:has(.bd-tech-card-picker-v375 input[type=search]:focus) .bd-catalog-form{padding-bottom:calc(12px + env(safe-area-inset-bottom))}}
 `;
+// Focus leaves the search field during pointerdown. Keep the action bar hidden
+// until the picker actually closes so it cannot replace the target before up.
+const legacyFocusSelector = ".bd-tech-card-editor-v354:has(.bd-tech-card-picker-v375 input[type=search]:focus)";
+const stablePickerSelector = ".bd-tech-card-editor-v354:has(.bd-tech-card-picker-v375)";
+const legacyFocusCount = css.split(legacyFocusSelector).length - 1;
+const stablePickerCount = css.split(stablePickerSelector).length - 1;
+if (legacyFocusCount === 2 && stablePickerCount === 0) css = css.replaceAll(legacyFocusSelector, stablePickerSelector);
+else if (legacyFocusCount !== 0 || stablePickerCount !== 2) throw new Error("Tech-card picker focus CSS anchors must be exactly legacy or upgraded");
 fs.writeFileSync(cssPath, css);
 
 for (const relativePath of ["app/bar-doctor-response.ts", "public/app.html", "public/bardoctor-preview.js"]) {
@@ -65,9 +74,10 @@ for (const relativePath of ["app/bar-doctor-response.ts", "public/app.html", "pu
   contents = contents.replace(/index-BQGspy0I\.js\?v=([^"']+)/g, (match, version) =>
     version.includes(marker) ? match : `index-BQGspy0I.js?v=${version}-${marker}`,
   );
-  contents = contents.replace(/catalog\.css\?v=([^"']+)/g, (match, version) =>
-    version.includes(marker) ? match : `catalog.css?v=${version}-${marker}`,
-  );
+  contents = contents.replace(/catalog\.css\?v=([^"']+)/g, (match, version) => {
+    const missing = [marker, pickerFocusRelease].filter(token => !version.includes(token));
+    return missing.length ? `catalog.css?v=${version}-${missing.join("-")}` : match;
+  });
   fs.writeFileSync(filePath, contents);
 }
 

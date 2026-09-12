@@ -1443,6 +1443,10 @@ async function runProfile(browser, baseUrl, profile) {
       headless: true,
       args: [...chromiumArgs, "--no-proxy-server", "--disable-dev-shm-usage"],
     });
+    const { verifyRecipePickerPointerTarget } = await import("../tests/helpers/recipe-picker-pointer-qa.mjs");
+    const pickerPointerChecks = await verifyRecipePickerPointerTarget({
+      browser, css: fs.readFileSync(path.join(projectRoot, "public/catalog.css"), "utf8"),
+    });
     const results = [];
     for (const profile of [
       { name: "desktop-1280x720", viewport: { width: 1280, height: 720 }, mobile: false },
@@ -1450,7 +1454,7 @@ async function runProfile(browser, baseUrl, profile) {
     ]) {
       results.push(await runProfile(browser, server.baseUrl, profile));
     }
-    const summary = { ok: true, outputDir, baseUrl: server.baseUrl, results };
+    const summary = { ok: true, outputDir, baseUrl: server.baseUrl, pickerPointerChecks, results };
     fs.writeFileSync(path.join(outputDir, "summary.json"), `${JSON.stringify(summary, null, 2)}\n`);
     console.log(JSON.stringify(summary, null, 2));
   } finally {

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { patchRecipeAuthoritativeUnits } from "./lib/recipe-authoritative-units.mjs";
 
 const root = process.cwd();
 const releaseToken = "20260907-menu-consumption-sot-v418";
@@ -549,6 +550,7 @@ function finalizePhase3Bundle(source) {
   source = patchMenuLegacyReview(source);
   source = syncMenuEditor(source);
   source = patchRecipeCostReferences(source);
+  source = patchRecipeAuthoritativeUnits(source);
   source = patchRecipeSavingGuard(source);
   source = syncFallbackAnalytics(source);
   source = patchAssortmentModeReadModels(source);

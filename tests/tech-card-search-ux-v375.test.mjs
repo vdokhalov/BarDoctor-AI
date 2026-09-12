@@ -40,13 +40,15 @@ test("search normalizes decimal separators and equivalent units", () => {
   for (const unit of ["миллилитр", "литр", "килограмм", "грамм", "штук"]) assert.match(bundle, new RegExp(unit));
 });
 
-test("mobile search keeps results visible and removes the obscuring action bar while typing", () => {
+test("mobile search keeps its action bar hidden for the whole picker lifetime", () => {
   assert.match(css, /\.bd-tech-card-picker-v375\.is-searching \.bd-tech-card-groups-v375/);
-  assert.match(css, /:has\(\.bd-tech-card-picker-v375 input\[type=search\]:focus\) \.bd-catalog-sheet-actions\{display:none\}/);
+  assert.match(css, /:has\(\.bd-tech-card-picker-v375\) \.bd-catalog-sheet-actions\{display:none\}/);
+  assert.doesNotMatch(css, /:has\(\.bd-tech-card-picker-v375 input\[type=search\]:focus\)/);
   assert.match(css, /max-height:min\(30dvh,270px\)/);
 });
 
 test("search assets are invalidated in every application shell", () => {
   for (const shell of shells) assert.match(shell, /index-BQGspy0I\.js\?v=[^"']*bd-tech-card-search-ux-v375/);
   for (const shell of shells.slice(0, 2)) assert.match(shell, /catalog\.css\?v=[^"']*bd-tech-card-search-ux-v375/);
+  for (const shell of shells.slice(0, 2)) assert.match(shell, /catalog\.css\?v=[^"']*bd-tech-card-picker-focus-phase7/);
 });

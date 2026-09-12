@@ -119,7 +119,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
     assert.equal(build.length, 2, "verified build compiler boundary must be unique");
     const buildCommands = block => [...block.matchAll(/^node "\$\{script_dir\}\/([a-z0-9-]+\.mjs)"\r?$/gm)].map(match => "scripts/" + match[1]);
     const checkBehavior = () => run(["--import", "tsx", "--test", "tests/manual-nomenclature-cost-fallback-v409.test.ts", "tests/manual-reference-price-phase5.test.ts"]);
-    const releaseSnapshot = () => Object.fromEntries([bundlePath, "dist/client/app.html", "dist/client/bardoctor-preview.js", "dist/client/bardoctor-preview-v396.js", "dist/client/bardoctor-preview-v397.js", "dist/server/index.js"]
+    const releaseSnapshot = () => Object.fromEntries([bundlePath, "public/catalog.css", "dist/client/catalog.css", "dist/client/app.html", "dist/client/bardoctor-preview.js", "dist/client/bardoctor-preview-v396.js", "dist/client/bardoctor-preview-v397.js", "dist/server/index.js"]
       .map(file => [file, fs.readFileSync(path.join(temporary, file))]));
     const assertReleaseBytes = (actual, expected, label) => {
       for (const [file, before] of Object.entries(expected)) {
