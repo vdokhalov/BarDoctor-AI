@@ -10,6 +10,7 @@ import * as scope from "../lib/bardoctor/purchase-venue-scope";
 import * as matching from "../lib/bardoctor/invoice-recognition-v2";
 import * as sales from "../lib/bardoctor/sales-events";
 import * as auditPresentation from "../lib/bardoctor/audit-presentation";
+import * as auditDiagnostics from "../lib/bardoctor/audit-d1-diagnostics";
 import { permissionsFor } from "../lib/bardoctor/access-control";
 
 // Actual handlers/domain/SQL, isolated in-memory fixture only. No network or production access.
@@ -62,7 +63,7 @@ async function runtime() {
   const count = () => r.loadRoute(countRoute, { ...counts, ...driver });
   // loadRoute assumes a POST binding in its return object, although audit is GET-only.
   // Providing undefined for the absent method allows the actual GET module to load unchanged.
-  const audit = () => r.loadRoute(auditRoute, { ...auditPresentation, ...driver, POST: undefined });
+  const audit = () => r.loadRoute(auditRoute, { ...auditPresentation, ...auditDiagnostics, ...driver, POST: undefined });
   const purchase = r.loadRoute(purchaseRoute, { ...purchases, ...conversion, ...scope, ...matching,
     INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots", ...driver });
   const sale = r.loadRoute(saleRoute, { ...sales, ...driver });

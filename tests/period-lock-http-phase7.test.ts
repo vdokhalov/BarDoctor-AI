@@ -257,7 +257,7 @@ test("reordering closed legacy timestamp ties cannot change the selected signed 
     r.setRole("owner");
     const reopened = { ...original, status: "reopened", reopenedAt: "2026-09-10T12:00:00.000Z" };
     assert.equal((await r.put(closings, [sibling, reopened])).status, 200);
-    assert.deepEqual((await r.get(closings)).body.data, [sibling, reopened]);
+    assert.deepEqual((await r.get(closings)).body.data, [sibling, { ...reopened, venueId: 901 }]);
   } finally { r.close(); }
 });
 
@@ -269,7 +269,7 @@ test("native reopen may fill missing legacy createdAt but cannot replace an exis
     const now = "2026-10-01T10:00:00.000Z";
     const reopened = { ...original, status: "reopened", reopenedAt: now, updatedAt: now, createdAt: now };
     assert.equal((await r.put(closings, [reopened])).status, 200);
-    assert.deepEqual((await r.get(closings)).body.data, [reopened]);
+    assert.deepEqual((await r.get(closings)).body.data, [{ ...reopened, venueId: 901 }]);
     assert.deepEqual(JSON.parse(String(r.audits()[0].before_json)), original);
     const reclosed = { ...reopened, status: "closed" };
     assert.equal((await r.put(closings, [reclosed])).status, 200);

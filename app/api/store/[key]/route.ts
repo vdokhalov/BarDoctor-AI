@@ -4,6 +4,7 @@ import { auditLog, domainData } from "../../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { isAllowedStoreKey } from "../../../../lib/bardoctor/constants";
 import { eventRevenueMutation } from "../../../../lib/bardoctor/sales-events";
+import { canonicalMonthClosingVenues } from "../../../../lib/bardoctor/month-closing-venue";
 import {
   canReadStore,
   canWriteStore,
@@ -180,6 +181,16 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     ? mergeConcurrentStoreData(body.baseData ?? null, body.data ?? null, before)
     : { data: body.data ?? null, conflicts: 0 };
   let after = merge.data;
+  if (key === "bd_month_closings") {
+    const canonical = canonicalMonthClosingVenues(after, account.venueId);
+    const existingScope = canonicalMonthClosingVenues(before, account.venueId);
+    if (!canonical.ok || !existingScope.ok) {
+      return Response.json({ ok: false, code: "MONTH_CLOSING_VENUE_SCOPE_NEEDS_REVIEW",
+        error: "Принадлежность периода заведению требует проверки. Данные не изменены.",
+      }, { status: 422 });
+    }
+    after = canonical.data;
+  }
   if (key === "bd_finance_revenue" && eventRevenueMutation(array(before), array(after))) {
     return Response.json({ ok:false, code:"SALES_EVENT_REVENUE_PROTECTED", error:"Выручка продаж изменяется только проведением или полным возвратом продажи. Смену продаж закройте в разделе ввода продаж." },{status:409});
   }
@@ -407,7 +418,10 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
 
   if (key === "bd_month_closings") {
-    const monthKey = firstChangedClosedSnapshot(before, after);
+    // Scope was validated above. Compare signed content after resolving only the
+    // account-local venue alias; the audit still records the original raw row.
+    const canonicalBefore = canonicalMonthClosingVenues(before, account.venueId);
+    const monthKey = firstChangedClosedSnapshot(canonicalBefore.ok ? canonicalBefore.data : before, after);
     if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey,
       error: `Итоги месяца ${monthKey} зафиксированы. Сначала откройте его штатным действием повторного открытия периода.`,
     }, { status: 423 });

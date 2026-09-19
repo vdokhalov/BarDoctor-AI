@@ -107,6 +107,22 @@ export function patchMonthlyFragment(input) {
 
 export function patchMonthlyBundle(input, domainSource) {
   let source = input;
+  source = replaceState(source,
+    'function bdUseMonthClosingStore(e="primary"){const{isReady:t}',
+    'function bdUseMonthClosingStore(e="primary"){e=bdMonthlyVenueIdPhase7(null,{id:e});if(!Number.isSafeInteger(e)||e<=0)throw new Error("MONTH_CLOSING_VENUE_REQUIRED");const{isReady:t}',
+    "canonical closing active venue");
+  source = replaceState(source,
+    'n.filter(s=>!s.venueId||s.venueId===e)',
+    'n.filter(s=>!s.venueId||s.venueId==="primary"||Number(s.venueId)===e)',
+    "canonical closing list");
+  source = replaceState(source,
+    'h=l.find(g=>g.monthKey===a&&g.venueId===(e?.id||"primary"))||null',
+    'h=l.find(g=>g.monthKey===a)||null',
+    "canonical closing launcher");
+  source = replaceState(source,
+    'f({id:l?.id||s.id+":"+t,venueId:s.id,monthKey:t,status:"closed"',
+    'f({...l,id:l?.id||bdMonthlyVenueIdPhase7(null,s)+":"+t,venueId:bdMonthlyVenueIdPhase7(null,s),monthKey:t,status:"closed"',
+    "canonical closing wizard and retained history");
   const begins = count(source, START), ends = count(source, END);
   if (begins !== ends || begins > 1) throw new Error("Phase 7: ambiguous financial block boundaries");
   if (begins === 1) {

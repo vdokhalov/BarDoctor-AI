@@ -13,6 +13,7 @@ import { physicalUnit, canonicalStockUnit } from "../lib/bardoctor/stock-units";
 import * as nomenclatureIdentity from "../lib/bardoctor/nomenclature-identity";
 import { manualReferencePrice } from "../lib/bardoctor/manual-reference-price";
 import { changedConsumptionModeIssues } from "../lib/bardoctor/consumption-mode";
+import { storeRuntime } from "./helpers/store-runtime";
 
 type Row = Record<string, unknown>;
 type Line = Row & { id: string; name: string; rawName: string; unit: string; quantity: number;
@@ -42,7 +43,7 @@ function document(id: string, quantity = 20, price = 10) {
       purchaseProductKey: p.key, nomenclatureId: p.id, quantity, unit: p.unit, packageSize: "1 шт.",
       unitPrice: price, lineTotal: quantity * price, category: "products", mappingSource: "manual" } as Line)) };
 }
-function runtime() {
+function runtime(venueId = 1) {
   const r = openingRuntime();
   const deps = { ...purchases, ...conversion, ...scope, ...matching, INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots" };
   const confirm = r.loadRoute(new URL("../app/api/purchases/confirm/route.ts", import.meta.url), deps);
@@ -50,11 +51,11 @@ function runtime() {
   const cancel = r.loadRoute(new URL("../app/api/purchases/cancel/route.ts", import.meta.url), deps);
   const repost = r.loadRoute(new URL("../app/api/purchases/repost/route.ts", import.meta.url), deps);
   const sale = r.loadRoute(new URL("../app/api/sales-events/route.ts", import.meta.url), sales);
-  r.put("bd_assortment_v1", fixture());
-  r.put("bd_suppliers", [{ id: "test-supplier", name: "TEST Supplier", venueId: 1, status: "active" }]);
+  r.put("bd_assortment_v1", JSON.parse(JSON.stringify(fixture(), (key, value) => key === "venueId" ? venueId : value)));
+  r.put("bd_suppliers", [{ id: "test-supplier", name: "TEST Supplier", venueId, status: "active" }]);
   const send = async (api: typeof confirm, body: Row, status?: number) => {
     const response = await api.POST(new Request("http://localhost/api/test", { method: "POST",
-      headers: { "Content-Type": "application/json", "X-Venue-Id": "1" }, body: JSON.stringify({ venueId: 1, ...body }) }));
+      headers: { "Content-Type": "application/json", "X-Venue-Id": String(venueId) }, body: JSON.stringify({ venueId, ...body }) }));
     const result = await response.json() as Result;
     if (status) assert.equal(response.status, status, JSON.stringify(result));
     else assert.ok(response.ok, JSON.stringify({ status: response.status, result }));
@@ -108,6 +109,48 @@ function assertStock(r: ReturnType<typeof runtime>, quantity: number, unitCost: 
     assert.equal(cost.value, unitCost, p.name);
   }
 }
+
+for (const venueId of [1, 3293]) test(`canonical close permits next-month receipt and sale/refund but locks August in venue ${venueId}`, async () => {
+  const closingStore = await storeRuntime(venueId), r = runtime(venueId);
+  try {
+    assert.equal((await closingStore.put("bd_month_closings", [{ id: "primary:2026-08", venueId: "primary", monthKey: "2026-08", status: "closed" }])).status, 200);
+    r.put("bd_month_closings", (await closingStore.get("bd_month_closings")).body.data);
+    const receipt = { ...document("next-month", 20, 14), venueId, date: "2026-09-08" };
+    const before = r.allStores(), audit = r.audit();
+    const blocked = await r.send(r.confirm, { document: { ...receipt, id: "closed-month", date: "2026-08-15" } }, 423);
+    assert.equal(blocked.code, "MONTH_LOCKED");
+    assert.deepEqual(r.allStores(), before); assert.deepEqual(r.audit(), audit);
+    await r.send(r.confirm, { document: receipt });
+    const check = (quantity: number) => {
+      const stock = r.get("bd_assortment_v1") as { stockBalances: Stock[] };
+      assert.equal(stock.stockBalances.length, 3);
+      for (const row of stock.stockBalances) {
+        assert.equal(row.current, quantity);
+        assert.equal(resolveCostBasis({ venueId, nomenclatureItem: row.productKey, baseUnit: physicalUnit(row.unit)!,
+          asOf: "2026-09-30", receipts: r.get("bd_stock_movements") as unknown[], accountingCurrency: "MDL" }).value, 14);
+      }
+    };
+    check(20);
+    await r.send(r.sale, { action: "open_shift", shiftId: "qa-hotfix-shift", name: "TEST canonical venue" });
+    const command = { id: "qa-hotfix-sale", shiftId: "qa-hotfix-shift", source: "MANUAL_GRID", lines: [{ id: "line", menuItemId: "combo", quantity: 1 }] };
+    const quote = await r.send(r.sale, { action: "preview", command });
+    assert.equal(quote.event.originalMovements.reduce((sum, movement) => sum + movement.costAmount, 0), -42);
+    const posted = await r.send(r.sale, { action: "post", command, previewHash: quote.previewHash });
+    check(19);
+    const revenue = r.get("bd_finance_revenue") as Row[];
+    assert.ok(revenue.some(row => Number(row.revenue) === 60));
+    await r.send(r.sale, { action: "reverse", eventId: posted.event.id });
+    check(20);
+    await r.send(r.sale, { action: "close_shift", shiftId: "qa-hotfix-shift" });
+    const final = r.allStores(), finalAudit = r.audit();
+    await r.send(r.confirm, { document: receipt });
+    await r.send(r.sale, { action: "reverse", eventId: posted.event.id });
+    await r.send(r.sale, { action: "close_shift", shiftId: "qa-hotfix-shift" });
+    assert.deepEqual(r.allStores(), final); assert.deepEqual(r.audit(), finalAudit);
+    assert.equal((r.get("bd_month_closings") as Row[])[0].venueId, venueId);
+    assert.deepEqual((await closingStore.get("bd_month_closings")).body.data, r.get("bd_month_closings"));
+  } finally { r.close(); closingStore.close(); }
+});
 
 test("Phase 7 production identity regression: native structured keys survive receipt, new price, recipe sale, update and full refund", async () => {
   const r = runtime();

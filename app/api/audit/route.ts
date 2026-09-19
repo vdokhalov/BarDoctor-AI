@@ -1,6 +1,7 @@
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
+import { auditD1Statement, withAuditD1Diagnostics } from "../../../lib/bardoctor/audit-d1-diagnostics";
 import {
   availableModule,
   moduleKeys,
@@ -373,9 +374,9 @@ async function integrityIssues(accountId: number, venueId: number, account: Para
 async function overview(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const [activity, recent, issueRows, periodState, connectionCount] = await Promise.all([
-    getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 10000`)
+    auditD1Statement("audit.overview.activity", () => getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 10000`)
       .bind(account.id, since)
-      .all<AuditDatabaseRow>(),
+      .all<AuditDatabaseRow>()),
     getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5`)
       .bind(account.id)
       .all<AuditDatabaseRow>(),
@@ -420,9 +421,9 @@ async function overview(account: NonNullable<Awaited<ReturnType<typeof authentic
 }
 
 async function filterOptions(accountId: number, account: Parameters<typeof presentAuditEvent>[1]) {
-  const result = await getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5000`)
+  const result = await auditD1Statement("audit.filters.options", () => getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5000`)
     .bind(accountId)
-    .all<AuditDatabaseRow>();
+    .all<AuditDatabaseRow>());
   const modules = new Map<string, string>();
   const sources = new Map<AuditSourceKind, string>();
   const actors = new Set<string>();
@@ -473,6 +474,10 @@ function eventsCsv(events: PresentedAuditEvent[]): string {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  return withAuditD1Diagnostics(request, () => getAudit(request));
+}
+
+async function getAudit(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "audit.view")) {

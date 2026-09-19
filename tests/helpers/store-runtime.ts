@@ -9,7 +9,7 @@ import { permissionsFor, type AccessRole } from "../../lib/bardoctor/access-cont
 type Reply = { status: number; body: Record<string, unknown> };
 
 /** Actual store GET/PUT, permissions and Drizzle SQL; only auth/connection are TEST fixtures. */
-export async function storeRuntime() {
+export async function storeRuntime(venueId = 901) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`CREATE TABLE domain_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL,
@@ -34,7 +34,7 @@ export async function storeRuntime() {
   }
   const db = drizzle({ prepare } as unknown as D1Database);
   let role: AccessRole = "owner";
-  const account = () => ({ id: 7, actorAccountId: 7, venueId: 901, role,
+  const account = () => ({ id: 7, actorAccountId: 7, venueId, role,
     permissions: permissionsFor(role), firstName: "QA", lastName: "Owner",
     appEmail: "qa@example.invalid", restaurantJson: '{"currency":"MDL"}' });
   const route = new URL("../../app/api/store/[key]/route.ts", import.meta.url);
@@ -66,7 +66,7 @@ export async function storeRuntime() {
   const api = new Function("dependencies", `const {${Object.keys(dependencies).join(",")}} = dependencies;\n${compiled}\nreturn {GET,PUT};`)(dependencies);
   async function request(method: "GET" | "PUT", key: string, payload?: unknown): Promise<Reply> {
     const response: Response = await api[method](new Request(`https://qa.invalid/api/store/${key}`, {
-      method, headers: { "X-Venue-Id": "901", "Content-Type": "application/json" },
+      method, headers: { "X-Venue-Id": String(venueId), "Content-Type": "application/json" },
       ...(method === "PUT" ? { body: JSON.stringify(payload) } : {}),
     }), { params: Promise.resolve({ key }) });
     return { status: response.status, body: await response.json() };
