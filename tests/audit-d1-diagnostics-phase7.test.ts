@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { openingRuntime } from "./helpers/opening-runtime";
 import * as presentation from "../lib/bardoctor/audit-presentation";
 import * as diagnostics from "../lib/bardoctor/audit-d1-diagnostics";
+import { auditSourceProjection } from "../lib/bardoctor/audit-source-projection";
 
 async function capture(operation: (lines: string[]) => Promise<void>) {
   const original = console.error, lines: string[] = [];
@@ -85,7 +86,7 @@ for (const tag of ["audit.overview.activity", "audit.filters.options"] as const)
   };
   try {
     const api = r.loadRoute(new URL("../app/api/audit/route.ts", import.meta.url), {
-      ...presentation, ...diagnostics, getD1: () => ({ prepare }), POST: undefined,
+      ...presentation, ...diagnostics, auditSourceProjection, getD1: () => ({ prepare }), POST: undefined,
     });
     await assert.rejects(api.GET(new Request("https://qa.invalid/api/audit?limit=1", { headers: { "X-Venue-Id": "3293" } })), e => e === failure);
     assert.equal(lines.length, 1);
@@ -118,7 +119,7 @@ test("actual CSV export keeps its independent read-only path; denied access issu
   };
   try {
     const api = r.loadRoute(new URL("../app/api/audit/route.ts", import.meta.url), {
-      ...presentation, ...diagnostics, getD1: () => ({ prepare }), POST: undefined,
+      ...presentation, ...diagnostics, auditSourceProjection, getD1: () => ({ prepare }), POST: undefined,
     });
     const response = await api.GET(new Request("https://qa.invalid/api/audit?format=csv&storeKey=bd_month_closings"));
     assert.equal(response.status, 200);

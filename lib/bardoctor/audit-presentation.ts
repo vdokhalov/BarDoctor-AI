@@ -234,7 +234,7 @@ export function moduleKeys(moduleKey: string): string[] {
   return keys;
 }
 
-export function sourceFromAudit(row: AuditRowLike): { kind: AuditSourceKind; label: string } {
+export function sourceFromAudit(row: Pick<AuditRowLike, "beforeJson" | "afterJson" | "reason" | "actorName" | "actorRole">): { kind: AuditSourceKind; label: string } {
   const before = records(parse(row.beforeJson));
   const after = records(parse(row.afterJson));
   const values = [...after, ...before];

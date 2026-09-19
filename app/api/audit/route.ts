@@ -2,6 +2,7 @@ import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { auditD1Statement, withAuditD1Diagnostics } from "../../../lib/bardoctor/audit-d1-diagnostics";
+import { auditSourceProjection } from "../../../lib/bardoctor/audit-source-projection";
 import {
   availableModule,
   moduleKeys,
@@ -73,6 +74,19 @@ const AUDIT_SELECT = `
     created_at AS createdAt
   FROM audit_log
 `;
+
+// Overview counters and filter choices do not need before/after snapshots or
+// diffs. Sending thousands of full snapshots exhausts the production D1 isolate.
+// Preserve row limits, order and source classification, but project metadata only.
+const AUDIT_METADATA_SELECT = `
+  SELECT store_key AS storeKey, action, actor_name AS actorName,
+    actor_role AS actorRole, reason,
+    ${auditSourceProjection("before_json")} AS beforeJson,
+    ${auditSourceProjection("after_json")} AS afterJson
+  FROM audit_log
+`;
+type AuditMetadataRow = Pick<AuditDatabaseRow,
+  "storeKey" | "action" | "actorName" | "actorRole" | "reason" | "beforeJson" | "afterJson">;
 
 function noStore(response: Response): Response {
   response.headers.set("Cache-Control", "no-store");
@@ -374,9 +388,9 @@ async function integrityIssues(accountId: number, venueId: number, account: Para
 async function overview(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const [activity, recent, issueRows, periodState, connectionCount] = await Promise.all([
-    auditD1Statement("audit.overview.activity", () => getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 10000`)
+    auditD1Statement("audit.overview.activity", () => getD1().prepare(`${AUDIT_METADATA_SELECT} WHERE account_id = ? AND created_at >= ? ORDER BY created_at DESC, id DESC LIMIT 10000`)
       .bind(account.id, since)
-      .all<AuditDatabaseRow>()),
+      .all<AuditMetadataRow>()),
     getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5`)
       .bind(account.id)
       .all<AuditDatabaseRow>(),
@@ -421,9 +435,9 @@ async function overview(account: NonNullable<Awaited<ReturnType<typeof authentic
 }
 
 async function filterOptions(accountId: number, account: Parameters<typeof presentAuditEvent>[1]) {
-  const result = await auditD1Statement("audit.filters.options", () => getD1().prepare(`${AUDIT_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5000`)
+  const result = await auditD1Statement("audit.filters.options", () => getD1().prepare(`${AUDIT_METADATA_SELECT} WHERE account_id = ? ORDER BY created_at DESC, id DESC LIMIT 5000`)
     .bind(accountId)
-    .all<AuditDatabaseRow>());
+    .all<AuditMetadataRow>());
   const modules = new Map<string, string>();
   const sources = new Map<AuditSourceKind, string>();
   const actors = new Set<string>();
