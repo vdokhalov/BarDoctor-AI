@@ -12,6 +12,7 @@ const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cj
 const projectRoot = path.resolve(__dirname, "..");
 const qaPort = Number(process.env.BD_QA_PORT || 4178);
 const configuredBaseUrl = process.env.BD_QA_BASE_URL || "";
+const menuActionsOnly = process.env.BD_QA_MENU_ACTIONS_ONLY === "1";
 const outputDir = process.env.BD_QA_OUTPUT
   || path.join(os.tmpdir(), "bardoctor-menu-consumption-v418-qa");
 const activeVenueId = 801;
@@ -327,6 +328,8 @@ function createMutableState() {
     externalRequests: [],
     unexpectedRequests: [],
     unexpectedMutations: [],
+    failNextAssortmentWrite: false,
+    assortmentWriteDelayMs: 0,
   };
 }
 
@@ -566,6 +569,17 @@ async function configureContext(context, state, baseUrl) {
       }
       if (method === "PUT") {
         const body = request.postDataJSON();
+        if (storeKey === "bd_assortment_v1" && state.assortmentWriteDelayMs > 0) {
+          await delay(state.assortmentWriteDelayMs);
+        }
+        if (storeKey === "bd_assortment_v1" && state.failNextAssortmentWrite) {
+          state.failNextAssortmentWrite = false;
+          return route.fulfill(jsonResponse({
+            ok: false,
+            code: "QA_MENU_SAVE_REJECTED",
+            error: "Не удалось сохранить позицию. Повторите попытку.",
+          }, 409));
+        }
         if (storeKey === "bd_assortment_v1") {
           const foreignRows = validateVenueScopedCatalog(body?.data || {}, venueId);
           const catalogVenueId = Number(body?.data?.venueId);
@@ -643,8 +657,11 @@ async function startQaServer() {
 
   const logPath = path.join(outputDir, `server-${process.pid}.log`);
   const logFd = fs.openSync(logPath, "w");
-  const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
-  const child = spawn(npmCommand, ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(qaPort)], {
+  const npmCommand = process.platform === "win32" ? process.execPath : "npm";
+  const npmArguments = process.platform === "win32"
+    ? [path.join(projectRoot, "node_modules", "vite", "bin", "vite.js"), "--host", "127.0.0.1", "--port", String(qaPort)]
+    : ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(qaPort)];
+  const child = spawn(npmCommand, npmArguments, {
     cwd: projectRoot,
     env: {
       ...process.env,
@@ -655,7 +672,7 @@ async function startQaServer() {
   });
   const baseUrl = `http://127.0.0.1:${qaPort}`;
   let ready = false;
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     if (child.exitCode != null) break;
     try {
       const response = await fetch(`${baseUrl}/api/healthz`, {
@@ -733,6 +750,30 @@ async function openMenuEditor(page) {
   return editor;
 }
 
+async function openMenuEditorFromList(page, baseUrl, itemName, venueId = activeVenueId) {
+  const response = await page.goto(
+    `${baseUrl}/catalog?venue=${venueId}&tab=menu`,
+    { waitUntil: "domcontentloaded", timeout: 60_000 },
+  );
+  assert.equal(response?.status(), 200, "catalog list route must return 200");
+  await waitForCatalog(page);
+  const closedDepartment = page.locator('.bd-catalog-department-toggle[aria-expanded="false"]').first();
+  if (await closedDepartment.count()) await closedDepartment.click();
+  const closedSubsection = page.locator('.bd-catalog-subsection-toggle[aria-expanded="false"]').first();
+  await closedSubsection.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
+  if (await closedSubsection.count()) await closedSubsection.click();
+  const card = page.locator(".bd-catalog-card").filter({ hasText: itemName }).first();
+  if (await card.count()) {
+    await card.getByRole("button", { name: "Изменить позицию", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: "Добавить позицию", exact: true }).first().click();
+  }
+  const editor = page.locator(".bd-menu-position-editor-v400");
+  await editor.waitFor({ state: "visible", timeout: 10_000 });
+  await editor.locator(".bd-menu-tax-loading-v350").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
+  return editor;
+}
+
 async function openRecipeEditor(page) {
   const recipeButton = page.getByRole("button", {
     name: /^(Открыть техкарту|Проверить техкарту|Создать техкарту)$/,
@@ -802,8 +843,50 @@ async function assertNoHorizontalOverflow(page, label) {
 }
 
 async function saveMenuEditor(editor) {
-  await editor.getByRole("button", { name: "Сохранить позицию" }).click();
+  await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
   await editor.waitFor({ state: "detached", timeout: 15_000 });
+}
+
+async function assertMenuActionLayout(page, profile, label) {
+  const audit = await page.evaluate(() => {
+    const editor = document.querySelector(".bd-menu-position-editor-v400");
+    const scroll = editor?.querySelector(".bd-menu-position-scroll-v435");
+    const footer = editor?.querySelector(".bd-menu-position-actions-v435");
+    const status = [...(scroll?.querySelectorAll(".bd-catalog-field") || [])].find((field) => (
+      field.textContent?.includes("Статус")
+    ));
+    if (!editor || !scroll || !footer || !status) return null;
+    scroll.scrollTop = scroll.scrollHeight;
+    const editorRect = editor.getBoundingClientRect();
+    const scrollRect = scroll.getBoundingClientRect();
+    const footerRect = footer.getBoundingClientRect();
+    const statusRect = status.getBoundingClientRect();
+    return {
+      viewportHeight: window.visualViewport?.height || window.innerHeight,
+      editor: { top: editorRect.top, bottom: editorRect.bottom },
+      scroll: {
+        top: scrollRect.top,
+        bottom: scrollRect.bottom,
+        clientHeight: scroll.clientHeight,
+        scrollHeight: scroll.scrollHeight,
+        scrollTop: scroll.scrollTop,
+      },
+      footer: { top: footerRect.top, bottom: footerRect.bottom, height: footerRect.height },
+      status: { top: statusRect.top, bottom: statusRect.bottom },
+      cancelVisible: footer.querySelector(".bd-catalog-secondary")?.getClientRects().length > 0,
+      saveVisible: footer.querySelector(".bd-catalog-primary")?.getClientRects().length > 0,
+      footerPosition: getComputedStyle(footer.querySelector(".bd-catalog-sheet-actions")).position,
+    };
+  });
+  assert.ok(audit, `${label}: menu action layout is missing`);
+  assert.ok(audit.cancelVisible && audit.saveVisible, `${label}: both actions must be visible ${JSON.stringify(audit)}`);
+  assert.equal(audit.footerPosition, "static", `${label}: footer buttons must participate in modal layout`);
+  assert.ok(audit.scroll.scrollHeight > audit.scroll.clientHeight, `${label}: long form must have an independent scroll axis`);
+  assert.ok(audit.scroll.bottom <= audit.footer.top + 1, `${label}: footer overlaps scroll viewport ${JSON.stringify(audit)}`);
+  assert.ok(audit.status.bottom <= audit.footer.top + 1, `${label}: last field cannot scroll above footer ${JSON.stringify(audit)}`);
+  assert.ok(audit.footer.bottom <= audit.viewportHeight + 1, `${label}: footer is below the visual viewport ${JSON.stringify(audit)}`);
+  assert.ok(audit.footer.top >= audit.editor.top, `${label}: footer escaped its modal ${JSON.stringify(audit)}`);
+  return { profile: profile.name, label, ...audit };
 }
 
 async function closeMenuEditor(editor) {
@@ -956,6 +1039,77 @@ async function runProfile(browser, baseUrl, profile) {
   const authoritativeReadbacks = [];
 
   try {
+    if (menuActionsOnly) {
+      const directMenuName = catalogFor(state).menuItems.find((item) => item.id === directMenuId).name;
+      let editor = await openMenuEditorFromList(page, baseUrl, directMenuName);
+      audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: menu actions`));
+      audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: long editor`));
+
+      const nameInput = editor.getByLabel("Название");
+      const originalName = await nameInput.inputValue();
+      await nameInput.fill(`${originalName} QA`);
+      const keepEditing = page.waitForEvent("dialog").then(async (dialog) => {
+        assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+        await dialog.dismiss();
+      });
+      await Promise.all([keepEditing, editor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+      assert.equal(await editor.isVisible(), true, `${profile.name}: rejected cancel must keep the editor open`);
+
+      if (profile.mobile) {
+        await nameInput.focus();
+        await page.setViewportSize({ width: profile.viewport.width, height: 430 });
+        await page.waitForTimeout(100);
+        audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: keyboard viewport`));
+        await page.setViewportSize(profile.viewport);
+        await page.waitForTimeout(100);
+      }
+
+      const discardChanges = page.waitForEvent("dialog").then(async (dialog) => {
+        assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+        await dialog.accept();
+      });
+      await Promise.all([discardChanges, editor.getByRole("button", { name: "Закрыть", exact: true }).click()]);
+      await editor.waitFor({ state: "detached", timeout: 10_000 });
+      editor = await openMenuEditorFromList(page, baseUrl, directMenuName);
+      assert.equal(await editor.getByLabel("Название").inputValue(), originalName, `${profile.name}: close must discard edits`);
+
+      const savedName = `${originalName || "QA Menu Action"} saved`;
+      await editor.getByLabel("Название").fill(savedName);
+      if (await editor.getByRole("button", { name: /^Без списания/ }).count()) {
+        await editor.getByRole("button", { name: /^Без списания/ }).click();
+      }
+      state.failNextAssortmentWrite = true;
+      state.assortmentWriteDelayMs = 250;
+      const saveButton = editor.getByRole("button", { name: "Сохранить", exact: true });
+      const rejectedSave = saveButton.click();
+      const savingButton = editor.getByRole("button", { name: "Сохраняем…", exact: true });
+      await savingButton.waitFor({ state: "visible", timeout: 5_000 });
+      await page.waitForFunction(() => [...document.querySelectorAll(".bd-menu-position-actions-v435 button")].some((button) => (
+        button.textContent === "Сохраняем…" && button.disabled
+      )));
+      await rejectedSave;
+      await editor.getByRole("alert").filter({ hasText: "Не удалось сохранить позицию" }).waitFor({ state: "visible" });
+      assert.equal(await editor.isVisible(), true, `${profile.name}: a failed save must keep the editor open`);
+
+      for (let issueIndex = runtimeIssues.length - 1; issueIndex >= 0; issueIndex -= 1) {
+        if (
+          runtimeIssues[issueIndex].includes("response 409:")
+          || runtimeIssues[issueIndex].includes("server responded with a status of 409")
+        ) runtimeIssues.splice(issueIndex, 1);
+      }
+      await saveMenuEditor(editor);
+      assert.equal(
+        catalogFor(state).menuItems.find((item) => item.name === savedName)?.name,
+        savedName,
+        `${profile.name}: successful retry must persist the edit`,
+      );
+      assert.equal(state.writes.filter((write) => write.storeKey === "bd_assortment_v1").length, 1);
+      assert.deepEqual(state.unexpectedRequests, []);
+      assert.deepEqual(state.unexpectedMutations, []);
+      assert.deepEqual(runtimeIssues, [], `${profile.name}: runtime issues ${runtimeIssues.join(" | ")}`);
+      return { profile: profile.name, viewport: profile.viewport, audits, writes: state.writes.length };
+    }
+
     const legacyBefore = clone(catalogFor(state));
     const writesBeforeLegacyOpen = state.writes.length;
     // A prior same-catalog detail URL must not be mistaken for the close target.
@@ -997,6 +1151,37 @@ async function runProfile(browser, baseUrl, profile) {
     assert.equal(await editor.locator(".bd-menu-nomenclature-picker-v350").count(), 1);
     assert.equal(await editor.locator(".bd-menu-sale-size-v298").count(), 0);
     audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: direct editor`));
+    audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: long editor`));
+
+    const originalName = await editor.getByLabel("Название").inputValue();
+    await editor.getByLabel("Название").fill(`${originalName} QA`);
+    const keepEditing = page.waitForEvent("dialog").then(async (dialog) => {
+      assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+      await dialog.dismiss();
+    });
+    await Promise.all([keepEditing, editor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+    assert.equal(await editor.isVisible(), true, `${profile.name}: rejected cancel must keep the editor open`);
+    await editor.getByLabel("Название").fill(originalName);
+
+    if (profile.mobile) {
+      const fullViewport = profile.viewport;
+      await editor.getByLabel("Название").focus();
+      await page.setViewportSize({ width: fullViewport.width, height: 430 });
+      await page.waitForTimeout(100);
+      audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: keyboard viewport`));
+      await page.setViewportSize(fullViewport);
+      await page.waitForTimeout(100);
+    }
+
+    await editor.getByLabel("Название").fill(`${originalName} discarded`);
+    const discardChanges = page.waitForEvent("dialog").then(async (dialog) => {
+      assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+      await dialog.accept();
+    });
+    await Promise.all([discardChanges, editor.getByRole("button", { name: "Закрыть", exact: true }).click()]);
+    await editor.waitFor({ state: "detached", timeout: 10_000 });
+    editor = await openMenuEditor(page);
+    assert.equal(await editor.getByLabel("Название").inputValue(), originalName, `${profile.name}: close must discard unsaved changes`);
 
     await chooseMode(page, editor, "Порция товара");
     assert.equal(await editor.locator(".bd-menu-nomenclature-picker-v350").count(), 1);
@@ -1451,6 +1636,7 @@ async function runProfile(browser, baseUrl, profile) {
     for (const profile of [
       { name: "desktop-1280x720", viewport: { width: 1280, height: 720 }, mobile: false },
       { name: "mobile-390x844", viewport: { width: 390, height: 844 }, mobile: true },
+      { name: "android-412x915", viewport: { width: 412, height: 915 }, mobile: true },
     ]) {
       results.push(await runProfile(browser, server.baseUrl, profile));
     }
