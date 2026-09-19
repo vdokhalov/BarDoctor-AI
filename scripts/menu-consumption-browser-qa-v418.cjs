@@ -1180,6 +1180,7 @@ async function runProfile(browser, baseUrl, profile) {
     });
     await Promise.all([discardChanges, editor.getByRole("button", { name: "Закрыть", exact: true }).click()]);
     await editor.waitFor({ state: "detached", timeout: 10_000 });
+    await openItem(page, baseUrl, "menu", directMenuId);
     editor = await openMenuEditor(page);
     assert.equal(await editor.getByLabel("Название").inputValue(), originalName, `${profile.name}: close must discard unsaved changes`);
 
@@ -1346,7 +1347,7 @@ async function runProfile(browser, baseUrl, profile) {
     assert.equal(await recipeChoice.count(), 1, "multiple active recipes must render a controlled chooser");
     assert.equal(await recipeChoice.inputValue(), "");
     assert.equal(
-      await editor.getByRole("button", { name: "Сохранить позицию" }).isDisabled(),
+      await editor.getByRole("button", { name: "Сохранить", exact: true }).isDisabled(),
       true,
       "an ambiguous Recipe mode must not save until one Recipe is selected",
     );
