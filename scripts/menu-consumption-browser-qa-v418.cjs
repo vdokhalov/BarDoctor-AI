@@ -889,6 +889,47 @@ async function assertMenuActionLayout(page, profile, label) {
   return { profile: profile.name, label, ...audit };
 }
 
+async function assertTechCardActionLayout(page, profile, label) {
+  const audit = await page.evaluate(() => {
+    const editor = document.querySelector(".bd-tech-card-editor-v354");
+    const scroll = editor?.querySelector(".bd-explicit-form-scroll-v438");
+    const footer = editor?.querySelector(".bd-tech-card-actions-v438");
+    const lastField = scroll?.querySelector(".bd-tech-card-total-v418");
+    if (!editor || !scroll || !footer || !lastField) return null;
+    scroll.scrollTop = scroll.scrollHeight;
+    const editorRect = editor.getBoundingClientRect();
+    const scrollRect = scroll.getBoundingClientRect();
+    const footerRect = footer.getBoundingClientRect();
+    const lastRect = lastField.getBoundingClientRect();
+    return {
+      viewportHeight: window.visualViewport?.height || window.innerHeight,
+      editor: { top: editorRect.top, bottom: editorRect.bottom },
+      scroll: {
+        top: scrollRect.top,
+        bottom: scrollRect.bottom,
+        clientHeight: scroll.clientHeight,
+        scrollHeight: scroll.scrollHeight,
+        scrollTop: scroll.scrollTop,
+      },
+      footer: { top: footerRect.top, bottom: footerRect.bottom, height: footerRect.height },
+      lastField: { top: lastRect.top, bottom: lastRect.bottom },
+      cancelVisible: footer.querySelector(".bd-explicit-cancel-v438")?.getClientRects().length > 0,
+      saveVisible: footer.querySelector(".bd-explicit-save-v438")?.getClientRects().length > 0,
+      draftVisible: footer.querySelector(".bd-explicit-secondary-v438")?.getClientRects().length > 0,
+      actionPosition: getComputedStyle(footer.querySelector(".bd-catalog-sheet-actions")).position,
+    };
+  });
+  assert.ok(audit, `${label}: tech-card action layout is missing`);
+  assert.ok(audit.cancelVisible && audit.saveVisible && audit.draftVisible, `${label}: all explicit actions must be visible ${JSON.stringify(audit)}`);
+  assert.equal(audit.actionPosition, "static", `${label}: footer buttons must participate in modal layout`);
+  assert.ok(audit.scroll.scrollHeight > audit.scroll.clientHeight, `${label}: long form must have an independent scroll axis`);
+  assert.ok(audit.scroll.bottom <= audit.footer.top + 1, `${label}: footer overlaps scroll viewport ${JSON.stringify(audit)}`);
+  assert.ok(audit.lastField.bottom <= audit.footer.top + 1, `${label}: last field cannot scroll under footer ${JSON.stringify(audit)}`);
+  assert.ok(audit.footer.bottom <= audit.viewportHeight + 1, `${label}: footer is below the visual viewport ${JSON.stringify(audit)}`);
+  assert.ok(audit.footer.top >= audit.editor.top, `${label}: footer escaped its modal ${JSON.stringify(audit)}`);
+  return { profile: profile.name, label, ...audit };
+}
+
 async function closeMenuEditor(editor) {
   await editor.locator(".bd-catalog-close").click();
   await editor.waitFor({ state: "detached", timeout: 10_000 });
@@ -1104,6 +1145,78 @@ async function runProfile(browser, baseUrl, profile) {
         `${profile.name}: successful retry must persist the edit`,
       );
       assert.equal(state.writes.filter((write) => write.storeKey === "bd_assortment_v1").length, 1);
+
+      await openItem(page, baseUrl, "recipes", legacyMenu.id);
+      let recipeEditor = await openRecipeEditor(page);
+      audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: tech-card actions`));
+      audits.push(await assertTechCardActionLayout(page, profile, `${profile.name}: long tech-card editor`));
+
+      const quantityInput = recipeEditor.getByLabel("Количество на порцию").first();
+      const originalQuantity = await quantityInput.inputValue();
+      await quantityInput.fill(String(Number(originalQuantity) + 1));
+      const keepRecipeEditing = page.waitForEvent("dialog").then(async (dialog) => {
+        assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+        await dialog.dismiss();
+      });
+      await Promise.all([keepRecipeEditing, recipeEditor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+      assert.equal(await recipeEditor.isVisible(), true, `${profile.name}: rejected tech-card cancel must keep the editor open`);
+
+      if (profile.mobile) {
+        await quantityInput.focus();
+        await page.setViewportSize({ width: profile.viewport.width, height: 430 });
+        await page.waitForTimeout(100);
+        audits.push(await assertTechCardActionLayout(page, profile, `${profile.name}: tech-card keyboard viewport`));
+        await page.setViewportSize(profile.viewport);
+        await page.waitForTimeout(100);
+      }
+
+      const discardRecipe = page.waitForEvent("dialog").then(async (dialog) => {
+        assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+        await dialog.accept();
+      });
+      await Promise.all([discardRecipe, recipeEditor.getByRole("button", { name: "Закрыть техкарту" }).click()]);
+      await recipeEditor.waitFor({ state: "detached", timeout: 10_000 });
+
+      await openItem(page, baseUrl, "recipes", legacyMenu.id);
+      recipeEditor = await openRecipeEditor(page);
+      assert.equal(
+        await recipeEditor.getByLabel("Количество на порцию").first().inputValue(),
+        originalQuantity,
+        `${profile.name}: close must discard unsaved tech-card edits`,
+      );
+
+      const savedQuantity = String(Number(originalQuantity) + 2);
+      await recipeEditor.getByLabel("Количество на порцию").first().fill(savedQuantity);
+      state.failNextAssortmentWrite = true;
+      state.assortmentWriteDelayMs = 250;
+      const recipeSave = recipeEditor.getByRole("button", { name: "Сохранить", exact: true });
+      const rejectedRecipeSave = recipeSave.click();
+      await recipeEditor.getByRole("button", { name: "Сохраняем…", exact: true }).last().waitFor({ state: "visible", timeout: 5_000 });
+      await page.evaluate(() => document.querySelector(".bd-tech-card-actions-v438 .bd-explicit-save-v438")?.click());
+      await rejectedRecipeSave;
+      await recipeEditor.getByRole("alert").filter({ hasText: /Не удалось|ошиб/i }).waitFor({ state: "visible" });
+      assert.equal(await recipeEditor.isVisible(), true, `${profile.name}: failed tech-card save must keep the editor open`);
+      const writesAfterRejectedRecipe = state.writes.filter((write) => write.storeKey === "bd_assortment_v1").length;
+      assert.equal(writesAfterRejectedRecipe, 1, `${profile.name}: rejected and double-clicked save must not persist`);
+
+      for (let issueIndex = runtimeIssues.length - 1; issueIndex >= 0; issueIndex -= 1) {
+        if (
+          runtimeIssues[issueIndex].includes("response 409:")
+          || runtimeIssues[issueIndex].includes("server responded with a status of 409")
+        ) runtimeIssues.splice(issueIndex, 1);
+      }
+      await recipeEditor.getByRole("button", { name: "Сохранить", exact: true }).click();
+      await recipeEditor.waitFor({ state: "detached", timeout: 15_000 });
+      assert.equal(state.writes.filter((write) => write.storeKey === "bd_assortment_v1").length, 2);
+
+      await openItem(page, baseUrl, "recipes", legacyMenu.id);
+      recipeEditor = await openRecipeEditor(page);
+      assert.equal(
+        await recipeEditor.getByLabel("Количество на порцию").first().inputValue(),
+        savedQuantity,
+        `${profile.name}: saved tech-card edit must survive reopen`,
+      );
+      await closeRecipeEditor(recipeEditor);
       assert.deepEqual(state.unexpectedRequests, []);
       assert.deepEqual(state.unexpectedMutations, []);
       assert.deepEqual(runtimeIssues, [], `${profile.name}: runtime issues ${runtimeIssues.join(" | ")}`);

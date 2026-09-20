@@ -32,15 +32,16 @@ test("menu actions patch is idempotent and the production bundle is valid", () =
 
 test("footer is a persistent sibling of the independently scrolling form", () => {
   assert.match(fragment, /className:"bd-catalog-form bd-menu-position-scroll-v435"/);
-  assert.match(fragment, /i\.jsxs\("footer",\{className:"bd-menu-position-actions-v435"/);
+  assert.match(fragment, /i\.jsx\(bdExplicitFormActionsV438,\{/);
   assert.ok(
-    fragment.indexOf(')]}),i.jsxs("footer",{className:"bd-menu-position-actions-v435"') > 0,
+    fragment.indexOf(')]}),i.jsx(bdExplicitFormActionsV438,{') > 0,
     "the form must close before the footer begins",
   );
-  assert.match(fragment, /children:"Отмена"/);
-  assert.match(fragment, /bdMenuSavingV418\?"Сохраняем…":"Сохранить"/);
-  assert.match(fragment, /bdMenuSavingV418\|\|!h\.name\.trim\(\)/);
-  assert.match(fragment, /bd-menu-position-error-v435",role:"alert"/);
+  assert.match(fragment, /onCancel:bdMenuCloseV435/);
+  assert.match(fragment, /saving:bdMenuSavingV418/);
+  assert.match(fragment, /saveDisabled:!h\.name\.trim\(\)/);
+  assert.match(fragment, /error:y,saveLabel:"Сохранить"/);
+  assert.match(fragment, /contextClass:"bd-menu-position-actions-v435"/);
 
   const override = css.slice(css.indexOf("/* bd-menu-edit-actions-v435 */"));
   assert.match(override, />\.bd-menu-position-scroll-v435\{[^}]*overflow-y:auto/);
@@ -99,15 +100,16 @@ test("cancel, close and backdrop use the existing unsaved-change confirmation wo
 
   assert.match(fragment, /onClick:P=>P\.target===P\.currentTarget&&bdMenuCloseV435\(\)/);
   assert.match(fragment, /className:"bd-catalog-close",onClick:bdMenuCloseV435/);
-  assert.match(fragment, /className:"bd-catalog-secondary",onClick:bdMenuCloseV435/);
+  assert.match(fragment, /onCancel:bdMenuCloseV435/);
 });
 
 test("save keeps one in-flight request, closes only after success and retains the error", () => {
-  assert.match(fragment, /try\{bdSetMenuSavingV418\(!0\),j\(""\);const ie=await s\(/);
+  assert.match(fragment, /try\{bdMenuSavingRefV438\.current=!0,bdSetMenuSavingV418\(!0\),j\(""\);const ie=await s\(/);
   assert.match(fragment, /ie===!1\?j\("Не удалось сохранить позицию\. Повторите попытку\."\):a\(\)/);
   assert.match(fragment, /catch\(ie\)\{j\(ie instanceof Error\?ie\.message:"Не удалось сохранить позицию\."\)\}/);
-  assert.match(fragment, /finally\{bdSetMenuSavingV418\(!1\)\}/);
-  assert.match(fragment, /disabled:bdMenuSavingV418\|\|/);
+  assert.match(fragment, /if\(bdMenuSavingRefV438\.current\)return!1/);
+  assert.match(fragment, /finally\{bdMenuSavingRefV438\.current=!1,bdSetMenuSavingV418\(!1\)\}/);
+  assert.match(fragment, /saving:bdMenuSavingV418/);
 });
 
 test("all source shells carry the v435 cache identity", () => {

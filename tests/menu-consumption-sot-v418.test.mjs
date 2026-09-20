@@ -130,6 +130,7 @@ test("menu save locks venue currency across modes and ignores stale item currenc
         bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs",
         bdMenuFixedCompatibleV418: true, bdMenuRecipeChoiceRequiredV418: false,
         bdMenuQuantityV418: 0.05, bdMenuVenueId: venueId, bdMenuVenueCurrency: currency,
+        bdMenuSavingRefV438: { current: false },
         bdAccountingCurrencyV243: (value) => value,
         bdCatNumber: (value) => Number(value) || 0,
         bdSetMenuSavingV418: () => {}, j: (message) => assert.equal(message, ""),

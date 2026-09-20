@@ -1858,3 +1858,25 @@
 @media(min-width:720px){
   .bd-menu-position-editor-v400{max-height:min(760px,calc(100dvh - 48px))}
 }
+
+
+/* bd-edit-form-actions-v438: one reachable action contract for explicit-save modal editors. */
+.bd-explicit-form-actions-v438{position:relative;z-index:12;flex:0 0 auto;padding:10px max(18px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));border-top:1px solid rgba(222,226,236,.9);background:rgba(248,249,252,.98);box-shadow:0 -9px 24px rgba(24,29,53,.08)}
+.bd-explicit-form-actions-v438 .bd-catalog-sheet-actions{position:static!important;display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);width:100%;max-width:none;margin:0!important;padding:0!important;background:transparent!important;box-shadow:none!important}
+.bd-explicit-form-actions-v438 .bd-explicit-secondary-v438{grid-column:1/-1;grid-row:1}
+.bd-explicit-form-actions-v438 .bd-explicit-cancel-v438{grid-column:1;grid-row:2}
+.bd-explicit-form-actions-v438 .bd-explicit-save-v438{grid-column:2;grid-row:2}
+.bd-explicit-form-error-v438{margin:0 0 8px}
+.bd-menu-position-editor-v400>.bd-explicit-form-actions-v438{margin:0 -18px calc(-28px - env(safe-area-inset-bottom))}
+.bd-tech-card-editor-v354>.bd-explicit-form-scroll-v438{min-height:0;flex:1 1 auto;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-bottom:18px!important}
+.bd-tech-card-editor-v354>.bd-tech-card-actions-v438{margin:0}
+@media(max-width:719px){
+  .bd-menu-position-editor-v400>.bd-explicit-form-actions-v438{margin:0 -18px}
+  .bd-tech-card-editor-v354{position:fixed;right:0;bottom:var(--bd-explicit-visual-bottom-v438,0);left:0;height:var(--bd-explicit-visual-height-v438,100dvh)!important;max-height:var(--bd-explicit-visual-height-v438,100dvh)!important}
+  .bd-tech-card-editor-v354>.bd-explicit-form-scroll-v438{padding-bottom:18px!important;scroll-padding-bottom:18px}
+  .bd-tech-card-editor-v354>.bd-explicit-form-actions-v438{padding-inline:max(14px,env(safe-area-inset-left),env(safe-area-inset-right))}
+}
+@media(max-width:420px){
+  .bd-explicit-form-actions-v438 .bd-catalog-sheet-actions{gap:8px}
+  .bd-explicit-form-actions-v438 button{min-width:0;padding-inline:10px}
+}
