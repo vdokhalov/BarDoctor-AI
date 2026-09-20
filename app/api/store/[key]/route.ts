@@ -32,6 +32,7 @@ import {
 } from "../../../../lib/bardoctor/purchases";
 import {
   reconcileTechCardsForMutation,
+  changedConfirmedReferenceConflicts,
   validateTechCardVenueIsolation,
 } from "../../../../lib/bardoctor/tech-card-reconciliation";
 import {
@@ -322,6 +323,12 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
         },
         { status: 409 },
       );
+    }
+    const referenceConflicts = changedConfirmedReferenceConflicts(before, after, account.venueId);
+    if (referenceConflicts.length) {
+      return Response.json({ ok: false, code: "INGREDIENT_REFERENCE_CONFLICT",
+        error: "ID и складской ключ ингредиента указывают на разные товары. Выберите номенклатуру явно перед подтверждением техкарты.",
+        issues: referenceConflicts.slice(0, 50) }, { status: 422 });
     }
     const consumptionIssues = changedConsumptionModeIssues(before, after, account.venueId);
     if (consumptionIssues.length) {

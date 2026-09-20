@@ -1,3 +1,4 @@
+import { ingredientReferencesConflict } from "./ingredient-reference";
 import {
   inventoryPackageAmount,
   inventoryProductKey,
@@ -704,6 +705,7 @@ export function rememberConfirmedIngredientAliases(input: {
   for (const recipe of array(assortment.recipes).map(record)) {
     for (const ingredient of array(recipe.ingredients).map(record)) {
       if (ingredient.linkConfirmedByUser !== true && text(ingredient.linkSource) !== "manual") continue;
+      if (ingredientReferencesConflict(ingredient, assortment)) continue;
       const key = productKey(ingredient);
       const normalizedIngredientName = aliasKey(ingredient.name);
       if (!key || !normalizedIngredientName) continue;

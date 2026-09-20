@@ -1,3 +1,4 @@
+import { canonicalIngredientReference as canonicalProductKey, ingredientReferencesConflict } from "./ingredient-reference";
 import {
   collectIngredientMatchCandidates,
   rankIngredientCandidates,
@@ -248,30 +249,6 @@ function productKey(value: JsonRecord): string {
   );
 }
 
-function canonicalProductKey(assortment: JsonRecord, initial: string): string {
-  const aliases = new Map([
-    ...array(assortment.canonicalProductAliases),
-    ...array(assortment.inventoryProductAliases),
-  ].map(record)
-    .map((alias) => [text(alias.from, "", 320), text(alias.to, "", 320)] as const)
-    .filter(([from, to]) => Boolean(from && to && from !== to)));
-  for (const product of [...array(assortment.nomenclature), ...array(assortment.stockBalances)].map(record)) {
-    const canonical = text(product.productKey ?? product.key ?? product.id, "", 320);
-    if (!canonical) continue;
-    for (const identity of [product.id, product.nomenclatureItemId, product.key, product.productKey]) {
-      const from = text(identity, "", 320);
-      if (from && from !== canonical) aliases.set(from, canonical);
-    }
-  }
-  let current = initial;
-  const seen = new Set<string>();
-  while (aliases.has(current) && !seen.has(current)) {
-    seen.add(current);
-    current = aliases.get(current)!;
-  }
-  return current;
-}
-
 function ingredientExternalId(value: JsonRecord): string {
   return text(
     value.nomenclatureSourceId
@@ -355,6 +332,16 @@ function reconcileIngredient(
   costRecovered: boolean;
 } {
   const before = JSON.stringify(ingredient);
+
+  if (ingredientReferencesConflict(ingredient, assortment)) {
+    // Preserve all submitted references: selecting a key here would erase the conflict.
+    const after = { ...ingredient, linkStatus: "ambiguous", resolutionStatus: "reference_conflict",
+      matchReason: "ID и складской ключ указывают на разные товары. Выберите номенклатуру явно.",
+      normalizedQuantity: undefined, normalizedUnit: undefined };
+    return { ingredient: after, state: "ambiguous", changed: JSON.stringify(after) !== before,
+      tier: "medium", manualProtected: true, unitMismatch: false, duplicateCandidateCase: false,
+      resolutionStatus: "reference_conflict", highIdentityPreviouslyUnmatched: false, costRecovered: false };
+  }
 
   const requestedKey = canonicalProductKey(assortment, productKey(ingredient));
   if (requestedKey) {
@@ -870,4 +857,17 @@ export function canonicalTechCardForOwner(
       const priority = recipePriority(right) - recipePriority(left);
       return priority || stamp(right).localeCompare(stamp(left));
     })[0];
+}
+
+/** Drafts retain conflicting identities; confirmation requires explicit resolution. */
+export function changedConfirmedReferenceConflicts(beforeValue: unknown, afterValue: unknown, venueId: number) {
+  const before = record(beforeValue), after = record(afterValue);
+  const owners = changedOwnerIds(before, after, venueId);
+  const previous = new Map(array(before.recipes).map(record).map(recipe => [text(recipe.id), recipe]));
+  return array(after.recipes).map(record).filter(recipe => sameVenue(recipe, venueId)
+    && canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
+    && (owners.has(ownerId(recipe)) || JSON.stringify(previous.get(text(recipe.id))) !== JSON.stringify(recipe)))
+    .flatMap(recipe => array(recipe.ingredients).map(record)
+      .filter(ingredient => ingredientReferencesConflict(ingredient, after))
+      .map(ingredient => ({ recipeId: text(recipe.id), ingredientId: text(ingredient.id), code: "INGREDIENT_REFERENCE_CONFLICT" })));
 }
