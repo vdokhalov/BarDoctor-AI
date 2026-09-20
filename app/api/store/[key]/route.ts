@@ -31,7 +31,7 @@ import {
   PURCHASE_STORE_KEY,
 } from "../../../../lib/bardoctor/purchases";
 import {
-  reconcileTechCards,
+  reconcileTechCardsForMutation,
   validateTechCardVenueIsolation,
 } from "../../../../lib/bardoctor/tech-card-reconciliation";
 import {
@@ -214,7 +214,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     }
     after = currencyNormalization.data;
   }
-  let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
+  let techCardReconciliation = null as ReturnType<typeof reconcileTechCardsForMutation>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
     after = normalizeExplicitConsumptionUpdates(before, after, account.venueId).data;
     const repeatedMenuItemIds = duplicateMenuItemIds(after);
@@ -348,7 +348,8 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     ) as unknown;
     const purchaseDocuments = Array.isArray(parsedPurchaseDocuments) ? parsedPurchaseDocuments : [];
     const now = new Date().toISOString();
-    const techCards = reconcileTechCards({
+    const techCards = reconcileTechCardsForMutation({
+      before,
       assortment: after,
       purchaseDocuments,
       venueId: account.venueId,

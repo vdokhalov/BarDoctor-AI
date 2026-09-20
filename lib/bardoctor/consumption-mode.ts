@@ -670,7 +670,7 @@ export function resolveConsumptionMode(
     : { ok: false, status: result.status, code: result.code, error: result.error };
 }
 
-function changedOwnerIds(before: JsonRecord, after: JsonRecord, venueId?: number): Set<string> {
+export function changedOwnerIds(before: JsonRecord, after: JsonRecord, venueId?: number): Set<string> {
   const owners = new Set<string>();
   const menuSignature = (item: JsonRecord) => JSON.stringify({
     id: item.id,

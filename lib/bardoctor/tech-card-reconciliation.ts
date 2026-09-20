@@ -6,7 +6,7 @@ import {
   type IngredientMatchCandidate,
   type IngredientUnitResolution,
 } from "./tech-card-ingredient-matching";
-import { legacyConsumptionConflicts, resolveMenuConsumption } from "./consumption-mode";
+import { changedOwnerIds, legacyConsumptionConflicts, resolveMenuConsumption } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -761,6 +761,51 @@ export function reconcileTechCards(input: {
       },
     },
     report,
+  };
+}
+
+/** Reconcile only owners affected by the submitted mutation. Keep global
+ * diagnostics read-only and preserve unrelated legacy recipes byte-for-byte.
+ * Dependency changes are included by changedOwnerIds; the caller still runs
+ * the full before/after consumption validation after reconciliation.
+ */
+export function reconcileTechCardsForMutation(input: {
+  before: unknown;
+  assortment: unknown;
+  purchaseDocuments?: unknown[];
+  venueId?: number;
+  now?: Date;
+}): TechCardReconciliationResult {
+  const source = record(input.assortment);
+  const before = record(input.before);
+  const owners = changedOwnerIds(before, source, input.venueId);
+  const previousMenus = new Map(array(before.menuItems).map(record).filter(item => sameVenue(item, input.venueId)).map(item => [text(item.id), item]));
+  for (const item of array(source.menuItems).map(record)) {
+    if (sameVenue(item, input.venueId)
+      && JSON.stringify(previousMenus.get(text(item.id))) !== JSON.stringify(item)) owners.add(text(item.id));
+  }
+  const recipes = array(source.recipes).map(record);
+  const previousRecipes = new Map(array(before.recipes).map(record).filter(recipe => sameVenue(recipe, input.venueId)).map(recipe => [text(recipe.id), recipe]));
+  const changedRecipes = new Set<JsonRecord>();
+  for (const recipe of recipes) {
+    if (sameVenue(recipe, input.venueId)
+      && JSON.stringify(previousRecipes.get(text(recipe.id))) !== JSON.stringify(recipe)) {
+      changedRecipes.add(recipe);
+      if (ownerId(recipe)) owners.add(ownerId(recipe));
+    }
+  }
+  const selected = recipes.filter(recipe => sameVenue(recipe, input.venueId)
+    && (changedRecipes.has(recipe) || owners.has(ownerId(recipe))));
+  const result = reconcileTechCards({ ...input, assortment: { ...source, recipes: selected } });
+  const reconciled = array(result.assortment.recipes).map(record);
+  const replacements = new Map(selected.map((recipe, index) => [recipe, reconciled[index]]));
+  return {
+    report: result.report,
+    assortment: {
+      ...source,
+      recipes: recipes.map(recipe => replacements.get(recipe) ?? recipe),
+      techCardIngredientAliases: result.assortment.techCardIngredientAliases,
+    },
   };
 }
 
