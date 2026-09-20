@@ -1,0 +1,23 @@
+function bdEditableRecipesV440(item, recipes, venueId) {
+  if (!item?.id || !venueId || item.venueId && Number(item.venueId) !== Number(venueId)) return [];
+  return (recipes || []).filter(recipe => String(recipe.menuItemId || recipe.ownerId || '') === String(item.id) && (!recipe.venueId || Number(recipe.venueId) === Number(venueId)) && recipe.lifecycleStatus !== 'superseded' && recipe.lifecycleStatus !== 'inactive' && recipe.current !== false);
+}
+function bdExistingRecipeEditorV440({item, recipes, canManage, venueId, ...props}) {
+  const choices=bdEditableRecipesV440(item,recipes,venueId);
+  const [selected,setSelected]=S.useState('');
+  if (!canManage || item.venueId && Number(item.venueId)!==Number(venueId)) return null;
+  const recipe=choices.length===1?choices[0]:choices.find(row=>String(row.id)===selected);
+  if(choices.length>1&&!recipe) return i.jsx(bdAssortmentSheetV170,{label:'Техкарты позиции',title:'Выберите техкарту',copy:'Открытие не меняет активный режим списания.',onClose:props.onClose,children:i.jsx('div',{children:choices.map(row=>i.jsx('button',{type:'button',onClick:()=>setSelected(String(row.id)),children:(row.name||'Техкарта')+' · версия '+(row.version||1)+' · '+(row.ingredients||[]).length+' ингредиентов'},row.id))})});
+  return i.jsx(bdCatRecipeEditor,{...props,item,recipe,venueId},String(venueId)+':'+item.id+':'+(recipe?.id||'new'));
+}
+function bdIngredientReferencePatchV440(product, key) {
+  return key ? {purchaseProductKey:key,productKey:key,nomenclatureItemId:product.id||product.nomenclatureItemId||key} : {purchaseProductKey:undefined,productKey:undefined,nomenclatureItemId:undefined,matchedBaseUnit:undefined};
+}
+function bdIngredientReferenceConflictV440(line,products) {
+  const id=line.nomenclatureItemId;
+  const keys=[line.productKey,line.purchaseProductKey].filter(Boolean);
+  if(new Set(keys).size>1)return true;
+  const byId=id&&(products||[]).find(p=>String(p.id||p.nomenclatureItemId)===String(id));
+  const byKey=keys[0]&&(products||[]).find(p=>String(p.key||p.productKey)===String(keys[0]));
+  return Boolean(byId&&byKey&&byId!==byKey);
+}

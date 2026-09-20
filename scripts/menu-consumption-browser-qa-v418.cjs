@@ -347,9 +347,10 @@ function scopedStoreCacheKey(storeKey, venueId) {
   return `${storeKey}_cache__${session.email}__venue_${venueId}`;
 }
 
-function taxonomyPayload() {
+function taxonomyPayload(venueId = activeVenueId) {
   return {
     ok: true,
+    venueId,
     taxonomy: nomenclatureStructure(),
     legacyMenuPaths: [
       {
@@ -603,7 +604,7 @@ async function configureContext(context, state, baseUrl) {
       }
     }
     if (url.pathname === "/api/nomenclature/taxonomy" && method === "GET") {
-      return route.fulfill(jsonResponse(taxonomyPayload()));
+      return route.fulfill(jsonResponse(taxonomyPayload(venueId)));
     }
     if (url.pathname === "/api/assortment/overview" && method === "GET") {
       if (headerVenueId !== Number(venueId)) {
@@ -752,7 +753,7 @@ async function openMenuEditor(page) {
 
 async function openRecipeEditor(page) {
   const recipeButton = page.getByRole("button", {
-    name: /^(Открыть техкарту|Проверить техкарту|Создать техкарту)$/,
+    name: /^(Открыть техкарту|Проверить техкарту|Создать техкарту|Редактировать техкарту)$/,
   });
   await recipeButton.click();
   const editor = page.locator(".bd-tech-card-editor-v354");
@@ -1720,7 +1721,8 @@ async function runProfile(browser, baseUrl, profile) {
   }
 }
 
-(async () => {
+module.exports = {createMutableState,configureContext,openItem,openMenuEditor,startQaServer,catalogFor,assertNoHorizontalOverflow,outputDir};
+if(process.env.BD_QA_EXPORT_ONLY !== "1") (async () => {
   const server = await startQaServer();
   let browser;
   try {

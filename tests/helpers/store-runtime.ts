@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { drizzle } from "drizzle-orm/d1";
 import * as orm from "drizzle-orm";
-import { permissionsFor, type AccessRole } from "../../lib/bardoctor/access-control";
+import { permissionsFor, type AccessRole, type PermissionKey } from "../../lib/bardoctor/access-control";
 
 type Reply = { status: number; body: Record<string, unknown> };
 
@@ -34,8 +34,9 @@ export async function storeRuntime(venueId = 901) {
   }
   const db = drizzle({ prepare } as unknown as D1Database);
   let role: AccessRole = "owner";
+  let permissionOverride: PermissionKey[] | undefined;
   const account = () => ({ id: 7, actorAccountId: 7, venueId, role,
-    permissions: permissionsFor(role), firstName: "QA", lastName: "Owner",
+    permissions: permissionOverride ?? permissionsFor(role), firstName: "QA", lastName: "Owner",
     appEmail: "qa@example.invalid", restaurantJson: '{"currency":"MDL"}' });
   const route = new URL("../../app/api/store/[key]/route.ts", import.meta.url);
   const source = readFileSync(route, "utf8");
@@ -71,9 +72,34 @@ export async function storeRuntime(venueId = 901) {
     }), { params: Promise.resolve({ key }) });
     return { status: response.status, body: await response.json() };
   }
+  const taxonomyRoute = new URL("../../app/api/nomenclature/taxonomy/route.ts", import.meta.url);
+  const taxonomySource = readFileSync(taxonomyRoute, "utf8");
+  const taxonomyDependencies: Record<string, unknown> = {};
+  for (const match of taxonomySource.matchAll(pattern)) {
+    const specifier = match[2];
+    let exports: Record<string, unknown>;
+    if (specifier === "../../../../db") exports = { getD1: () => ({ prepare }) };
+    else if (specifier === "../../../../lib/bardoctor/auth") exports = {
+      authenticateRequest: async () => account(),
+      unauthorized: () => Response.json({ ok: false }, { status: 401 }),
+    };
+    else exports = await import(new URL(specifier + ".ts", taxonomyRoute).href);
+    for (const name of match[1].split(",").map(value => value.trim()).filter(value => value && !value.startsWith("type "))) {
+      assert.match(name, /^[A-Za-z_$][\w$]*$/);
+      assert.ok(name in exports, "Missing taxonomy dependency " + name);
+      taxonomyDependencies[name] = exports[name];
+    }
+  }
+  const taxonomyCompiled = stripTypeScriptTypes(taxonomySource.replace(pattern, "")).replace(/export async function /g, "async function ");
+  const taxonomyApi = new Function("dependencies", "const {" + Object.keys(taxonomyDependencies).join(",") + "} = dependencies;\n" + taxonomyCompiled + "\nreturn {GET,POST};")(taxonomyDependencies);
   const rows = () => sqlite.prepare("SELECT * FROM domain_data ORDER BY id").all();
   const audits = () => sqlite.prepare("SELECT * FROM audit_log ORDER BY id").all();
   return {
+    async taxonomyGet(): Promise<Reply> {
+      const response: Response = await taxonomyApi.GET(new Request("https://qa.invalid/api/nomenclature/taxonomy", {headers:{"X-Venue-Id":String(venueId)}}));
+      return {status:response.status,body:await response.json()};
+    },
+    setPermissions: (value: PermissionKey[]) => { permissionOverride = value; },
     sqlite, rows, audits, close: () => sqlite.close(), setRole: (value: AccessRole) => { role = value; },
     bytes: () => JSON.stringify({ domain: rows(), audit: audits() }),
     seed(key: string, value: unknown) {

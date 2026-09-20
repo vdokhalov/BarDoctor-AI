@@ -44,32 +44,17 @@ test("closing a catalog detail removes its URL ownership instead of reopening hi
   }
 });
 
-test("production recipe mount accepts an unambiguous legacy recipe without rewriting its menu", () => {
-  const helperStart = bundle.indexOf("function bdLegacyRecipeCanOpenV418");
-  const helperEnd = bundle.indexOf("function bdCatalogPage", helperStart);
-  const gate = command.match(/((?:D\?\.consumptionMode==="RECIPE"|D&&\(!D\.venueId.*?))&&!O&&!B&&!L&&i.jsx\(bdCatRecipeEditor/);
-  assert.ok(gate, "execute the actual production recipe mount condition");
-  const menuItem = { id: "legacy-sprite", venueId: 1, type: "composite" };
-  const activeRecipe = { id: "persisted-recipe", menuItemId: menuItem.id, venueId: 1, current: true, status: "confirmed" };
-  const original = JSON.stringify({ menuItem, activeRecipe });
-  const canMount = (item, recipes = [activeRecipe], overlays = {}) => runInNewContext(
-    `${bundle.slice(helperStart, helperEnd)};Boolean(${gate[1]}&&!O&&!B&&!L)`,
-    { D: item, E: { recipes }, s: { activeVenueId: 1 }, O: null, B: null, L: null,
-      bdCatArray: (value) => Array.isArray(value) ? value : [], ...overlays },
-  );
-  assert.equal(canMount(menuItem), true, "a legacy persisted recipe must open from its detail");
-  assert.equal(canMount({ ...menuItem, consumptionMode: "RECIPE" }), true);
-  for (const consumptionMode of ["DIRECT_ITEM", "FIXED_QUANTITY", "NONE", "NEEDS_REVIEW"]) {
-    assert.equal(canMount({ ...menuItem, consumptionMode }), false, consumptionMode);
-  }
-  assert.equal(canMount({ ...menuItem, readyProduct: { productKey: "stock:sprite" } }), false, "dual legacy link remains blocked");
-  assert.equal(canMount(menuItem, [activeRecipe, { ...activeRecipe, id: "conflicting-recipe" }]), false);
-  assert.equal(canMount(menuItem, [{ ...activeRecipe, current: false, lifecycleStatus: "inactive" }]), false);
-  assert.equal(canMount({ ...menuItem, venueId: 2 }), false, "foreign venue cannot mount");
-  for (const overlay of ["O", "B", "L"]) {
-    assert.equal(canMount(menuItem, [activeRecipe], { [overlay]: {} }), false, `${overlay}: another editor remains exclusive`);
-  }
-  assert.equal(JSON.stringify({ menuItem, activeRecipe }), original, "opening must not migrate legacy data");
+test("existing recipe access is mode-independent, permission-checked and exclusive", () => {
+  const gate=command.match(/(D&&\(!D\.venueId.*?)&&!O&&!B&&!L&&i.jsx\(bdExistingRecipeEditorV440/);
+  assert.ok(gate, "execute actual production mount condition");
+  const item={id:"legacy",venueId:1};
+  const original=JSON.stringify(item);
+  const mount=(value,overlays={})=>runInNewContext('Boolean('+gate[1]+'&&!O&&!B&&!L)',{D:value,s:{activeVenueId:1},me:true,O:null,B:null,L:null,...overlays});
+  for(const consumptionMode of [undefined,"RECIPE","DIRECT_ITEM","FIXED_QUANTITY","NONE","NEEDS_REVIEW"])assert.equal(mount({...item,consumptionMode}),true);
+  assert.equal(mount({...item,venueId:2}),false);
+  assert.equal(mount(item,{me:false}),false);
+  for(const overlay of ["O","B","L"])assert.equal(mount(item,{[overlay]:{}}),false);
+  assert.equal(JSON.stringify(item),original);
 });
 
 function runFallbackFixture(state, purchases) {
@@ -130,7 +115,7 @@ test("menu save locks venue currency across modes and ignores stale item currenc
         bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs",
         bdMenuFixedCompatibleV418: true, bdMenuRecipeChoiceRequiredV418: false,
         bdMenuQuantityV418: 0.05, bdMenuVenueId: venueId, bdMenuVenueCurrency: currency,
-        bdMenuSavingRefV438: { current: false },
+        bdMenuSavingRefV438: { current: false }, bdMenuTaxIssueV440: "",
         bdAccountingCurrencyV243: (value) => value,
         bdCatNumber: (value) => Number(value) || 0,
         bdSetMenuSavingV418: () => {}, j: (message) => assert.equal(message, ""),
@@ -194,7 +179,7 @@ test("Menu asks one business question and conditionally configures one consumpti
   ]) assert.match(menu, new RegExp(phrase));
   assert.match(menu, /h\.consumptionMode==="DIRECT_ITEM"\|\|h\.consumptionMode==="FIXED_QUANTITY"/);
   assert.match(menu, /h\.consumptionMode==="FIXED_QUANTITY"&&i\.jsx\(bdMenuSaleSizeControlV298/);
-  assert.match(menu, /h\.consumptionMode==="RECIPE"&&!bdMenuRecipeChoiceRequiredV418&&i\.jsx\("p"/);
+  assert.match(menu, /h\.consumptionMode==="RECIPE"&&!bdMenuHasRecipeV418&&!bdMenuRecipeChoiceRequiredV418&&i\.jsx\("p"/);
   assert.match(menu, /h\.consumptionMode==="NONE"&&i\.jsx\("p"/);
   assert.match(menu, /При продаже 1 шт\. будет списана 1 шт\./);
   assert.doesNotMatch(menu, /bdMenuExactProductsV352/);
@@ -219,7 +204,7 @@ test("mode switching is controlled and preserves inactive legacy configuration",
 });
 
 test("Menu and Tech Cards share one persisted recipe identity", () => {
-  assert.match(command, /recipe:bdCatRecipeFor\(D,E\.recipes\)/);
+  assert.match(command, /bdExistingRecipeEditorV440,\{item:D,recipes:E\.recipes,canManage:me/);
   assert.match(command, /id:X\?\.id\|\|w\.id\|\|crypto\.randomUUID\(\)/);
   assert.match(command, /P\.recipes\.some\(p=>p\.id===Qe\.id\)\?P\.recipes\.map/);
   assert.doesNotMatch(command, /version:ce\+1/);

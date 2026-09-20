@@ -1,0 +1,42 @@
+function bdMenuTaxonomyMergeV440(draft, response, existing) {
+  // Existing canonical references (including an intentionally absent subcategory) are authoritative.
+  if (draft.sectionId || draft.taxonomyCategoryId || draft.subcategoryId) return draft;
+  const paths = (response.legacyMenuPaths || []).filter(p => p.groupId === draft.groupId && (!draft.subgroupId || p.subgroupId === draft.subgroupId));
+  if (paths.length === 1) return {...draft, sectionId:paths[0].sectionId || '', taxonomyCategoryId:paths[0].taxonomyCategoryId || '', subcategoryId:paths[0].subcategoryId || ''};
+  // Never infer an existing item's taxonomy from the first unrelated section.
+  if (existing) return draft;
+  return draft;
+}
+function bdMenuTaxonomyIssueV440(taxonomy, value) {
+  const active = rows => (rows || []).filter(row => row.active !== false && row.archived !== true && row.status !== 'archived');
+  const section = active(taxonomy?.sections).find(row => row.id === value.sectionId);
+  const category = active(taxonomy?.categories).find(row => row.id === value.taxonomyCategoryId && row.parentId === value.sectionId);
+  if (value.sectionId && !section) return 'Сохранённый раздел недоступен или удалён. Выберите доступный раздел.';
+  if (value.taxonomyCategoryId && !category) return 'Сохранённая категория недоступна или удалена. Выберите доступную категорию.';
+  if (value.subcategoryId && !active(taxonomy?.subcategories).some(row => row.id === value.subcategoryId && row.parentId === value.taxonomyCategoryId)) return 'Сохранённая подкатегория недоступна или удалена. Выберите подкатегорию или явно уберите связь.';
+  return '';
+}
+async function bdMenuTaxonomyRequestV440(venueId, signal) {
+  const path = '/api/nomenclature/taxonomy';
+  const fail = (kind, status) => {
+    const error = new Error(status === 401 ? 'Сессия истекла. Войдите снова; введённые данные пока сохранены в форме.' : status === 403 ? 'Нет доступа к структуре этого заведения.' : 'Не удалось загрузить разделы и категории. Повторите загрузку; введённые данные сохранены.');
+    error.diagnostic = {method:'GET', path, kind, status:status || null};
+    return error;
+  };
+  let response;
+  try { response = await fetch(path, {credentials:'include', cache:'no-store', signal, headers:{...ca(Ot()), 'X-Venue-Id':String(venueId)}}); }
+  catch (error) { if (error?.name === 'AbortError') throw error; throw fail('transport'); }
+  if (!response.ok) throw fail('http', response.status);
+  let data;
+  try { data = await response.json(); } catch { throw fail('invalid-response', response.status); }
+  if (!data?.ok || !data.taxonomy || !['sections','categories','subcategories'].every(key => Array.isArray(data.taxonomy[key])) || String(data.venueId) !== String(venueId)) throw fail('invalid-response', response.status);
+  return data;
+}
+function bdMenuTaxonomySelectorsV440({taxonomy, value, onChange, onCreate}) {
+  const fields = [['sectionId','sections','Раздел',''],['taxonomyCategoryId','categories','Категория','sectionId'],['subcategoryId','subcategories','Подкатегория (необязательно)','taxonomyCategoryId']];
+  return i.jsx('div',{className:'bd-tax-selectors-v336',children:fields.map(([field,collection,label,parent],index) => {
+    const rows = bdTaxActiveV336(taxonomy?.[collection]).filter(row => !parent || row.parentId === value[parent]);
+    const missing = value[field] && !rows.some(row => row.id === value[field]);
+    return i.jsxs('label',{children:[i.jsx('span',{children:label}),i.jsxs('div',{children:[i.jsxs('select',{value:value[field] || '',disabled:!!parent && !value[parent],onChange:event => onChange({...value,[field]:event.target.value,...(index===0?{taxonomyCategoryId:'',subcategoryId:''}:index===1?{subcategoryId:''}:{})}),children:[i.jsx('option',{value:'',children:index===2?'Без подкатегории':'Выберите '+(index===0?'раздел':'категорию')}),missing && i.jsx('option',{value:value[field],disabled:true,children:'Сохранённая связь недоступна'}),...rows.map(row=>i.jsx('option',{value:row.id,children:row.name},row.id))]}),onCreate && i.jsx('button',{type:'button',disabled:!!parent && !value[parent],onClick:()=>onCreate(['section','category','subcategory'][index]),'aria-label':'Создать: '+label,children:'+'})]})]},field);
+  })});
+}

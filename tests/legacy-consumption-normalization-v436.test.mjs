@@ -47,7 +47,7 @@ test("editor save payload contains only fields for the selected consumption mode
       _: { id: "sprite-stock", key: "sprite", productKey: "sprite" },
       bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs", bdMenuFixedCompatibleV418: true,
       bdMenuRecipeChoiceRequiredV418: false, bdMenuQuantityV418: 500, bdMenuVenueId: 1,
-      bdMenuSavingRefV438: { current: false },
+      bdMenuTaxIssueV440: "", bdMenuSavingRefV438: { current: false },
       bdMenuVenueCurrency: "RUB", bdAccountingCurrencyV243: (value) => value,
       bdCatNumber: (value) => Number(value) || 0, bdSetMenuSavingV418: () => {}, j: () => {},
       s: async (value) => { persisted = structuredClone(value); }, a: () => {},

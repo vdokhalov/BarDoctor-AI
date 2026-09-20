@@ -378,7 +378,8 @@ function syncConsumptionPersistencePaths(source) {
   // Raw persisted legacy menu items lack consumptionMode even when the read model
   // resolves their single recipe. Use the existing non-mutating eligibility rule.
   const recipeGate = 'D&&(!D.venueId||Number(D.venueId)===Number(s.activeVenueId))&&bdLegacyRecipeCanOpenV418(D,E.recipes)&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor';
-  if (!value.includes(recipeGate)) value = replaceOnce(value,
+  const scopedRecipeGate = 'D&&(!D.venueId||Number(D.venueId)===Number(s.activeVenueId))&&me&&!O&&!B&&!L&&i.jsx(bdExistingRecipeEditorV440';
+  if (!value.includes(recipeGate) && !value.includes(scopedRecipeGate)) value = replaceOnce(value,
     'D?.consumptionMode==="RECIPE"&&!O&&!B&&!L&&i.jsx(bdCatRecipeEditor',
     recipeGate, 'legacy recipe editor eligibility');
   source = source.slice(0, command.start) + value + source.slice(command.end);
@@ -576,7 +577,7 @@ function verifyBundle(source) {
     "bdRecipeCalculatedCostByIdV418",
     "bd-tech-card-total-v418",
     "bdPhase3VenueRefV418",
-    'recipe:bdCatRecipeFor(D,E.recipes)',
+    source.includes('function bdEditableRecipesV440(') ? 'bdExistingRecipeEditorV440,{item:D,recipes:E.recipes,canManage:me' : 'recipe:bdCatRecipeFor(D,E.recipes)',
     'recipes:a.filter(m=>m.consumptionMode==="RECIPE"||m.consumptionMode==="NEEDS_REVIEW")',
     'onSave:ie,recipes:s.recipes,venueId:s.activeVenueId,onManageStructure:',
     'p.consumptionMode==="RECIPE"&&!W.length',
@@ -598,7 +599,7 @@ function verifyBundle(source) {
     "bdSelectableImportProductsV418",
     'inactiveReason:bdActivateImportedRecipeV418?void 0:bdOtherActiveRecipesV418.length?"existing_recipe_requires_review":"menu_consumption_mode"',
     "bdRequireServerV418",
-    'bdLegacyRecipeCanOpenV418(D,E.recipes)',
+    source.includes('function bdEditableRecipesV440(') ? '&&me&&!O&&!B&&!L&&i.jsx(bdExistingRecipeEditorV440' : 'bdLegacyRecipeCanOpenV418(D,E.recipes)',
     "bdImportSavedV418",
   ];
   for (const token of required) if (!source.includes(token)) throw new Error(`${releaseToken}: bundle invariant missing: ${token}`);

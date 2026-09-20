@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import test from 'node:test';
+import {storeRuntime} from './helpers/store-runtime';
+const scope=vm.createContext({});
+vm.runInContext(readFileSync(new URL('../scripts/fragments/tech-card-access-v440.fragment.txt',import.meta.url),'utf8'),scope);
+const STORE='bd_assortment_v1';
+for(const [scenario,venueId] of [["conflict",901],["correct",901],["new",901],["multiple",901],["other-venue",902]] as const)test(`actual GET/PUT and isolated SQLite: ${scenario}, venue ${venueId}`,async()=>{
+ const runtime=await storeRuntime(venueId);
+ try{
+  const product={id:'correct',key:'correct-key',productKey:'correct-key',name:'Volk',unit:'ml',unitModelVersion:4,venueId,active:true};
+  const other={...product,id:'other',key:'other-key',productKey:'other-key',name:'Other'};
+  const line={id:'line',name:'Volk',quantity:40,unit:'ml',nomenclatureItemId:'correct',purchaseProductKey:'other-key',productKey:'other-key',venueId};
+  const before={menuItems:[{id:'menu',name:'Водка Volk 0,04л.',type:'composite',consumptionMode:'RECIPE',venueId,active:true,sectionId:'bar',taxonomyCategoryId:'vodka',subcategoryId:''}],recipes:[{id:'recipe',menuItemId:'menu',ownerId:'menu',ownerType:'menu_item',venueId,status:'draft',current:true,lifecycleStatus:'current',version:1,ingredients:[line]}],nomenclature:[product,other],stockBalances:[{...product,current:1000},{...other,current:1000}],priceHistory:[]};
+  if(scenario==="correct")Object.assign(line,scope.bdIngredientReferencePatchV440(product,product.key));
+  if(scenario==="multiple")before.recipes[0].ingredients.push({...line,id:"second",quantity:10});
+  runtime.seed(STORE,scenario==="new"?{...before,menuItems:[],recipes:[]}:before);
+  const initial=runtime.bytes();
+  await runtime.get(STORE);
+  assert.equal(runtime.bytes(),initial,'opening must not write');
+  assert.equal(scope.bdIngredientReferenceConflictV440(line,[product,other]),scenario!=="correct");
+  const after=structuredClone(before);
+  Object.assign(after.recipes[0].ingredients[0],scope.bdIngredientReferencePatchV440(product,product.key),{linkSource:'manual',linkConfirmedByUser:true,linkStatus:'linked'});
+  for(const ingredient of after.recipes[0].ingredients)Object.assign(ingredient,scope.bdIngredientReferencePatchV440(product,product.key),{linkSource:"manual",linkConfirmedByUser:true,linkStatus:"linked"});
+  const saved=await runtime.put(STORE,after,'Explicitly correct conflicting ingredient reference');
+  assert.equal(saved.status,200,JSON.stringify(saved.body));
+  const read=await runtime.get(STORE);
+  const data=read.body.data as typeof before;
+  assert.equal(data.recipes.length,1);
+  assert.equal(data.recipes[0].id,'recipe');
+  assert.equal(data.recipes[0].ingredients[0].nomenclatureItemId,product.id);
+  assert.equal(data.recipes[0].ingredients[0].productKey,product.key);
+  assert.equal(data.recipes[0].ingredients[0].purchaseProductKey,product.key);
+  assert.equal(data.menuItems[0].taxonomyCategoryId,'vodka');
+  assert.equal(data.recipes[0].ingredients.length,scenario==='multiple'?2:1);
+  const taxonomy=await runtime.taxonomyGet();assert.equal(taxonomy.status,200);assert.equal(taxonomy.body.venueId,venueId);
+  const stable=runtime.bytes();runtime.setRole('shift_manager');runtime.setPermissions(['inventory.view']);
+  const denied=structuredClone(data);denied.recipes[0].ingredients[0].quantity=41;
+  const forbidden=await runtime.put(STORE,denied,'Forbidden edit');assert.equal(forbidden.status,403);assert.equal(runtime.bytes(),stable);
+  assert.deepEqual(data.stockBalances,before.stockBalances);
+ }finally{runtime.close()}
+});
