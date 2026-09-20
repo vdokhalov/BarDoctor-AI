@@ -168,7 +168,7 @@ test("taxonomy initialization resets only an untouched menu baseline and never e
       const surface = {};
       const ref = { current: false };
       runInNewContext(menu.slice(start, end), {
-        S: { useEffect: (effect) => effect() }, bdMenuTaxLoadingV350: loading,
+        S: { useEffect: (effect) => effect() }, bdUseExplicitFormViewportV438: () => {}, bdMenuTaxLoadingV350: loading,
         bdMenuInteractedRefV418: ref, bdMenuDialogRefV418: { current: surface },
         requestAnimationFrame: (callback) => { frame = callback; return 1; }, cancelAnimationFrame: () => {},
         window: { bdMarkNavigationClean: (target) => { assert.equal(target, surface); marked++; } },

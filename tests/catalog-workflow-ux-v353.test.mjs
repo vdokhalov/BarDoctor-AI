@@ -34,7 +34,8 @@ test("prepared menu products continue directly to their recipe", () => {
 
 test("recipe confirmation is gated by canonical links", () => {
   assert.match(bundle, /bdTechInvalidCount=/);
-  assert.match(bundle, /saveDisabled:!bdTechCanConfirm,error:bdRecipeSaveErrorV418/);
+  assert.match(bundle, /saveDisabled:!bdTechCanConfirm,saveDisabledReason:[\s\S]*?error:bdRecipeSaveErrorV418/);
+  assert.match(bundle, /Проверьте количество, единицу и связь с номенклатурой/);
   assert.match(bundle, /Завершите обязательные связи/);
   assert.match(bundle, /Текущая себестоимость техкарты/);
   assert.doesNotMatch(bundle, /Складские параметры \(необязательно\)/);

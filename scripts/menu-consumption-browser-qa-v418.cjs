@@ -127,7 +127,7 @@ function buildAssortment(venueId) {
       {
         id: `menu-kozel-${suffix}`,
         venueId,
-        name: "Kozel Dark 0.5",
+        name: "Спрайт 0,5л. · QA copy",
         groupId: "bar",
         subgroupId: "bar-main",
         sectionId: "stock-bar",
@@ -750,30 +750,6 @@ async function openMenuEditor(page) {
   return editor;
 }
 
-async function openMenuEditorFromList(page, baseUrl, itemName, venueId = activeVenueId) {
-  const response = await page.goto(
-    `${baseUrl}/catalog?venue=${venueId}&tab=menu`,
-    { waitUntil: "domcontentloaded", timeout: 60_000 },
-  );
-  assert.equal(response?.status(), 200, "catalog list route must return 200");
-  await waitForCatalog(page);
-  const closedDepartment = page.locator('.bd-catalog-department-toggle[aria-expanded="false"]').first();
-  if (await closedDepartment.count()) await closedDepartment.click();
-  const closedSubsection = page.locator('.bd-catalog-subsection-toggle[aria-expanded="false"]').first();
-  await closedSubsection.waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
-  if (await closedSubsection.count()) await closedSubsection.click();
-  const card = page.locator(".bd-catalog-card").filter({ hasText: itemName }).first();
-  if (await card.count()) {
-    await card.getByRole("button", { name: "Изменить позицию", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Добавить позицию", exact: true }).first().click();
-  }
-  const editor = page.locator(".bd-menu-position-editor-v400");
-  await editor.waitFor({ state: "visible", timeout: 10_000 });
-  await editor.locator(".bd-menu-tax-loading-v350").waitFor({ state: "detached", timeout: 10_000 }).catch(() => {});
-  return editor;
-}
-
 async function openRecipeEditor(page) {
   const recipeButton = page.getByRole("button", {
     name: /^(Открыть техкарту|Проверить техкарту|Создать техкарту)$/,
@@ -848,95 +824,59 @@ async function saveMenuEditor(editor) {
 }
 
 async function assertMenuActionLayout(page, profile, label) {
-  const audit = await page.evaluate(() => {
+  const audit = await page.evaluate(({ mobile }) => {
     const editor = document.querySelector(".bd-menu-position-editor-v400");
     const scroll = editor?.querySelector(".bd-menu-position-scroll-v435");
-    const footer = editor?.querySelector(".bd-menu-position-actions-v435");
-    const status = [...(scroll?.querySelectorAll(".bd-catalog-field") || [])].find((field) => (
-      field.textContent?.includes("Статус")
-    ));
-    if (!editor || !scroll || !footer || !status) return null;
+    const actions = editor?.querySelector(".bd-menu-position-actions-v435");
+    const toolbar = editor?.querySelector(".bd-explicit-mobile-toolbar-v439");
+    const desktop = editor?.querySelector(".bd-explicit-desktop-actions-v439");
+    const status = [...(scroll?.querySelectorAll(".bd-catalog-field") || [])].find((field) => field.textContent?.includes("Статус"));
+    if (!editor || !scroll || !actions || !status || !toolbar || !desktop) return null;
     scroll.scrollTop = scroll.scrollHeight;
-    const editorRect = editor.getBoundingClientRect();
-    const scrollRect = scroll.getBoundingClientRect();
-    const footerRect = footer.getBoundingClientRect();
-    const statusRect = status.getBoundingClientRect();
-    return {
-      viewportHeight: window.visualViewport?.height || window.innerHeight,
-      editor: { top: editorRect.top, bottom: editorRect.bottom },
-      scroll: {
-        top: scrollRect.top,
-        bottom: scrollRect.bottom,
-        clientHeight: scroll.clientHeight,
-        scrollHeight: scroll.scrollHeight,
-        scrollTop: scroll.scrollTop,
-      },
-      footer: { top: footerRect.top, bottom: footerRect.bottom, height: footerRect.height },
-      status: { top: statusRect.top, bottom: statusRect.bottom },
-      cancelVisible: footer.querySelector(".bd-catalog-secondary")?.getClientRects().length > 0,
-      saveVisible: footer.querySelector(".bd-catalog-primary")?.getClientRects().length > 0,
-      footerPosition: getComputedStyle(footer.querySelector(".bd-catalog-sheet-actions")).position,
-    };
-  });
-  assert.ok(audit, `${label}: menu action layout is missing`);
-  assert.ok(audit.cancelVisible && audit.saveVisible, `${label}: both actions must be visible ${JSON.stringify(audit)}`);
-  assert.equal(audit.footerPosition, "static", `${label}: footer buttons must participate in modal layout`);
-  assert.ok(audit.scroll.scrollHeight > audit.scroll.clientHeight, `${label}: long form must have an independent scroll axis`);
-  assert.ok(audit.scroll.bottom <= audit.footer.top + 1, `${label}: footer overlaps scroll viewport ${JSON.stringify(audit)}`);
-  assert.ok(audit.status.bottom <= audit.footer.top + 1, `${label}: last field cannot scroll above footer ${JSON.stringify(audit)}`);
-  assert.ok(audit.footer.bottom <= audit.viewportHeight + 1, `${label}: footer is below the visual viewport ${JSON.stringify(audit)}`);
-  assert.ok(audit.footer.top >= audit.editor.top, `${label}: footer escaped its modal ${JSON.stringify(audit)}`);
-  return { profile: profile.name, label, ...audit };
+    const er=editor.getBoundingClientRect(),sr=scroll.getBoundingClientRect(),ar=actions.getBoundingClientRect(),tr=toolbar.getBoundingClientRect(),lr=status.getBoundingClientRect();
+    const visible=(selector)=>[...editor.querySelectorAll(selector)].filter((node)=>node.getClientRects().length>0).length;
+    return {mobile,viewportHeight:window.visualViewport?.height||window.innerHeight,editor:{top:er.top,bottom:er.bottom},scroll:{top:sr.top,bottom:sr.bottom,clientHeight:scroll.clientHeight,scrollHeight:scroll.scrollHeight,scrollTop:scroll.scrollTop},actions:{top:ar.top,bottom:ar.bottom},toolbar:{top:tr.top,bottom:tr.bottom,visible:tr.height>0},status:{top:lr.top,bottom:lr.bottom},cancelVisible:visible(".bd-explicit-mobile-cancel-v439,.bd-explicit-cancel-v438"),saveVisible:visible(".bd-explicit-save-v438"),desktopVisible:desktop.getClientRects().length>0,moreVisible:visible(".bd-explicit-mobile-more-v439"),bodyOverflow:getComputedStyle(document.body).overflow};
+  }, { mobile: profile.mobile });
+  assert.ok(audit, label + ": menu action layout is missing");
+  assert.equal(audit.cancelVisible,1,label+": exactly one visible Cancel action");
+  assert.equal(audit.saveVisible,1,label+": exactly one visible Save action");
+  assert.equal(audit.bodyOverflow,"hidden",label+": background page stays locked");
+  assert.ok(audit.scroll.scrollHeight>audit.scroll.clientHeight,label+": long form scrolls independently");
+  assert.ok(audit.status.bottom<=audit.scroll.bottom+1,label+": last field remains reachable");
+  if(profile.mobile){assert.equal(audit.toolbar.visible,true,label+": toolbar visible");assert.equal(audit.desktopVisible,false,label+": desktop footer hidden");assert.equal(audit.moreVisible,0,label+": Menu has no secondary action");assert.ok(audit.toolbar.bottom<=audit.scroll.top+1,label+": toolbar above scroll");assert.ok(audit.scroll.bottom<=audit.editor.bottom+1,label+": scroll fills editor");assert.ok(audit.scroll.clientHeight>=300||audit.viewportHeight<500,label+": useful field space remains");}
+  else{assert.equal(audit.toolbar.visible,false,label+": mobile toolbar hidden on desktop");assert.equal(audit.desktopVisible,true,label+": desktop actions preserved");assert.ok(audit.scroll.bottom<=audit.actions.top+1,label+": desktop footer does not overlap");}
+  return {profile:profile.name,label,...audit};
 }
 
 async function assertTechCardActionLayout(page, profile, label) {
-  const audit = await page.evaluate(() => {
-    const editor = document.querySelector(".bd-tech-card-editor-v354");
-    const scroll = editor?.querySelector(".bd-explicit-form-scroll-v438");
-    const footer = editor?.querySelector(".bd-tech-card-actions-v438");
-    const lastField = scroll?.querySelector(".bd-tech-card-total-v418");
-    if (!editor || !scroll || !footer || !lastField) return null;
-    scroll.scrollTop = scroll.scrollHeight;
-    const editorRect = editor.getBoundingClientRect();
-    const scrollRect = scroll.getBoundingClientRect();
-    const footerRect = footer.getBoundingClientRect();
-    const lastRect = lastField.getBoundingClientRect();
-    return {
-      viewportHeight: window.visualViewport?.height || window.innerHeight,
-      editor: { top: editorRect.top, bottom: editorRect.bottom },
-      scroll: {
-        top: scrollRect.top,
-        bottom: scrollRect.bottom,
-        clientHeight: scroll.clientHeight,
-        scrollHeight: scroll.scrollHeight,
-        scrollTop: scroll.scrollTop,
-      },
-      footer: { top: footerRect.top, bottom: footerRect.bottom, height: footerRect.height },
-      lastField: { top: lastRect.top, bottom: lastRect.bottom },
-      cancelVisible: footer.querySelector(".bd-explicit-cancel-v438")?.getClientRects().length > 0,
-      saveVisible: footer.querySelector(".bd-explicit-save-v438")?.getClientRects().length > 0,
-      draftVisible: footer.querySelector(".bd-explicit-secondary-v438")?.getClientRects().length > 0,
-      actionPosition: getComputedStyle(footer.querySelector(".bd-catalog-sheet-actions")).position,
-    };
-  });
-  assert.ok(audit, `${label}: tech-card action layout is missing`);
-  assert.ok(audit.cancelVisible && audit.saveVisible && audit.draftVisible, `${label}: all explicit actions must be visible ${JSON.stringify(audit)}`);
-  assert.equal(audit.actionPosition, "static", `${label}: footer buttons must participate in modal layout`);
-  assert.ok(audit.scroll.scrollHeight > audit.scroll.clientHeight, `${label}: long form must have an independent scroll axis`);
-  assert.ok(audit.scroll.bottom <= audit.footer.top + 1, `${label}: footer overlaps scroll viewport ${JSON.stringify(audit)}`);
-  assert.ok(audit.lastField.bottom <= audit.footer.top + 1, `${label}: last field cannot scroll under footer ${JSON.stringify(audit)}`);
-  assert.ok(audit.footer.bottom <= audit.viewportHeight + 1, `${label}: footer is below the visual viewport ${JSON.stringify(audit)}`);
-  assert.ok(audit.footer.top >= audit.editor.top, `${label}: footer escaped its modal ${JSON.stringify(audit)}`);
-  return { profile: profile.name, label, ...audit };
+  const audit=await page.evaluate(({mobile})=>{
+    const editor=document.querySelector(".bd-tech-card-editor-v354"),scroll=editor?.querySelector(".bd-explicit-form-scroll-v438"),actions=editor?.querySelector(".bd-tech-card-actions-v438"),toolbar=editor?.querySelector(".bd-explicit-mobile-toolbar-v439"),desktop=editor?.querySelector(".bd-explicit-desktop-actions-v439"),last=scroll?.querySelector(".bd-tech-card-total-v418");
+    if(!editor||!scroll||!actions||!last||!toolbar||!desktop)return null;scroll.scrollTop=scroll.scrollHeight;
+    const er=editor.getBoundingClientRect(),sr=scroll.getBoundingClientRect(),ar=actions.getBoundingClientRect(),tr=toolbar.getBoundingClientRect(),lr=last.getBoundingClientRect(),visible=(selector)=>[...editor.querySelectorAll(selector)].filter((node)=>node.getClientRects().length>0).length;
+    return{mobile,viewportHeight:window.visualViewport?.height||window.innerHeight,editor:{top:er.top,bottom:er.bottom},scroll:{top:sr.top,bottom:sr.bottom,clientHeight:scroll.clientHeight,scrollHeight:scroll.scrollHeight,scrollTop:scroll.scrollTop},actions:{top:ar.top,bottom:ar.bottom},toolbar:{top:tr.top,bottom:tr.bottom,visible:tr.height>0},last:{top:lr.top,bottom:lr.bottom},cancelVisible:visible(".bd-explicit-mobile-cancel-v439,.bd-explicit-cancel-v438"),saveVisible:visible(".bd-explicit-save-v438"),draftVisible:visible(".bd-explicit-secondary-v438"),moreVisible:visible(".bd-explicit-mobile-more-v439"),desktopVisible:desktop.getClientRects().length>0,bodyOverflow:getComputedStyle(document.body).overflow};
+  },{mobile:profile.mobile});
+  assert.ok(audit,label+": tech-card action layout is missing");assert.equal(audit.cancelVisible,1,label+": one Cancel");assert.equal(audit.saveVisible,1,label+": one Save");assert.equal(audit.bodyOverflow,"hidden",label+": background locked");assert.ok(audit.scroll.scrollHeight>=audit.scroll.clientHeight-1,label+": content fits or scrolls without clipping");if(audit.viewportHeight<500)assert.ok(audit.scroll.scrollHeight>audit.scroll.clientHeight,label+": keyboard viewport remains scrollable");assert.ok(audit.last.bottom<=audit.scroll.bottom+1,label+": final cost reachable");
+  if(profile.mobile){assert.equal(audit.toolbar.visible,true,label+": toolbar visible");assert.equal(audit.desktopVisible,false,label+": desktop footer hidden");assert.equal(audit.draftVisible,0,label+": draft not a permanent row");assert.equal(audit.moreVisible,1,label+": draft available through More");assert.ok(audit.toolbar.bottom<=audit.scroll.top+1,label+": toolbar above scroll");assert.ok(audit.scroll.bottom<=audit.editor.bottom+1,label+": scroll fills editor");assert.ok(audit.scroll.clientHeight>=300||audit.viewportHeight<500,label+": useful field space remains");}
+  else{assert.equal(audit.toolbar.visible,false,label+": mobile toolbar hidden");assert.equal(audit.desktopVisible,true,label+": desktop preserved");assert.equal(audit.draftVisible,1,label+": desktop Save draft preserved");assert.ok(audit.scroll.bottom<=audit.actions.top+1,label+": desktop footer does not overlap");}
+  return{profile:profile.name,label,...audit};
+}
+
+async function assertFocusedEditorFieldVisible(page, locator, label) {
+  const audit=await locator.evaluate((input)=>{const editor=input.closest(".bd-menu-position-editor-v400,.bd-tech-card-editor-v354"),field=input.closest(".bd-catalog-field"),caption=field?.querySelector("span,label"),toolbar=editor?.querySelector(".bd-explicit-mobile-toolbar-v439"),ir=input.getBoundingClientRect(),cr=caption?.getBoundingClientRect(),tr=toolbar?.getBoundingClientRect(),bottom=(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight);return{focused:document.activeElement===input,input:{top:ir.top,bottom:ir.bottom},caption:cr?{top:cr.top,bottom:cr.bottom}:null,toolbarBottom:tr?.bottom||0,viewportBottom:bottom,bodyOverflow:getComputedStyle(document.body).overflow}});
+  assert.equal(audit.focused,true,label+": focus preserved");assert.ok(audit.caption&&audit.caption.top>=audit.toolbarBottom-1&&audit.caption.bottom<=audit.viewportBottom,label+": label visible "+JSON.stringify(audit));assert.ok(audit.input.top>=audit.toolbarBottom-1&&audit.input.bottom<=audit.viewportBottom,label+": input visible "+JSON.stringify(audit));assert.equal(audit.bodyOverflow,"hidden",label+": no background scroll");return audit;
 }
 
 async function closeMenuEditor(editor) {
-  await editor.locator(".bd-catalog-close").click();
+  const mobileCancel = editor.locator(".bd-explicit-mobile-cancel-v439");
+  if (await mobileCancel.isVisible().catch(() => false)) await mobileCancel.click();
+  else await editor.locator(".bd-catalog-close").click();
   await editor.waitFor({ state: "detached", timeout: 10_000 });
 }
 
 async function closeRecipeEditor(editor) {
-  await editor.getByRole("button", { name: "Закрыть техкарту" }).click();
+  const mobileCancel = editor.locator(".bd-explicit-mobile-cancel-v439");
+  if (await mobileCancel.isVisible().catch(() => false)) await mobileCancel.click();
+  else await editor.getByRole("button", { name: "Закрыть техкарту" }).click();
   await editor.waitFor({ state: "detached", timeout: 10_000 });
 }
 
@@ -1026,7 +966,7 @@ async function runProfile(browser, baseUrl, profile) {
   // Production legacy records predate consumptionMode. Keep a persisted fixture
   // in that shape; analytics may resolve RECIPE but opening must not migrate it.
   const legacyCatalog = catalogFor(state);
-  const legacyMenu = { ...clone(legacyCatalog.menuItems.find((item) => item.name === "Espresso")), id: "legacy-recipe-menu", name: "Legacy Sprite" };
+  const legacyMenu = { ...clone(legacyCatalog.menuItems.find((item) => item.name === "Espresso")), id: "legacy-recipe-menu", name: "Хортица · QA copy" };
   delete legacyMenu.consumptionMode;
   const legacyRecipe = { ...clone(legacyCatalog.recipes[0]), id: "legacy-persisted-recipe", menuItemId: legacyMenu.id, ownerId: legacyMenu.id };
   legacyRecipe.ingredients = legacyRecipe.ingredients.map((ingredient, index) => ({ ...ingredient, id: `legacy-ingredient-${index}` }));
@@ -1081,26 +1021,40 @@ async function runProfile(browser, baseUrl, profile) {
 
   try {
     if (menuActionsOnly) {
-      const directMenuName = catalogFor(state).menuItems.find((item) => item.id === directMenuId).name;
-      let editor = await openMenuEditorFromList(page, baseUrl, directMenuName);
+      await openItem(page, baseUrl, "menu", directMenuId);
+      let editor = await openMenuEditor(page);
       audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: menu actions`));
       audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: long editor`));
+      await editor.locator(".bd-menu-position-scroll-v435").evaluate((scroll) => scroll.scrollTo(0, 0));
+      await page.screenshot({ path: path.join(outputDir, profile.name + "-menu-no-keyboard.png"), animations: "disabled" });
 
-      const nameInput = editor.getByLabel("Название");
+      const nameInput = editor.getByLabel("Название",{exact:true});
       const originalName = await nameInput.inputValue();
       await nameInput.fill(`${originalName} QA`);
       const keepEditing = page.waitForEvent("dialog").then(async (dialog) => {
         assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
         await dialog.dismiss();
       });
-      await Promise.all([keepEditing, editor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+      const menuCancelAction = profile.mobile ? editor.locator(".bd-explicit-mobile-cancel-v439") : editor.locator(".bd-explicit-cancel-v438");
+      await Promise.all([keepEditing, menuCancelAction.click()]);
       assert.equal(await editor.isVisible(), true, `${profile.name}: rejected cancel must keep the editor open`);
 
       if (profile.mobile) {
+        await page.evaluate(() => document.activeElement?.blur());
         await nameInput.focus();
         await page.setViewportSize({ width: profile.viewport.width, height: 430 });
         await page.waitForTimeout(100);
         audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: keyboard viewport`));
+        await page.evaluate(() => document.activeElement?.blur());
+        await nameInput.focus();
+        await page.waitForTimeout(100);
+        audits.push(await assertFocusedEditorFieldVisible(page, nameInput, profile.name + ": menu name with keyboard"));
+        await editor.getByRole("button", { name: /^Готовый товар/ }).click();
+        const menuSearch=editor.getByLabel("Поиск в номенклатуре");
+        await menuSearch.focus();
+        audits.push(await assertFocusedEditorFieldVisible(page,menuSearch,profile.name+": menu search with keyboard"));
+        await page.screenshot({path:path.join(outputDir,profile.name+"-menu-keyboard.png"),animations:"disabled"});
+        await nameInput.focus();
         await page.setViewportSize(profile.viewport);
         await page.waitForTimeout(100);
       }
@@ -1109,18 +1063,20 @@ async function runProfile(browser, baseUrl, profile) {
         assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
         await dialog.accept();
       });
-      await Promise.all([discardChanges, editor.getByRole("button", { name: "Закрыть", exact: true }).click()]);
+      const menuDiscardAction = profile.mobile ? editor.locator(".bd-explicit-mobile-cancel-v439") : editor.getByRole("button", { name: "Закрыть", exact: true });
+      await Promise.all([discardChanges, menuDiscardAction.click()]);
       await editor.waitFor({ state: "detached", timeout: 10_000 });
-      editor = await openMenuEditorFromList(page, baseUrl, directMenuName);
-      assert.equal(await editor.getByLabel("Название").inputValue(), originalName, `${profile.name}: close must discard edits`);
+      await openItem(page, baseUrl, "menu", directMenuId);
+      editor = await openMenuEditor(page);
+      assert.equal(await editor.getByLabel("Название",{exact:true}).inputValue(), originalName, `${profile.name}: close must discard edits`);
 
       const savedName = `${originalName || "QA Menu Action"} saved`;
-      await editor.getByLabel("Название").fill(savedName);
+      await editor.getByLabel("Название",{exact:true}).fill(savedName);
       if (await editor.getByRole("button", { name: /^Без списания/ }).count()) {
         await editor.getByRole("button", { name: /^Без списания/ }).click();
       }
       state.failNextAssortmentWrite = true;
-      state.assortmentWriteDelayMs = 250;
+      state.assortmentWriteDelayMs = 800;
       const saveButton = editor.getByRole("button", { name: "Сохранить", exact: true });
       const rejectedSave = saveButton.click();
       const savingButton = editor.getByRole("button", { name: "Сохраняем…", exact: true });
@@ -1150,6 +1106,9 @@ async function runProfile(browser, baseUrl, profile) {
       let recipeEditor = await openRecipeEditor(page);
       audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: tech-card actions`));
       audits.push(await assertTechCardActionLayout(page, profile, `${profile.name}: long tech-card editor`));
+      await recipeEditor.locator(".bd-explicit-form-scroll-v438").evaluate((scroll) => scroll.scrollTo(0, 0));
+      if(profile.mobile){await recipeEditor.getByRole("button",{name:"Дополнительные действия"}).click();await recipeEditor.getByRole("menuitem",{name:"Сохранить черновик"}).waitFor({state:"visible"});await recipeEditor.getByRole("button",{name:"Дополнительные действия"}).click();}
+      await page.screenshot({path:path.join(outputDir,profile.name+"-tech-card-no-keyboard.png"),animations:"disabled"});
 
       const quantityInput = recipeEditor.getByLabel("Количество на порцию").first();
       const originalQuantity = await quantityInput.inputValue();
@@ -1158,24 +1117,47 @@ async function runProfile(browser, baseUrl, profile) {
         assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
         await dialog.dismiss();
       });
-      await Promise.all([keepRecipeEditing, recipeEditor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+      const recipeCancelAction = profile.mobile ? recipeEditor.locator(".bd-explicit-mobile-cancel-v439") : recipeEditor.locator(".bd-explicit-cancel-v438");
+      await Promise.all([keepRecipeEditing, recipeCancelAction.click()]);
       assert.equal(await recipeEditor.isVisible(), true, `${profile.name}: rejected tech-card cancel must keep the editor open`);
 
       if (profile.mobile) {
+        await page.evaluate(() => document.activeElement?.blur());
         await quantityInput.focus();
         await page.setViewportSize({ width: profile.viewport.width, height: 430 });
         await page.waitForTimeout(100);
         audits.push(await assertTechCardActionLayout(page, profile, `${profile.name}: tech-card keyboard viewport`));
+        await page.evaluate(() => document.activeElement?.blur());
+        await quantityInput.focus();
+        await page.waitForTimeout(100);
+        audits.push(await assertFocusedEditorFieldVisible(page,quantityInput,profile.name+": tech-card quantity with keyboard"));
+        const ingredientName=recipeEditor.getByLabel("Название",{exact:true}).first();
+        await ingredientName.focus();
+        audits.push(await assertFocusedEditorFieldVisible(page,ingredientName,profile.name+": tech-card name with keyboard"));
+        const openTechSearch = recipeEditor.locator("button").filter({ hasText: /Изменить товар|Найти в номенклатуре|Проверить|Показать все/ }).first();
+        if (await openTechSearch.count()) await openTechSearch.click();
+        const techSearch=recipeEditor.getByLabel("Поиск по всей номенклатуре").first();
+        await techSearch.focus();
+        audits.push(await assertFocusedEditorFieldVisible(page,techSearch,profile.name+": tech-card search with keyboard"));
+        await page.screenshot({path:path.join(outputDir,profile.name+"-tech-card-keyboard.png"),animations:"disabled"});
+        const closeTechSearch = recipeEditor.getByRole("button", { name: "Закрыть поиск", exact: true });
+        if (await closeTechSearch.count()) await closeTechSearch.click();
+        await quantityInput.focus();
         await page.setViewportSize(profile.viewport);
         await page.waitForTimeout(100);
       }
 
-      const discardRecipe = page.waitForEvent("dialog").then(async (dialog) => {
-        assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
-        await dialog.accept();
-      });
-      await Promise.all([discardRecipe, recipeEditor.getByRole("button", { name: "Закрыть техкарту" }).click()]);
-      await recipeEditor.waitFor({ state: "detached", timeout: 10_000 });
+      const discardRecipeMessages = [];
+      const acceptDiscardRecipe = async (dialog) => { discardRecipeMessages.push(dialog.message()); await dialog.accept(); };
+      page.on("dialog", acceptDiscardRecipe);
+      const recipeDiscardAction = profile.mobile ? recipeEditor.locator(".bd-explicit-mobile-cancel-v439") : recipeEditor.getByRole("button", { name: "Закрыть техкарту" });
+      try {
+        await recipeDiscardAction.click();
+        await recipeEditor.waitFor({ state: "detached", timeout: 10_000 });
+      } finally {
+        page.off("dialog", acceptDiscardRecipe);
+      }
+      assert.deepEqual(discardRecipeMessages, ["Изменения не сохранены. Выйти без сохранения?"], `${profile.name}: tech-card discard must show one warning`);
 
       await openItem(page, baseUrl, "recipes", legacyMenu.id);
       recipeEditor = await openRecipeEditor(page);
@@ -1188,7 +1170,7 @@ async function runProfile(browser, baseUrl, profile) {
       const savedQuantity = String(Number(originalQuantity) + 2);
       await recipeEditor.getByLabel("Количество на порцию").first().fill(savedQuantity);
       state.failNextAssortmentWrite = true;
-      state.assortmentWriteDelayMs = 250;
+      state.assortmentWriteDelayMs = 800;
       const recipeSave = recipeEditor.getByRole("button", { name: "Сохранить", exact: true });
       const rejectedRecipeSave = recipeSave.click();
       await recipeEditor.getByRole("button", { name: "Сохраняем…", exact: true }).last().waitFor({ state: "visible", timeout: 5_000 });
@@ -1266,19 +1248,20 @@ async function runProfile(browser, baseUrl, profile) {
     audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: direct editor`));
     audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: long editor`));
 
-    const originalName = await editor.getByLabel("Название").inputValue();
-    await editor.getByLabel("Название").fill(`${originalName} QA`);
+    const originalName = await editor.getByLabel("Название",{exact:true}).inputValue();
+    await editor.getByLabel("Название",{exact:true}).fill(`${originalName} QA`);
     const keepEditing = page.waitForEvent("dialog").then(async (dialog) => {
       assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
       await dialog.dismiss();
     });
-    await Promise.all([keepEditing, editor.getByRole("button", { name: "Отмена", exact: true }).click()]);
+    const menuCancelAction = profile.mobile ? editor.locator(".bd-explicit-mobile-cancel-v439") : editor.locator(".bd-explicit-cancel-v438");
+      await Promise.all([keepEditing, menuCancelAction.click()]);
     assert.equal(await editor.isVisible(), true, `${profile.name}: rejected cancel must keep the editor open`);
-    await editor.getByLabel("Название").fill(originalName);
+    await editor.getByLabel("Название",{exact:true}).fill(originalName);
 
     if (profile.mobile) {
       const fullViewport = profile.viewport;
-      await editor.getByLabel("Название").focus();
+      await editor.getByLabel("Название",{exact:true}).focus();
       await page.setViewportSize({ width: fullViewport.width, height: 430 });
       await page.waitForTimeout(100);
       audits.push(await assertMenuActionLayout(page, profile, `${profile.name}: keyboard viewport`));
@@ -1286,16 +1269,17 @@ async function runProfile(browser, baseUrl, profile) {
       await page.waitForTimeout(100);
     }
 
-    await editor.getByLabel("Название").fill(`${originalName} discarded`);
+    await editor.getByLabel("Название",{exact:true}).fill(`${originalName} discarded`);
     const discardChanges = page.waitForEvent("dialog").then(async (dialog) => {
       assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
       await dialog.accept();
     });
-    await Promise.all([discardChanges, editor.getByRole("button", { name: "Закрыть", exact: true }).click()]);
+    const menuDiscardAction = profile.mobile ? editor.locator(".bd-explicit-mobile-cancel-v439") : editor.getByRole("button", { name: "Закрыть", exact: true });
+      await Promise.all([discardChanges, menuDiscardAction.click()]);
     await editor.waitFor({ state: "detached", timeout: 10_000 });
     await openItem(page, baseUrl, "menu", directMenuId);
     editor = await openMenuEditor(page);
-    assert.equal(await editor.getByLabel("Название").inputValue(), originalName, `${profile.name}: close must discard unsaved changes`);
+    assert.equal(await editor.getByLabel("Название",{exact:true}).inputValue(), originalName, `${profile.name}: close must discard unsaved changes`);
 
     await chooseMode(page, editor, "Порция товара");
     assert.equal(await editor.locator(".bd-menu-nomenclature-picker-v350").count(), 1);

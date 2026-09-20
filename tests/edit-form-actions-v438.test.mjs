@@ -45,7 +45,7 @@ test("tech-card content scrolls independently and actions remain outside it", ()
   const footer = recipe.indexOf("i.jsx(bdExplicitFormActionsV438");
   assert.ok(scroll >= 0 && footer > scroll);
   assert.match(recipe, /\]\}\) ,i\.jsx\(bdExplicitFormActionsV438/);
-  assert.match(recipe, /saveLabel:t\?"Сохранить":"Сохранить и подтвердить"/);
+  assert.match(recipe, /saveLabel:"Сохранить",mobileTitle:"Техкарта"/);
   assert.match(recipe, /secondaryAction:\{label:"Сохранить черновик"/);
 
   const override = css.slice(css.indexOf("/* bd-edit-form-actions-v438:"));
@@ -117,7 +117,7 @@ test("save is single-flight, closes only on success and keeps failures visible",
   assert.match(recipe, /catch\(c\)\{return bdSetRecipeSaveErrorV418/);
   assert.match(recipe, /bdSetRecipeSaveErrorV418\("Не удалось сохранить техкарту\. Повторите попытку\."\),!1/);
   assert.match(recipe, /finally\{bdRecipeSavingRefV418\.current=!1,bdSetRecipeSavingV418\(!1\)\}/);
-  assert.match(recipe, /saveDisabled:!bdTechCanConfirm,error:bdRecipeSaveErrorV418/);
+  assert.match(recipe, /saveDisabled:!bdTechCanConfirm,[^}]*error:bdRecipeSaveErrorV418/);
 });
 
 test("editing ingredient quantity, unit, link, add and remove marks the recipe dirty", () => {
