@@ -1238,11 +1238,8 @@ async function runProfile(browser, baseUrl, profile) {
     activeCatalog = catalogFor(state);
     directItem = activeCatalog.menuItems.find((item) => item.id === directMenuId);
     assert.equal(directItem.consumptionMode, "NONE");
-    assert.equal(
-      directItem.readyProduct.nomenclatureItemId,
-      targetProductId,
-      "NONE must preserve the former link as inactive historical configuration",
-    );
+    assert.equal("readyProduct" in directItem, false, "NONE must clear the incompatible direct configuration");
+    assert.equal("saleSize" in directItem, false, "NONE must clear the incompatible portion configuration");
     assert.equal(activeCatalog.recipes.filter((recipe) => recipe.menuItemId === directMenuId).length, 0);
 
     authoritativeReadbacks.push(await authoritativeCatalogReload(
@@ -1402,11 +1399,8 @@ async function runProfile(browser, baseUrl, profile) {
     directItem = activeCatalog.menuItems.find((item) => item.id === directMenuId);
     const switchedRecipes = activeCatalog.recipes.filter((recipe) => recipe.menuItemId === directMenuId);
     assert.equal(directItem.consumptionMode, "RECIPE", "new mode must be active for future sales");
-    assert.equal(
-      directItem.readyProduct.nomenclatureItemId,
-      targetProductId,
-      "the previous direct reference must be retained as inactive history",
-    );
+    assert.equal("readyProduct" in directItem, false, "RECIPE must clear the incompatible direct configuration");
+    assert.equal("saleSize" in directItem, false, "RECIPE must clear the incompatible portion configuration");
     assert.equal(switchedRecipes.length, 1, "mode switch must create one persisted Recipe object");
     assert.equal(switchedRecipes[0].ingredients.length, 0, "the former direct link must not become a recipe ingredient");
     assert.equal(

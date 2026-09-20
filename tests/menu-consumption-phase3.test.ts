@@ -5,6 +5,7 @@ import {
   changedConsumptionModeIssues,
   duplicateMenuItemIds,
   legacyConsumptionConflicts,
+  normalizeExplicitConsumptionUpdates,
   resolveMenuConsumption,
 } from "../lib/bardoctor/consumption-mode";
 import {
@@ -204,7 +205,7 @@ test("Menu and Tech Cards edit the same persisted recipe object", () => {
   assert.equal("readyProduct" in (reloaded.menuItems as JsonRecord[])[2], false);
 });
 
-test("switching DIRECT_ITEM to RECIPE keeps legacy config and immutable historical snapshots", () => {
+test("switching DIRECT_ITEM to RECIPE normalizes current config and preserves immutable historical snapshots", () => {
   const source = persisted(fixture());
   const first = postSale(source, "kozel-menu", "Kozel Dark 0.5", 1, "before-switch");
   const frozenBatch = JSON.stringify(first.posted.batch);
@@ -219,9 +220,10 @@ test("switching DIRECT_ITEM to RECIPE keeps legacy config and immutable historic
       name: "Coffee beans", quantity: 8, unit: "g", normalizedQuantity: 8, normalizedUnit: "g", venueId: 1,
     }],
   });
-  assert.deepEqual(changedConsumptionModeIssues(first.posted.assortment, switched, 1), []);
-  const persistedSwitch = persisted(switched);
-  assert.equal("readyProduct" in ((persistedSwitch.menuItems as JsonRecord[]).find((candidate) => candidate.id === "kozel-menu")!), true);
+  const normalizedSwitch = normalizeExplicitConsumptionUpdates(first.posted.assortment, switched, 1).data as JsonRecord;
+  assert.deepEqual(changedConsumptionModeIssues(first.posted.assortment, normalizedSwitch, 1), []);
+  const persistedSwitch = persisted(normalizedSwitch);
+  assert.equal("readyProduct" in ((persistedSwitch.menuItems as JsonRecord[]).find((candidate) => candidate.id === "kozel-menu")!), false);
 
   const secondSaved = createSale(persistedSwitch, "kozel-menu", "Kozel Dark 0.5", 1, "after-switch");
   assert.equal(secondSaved.ok, true);
@@ -905,4 +907,88 @@ test("menu ID uniqueness and changed-state validation use venue plus ID identity
   const localChange = structuredClone(before) as JsonRecord;
   (localChange.menuItems as JsonRecord[])[0].consumptionMode = "INVALID";
   assert.equal(changedConsumptionModeIssues(before, localChange, 1)[0]?.code, "CONSUMPTION_MODE_INVALID");
+});
+
+test("explicit menu mode normalizes every conflicting legacy source without changing business history", () => {
+  const base = fixture();
+  const sprite = {
+    id: "sprite-menu", name: "Спрайт 0,5л.", venueId: 1, active: true, type: "ready",
+    consumptionMode: "DIRECT_ITEM", readyProduct: { nomenclatureItemId: "nom-kozel", productKey: "stock-kozel", packagesPerSale: 1 },
+  };
+  (base.menuItems as JsonRecord[]).push(sprite);
+  const recipe = structuredClone((base.recipes as JsonRecord[])[0]);
+  Object.assign(recipe, { id: "sprite-recipe", menuItemId: sprite.id, ownerId: sprite.id, current: true, lifecycleStatus: "current" });
+  (base.recipes as JsonRecord[]).push(recipe);
+  base.historicalMovements = [{ id: "movement-1", menuItemId: sprite.id, amount: -1 }];
+  const frozenHistory = JSON.stringify(base.historicalMovements);
+
+  const conflicting = (mode: string) => ({
+    ...sprite,
+    type: mode === "NONE" ? "service" : mode === "RECIPE" ? "composite" : "ready",
+    consumptionMode: mode,
+    readyProduct: { nomenclatureItemId: "nom-kozel", productKey: "stock-kozel", packagesPerSale: 4 },
+    readyProductLink: { nomenclatureItemId: "nom-whisky", productKey: "stock-whisky" },
+    readyProductKey: "stock-whisky",
+    nomenclatureItemId: "nom-whisky",
+    saleSize: mode === "FIXED_QUANTITY" ? { quantity: 1, unit: "pcs" } : { quantity: 50, unit: "ml" },
+    portionSize: "0,5 л",
+    legacyPortionSize: "бутылка",
+    updatedAt: "2026-09-19T12:00:00.000Z",
+  });
+
+  for (const mode of ["DIRECT_ITEM", "FIXED_QUANTITY", "RECIPE", "NONE"] as const) {
+    const after = structuredClone(base) as JsonRecord;
+    (after.menuItems as JsonRecord[])[(after.menuItems as JsonRecord[]).length - 1] = conflicting(mode);
+    const result = normalizeExplicitConsumptionUpdates(base, after, 1, new Date("2026-09-19T12:30:00.000Z"));
+    const normalized = result.data as JsonRecord;
+    const item = (normalized.menuItems as JsonRecord[]).find(candidate => candidate.id === sprite.id)!;
+    const normalizedRecipe = (normalized.recipes as JsonRecord[]).find(candidate => candidate.id === recipe.id)!;
+    assert.deepEqual(result.normalizedMenuItemIds, [sprite.id]);
+    assert.equal(item.consumptionMode, mode);
+    assert.equal("readyProductLink" in item, false, mode);
+    assert.equal("readyProductKey" in item, false, mode);
+    assert.equal("nomenclatureItemId" in item, false, mode);
+    assert.equal("portionSize" in item, false, mode);
+    assert.equal("legacyPortionSize" in item, false, mode);
+    assert.equal(Boolean(item.readyProduct), mode === "DIRECT_ITEM" || mode === "FIXED_QUANTITY", mode);
+    assert.equal(Boolean(item.saleSize), mode === "FIXED_QUANTITY", mode);
+    assert.equal(normalizedRecipe.lifecycleStatus, mode === "RECIPE" ? "current" : "inactive", mode);
+    assert.equal(normalizedRecipe.current, mode === "RECIPE", mode);
+    assert.equal(JSON.stringify(normalized.historicalMovements), frozenHistory, mode);
+    assert.equal((normalized.nomenclature as JsonRecord[]).length, (base.nomenclature as JsonRecord[]).length, mode);
+    assert.deepEqual(changedConsumptionModeIssues(base, normalized, 1), []);
+  }
+});
+
+test("reverse transitions restore one historical recipe and reopen with exactly one authoritative mode", () => {
+  const base = fixture();
+  const item = (base.menuItems as JsonRecord[])[2];
+  const recipe = (base.recipes as JsonRecord[])[0];
+  const transitions = ["DIRECT_ITEM", "FIXED_QUANTITY", "NONE"] as const;
+  for (const target of transitions) {
+    const away = structuredClone(base) as JsonRecord;
+    const awayItem = (away.menuItems as JsonRecord[])[2];
+    awayItem.consumptionMode = target;
+    awayItem.readyProduct = { nomenclatureItemId: "nom-kozel", productKey: "stock-kozel", packagesPerSale: 1 };
+    if (target === "FIXED_QUANTITY") awayItem.saleSize = { quantity: 1, unit: "pcs" };
+    awayItem.updatedAt = `2026-09-19T12:0${transitions.indexOf(target)}:00.000Z`;
+    const inactive = normalizeExplicitConsumptionUpdates(base, away, 1, new Date("2026-09-19T12:10:00.000Z")).data as JsonRecord;
+    const back = structuredClone(inactive) as JsonRecord;
+    const backItem = (back.menuItems as JsonRecord[])[2];
+    backItem.consumptionMode = "RECIPE";
+    backItem.updatedAt = "2026-09-19T12:20:00.000Z";
+    const restored = normalizeExplicitConsumptionUpdates(inactive, back, 1, new Date("2026-09-19T12:30:00.000Z")).data as JsonRecord;
+    const restoredItem = (restored.menuItems as JsonRecord[])[2];
+    const ownerRecipes = (restored.recipes as JsonRecord[]).filter(candidate =>
+      (candidate.menuItemId === item.id || candidate.ownerId === item.id)
+      && candidate.lifecycleStatus !== "inactive" && candidate.lifecycleStatus !== "superseded" && candidate.current !== false
+    );
+    assert.equal(restoredItem.consumptionMode, "RECIPE", target);
+    assert.equal("readyProduct" in restoredItem, false, target);
+    assert.equal("saleSize" in restoredItem, false, target);
+    assert.equal(ownerRecipes.length, 1, target);
+    assert.equal(ownerRecipes[0].id, recipe.id, target);
+    const reopened = resolveMenuConsumption(restoredItem, persisted(restored), { venueId: 1 });
+    assert.equal(reopened.ok && reopened.mode, "RECIPE", target);
+  }
 });

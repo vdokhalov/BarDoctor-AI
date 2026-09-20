@@ -71,6 +71,11 @@ export type ConsumptionModeResolution = {
   error?: string;
 };
 
+export type ExplicitConsumptionNormalization = {
+  data: unknown;
+  normalizedMenuItemIds: string[];
+};
+
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
 }
@@ -277,6 +282,135 @@ function needsReview(error: string): ConsumptionResolution {
 function explicitMode(menuItem: JsonRecord): ConsumptionMode | null {
   const candidate = text(menuItem.consumptionMode, "", 40);
   return (CONSUMPTION_MODES as readonly string[]).includes(candidate) ? candidate as ConsumptionMode : null;
+}
+
+function withoutKeys(value: JsonRecord, keys: string[]): JsonRecord {
+  const next = { ...value };
+  for (const key of keys) delete next[key];
+  return next;
+}
+
+const LEGACY_DIRECT_KEYS = [
+  "readyProductLink",
+  "readyProductKey",
+  "nomenclatureItemId",
+] as const;
+
+const LEGACY_PORTION_KEYS = [
+  "saleSize",
+  "portionSize",
+  "legacyPortionSize",
+] as const;
+
+function canonicalExplicitMenuItem(menuItem: JsonRecord, mode: ConsumptionMode): JsonRecord {
+  const canonicalType = mode === "RECIPE" ? "composite" : mode === "NONE" ? "service" : "ready";
+  const next = withoutKeys(menuItem, [...LEGACY_DIRECT_KEYS, ...LEGACY_PORTION_KEYS]);
+  next.type = canonicalType;
+  next.consumptionMode = mode;
+
+  if (mode === "DIRECT_ITEM" || mode === "FIXED_QUANTITY") {
+    const configured = record(menuItem.readyProduct ?? menuItem.readyProductLink);
+    next.readyProduct = {
+      ...configured,
+      packagesPerSale: 1,
+    };
+  } else {
+    delete next.readyProduct;
+  }
+
+  if (mode === "FIXED_QUANTITY") next.saleSize = menuItem.saleSize;
+  return next;
+}
+
+function recipeBelongsToMenuItem(recipe: JsonRecord, menuItemId: string, venueId?: number): boolean {
+  return ownerId(recipe) === menuItemId && sameVenue(recipe, venueId);
+}
+
+function recipeIsActiveConfiguration(recipe: JsonRecord): boolean {
+  return text(recipe.lifecycleStatus, "", 40) !== "superseded"
+    && text(recipe.lifecycleStatus, "", 40) !== "inactive"
+    && text(recipe.reviewStatus, "", 40) !== "superseded"
+    && text(recipe.status, "", 30) !== "superseded"
+    && recipe.current !== false;
+}
+
+/**
+ * Treats an explicit menu consumptionMode as the authoritative current
+ * configuration. Only changed menu rows are normalized. Historical recipes
+ * are retained as inactive records; nomenclature and stock history are never
+ * mutated here.
+ */
+export function normalizeExplicitConsumptionUpdates(
+  beforeValue: unknown,
+  afterValue: unknown,
+  venueIdValue?: number,
+  nowValue: Date = new Date(),
+): ExplicitConsumptionNormalization {
+  const before = record(beforeValue);
+  const after = record(afterValue);
+  if (!Array.isArray(after.menuItems)) return { data: afterValue, normalizedMenuItemIds: [] };
+
+  const previousItems = new Map(array(before.menuItems).map(record).map((item) => [text(item.id), item] as const));
+  const normalizedModes = new Map<string, ConsumptionMode>();
+  const menuItems = array(after.menuItems).map((value) => {
+    const item = record(value);
+    const id = text(item.id, "", 160);
+    const mode = explicitMode(item);
+    const previous = previousItems.get(id);
+    const changed = !previous || JSON.stringify(previous) !== JSON.stringify(item);
+    if (!id || !mode || !changed || !sameVenue(item, venueIdValue)) return value;
+    normalizedModes.set(id, mode);
+    return canonicalExplicitMenuItem(item, mode);
+  });
+  if (!normalizedModes.size) return { data: afterValue, normalizedMenuItemIds: [] };
+
+  const now = nowValue.toISOString();
+  const sourceRecipes = array(after.recipes).map(record);
+  const reactivatedByOwner = new Map<string, JsonRecord>();
+  for (const [menuItemId, mode] of normalizedModes) {
+    if (mode !== "RECIPE") continue;
+    const owned = sourceRecipes.filter((recipe) => recipeBelongsToMenuItem(recipe, menuItemId, venueIdValue));
+    if (owned.some(recipeIsActiveConfiguration)) continue;
+    const restorable = owned.filter((recipe) =>
+      text(recipe.lifecycleStatus, "", 40) === "inactive"
+      && text(recipe.reviewStatus, "", 40) !== "superseded"
+      && text(recipe.status, "", 30) !== "superseded"
+    ).sort((left, right) =>
+      text(right.deactivatedAt, recipeStamp(right), 50).localeCompare(text(left.deactivatedAt, recipeStamp(left), 50))
+        || text(right.id, "", 160).localeCompare(text(left.id, "", 160))
+    )[0];
+    if (restorable) reactivatedByOwner.set(menuItemId, restorable);
+  }
+
+  const recipes = sourceRecipes.map((recipe) => {
+    const owner = ownerId(recipe);
+    const mode = normalizedModes.get(owner);
+    if (!mode || !recipeBelongsToMenuItem(recipe, owner, venueIdValue)) return recipe;
+    if (mode === "RECIPE") {
+      if (reactivatedByOwner.get(owner) !== recipe) return recipe;
+      return {
+        ...withoutKeys(recipe, ["inactiveReason", "deactivatedAt"]),
+        current: true,
+        currentDraft: text(recipe.status, "", 30) !== "confirmed",
+        lifecycleStatus: "current",
+        reactivatedAt: now,
+      };
+    }
+    if (!recipeIsActiveConfiguration(recipe)) return recipe;
+    return {
+      ...recipe,
+      current: false,
+      currentDraft: false,
+      lifecycleStatus: "inactive",
+      inactiveReason: "consumption_mode_normalization",
+      deactivatedAt: text(recipe.deactivatedAt, now, 50),
+    };
+  });
+
+  return {
+    data: { ...after, menuItems, recipes },
+    normalizedMenuItemIds: [...normalizedModes.keys()].sort(),
+  };
 }
 
 function hasExplicitMode(menuItem: JsonRecord): boolean {

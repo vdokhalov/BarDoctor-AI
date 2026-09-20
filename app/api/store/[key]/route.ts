@@ -51,6 +51,7 @@ import {
   changedConsumptionModeIssues,
   duplicateMenuItemIds,
   legacyConsumptionConflicts,
+  normalizeExplicitConsumptionUpdates,
 } from "../../../../lib/bardoctor/consumption-mode";
 import {
   protectedSalesBatchMutations,
@@ -215,6 +216,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
   let techCardReconciliation = null as ReturnType<typeof reconcileTechCards>["report"] | null;
   if (key === ASSORTMENT_STORE_KEY) {
+    after = normalizeExplicitConsumptionUpdates(before, after, account.venueId).data;
     const repeatedMenuItemIds = duplicateMenuItemIds(after);
     if (repeatedMenuItemIds.length) {
       return Response.json({
