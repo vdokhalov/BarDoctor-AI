@@ -21,7 +21,8 @@ test("alphabetical display does not change existing default selections", () => {
   assert.match(bundle, /bdTaxOperationalV363\(O\.taxonomy\?\.sections\)\[0\]/);
   assert.match(bundle, /bdTaxOperationalV363\(T\.taxonomy\?\.sections\)\[0\]/);
   assert.match(bundle, /bdTaxOperationalV363\(bdMenuTaxInitial\.sections\)\[0\]/);
-  assert.match(bundle, /bdTaxOperationalV363\(c\.taxonomy\?\.sections\)\[0\]/);
+  assert.match(bundle, /g\(draft=>bdMenuTaxonomyMergeV440\(draft,response,Boolean\(e\?\.id\)\)\)/);
+  assert.match(bundle, /if \(draft\.sectionId \|\| draft\.taxonomyCategoryId \|\| draft\.subcategoryId\) return draft/);
 });
 
 test("tree and manager are alphabetical at every taxonomy level", () => {

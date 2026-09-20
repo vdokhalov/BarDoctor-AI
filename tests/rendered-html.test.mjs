@@ -543,7 +543,7 @@ test("catalog resolves menu positions through the canonical nomenclature taxonom
   assert.match(grouping, /taxonomyCategoryId/);
   assert.match(grouping, /subcategoryId/);
   assert.match(grouping, /Без категории/);
-  assert.match(editor, /bdTaxonomySelectorsV336/);
+  assert.match(editor, /bdMenuTaxonomySelectorsV440/);
   assert.doesNotMatch(editor, /label:"Группа"/);
   assert.doesNotMatch(editor, /label:"Подраздел"/);
 });

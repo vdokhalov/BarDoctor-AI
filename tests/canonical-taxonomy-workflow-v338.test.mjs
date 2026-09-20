@@ -51,7 +51,7 @@ test("menu and purchase lines consume taxonomy IDs instead of a separate busines
   const purchaseEnd = bundle.indexOf("const bdImageUploadVersion", purchaseStart);
   assert.match(bundle.slice(menuStart, menuEnd), /nomenclatureStructure/);
   assert.match(bundle.slice(menuStart, menuEnd), /taxonomyCategoryId/);
-  assert.match(bundle.slice(editorStart, editorEnd), /bdTaxonomySelectorsV336/);
+  assert.match(bundle.slice(editorStart, editorEnd), /bdMenuTaxonomySelectorsV440/);
   assert.match(bundle.slice(editorStart, editorEnd), /Управление общей структурой/);
   assert.match(bundle.slice(purchaseStart, purchaseEnd), /line\.purchaseProductKey\|\|line\.nomenclatureId/);
   assert.doesNotMatch(bundle.slice(purchaseStart, purchaseEnd), /label:"Категория",children:i\.jsx\("select",\{value:[a-z]\.category/);
