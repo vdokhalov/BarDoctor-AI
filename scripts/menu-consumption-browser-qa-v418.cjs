@@ -823,6 +823,16 @@ async function saveMenuEditor(editor) {
   await editor.waitFor({ state: "detached", timeout: 15_000 });
 }
 
+async function saveRecipeDraft(editor, mobile) {
+  if (mobile) {
+    await editor.getByRole("button", { name: "Дополнительные действия" }).click();
+    await editor.getByRole("menuitem", { name: "Сохранить черновик" }).click();
+  } else {
+    await editor.getByRole("button", { name: "Сохранить черновик" }).click();
+  }
+  await editor.waitFor({ state: "detached", timeout: 15_000 });
+}
+
 async function assertMenuActionLayout(page, profile, label) {
   const audit = await page.evaluate(({ mobile }) => {
     const editor = document.querySelector(".bd-menu-position-editor-v400");
@@ -1212,7 +1222,7 @@ async function runProfile(browser, baseUrl, profile) {
     for (const entryTab of ["menu", "recipes"]) {
       await openItem(page, baseUrl, entryTab, legacyMenu.id);
       const legacyEditor = await openRecipeEditor(page);
-      assert.match(await legacyEditor.innerText(), /Legacy Sprite/);
+      assert.ok((await legacyEditor.innerText()).includes(legacyMenu.name));
       assert.equal(await legacyEditor.getByLabel("Количество на порцию").first().inputValue(), "8");
       audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: legacy recipe from ${entryTab}`));
       await closeRecipeEditor(legacyEditor);
@@ -1407,8 +1417,7 @@ async function runProfile(browser, baseUrl, profile) {
     assert.equal(await quantity.inputValue(), "8");
     await quantity.fill("9");
     audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: recipe editor from Menu`));
-    await recipeEditor.getByRole("button", { name: "Сохранить черновик" }).click();
-    await recipeEditor.waitFor({ state: "detached", timeout: 15_000 });
+    await saveRecipeDraft(recipeEditor, profile.mobile);
 
     activeCatalog = catalogFor(state);
     let espressoRecipes = activeCatalog.recipes.filter((recipe) => recipe.menuItemId === espressoMenuId);
@@ -1441,7 +1450,7 @@ async function runProfile(browser, baseUrl, profile) {
     assert.equal(await recipeChoice.count(), 1, "multiple active recipes must render a controlled chooser");
     assert.equal(await recipeChoice.inputValue(), "");
     assert.equal(
-      await editor.getByRole("button", { name: "Сохранить", exact: true }).isDisabled(),
+      await editor.getByRole("button", { name: /^Сохранить/ }).isDisabled(),
       true,
       "an ambiguous Recipe mode must not save until one Recipe is selected",
     );
@@ -1522,7 +1531,8 @@ async function runProfile(browser, baseUrl, profile) {
     ));
     await openItem(page, baseUrl, "recipes", directMenuId);
     recipeEditor = await openRecipeEditor(page);
-    assert.match(await recipeEditor.innerText(), /МЕНЮ → ТЕХКАРТА[\s\S]*Kozel Dark 0\.5/);
+    assert.match(await recipeEditor.innerText(), /МЕНЮ → ТЕХКАРТА/);
+    assert.ok((await recipeEditor.innerText()).includes(directItem.name));
     assert.equal(
       await recipeEditor.locator(".bd-menu-nomenclature-picker-v350").count(),
       0,
