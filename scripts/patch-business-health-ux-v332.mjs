@@ -1,4 +1,8 @@
 import fs from "node:fs";
+import {
+  findBlankLineStartBeforeMarker,
+  findLineStartBeforeMarker,
+} from "./lib/patch-line-boundaries.mjs";
 
 const bundlePath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 const bootstrapPath = new URL("../public/bardoctor-preview.js", import.meta.url);
@@ -34,17 +38,17 @@ source = source.replace(
 
 const helpersAnchor = "function bdSnapshotHealthViewV284(e,t){";
 const existingHelperStarts = [
-  source.indexOf("\nfunction bdBusinessHealthSnapshotFromEnvelopeV334"),
-  source.indexOf("\nfunction bdBusinessHealthSnapshotFromEnvelopeV333"),
-  source.indexOf("\nfunction bdHealthUiStatusV332"),
+  findLineStartBeforeMarker(source, "function bdBusinessHealthSnapshotFromEnvelopeV334"),
+  findLineStartBeforeMarker(source, "function bdBusinessHealthSnapshotFromEnvelopeV333"),
+  findLineStartBeforeMarker(source, "function bdHealthUiStatusV332"),
 ].filter((index) => index >= 0);
 const existingHelpersStart = existingHelperStarts.length ? Math.min(...existingHelperStarts) : -1;
 if (existingHelpersStart >= 0) {
-  const existingHelpersEnd = source.indexOf("\n\nfunction WS()", existingHelpersStart);
+  const existingHelpersEnd = findBlankLineStartBeforeMarker(source, "function WS()", existingHelpersStart);
   if (existingHelpersEnd < 0) throw new Error("Business Health UX existing helper boundary not found");
   source = source.slice(0, existingHelpersStart) + source.slice(existingHelpersEnd);
 }
-const helpersEnd = source.indexOf("\n\nfunction WS()", source.indexOf(helpersAnchor));
+const helpersEnd = findBlankLineStartBeforeMarker(source, "function WS()", source.indexOf(helpersAnchor));
 if (helpersEnd < 0) throw new Error("Business Health UX helper boundary not found");
 const uiHelpers = String.raw`
 function bdBusinessHealthSnapshotFromEnvelopeV334(e){const n=e?.data?.businessHealthSnapshot;if(!n||n.calculationVersion!==bdBusinessHealthCalculationVersionV284||!n.livePeriod)return null;const t=bdBusinessHealthSnapshotFromEnvelopeV284(e);if(!t)return null;const r=Array.isArray(n?.zones)?n.zones:[],a=new Map(r.map(s=>[String(s?.id||""),s])),l=n?.priorityAction??null;return{...t,dataAccountId:String(n.dataAccountId??""),zones:(t.zones??[]).map(s=>{const u=a.get(String(s.id));return{...s,status:u?.status??null,statusLabel:String(u?.statusLabel??""),interpretation:String(u?.interpretation??""),factors:Array.isArray(u?.factors)?u.factors.map(String):[]}}),priorityAction:t.priorityAction?{...t.priorityAction,target:l?.target&&l.target.path&&l.target.label?{path:String(l.target.path),label:String(l.target.label)}:null,ctaLabel:String(l?.target?.label??l?.ctaLabel??t.priorityAction.ctaLabel??"")}:null,livePeriod:n.livePeriod,dataQuality:{...(t.dataQuality??{}),status:n?.dataQuality?.status??null,statusLabel:String(n?.dataQuality?.statusLabel??"")}}}

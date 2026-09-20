@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { findUniquePatternStart } from "./lib/patch-line-boundaries.mjs";
 
 const root = new URL("../", import.meta.url);
 const bundlePaths = [
@@ -205,7 +206,7 @@ function patchShell(path) {
     '    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />',
     `    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />\n${launchLinks}`,
   );
-  const styleStart = source.indexOf("    <style>\n      /* bd-");
+  const styleStart = findUniquePatternStart(source, /    <style>\r?\n      \/\* bd-/);
   const styleEnd = source.indexOf("    </style>", styleStart);
   if (styleStart < 0 || styleEnd < 0) throw new Error(`Startup styles missing in ${path.pathname}`);
   source = source.slice(0, styleStart) + startupCss + source.slice(styleEnd + "    </style>".length);
