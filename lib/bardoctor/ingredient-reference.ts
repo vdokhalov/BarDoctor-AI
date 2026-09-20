@@ -16,5 +16,11 @@ export function ingredientReferencesConflict(ingredient:Record<string,unknown>,a
  const references=[ingredient.nomenclatureItemId,ingredient.purchaseProductKey,ingredient.productKey,ingredient.key]
   .filter((value):value is string=>typeof value==='string'&&!!value.trim())
   .map(value=>canonicalIngredientReference(assortment,value.trim()));
- return new Set(references).size>1;
+ // Legacy purchase/package references may not be catalogue identities. A conflict
+ // requires two different resolved catalogue products, not merely different strings.
+ const products=[assortment.nomenclature,assortment.stockBalances].flatMap(value=>Array.isArray(value)?value:[]);
+ const known=new Set(products.flatMap(product=>[product.id,product.nomenclatureItemId,product.key,product.productKey])
+  .filter((value):value is string=>typeof value==='string'&&!!value.trim())
+  .map(value=>canonicalIngredientReference(assortment,value.trim())));
+ return new Set(references.filter(reference=>known.has(reference))).size>1;
 }
