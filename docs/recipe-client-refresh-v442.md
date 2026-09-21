@@ -20,4 +20,4 @@ The fresh read-only production session showed the conflicting references correct
 
 Browser evidence is written to `outputs/general-tech-card-v440/`. The optional `BD_QA_CLIENT_BASELINE` test input serves an immutable earlier client for a negative run; its output is separate under `outputs/general-tech-card-v441-baseline/`. Persistence still uses the real handler in both runs.
 
-Full mandatory GitHub CI on the final commit is the release gate. A local Windows build attempt hit the local runner's 240-second timeout; that is not a passing build. Production remains on v441 until the corrected release is approved and deployed. No `PRODUCTION VERIFIED` claim is made by this document.
+Full mandatory GitHub CI on the final commit is the release gate. The first local Windows build attempt hit the local runner's 240-second timeout. The subsequent direct compilation and the unchanged post-build validation completed successfully (`VERIFIED BUILD PASS`). Production remains on v441 until the corrected release is approved and deployed. No `PRODUCTION VERIFIED` claim is made by this document.
