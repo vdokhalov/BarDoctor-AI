@@ -52,6 +52,8 @@ jobs:
         run: npm run test:menu-consumption-browser
       - name: General tech card real server SQLite mobile desktop
         run: node --import tsx scripts/general-tech-card-browser-v440.ts
+      - name: Account and venue lifecycle real server SQLite mobile desktop
+        run: node --import tsx scripts/account-lifecycle-browser.ts
       - name: Phase 4 purchase units mobile and desktop QA
         run: BD_QA_SCENARIO=phase4-conversion npm run test:procurement-browser
       - name: Phase 5 opening stock and CSV mobile desktop persisted HTTP QA

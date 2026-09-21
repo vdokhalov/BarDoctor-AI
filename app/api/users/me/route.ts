@@ -9,13 +9,14 @@ import {
 } from "../../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import { venueIdentityFromJson } from "../../../../lib/bardoctor/venue-identity";
+import { ownedLifecycleVenues } from "../../../../lib/bardoctor/account-lifecycle";
 
 export async function GET(request: Request): Promise<Response> {
   const [account, actor] = await Promise.all([
     authenticateIdentityRequest(request),
     authenticateRequest(request),
   ]);
-  if (!account || !actor) return unauthorized();
+  if (!account) return unauthorized();
   const memberships = await membershipsForAccount(account);
 
   return Response.json({
@@ -30,12 +31,12 @@ export async function GET(request: Request): Promise<Response> {
         method: account.passwordHash ? "password" : "identity",
         canChangePassword: Boolean(account.passwordHash && account.chatgptEmail),
       },
-      role: actor.role,
-      permissions: actor.permissions,
-      activeVenueId: actor.venueId,
-      activeWorkspaceId: memberships.find((item) => item.venue.id === actor.venueId)?.venue.workspaceId ?? null,
-      activeVenueIsPrimary: actor.id === account.id,
-      canCreateVenues: actor.role === "owner",
+      role: actor?.role ?? null,
+      permissions: actor?.permissions ?? [],
+      activeVenueId: actor?.venueId ?? null,
+      activeWorkspaceId: memberships.find((item) => item.venue.id === actor?.venueId)?.venue.workspaceId ?? null,
+      activeVenueIsPrimary: actor?.id === account.id,
+      canCreateVenues: actor?.role === "owner" || memberships.length === 0 || (await ownedLifecycleVenues(account.id)).length > 0,
       venues: memberships.map((item) => {
         const identity = venueIdentityFromJson(item.dataAccount.restaurantJson);
         return {

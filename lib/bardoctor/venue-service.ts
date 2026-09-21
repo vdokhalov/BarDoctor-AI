@@ -5,6 +5,7 @@ import {
   domainData,
   venueMemberships,
   venues,
+  workspaces,
 } from "../../db/schema";
 import type { AuthenticatedAccount } from "./access-control";
 import type { VenueProfile } from "./venue-profile";
@@ -16,7 +17,7 @@ function internalVenueEmail(): string {
 }
 
 export async function createVenueForOwner(
-  actor: AuthenticatedAccount,
+  actor: Pick<AuthenticatedAccount, "role" | "venueId" | "actorAccountId">,
   profile: VenueProfile,
 ) {
   if (actor.role !== "owner") throw new Error("VENUE_CREATE_FORBIDDEN");
@@ -33,7 +34,16 @@ export async function createVenueForOwner(
       ),
     )
     .limit(1);
-  if (!currentVenue?.workspaceId) throw new Error("VENUE_WORKSPACE_MISSING");
+  let workspaceId = currentVenue?.workspaceId;
+  if (!workspaceId) {
+    // Identity-only management also works after archiving/deleting the last venue.
+    const [workspace] = await db.select().from(workspaces).where(and(eq(workspaces.createdByAccountId, actor.actorAccountId), eq(workspaces.status, "active"))).limit(1);
+    if (workspace) workspaceId = workspace.id;
+    else {
+      const [created] = await db.insert(workspaces).values({ name: profile.name, createdByAccountId: actor.actorAccountId }).returning();
+      workspaceId = created.id;
+    }
+  }
 
   const now = new Date().toISOString();
   const dataEmail = internalVenueEmail();
@@ -58,7 +68,7 @@ export async function createVenueForOwner(
     const [venue] = await db
       .insert(venues)
       .values({
-        workspaceId: currentVenue.workspaceId,
+        workspaceId,
         dataAccountId,
         status: "active",
         createdByAccountId: actor.actorAccountId,

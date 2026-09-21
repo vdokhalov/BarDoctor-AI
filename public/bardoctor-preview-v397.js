@@ -1006,6 +1006,21 @@
 
   function rememberAccessContext(result) {
     if (!result || !result.ok) return;
+    // Account incarnation, not email: a fresh registration must never reuse an old cache.
+    if (result.userId && result.email) {
+      var incarnationKey = "bd_identity_incarnation__" + result.email;
+      var previousIdentity = localStorage.getItem(incarnationKey) || (localStorage.getItem("bd_session") === result.email ? localStorage.getItem("bd_session_userid") : null);
+      if (previousIdentity !== String(result.userId)) {
+        for (var storage of [localStorage, sessionStorage]) {
+          for (var index = storage.length - 1; index >= 0; index--) {
+            var key = storage.key(index);
+            if (key && (key.startsWith("bd_") || key.startsWith("bardoctor")) && !["bd_session","bd_session_token","bd_session_userid"].includes(key)) storage.removeItem(key);
+          }
+        }
+      }
+      localStorage.setItem(incarnationKey, String(result.userId));
+    }
+
     window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"
       ? result.bootstrap
       : { state: "recovery_required", reason: "bootstrap_contract_missing" };

@@ -2,7 +2,6 @@ import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
 import {
   accounts,
-  domainData,
   sessions,
   venueMemberships,
   venues,
@@ -323,29 +322,21 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
     .limit(1);
   let workspaceId = venue?.workspaceId ?? null;
   let createdVenue = false;
-  if (!workspaceId) {
-    const [workspace] = await db
-      .insert(workspaces)
-      .values({
-        name: venueName(account),
-        status: "active",
-        createdByAccountId: account.id,
-        updatedAt: now,
-      })
-      .returning();
-    workspaceId = workspace.id;
-  }
   if (!venue) {
-    [venue] = await db
-      .insert(venues)
-      .values({
-        workspaceId,
-        dataAccountId: account.id,
-        status: "active",
-        createdByAccountId: account.id,
-        updatedAt: now,
-      })
-      .returning();
+    // A stale bootstrap request must not recreate a venue deleted by another request.
+    // D1 executes the eligibility check and both inserts in the same transaction.
+    const d1 = getD1();
+    await d1.batch([
+      d1.prepare(`INSERT INTO workspaces(name,status,created_by_account_id,updated_at)
+        SELECT ?,'active',id,? FROM accounts WHERE id=? AND owns_venue=1 AND account_kind='user'
+        AND NOT EXISTS(SELECT 1 FROM venues WHERE data_account_id=?)`).bind(venueName(account), now, account.id, account.id),
+      d1.prepare(`INSERT INTO venues(workspace_id,data_account_id,status,created_by_account_id,updated_at)
+        SELECT last_insert_rowid(),id,'active',id,? FROM accounts WHERE id=? AND owns_venue=1 AND account_kind='user'
+        AND NOT EXISTS(SELECT 1 FROM venues WHERE data_account_id=?)`).bind(now, account.id, account.id),
+    ]);
+    [venue] = await db.select().from(venues).where(eq(venues.dataAccountId, account.id)).limit(1);
+    if (!venue) return;
+    workspaceId = venue.workspaceId;
     createdVenue = true;
   } else if (venue.workspaceId !== workspaceId || !venue.createdByAccountId) {
     await db
@@ -355,15 +346,16 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
     venue = { ...venue, workspaceId, createdByAccountId: venue.createdByAccountId ?? account.id };
   }
   if (!venue) throw new Error("VENUE_INITIALIZATION_FAILED");
-  if (createdVenue || account.migrationStatus === "server_authoritative") {
-    await db
-      .insert(domainData)
-      .values(authoritativeVenueStoreRows({
+  if (venue.status === "active" && (createdVenue || account.migrationStatus === "server_authoritative")) {
+    const d1 = getD1();
+    await d1.batch(authoritativeVenueStoreRows({
         dataAccountId: account.id,
         venueId: venue.id,
         updatedAt: now,
-      }))
-      .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
+      }).map(row => d1.prepare(`INSERT OR IGNORE INTO domain_data(account_id,store_key,data_json,updated_at)
+        SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM venues v JOIN accounts a ON a.id=v.data_account_id
+          WHERE v.id=? AND v.status='active' AND a.owns_venue=1 AND a.account_kind='user')`)
+        .bind(row.accountId, row.storeKey, row.dataJson, row.updatedAt, venue.id)));
   }
   await reconcileVenueOwnerAccess(venue.id);
 }
@@ -528,7 +520,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     activeVenueId: active?.venue.id ?? null,
     activeWorkspaceId: active?.venue.workspaceId ?? null,
     activeVenueIsPrimary: Boolean(active && active.venue.dataAccountId === account.id),
-    canCreateVenues: activeRole === "owner",
+    canCreateVenues: activeRole === "owner" || memberships.length === 0 || ownedVenueStatuses.length > 0,
     bootstrap: {
       ...bootstrap,
       membershipsLoaded: true,

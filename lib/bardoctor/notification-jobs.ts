@@ -103,6 +103,7 @@ export async function dispatchNotificationJobs(input: {
   const rows = await getD1().prepare(`
     SELECT * FROM notification_jobs
     WHERE (status IN ('queued','failed') OR (status='dispatching' AND leased_at < ?))
+      AND (venue_id IS NULL OR EXISTS (SELECT 1 FROM venues WHERE venues.id=notification_jobs.venue_id AND venues.status='active'))
       AND target_at > ? AND target_at <= ? AND (next_attempt_at IS NULL OR next_attempt_at <= ?)
       AND (? IS NULL OR account_id=?) AND (? IS NULL OR source_id=?)
     ORDER BY target_at,id LIMIT ?
@@ -114,6 +115,7 @@ export async function dispatchNotificationJobs(input: {
     const claim = await getD1().prepare(`
       UPDATE notification_jobs SET status='dispatching', leased_at=?, attempt_count=attempt_count+1, updated_at=?
       WHERE id=? AND (status IN ('queued','failed') OR (status='dispatching' AND leased_at < ?))
+        AND (venue_id IS NULL OR EXISTS (SELECT 1 FROM venues WHERE venues.id=notification_jobs.venue_id AND venues.status='active'))
     `).bind(nowIso, nowIso, job.id, staleLease).run();
     if ((claim.meta.changes ?? 0) !== 1) continue;
     summary.checked += 1; await transition(job.id, job.status, "dispatching", `Попытка ${job.attempt_count + 1}`);

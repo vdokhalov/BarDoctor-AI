@@ -5,6 +5,7 @@ import { getChatGPTEmail, normalizeEmail } from "./auth";
 import { ALLOWED_STORE_KEYS, LEGACY_REPLIT_ORIGIN } from "./constants";
 import { runtimeEnv } from "./runtime-env";
 import { canImportLegacyAccount } from "./account-identity";
+import { identityWasDeleted } from "./account-lifecycle";
 
 type LegacyAuthResult = {
   ok: true;
@@ -159,6 +160,7 @@ export async function importLegacyAccount(input: {
   loginProfile?: Partial<LegacyAuthResult>;
 }): Promise<Account> {
   const appEmail = normalizeEmail(input.email);
+  if (await identityWasDeleted(appEmail)) throw new Error("LEGACY_AUTH_INVALID");
   const chatgptEmail = getChatGPTEmail(input.request);
   if (!chatgptEmail || !canImportLegacyAccount(chatgptEmail, appEmail)) {
     throw new Error("LEGACY_IDENTITY_MISMATCH");

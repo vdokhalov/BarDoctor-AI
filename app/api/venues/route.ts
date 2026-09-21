@@ -11,6 +11,7 @@ import { createVenueForOwner } from "../../../lib/bardoctor/venue-service";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
 import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
 import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
+import { ownedLifecycleVenues } from "../../../lib/bardoctor/account-lifecycle";
 
 function venueCurrency(value: string | null): string | null {
   if (!value) return null;
@@ -27,12 +28,12 @@ export async function GET(request: Request): Promise<Response> {
     authenticateRequest(request),
     authenticateIdentityRequest(request),
   ]);
-  if (!actor || !identity) return unauthorized();
+  if (!identity) return unauthorized();
   const memberships = await membershipsForAccount(identity);
   return Response.json({
     ok: true,
-    activeVenueId: actor.venueId,
-    canCreateVenues: actor.role === "owner",
+    activeVenueId: actor?.venueId ?? null,
+    canCreateVenues: actor?.role === "owner" || memberships.length === 0 || (await ownedLifecycleVenues(identity.id)).length > 0,
     venues: memberships.map((item) => {
       const venueIdentity = venueIdentityFromJson(item.dataAccount.restaurantJson);
       return {
@@ -45,21 +46,24 @@ export async function GET(request: Request): Promise<Response> {
         permissions: item.permissions,
         status: item.venue.status,
         isPrimary: item.venue.dataAccountId === identity.id,
-        active: item.venue.id === actor.venueId,
+        active: item.venue.id === actor?.venueId,
       };
     }),
   });
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const actor = await authenticateRequest(request);
-  if (!actor) return unauthorized();
-  if (actor.role !== "owner") {
+  const identity = await authenticateIdentityRequest(request);
+  if (!identity) return unauthorized();
+  const memberships = await membershipsForAccount(identity);
+  const mayCreate = memberships.length === 0 || memberships.some(item => item.role === "owner") || (await ownedLifecycleVenues(identity.id)).length > 0;
+  if (!mayCreate) {
     return Response.json(
       { ok: false, code: "ACCESS_DENIED", error: "Новое заведение может создать только владелец" },
       { status: 403 },
     );
   }
+  const actor = { ...identity, actorAccountId: identity.id, venueId: memberships.find(item => item.role === "owner")?.venue.id ?? 0, workspaceId: 0, role: "owner" as const, permissions: permissionsFor("owner") };
   const parsed = await readJsonRequest<Record<string, unknown>>(request, {
     maxBytes: 512 * 1024,
   });

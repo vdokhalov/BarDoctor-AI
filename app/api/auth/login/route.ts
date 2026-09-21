@@ -20,6 +20,7 @@ import {
 } from "../../../../lib/bardoctor/password";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import { canImportLegacyAccount } from "../../../../lib/bardoctor/account-identity";
+import { identityWasDeleted } from "../../../../lib/bardoctor/account-lifecycle";
 
 const INVALID_CREDENTIALS = "Неверный email или пароль";
 
@@ -67,7 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     // Never forward credentials to the legacy service unless dispatch has
     // verified that the current ChatGPT identity owns the same email address.
     // Normal local-password login above remains independent of ChatGPT email.
-    if (!chatgptEmail || !canImportLegacyAccount(chatgptEmail, email)) {
+    if (!chatgptEmail || !canImportLegacyAccount(chatgptEmail, email) || await identityWasDeleted(email)) {
       return Response.json(
         { ok: false, error: INVALID_CREDENTIALS },
         { status: 401 },
