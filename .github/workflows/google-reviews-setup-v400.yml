@@ -52,6 +52,8 @@ jobs:
         run: npm run test:menu-consumption-browser
       - name: General tech card real server SQLite mobile desktop
         run: node --import tsx scripts/general-tech-card-browser-v440.ts
+      - name: First venue setup registration wizard real server SQLite mobile desktop
+        run: node --import tsx scripts/first-venue-setup-browser.ts
       - name: Account and venue lifecycle real server SQLite mobile desktop
         run: node --import tsx scripts/account-lifecycle-browser.ts
       - name: Phase 4 purchase units mobile and desktop QA

@@ -41,13 +41,35 @@
     }
   }
 
+  var locationListenersBound = false;
+  function retryLocationDirectory() {
+    var retry = document.getElementById('venue-directory-retry');
+    if (retry) retry.disabled = true;
+    var script = document.createElement('script');
+    script.src = '/venue-location-data.js?v=setup-retry-v444';
+    script.onload = function () {
+      script.remove();
+      if (initialiseLocationFields()) {
+        notice.className = 'notice hidden';
+        verifyOwner().then(function (allowed) { submit.disabled = !allowed; });
+      }
+    };
+    script.onerror = function () { script.remove(); initialiseLocationFields(); };
+    document.head.appendChild(script);
+  }
+
   function initialiseLocationFields() {
     if (!countrySelect || !citySelect) return;
     var directory = window.BD_VENUE_LOCATIONS;
     if (!directory || !Array.isArray(directory.countries)) {
-      showNotice("Не удалось загрузить справочник стран и городов. Обновите страницу.", "error");
+      showNotice("Не удалось загрузить справочник стран и городов. Повторите загрузку; введённые данные сохранятся.", "error");
       submit.disabled = true;
-      return;
+      var retry = document.createElement('button');
+      retry.id = 'venue-directory-retry'; retry.type = 'button';
+      retry.textContent = 'Повторить загрузку справочника';
+      retry.addEventListener('click', retryLocationDirectory);
+      notice.appendChild(retry);
+      return false;
     }
     var restoredCountry = countrySelect.value;
     countrySelect.replaceChildren(option("", "Выберите страну"));
@@ -60,6 +82,8 @@
     });
     if (restoredCountry) countrySelect.value = restoredCountry;
     renderCities(false);
+    if (locationListenersBound) return true;
+    locationListenersBound = true;
     countrySelect.addEventListener("change", function () {
       renderCities(true);
       if (regionInput) regionInput.value = "";
@@ -70,6 +94,7 @@
         regionInput.value = "Приднестровье";
       }
     });
+    return true;
   }
 
   function sessionHeaders() {

@@ -61,6 +61,8 @@ const launchMedia = launchScreens
 const startupCss = `    <style>
       /* bd-stable-splash-v394 */
       .bd-static-startup-v201 { display: none; }
+      /* bd-static-splash-ownership-v444 */
+      .bd-static-startup-v201.bd-unified-splash-v394 { display: none; }
       html[data-bd-startup-pending="v201"] {
         min-height: 100%;
         background: #070911;

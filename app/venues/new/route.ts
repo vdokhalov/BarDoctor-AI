@@ -16,7 +16,7 @@ const VENUE_CREATE_HTML = `<!doctype html>
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-location-data.js?v=20260811-location-selects-v2" defer></script>
-    <script src="/venue-create.js?v=20260811-location-selects-v2" defer></script>
+    <script src="/venue-create.js?v=first-venue-setup-v444" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/more">

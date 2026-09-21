@@ -96,6 +96,7 @@ node "${script_dir}/patch-editor-standard-v439.mjs"
 node "${script_dir}/patch-tech-card-access-v440.mjs"
 node "${script_dir}/patch-menu-taxonomy-v440.mjs"
 node "${script_dir}/patch-account-lifecycle.mjs"
+node "${script_dir}/patch-first-venue-setup-v444.mjs"
 node "${script_dir}/patch-monthly-financial-model-phase7.mjs"
 node "${script_dir}/prepare-versioned-client-asset-v379.mjs"
 timeout \
