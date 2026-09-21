@@ -32,6 +32,22 @@ if(!source.includes('bd-tech-card-direct-action-v440')){
 if(source.includes('if(w.status==="confirmed"&&(!c.synced||!p))'))once('if(w.status==="confirmed"&&(!c.synced||!p))','if(!c.synced||w.status==="confirmed"&&!p)');
 source=source.replaceAll('bdLegacyRecipeCanOpenV418(p,s.recipes)','bdEditableRecipesV440(p,s.recipes,s.activeVenueId).length>0').replaceAll('bdLegacyRecipeCanOpenV418(W,s.recipes)','bdEditableRecipesV440(W,s.recipes,s.activeVenueId).length>0');
 source=source.replace("const R=n.find(G=>(G.key||G.productKey)===c&&(!G.venueId||Number(G.venueId)===Number(bdRecipeVenueId)));if(c&&!R)return;const W=","const R=I||n.find(G=>(G.key||G.productKey)===c);if(c&&(!R||(R.key||R.productKey)!==c||R.venueId&&Number(R.venueId)!==Number(bdRecipeVenueId)))return;const W=");
+// Refresh helper definitions on prepared clients as well as first-time builds.
+if(!source.includes('const bdRecipeSourceChangedV442=')){
+ once('bdUseExplicitFormViewportV438(bdTechDialogRefV354);','bdUseExplicitFormViewportV438(bdTechDialogRefV354);const bdRecipeSourceChangedV442=bdUseRecipeRefreshV442(t,r,bdTechDirtyRefV438,bdRecipeSavingRefV418,u,f);');
+ once('E=async p=>{if(bdRecipeSavingRefV418.current)return!1;', 'E=async p=>{if(bdRecipeSourceChangedV442){bdSetRecipeSaveErrorV418(bdRecipeRefreshMessageV442);return!1}if(bdRecipeSavingRefV418.current)return!1;');
+ once('saveDisabledReason:!l.ingredients.length?', 'saveDisabledReason:bdRecipeSourceChangedV442?bdRecipeRefreshMessageV442:!l.ingredients.length?');
+ once('onClick:()=>E(!1),disabled:!l.ingredients.length', 'onClick:()=>E(!1),disabled:bdRecipeSourceChangedV442||!l.ingredients.length');
+}
+source=source.replace('bdTechCanConfirm=!bdRecipeSourceChangedV442&&l.ingredients.length>0', 'bdTechCanConfirm=l.ingredients.length>0');
+source=source.replace('error:bdRecipeSourceChangedV442?bdRecipeRefreshMessageV442:bdRecipeSaveErrorV418,','error:bdRecipeSaveErrorV418,');
+source=source.replace('saveDisabled:!bdTechCanConfirm,','saveDisabled:bdRecipeSourceChangedV442||!bdTechCanConfirm,');
+if(!source.includes('children:[bdRecipeSourceChangedV442&&'))once('className:"bd-catalog-form bd-explicit-form-scroll-v438",children:[','className:"bd-catalog-form bd-explicit-form-scroll-v438",children:[bdRecipeSourceChangedV442&&i.jsx("p",{className:"bd-catalog-structure-error",role:"alert",children:bdRecipeRefreshMessageV442}),');
+source=source.replace('resolutionStatus:"linked_ready",linkStatus:p.linkSource===', 'resolutionStatus:bdIngredientReferenceConflictV440(p,n)?"reference_conflict":"linked_ready",linkStatus:p.linkSource===');
+const helperStart=source.indexOf('function bdEditableRecipesV440(');
+const helperEnd=source.indexOf('function bdCatRecipeEditor(',helperStart);
+if(helperStart<0||helperEnd<helperStart)throw Error('access helper boundaries missing');
+source=source.slice(0,helperStart)+helper+'\n'+source.slice(helperEnd);
 fs.writeFileSync(file,source);
 const path='scripts/fragments/menu-consumption-sot-v418.fragment.txt';
 let menu=fs.readFileSync(path,'utf8');

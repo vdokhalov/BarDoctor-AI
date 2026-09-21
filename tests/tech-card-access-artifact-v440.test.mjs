@@ -13,4 +13,7 @@ test('access and taxonomy patches replay without duplicate helpers or losing fin
  assert.ok(after.includes('if(!c.synced||w.status==="confirmed"&&!p)'),'draft stays open on failed sync');
  assert.ok(after.includes('onClick:()=>{bdMenuCloseV435()&&bdMenuOpenRecipeV440()}'),'menu transition uses existing dirty confirmation');
  assert.ok(after.includes('bdIngredientReferenceConflictV440(p,n)||'),'conflicts block confirmation');
+ assert.ok(after.includes('const bdRecipeSourceChangedV442=bdUseRecipeRefreshV442(t,r,bdTechDirtyRefV438,bdRecipeSavingRefV418,u,f)'),'editor subscribes to fresh source without remounting');
+ assert.ok(after.includes('E=async p=>{if(bdRecipeSourceChangedV442)'),'both saves guard against a changed source');
+ assert.ok(after.includes('resolutionStatus:bdIngredientReferenceConflictV440(p,n)?"reference_conflict":"linked_ready"'),'unit conversion does not clear an unresolved reference conflict');
 });

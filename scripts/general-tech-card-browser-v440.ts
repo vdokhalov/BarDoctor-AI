@@ -9,6 +9,9 @@ process.env.BD_QA_EXPORT_ONLY='1';
 const publicRoot=path.resolve('public');
 const frontend=http.createServer((req,res)=>{
  const pathname=decodeURIComponent(new URL(req.url||'/', 'http://127.0.0.1').pathname);
+ if(process.env.BD_QA_CLIENT_BASELINE&&/^\/assets\/index-BQGspy0I.*\.js$/.test(pathname)){
+  res.writeHead(200,{'Content-Type':'text/javascript'});fs.createReadStream(process.env.BD_QA_CLIENT_BASELINE).pipe(res);return;
+ }
  const file=path.resolve(publicRoot,'.'+(pathname.includes('.')?pathname:'/app.html'));
  if(!file.startsWith(publicRoot+path.sep)||!fs.existsSync(file)){res.writeHead(404);res.end();return}
  const mime:Record<string,string>={'.js':'text/javascript','.css':'text/css','.html':'text/html','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.json':'application/json'};res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream'});fs.createReadStream(file).pipe(res);
@@ -17,7 +20,7 @@ await new Promise<void>(resolve=>frontend.listen(0,'127.0.0.1',resolve));
 process.env.BD_QA_BASE_URL='http://127.0.0.1:'+(frontend.address() as {port:number}).port;
 const qaModule=await import('./menu-consumption-browser-qa-v418.cjs');
 const qa=qaModule.default || qaModule;
-const output=path.resolve('outputs/general-tech-card-v440');fs.mkdirSync(output,{recursive:true});
+const output=path.resolve(process.env.BD_QA_CLIENT_BASELINE?'outputs/general-tech-card-v441-baseline':'outputs/general-tech-card-v440');fs.mkdirSync(output,{recursive:true});
 const server=await qa.startQaServer();
 assert.equal(typeof browserRuntime.resolveBrowserExecutable,'function');
 const browserPath=process.env.BD_QA_BROWSER||(process.platform==='win32'?'C:/Program Files/Google/Chrome/Application/chrome.exe':await browserRuntime.resolveBrowserExecutable(chromium.executablePath()));
@@ -132,9 +135,46 @@ try{
    await qa.openItem(page,server.baseUrl,'menu','menu-volk-qa');await page.getByRole('button',{name:'Редактировать техкарту',exact:true}).click();await recipe.waitFor();
    assert.equal(await recipe.getByLabel('Количество на порцию').first().inputValue(),'0.04');
    await page.screenshot({path:path.join(output,viewport.width+'-conflict-repaired.png')});
+   // A real server read delivered through the same cache notification used by Kse.
+   // This exercises late updates without replacing the persistence handler.
+   const refreshRecipe=async(nextQuantity:number)=>{
+    const current=await runtimes.get(801).get('bd_assortment_v1');
+    const changed=structuredClone(current.body.data);
+    changed.recipes.find((row:{id:string})=>row.id==='recipe-volk-qa').ingredients[0].quantity=nextQuantity;
+    const saved=await runtimes.get(801).put('bd_assortment_v1',changed,'QA concurrent recipe update',current.body.data);
+    assert.equal(saved.status,200,JSON.stringify(saved.body));
+    const response=await fetch('http://127.0.0.1:'+address.port+'/api/store/bd_assortment_v1',{headers:{'X-Venue-Id':'801'}});
+    assert.equal(response.status,200);
+    const fresh=await response.json() as {data:unknown};
+    await page.evaluate(data=>{
+     const key=Object.keys(localStorage).find(key=>key.startsWith('bd_assortment_v1_cache__')&&key.endsWith('__venue_801'));
+     if(!key)throw Error('missing active venue cache');
+     localStorage.setItem(key,JSON.stringify(data));
+     window.dispatchEvent(new CustomEvent('bd:store-updated',{detail:{storeKey:'bd_assortment_v1'}}));
+    },fresh.data);
+   };
+   await refreshRecipe(0.05);
+   await page.waitForFunction(()=>document.querySelector<HTMLInputElement>('.bd-tech-card-editor-v354 input[type="number"]')?.value==='0.05',{},{timeout:5000});
+   assert.equal(await quantity.inputValue(),'0.05','pristine editor accepts the fresh server recipe');
+   await quantity.fill('0.06');
+   await refreshRecipe(0.07);
+   await recipe.getByText('Техкарта обновилась на сервере.',{exact:false}).waitFor({timeout:5000});
+   assert.equal(await quantity.inputValue(),'0.06','late data must preserve unsaved input');
+   assert.equal(await recipe.locator('.bd-explicit-save-v438:visible').isDisabled(),true);
+   if(viewport.width<600){
+    await recipe.getByRole('button',{name:'Дополнительные действия'}).click();
+    assert.equal(await recipe.getByRole('menuitem',{name:'Сохранить черновик'}).isDisabled(),true);
+    await recipe.getByRole('button',{name:'Дополнительные действия'}).click();
+   }else assert.equal(await recipe.getByRole('button',{name:'Сохранить черновик',exact:true}).isDisabled(),true);
+   await page.screenshot({path:path.join(output,viewport.width+'-remote-update.png')});
+   page.once('dialog',dialog=>dialog.accept());
+   await recipe.getByRole('button',{name:'Отмена',exact:true}).filter({visible:true}).click();
+   await qa.openItem(page,server.baseUrl,'menu','menu-volk-qa');
+   await page.getByRole('button',{name:'Редактировать техкарту',exact:true}).click();await recipe.waitFor();
+   assert.equal(await quantity.inputValue(),'0.07','reopen reads the latest committed server value');
    assert.deepEqual(errors,[]);
-   results.push({viewport,requestCount,writeCount,menuSaved:true,taxonomyRetry:true,recipeOpenWithoutWrite:true,recipeSaveReopen:true,unsavedCancel:true,menuTransition:true,conflictRepairReopen:true,physicalDevice:false,keyboard:viewport.width<600?'reduced viewport only':'not tested'});
-  }catch(error){await page.screenshot({path:path.join(output,viewport.width+'-failure.png')});throw error}
+   results.push({viewport,requestCount,writeCount,menuSaved:true,taxonomyRetry:true,recipeOpenWithoutWrite:true,recipeSaveReopen:true,unsavedCancel:true,menuTransition:true,conflictRepairReopen:true,pristineSourceRefresh:true,dirtySourceGuard:true,physicalDevice:false,keyboard:viewport.width<600?'reduced viewport only':'not tested'});
+  }catch(error){await page.screenshot({path:path.join(output,viewport.width+'-failure.png'),timeout:5000}).catch(()=>{});throw error}
   finally{await context.close();await new Promise<void>(resolve=>api.close(()=>resolve()));for(const runtime of runtimes.values())runtime.close()}
  }
  fs.writeFileSync(path.join(output,'summary.json'),JSON.stringify(results,null,2));console.log(JSON.stringify(results));

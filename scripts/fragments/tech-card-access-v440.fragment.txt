@@ -11,9 +11,10 @@ function bdExistingRecipeEditorV440({item, recipes, canManage, venueId, ...props
   return i.jsx(bdCatRecipeEditor,{...props,item,recipe,venueId},String(venueId)+':'+item.id+':'+(recipe?.id||'new'));
 }
 function bdIngredientReferencePatchV440(product, key) {
-  return key ? {purchaseProductKey:key,productKey:key,nomenclatureItemId:product.id||product.nomenclatureItemId||key} : {purchaseProductKey:undefined,productKey:undefined,nomenclatureItemId:undefined,matchedBaseUnit:undefined};
+  return key ? {purchaseProductKey:key,productKey:key,nomenclatureItemId:product.id||product.nomenclatureItemId||key,resolutionStatus:undefined,matchReason:undefined} : {purchaseProductKey:undefined,productKey:undefined,nomenclatureItemId:undefined,matchedBaseUnit:undefined,resolutionStatus:undefined,matchReason:undefined};
 }
 function bdIngredientReferenceConflictV440(line,products) {
+  if(line.resolutionStatus==='reference_conflict')return true;
   const id=line.nomenclatureItemId;
   const keys=[line.productKey,line.purchaseProductKey].filter(Boolean);
   if(new Set(keys).size>1)return true;
@@ -21,3 +22,24 @@ function bdIngredientReferenceConflictV440(line,products) {
   const byKey=keys[0]&&(products||[]).find(p=>String(p.key||p.productKey)===String(keys[0]));
   return Boolean(byId&&byKey&&byId!==byKey);
 }
+function bdUseRecipeRefreshV442(recipe,balances,dirty,saving,setRecipe,setBalances) {
+  const token=JSON.stringify(recipe||null);
+  const previous=S.useRef(token);
+  const [blocked,setBlocked]=S.useState(false);
+  const changed=previous.current!==token;
+  S.useEffect(()=>{
+    if(previous.current===token||saving.current)return;
+    previous.current=token;
+    if(dirty.current||!recipe){setBlocked(true);return;}
+    setRecipe({...recipe,ingredients:bdCatArray(recipe.ingredients).map(line=>({...line}))});
+    const next={};
+    for(const line of bdCatArray(recipe.ingredients)){
+      const key=bdCatBalanceKey(line),balance=(balances||[]).find(row=>row.key===key)||{};
+      next[line.id]={key,current:balance.current??'',safety:balance.safety??'',onOrder:balance.onOrder??'',packageAmount:balance.packageAmount??'',checkedAt:balance.checkedAt||''};
+    }
+    setBalances(next);
+    setBlocked(false);
+  },[token,recipe,balances,dirty,saving,setRecipe,setBalances]);
+  return blocked||(changed&&dirty.current&&!saving.current);
+}
+const bdRecipeRefreshMessageV442='Техкарта обновилась на сервере. Ваши изменения остались в форме. Закройте редактор и откройте его заново перед сохранением.';
