@@ -13,7 +13,12 @@
     return data;
   }
   function clearLocal() {
-    for (const storage of [localStorage, sessionStorage]) for (let index = storage.length - 1; index >= 0; index--) { const key = storage.key(index); if (key && (key.startsWith('bd_') || key.startsWith('bardoctor'))) storage.removeItem(key); }
+    const email = localStorage.getItem('bd_session');
+    for (const storage of [localStorage, sessionStorage]) for (let index = storage.length - 1; index >= 0; index--) {
+      const key = storage.key(index);
+      const ownScope = email && (key?.endsWith('__' + email) || key?.includes('__' + email + '__'));
+      if (key && (key.startsWith('bd_') || key.startsWith('bardoctor')) && (!key.includes('__') || ownScope)) storage.removeItem(key);
+    }
   }
   function input(label, name, type = 'text') {
     const wrapper = node('label', label), field = node('input'); field.name = name; field.required = true; field.type = type; field.autocomplete = type === 'password' ? 'current-password' : 'off'; wrapper.append(field); return wrapper;

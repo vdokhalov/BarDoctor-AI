@@ -17,11 +17,21 @@ test('new identity incarnation clears old email caches and pending writes, exist
   assert.ok(start > 0 && end > start);
   const localStorage = new Storage(), sessionStorage = new Storage();
   localStorage.setItem('bd_session', 'same@isolated.test'); localStorage.setItem('bd_session_userid', '10'); localStorage.setItem('bd_store_cache__same@isolated.test', 'old venue'); localStorage.setItem('bd_sync_queue', 'old write'); localStorage.setItem('unrelated', 'keep'); sessionStorage.setItem('bd_restaurant', 'old venue');
+  localStorage.setItem('bd_sync_queue__other@isolated.test__venue_77', 'other pending write'); localStorage.setItem('bd_store_cache__other@isolated.test', 'other account data');
   const script = new vm.Script(source.slice(start, end));
   const apply = (id: number) => script.runInNewContext({ result: { userId: id, email: 'same@isolated.test' }, localStorage, sessionStorage });
   apply(10); assert.equal(localStorage.getItem('bd_sync_queue'), 'old write', 'existing account upgrade must preserve cache');
   apply(11); assert.equal(localStorage.getItem('bd_sync_queue'), null); assert.equal(localStorage.getItem('bd_store_cache__same@isolated.test'), null); assert.equal(sessionStorage.getItem('bd_restaurant'), null); assert.equal(localStorage.getItem('unrelated'), 'keep');
   assert.equal(localStorage.getItem('bd_identity_incarnation__same@isolated.test'), '11');
+  assert.equal(localStorage.getItem('bd_sync_queue__other@isolated.test__venue_77'), 'other pending write'); assert.equal(localStorage.getItem('bd_store_cache__other@isolated.test'), 'other account data');
+});
+test('deleting one account clears its browser data without erasing another account pending writes', () => {
+  const source = fs.readFileSync(new URL('../public/account-lifecycle.js', import.meta.url), 'utf8');
+  const start = source.indexOf('  function clearLocal()'); const end = source.indexOf('  function input(', start); assert.ok(start > 0 && end > start);
+  const localStorage = new Storage(), sessionStorage = new Storage();
+  localStorage.setItem('bd_session', 'delete@isolated.test'); localStorage.setItem('bd_session_token', 'old-token'); localStorage.setItem('bd_cache__delete@isolated.test__venue_5', 'private'); localStorage.setItem('bd_sync_queue__keep@isolated.test__venue_9', 'pending');
+  vm.runInNewContext(source.slice(start, end) + '\nclearLocal();', { localStorage, sessionStorage });
+  assert.equal(localStorage.getItem('bd_session_token'), null); assert.equal(localStorage.getItem('bd_cache__delete@isolated.test__venue_5'), null); assert.equal(localStorage.getItem('bd_sync_queue__keep@isolated.test__venue_9'), 'pending');
 });
 test('settings and zero-active-venue recovery expose the same lifecycle UI', () => {
   const bundle = fs.readFileSync(new URL('../public/assets/index-BQGspy0I.js', import.meta.url), 'utf8');

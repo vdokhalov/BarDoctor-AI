@@ -38,7 +38,7 @@ for (const name of ['public/bardoctor-preview.js', 'public/bardoctor-preview-v39
         for (var storage of [localStorage, sessionStorage]) {
           for (var index = storage.length - 1; index >= 0; index--) {
             var key = storage.key(index);
-            if (key && (key.startsWith("bd_") || key.startsWith("bardoctor")) && !["bd_session","bd_session_token","bd_session_userid"].includes(key)) storage.removeItem(key);
+            if (key && (key.startsWith("bd_") || key.startsWith("bardoctor")) && (!key.includes("__") || key.endsWith("__" + result.email) || key.includes("__" + result.email + "__")) && !["bd_session","bd_session_token","bd_session_userid"].includes(key)) storage.removeItem(key);
           }
         }
       }
