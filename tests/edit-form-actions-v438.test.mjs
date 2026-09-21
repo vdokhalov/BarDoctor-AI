@@ -117,7 +117,7 @@ test("save is single-flight, closes only on success and keeps failures visible",
   assert.match(recipe, /catch\(c\)\{return bdSetRecipeSaveErrorV418/);
   assert.match(recipe, /bdSetRecipeSaveErrorV418\("Не удалось сохранить техкарту\. Повторите попытку\."\),!1/);
   assert.match(recipe, /finally\{bdRecipeSavingRefV418\.current=!1,bdSetRecipeSavingV418\(!1\)\}/);
-  assert.match(recipe, /saveDisabled:!bdTechCanConfirm,[^}]*error:bdRecipeSaveErrorV418/);
+  assert.match(recipe, /saveDisabled:bdRecipeSourceChangedV442\|\|!bdTechCanConfirm,[^}]*error:bdRecipeSaveErrorV418/);
 });
 
 test("editing ingredient quantity, unit, link, add and remove marks the recipe dirty", () => {
