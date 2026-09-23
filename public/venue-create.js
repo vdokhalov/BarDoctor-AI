@@ -117,17 +117,9 @@
     notice.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  function workingDays(data) {
-    var enabled = new Set(data.getAll("day"));
-    return ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-      .reduce(function (result, day) {
-        result[day] = enabled.has(day);
-        return result;
-      }, {});
-  }
-
   function payloadFromForm() {
     var data = new FormData(form);
+    var schedule = form.querySelector("bd-venue-schedule").value;
     return {
       name: String(data.get("name") || "").trim(),
       businessType: String(data.get("businessType") || "").trim(),
@@ -141,14 +133,14 @@
       venueFormat: String(data.get("venueFormat") || "").trim(),
       seats: Number(data.get("seats")) || 0,
       employees: Number(data.get("employees")) || 0,
-      openTime: String(data.get("openTime") || "10:00"),
-      closeTime: String(data.get("closeTime") || "23:00"),
+      openTime: schedule.openTime,
+      closeTime: schedule.closeTime,
       trackingStartDate: [
         new Date().getFullYear(),
         String(new Date().getMonth() + 1).padStart(2, "0"),
         String(new Date().getDate()).padStart(2, "0")
       ].join("-"),
-      workingDays: workingDays(data),
+      workingDays: schedule.workingDays,
       areas: [],
       competitors: []
     };

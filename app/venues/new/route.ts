@@ -16,6 +16,8 @@ const VENUE_CREATE_HTML = `<!doctype html>
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-location-data.js?v=20260811-location-selects-v2" defer></script>
+    <link rel="stylesheet" href="/venue-schedule.css?v=working-days-v447" />
+    <script src="/venue-schedule.js?v=working-days-v447" defer></script>
     <script src="/venue-create.js?v=first-venue-setup-v444" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
@@ -97,22 +99,7 @@ const VENUE_CREATE_HTML = `<!doctype html>
 
         <section class="form-section">
           <div class="section-heading"><span>03</span><div><small>РЕЖИМ РАБОТЫ</small><h2>Когда вы открыты</h2></div></div>
-          <div class="two-columns">
-            <label class="field">Открытие <input name="openTime" type="time" value="10:00" /></label>
-            <label class="field">Закрытие <input name="closeTime" type="time" value="23:00" /></label>
-          </div>
-          <fieldset class="days-field">
-            <legend>Рабочие дни</legend>
-            <div class="days-grid">
-              <label><input type="checkbox" name="day" value="monday" checked /><span>Пн</span></label>
-              <label><input type="checkbox" name="day" value="tuesday" checked /><span>Вт</span></label>
-              <label><input type="checkbox" name="day" value="wednesday" checked /><span>Ср</span></label>
-              <label><input type="checkbox" name="day" value="thursday" checked /><span>Чт</span></label>
-              <label><input type="checkbox" name="day" value="friday" checked /><span>Пт</span></label>
-              <label><input type="checkbox" name="day" value="saturday" checked /><span>Сб</span></label>
-              <label><input type="checkbox" name="day" value="sunday" checked /><span>Вс</span></label>
-            </div>
-          </fieldset>
+          <bd-venue-schedule></bd-venue-schedule>
           <div class="two-columns">
             <label class="field">Мест в зале <input name="seats" type="number" min="0" max="100000" inputmode="numeric" placeholder="80" /></label>
             <label class="field">Сотрудников <input name="employees" type="number" min="0" max="100000" inputmode="numeric" placeholder="15" /></label>
