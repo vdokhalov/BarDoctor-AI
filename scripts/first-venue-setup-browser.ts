@@ -9,7 +9,23 @@ const executablePath = process.env.BD_QA_BROWSER || (process.platform === 'win32
 const browser = await chromium.launch({ executablePath, headless: true });
 const results = [];
 const password = 'Setup-Isolated-123!';
-async function registration(page: Page, email: string) { await page.goto(server.base + '/register'); await page.getByPlaceholder('Алексей').fill('Setup Test'); await page.locator('input[type=email]').fill(email); await page.getByPlaceholder('Минимум 6 символов').fill(password); await page.getByPlaceholder('Повторите пароль').fill(password); await page.getByRole('checkbox').click(); await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).click(); await page.waitForURL('**/setup*'); await page.getByRole('button', { name: 'Начать', exact: true }).click(); await page.getByRole('textbox', { name: 'Название заведения', exact: true }).waitFor(); }
+async function registration(page: Page, email: string) {
+    const blockedNavigations: string[] = [];
+    const dismissRegistrationDialog = async (dialog: import('playwright-core').Dialog) => { blockedNavigations.push(dialog.type()); await dialog.dismiss(); };
+    page.on('dialog', dismissRegistrationDialog);
+    await page.goto(server.base + '/register');
+    await page.getByPlaceholder('Алексей').fill('Setup Test');
+    await page.locator('input[type=email]').fill(email);
+    await page.getByPlaceholder('Минимум 6 символов').fill(password);
+    await page.getByPlaceholder('Повторите пароль').fill(password);
+    await page.getByRole('checkbox').click();
+    await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).click();
+    await page.waitForURL('**/setup*', { timeout: 10000 });
+    page.off('dialog', dismissRegistrationDialog);
+    assert.deepEqual(blockedNavigations, [], 'Registration must navigate to setup without an unsaved-changes prompt');
+    await page.getByRole('button', { name: 'Начать', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Название заведения', exact: true }).waitFor();
+}
 async function api(page: Page, url: string) { for (let attempt = 0; attempt < 3; attempt++) {
     try {
         return await page.evaluate(async (url) => { const r = await fetch(url, { headers: { 'X-Session-Email': localStorage.getItem('bd_session') || '', 'X-Session-Token': localStorage.getItem('bd_session_token') || '', 'X-Venue-Id': localStorage.getItem('bd_active_venue_id') || '' }, cache: 'no-store' }); return { status: r.status, data: await r.json() as {

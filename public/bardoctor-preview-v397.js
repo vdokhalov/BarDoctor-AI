@@ -1691,6 +1691,11 @@
           try {
             var result = JSON.parse(body);
             rememberAccessContext(result);
+            // Registration is committed on the server before the client leaves this form.
+            // Clear only its dirty state so the beforeunload guard cannot strand setup.
+            if (requestUrl.pathname === "/api/auth/register" && response.ok && result && result.ok) {
+              window.bdMarkNavigationClean?.();
+            }
             if (result && result.ok && result.joinedVenue) {
               sessionStorage.removeItem("bd_pending_invite_code");
             }
