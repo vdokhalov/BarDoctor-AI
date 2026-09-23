@@ -99,6 +99,8 @@ try {
         await page.goto(server.base + '/settings');
         await page.getByRole('button', { name: 'Выйти из аккаунта', exact: true }).click();
         await page.waitForURL('**/login*');
+        await page.waitForLoadState('load');
+        await page.getByRole('button', { name: 'Войти', exact: true }).waitFor();
         await page.locator('input[type=email]').fill(email);
         await page.locator('input[type=password]').fill(password);
         await page.getByRole('button', { name: 'Войти', exact: true }).click();
@@ -129,6 +131,8 @@ try {
         await page.goto(server.base + '/settings');
         await page.getByRole('button', { name: 'Выйти из аккаунта', exact: true }).click();
         await page.waitForURL('**/login*');
+        await page.waitForLoadState('load');
+        await page.getByRole('button', { name: 'Войти', exact: true }).waitFor();
         console.log('Same browser new registration', width);
         await registration(page, 'second-' + email);
         assert.equal(await page.getByRole('textbox', { name: 'Название заведения', exact: true }).inputValue(), '');
