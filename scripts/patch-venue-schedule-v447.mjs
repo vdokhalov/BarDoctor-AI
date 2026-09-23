@@ -16,8 +16,10 @@ function range(label, start, end, replacement) {
   if (last < 0) throw new Error("Schedule patch end missing: " + label);
   code = code.slice(0, first) + replacement + code.slice(last);
 }
-const widget = 'function bdVenueScheduleReact({value:e,onChange:t}){const n=S.useRef(null),r=S.useRef(t);r.current=t;S.useEffect(()=>{const a=n.current;if(!a)return;const s=l=>r.current(l.detail);a.addEventListener("schedulechange",s);return()=>a.removeEventListener("schedulechange",s)},[]);S.useEffect(()=>{if(n.current)n.current.value={openTime:e.openTime,closeTime:e.closeTime,workingDays:e.workingDays}},[e.openTime,e.closeTime,e.workingDays]);return i.jsx("bd-venue-schedule",{ref:n})}';
-replace("shared React bridge", "function Ule({d:e,upd:t})", widget + "function Ule({d:e,upd:t})");
+const widget = 'function bdVenueScheduleReact({value:e,onChange:t}){const n=S.useRef(null),r=S.useRef(t),p=S.useRef(null);r.current=t;S.useEffect(()=>{const a=n.current;if(!a)return;const s=l=>{p.current=l.detail;r.current(l.detail)};a.addEventListener("schedulechange",s);return()=>a.removeEventListener("schedulechange",s)},[]);S.useEffect(()=>{if(!n.current)return;const a={openTime:e.openTime,closeTime:e.closeTime,workingDays:e.workingDays};if(p.current){if(JSON.stringify(a)!==JSON.stringify(p.current))return;p.current=null}n.current.value=a},[e.openTime,e.closeTime,e.workingDays]);return i.jsx("bd-venue-schedule",{ref:n})}';
+const oldWidget = 'function bdVenueScheduleReact({value:e,onChange:t}){const n=S.useRef(null),r=S.useRef(t);r.current=t;S.useEffect(()=>{const a=n.current;if(!a)return;const s=l=>r.current(l.detail);a.addEventListener("schedulechange",s);return()=>a.removeEventListener("schedulechange",s)},[]);S.useEffect(()=>{if(n.current)n.current.value={openTime:e.openTime,closeTime:e.closeTime,workingDays:e.workingDays}},[e.openTime,e.closeTime,e.workingDays]);return i.jsx("bd-venue-schedule",{ref:n})}';
+if (code.includes(oldWidget)) code = code.replace(oldWidget, widget);
+else replace("shared React bridge", "function Ule({d:e,upd:t})", widget + "function Ule({d:e,upd:t})");
 range("first wizard hours",
   'i.jsxs("div",{children:[i.jsx(ja,{children:"Часы работы"})',
   ',i.jsx("p",{className:"text-[12px] text-muted-foreground px-1 -mt-1"',
