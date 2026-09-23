@@ -3,7 +3,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { lifecycleRuntime } from './lifecycle-runtime';
-export async function setupServer() {
+export async function setupServer(options: { bootstrapDelayMs?: number } = {}) {
     const extra = { restaurants: './app/api/restaurants/route', restaurantMe: './app/api/restaurants/me/route', store: './app/api/store/route', storeKey: './app/api/store/[key]/route', usersMe: './app/api/users/me/route', logout: './app/api/auth/logout/route', sessions: './app/api/users/sessions/route', opportunities: './app/api/opportunities/route', competitors: './app/api/competitors/me/route', reviews: './app/api/reviews/home/route', health: './app/api/business-health/route', newVenue: './app/venues/new/route' };
     const r = await lifecycleRuntime(extra);
     const routes: Record<string, string> = { '/api/auth/register': 'register', '/api/auth/login': 'login', '/api/auth/bootstrap': 'bootstrap', '/api/auth/logout': 'logout', '/api/restaurants': 'restaurants', '/api/restaurants/me': 'restaurantMe', '/api/store': 'store', '/api/users/me': 'usersMe', '/api/venues': 'venues', '/api/users/sessions': 'sessions', '/api/opportunities': 'opportunities', '/api/competitors/me': 'competitors', '/api/reviews/home': 'reviews', '/api/business-health': 'health' };
@@ -46,6 +46,7 @@ export async function setupServer() {
                     return;
                 }
                 const response = await r.api[group][req.method || 'GET'](request, { params: Promise.resolve({ key }) } as never);
+                if (group === "bootstrap" && options.bootstrapDelayMs) await new Promise(resolve => setTimeout(resolve, options.bootstrapDelayMs));
                 res.writeHead(response.status, Object.fromEntries(response.headers));
                 res.end(await response.text());
                 requests.push({ path: url.pathname, method: req.method || 'GET', status: response.status });

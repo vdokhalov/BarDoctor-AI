@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { chromium, type Page } from 'playwright-core';
 import browserRuntime from './browser-runtime.cjs';
 import { setupServer } from '../tests/helpers/setup-server';
-const server = await setupServer(), out = 'outputs/setup';
+const server = await setupServer({ bootstrapDelayMs: 1200 }), out = 'outputs/setup';
 fs.mkdirSync(out, { recursive: true });
 const executablePath = process.env.BD_QA_BROWSER || (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : await browserRuntime.resolveBrowserExecutable(chromium.executablePath()));
 const browser = await chromium.launch({ executablePath, headless: true });
@@ -54,6 +54,8 @@ try {
         const box = await next.boundingBox();
         assert.ok(box && box.y >= 0 && box.y + box.height <= 850);
         await page.screenshot({ path: out + '/' + width + '-step1.png' });
+        // Cold/missing venue metadata must wait for delayed real bootstrap, not assume ready.
+        await page.evaluate(() => localStorage.removeItem('bd_venue_context__' + localStorage.getItem('bd_session')));
         await page.reload();
         assert.equal(await page.getByRole('textbox', { name: 'Название заведения', exact: true }).inputValue(), name);
         await next.click();

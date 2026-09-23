@@ -130,11 +130,20 @@
   var bdCachedSessionV397 = localStorage.getItem("bd_session");
   var bdCachedTokenV397 = localStorage.getItem("bd_session_token");
   var bdCachedVenueV397 = localStorage.getItem("bd_active_venue_id");
-  window.__bdAuthBootstrapV274 = bdCachedSessionV397 && bdCachedTokenV397
-    ? (bdCachedVenueV397
+  /* bd-cached-setup-state-v445: a venue allocation is not a completed profile. */
+  var bdCachedAccessV445 = null;
+  try {
+    var bdCachedContextV445 = JSON.parse(localStorage.getItem("bd_venue_context__" + bdCachedSessionV397) || "null");
+    bdCachedAccessV445 = Array.isArray(bdCachedContextV445?.venues)
+      ? bdCachedContextV445.venues.find(function (venue) { return String(venue.id) === String(bdCachedVenueV397) && venue.status !== "inactive"; }) : null;
+  } catch { /* Missing or invalid cache waits for authoritative bootstrap. */ }
+  window.__bdAuthBootstrapV274 = !bdCachedSessionV397 || !bdCachedTokenV397
+    ? { state: "unauthenticated", reason: "cached_shell_no_session_v397" }
+    : bdCachedAccessV445?.hasProfile === true
       ? { state: "ready", reason: "cached_shell_ready_v397" }
-      : { state: "onboarding_required", reason: "cached_shell_needs_venue_v397" })
-    : { state: "unauthenticated", reason: "cached_shell_no_session_v397" };
+      : bdCachedAccessV445?.hasProfile === false && bdCachedAccessV445.role === "owner" && bdCachedAccessV445.isPrimary === true
+        ? { state: "onboarding_required", reason: "cached_primary_venue_profile_required_v445" }
+        : { state: "loading", reason: "cached_venue_requires_bootstrap_v445" };
 
   var bdStartupRecoveryVersionV341 = "shell-first-startup-v397";
   var bdStartupHealthyV341 = false;

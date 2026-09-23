@@ -30,3 +30,16 @@ The save-failure response is deliberately injected; successful writes and reads 
 Production publication requires user confirmation, then full test-account creation through the published UI. Deployment approval never authorizes deleting existing user accounts or venues.
 
 Local final verification: Chrome 153 at 1280x850, 390x850 and 412x850 passed both complete registration/setup paths. The field scroller has 695 CSS px available (content 929/998 px); actions remain in the viewport. Verified build, typecheck and scoped lint pass. Startup/auth/setup regression: 5/5. Lifecycle adapter consumers: 8/8. Full mandatory CI is required on the committed SHA before readiness.
+
+
+## Bootstrap race found in v444 production smoke
+
+Publication v444 succeeded, but the first real production registration intermittently left /setup for Home and displayed access recovery. POST /api/auth/register returned 201 and POST /api/auth/bootstrap returned 200 with onboarding_required / primary_venue_profile_required and hasProfile:false. A second clean registration opened setup. This is a timing-dependent client routing defect; neither response established a configured profile.
+
+The shell-first loader treated any cached active venue ID as ready. Registration allocates a primary venue before its profile is configured, so a fast client mount could redirect before the authoritative response arrived. Route guards also read a mutable bootstrap global without subscribing to completion.
+
+The loader now requires an explicitly completed cached profile for ready. A matching unconfigured primary owner venue remains onboarding; missing/invalid/unavailable cache waits for bootstrap. Route guards subscribe to state changes, with stable hook ordering. An unchanged ready state does not force a rerender that could reload an embedded form.
+
+The real-handler wizard test now delays bootstrap responses by 1200 ms. Before the fix it failed waiting for Start after the incorrect redirect. It also removes cached venue metadata before resuming the draft to verify authoritative recovery. Successes still use real database writes and reads. No server auth, schema, secrets, or production records were edited for this fix.
+
+Final local race verification: Chrome 153.0.8010.53, 1280/390/412 x 850, all PASS with delayed bootstrap and missing venue cache. Additional venue retry preserves input and opens Home. Final patch replay repairs each route guard independently and runs again after late build transforms, before fingerprinting, so an existing helper marker cannot hide overwritten route guards. No physical-device or Opera test is claimed.

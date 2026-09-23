@@ -33,3 +33,17 @@ for (const name of ['public/app.html', 'app/bar-doctor-response.ts', 'scripts/pa
     fs.writeFileSync(p, source);
 }
 console.log('First venue setup ownership, scrolling, draft and submit guard patched');
+
+// Subscribe route decisions to the authoritative bootstrap. Keep hooks unconditional
+// when a pending state changes to a ready profile in the same mounted component.
+bundle = fs.readFileSync(file, 'utf8');
+if (!bundle.includes('bdUseBootstrapRevisionV445')) {
+  bundle = replace(bundle, 'function Cle(){', 'function bdUseBootstrapRevisionV445(){const[,update]=S.useState(()=>bdAuthBootstrapV274().state);S.useLayoutEffect(()=>{const refresh=()=>update(bdAuthBootstrapV274().state);window.addEventListener("bd:bootstrap-complete",refresh);refresh();return()=>window.removeEventListener("bd:bootstrap-complete",refresh)},[])}function Cle(){');
+}
+if (!bundle.includes('function _le(){bdUseBootstrapRevisionV445();')) bundle = replace(bundle, 'function _le(){const[,e]=bt(),[t]=S.useState(Cle);', 'function _le(){bdUseBootstrapRevisionV445();const[,e]=bt(),t=Cle();');
+if (!bundle.includes('function oEe({component:e}){bdUseBootstrapRevisionV445();')) bundle = replace(bundle, 'function oEe({component:e}){if(!Ot())', 'function oEe({component:e}){bdUseBootstrapRevisionV445();if(!Ot())');
+if (!bundle.includes('function pt({component:e}){bdUseBootstrapRevisionV445();')) {
+  bundle = replace(bundle, 'function pt({component:e}){if(!Ot())', 'function pt({component:e}){bdUseBootstrapRevisionV445();const{profile:r,isReady:a}=Un();if(!Ot())');
+  bundle = replace(bundle, 'const{profile:r,isReady:a}=Un();return a?r?i.jsx(e,{})', 'return a?r?i.jsx(e,{})');
+}
+fs.writeFileSync(file, bundle);
