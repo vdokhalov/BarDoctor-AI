@@ -112,6 +112,7 @@ try {
         await page.locator('[data-bd-profile="profile-v282"]').waitFor();
         await page.locator('.bd-profile-venue-head-v280').click();
         await page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule').waitFor();
+        await page.waitForFunction(() => { const editor = document.querySelector(".bd-profile-editor-v281"); return editor && getComputedStyle(editor).display === "flex"; });
         const editorSchedule=page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule');
         assert.equal(await editorSchedule.getByRole('button',{name:'Воскресенье'}).getAttribute('aria-pressed'),'true');
         await editorSchedule.getByRole('button',{name:'Четверг'}).click();

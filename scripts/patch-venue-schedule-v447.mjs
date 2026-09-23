@@ -61,6 +61,11 @@ code = code.replaceAll(']}),,i.jsxs("fieldset"',']}),i.jsxs("fieldset"');
 fs.writeFileSync(asset, code);
 for (const path of ["public/app.html","app/bar-doctor-response.ts"]) {
   let html = fs.readFileSync(path,"utf8");
+  // The isolated browser server serves public/app.html; match the production editor CSS.
+  if (path === "public/app.html" && !html.includes('href="/profile-v281.css')) {
+    html = html.replace('<link rel="stylesheet" href="/venue-schedule.css', '<link rel="stylesheet" href="/profile-v280.css?v=20260825-profile-v280" media="print" onload="this.media=\'all\'" />\n    <link rel="stylesheet" href="/profile-v281.css?v=20260825-profile-v282" media="print" onload="this.media=\'all\'" />\n    <link rel="stylesheet" href="/venue-schedule.css');
+    fs.writeFileSync(path, html);
+  }
   if (!html.includes('/venue-schedule.js?v=working-days-v447')) {
     const marker = '<link rel="modulepreload" href="/assets/index-BQGspy0I.js';
     if (!html.includes(marker)) throw new Error("HTML asset anchor missing: " + path);
