@@ -136,6 +136,7 @@ try {
         assert.equal(await page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule').getByRole('button',{name:'Четверг'}).getAttribute('aria-pressed'),'true');
         await page.screenshot({path:out+'/'+width+'-profile-schedule-reopen.png'});
         await page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule').getByRole('button',{name:'Вторник'}).click();
+        await page.waitForFunction(() => { const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented; });
         let warningSeen=false;
         page.once('dialog',async dialog=>{warningSeen=true;await dialog.accept()});
         await page.goto(server.base+'/home');
