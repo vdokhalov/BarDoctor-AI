@@ -26,7 +26,25 @@ async function registration(page: Page, email: string) {
     await page.getByRole('button', { name: 'Начать', exact: true }).click();
     await page.getByRole('textbox', { name: 'Название заведения', exact: true }).waitFor();
 }
-async function api(page: Page, url: string) { for (let attempt = 0; attempt < 3; attempt++) {
+async function loginToUnfinishedSetup(email: string, width: number) {
+    const context = await browser.newContext({ viewport: { width, height: 850 }, isMobile: width < 600, hasTouch: width < 600 });
+    try {
+        const page = await context.newPage();
+        const dialogs: string[] = [];
+        page.on('dialog', async dialog => { dialogs.push(dialog.type()); await dialog.dismiss(); });
+        await page.goto(server.base + '/login');
+        await page.locator('input[type=email]').fill(email);
+        await page.locator('input[type=password]').fill(password);
+        const response = page.waitForResponse(r => new URL(r.url()).pathname === '/api/auth/login');
+        await page.getByRole('button', { name: 'Войти', exact: true }).click();
+        assert.equal((await response).status(), 200);
+        await page.waitForURL('**/setup*', { timeout: 10000 });
+        await page.getByRole('button', { name: 'Начать', exact: true }).waitFor();
+        assert.deepEqual(dialogs, [], 'Successful login must navigate without an unsaved-changes prompt');
+    } finally {
+        await context.close();
+    }
+}async function api(page: Page, url: string) { for (let attempt = 0; attempt < 3; attempt++) {
     try {
         return await page.evaluate(async (url) => { const r = await fetch(url, { headers: { 'X-Session-Email': localStorage.getItem('bd_session') || '', 'X-Session-Token': localStorage.getItem('bd_session_token') || '', 'X-Venue-Id': localStorage.getItem('bd_active_venue_id') || '' }, cache: 'no-store' }); return { status: r.status, data: await r.json() as {
                 restaurant: {
@@ -53,6 +71,7 @@ try {
         console.log('Setup viewport', width);
         const email = 'setup-' + width + '@isolated.test', name = 'Мастер ' + width;
         await registration(page, email);
+        await loginToUnfinishedSetup(email, width);
         await page.screenshot({ path: out + '/' + width + '-initial.png' });
         // Behavioral regression: the committed v443 launch node intercepts this click.
         await page.getByRole('button', { name: 'Выберите страну', exact: true }).click({ timeout: 5000 });
