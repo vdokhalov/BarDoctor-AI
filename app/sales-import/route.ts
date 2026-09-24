@@ -26,7 +26,7 @@ const HTML = `<!doctype html>
   </header>
 
   <main class="sales-shell">
-    <p><a href="/cashier">Открыть кассу</a> · <a href="/sales-entry">История и ручной ввод продаж</a></p>
+    <p><a href="/cashier">Открыть кассу</a> · <a href="/sales-entry">Ввести продажу с выручкой и складским расходом</a></p>
     <section class="sales-command">
       <div>
         <h1 id="coverage-title">Продажи за смены</h1>
