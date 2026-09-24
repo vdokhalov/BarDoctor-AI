@@ -20,6 +20,7 @@ fixture.put("bd_assortment_v1",{
   recipes:[{id:"vodka-recipe",menuItemId:"vodka40",ownerId:"vodka40",venueId:1,version:1,current:true,status:"confirmed",reviewStatus:"approved",ingredients:[{id:"vodka-line",nomenclatureItemId:"vodka",purchaseProductKey:"vodka-stock",name:"TEST VODKA",quantity:0.04,unit:"l",normalizedQuantity:0.04,normalizedUnit:"l",venueId:1}]}]
 });
 fixture.put("bd_stock_movements",[{id:"vodka-receipt",type:"receipt",venueId:1,productKey:"vodka-stock",productName:"TEST VODKA",amount:1,unit:"l",costAmount:300,costStatus:"KNOWN",currency:"PMR_RUB",date:"2026-09-01",sourceDocumentId:"confirmed-purchase",sourceLineId:"line",createdAt:"2026-09-01T10:00:00Z"}]);
+let dropNextPost=false;
 const server=createServer(async (req,res)=>{
   try{
     const url=new URL(req.url||"/","http://127.0.0.1");
@@ -28,8 +29,10 @@ const server=createServer(async (req,res)=>{
     }
     if(url.pathname==="/api/sales-events"){
       const parts=[];for await(const part of req)parts.push(part);
-      const request=new Request(url,{method:req.method,headers:req.headers as Record<string,string>,...(["GET","HEAD"].includes(req.method||"GET")?{}:{body:Buffer.concat(parts)})});
+      const input=Buffer.concat(parts);
+      const request=new Request(url,{method:req.method,headers:req.headers as Record<string,string>,...(["GET","HEAD"].includes(req.method||"GET")?{}:{body:input})});
       const response=req.method==="POST"?await fixture.api.POST(request):await fixture.api.GET(request);
+      if(dropNextPost && req.method==="POST" && JSON.parse(input.toString("utf8")).action==="post"){dropNextPost=false;res.destroy();return;}
       res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text());return;
     }
     // The tested cashier route uses the real HTML/CSS/JS. Ancillary app-shell scripts are unrelated to POS.
@@ -98,6 +101,14 @@ try{
       await page.getByRole("heading",{name:"Продажа проведена"}).waitFor();
       const reread=await page.evaluate(async()=>{const response=await fetch("/api/sales-events",{headers:{"X-Venue-Id":"1"}});return response.json();}) as {events:sales.SalesEvent[]};
       assert.equal(reread.events.length,2);assert.equal(reread.events[0].payments?.[0].method,"CARD_EXTERNAL");
+      assert.equal((fixture.get("bd_assortment_v1") as {stockBalances:{current:number}[]}).stockBalances[0].current,0.96);
+      await page.locator("#new-order").click();await page.locator('[data-add="ticket"]').waitFor();
+      await page.locator('[data-add="ticket"]').click();dropNextPost=true;
+      await page.getByRole("button",{name:"Оплатить"}).click();
+      await page.locator("#notice").filter({hasText:/Продажа уже проведена|Заказ сохранён для безопасного повтора/}).waitFor();
+      await page.reload({waitUntil:"networkidle"});
+      const afterLoss=await page.evaluate(async()=>{const response=await fetch("/api/sales-events",{headers:{"X-Venue-Id":"1"}});return response.json();}) as {events:sales.SalesEvent[]};
+      assert.equal(afterLoss.events.length,3,"lost response must not duplicate sale");
       assert.equal((fixture.get("bd_assortment_v1") as {stockBalances:{current:number}[]}).stockBalances[0].current,0.96);
     }
     await context.close();

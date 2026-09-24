@@ -96,21 +96,27 @@
   $("cart-lines").onclick=event=>{const button=event.target.closest("[data-increase],[data-decrease],[data-remove]");if(!button||busy||pending)return;const id=button.dataset.increase??button.dataset.decrease??button.dataset.remove,row=cart.get(id);if(!row)return;if(button.hasAttribute("data-remove"))cart.delete(id);else{row.quantity+=button.hasAttribute("data-increase")?1:-1;if(row.quantity<=0)cart.delete(id);else row.quantity=Math.min(row.quantity,999);}renderCart();};
   $("shift-picker").onchange=()=>{activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;renderShift();};
   $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});data=await request();renderShift();notice("Смена открыта.");});};
+  async function handlePendingFailure(error) {
+    if(error.status>=400&&error.status<500&&pending){
+      try{
+        data=await request();
+        const saved=data.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");
+        if(saved){sessionStorage.removeItem(sessionKey());pending=null;showReceipt(saved,true);return;}
+        sessionStorage.removeItem(sessionKey());pending=null;renderShift();renderCart();
+        notice(`${error.message} Исправьте заказ и повторите оплату.`);return;
+      }catch{ /* The server could not confirm the result; retain the original idempotency key. */ }
+    }
+    notice(`${error.message} Заказ сохранён для безопасного повтора.`);
+  }
   $("pay").onclick=()=>working(async()=>{
     if(!activeShift||!cart.size||pending)return;
     const amount=total(),method=document.querySelector('input[name="payment"]:checked').value;
     pending={command:{id:crypto.randomUUID(),source:"POS_API",shiftId:activeShift.id,comment:$("comment").value,lines:[...cart.values()].map((row,i)=>({id:`line-${i+1}`,menuItemId:row.item.id,quantity:row.quantity})),payments:[{id:"payment-1",method,amount}]}};
     sessionStorage.setItem(sessionKey(),JSON.stringify(pending));
-    try{await submitPending();}catch(error){
-      if(error.status>=400&&error.status<500){
-        try{data=await request();const saved=data.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");if(saved){sessionStorage.removeItem(sessionKey());pending=null;showReceipt(saved,true);return;}}catch{}
-        sessionStorage.removeItem(sessionKey());pending=null;renderButtons();notice(`${error.message} Исправьте заказ и повторите оплату.`);return;
-      }
-      notice(`${error.message} Заказ сохранён для безопасного повтора.`);
-    }
+    try{await submitPending();}catch(error){await handlePendingFailure(error);}
   });
   $("order-jump").onclick=()=>$("cart").scrollIntoView({behavior:"smooth",block:"start"});
-  $("retry").onclick=()=>working(async()=>{data=await request();await submitPending();});
+  $("retry").onclick=()=>working(async()=>{try{data=await request();await submitPending();}catch(error){await handlePendingFailure(error);}});
   $("new-order").onclick=()=>{cart.clear();$("comment").value="";$("receipt").hidden=true;working(refresh);};
   window.addEventListener("scroll",updateJump,{passive:true});window.addEventListener("resize",updateJump);
   window.addEventListener("online",()=>online(true));window.addEventListener("offline",()=>online(false));
