@@ -3,8 +3,8 @@
   const $ = id => document.getElementById(id);
   const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
   const text = (id, value) => { $(id).textContent = value; };
-  let data, activeShift, cart = new Map(), department = "all", category = "all", busy = false, pending = null, frozen = false;
-  const departmentKey = raw => { const key=String(raw||"other").toLocaleLowerCase("ru-RU"); return ({"бар":"bar","кухня":"kitchen","кальяны":"hookah","кальян":"hookah"})[key]||key; };
+  let data, activeShift, cart = new Map(), department = "all", category = "all", subcategory = "all", busy = false, pending = null, frozen = false;
+  const departmentKey = item => String(item.sectionId);
   const money = amount => window.bdFormatAccountingMoney(amount,data?.currency);
   const sessionKey = () => `bd_pos_pending:${localStorage.getItem("bd_session")}:${data.venueId}`;
   const notice = message => text("notice",message);
@@ -79,18 +79,24 @@
   }
   function visibleMenu() {
     const query=$("search").value.trim().toLocaleLowerCase("ru-RU");
-    return data.menu.filter(item=>item.name && item.salePrice != null && Number.isFinite(Number(item.salePrice)) && (department==="all" || departmentKey(item.department)===department) && (category==="all" || String(item.categoryId||item.category)===category) && (!query || String(item.name).toLocaleLowerCase("ru-RU").includes(query)));
+    return data.menu.filter(item=>item.name && item.salePrice != null && Number.isFinite(Number(item.salePrice)) && (query ? String(item.name).toLocaleLowerCase("ru-RU").includes(query) : (department==="all" || departmentKey(item)===department) && (category==="all" || String(item.categoryId||item.category)===category) && (subcategory==="all" || String(item.subcategoryId||"")===subcategory)));
   }
   function renderMenu() {
-    const departments=[...["bar","kitchen","hookah"],...new Set(data.menu.map(item=>departmentKey(item.department)).filter(key=>!["bar","kitchen","hookah"].includes(key)))];
-    const labels={all:"Все",bar:"Бар",kitchen:"Кухня",hookah:"Кальяны",other:"Другое"};
+    const labels=Object.fromEntries(data.menu.map(item=>[departmentKey(item),item.department]));
+    const departments=Object.keys(labels);
+    const searching=Boolean($("search").value.trim());
     $("departments").innerHTML=`<button type="button" data-department="all" aria-pressed="${department==="all"}">Все</button>`+departments.map(key=>`<button type="button" data-department="${esc(key)}" aria-pressed="${department===key}">${esc(labels[key]||key)}</button>`).join("");
-    const categoryMap=new Map(data.menu.filter(item=>department==="all"||departmentKey(item.department)===department).map(item=>[String(item.categoryId||item.category),item.category]));
+    const categoryMap=new Map(data.menu.filter(item=>department==="all"||departmentKey(item)===department).map(item=>[String(item.categoryId||item.category),item.category]));
     const categories=[...categoryMap.keys()];
     if(category!=="all"&&!categories.includes(category))category="all";
     $("categories").innerHTML=`<button type="button" data-category="all" aria-pressed="${category==="all"}">Все категории</button>`+categories.map(name=>`<button type="button" data-category="${esc(name)}" aria-pressed="${category===name}">${esc(categoryMap.get(name))}</button>`).join("");
+    const subcategoryMap=new Map(data.menu.filter(item=>(department==="all"||departmentKey(item)===department)&&(category==="all"||String(item.categoryId||item.category)===category)).filter(item=>item.subcategoryId).map(item=>[String(item.subcategoryId),item.subcategory]));
+    $("subcategories").hidden=category==="all"||!subcategoryMap.size||searching;
+    $("subcategories").innerHTML='<button type="button" data-subcategory="all" aria-pressed="'+(subcategory==="all")+'">Все подразделы</button>'+[...subcategoryMap].map(([id,name])=>'<button type="button" data-subcategory="'+esc(id)+'" aria-pressed="'+(subcategory===id)+'">'+esc(name)+'</button>').join("");
+    $("categories").hidden=searching;$("departments").hidden=searching;
+    $("search-context").hidden=!searching;
     const items=visibleMenu();
-    $("menu").innerHTML=items.length?items.map(item=>`<button type="button" class="pos-item" data-add="${esc(item.id)}"><strong>${esc(item.name)}</strong><span><small>${esc(item.category||"")}</small><br><span class="pos-item-price">${esc(money(item.salePrice))} · +1</span></span></button>`).join(""):`<p class="pos-empty">Позиций по этому запросу нет.</p>`;
+    $("menu").innerHTML=items.length?items.map(item=>`<button type="button" class="pos-item" data-add="${esc(item.id)}"><strong>${esc(item.name)}</strong><span><small>${esc([...(item.sectionPath?.length?item.sectionPath.map(node=>node.name):[item.department]),item.category,item.subcategory].filter(Boolean).join(" → "))}</small><br><span class="pos-item-price">${esc(money(item.salePrice))} · +1</span></span></button>`).join(""):`<p class="pos-empty">Позиций по этому запросу нет.</p>`;
   }
   function total() {if([...cart.values()].some(row=>row.item.unavailable))return null;return Math.round([...cart.values()].reduce((sum,row)=>sum+Number(row.item.salePrice)*row.quantity,0)*100)/100;}
   function renderCart() {
@@ -102,7 +108,7 @@
   function showReceipt(event, duplicate=false) {
     $("cashier").hidden=true;$("shift-gate").hidden=true;$("order-jump").hidden=true;$("receipt").hidden=false;
     const details=event.prices.map(line=>`<p>${esc(line.name)} × ${line.quantity} — ${esc(money(line.total))}</p>`).join("");
-    const cost=event.batch.totalTheoreticalCost == null?"Себестоимость неизвестна":money(event.batch.totalTheoreticalCost);
+    const cost=window.bdFormatSalesCost(event.batch,data.currency);
     $("receipt-detail").innerHTML=details+`<p><strong>Выручка: ${esc(money(event.revenue))}</strong></p><p>Себестоимость: ${esc(cost)}</p><p>Смена: ${esc(event.shiftId||"")}</p><p>Сотрудник: ${esc(event.actor?.name||event.batch.createdBy?.name||"")}</p>`;
     notice(duplicate?"Продажа уже проведена. Повторного списания нет.":"Продажа проведена и сохранена.");
   }
@@ -127,8 +133,9 @@
     const result=await request({action:"post",command:pending.command,previewHash:preview.previewHash});
     complete(result.event,Boolean(result.duplicate));
   }
-  $("departments").onclick=event=>{const button=event.target.closest("[data-department]");if(button&&!busy){department=button.dataset.department;category="all";renderMenu();}};
-  $("categories").onclick=event=>{const button=event.target.closest("[data-category]");if(button&&!busy){category=button.dataset.category;renderMenu();}};
+  $("departments").onclick=event=>{const button=event.target.closest("[data-department]");if(button&&!busy){department=button.dataset.department;category="all";subcategory="all";renderMenu();}};
+  $("categories").onclick=event=>{const button=event.target.closest("[data-category]");if(button&&!busy){category=button.dataset.category;subcategory="all";renderMenu();}};
+  $("subcategories").onclick=event=>{if(event.target.dataset.subcategory){subcategory=event.target.dataset.subcategory;renderMenu();}};
   $("search").oninput=renderMenu;
   $("menu").onclick=event=>{const button=event.target.closest("[data-add]");if(!button||busy||pending)return;const item=data.menu.find(item=>String(item.id)===button.dataset.add);if(!item)return;const row=cart.get(String(item.id));if(!row&&cart.size>=100){notice("В одном заказе может быть до 100 позиций.");return;}cart.set(String(item.id),{item,quantity:Math.min(999,(row?.quantity||0)+1)});persistDraft();renderCart();};
   $("cart-lines").onclick=event=>{const button=event.target.closest("[data-increase],[data-decrease],[data-remove]");if(!button||busy||pending)return;const id=button.dataset.increase??button.dataset.decrease??button.dataset.remove,row=cart.get(id);if(!row)return;if(button.hasAttribute("data-remove"))cart.delete(id);else{row.quantity+=button.hasAttribute("data-increase")?1:-1;if(row.quantity<=0)cart.delete(id);else row.quantity=Math.min(row.quantity,999);}persistDraft();renderCart();};

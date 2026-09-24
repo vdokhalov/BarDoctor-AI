@@ -125,7 +125,7 @@
       var shift = shifts.find(function (item) { return item.id === batch.shiftId; });
       var portions = batch.lines.reduce(function (sum, line) { return sum + number(line.quantity); }, 0);
       var shiftName = shift ? shift.label + ((shift.startTime || shift.endTime) ? " · " + (shift.startTime || "—") + "–" + (shift.endTime || "—") : "") : batch.shiftId ? "Смена" : "Без привязки к смене";
-      return '<button class="batch-row" type="button" data-batch="' + h(batch.id) + '"><span class="batch-date"><b>' + h(formatDateShort(batch.businessDate)) + ' · ' + h(shiftName) + '</b><small>' + h(sourceLabel(batch.source)) + '</small></span><span class="batch-progress"><b>' + batch.lines.length + ' ' + plural(batch.lines.length, "позиция", "позиции", "позиций") + ' · ' + h(formatQuantity(portions)) + ' ' + plural(portions, "порция", "порции", "порций") + '</b><small>' + (batch.blockedLineCount ? batch.blockedLineCount + ' требуют исправления' : 'Себестоимость ' + h(money(batch.totalTheoreticalCost, batch.lines[0] && batch.lines[0].currency))) + '</small></span><span class="status-pill ' + statusClass(batch.status) + '">' + h(statusLabel(batch.status)) + '</span><img class="chevron" src="/integration-icons/chevron-right.svg" alt=""></button>';
+      return '<button class="batch-row" type="button" data-batch="' + h(batch.id) + '"><span class="batch-date"><b>' + h(formatDateShort(batch.businessDate)) + ' · ' + h(shiftName) + '</b><small>' + h(sourceLabel(batch.source)) + '</small></span><span class="batch-progress"><b>' + batch.lines.length + ' ' + plural(batch.lines.length, "позиция", "позиции", "позиций") + ' · ' + h(formatQuantity(portions)) + ' ' + plural(portions, "порция", "порции", "порций") + '</b><small>' + (batch.blockedLineCount ? batch.blockedLineCount + ' требуют исправления' : 'Себестоимость ' + h(window.bdFormatSalesCost(batch, batch.currency || batch.lines[0] && batch.lines[0].currency))) + '</small></span><span class="status-pill ' + statusClass(batch.status) + '">' + h(statusLabel(batch.status)) + '</span><img class="chevron" src="/integration-icons/chevron-right.svg" alt=""></button>';
     }).join("");
   }
   function renderQuality(quality) {
@@ -302,7 +302,7 @@
     editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><span>Выручка</span></div></section>'
       + '<p>Смена: ' + h(batch.shiftId || 'Без смены') + ' · Сотрудник: ' + h(batch.actor?.name || batch.createdBy?.name || '') + '</p>'
       + (batch.prices || []).map(function(line){return '<p><b>' + h(line.name) + '</b> × ' + h(line.quantity) + ' · ' + h(money(line.total,batch.currency)) + '</p>';}).join('')
-      + '<p>Себестоимость: ' + h(money(batch.totalTheoreticalCost,batch.currency)) + '</p>'
+      + '<p>Себестоимость: ' + h(window.bdFormatSalesCost(batch,batch.currency)) + '</p>'
       + '<p>Оплата: ' + h((batch.payments || []).map(p=>p.method === 'CASH' ? 'Наличные' : 'Карта · внешняя оплата').join(', ')) + '</p>'
       + (batch.comment ? '<p>Комментарий: ' + h(batch.comment) + '</p>' : '')
       + '<p>Складских движений: ' + h((batch.movementIds || []).length) + '. Продажа уже проведена; повторное проведение не требуется.</p>';

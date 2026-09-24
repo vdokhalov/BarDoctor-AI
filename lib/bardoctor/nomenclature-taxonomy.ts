@@ -151,7 +151,8 @@ export function canonicalTaxonomyForAssortment(
     const subgroupId = text(subgroup?.id, "", 120);
     const groupName = text(group.name ?? group.label, "Раздел", 160);
     const subgroupName = text(subgroup?.name ?? subgroup?.label, "Общее", 160);
-    let section = taxonomy.sections.find((node) => normalizedName(node.name) === normalizedName(groupName));
+    let section = taxonomy.sections.find(node => node.id === group.sectionId || node.id === group.legacyDepartment || node.id === groupId)
+      ?? taxonomy.sections.find((node) => normalizedName(node.name) === normalizedName(groupName));
     if (!section) {
       section = { id: `menu-section:${groupId}`, name: groupName, order: number(group.sortOrder, taxonomy.sections.length * 10 + 10), active: true };
       taxonomy.sections.push(section);
@@ -511,20 +512,59 @@ export function menuTaxonomyPresentation(assortment: unknown, value: unknown, re
   const { taxonomy, legacyMenuPaths } = resolved;
   const canonical = Boolean(item.sectionId || item.taxonomyCategoryId || item.subcategoryId);
   const paths = canonical ? [] : legacyMenuPaths.filter(path => path.groupId === item.groupId && (!item.subgroupId || path.subgroupId === item.subgroupId));
-  const path = canonical ? item : paths.length === 1 ? paths[0] : item;
-  let section = taxonomy.sections.find(node => node.id === path.sectionId);
+  const path = canonical ? item : !item.subgroupId && paths.length ? { sectionId: paths[0].sectionId } : paths.length === 1 ? paths[0] : item;
+  const subgroup = taxonomy.subcategories.find(node => node.id === path.subcategoryId);
+  const category = taxonomy.categories.find(node => node.id === path.taxonomyCategoryId || (!path.taxonomyCategoryId && node.id === subgroup?.parentId));
+  let section = taxonomy.sections.find(node => node.id === path.sectionId || (!path.sectionId && node.id === category?.parentId));
+  // Legacy department codes are identities, never translated display labels.
+  if (!canonical && !section && !item.groupId) section = taxonomy.sections.find(node => node.id === item.department);
+  const sectionPath: CanonicalTaxonomyNode[] = [];
+  if (section) sectionPath.unshift(section);
   const seen = new Set<string>();
   while (section?.parentId && !seen.has(section.id)) {
     seen.add(section.id);
     const parent = taxonomy.sections.find(node => node.id === section?.parentId);
-    if (!parent) break;
+    if (!parent || seen.has(parent.id)) break;
     section = parent;
+    sectionPath.unshift(parent);
   }
-  const category = taxonomy.categories.find(node => node.id === path.taxonomyCategoryId);
-  const subgroup = taxonomy.subcategories.find(node => node.id === path.subcategoryId);
+
   const group = !canonical ? array(root.groups).map(record).find(row => row.id === item.groupId) : undefined;
   const legacyCategory = !canonical ? array(root.subgroups).map(record).find(row => row.id === item.subgroupId && row.groupId === item.groupId) : undefined;
-  const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "Раздел недоступен" : text(item.department, "other"));
+  const legacyLabels: Record<string,string> = {bar:"Бар",kitchen:"Кухня",hookah:"Кальянная",other:"Другое"};
+  const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "Раздел недоступен" : (legacyLabels[text(item.department)] || text(item.department, "Другое")));
   const categoryLabel = category?.name || text(legacyCategory?.name ?? legacyCategory?.label) || (canonical ? (item.taxonomyCategoryId ? "Категория недоступна" : "Без подраздела") : text(item.category, "Без подраздела"));
-  return { department, category: categoryLabel, categoryId: category?.id || text(legacyCategory?.id) || categoryLabel, subcategory: subgroup?.name || "" };
+  return { department, sectionId: section?.id || text(path.sectionId) || (group ? "legacy-group:" + text(group.id) : text(item.department, "other")),
+    category: categoryLabel, categoryId: category?.id || text(path.taxonomyCategoryId) || text(legacyCategory?.id) || "",
+    subcategory: subgroup?.name || (path.subcategoryId ? "Подраздел недоступен" : ""), subcategoryId: subgroup?.id || text(path.subcategoryId),
+    sectionPath: sectionPath.map(node => ({id:node.id,name:node.name})) };
+}
+
+/** Read-only adapter to the existing Menu accordion; no store writes or alternate taxonomy. */
+export function menuTaxonomyHierarchy(analytics: unknown, assortment: unknown) {
+  const root=record(assortment), resolved=canonicalTaxonomyForAssortment(root);
+  const originals=new Map(array(root.menuItems).map(record).map(item=>[item.id,item]));
+  type Node = { id:string; name:string; groupId:string; items:JsonRecord[]; children:Node[]; allItems:JsonRecord[] };
+  type Group = { id:string; name:string; directItems:JsonRecord[]; roots:Node[]; allItems:JsonRecord[] };
+  const groups=new Map<string,Group>(), nodes=new Map<string,Node>();
+  for(const value of array(record(analytics).menuItems)) {
+    const item=record(value), original=originals.get(item.id) || item;
+    const view=menuTaxonomyPresentation(root,original,resolved);
+    const display={...item,groupId:view.sectionId,groupName:view.department,category:view.category,subcategory:view.subcategory};
+    let group=groups.get(view.sectionId);
+    if(!group){group={id:view.sectionId,name:view.department,directItems:[],roots:[],allItems:[]};groups.set(group.id,group);}
+    let children=group.roots, parent:Node|undefined;
+    const path=[...view.sectionPath.slice(1).map(node=>({...node,id:"section:"+node.id})),
+      ...(view.categoryId?[{id:"category:"+view.categoryId,name:view.category}]:[]),
+      ...(view.subcategoryId?[{id:"subcategory:"+view.subcategoryId,name:view.subcategory}]:[])];
+    // Preserve free-form legacy categories that have no saved structural link.
+    if(!path.length && !view.categoryId && view.category!=="Без подраздела") path.push({id:"legacy-category:"+view.category,name:view.category});
+    for(const part of path){const key=group.id+":"+part.id;let node=nodes.get(key);
+      if(!node){node={id:key,name:part.name,groupId:group.id,items:[],children:[],allItems:[]};nodes.set(key,node);children.push(node);}
+      node.allItems.push(display);parent=node;children=node.children;
+    }
+    if(parent)parent.items.push(display);else group.directItems.push(display);
+    group.allItems.push(display);
+  }
+  return [...groups.values()];
 }

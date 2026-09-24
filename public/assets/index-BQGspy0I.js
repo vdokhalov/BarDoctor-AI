@@ -1,3 +1,237 @@
+/* bd-menu-taxonomy-shared-start */
+(function(){const exports={};
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.normalizeCanonicalTaxonomy = normalizeCanonicalTaxonomy;
+exports.canonicalTaxonomyForAssortment = canonicalTaxonomyForAssortment;
+exports.menuTaxonomyPresentation = menuTaxonomyPresentation;
+exports.menuTaxonomyHierarchy = menuTaxonomyHierarchy;
+function record(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function array(value) {
+    return Array.isArray(value) ? value : [];
+}
+function text(value, fallback = "", max = 200) {
+    return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
+}
+function number(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+function slug(value) {
+    return value.toLocaleLowerCase("ru-RU")
+        .replace(/ё/g, "е")
+        .replace(/[^a-zа-я0-9]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 48) || "node";
+}
+function normalizedName(value) {
+    return text(value).toLocaleLowerCase("ru-RU").replace(/ё/g, "е").replace(/\s+/g, " ");
+}
+function nodes(value) {
+    const ids = new Set();
+    return array(value).map(record).flatMap((item, index) => {
+        const id = text(item.id, "", 120);
+        const name = text(item.name ?? item.label, "", 160);
+        if (!id || !name || ids.has(id))
+            return [];
+        ids.add(id);
+        return [{
+                id,
+                name,
+                ...(text(item.parentId, "", 120) ? { parentId: text(item.parentId, "", 120) } : {}),
+                order: number(item.order ?? item.sortOrder, (index + 1) * 10),
+                active: item.active !== false,
+                ...(item.system === true ? { system: true } : {}),
+                ...(text(item.createdAt) ? { createdAt: text(item.createdAt) } : {}),
+                ...(text(item.updatedAt) ? { updatedAt: text(item.updatedAt) } : {}),
+                ...(text(item.archivedAt) ? { archivedAt: text(item.archivedAt) } : {}),
+            }];
+    }).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+}
+/**
+ * The existing structure inside bd_assortment_v1 is the canonical source.
+ * Defaults are used only for a genuinely new venue. Existing structures are
+ * normalized without re-inserting removed or renamed business categories.
+ */
+function normalizeCanonicalTaxonomy(value, fallback) {
+    const root = record(value);
+    const hasExistingStructure = [root.sections, root.categories, root.subcategories]
+        .some((candidate) => Array.isArray(candidate));
+    const source = hasExistingStructure ? root : record(fallback);
+    return {
+        version: "v336",
+        sections: nodes(source.sections),
+        categories: nodes(source.categories),
+        subcategories: nodes(source.subcategories),
+        locations: nodes(source.locations),
+    };
+}
+/**
+ * Legacy menu groups are read as an additive compatibility source until the
+ * venue persists the canonical tree. GET callers can use this projection
+ * without writing production data; a later user-authorized save can persist
+ * the same stable IDs through materializeMenuTaxonomy().
+ */
+function canonicalTaxonomyForAssortment(assortment, fallback) {
+    const root = record(assortment);
+    let taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, fallback);
+    const structuralCount = taxonomy.sections.length + taxonomy.categories.length + taxonomy.subcategories.length;
+    if (structuralCount === 0 && fallback)
+        taxonomy = normalizeCanonicalTaxonomy(fallback);
+    taxonomy = {
+        ...taxonomy,
+        sections: taxonomy.sections.map((node) => ({ ...node })),
+        categories: taxonomy.categories.map((node) => ({ ...node })),
+        subcategories: taxonomy.subcategories.map((node) => ({ ...node })),
+        locations: taxonomy.locations.map((node) => ({ ...node })),
+    };
+    const groups = array(root.groups).map(record).filter((group) => text(group.id, "", 120) && text(group.name ?? group.label, "", 160) && group.active !== false);
+    const subgroups = array(root.subgroups).map(record).filter((subgroup) => text(subgroup.id, "", 120) && text(subgroup.groupId, "", 120)
+        && text(subgroup.name ?? subgroup.label, "", 160) && subgroup.active !== false);
+    const paths = [];
+    let derivedFromMenu = structuralCount === 0 && groups.length > 0;
+    const ensureGenericPath = (group, subgroup) => {
+        const groupId = text(group.id, "", 120);
+        const subgroupId = text(subgroup?.id, "", 120);
+        const groupName = text(group.name ?? group.label, "Раздел", 160);
+        const subgroupName = text(subgroup?.name ?? subgroup?.label, "Общее", 160);
+        let section = taxonomy.sections.find(node => node.id === group.sectionId || node.id === group.legacyDepartment || node.id === groupId)
+            ?? taxonomy.sections.find((node) => normalizedName(node.name) === normalizedName(groupName));
+        if (!section) {
+            section = { id: `menu-section:${groupId}`, name: groupName, order: number(group.sortOrder, taxonomy.sections.length * 10 + 10), active: true };
+            taxonomy.sections.push(section);
+            derivedFromMenu = true;
+        }
+        const existingSubcategory = taxonomy.subcategories.find((node) => {
+            if (normalizedName(node.name) !== normalizedName(subgroupName))
+                return false;
+            const category = taxonomy.categories.find((candidate) => candidate.id === node.parentId);
+            return category?.parentId === section?.id;
+        });
+        if (existingSubcategory) {
+            const category = taxonomy.categories.find((node) => node.id === existingSubcategory.parentId);
+            return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: existingSubcategory.id };
+        }
+        let category = taxonomy.categories.find((node) => node.parentId === section?.id && normalizedName(node.name) === normalizedName(subgroupName));
+        if (!category) {
+            category = {
+                id: `menu-category:${subgroupId || groupId}`,
+                name: subgroupName,
+                parentId: section.id,
+                order: number(subgroup?.sortOrder, taxonomy.categories.filter((node) => node.parentId === section?.id).length * 10 + 10),
+                active: true,
+            };
+            taxonomy.categories.push(category);
+            derivedFromMenu = true;
+        }
+        let subcategory = taxonomy.subcategories.find((node) => node.parentId === category?.id && normalizedName(node.name) === "без подкатегории") ?? taxonomy.subcategories.find((node) => node.parentId === category?.id && node.active);
+        if (!subcategory) {
+            subcategory = {
+                id: `menu-subcategory:${subgroupId || groupId}`,
+                name: "Без подкатегории",
+                parentId: category.id,
+                order: 999,
+                active: true,
+            };
+            taxonomy.subcategories.push(subcategory);
+            derivedFromMenu = true;
+        }
+        return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: subcategory.id };
+    };
+    for (const group of groups) {
+        const children = subgroups.filter((subgroup) => text(subgroup.groupId, "", 120) === text(group.id, "", 120));
+        if (!children.length)
+            paths.push(ensureGenericPath(group));
+        else
+            children.forEach((subgroup) => paths.push(ensureGenericPath(group, subgroup)));
+    }
+    taxonomy.sections.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+    taxonomy.categories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+    taxonomy.subcategories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
+    return { taxonomy, legacyMenuPaths: paths, derivedFromMenu };
+}
+/** Resolve menu presentation from its existing canonical links without mutating stored items. */
+function menuTaxonomyPresentation(assortment, value, resolved = canonicalTaxonomyForAssortment(assortment)) {
+    const root = record(assortment), item = record(value);
+    const { taxonomy, legacyMenuPaths } = resolved;
+    const canonical = Boolean(item.sectionId || item.taxonomyCategoryId || item.subcategoryId);
+    const paths = canonical ? [] : legacyMenuPaths.filter(path => path.groupId === item.groupId && (!item.subgroupId || path.subgroupId === item.subgroupId));
+    const path = canonical ? item : !item.subgroupId && paths.length ? { sectionId: paths[0].sectionId } : paths.length === 1 ? paths[0] : item;
+    const subgroup = taxonomy.subcategories.find(node => node.id === path.subcategoryId);
+    const category = taxonomy.categories.find(node => node.id === path.taxonomyCategoryId || (!path.taxonomyCategoryId && node.id === subgroup?.parentId));
+    let section = taxonomy.sections.find(node => node.id === path.sectionId || (!path.sectionId && node.id === category?.parentId));
+    // Legacy department codes are identities, never translated display labels.
+    if (!canonical && !section && !item.groupId)
+        section = taxonomy.sections.find(node => node.id === item.department);
+    const sectionPath = [];
+    if (section)
+        sectionPath.unshift(section);
+    const seen = new Set();
+    while (section?.parentId && !seen.has(section.id)) {
+        seen.add(section.id);
+        const parent = taxonomy.sections.find(node => node.id === section?.parentId);
+        if (!parent || seen.has(parent.id))
+            break;
+        section = parent;
+        sectionPath.unshift(parent);
+    }
+    const group = !canonical ? array(root.groups).map(record).find(row => row.id === item.groupId) : undefined;
+    const legacyCategory = !canonical ? array(root.subgroups).map(record).find(row => row.id === item.subgroupId && row.groupId === item.groupId) : undefined;
+    const legacyLabels = { bar: "Бар", kitchen: "Кухня", hookah: "Кальянная", other: "Другое" };
+    const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "Раздел недоступен" : (legacyLabels[text(item.department)] || text(item.department, "Другое")));
+    const categoryLabel = category?.name || text(legacyCategory?.name ?? legacyCategory?.label) || (canonical ? (item.taxonomyCategoryId ? "Категория недоступна" : "Без подраздела") : text(item.category, "Без подраздела"));
+    return { department, sectionId: section?.id || text(path.sectionId) || (group ? "legacy-group:" + text(group.id) : text(item.department, "other")),
+        category: categoryLabel, categoryId: category?.id || text(path.taxonomyCategoryId) || text(legacyCategory?.id) || "",
+        subcategory: subgroup?.name || (path.subcategoryId ? "Подраздел недоступен" : ""), subcategoryId: subgroup?.id || text(path.subcategoryId),
+        sectionPath: sectionPath.map(node => ({ id: node.id, name: node.name })) };
+}
+/** Read-only adapter to the existing Menu accordion; no store writes or alternate taxonomy. */
+function menuTaxonomyHierarchy(analytics, assortment) {
+    const root = record(assortment), resolved = canonicalTaxonomyForAssortment(root);
+    const originals = new Map(array(root.menuItems).map(record).map(item => [item.id, item]));
+    const groups = new Map(), nodes = new Map();
+    for (const value of array(record(analytics).menuItems)) {
+        const item = record(value), original = originals.get(item.id) || item;
+        const view = menuTaxonomyPresentation(root, original, resolved);
+        const display = { ...item, groupId: view.sectionId, groupName: view.department, category: view.category, subcategory: view.subcategory };
+        let group = groups.get(view.sectionId);
+        if (!group) {
+            group = { id: view.sectionId, name: view.department, directItems: [], roots: [], allItems: [] };
+            groups.set(group.id, group);
+        }
+        let children = group.roots, parent;
+        const path = [...view.sectionPath.slice(1).map(node => ({ ...node, id: "section:" + node.id })),
+            ...(view.categoryId ? [{ id: "category:" + view.categoryId, name: view.category }] : []),
+            ...(view.subcategoryId ? [{ id: "subcategory:" + view.subcategoryId, name: view.subcategory }] : [])];
+        // Preserve free-form legacy categories that have no saved structural link.
+        if (!path.length && !view.categoryId && view.category !== "Без подраздела")
+            path.push({ id: "legacy-category:" + view.category, name: view.category });
+        for (const part of path) {
+            const key = group.id + ":" + part.id;
+            let node = nodes.get(key);
+            if (!node) {
+                node = { id: key, name: part.name, groupId: group.id, items: [], children: [], allItems: [] };
+                nodes.set(key, node);
+                children.push(node);
+            }
+            node.allItems.push(display);
+            parent = node;
+            children = node.children;
+        }
+        if (parent)
+            parent.items.push(display);
+        else
+            group.directItems.push(display);
+        group.allItems.push(display);
+    }
+    return [...groups.values()];
+}
+
+window.bdMenuTaxonomy=exports;})();
+/* bd-menu-taxonomy-shared-end */
+function bdLegacyAssortmentHierarchyV171(e,t){const n=bdCatState(t),r=bdCatArray(e?.menuItems),a=new Map;for(const g of bdCatArray(n.groups)){const y=String(g.id);a.set(y,{...g,id:y,name:g.name||g.label||"Раздел",directItems:[],roots:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other");a.has(y)||a.set(y,{id:y,name:g.groupName||"Другое",legacyDepartment:"other",sortOrder:a.size,directItems:[],roots:[],allItems:[]})}const s=new Map;for(const g of bdCatArray(n.subgroups)){const y=String(g.id),j=String(g.groupId||"");y&&j&&a.has(j)&&s.set(y,{...g,id:y,groupId:j,name:g.name||g.label||"Подраздел",items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.subgroupId||"");if(!y||s.has(y))continue;const j=String(g.groupId||g.groupName||"other");a.has(j)&&s.set(y,{id:y,groupId:j,name:g.category||"Без подраздела",sortOrder:9999,items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other"),j=String(g.subgroupId||""),v=s.get(j),b=a.get(y);v&&v.groupId===y?v.items.push(g):b?.directItems.push(g)}const l=(g,y)=>bdCatNumber(g.sortOrder)-bdCatNumber(y.sortOrder)||String(g.name).localeCompare(String(y.name),"ru"),u=g=>{g.children.sort(l);for(const y of g.children)u(y)},d=(g,y,j)=>{let v=y;const b=new Set([g]);for(let N=0;v&&N<=j.size;N++){if(b.has(v))return!0;b.add(v);v=j.get(v)||""}return!1},f=[];for(const g of [...a.values()].sort(l)){const y=[...s.values()].filter(v=>v.groupId===g.id),j=new Map(y.map(v=>[v.id,bdAssortmentNodeParentV171(v)]));g.roots=[];for(const v of y){const b=j.get(v.id)||"",N=s.get(b);b&&N&&N.groupId===g.id&&!d(v.id,b,j)?N.children.push(v):g.roots.push(v)}g.roots.sort(l);for(const v of g.roots)u(v);const b=v=>{const N=[...v.items];for(const E of v.children)N.push(...b(E));return v.allItems=N,N};for(const v of g.roots)b(v);g.allItems=[...g.directItems,...g.roots.flatMap(v=>v.allItems)];g.allItems.length&&f.push(g)}return f}
 const bdOwnerUATFixesV285="owner-uat-v285";/* purchase-units-v421:start */
 /** Purchase accounting category is not a nomenclature taxonomy or inventory kind.
  * A persisted, explicit stock kind wins over legacy `other`; callers must resolve
@@ -236,6 +470,12 @@ function bdCurrentAccountingCurrencyV243(){try{return bdAccountingCurrencyV243(b
     if (code === "PMR_RUB") return number + " руб. ПМР";
     try { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: code, maximumFractionDigits: 2 }).format(Number(value)); }
     catch { return number + " " + code; }
+  };
+  window.bdFormatSalesCost = function (batch, currency) {
+    var full = batch && batch.costStatus === "FULL";
+    if (full && batch.totalTheoreticalCost != null) return window.bdFormatAccountingMoney(batch.totalTheoreticalCost, currency);
+    if (batch && batch.costStatus === "PARTIAL" && batch.totalTheoreticalCost != null) return "не рассчитана полностью (известная часть: " + window.bdFormatAccountingMoney(batch.totalTheoreticalCost,currency) + ")";
+    return "не рассчитана";
   };
 })();
 /* bd-shared-accounting-money-end */
@@ -2521,7 +2761,7 @@ function bdAssortmentNodeParentV171(e){return String(e?.parentId||e?.parentSubgr
 function bdAssortmentMetricsV171(e){const t=bdCatArray(e),n=t.filter(r=>r.status==="ready").length;return{total:t.length,calculated:n,attention:Math.max(0,t.length-n)}}
 function bdAssortmentMetricsTextV171(e){const t=bdAssortmentMetricsV171(e),n=t.total+" "+bdAssortmentPluralV170(t.total,"позиция","позиции","позиций");return n+" · "+t.calculated+" рассчитано"+(t.attention?" · "+t.attention+" требуют настройки":"")}
 function bdAssortmentMatchesV171(e,t,n){const r=e.techCardStatus||e.recipeStatus,a=e.consumptionMode==="RECIPE";return(n==="all"||n==="attention"&&e.status!=="ready"||n==="missing"&&a&&e.recipeStatus==="missing"||n==="review"&&["requires_review","needs_review"].includes(r)||n==="ai_draft"&&a&&(r==="ai_draft"||e.hasPendingDraft)||n==="with_recipe"&&a&&e.recipeStatus!=="missing")&&(!t||bdAssortmentNormV170([e.name,e.groupName,e.category].join(" ")).includes(t))}
-function bdAssortmentHierarchyV171(e,t){const n=bdCatState(t),r=bdCatArray(e?.menuItems),a=new Map;for(const g of bdCatArray(n.groups)){const y=String(g.id);a.set(y,{...g,id:y,name:g.name||g.label||"Раздел",directItems:[],roots:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other");a.has(y)||a.set(y,{id:y,name:g.groupName||"Другое",legacyDepartment:"other",sortOrder:a.size,directItems:[],roots:[],allItems:[]})}const s=new Map;for(const g of bdCatArray(n.subgroups)){const y=String(g.id),j=String(g.groupId||"");y&&j&&a.has(j)&&s.set(y,{...g,id:y,groupId:j,name:g.name||g.label||"Подраздел",items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.subgroupId||"");if(!y||s.has(y))continue;const j=String(g.groupId||g.groupName||"other");a.has(j)&&s.set(y,{id:y,groupId:j,name:g.category||"Без подраздела",sortOrder:9999,items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other"),j=String(g.subgroupId||""),v=s.get(j),b=a.get(y);v&&v.groupId===y?v.items.push(g):b?.directItems.push(g)}const l=(g,y)=>bdCatNumber(g.sortOrder)-bdCatNumber(y.sortOrder)||String(g.name).localeCompare(String(y.name),"ru"),u=g=>{g.children.sort(l);for(const y of g.children)u(y)},d=(g,y,j)=>{let v=y;const b=new Set([g]);for(let N=0;v&&N<=j.size;N++){if(b.has(v))return!0;b.add(v);v=j.get(v)||""}return!1},f=[];for(const g of [...a.values()].sort(l)){const y=[...s.values()].filter(v=>v.groupId===g.id),j=new Map(y.map(v=>[v.id,bdAssortmentNodeParentV171(v)]));g.roots=[];for(const v of y){const b=j.get(v.id)||"",N=s.get(b);b&&N&&N.groupId===g.id&&!d(v.id,b,j)?N.children.push(v):g.roots.push(v)}g.roots.sort(l);for(const v of g.roots)u(v);const b=v=>{const N=[...v.items];for(const E of v.children)N.push(...b(E));return v.allItems=N,N};for(const v of g.roots)b(v);g.allItems=[...g.directItems,...g.roots.flatMap(v=>v.allItems)];g.allItems.length&&f.push(g)}return f}
+function bdAssortmentHierarchyV171(e,t){const state=bdCatState(t);return bdCatArray(state.menuItems).some(item=>item.sectionId||item.taxonomyCategoryId||item.subcategoryId)?window.bdMenuTaxonomy.menuTaxonomyHierarchy(e,state):bdLegacyAssortmentHierarchyV171(e,state)}
 function bdAssortmentMenuItemRowV171({item:e,onOpen:t}){const n=e.techCardStatus||e.recipeStatus,r=e.consumptionMode==="RECIPE"?bdAssortmentTechCardLabelV257(n):e.consumptionMode==="DIRECT_ITEM"?"Готовый товар":e.consumptionMode==="FIXED_QUANTITY"?"Порция товара":e.consumptionMode==="NONE"?"Без списания":"Требуется проверка",a=e.hasPendingDraft?" · Есть AI-черновик":"";return i.jsxs("button",{type:"button",className:"bd-assortment-menu-row-v170 "+e.status,"data-menu-item-id":e.id,onClick:()=>t(e),children:[i.jsx("span",{className:"bd-assortment-menu-mark-v170","aria-hidden":!0,children:i.jsx(kX,{size:17})}),i.jsxs("span",{className:"copy",children:[i.jsx("strong",{children:e.name}),i.jsx("small",{children:e.recipeCost!=null?"Себестоимость: "+bdAssortmentMoneyV170(e.recipeCost,e.costCurrency||e.currency)+(e.costPercent!=null?" · "+String(e.costPercent).replace(".",",")+"%":""):e.consumptionSummary||r+a}),e.costChangePercent!=null&&Math.abs(e.costChangePercent)>=5&&i.jsx("em",{children:"Себестоимость "+bdAssortmentPercentV170(e.costChangePercent)})]}),i.jsxs("span",{className:"amount",children:[i.jsx("strong",{children:e.salePrice!=null?bdAssortmentMoneyV170(e.salePrice,e.currency):"Цена не определена"}),i.jsx("small",{className:"tech-card "+n,children:r})]}),i.jsx(Br,{size:17})]},e.id)}
 function bdAssortmentSubgroupV171({node:e,query:t,filter:n,forceOpen:r,disclosure:a,onToggle:s,onOpen:l,depth:u=1}){const d=e.allItems.filter(b=>bdAssortmentMatchesV171(b,t,n));if(!d.length)return null;const f="subsection:"+e.id,m=r||a[f]===!0,h="bd-assortment-subgroup-"+bdAssortmentDomIdV171(e.id),g=e.items.filter(b=>bdAssortmentMatchesV171(b,t,n)),y=e.children.filter(b=>b.allItems.some(N=>bdAssortmentMatchesV171(N,t,n)));return i.jsxs("section",{className:"bd-assortment-subgroup-v171 "+(m?"open":""),"data-assortment-subsection-id":e.id,"data-depth":u,style:{"--bd-assortment-depth-v171":u},children:[i.jsxs("button",{type:"button",className:"bd-assortment-subgroup-toggle-v171",onClick:()=>s(f,m),"aria-expanded":m,"aria-controls":h,children:[i.jsxs("span",{className:"copy",children:[i.jsx("strong",{children:e.name}),i.jsx("small",{children:bdAssortmentMetricsTextV171(e.allItems)})]}),i.jsx("span",{className:"bd-assortment-chevron-v171","aria-hidden":!0,children:m?"⌄":"›"})]}),m&&i.jsxs("div",{id:h,className:"bd-assortment-expand-v171",children:[g.length>0&&i.jsx("div",{className:"bd-assortment-menu-list-v170 bd-assortment-menu-items-v171",children:g.map(b=>i.jsx(bdAssortmentMenuItemRowV171,{item:b,onOpen:l},b.id))}),...y.map(b=>i.jsx(bdAssortmentSubgroupV171,{node:b,query:t,filter:n,forceOpen:r,disclosure:a,onToggle:s,onOpen:l,depth:u+1},b.id))]})]},e.id)}
 function bdAssortmentMenuV170({analytics:e,query:t,onQuery:n,filter:r,onFilter:a,section:s,onSection:l,onOpen:u,onAdd:d,onStructure:f,canManage:m}){const h=bdAssortmentNormV170(t),g=String(localStorage.getItem("bd_active_venue_id")||""),[y,j]=S.useState(()=>bdAssortmentReadDisclosureV171());S.useEffect(()=>j(bdAssortmentReadDisclosureV171()),[g]);const v=S.useMemo(()=>bdAssortmentHierarchyV171(e,bdCatState(xr(bdCatalogStoreKey))),[e,g]),b=Boolean(h||r!=="all"),N=v.filter(E=>E.allItems.some(_=>bdAssortmentMatchesV171(_,h,r))),E=(A,k)=>{j(O=>{const M={...O,[A]:!k};return bdAssortmentWriteDisclosureV171(M),M})};return i.jsxs("div",{className:"bd-assortment-menu-v170 bd-assortment-menu-hierarchy-v171",children:[i.jsx(bdAssortmentToolbarV170,{query:t,onQuery:n,placeholder:"Поиск по меню…",children:i.jsxs("div",{className:"bd-assortment-toolbar-actions-v170",children:[m&&i.jsx("button",{type:"button",onClick:f,children:"Разделы"})]})}),i.jsx("div",{className:"bd-assortment-filter-row-v170",children:[{id:"all",label:"Все"},{id:"attention",label:"Требуют внимания"},{id:"missing",label:"Без техкарты"},{id:"review",label:"Требуют проверки"},{id:"ai_draft",label:"AI-черновики"},{id:"with_recipe",label:"С техкартой"}].map(A=>i.jsx("button",{type:"button",className:r===A.id?"active":"",onClick:()=>a(A.id),children:A.label},A.id))}),N.length?i.jsx("section",{className:"bd-assortment-accordion-v171","aria-label":"Структура меню",children:N.map((A,k)=>{const O="section:"+A.id,M=b||String(s)===String(A.id)||y[O]===!0,D="bd-assortment-section-"+bdAssortmentDomIdV171(A.id),z=A.directItems.filter(L=>bdAssortmentMatchesV171(L,h,r)),F=A.roots.filter(L=>L.allItems.some(q=>bdAssortmentMatchesV171(q,h,r)));return i.jsxs("section",{className:"bd-assortment-section-v171 "+(M?"open":""),"data-assortment-section-id":A.id,children:[i.jsxs("button",{type:"button",className:"bd-assortment-section-toggle-v171",onClick:()=>{String(s)===String(A.id)&&s!=="all"&&l("all"),E(O,M)},"aria-expanded":M,"aria-controls":D,children:[i.jsxs("span",{className:"title",children:[i.jsx("i",{className:"tone tone-"+(k%3),"aria-hidden":!0}),i.jsxs("span",{className:"copy",children:[i.jsx("strong",{children:A.name}),i.jsx("small",{children:bdAssortmentMetricsTextV171(A.allItems)})]})]}),i.jsx("span",{className:"bd-assortment-chevron-v171","aria-hidden":!0,children:M?"⌄":"›"})]}),M&&i.jsxs("div",{id:D,className:"bd-assortment-expand-v171 bd-assortment-section-content-v171",children:[z.length>0&&i.jsx("div",{className:"bd-assortment-menu-list-v170 bd-assortment-menu-items-v171 direct",children:z.map(L=>i.jsx(bdAssortmentMenuItemRowV171,{item:L,onOpen:u},L.id))}),...F.map(L=>i.jsx(bdAssortmentSubgroupV171,{node:L,query:h,filter:r,forceOpen:b,disclosure:y,onToggle:E,onOpen:u},L.id))]})]},A.id)})}):i.jsx(bdAssortmentEmptyV170,{icon:xi,title:e.menuItems?.length?"Ничего не найдено":"Ассортимент пока пуст",copy:e.menuItems?.length?"Измените поиск или фильтр.":"Импортируйте меню или создайте первую позицию вручную.",action:null})]})}

@@ -1581,7 +1581,7 @@ export function salesBatchKpis(batchesValue: unknown[], venueId: number) {
     // A partial sum is not the cost of all sales. Preserve UNKNOWN through
     // aggregate readers; explicit known zero remains a valid measured value.
     theoreticalCost: batches.length > 0 && batches.every((batch) =>
-      typeof batch.totalTheoreticalCost === "number" && Number.isFinite(batch.totalTheoreticalCost)
+      batch.costStatus === "FULL" && typeof batch.totalTheoreticalCost === "number" && Number.isFinite(batch.totalTheoreticalCost)
         && batch.totalTheoreticalCost >= 0)
       ? money(batches.reduce((sum, batch) => sum + batch.totalTheoreticalCost!, 0))
       : null,

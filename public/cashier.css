@@ -5,3 +5,5 @@
 .pos-item,.pos-line,.pos-top,.pos-total{min-width:0;overflow-wrap:anywhere}.pos-menu-head>div{min-width:0}.pos-line{grid-template-columns:minmax(0,1fr)}.pos-qty{justify-content:flex-end}.pos-total{gap:10px;flex-wrap:wrap}.pos-tabs,.pos-categories{max-width:100%}.pos-receipt{overflow-wrap:anywhere}
 
 @media(min-width:751px){.pos-cart{top:calc(var(--bd-header-total,64px) + 12px);min-height:0;max-height:calc(100dvh - var(--bd-header-total,64px) - 24px)}.pos-cart-lines{flex:1}.pos-cart-head,.pos-comment,.pos-cart-foot{flex-shrink:0}}
+
+.pos-tabs button,.pos-categories button{max-width:100%;white-space:normal;flex-shrink:0;overflow-wrap:anywhere}

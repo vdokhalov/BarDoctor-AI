@@ -16,7 +16,7 @@ const HTML = `<!doctype html>
   <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
   <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
-  <script src="/sales-import.js?v=pos1-hardening" defer></script>
+  <script src="/sales-import.js?v=pos1-functional" defer></script>
 </head>
 <body data-bd-parent-route="/warehouse" data-sales-experience="v278">
   <header class="sales-topbar">

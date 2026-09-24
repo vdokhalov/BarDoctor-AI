@@ -11,10 +11,11 @@ const taxonomy={sections:[{id:"bar",name:"Бар"},{id:"kitchen",name:"Кухн�
 test("POS classification uses canonical and legacy menu links without rewriting stale text",()=>{
   const root={nomenclatureStructure:taxonomy};
   const menu={department:"bar",category:"Без подраздела",sectionId:"kitchen",taxonomyCategoryId:"food"};
-  assert.deepEqual(menuTaxonomyPresentation(root,menu),{department:"Кухня",category:"Продукты",categoryId:"food",subcategory:""});
+  assert.deepEqual(menuTaxonomyPresentation(root,menu),{department:"Кухня",sectionId:"kitchen",category:"Продукты",categoryId:"food",subcategory:"",subcategoryId:"",sectionPath:[{id:"kitchen",name:"Кухня"}]});
   assert.equal(menu.department,"bar");
   assert.equal(menuTaxonomyPresentation(root,{sectionId:"bar",taxonomyCategoryId:"water"}).category,"Безалкогольные напитки");
   assert.equal(menuTaxonomyPresentation(root,{sectionId:"nested"}).department,"Бар");
+  assert.deepEqual(menuTaxonomyPresentation(root,{sectionId:"nested"}).sectionPath.map(node=>node.name),["Бар","Напитки"]);
   assert.equal(menuTaxonomyPresentation(root,{sectionId:"hookah"}).category,"Без подраздела");
   assert.equal(menuTaxonomyPresentation(root,{sectionId:"deleted",department:"bar"}).department,"Раздел недоступен");
   const legacy={groups:[{id:"g",name:"Кухня"}],subgroups:[{id:"s",groupId:"g",name:"Продукты"}]};

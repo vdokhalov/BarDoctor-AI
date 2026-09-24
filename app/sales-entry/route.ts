@@ -2,7 +2,7 @@ import { canonicalUserShellAssets } from "../../lib/bardoctor/app-shell";
 
 export function GET(): Response {
   return new Response(`<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Ввести продажу — BarDoctor</title>
-  ${canonicalUserShellAssets()}<link rel="stylesheet" href="/inventory-onboarding.css?v=phase5"><link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297"><script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script><script src="/sales-entry.js?v=phase5" defer></script></head>
+  ${canonicalUserShellAssets()}<link rel="stylesheet" href="/inventory-onboarding.css?v=phase5"><link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297"><script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script><script src="/sales-entry.js?v=pos1-functional" defer></script></head>
   <body data-bd-parent-route="/sales-import"><header><a href="/sales-import">← Продажи</a><h1>Ввести продажу</h1><div class="bd-standalone-venue-host" data-bd-venue-host></div></header><main>
   <p id="notice" role="status" aria-live="polite">Загрузка…</p><div id="work" hidden>
   <form id="sale"><label>Смена<select id="shift"><option value="">Без смены</option></select></label><div id="lines"></div><div class="actions"><button id="add-line" type="button">Добавить позицию</button><button type="submit">Проверить продажу</button></div></form>

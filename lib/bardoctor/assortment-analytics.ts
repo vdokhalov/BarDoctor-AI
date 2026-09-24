@@ -1,3 +1,4 @@
+import { canonicalTaxonomyForAssortment, menuTaxonomyPresentation } from "./nomenclature-taxonomy";
 import {
   inventoryPackageAmount,
   toInventoryBaseAmount,
@@ -636,6 +637,7 @@ export function buildAssortmentAnalytics(input: {
     now,
   });
   const assortment = record(reconciliation.assortment);
+  const menuTaxonomy = canonicalTaxonomyForAssortment(assortment);
   const groups = array(assortment.groups).map(record);
   const menuItems = array(assortment.menuItems).map(record).filter((item) => item.active !== false);
   const recipes = array(assortment.recipes).map(record);
@@ -922,13 +924,19 @@ export function buildAssortmentAnalytics(input: {
     const grossProfit = itemRevenue !== null && soldCost !== null
       ? rounded(itemRevenue - soldCost, 2)
       : null;
+    const taxonomyView = menuTaxonomyPresentation(assortment, item, menuTaxonomy);
+    const canonicalLinks = Boolean(item.sectionId || item.taxonomyCategoryId || item.subcategoryId);
     return {
       id,
       name: text(item.name, "Позиция", 240),
-      groupId: text(item.groupId, "", 120) || null,
-      groupName: groupName(item, groups),
-      subgroupId: text(item.subgroupId, "", 120) || null,
-      category: text(item.category, "Без подраздела", 120),
+      groupId: canonicalLinks ? taxonomyView.sectionId : text(item.groupId, "", 120) || null,
+      groupName: canonicalLinks ? taxonomyView.department : groupName(item, groups),
+      subgroupId: canonicalLinks ? taxonomyView.subcategoryId || taxonomyView.categoryId || null : text(item.subgroupId, "", 120) || null,
+      category: canonicalLinks ? taxonomyView.category : text(item.category, "Без подраздела", 120),
+      sectionId: taxonomyView.sectionId,
+      taxonomyCategoryId: taxonomyView.categoryId,
+      subcategoryId: taxonomyView.subcategoryId,
+      subcategory: taxonomyView.subcategory,
       type: text(item.type, "composite", 40),
       saleSize: resolvedSaleSize,
       portionSize: formatMenuSaleSize(resolvedSaleSize) || null,
