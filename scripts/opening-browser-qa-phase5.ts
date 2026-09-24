@@ -11,7 +11,7 @@ const pageSource = readFileSync(new URL("../app/inventory-onboarding/route.ts", 
 const pageBody = stripTypeScriptTypes(pageSource.replace(/^import[^\n]+\n/gm, "")).replace("export function GET", "function GET");
 // Actual feature HTML, shared shell assets and real HTTP domain writes; only authentication is a local fixture.
 const render = new Function("canonicalUserShellAssets", pageBody + ";return GET;")(canonicalUserShellAssets) as () => Response;
-const assets = new Set(["/inventory-onboarding.js", "/inventory-onboarding.css", "/app-shell-v185.css", "/navigation-contract-v247.js", "/app-shell-v185.js", "/navigation-transient-v247.js", "/catalog-accounting-v207.js"]);
+const assets = new Set(["/accounting-currency.js", "/inventory-onboarding.js", "/inventory-onboarding.css", "/app-shell-v185.css", "/navigation-contract-v247.js", "/app-shell-v185.js", "/navigation-transient-v247.js", "/catalog-accounting-v207.js"]);
 const executablePath = await resolveBrowserExecutable(chromium.executablePath());
 const browser = await chromium.launch({ executablePath, headless: true, args: process.platform === "win32" ? [] : chromiumArgs });
 try {
