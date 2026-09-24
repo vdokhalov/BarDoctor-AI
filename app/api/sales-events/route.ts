@@ -1,7 +1,8 @@
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
-import { hasPermission, type PermissionKey } from "../../../lib/bardoctor/access-control";
+import { hasPermission, canManagePosPrivilegedAction, type PermissionKey } from "../../../lib/bardoctor/access-control";
 import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
+import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
@@ -25,7 +26,18 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
 function controlled(error:unknown) {
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
-  if (error instanceof Error && error.message.startsWith("SALES_EVENT_")) return reply({ok:false,code:error.message,error:"Продажа или смена требует проверки. Проверьте позиции, цены, состояние смены и ранее внесённую выручку. Ничего не изменено."},409);
+  if (error instanceof Error && error.message.startsWith("SALES_EVENT_")) {
+    const messages: Record<string,string> = {
+      SALES_EVENT_SHIFT_NOT_FOUND: "Открытая смена не найдена. Выберите другую смену.",
+      SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH: "Эта смена уже закрыта. Выберите открытую смену.",
+      SALES_EVENT_POS_COMMAND_INVALID: "Укажите открытую смену и один способ оплаты с точной суммой.",
+      SALES_EVENT_POS_PAYMENT_MISMATCH: "Сумма оплаты не совпадает с суммой заказа.",
+      SALES_EVENT_CONSUMPTION_NEEDS_REVIEW: "Для одной из позиций не настроено безопасное складское списание. Проверьте режим и техкарту.",
+      SALES_EVENT_PRICE_NEEDS_REVIEW: "Проверьте цену и валюту позиции меню.",
+      SALES_EVENT_IDEMPOTENCY_CONFLICT: "Этот запрос уже использовался для другого заказа. Обновите кассу.",
+    };
+    return reply({ok:false,code:error.message,error:messages[error.message] ?? "Продажа или смена требует проверки. Проверьте позиции, цены, состояние смены и ранее внесённую выручку. Ничего не изменено."},409);
+  }
   throw error;
 }
 export async function GET(request:Request) {
@@ -34,9 +46,9 @@ export async function GET(request:Request) {
   try {
     const {context:c} = await load(account);
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
-    return reply({ok:true,venueId:c.venueId,currency:c.currency,
+    return reply({ok:true,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
-        .map(m => ({id:m.id,name:m.name,salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
+        .map(m => ({id:m.id,name:m.name,department:m.department ?? "other",category:m.category ?? "",salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null),
       events:c.events.filter(e => e.venueId === c.venueId).slice(-100).reverse(),
       permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:hasPermission(account,"shifts.manage")} });
@@ -50,7 +62,7 @@ async function command(request:Request):Promise<Response> {
   const body = parsed.data;
   const permissions:Record<string,PermissionKey> = {preview:"sales.create",post:"sales.post",reverse:"sales.reverse",open_shift:"shifts.manage",close_shift:"shifts.manage"};
   if (!permissions[body.action]) return reply({ok:false,code:"ACTION_INVALID"},422);
-  if (!hasPermission(account,permissions[body.action]) || body.action === "post" && !hasPermission(account,"sales.create")) return reply({ok:false,code:"ACCESS_DENIED"},403);
+  if (!hasPermission(account,permissions[body.action]) || body.action === "post" && !hasPermission(account,"sales.create") || body.action === "reverse" && !canManagePosPrivilegedAction(account)) return reply({ok:false,code:"ACCESS_DENIED"},403);
   if (body.venueId !== account.venueId) return reply({ok:false,code:"VENUE_CHANGED"},409);
   try {
     const {db,snapshots,context:c} = await load(account);
@@ -62,6 +74,8 @@ async function command(request:Request):Promise<Response> {
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
     } else if (body.action === "reverse") {
+      const target=c.events.find(event => event.id === body.eventId && event.venueId === c.venueId);
+      if (target?.source === "POS_API") return reply({ok:false,code:"POS_REVERSAL_NOT_AVAILABLE",error:"Отмена кассовой продажи пока недоступна."},409);
       const plan=planReverseSalesEvent(c,body.eventId); result={ok:true,duplicate:plan.duplicate,event:plan.event};
       if (plan.duplicate) return reply(result);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];

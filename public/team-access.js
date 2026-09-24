@@ -1,10 +1,11 @@
 (function () {
   "use strict";
-  var ROLE_LABELS = { owner: "Владелец", manager: "Управляющий", shift_manager: "Менеджер" };
+  var ROLE_LABELS = { owner: "Владелец", manager: "Управляющий", shift_manager: "Администратор заведения", cashier: "Кассир" };
   var ROLE_DESCRIPTIONS = {
     owner: "Все данные, права, интеграции и критические настройки заведения.",
     manager: "Операционное управление. Владелец может точечно изменить доступ.",
-    shift_manager: "Смены, склад, поручения, происшествия и оборудование."
+    shift_manager: "Смены, склад, поручения, происшествия и оборудование.",
+    cashier: "Просмотр смен и проведение продаж в кассе без отмены проведённых операций."
   };
   var state = { access: null, selectedMember: null, lastInvite: null };
 
@@ -53,7 +54,7 @@
   function renderRoles() {
     var root = byId("role-cards");
     clear(root);
-    ["owner", "manager", "shift_manager"].forEach(function (role) {
+    ["owner", "manager", "shift_manager", "cashier"].forEach(function (role) {
       var card = node("article", "role-card" + (state.access.current.role === role ? " current" : ""));
       card.appendChild(node("strong", "", roleLabel(role)));
       card.appendChild(node("span", "", ROLE_DESCRIPTIONS[role]));
@@ -110,7 +111,7 @@
         var actions = node("div", "member-actions");
         if (state.access.current.role === "owner") {
           var role = node("select");
-          ["manager", "shift_manager"].forEach(function (value) {
+          ["manager", "shift_manager", "cashier"].forEach(function (value) {
             var option = node("option", "", roleLabel(value));
             option.value = value;
             role.appendChild(option);

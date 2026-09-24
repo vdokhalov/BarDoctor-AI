@@ -62,6 +62,8 @@ jobs:
         run: node --import tsx scripts/opening-browser-qa-phase5.ts
       - name: Phase 5 sales mobile desktop persisted HTTP QA
         run: node --import tsx scripts/sales-browser-qa-phase5.ts
+      - name: POS-1 cashier real sales handler SQLite mobile desktop QA
+        run: node --import tsx scripts/pos1-browser-qa.ts
       - name: Startup recovery browser QA
         run: npm run test:startup-recovery
       - name: Anonymous mobile desktop startup handoff

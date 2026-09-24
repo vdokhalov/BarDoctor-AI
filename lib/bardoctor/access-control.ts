@@ -1,6 +1,6 @@
 import type { Account, VenueMembership } from "../../db/schema";
 
-export const ACCESS_ROLES = ["owner", "manager", "shift_manager"] as const;
+export const ACCESS_ROLES = ["owner", "manager", "shift_manager", "cashier"] as const;
 export type AccessRole = (typeof ACCESS_ROLES)[number];
 
 export const PERMISSION_KEYS = [
@@ -170,6 +170,7 @@ const ROLE_DEFAULTS: Record<Exclude<AccessRole, "owner">, PermissionKey[]> = {
     "data.import",
     "settings.manage",
   ],
+  cashier: ["home.view", "shifts.view", "sales.view", "sales.create", "sales.post"],
   shift_manager: [
     "home.view",
     "shifts.view",
@@ -233,7 +234,8 @@ export function sanitizePermissionOverrides(
   const parsed = value && typeof value === "object"
     ? value as { allow?: unknown; deny?: unknown }
     : {};
-  const allow = uniquePermissions(parsed.allow).filter((key) => !OWNER_ONLY_PERMISSIONS.has(key));
+  const allow = uniquePermissions(parsed.allow).filter((key) => !OWNER_ONLY_PERMISSIONS.has(key)
+    && (key !== "sales.reverse" || canManagePosPrivilegedAction({ role })));
   const deny = uniquePermissions(parsed.deny);
   const allowSet = new Set(allow);
   return {
@@ -261,7 +263,7 @@ export function permissionsFor(
   const permissions = new Set<PermissionKey>(ROLE_DEFAULTS[role]);
   const overrides = parsePermissionOverrides(permissionsJson);
   for (const key of overrides.allow) {
-    if (!OWNER_ONLY_PERMISSIONS.has(key)) permissions.add(key);
+    if (!OWNER_ONLY_PERMISSIONS.has(key) && (key !== "sales.reverse" || canManagePosPrivilegedAction({ role }))) permissions.add(key);
   }
   for (const key of overrides.deny) permissions.delete(key);
   for (const [permission, dependency] of Object.entries(PERMISSION_DEPENDENCIES) as [
@@ -283,6 +285,7 @@ export function hasPermission(
   account: Pick<AuthenticatedAccount, "role" | "permissions">,
   permission: PermissionKey,
 ): boolean {
+  if (permission === "sales.reverse" && !canManagePosPrivilegedAction(account)) return false;
   return account.role === "owner" || account.permissions.includes(permission);
 }
 
@@ -307,4 +310,9 @@ export function permissionPayload(role: AccessRole, permissionsJson?: string | n
     permissions: permissionsFor(role, permissionsJson),
     overrides: parsePermissionOverrides(permissionsJson),
   };
+}
+
+/** POS-2 privileged actions cannot be granted to a cashier through overrides. */
+export function canManagePosPrivilegedAction(account: Pick<AuthenticatedAccount, "role">): boolean {
+  return account.role === "owner" || account.role === "manager" || account.role === "shift_manager";
 }

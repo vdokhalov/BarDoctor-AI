@@ -10,13 +10,15 @@ import * as nomenclature from "../../lib/bardoctor/nomenclature";
 import * as currency from "../../lib/bardoctor/currency";
 import * as http from "../../lib/bardoctor/http";
 import * as trust from "../../lib/bardoctor/data-trust";
+import * as access from "../../lib/bardoctor/access-control";
+import * as venueIdentity from "../../lib/bardoctor/venue-identity";
 
 /** Real route + real CAS SQL on isolated SQLite. Auth fixture never enters production code. */
 export function openingRuntime(route = new URL("../../app/api/inventory/opening/route.ts", import.meta.url), extraDependencies: Record<string, unknown> = {}) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`CREATE TABLE domain_data (account_id INTEGER, store_key TEXT, data_json TEXT NOT NULL, updated_at TEXT, PRIMARY KEY(account_id, store_key));
     CREATE TABLE audit_log (account_id INTEGER, store_key TEXT, action TEXT, entity_id TEXT, entity_label TEXT, month_key TEXT, before_json TEXT, after_json TEXT, changed_fields_json TEXT, actor_name TEXT, actor_role TEXT, reason TEXT, created_at TEXT);`);
-  let allowed = true, signedIn = true, batches = 0;
+  let allowed = true, signedIn = true, batches = 0, accountingCurrency = "MDL";
   let beforeBatch: (() => void) | undefined;
   let failAt = -1;
   const prepare = (sql: string) => {
@@ -36,9 +38,9 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
       if (i === failAt) throw new Error("SIMULATED_D1_WRITE_FAILURE"); out.push(await statements[i].run());
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
-  const dependencies = { ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust,
+  const dependencies = { ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity,
     getD1: () => db as unknown as D1Database,
-    authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), role: "owner", firstName: "QA", lastName: "", restaurantJson: '{"currency":"MDL"}' } : null,
+    authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), actorAccountId: 7, role: "owner", firstName: "QA", lastName: "", restaurantJson: JSON.stringify({ currency: accountingCurrency }) } : null,
     unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };
   function loadRoute(route: URL, extra: Record<string, unknown> = {}) {
     const injected = { ...dependencies, ...extra };
@@ -48,6 +50,7 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
   }
   const api = loadRoute(route);
   return { api, loadRoute, sqlite, close: () => sqlite.close(), batches: () => batches,
+    setCurrency: (value: string) => { accountingCurrency = value; },
     setAllowed: (value: boolean) => { allowed = value; }, setSignedIn: (value: boolean) => { signedIn = value; },
     beforeBatch: (hook: () => void) => { beforeBatch = hook; }, failAt: (index: number) => { failAt = index; },
     put(key: string, value: unknown) { sqlite.prepare("INSERT INTO domain_data VALUES (7, ?, ?, 'test') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(key, JSON.stringify(value)); },

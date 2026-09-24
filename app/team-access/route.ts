@@ -44,7 +44,7 @@ const TEAM_ACCESS_HTML = `<!doctype html>
           <div class="card-title"><div><p>ПРИГЛАШЕНИЕ</p><h2>Добавить участника</h2></div></div>
           <p class="help">Создайте одноразовый код. Пароль сотрудника вам не показывается и не передаётся.</p>
           <div class="invite-controls">
-            <label>Роль<select id="invite-role"><option value="manager">Управляющий</option><option value="shift_manager">Менеджер</option></select></label>
+            <label>Роль<select id="invite-role"><option value="manager">Управляющий</option><option value="shift_manager">Администратор заведения</option><option value="cashier">Кассир</option></select></label>
             <button id="create-invite" type="button">Создать код</button>
           </div>
           <div id="invite-result" class="invite-result hidden">

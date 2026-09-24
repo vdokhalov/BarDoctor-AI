@@ -30,6 +30,7 @@
     "test:startup-recovery": "bash scripts/sites-env.sh -- bash scripts/run-startup-recovery-browser-qa-v341.sh",
     "test:procurement-browser": "bash scripts/sites-env.sh -- bash scripts/run-procurement-browser-qa-v190.sh",
     "test:menu-sale-size-browser": "bash scripts/sites-env.sh -- bash scripts/run-menu-sale-size-browser-qa-v298.sh",
+    "test:pos1-browser": "node --import tsx scripts/pos1-browser-qa.ts",
     "test:menu-consumption-browser": "bash scripts/sites-env.sh -- node scripts/menu-consumption-browser-qa-v418.cjs",
     "test:menu-edit-actions-browser": "node scripts/run-menu-edit-actions-browser-v435.mjs",
     "test:edit-form-actions-browser": "node scripts/run-edit-form-actions-browser-v438.mjs",

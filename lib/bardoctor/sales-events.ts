@@ -4,11 +4,13 @@ import type { StockMovement } from "./inventory";
 export const SALES_EVENT_STORE_KEY = "bd_sales_events_v1";
 export const EVENT_REVENUE_SOURCE = "sales_events_v1";
 type Row = Record<string, unknown>;
-export type SalesEventCommand = { id: string; source: SalesSource; shiftId?: string; occurredAt?: string; lines: { id: string; menuItemId: string; quantity: number }[] };
+export type PosPayment = { id: string; method: "CASH" | "CARD_EXTERNAL"; amount: number };
+export type SalesEventCommand = { id: string; source: SalesSource; shiftId?: string; occurredAt?: string; comment?: string; payments?: PosPayment[]; lines: { id: string; menuItemId: string; quantity: number }[] };
 export type SalesEvent = {
   id: string; externalId: string; source: SalesSource; venueId: number; fingerprint: string;
   status: "POSTED" | "REVERSED"; acceptedAt: string; reversedAt?: string; businessDate: string;
   shiftId?: string; revenueRowId: string; currency: string; revenue: number;
+  actor?: SalesBatch["createdBy"]; comment?: string; payments?: PosPayment[];
   prices: { lineId: string; menuItemId: string; name: string; quantity: number; unitPrice: number; total: number }[];
   batch: SalesBatch; originalMovements: StockMovement[];
 };
@@ -32,18 +34,17 @@ function id(value: unknown): value is string { return typeof value === "string" 
 function scoped(row: Row, venue: number) { return row.venueId == null || row.venueId === venue; }
 function contextCheck(c: SalesEventContext) {
   if (!Number.isSafeInteger(c.venueId) || c.venueId <= 0 || !c.currency || !Number.isFinite(Date.parse(c.now))) fail("CONTEXT_INVALID");
-  if (c.closedMonths.has(c.now.slice(0,7))) fail("MONTH_LOCKED");
   if (new Set(c.events.map(e => e.id)).size !== c.events.length) fail("HISTORY_NEEDS_REVIEW");
 }
 function revenueCheck(c: SalesEventContext, date: string) {
   if (c.revenues.some(r => scoped(r,c.venueId) && r.date === date && r.revenueSource !== EVENT_REVENUE_SOURCE)) fail("LEGACY_REVENUE_CONFLICT");
 }
-function shift(c: SalesEventContext, shiftId: string, date: string) {
+function shift(c: SalesEventContext, shiftId: string, date?: string) {
   const matches = c.revenues.filter(r => r.id === shiftId && r.venueId === c.venueId);
   if (matches.length !== 1) fail("SHIFT_NOT_FOUND");
   const value = matches[0];
-  if (value.date !== date || value.closingStatus !== "open") fail("SHIFT_CLOSED_OR_DATE_MISMATCH");
-  if (value.revenueSource !== EVENT_REVENUE_SOURCE || value.currency !== c.currency) fail("SHIFT_NEEDS_REVIEW");
+  if ((date != null && value.date !== date) || value.closingStatus !== "open") fail("SHIFT_CLOSED_OR_DATE_MISMATCH");
+  if (value.revenueSource !== EVENT_REVENUE_SOURCE || value.currency !== c.currency || !/^\d{4}-\d{2}-\d{2}$/.test(String(value.date))) fail("SHIFT_NEEDS_REVIEW");
   return value;
 }
 function capacity(events: SalesEvent[]) {
@@ -64,10 +65,18 @@ function project(c: SalesEventContext, events: SalesEvent[], rowId: string, date
 export async function planSalesEvent(c: SalesEventContext, command: SalesEventCommand) {
   if (!command || !id(command.id) || !SALES_SOURCES.includes(command.source) || command.occurredAt != null
     || command.shiftId !== undefined && !id(command.shiftId)) fail("LIVE_COMMAND_REQUIRED");
+  const isPos = command.source === "POS_API";
+  if (!isPos && (command.payments !== undefined || command.comment !== undefined)) fail("POS_FIELDS_FORBIDDEN");
+  if (isPos && (!id(command.shiftId) || !Array.isArray(command.payments) || command.payments.length !== 1
+    || command.payments.some(p => !p || !id(p.id) || !["CASH","CARD_EXTERNAL"].includes(p.method)
+      || typeof p.amount !== "number" || !Number.isSafeInteger(Math.round(p.amount*100)) || Math.abs(p.amount*100-Math.round(p.amount*100))>0.000001 || p.amount < 0)
+    || command.comment != null && (typeof command.comment !== "string" || command.comment.length > 500))) fail("POS_COMMAND_INVALID");
   if (!Array.isArray(command.lines) || command.lines.length < 1 || command.lines.length > 100
     || command.lines.some(l => !l || !id(l.id) || !id(l.menuItemId) || typeof l.quantity !== "number" || !Number.isFinite(l.quantity) || l.quantity <= 0 || l.quantity > 1_000_000)
     || new Set(command.lines.map(l => l.id)).size !== command.lines.length) fail("LINES_INVALID");
+  if (isPos && command.lines.some(l => !Number.isSafeInteger(l.quantity) || l.quantity > 999)) fail("POS_QUANTITY_INVALID");
   const normalized = { id: command.id, source: command.source, shiftId: command.shiftId,
+    ...(isPos ? { payments:command.payments,comment:command.comment ?? "" } : {}),
     lines: command.lines.map(l => ({ id:l.id, menuItemId:l.menuItemId, quantity:l.quantity })) };
   const fingerprint = await digest(normalized);
   const eventId = "sales-event:" + await digest([c.venueId,command.source,command.id]);
@@ -79,9 +88,10 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
     return { duplicate:true, event:existing[0], events:c.events, assortment:c.assortment, movements:c.movements, revenues:c.revenues, previewHash:"" };
   }
   contextCheck(c);
-  const date = c.now.slice(0,10);
+  const date = isPos ? String(shift(c,command.shiftId!).date) : c.now.slice(0,10);
+  if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED");
   revenueCheck(c,date);
-  if (command.shiftId) shift(c,command.shiftId,date);
+  if (!isPos && command.shiftId) shift(c,command.shiftId,date);
   const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems as Row[] : [];
   if (menu.some(m => !m || typeof m !== "object" || Array.isArray(m))) fail("MENU_NEEDS_REVIEW");
   const prices = command.lines.map(line => {
@@ -93,6 +103,8 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
     if (!Number.isSafeInteger(Math.round(total*100))) fail("PRICE_NEEDS_REVIEW");
     return { lineId:line.id, menuItemId:line.menuItemId, name:String(item.name ?? ""), quantity:line.quantity, unitPrice:price, total };
   });
+  const revenue = Math.round(prices.reduce((sum,p) => sum+p.total,0)*100)/100;
+  if (isPos && Math.round(command.payments![0].amount*100) !== Math.round(revenue*100)) fail("POS_PAYMENT_MISMATCH");
   const common = { assortment:c.assortment, mappings:c.mappings, warehouseRoutes:c.warehouseRoutes, warehouses:c.warehouses,
     stockMovements:c.movements, venueId:c.venueId, actor:c.actor, now:c.now, costAsOf:c.now };
   const draft = createOrUpdateSalesBatch({ ...common, batches:[], batchId:eventId, draft:{ source:command.source, businessDate:date, shiftId:command.shiftId,
@@ -103,10 +115,11 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   const event: SalesEvent = { id:eventId, externalId:command.id, source:command.source, venueId:c.venueId, fingerprint,
     status:"POSTED", acceptedAt:c.now, businessDate:date, shiftId:command.shiftId,
     revenueRowId:command.shiftId ?? `sales-events:${c.venueId}:${date}`, currency:c.currency,
-    revenue:Math.round(prices.reduce((sum,p) => sum+p.total,0)*100)/100, prices, batch:posted.batch,
+    revenue, prices, actor:c.actor, ...(isPos ? {payments:command.payments,comment:command.comment?.trim() ?? ""} : {}), batch:posted.batch,
     originalMovements:posted.stockMovements.filter(m => m.salesBatchId === eventId && m.venueId === c.venueId) };
   const events = [...c.events,event]; capacity(events);
   const previewHash = await digest({ date, currency:c.currency, prices, shiftId:command.shiftId,
+    ...(isPos ? {payments:command.payments,comment:command.comment ?? ""} : {}),
     recipes:posted.batch.lines.map(l => { const snapshot = l.recipeSnapshot!; return { ...snapshot, capturedAt:undefined }; }) });
   return { duplicate:false, event, events, assortment:posted.assortment, movements:posted.stockMovements,
     revenues:project(c,events,event.revenueRowId,date), previewHash };
@@ -149,7 +162,7 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
     if (existing.revenueSource !== EVENT_REVENUE_SOURCE || existing.shiftName !== name) fail("IDEMPOTENCY_CONFLICT");
     return c.revenues;
   }
-  const date = c.now.slice(0,10); revenueCheck(c,date);
+  const date = c.now.slice(0,10); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
   return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,accountingMonth:date.slice(0,7),shiftName:name,
     revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",startTime:c.now.slice(11,16),createdAt:c.now,updatedAt:c.now }];
 }
