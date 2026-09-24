@@ -63,10 +63,16 @@ try {
       assert.equal(new URL(page.url()).searchParams.has("embedded"),false);
       await page.locator("#work:not([hidden])").waitFor();
       await page.selectOption("[data-menu]","whisky");await page.fill("[data-quantity]","2");
+      const previewResponse=page.waitForResponse(response=>response.url().includes("/api/sales-events")&&response.request().method()==="POST"&&response.request().postDataJSON()?.action==="preview");
       await page.getByRole("button",{name:"Проверить продажу",exact:true}).click();
+      const preview=await (await previewResponse).json();
+      assert.equal(preview.ok,true);
+      assert.equal(preview.event.batch.costStatus,"UNVALUED");
+      assert.equal(preview.event.batch.totalTheoreticalCost,null,"unknown cost must remain null in the real server preview");
       await page.locator("#preview:not([hidden])").waitFor();
       assert.match(await page.locator("#quote").innerText(),/0\.1 l/);
-      assert.match(await page.locator("#quote").innerText(),/Стоимость неизвестна/);
+      assert.match(await page.locator("#quote").innerText(),/Себестоимость: не рассчитана/);
+      assert.doesNotMatch(await page.locator("#quote").innerText(),/Себестоимость: 0/);
       await page.screenshot({path:join(tmpdir(),`bardoctor-sales-${viewport.width}.png`),fullPage:true});
       await page.click("#discard");assert.equal(runtime.batches(),0);
       await page.getByRole("button",{name:"Проверить продажу",exact:true}).click();

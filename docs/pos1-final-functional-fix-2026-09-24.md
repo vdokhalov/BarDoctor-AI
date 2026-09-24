@@ -62,4 +62,7 @@ Run verified build, typecheck, lint, full tests and mandatory GitHub CI on the f
 - scripts/patch-pos1-functional.mjs, public/assets/index-BQGspy0I.js — generated shared resolver and existing Menu adapter.
 - package.json, scripts/build-verified.sh — repeatable artifact integration.
 - tests/pos1-functional.test.ts, tests/pos1-hardening.test.ts, scripts/pos1-hardening-browser.ts — behavioral, real-handler and viewport regression.
+- scripts/sales-browser-qa-phase5.ts — manual-entry browser check asserts real UNVALUED/null preview and status-aware text.
 - This report.
+
+Final manual-sales browser regression passes on 390×844 and 1280×720. The existing text expectation was updated to the shared “Себестоимость: не рассчитана” wording and strengthened with real server UNVALUED/null and no-zero assertions; cancellation, lost-response recovery, return, shifts and venue switching remain covered.
