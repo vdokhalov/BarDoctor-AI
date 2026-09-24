@@ -504,3 +504,27 @@ export function taxonomyPath(taxonomy: CanonicalTaxonomy, item: unknown): string
   }
   return [...sectionPath, category?.name, subcategory?.name].filter(Boolean) as string[];
 }
+
+/** Resolve menu presentation from its existing canonical links without mutating stored items. */
+export function menuTaxonomyPresentation(assortment: unknown, value: unknown, resolved = canonicalTaxonomyForAssortment(assortment)) {
+  const root = record(assortment), item = record(value);
+  const { taxonomy, legacyMenuPaths } = resolved;
+  const canonical = Boolean(item.sectionId || item.taxonomyCategoryId || item.subcategoryId);
+  const paths = canonical ? [] : legacyMenuPaths.filter(path => path.groupId === item.groupId && (!item.subgroupId || path.subgroupId === item.subgroupId));
+  const path = canonical ? item : paths.length === 1 ? paths[0] : item;
+  let section = taxonomy.sections.find(node => node.id === path.sectionId);
+  const seen = new Set<string>();
+  while (section?.parentId && !seen.has(section.id)) {
+    seen.add(section.id);
+    const parent = taxonomy.sections.find(node => node.id === section?.parentId);
+    if (!parent) break;
+    section = parent;
+  }
+  const category = taxonomy.categories.find(node => node.id === path.taxonomyCategoryId);
+  const subgroup = taxonomy.subcategories.find(node => node.id === path.subcategoryId);
+  const group = !canonical ? array(root.groups).map(record).find(row => row.id === item.groupId) : undefined;
+  const legacyCategory = !canonical ? array(root.subgroups).map(record).find(row => row.id === item.subgroupId && row.groupId === item.groupId) : undefined;
+  const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "Раздел недоступен" : text(item.department, "other"));
+  const categoryLabel = category?.name || text(legacyCategory?.name ?? legacyCategory?.label) || (canonical ? (item.taxonomyCategoryId ? "Категория недоступна" : "Без подраздела") : text(item.category, "Без подраздела"));
+  return { department, category: categoryLabel, categoryId: category?.id || text(legacyCategory?.id) || categoryLabel, subcategory: subgroup?.name || "" };
+}

@@ -11,7 +11,7 @@
     "/home", "/shifts", "/finance", "/employees", "/salaries", "/warehouse",
     "/suppliers", "/assortment", "/equipment", "/integrations", "/data-control",
     "/team-access", "/tasks", "/reports", "/notifications", "/market",
-    "/opportunities", "/supplier-alternatives", "/sales-import", "/more",
+    "/opportunities", "/supplier-alternatives", "/sales-import", "/cashier", "/sales-entry", "/more",
     "/profile", "/settings", "/analysis", "/reviews", "/incidents"
   ]);
 

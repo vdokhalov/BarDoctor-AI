@@ -37,8 +37,7 @@
   }
   function money(value, currency) {
     if (value == null) return "не оценено";
-    try { return new Intl.NumberFormat("ru-RU", { style: "currency", currency: currency || "MDL", maximumFractionDigits: 2 }).format(value); }
-    catch { return new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(value) + " " + (currency || ""); }
+    return window.bdFormatAccountingMoney(value, currency || state.payload?.currency);
   }
   function sessionHeaders(extra) {
     var headers = new Headers(extra || {});
@@ -105,7 +104,7 @@
     document.getElementById("kpi-mapping").textContent = k.needsMapping || 0;
     document.getElementById("kpi-recipe").textContent = k.noRecipe || 0;
     document.getElementById("kpi-errors").textContent = k.errors || 0;
-    document.getElementById("kpi-cost").textContent = k.batches ? money(k.theoreticalCost, "MDL") : "—";
+    document.getElementById("kpi-cost").textContent = k.batches ? money(k.theoreticalCost, payload.currency) : "—";
     document.getElementById("coverage-title").textContent = "Продажи за смены";
     document.getElementById("coverage-copy").textContent = k.loadedQuantity
       ? ((k.reflectedPercent || 0) + "% продаж отражено на складе. Добавьте следующую смену или откройте документ для проверки.")
@@ -296,7 +295,18 @@
   }
   function openBatch(id) {
     var batch = (state.payload && state.payload.batches || []).find(function (item) { return item.id === id; }); if (!batch) return;
-    state.batch = batch; state.mode = "preview"; renderPreview(); showEditor();
+    state.batch = batch; state.mode = "preview"; if(batch.readOnly) renderEventDocument(batch); else renderPreview(); showEditor();
+  }
+  function renderEventDocument(batch) {
+    header("Проведённая продажа", "ДОКУМЕНТ ПРОДАЖИ", batch.status);
+    editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><span>Выручка</span></div></section>'
+      + '<p>Смена: ' + h(batch.shiftId || 'Без смены') + ' · Сотрудник: ' + h(batch.actor?.name || batch.createdBy?.name || '') + '</p>'
+      + (batch.prices || []).map(function(line){return '<p><b>' + h(line.name) + '</b> × ' + h(line.quantity) + ' · ' + h(money(line.total,batch.currency)) + '</p>';}).join('')
+      + '<p>Себестоимость: ' + h(money(batch.totalTheoreticalCost,batch.currency)) + '</p>'
+      + '<p>Оплата: ' + h((batch.payments || []).map(p=>p.method === 'CASH' ? 'Наличные' : 'Карта · внешняя оплата').join(', ')) + '</p>'
+      + (batch.comment ? '<p>Комментарий: ' + h(batch.comment) + '</p>' : '')
+      + '<p>Складских движений: ' + h((batch.movementIds || []).length) + '. Продажа уже проведена; повторное проведение не требуется.</p>';
+    editorFooter.innerHTML = '<span>Документ из единого журнала продаж</span>';
   }
   function lineState(line) {
     if (line.processingStatus === "POSTED") return { icon: "/integration-icons/circle-check.svg", label: "Отражено на складе", cls: "success" };

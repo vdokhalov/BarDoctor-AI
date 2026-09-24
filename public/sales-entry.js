@@ -5,7 +5,7 @@
   const notice = message => { $("notice").textContent = message; };
   let payload, quote, pending, busy = false, frozen = false;
   const storageKey = () => "bd_pending_sale:" + localStorage.getItem("bd_session") + ":" + payload.venueId;
-  const money = (value, currency) => value == null ? "Стоимость неизвестна" : `${Number(value).toLocaleString("ru-RU")} ${currency}`;
+  const money = (value, currency) => value == null ? "Стоимость неизвестна" : window.bdFormatAccountingMoney(value,currency);
   async function request(body) {
     const headers = new Headers({"Content-Type":"application/json"});
     const venue = localStorage.getItem("bd_active_venue_id"), email = localStorage.getItem("bd_session"), token = localStorage.getItem("bd_session_token");
@@ -47,7 +47,7 @@
     $("work").hidden=false;$("sale").hidden=!payload.permissions.post;$("shift-actions").hidden=!payload.permissions.shifts;
     $("shift").innerHTML='<option value="">Без смены</option>'+payload.shifts.filter(s=>s.closingStatus==="open").map(s=>`<option value="${escape(s.id)}">${escape(s.shiftName)} · ${escape(s.date)}</option>`).join("");
     $("shifts").innerHTML=payload.shifts.map(s=>`<details><summary>${escape(s.shiftName)} · ${escape(s.date)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"} · ${escape(money(s.revenue,s.currency))}</summary>${s.closingStatus==="open"?`<button data-close="${escape(s.id)}">Подтвердить закрытие смены</button>`:""}</details>`).join("");
-    $("events").innerHTML=payload.events.length?payload.events.map(e=>`<details><summary>${escape(e.acceptedAt)} · ${escape(money(e.revenue,e.currency))} · ${e.status==="POSTED"?"Продажа":"Возвращена"}</summary>${e.prices.map(p=>`<p>${escape(p.name)} × ${escape(p.quantity)}</p>`).join("")}<p>Себестоимость: ${escape(money(e.batch.totalTheoreticalCost,e.currency))}</p>${e.status==="POSTED"&&payload.permissions.reverse?`<details><summary>Вернуть всю продажу</summary><p>Будут возвращены все товары и отменена выручка этой продажи.</p><button data-reverse="${escape(e.id)}">Подтвердить полный возврат</button></details>`:""}</details>`).join(""):"Продаж ещё нет.";
+    $("events").innerHTML=payload.events.length?payload.events.map(e=>`<details><summary>${escape(e.acceptedAt)} · ${escape(money(e.revenue,e.currency))} · ${e.status==="POSTED"?"Продажа":"Возвращена"}</summary>${e.prices.map(p=>`<p>${escape(p.name)} × ${escape(p.quantity)}</p>`).join("")}<p>Себестоимость: ${escape(money(e.batch.totalTheoreticalCost,e.currency))}</p>${e.status==="POSTED"&&e.source!=="POS_API"&&payload.permissions.reverse?`<details><summary>Вернуть всю продажу</summary><p>Будут возвращены все товары и отменена выручка этой продажи.</p><button data-reverse="${escape(e.id)}">Подтвердить полный возврат</button></details>`:""}</details>`).join(""):"Продаж ещё нет.";
     $("lines").replaceChildren();if(payload.permissions.post)addLine();
     const saved=sessionStorage.getItem(storageKey());
     if(saved){

@@ -26,3 +26,5 @@ dialog{padding:0;border:0;background:transparent}dialog::backdrop{background:rgb
 .sales-keyboard-open .editor-footer>div:first-child{display:none}
 @media(max-width:360px){.sales-topbar-copy span{font-size:10px}.sales-topbar>a{width:40px;height:40px}.sales-command{padding:16px}.sales-kpis article{min-height:80px}.source-grid button{grid-template-columns:46px minmax(0,1fr) 16px;padding:10px}.source-icon{width:44px;height:44px}.source-copy b{font-size:14px}.context-row{grid-template-columns:1fr}.entry-modes button{padding:0 4px;font-size:10px}.manual-tools{grid-template-columns:1fr}.preview-summary>div{padding:9px 5px}.preview-summary strong{font-size:22px}.preview-head,.preview-line{grid-template-columns:minmax(0,1fr) 42px minmax(102px,.78fr);gap:5px;padding-right:8px;padding-left:8px}}
 @media(min-width:701px){body.has-sales-documents .sales-command{min-height:128px}}
+
+.preview-summary.pos-event-summary{grid-template-columns:minmax(0,1fr)}

@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+const path='public/assets/index-BQGspy0I.js';
+let source=fs.readFileSync(path,'utf8');
+source=source.replace('if(h.pathname==="/sales-entry"){','if(["/sales-entry","/cashier"].includes(h.pathname)){');
+const shared='/* bd-shared-accounting-money-start */\n'+fs.readFileSync('public/accounting-currency.js','utf8')+'/* bd-shared-accounting-money-end */\n';
+source=source.replace(/\/\* bd-shared-accounting-money-start \*\/[\s\S]*?\/\* bd-shared-accounting-money-end \*\/\n?/,'');
+source=source.replace('function bdAccountingMoneyV243(',shared+'function bdAccountingMoneyV243(');
+const start=source.indexOf('function bdAccountingMoneyV243('),end=source.indexOf('\n',start);
+if(start<0||end<0)throw Error('Accounting formatter anchor missing');
+source=source.slice(0,start)+'function bdAccountingMoneyV243(e,t){return window.bdFormatAccountingMoney(e,bdAccountingCurrencyV243(t)||bdCurrentAccountingCurrencyV243())}'+source.slice(end);
+source=source.replace('function bdWarehouseMoney(e,t="MDL"){return bdWarehouseDecimal(e,2)+" "+String(t||"MDL").toUpperCase()}','function bdWarehouseMoney(e,t){return bdAccountingMoneyV243(e,t)}');
+source=source.replaceAll('bdWarehouseMoney(e.inventoryValue,e.currency||"MDL")','bdWarehouseMoney(e.inventoryValue,e.currency||bdCurrentAccountingCurrencyV243())');
+source=source.replaceAll('bdWarehouseMoney(B.costAmount,B.currency||"MDL")','bdWarehouseMoney(B.costAmount,B.currency||bdCurrentAccountingCurrencyV243())');
+source=source.replaceAll('bdWarehouseMoney(e.inventoryValue,e.currency||bdCurrentAccountingCurrencyV243())','bdWarehouseMoney(e.inventoryValue,e.currency)');
+source=source.replaceAll('bdWarehouseMoney(B.costAmount,B.currency||bdCurrentAccountingCurrencyV243())','bdWarehouseMoney(B.costAmount,B.currency)');
+if(!source.includes('["/sales-entry","/cashier"].includes(h.pathname)'))throw Error('Cashier navigation bridge missing');
+fs.writeFileSync(path,source);
+console.log('POS-1 navigation and shared money presentation applied');

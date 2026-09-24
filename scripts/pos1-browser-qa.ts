@@ -82,7 +82,7 @@ try{
       await page.getByRole("button",{name:"Убрать TEST VODKA 40"}).click();
       assert.match(await page.locator("#cart-lines").innerText(),/Нажмите на позицию/);
       await page.locator('[data-add="vodka40"]').click();
-      assert.match(await page.locator("#total").innerText(),/30,00/);
+      assert.match(await page.locator("#total").innerText(),/30.*руб\. ПМР/);
       await page.screenshot({path:"outputs/pos1/mobile-390-order.png",fullPage:true});
       await page.getByRole("button",{name:"Оплатить"}).click();
       await page.getByRole("heading",{name:"Продажа проведена"}).waitFor();

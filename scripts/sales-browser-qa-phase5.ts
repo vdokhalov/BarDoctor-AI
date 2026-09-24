@@ -20,7 +20,7 @@ assert.ok(bridge.includes("function bdPrepareEmbeddedPage"));
 const importSource=readFileSync(new URL("../app/sales-import/route.ts",import.meta.url),"utf8");
 const entryLink=importSource.match(/<a href="\/sales-entry">[^<]+<\/a>/)?.[0];
 assert.ok(entryLink,"use the actual production sales link");
-const assets=new Set(["/sales-entry.js","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
+const assets=new Set(["/icons/bardoctor-mark-v159.svg","/accounting-currency.js","/sales-entry.js","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
 const executablePath=await resolveBrowserExecutable(chromium.executablePath());
 const browser=await chromium.launch({executablePath,headless:true,args:process.platform==="win32"?[]:chromiumArgs});
 try {
@@ -39,14 +39,14 @@ try {
           if(losePostResponse&&req.method==="POST"&&JSON.parse(body.toString()).action==="post"&&response.status===201){
             losePostResponse=false;response=Response.json({ok:false,error:"Ответ подтверждения потерян. Повторите запрос."},{status:503});
           }
-        } else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":"text/css"}});
+        } else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":path.endsWith("svg")?"image/svg+xml":"text/css"}});
         else if(path==="/favicon.ico")response=new Response(null,{status:204});
         else if(path==="/sales-entry")response=render();
         else if(path==="/sales-import")response=new Response(`<!doctype html><html><body>${entryLink}</body></html>`,{headers:{"Content-Type":"text/html; charset=utf-8"}});
         else if(path==="/embedded-host")response=new Response(`<!doctype html><html><body><iframe src="/sales-import?embedded=1" onload="bdPrepareEmbeddedPage(event,function(){document.body.textContent='SPA 404';})"></iframe><script>${bridge}</script></body></html>`,{headers:{"Content-Type":"text/html"}});
         else if(path==="/embedded-shell-v269.css")response=new Response(readFileSync(new URL("../public/embedded-shell-v269.css",import.meta.url)),{headers:{"Content-Type":"text/css"}});
         else if(path==="/home")response=new Response('<!doctype html><html><body><a href="/sales-entry">Sales entry</a></body></html>',{headers:{"Content-Type":"text/html"}});
-        else response=new Response("Not found",{status:404});
+        else {errors.push("Missing QA route: "+req.url);response=new Response("Not found",{status:404});}
         res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
       }catch(error){errors.push(String(error));res.writeHead(500);res.end("QA failure");}
     });
@@ -95,7 +95,7 @@ try {
       // The real switcher owns this navigation. Observe it before dispatching
       // storage; a second reload races location.replace in Chromium on CI.
       const [,frozen]=await Promise.all([
-        page.waitForURL(url=>url.pathname==="/home"&&url.searchParams.get("venue")==="2"),
+        page.waitForURL(url=>url.pathname==="/sales-entry"&&url.searchParams.get("venue")==="2"),
         page.evaluate(()=>{
           localStorage.setItem("bd_active_venue_id","2");
           window.dispatchEvent(new StorageEvent("storage",{key:"bd_active_venue_id",newValue:"2"}));
@@ -103,7 +103,6 @@ try {
         }),
       ]);
       assert.equal(frozen,true);assert.equal(runtime.batches(),writes);
-      await page.getByRole("link",{name:"Sales entry",exact:true}).click();
       await page.locator("#work:not([hidden])").waitFor();assert.match(await page.locator("#events").innerText(),/Продаж ещё нет/);
       assert.equal(await page.locator("[data-menu] option").count(),1,"foreign menu must not leak");
       assert.equal(runtime.batches(),writes,"venue transition must not write stock or revenue");

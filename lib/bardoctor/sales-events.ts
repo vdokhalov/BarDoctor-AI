@@ -174,3 +174,8 @@ export function eventRevenueMutation(before: unknown[], after: unknown[]): boole
     || managed.some(m => incoming.filter(r => stableSalesValue(m) === stableSalesValue(r)).length !== 1)
     || incoming.some(r => r.revenueSource !== EVENT_REVENUE_SOURCE && managed.some(m => m.date === r.date && (r.venueId == null || r.venueId === m.venueId)));
 }
+
+export function salesEventDocuments(events: unknown[], venueId: number) {
+  return events.filter((value): value is SalesEvent => Boolean(value && typeof value === "object" && (value as SalesEvent).venueId === venueId && (value as SalesEvent).batch && ["POSTED","REVERSED"].includes((value as SalesEvent).status)))
+    .map(event => ({ ...event.batch, status:event.status, readOnly:true, salesEventId:event.id, currency:event.currency, revenue:event.revenue, prices:event.prices, payments:event.payments, comment:event.comment, actor:event.actor, acceptedAt:event.acceptedAt }));
+}

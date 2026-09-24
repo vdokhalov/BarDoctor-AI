@@ -7,7 +7,7 @@ export const CATALOG_ACCOUNTING_VERSION = "20260820-catalog-v208";
  * secondary tabs and the Back interaction in both the SPA and embedded pages.
  */
 export function canonicalUserShellAssets(): string {
-  return `<link rel="stylesheet" href="/app-shell-v185.css?v=${APP_SHELL_VERSION}" />
+  return `<script src="/accounting-currency.js?v=pos1-hardening"></script><link rel="stylesheet" href="/app-shell-v185.css?v=${APP_SHELL_VERSION}" />
     <script src="/navigation-contract-v247.js?v=${APP_SHELL_VERSION}" defer></script>
     <script src="/app-shell-v185.js?v=${APP_SHELL_VERSION}" defer></script>
     <script src="/navigation-transient-v247.js?v=${APP_SHELL_VERSION}" defer></script>

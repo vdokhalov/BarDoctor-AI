@@ -25,6 +25,9 @@ import {
   type SalesSource,
 } from "../../../lib/bardoctor/sales-consumption";
 
+import { SALES_EVENT_STORE_KEY, salesEventDocuments } from "../../../lib/bardoctor/sales-events";
+import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
+
 const WAREHOUSE_STORE_KEY = "bd_warehouses";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 const REVENUE_STORE_KEY = "bd_finance_revenue";
@@ -61,7 +64,7 @@ function upsertStore(database: D1Database, accountId: number, key: string, value
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?)
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     accountId,
     SALES_BATCH_STORE_KEY,
@@ -72,10 +75,12 @@ async function readStores(database: D1Database, accountId: number) {
     WAREHOUSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY,
     REVENUE_STORE_KEY,
+    SALES_EVENT_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
+    events: array(parse(stores.get(SALES_EVENT_STORE_KEY), [])),
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
@@ -198,7 +203,9 @@ function latestTemplate(batches: SalesBatch[]) {
 }
 
 function responsePayload(stores: Awaited<ReturnType<typeof readStores>>, venueId: number, permissions: string[]) {
-  const batches = salesBatches(stores.batches, venueId).sort((left, right) =>
+  const eventDocuments = salesEventDocuments(stores.events, venueId);
+  const eventIds = new Set(eventDocuments.map(batch => batch.id));
+  const batches = [...salesBatches(stores.batches, venueId).filter(batch => !eventIds.has(batch.id)), ...eventDocuments].sort((left, right) =>
     right.businessDate.localeCompare(left.businessDate) || right.createdAt.localeCompare(left.createdAt)
   );
   return {
@@ -214,8 +221,8 @@ function responsePayload(stores: Awaited<ReturnType<typeof readStores>>, venueId
     }),
     kpis: salesBatchKpis(batches, venueId),
     dataQuality: salesDataQuality(batches, venueId),
-    latestTemplate: latestTemplate(batches),
-    frequentItems: frequentItems(batches),
+    latestTemplate: latestTemplate(salesBatches(stores.batches, venueId)),
+    frequentItems: frequentItems(salesBatches(stores.batches, venueId)),
     shifts: availableShifts(stores.shifts, venueId),
     capabilities: {
       create: permissions.includes("sales.create"),
@@ -237,11 +244,11 @@ export async function GET(request: Request): Promise<Response> {
   const stores = await readStores(getD1(), account.id);
   const id = text(new URL(request.url).searchParams.get("id"), "", 160);
   if (id) {
-    const batch = salesBatches(stores.batches, account.venueId).find((item) => item.id === id);
+    const batch = salesEventDocuments(stores.events, account.venueId).find(item => item.id === id) ?? salesBatches(stores.batches, account.venueId).find((item) => item.id === id);
     if (!batch) return Response.json({ ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ не найден или относится к другому заведению" }, { status: 404 });
     return Response.json({ ok: true, batch, venueId: account.venueId }, { headers: { "Cache-Control": "private, no-store" } });
   }
-  return Response.json(responsePayload(stores, account.venueId, account.permissions), { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({...responsePayload(stores, account.venueId, account.permissions),currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)}, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 async function postOnce(request: Request): Promise<Response> {

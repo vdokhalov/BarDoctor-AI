@@ -50,6 +50,8 @@
     "/month-closing": { type: "redirect", title: "Закрытие месяца", parent: "/reports" },
     "/finance/settings": { type: "settings", title: "Настройки финансов", parent: "/finance" },
     "/notifications": { type: "list", title: "Уведомления", parent: "/more" },
+    "/cashier": { type: "create", title: "Касса", parent: "/sales-import", shell: "fullscreen", bottomNav: false },
+    "/sales-entry": { type: "list", title: "Журнал продаж", parent: "/sales-import", shell: "fullscreen", bottomNav: false },
     "/sales-import": { type: "wizard", title: "Импорт продаж", parent: "/warehouse", shell: "fullscreen", bottomNav: false },
     "/supplier-alternatives": { type: "list", title: "Новые поставщики", parent: "/suppliers" },
     "/venues/new": { type: "create", title: "Новое заведение", parent: "/more", shell: "fullscreen", bottomNav: false },

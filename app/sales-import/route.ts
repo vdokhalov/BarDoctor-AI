@@ -9,14 +9,14 @@ const HTML = `<!doctype html>
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#f5f6fb">
   <title>Продажи — BarDoctor</title>
-  <link rel="stylesheet" href="/sales-import.css?v=20260825-sales-ux-v278">
+  <link rel="stylesheet" href="/sales-import.css?v=pos1-hardening">
   <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87">
   <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297">
   ${canonicalUserShellAssets()}
   <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
   <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
-  <script src="/sales-import.js?v=20260825-sales-ux-v278" defer></script>
+  <script src="/sales-import.js?v=pos1-hardening" defer></script>
 </head>
 <body data-bd-parent-route="/warehouse" data-sales-experience="v278">
   <header class="sales-topbar">

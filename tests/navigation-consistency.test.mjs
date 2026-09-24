@@ -8,7 +8,7 @@ import { runNavigationAudit } from "../scripts/audit-navigation-consistency.mjs"
 test("production navigation graph satisfies the RC consistency contract", async () => {
   const result = await runNavigationAudit();
   assert.deepEqual(result.routes, { current: 60, compatibility: 2, admin: 1, total: 63, spa: 57 });
-  assert.equal(result.registeredStaticMetadata, 53);
+  assert.equal(result.registeredStaticMetadata, 55);
   assert.equal(result.queryScreens, 10);
   assert.deepEqual(result.traps, { detected: 0, unresolved: 0 });
 });
@@ -84,6 +84,8 @@ test("deep-link query flows resolve to a stable logical parent without losing li
     parent("/integrations?venue=2&flow=onec&connection=source-1"),
     "/integrations?venue=2",
   );
+  assert.equal(parent("/cashier?venue=2"), "/sales-import");
+  assert.equal(parent("/sales-entry?venue=2"), "/sales-import");
   assert.equal(parent("/finance?month=2026-08"), null);
   assert.equal(parent("/equipment/item-1"), "/equipment");
 });

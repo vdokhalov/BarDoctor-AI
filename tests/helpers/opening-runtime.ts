@@ -11,6 +11,7 @@ import * as currency from "../../lib/bardoctor/currency";
 import * as http from "../../lib/bardoctor/http";
 import * as trust from "../../lib/bardoctor/data-trust";
 import * as access from "../../lib/bardoctor/access-control";
+import * as salesEvents from "../../lib/bardoctor/sales-events";
 import * as venueIdentity from "../../lib/bardoctor/venue-identity";
 
 /** Real route + real CAS SQL on isolated SQLite. Auth fixture never enters production code. */
@@ -38,7 +39,7 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
       if (i === failAt) throw new Error("SIMULATED_D1_WRITE_FAILURE"); out.push(await statements[i].run());
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
-  const dependencies = { ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity,
+  const dependencies = { ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...salesEvents,
     getD1: () => db as unknown as D1Database,
     authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), actorAccountId: 7, role: "owner", firstName: "QA", lastName: "", restaurantJson: JSON.stringify({ currency: accountingCurrency }) } : null,
     unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };

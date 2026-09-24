@@ -16,7 +16,7 @@ if (!source.includes('label:"Начальный остаток"')) {
 // Sales entry is a server-rendered document, absent from the legacy SPA router.
 // Keep the embedded navigation bridge, but hand this one route to the browser.
 const salesNavigation = 'if(h.pathname==="/sales-entry"){';
-if (!source.includes(salesNavigation)) {
+if (!source.includes(salesNavigation) && !source.includes('if(["/sales-entry","/cashier"].includes(h.pathname)){')) {
   const anchor = '    t(h.pathname+h.search+h.hash)';
   if (source.split(anchor).length !== 2) throw new Error("Phase 5: unique embedded navigation anchor required");
   source = source.replace(anchor, `    ${salesNavigation}

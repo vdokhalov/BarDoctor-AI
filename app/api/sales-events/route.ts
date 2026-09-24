@@ -8,6 +8,8 @@ import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import { SALES_EVENT_STORE_KEY, EVENT_REVENUE_SOURCE, planSalesEvent, planReverseSalesEvent, planSalesShift, type SalesEventContext, type SalesEventCommand } from "../../../lib/bardoctor/sales-events";
 
+import { menuTaxonomyPresentation, canonicalTaxonomyForAssortment } from "../../../lib/bardoctor/nomenclature-taxonomy";
+
 const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings"];
 const reply = (data: unknown,status=200) => Response.json(data,{ status,headers:{ "Cache-Control":"private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
@@ -46,11 +48,12 @@ export async function GET(request:Request) {
   try {
     const {context:c} = await load(account);
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
+    const taxonomy = canonicalTaxonomyForAssortment(c.assortment);
     return reply({ok:true,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
-        .map(m => ({id:m.id,name:m.name,department:m.department ?? "other",category:m.category ?? "",salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
+        .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null),
-      events:c.events.filter(e => e.venueId === c.venueId).slice(-100).reverse(),
+      events:c.events.filter(e => e.venueId === c.venueId && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse(),
       permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:hasPermission(account,"shifts.manage")} });
   } catch(error) { return controlled(error); }
 }
