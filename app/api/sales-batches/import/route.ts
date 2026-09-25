@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { venueTimeFromJson, venueDate } from "../../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -140,6 +141,7 @@ async function postOnce(request: Request): Promise<Response> {
   const database = getD1();
   const stores = await readStores(database, account.id);
   const now = new Date().toISOString();
+  draft.businessDate ||= venueDate(now, venueTimeFromJson(account.restaurantJson).timezone);
   const currentActor = {
     accountId: account.actorAccountId,
     name: [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,

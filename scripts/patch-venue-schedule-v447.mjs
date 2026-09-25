@@ -2,12 +2,17 @@ import fs from "node:fs";
 const asset = "public/assets/index-BQGspy0I.js";
 let code = fs.readFileSync(asset, "utf8");
 function replace(label, before, after) {
+  if (label === "shared React bridge" && code.includes("function bdVenueScheduleReact(")) return;
+  if (label === "wizard payload" && code.includes("workingDays:u.workingDays,timezone:u.timezone")) return;
+  if (label === "main profile visible schedule" && code.includes("workingDays:C.workingDays,timezone:C.timezone??N.timezone")) return;
   if (label === "profile duplicate days" && !code.includes(before)) return;
   if (after && code.includes(after)) return;
   if (!code.includes(before)) throw new Error("Schedule patch anchor missing: " + label);
   code = code.replace(before, after);
 }
 function range(label, start, end, replacement) {
+  if (label === "first wizard hours" && code.includes('value:e,suggestTimezone:!0,onChange:')) return;
+  if (label === "legacy modal hours and days" && code.includes('workingDays:b.workingDays,timezone:b.timezone??N.timezone')) return;
   if (label === "profile duplicate time" && code.indexOf(start,code.indexOf("function bdProfileVenueV281")) < 0) return;
   if (replacement && code.includes(replacement)) return;
   const first = code.indexOf(start, label === "profile duplicate time" ? code.indexOf("function bdProfileVenueV281") : 0);

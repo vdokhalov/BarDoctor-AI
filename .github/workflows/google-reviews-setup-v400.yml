@@ -66,6 +66,8 @@ jobs:
         run: node --import tsx scripts/pos1-browser-qa.ts
       - name: POS-1 hardening navigation drafts journal and retries mobile tablet desktop
         run: node --import tsx scripts/pos1-hardening-browser.ts
+      - name: Venue timezone settings and Sales date mobile tablet desktop
+        run: node --import tsx scripts/venue-timezone-browser.ts
       - name: Accounting report reversal guard mobile tablet desktop
         run: node --import tsx scripts/accounting-guard-browser.ts
       - name: Sales v454 overnight shifts and cashier auth network browser regression

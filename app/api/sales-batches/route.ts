@@ -1,3 +1,4 @@
+import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -248,9 +249,9 @@ export async function GET(request: Request): Promise<Response> {
   if (id) {
     const batch = salesEventDocuments(stores.events, account.venueId).find(item => item.id === id) ?? salesBatches(stores.batches, account.venueId).find((item) => item.id === id);
     if (!batch) return Response.json({ ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ не найден или относится к другому заведению" }, { status: 404 });
-    return Response.json({ ok: true, batch, venueId: account.venueId }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ ok: true, serverNow:new Date().toISOString(), ...venueTimeFromJson(account.restaurantJson), batch, venueId: account.venueId }, { headers: { "Cache-Control": "private, no-store" } });
   }
-  return Response.json({...responsePayload(stores, account.venueId, account.permissions),currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)}, { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({serverNow:new Date().toISOString(),...venueTimeFromJson(account.restaurantJson),...responsePayload(stores, account.venueId, account.permissions),currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)}, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 async function postOnce(request: Request): Promise<Response> {
@@ -470,6 +471,7 @@ async function postOnce(request: Request): Promise<Response> {
     draft.sourceReference = text(requested.sourceReference ?? body.sourceReference, "", 240) || undefined;
     draft.externalBatchId = text(requested.externalBatchId ?? body.externalBatchId, "", 180) || undefined;
   }
+  draft.businessDate ||= before?.businessDate || venueDate(now, venueTimeFromJson(account.restaurantJson).timezone);
   if (!draft.lines.length) return Response.json({ ok: false, code: "SALES_LINES_REQUIRED", error: "Добавьте хотя бы одну проданную позицию" }, { status: 422 });
   const result = createOrUpdateSalesBatch({
     batches: stores.batches,

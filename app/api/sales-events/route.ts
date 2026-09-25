@@ -1,3 +1,4 @@
+import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission, canManagePosPrivilegedAction, type PermissionKey } from "../../../lib/bardoctor/access-control";
@@ -20,7 +21,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
   const events = rows(SALES_EVENT_STORE_KEY);
   if (events.some(e => !e.id || !e.fingerprint || !e.batch || !Array.isArray(e.originalMovements) || !Array.isArray(e.prices) || !["POSTED","REVERSED"].includes(e.status))) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
-  const context: SalesEventContext = { venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now:new Date().toISOString(),
+  const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now:new Date().toISOString(),
     actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role },
     assortment:assortment as Record<string,unknown>,movements:rows(keys[1]),events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
   return { db,snapshots,context };
@@ -49,7 +50,7 @@ export async function GET(request:Request) {
     const {context:c} = await load(account);
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
     const taxonomy = canonicalTaxonomyForAssortment(c.assortment);
-    return reply({ok:true,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
+    return reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null),
@@ -70,8 +71,10 @@ async function command(request:Request):Promise<Response> {
   try {
     const {db,snapshots,context:c} = await load(account);
     let updates: [string,unknown][], result:unknown;
+    let accountingMonth = venueDate(c.now, c.timezone).slice(0,7);
     if (body.action === "preview" || body.action === "post") {
       const plan = await planSalesEvent(c,body.command);
+      accountingMonth = plan.event.businessDate.slice(0,7);
       result = {ok:true,duplicate:plan.duplicate,event:plan.event,previewHash:plan.previewHash};
       if (body.action === "preview" || plan.duplicate) return reply(result);
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
@@ -79,18 +82,19 @@ async function command(request:Request):Promise<Response> {
     } else if (body.action === "reverse") {
       const target=c.events.find(event => event.id === body.eventId && event.venueId === c.venueId);
       if (target?.source === "POS_API") return reply({ok:false,code:"POS_REVERSAL_NOT_AVAILABLE",error:"Отмена кассовой продажи пока недоступна."},409);
-      const plan=planReverseSalesEvent(c,body.eventId); result={ok:true,duplicate:plan.duplicate,event:plan.event};
+      const plan=planReverseSalesEvent(c,body.eventId); accountingMonth=plan.event.businessDate.slice(0,7); result={ok:true,duplicate:plan.duplicate,event:plan.event};
       if (plan.duplicate) return reply(result);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
     } else {
       const revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name);
       result={ok:true,shiftId:body.shiftId}; if (revenues===c.revenues) return reply({...result as object,duplicate:true});
+      accountingMonth=String(revenues.find(row=>row.id===body.shiftId)?.date).slice(0,7);
       updates=[[keys[3],revenues]];
     }
     const statements=updates.map(([key,value]) => db.prepare(`INSERT INTO domain_data (account_id,store_key,data_json,updated_at) VALUES (?,?,?,?)
       ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`).bind(account.id,key,JSON.stringify(value),c.now));
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
-      VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",c.now.slice(0,7),JSON.stringify(result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
+      VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",accountingMonth,JSON.stringify(result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
     await runStoreCasBatch(db,account.id,snapshots,statements,c.now);
     return reply(result,201);
   } catch(error) { return controlled(error); }

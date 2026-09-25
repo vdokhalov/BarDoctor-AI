@@ -18,8 +18,8 @@ const HTML = `<!doctype html>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   <link rel="stylesheet" href="/sales-journal.css?v=sales-ux1">
   <script src="/pos-draft.js?v=pos1-hardening" defer></script>
-  <script src="/sales-journal.js?v=sales-ux1" defer></script>
-  <script src="/sales-import.js?v=accounting-fix-v455" defer></script>
+  <script src="/sales-journal.js?v=venue-time-v456" defer></script>
+  <script src="/sales-import.js?v=venue-time-v456" defer></script>
 </head>
 <body data-bd-parent-route="/warehouse" data-sales-experience="v278">
   <header class="sales-topbar">

@@ -1,3 +1,4 @@
+import { venueTimeFromJson, venueDate } from "../../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -59,7 +60,7 @@ async function postOnce(request: Request): Promise<Response> {
   let body: JsonRecord;
   try { body = record(JSON.parse(raw) as unknown); } catch { return Response.json({ ok: false, error: "Некорректный отчёт" }, { status: 400 }); }
   const now = new Date().toISOString();
-  const document = normalizeSalesDocument(body.document, crypto.randomUUID());
+  const document = normalizeSalesDocument({ ...record(body.document), date: record(body.document).date || venueDate(now, venueTimeFromJson(account.restaurantJson).timezone) }, crypto.randomUUID());
   if (!document.items.length) return Response.json({ ok: false, error: "В отчёте нет проданных позиций" }, { status: 422 });
   if (document.venueId && document.venueId !== account.venueId) return Response.json({ ok: false, code: "SALES_VENUE_MISMATCH", error: "Отчёт относится к другому заведению" }, { status: 403 });
 

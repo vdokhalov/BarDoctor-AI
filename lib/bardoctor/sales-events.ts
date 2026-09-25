@@ -1,3 +1,4 @@
+import { canonicalVenueTimezone, venueDate, venueClock } from "./venue-time";
 import { createOrUpdateSalesBatch, postSalesBatch, reverseSalesBatch, SALES_SOURCES, type SalesBatch, type SalesSource } from "./sales-consumption";
 import type { StockMovement } from "./inventory";
 
@@ -8,6 +9,7 @@ export type PosPayment = { id: string; method: "CASH" | "CARD_EXTERNAL"; amount:
 export type SalesEventCommand = { id: string; source: SalesSource; shiftId?: string; occurredAt?: string; comment?: string; payments?: PosPayment[]; lines: { id: string; menuItemId: string; quantity: number }[] };
 export type SalesEvent = {
   id: string; externalId: string; source: SalesSource; venueId: number; fingerprint: string;
+  timezone?: string;
   status: "POSTED" | "REVERSED"; acceptedAt: string; reversedAt?: string; businessDate: string;
   shiftId?: string; revenueRowId: string; currency: string; revenue: number;
   actor?: SalesBatch["createdBy"]; comment?: string; payments?: PosPayment[];
@@ -15,7 +17,7 @@ export type SalesEvent = {
   batch: SalesBatch; originalMovements: StockMovement[];
 };
 export type SalesEventContext = {
-  venueId: number; currency: string; now: string; actor: SalesBatch["createdBy"];
+  venueId: number; currency: string; now: string; timezone?: string; timezoneConfigured?: boolean; actor: SalesBatch["createdBy"];
   assortment: Row; movements: StockMovement[]; events: SalesEvent[]; revenues: Row[];
   mappings: unknown[]; warehouseRoutes: unknown[]; warehouses: unknown[]; closedMonths: Set<string>;
 };
@@ -89,7 +91,9 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   }
   contextCheck(c);
   // A selected cash shift owns the business date, including an open overnight shift.
-  const date = command.shiftId ? String(shift(c,command.shiftId).date) : c.now.slice(0,10);
+  const selectedShift = command.shiftId ? shift(c,command.shiftId) : undefined;
+  const timezone = canonicalVenueTimezone(selectedShift ? selectedShift.timezone : c.timezone) || "UTC";
+  const date = selectedShift ? String(selectedShift.date) : venueDate(c.now, timezone);
   if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED");
   revenueCheck(c,date);
   const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems as Row[] : [];
@@ -113,12 +117,12 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   const posted = postSalesBatch({ ...common, batches:draft.batches, batchId:eventId });
   if (!posted.ok || posted.batch.status !== "POSTED" || posted.postedNow !== prices.length) fail("CONSUMPTION_NEEDS_REVIEW");
   const event: SalesEvent = { id:eventId, externalId:command.id, source:command.source, venueId:c.venueId, fingerprint,
-    status:"POSTED", acceptedAt:c.now, businessDate:date, shiftId:command.shiftId,
+    status:"POSTED", acceptedAt:c.now, timezone, businessDate:date, shiftId:command.shiftId,
     revenueRowId:command.shiftId ?? `sales-events:${c.venueId}:${date}`, currency:c.currency,
     revenue, prices, actor:c.actor, ...(isPos ? {payments:command.payments,comment:command.comment?.trim() ?? ""} : {}), batch:posted.batch,
     originalMovements:posted.stockMovements.filter(m => m.salesBatchId === eventId && m.venueId === c.venueId) };
   const events = [...c.events,event]; capacity(events);
-  const previewHash = await digest({ date, currency:c.currency, prices, shiftId:command.shiftId,
+  const previewHash = await digest({ date, timezone, currency:c.currency, prices, shiftId:command.shiftId,
     ...(isPos ? {payments:command.payments,comment:command.comment ?? ""} : {}),
     recipes:posted.batch.lines.map(l => { const snapshot = l.recipeSnapshot!; return { ...snapshot, capturedAt:undefined }; }) });
   return { duplicate:false, event, events, assortment:posted.assortment, movements:posted.stockMovements,
@@ -155,16 +159,17 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
     if (c.closedMonths.has(String(existing.date).slice(0,7))) fail("MONTH_LOCKED");
     if (existing.closingStatus === "closed") return c.revenues;
     if (existing.closingStatus !== "open") fail("SHIFT_NEEDS_REVIEW");
-    return c.revenues.map(r => r === existing ? { ...r,closingStatus:"closed",endTime:c.now.slice(11,16),closedAt:c.now,updatedAt:c.now } : r);
+    return c.revenues.map(r => r === existing ? { ...r,closingStatus:"closed",endTime:venueClock(c.now, canonicalVenueTimezone(existing.timezone) || "UTC"),closedAt:c.now,updatedAt:c.now } : r);
   }
   if (!id(name)) fail("SHIFT_NAME_INVALID");
   if (existing) {
     if (existing.revenueSource !== EVENT_REVENUE_SOURCE || existing.shiftName !== name) fail("IDEMPOTENCY_CONFLICT");
     return c.revenues;
   }
-  const date = c.now.slice(0,10); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
-  return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,accountingMonth:date.slice(0,7),shiftName:name,
-    revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",startTime:c.now.slice(11,16),createdAt:c.now,updatedAt:c.now }];
+  const timezone = canonicalVenueTimezone(c.timezone) || "UTC";
+  const date = venueDate(c.now, timezone); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
+  return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,timezone,accountingMonth:date.slice(0,7),shiftName:name,
+    revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",startTime:venueClock(c.now, timezone),createdAt:c.now,updatedAt:c.now }];
 }
 /** Legacy writers may neither replace event totals nor add another daily total. */
 export function eventRevenueMutation(before: unknown[], after: unknown[]): boolean {

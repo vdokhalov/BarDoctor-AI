@@ -124,7 +124,7 @@
     notice(duplicate?"Продажа уже проведена. Повторного списания нет.":"Продажа проведена и сохранена.");
   }
   async function refresh() {
-    data=await request();text("venue-name",data.venueName||"Заведение");text("employee-name",data.actor?.name||"Сотрудник");
+    data=await request();window.bdVenueTime.context(data);text("venue-name",data.venueName||"Заведение");text("employee-name",data.actor?.name||"Сотрудник");
     $("work").hidden=false;
     const selected=localStorage.getItem(selectionKey());activeShift=data.shifts.find(shift=>shift.id===selected&&shift.closingStatus==="open")||null;
     const legacy=sessionStorage.getItem(sessionKey());

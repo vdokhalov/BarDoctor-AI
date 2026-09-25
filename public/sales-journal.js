@@ -10,7 +10,7 @@
   const timestamp = batch => batch.acceptedAt || batch.createdAt;
   const date = value => {
     if (!value || !Number.isFinite(new Date(value).getTime())) return "Не указано";
-    return new Intl.DateTimeFormat("ru-RU",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date(value));
+    return new Intl.DateTimeFormat("ru-RU",{timeZone:window.bdVenueTime?.zone() || "UTC",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"}).format(new Date(value));
   };
   const businessDate = batch => /^\d{4}-\d{2}-\d{2}$/.test(batch.businessDate || '') ? new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',year:'numeric'}).format(new Date(batch.businessDate+'T12:00:00')) : 'Не указана';
   const shiftName = (batch, shifts) => shifts.find(s => s.id === batch.shiftId)?.label || shifts.find(s => s.id === batch.shiftId)?.shiftName || (batch.shiftId ? "Смена без названия" : "Без смены");

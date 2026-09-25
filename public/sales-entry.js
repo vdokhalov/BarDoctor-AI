@@ -51,7 +51,7 @@
       event.batch.lines.flatMap(l=>l.recipeSnapshot.ingredients).map(i=>`<p>Расход: ${escape(i.name)} — ${escape(i.baseQuantityTotal)} ${escape(i.baseUnit)}</p>`).join("");
   }
   async function load() {
-    payload=await request();
+    payload=await request();window.bdVenueTime.context(payload);
     if(selectedEvent && !payload.events.some(e=>e.id===selectedEvent)) {
       const documents=await request(undefined,'/api/sales-batches');
       const doc=documents.batches.find(b=>b.salesEventId===selectedEvent && b.readOnly);

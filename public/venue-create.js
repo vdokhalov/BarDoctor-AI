@@ -121,6 +121,7 @@
     var data = new FormData(form);
     var schedule = form.querySelector("bd-venue-schedule").value;
     return {
+      timezone: form.querySelector("bd-venue-timezone").value || undefined,
       name: String(data.get("name") || "").trim(),
       businessType: String(data.get("businessType") || "").trim(),
       country: String(data.get("country") || "").trim(),
@@ -135,11 +136,7 @@
       employees: Number(data.get("employees")) || 0,
       openTime: schedule.openTime,
       closeTime: schedule.closeTime,
-      trackingStartDate: [
-        new Date().getFullYear(),
-        String(new Date().getMonth() + 1).padStart(2, "0"),
-        String(new Date().getDate()).padStart(2, "0")
-      ].join("-"),
+      trackingStartDate: window.bdVenueTime.dateKey(new Date(),form.querySelector("bd-venue-timezone").value || "UTC"),
       workingDays: schedule.workingDays,
       areas: [],
       competitors: []

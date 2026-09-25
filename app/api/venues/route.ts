@@ -8,6 +8,7 @@ import {
 import { permissionsFor } from "../../../lib/bardoctor/access-control";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { createVenueForOwner } from "../../../lib/bardoctor/venue-service";
+import { canonicalVenueTimezone, venueDate } from "../../../lib/bardoctor/venue-time";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
 import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
 import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
@@ -68,10 +69,13 @@ export async function POST(request: Request): Promise<Response> {
     maxBytes: 512 * 1024,
   });
   if (!parsed.ok) return parsed.response;
+  if (parsed.data.timezone !== undefined && !canonicalVenueTimezone(parsed.data.timezone)) {
+    return Response.json({ ok: false, code: "INVALID_VENUE_TIMEZONE", error: "Выберите часовой пояс заведения из списка." }, { status: 400 });
+  }
   const profile = venueProfileFromInput({
     ...parsed.data,
     trackingStartDate:
-      parsed.data.trackingStartDate ?? new Date().toISOString().slice(0, 10),
+      parsed.data.trackingStartDate ?? venueDate(new Date().toISOString(), canonicalVenueTimezone(parsed.data.timezone) || "UTC"),
   });
   if (!profile.name) {
     return Response.json({ ok: false, error: "Укажите название заведения" }, { status: 400 });

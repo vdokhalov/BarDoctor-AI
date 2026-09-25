@@ -17,8 +17,8 @@ const VENUE_CREATE_HTML = `<!doctype html>
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-location-data.js?v=20260811-location-selects-v2" defer></script>
     <link rel="stylesheet" href="/venue-schedule.css?v=working-days-v447" />
-    <script src="/venue-schedule.js?v=working-days-v447" defer></script>
-    <script src="/venue-create.js?v=first-venue-setup-v444" defer></script>
+    <script src="/venue-timezone.js?v=venue-time-v456" defer></script><script src="/venue-schedule.js?v=working-days-v447" defer></script>
+    <script src="/venue-create.js?v=venue-time-v456" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/more">
@@ -99,6 +99,7 @@ const VENUE_CREATE_HTML = `<!doctype html>
 
         <section class="form-section">
           <div class="section-heading"><span>03</span><div><small>РЕЖИМ РАБОТЫ</small><h2>Когда вы открыты</h2></div></div>
+          <bd-venue-timezone suggest></bd-venue-timezone>
           <bd-venue-schedule></bd-venue-schedule>
           <div class="two-columns">
             <label class="field">Мест в зале <input name="seats" type="number" min="0" max="100000" inputmode="numeric" placeholder="80" /></label>

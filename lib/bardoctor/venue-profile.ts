@@ -1,7 +1,9 @@
+import { canonicalVenueTimezone } from "./venue-time";
 import { normalizeAccountingCurrency } from "./currency";
 import { canonicalVenueLogoId } from "./venue-identity";
 
 export type VenueProfile = {
+  timezone?: string;
   name: string;
   businessType: string;
   country: string;
@@ -43,6 +45,7 @@ function dateKey(value: unknown): string | undefined {
 
 export function venueProfileFromInput(body: Record<string, unknown>): VenueProfile {
   return {
+    timezone: canonicalVenueTimezone(body.timezone),
     name: text(body.name, 120),
     businessType: text(body.businessType, 80),
     country: text(body.country, 80),

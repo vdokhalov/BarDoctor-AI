@@ -15,7 +15,7 @@
   }
   function normal(value) { return String(value || "").toLocaleLowerCase("ru").replace(/ё/g, "е").replace(/[^a-zа-я0-9]+/gi, " ").trim(); }
   function number(value) { var parsed = Number(String(value == null ? "" : value).replace(",", ".")); return Number.isFinite(parsed) ? parsed : 0; }
-  function today() { return new Date().toISOString().slice(0, 10); }
+  function today() { return window.bdVenueTime.dateKey(window.bdVenueTime.now(),state.payload?.timezone || "UTC"); }
   function formatDateShort(value) {
     if (!value) return "—";
     return new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value + "T12:00:00"));
@@ -148,6 +148,7 @@
     return request("/api/sales-batches").then(function (data) {
       if(venue!==localStorage.getItem("bd_active_venue_id")||email!==localStorage.getItem("bd_session"))return;
       state.payload = data;
+      window.bdVenueTime.context(data);
       renderHome();
       notice("", "");
       loadPosContext();

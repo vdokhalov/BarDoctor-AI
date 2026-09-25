@@ -5,6 +5,7 @@ import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { compareStoreData } from "../../../lib/bardoctor/data-trust";
+import { canonicalVenueTimezone, venueDate } from "../../../lib/bardoctor/venue-time";
 import { venueProfileFromInput } from "../../../lib/bardoctor/venue-profile";
 import { normalizeAccountingCurrency } from "../../../lib/bardoctor/currency";
 
@@ -20,6 +21,9 @@ export async function POST(request: Request): Promise<Response> {
 
   const parsed = await readJsonRequest<Record<string, unknown>>(request, { maxBytes: 512 * 1024 });
   if (!parsed.ok) return parsed.response;
+  if (parsed.data.timezone !== undefined && !canonicalVenueTimezone(parsed.data.timezone)) {
+    return Response.json({ ok: false, code: "INVALID_VENUE_TIMEZONE", error: "Выберите часовой пояс заведения из списка." }, { status: 400 });
+  }
   const body = parsed.data;
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) {
@@ -67,11 +71,12 @@ export async function POST(request: Request): Promise<Response> {
   }
   const restaurant = venueProfileFromInput({
     ...body,
+    timezone: body.timezone ?? before?.timezone,
     currency: requestedCurrency ?? "",
     trackingStartDate:
       before?.trackingStartDate
       ?? body.trackingStartDate
-      ?? new Date().toISOString().slice(0, 10),
+      ?? venueDate(new Date().toISOString(), canonicalVenueTimezone(body.timezone ?? before?.timezone) || "UTC"),
   });
   const mutations = compareStoreData(before, restaurant);
   const updatedAt = new Date().toISOString();
