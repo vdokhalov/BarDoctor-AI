@@ -18,9 +18,9 @@ const bundle=readFileSync(new URL("../public/assets/index-BQGspy0I.js",import.me
 const bridge=bundle.slice(bundle.indexOf("const bdEmbeddedPagePaths="),bundle.indexOf("function bdEmbeddedPage({"));
 assert.ok(bridge.includes("function bdPrepareEmbeddedPage"));
 const importSource=readFileSync(new URL("../app/sales-import/route.ts",import.meta.url),"utf8");
-const entryLink=importSource.match(/<a href="\/sales-entry">[^<]+<\/a>/)?.[0];
+const entryLink=importSource.match(/<a[^>]*href="\/sales-entry"[^>]*>[^<]+<\/a>/)?.[0];
 assert.ok(entryLink,"use the actual production sales link");
-const assets=new Set(["/icons/bardoctor-mark-v159.svg","/accounting-currency.js","/sales-entry.js","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
+const assets=new Set(["/icons/bardoctor-mark-v159.svg","/accounting-currency.js","/sales-entry.js","/sales-journal.js","/sales-journal.css","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
 const executablePath=await resolveBrowserExecutable(chromium.executablePath());
 const browser=await chromium.launch({executablePath,headless:true,args:process.platform==="win32"?[]:chromiumArgs});
 try {
@@ -39,7 +39,8 @@ try {
           if(losePostResponse&&req.method==="POST"&&JSON.parse(body.toString()).action==="post"&&response.status===201){
             losePostResponse=false;response=Response.json({ok:false,error:"Ответ подтверждения потерян. Повторите запрос."},{status:503});
           }
-        } else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":path.endsWith("svg")?"image/svg+xml":"text/css"}});
+        } else if(path==="/api/sales-batches")response=Response.json({ok:true,venueId:Number(req.headers['x-venue-id'] || 1),batches:sales.salesEventDocuments(runtime.get('bd_sales_events_v1') as unknown[] || [],Number(req.headers['x-venue-id'] || 1))});
+        else if(path&&assets.has(path))response=new Response(readFileSync(new URL("../public"+path,import.meta.url)),{headers:{"Content-Type":path.endsWith("js")?"application/javascript":path.endsWith("svg")?"image/svg+xml":"text/css"}});
         else if(path==="/favicon.ico")response=new Response(null,{status:204});
         else if(path==="/sales-entry")response=render();
         else if(path==="/sales-import")response=new Response(`<!doctype html><html><body>${entryLink}</body></html>`,{headers:{"Content-Type":"text/html; charset=utf-8"}});
@@ -58,7 +59,7 @@ try {
     try {
       await page.addInitScript(()=>{if(!localStorage.getItem("bd_active_venue_id"))localStorage.setItem("bd_active_venue_id","1");});
       await page.goto(`http://127.0.0.1:${address.port}/embedded-host?venue=1`);
-      await page.frameLocator("iframe").getByRole("link",{name:"Ввести продажу с выручкой и складским расходом"}).click();
+      await page.frameLocator("iframe").getByRole("link",{name:"Добавить продажу вручную"}).click();
       await page.waitForURL(url=>url.pathname==="/sales-entry"&&url.searchParams.get("venue")==="1");
       assert.equal(new URL(page.url()).searchParams.has("embedded"),false);
       await page.locator("#work:not([hidden])").waitFor();
@@ -84,13 +85,14 @@ try {
       assert.equal(runtime.batches(),1);
       assert.equal((runtime.get("bd_assortment_v1") as {stockBalances:{current:number}[]}).stockBalances[1].current,1.9);
       await page.reload();await page.locator("#work:not([hidden])").waitFor();
+      await page.goto(`http://127.0.0.1:${address.port}/sales-entry?venue=1&event=${encodeURIComponent((runtime.get("bd_sales_events_v1") as {id:string}[])[0].id)}`);
       await page.locator("#events > details > summary").first().click();
       await page.getByText("Вернуть всю продажу",{exact:true}).click();
       await page.getByRole("button",{name:"Подтвердить полный возврат"}).click();
       await page.waitForFunction(()=>document.getElementById("notice")?.textContent==="Продажа возвращена полностью.");
       assert.equal((runtime.get("bd_assortment_v1") as {stockBalances:{current:number}[]}).stockBalances[1].current,2);
       assert.equal((runtime.get("bd_finance_revenue") as {revenue:number}[])[0].revenue,0);
-      await page.fill("#shift-name","Day");await page.getByRole("button",{name:"Открыть смену",exact:true}).click();
+      await page.goto(`http://127.0.0.1:${address.port}/sales-entry?venue=1&view=shifts`);await page.fill("#shift-name","Day");await page.getByRole("button",{name:"Открыть смену",exact:true}).click();
       await page.waitForFunction(()=>document.getElementById("notice")?.textContent==="Смена открыта.");
       await page.locator("#shifts summary").first().click();await page.getByRole("button",{name:"Подтвердить закрытие смены"}).click();
       await page.waitForFunction(()=>document.getElementById("notice")?.textContent==="Смена закрыта.");
@@ -109,7 +111,7 @@ try {
         }),
       ]);
       assert.equal(frozen,true);assert.equal(runtime.batches(),writes);
-      await page.locator("#work:not([hidden])").waitFor();assert.match(await page.locator("#events").innerText(),/Продаж ещё нет/);
+      await page.locator("#work:not([hidden])").waitFor();assert.match(await page.locator("#shifts").innerText(),/Кассовых смен пока нет/);
       assert.equal(await page.locator("[data-menu] option").count(),1,"foreign menu must not leak");
       assert.equal(runtime.batches(),writes,"venue transition must not write stock or revenue");
       assert.equal(errors.filter(e=>/503/.test(e)).length,1,"one deliberately lost success response");

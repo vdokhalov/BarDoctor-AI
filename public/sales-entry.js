@@ -3,16 +3,24 @@
   const $ = id => document.getElementById(id);
   const escape = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const notice = message => { $("notice").textContent = message; };
+  const view = new URL(location.href).searchParams.get('view');
+  const selectedEvent = new URL(location.href).searchParams.get('event');
+  const journal = window.bdSalesJournal;
+  const isShifts = view === 'shifts';
+  $('entry-title').textContent = isShifts ? 'Кассовые смены' : selectedEvent ? 'Действия продажи' : 'Ручной ввод';
+  document.title = $('entry-title').textContent + ' — BarDoctor';
+  $(isShifts ? 'shifts-nav' : 'manual-nav').setAttribute('aria-current','page');
+  $('entry-explanation').hidden = isShifts || Boolean(selectedEvent);
   let payload, quote, pending, busy = false, frozen = false;
   const storageKey = () => "bd_pending_sale:" + localStorage.getItem("bd_session") + ":" + payload.venueId;
   const money = (value, currency) => value == null ? "Стоимость неизвестна" : window.bdFormatAccountingMoney(value,currency);
-  async function request(body) {
+  async function request(body, readUrl) {
     const headers = new Headers({"Content-Type":"application/json"});
     const venue = localStorage.getItem("bd_active_venue_id"), email = localStorage.getItem("bd_session"), token = localStorage.getItem("bd_session_token");
     if (email && token) { headers.set("X-Session-Email",email); headers.set("X-Session-Token",token); }
     if (venue) headers.set("X-Venue-Id",venue);
     if (frozen || body && String(payload.venueId) !== venue) throw new Error("Заведение изменилось. Обновите страницу.");
-    const response = await fetch("/api/sales-events",{method:body?"POST":"GET",headers,...(body?{body:JSON.stringify({...body,venueId:payload.venueId})}:{}),signal:AbortSignal.timeout(20000)});
+    const response = await fetch(body ? "/api/sales-events" : readUrl || "/api/sales-events",{method:body?"POST":"GET",headers,...(body?{body:JSON.stringify({...body,venueId:payload.venueId})}:{}),signal:AbortSignal.timeout(20000)});
     const result = await response.json();
     if (venue !== localStorage.getItem("bd_active_venue_id")) throw new Error("Заведение изменилось. Обновите страницу.");
     if (!response.ok || !result.ok) {
@@ -44,18 +52,30 @@
   }
   async function load() {
     payload=await request();
-    $("work").hidden=false;$("sale").hidden=!payload.permissions.post;$("shift-actions").hidden=!payload.permissions.shifts;
-    $("shift").innerHTML='<option value="">Без смены</option>'+payload.shifts.filter(s=>s.closingStatus==="open").map(s=>`<option value="${escape(s.id)}">${escape(s.shiftName)} · ${escape(s.date)}</option>`).join("");
-    $("shifts").innerHTML=payload.shifts.map(s=>`<details><summary>${escape(s.shiftName)} · ${escape(s.date)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"} · ${escape(money(s.revenue,s.currency))}</summary>${s.closingStatus==="open"?`<button data-close="${escape(s.id)}">Подтвердить закрытие смены</button>`:""}</details>`).join("");
-    $("events").innerHTML=payload.events.length?payload.events.map(e=>`<details><summary>${escape(e.acceptedAt)} · ${escape(money(e.revenue,e.currency))} · ${e.status==="POSTED"?"Продажа":"Возвращена"}</summary>${e.prices.map(p=>`<p>${escape(p.name)} × ${escape(p.quantity)}</p>`).join("")}<p>Себестоимость: ${escape(window.bdFormatSalesCost(e.batch,e.currency))}</p>${e.status==="POSTED"&&e.source!=="POS_API"&&payload.permissions.reverse?`<details><summary>Вернуть всю продажу</summary><p>Будут возвращены все товары и отменена выручка этой продажи.</p><button data-reverse="${escape(e.id)}">Подтвердить полный возврат</button></details>`:""}</details>`).join(""):"Продаж ещё нет.";
+    if(selectedEvent && !payload.events.some(e=>e.id===selectedEvent)) {
+      const documents=await request(undefined,'/api/sales-batches');
+      const doc=documents.batches.find(b=>b.salesEventId===selectedEvent && b.readOnly);
+      if(doc)payload.events=[{...doc,id:doc.salesEventId,batch:doc}];
+    }
+    let shiftDocuments=null;
+    if(isShifts){try{shiftDocuments=(await request(undefined,'/api/sales-batches')).batches;}catch{notice('Не удалось прочитать разбивку оплат. Обновите страницу.');}}
+    const shiftPayments = shift => {
+      if(!shiftDocuments)return '<p>Разбивка оплат недоступна.</p>';
+      const events=shiftDocuments.filter(b=>b.readOnly && b.shiftId===shift.id && b.status==='POSTED' && b.currency===shift.currency);
+      return '<p>'+['CASH','CARD_EXTERNAL'].map(method=>({CASH:'Наличные',CARD_EXTERNAL:'Карта'})[method]+': '+escape(money(events.flatMap(b=>b.payments || []).filter(p=>p.method===method).reduce((sum,p)=>sum+p.amount,0),shift.currency))).join(' · ')+(events.some(b=>!b.payments?.length)?' · Есть продажи без указанного способа оплаты.':'')+'</p>';
+    };
+    $("work").hidden=false;$("sale").hidden=!payload.permissions.post || isShifts || Boolean(selectedEvent);$("shift-actions").hidden=!isShifts;$("open-shift").hidden=!payload.permissions.shifts;$("event-actions").hidden=!selectedEvent;
+    $("shift").innerHTML='<option value="">Без смены</option>'+payload.shifts.filter(s=>s.closingStatus==="open").map(s=>`<option value="${escape(s.id)}">${escape(s.shiftName)} · ${escape(journal.businessDate({businessDate:s.date}))}</option>`).join("");
+    $("shifts").innerHTML=payload.shifts.length?payload.shifts.map(s=>`<article class="cash-shift"><h3>${escape(s.shiftName)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"}</h3><dl class="sale-metadata">${[["Открыта",journal.date(s.createdAt)],["Закрыта",s.closedAt?journal.date(s.closedAt):"Ещё открыта"],["Ответственный",s.actor?.name || s.createdBy?.name || "Не указан"],["Выручка",money(s.revenue,s.currency)],["Чеки",s.receipts ?? "Не указано"]].map(([label,value])=>`<div><dt>${escape(label)}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>${shiftPayments(s)}${s.closingStatus==="open"&&payload.permissions.shifts?`<details><summary>Закрыть смену</summary><p>Ввод новых продаж и возвратов в эту смену завершится.</p><button data-close="${escape(s.id)}">Подтвердить закрытие смены</button></details>`:""}</article>`).join(""):"Кассовых смен пока нет.";
+    $("events").innerHTML=payload.events.some(e=>e.id===selectedEvent)?payload.events.filter(e=>e.id===selectedEvent).map(e=>`<details><summary>${escape(journal.date(e.acceptedAt))} · ${escape(money(e.revenue,e.currency))} · ${e.status==="POSTED"?"Продажа":"Возвращена"}</summary>${e.prices.map(p=>`<p>${escape(p.name)} × ${escape(p.quantity)}</p>`).join("")}<p>Себестоимость: ${escape(window.bdFormatSalesCost(e.batch,e.currency))}</p>${e.status==="POSTED"&&e.source!=="POS_API"&&payload.permissions.reverse?`<details><summary>Вернуть всю продажу</summary><p>Будут возвращены все товары и отменена выручка этой продажи.</p><button data-reverse="${escape(e.id)}">Подтвердить полный возврат</button></details>`:""}</details>`).join(""):"Продаж ещё нет.";
     $("lines").replaceChildren();if(payload.permissions.post)addLine();
     const saved=sessionStorage.getItem(storageKey());
-    if(saved){
+    if(saved && !isShifts && !selectedEvent){
       pending=JSON.parse(saved);$("sale").hidden=true;$("preview").hidden=false;$("discard").hidden=true;
       $("quote").textContent="Предыдущий запрос мог сохраниться. Проверьте результат повторным запросом — повторного списания не будет.";
       $("post").textContent="Проверить результат продажи";
     }
-    notice(payload.menu.length?"Готово. Проверьте продажу перед подтверждением.":"Добавьте позиции и цены в меню, чтобы ввести продажу.");
+    notice(isShifts?"Результаты кассовых смен.":selectedEvent?"Действия выбранной продажи.":payload.menu.length?"Готово. Проверьте продажу перед подтверждением.":"Добавьте позиции и цены в меню, чтобы ввести продажу.");
   }
   $("add-line").onclick=()=>{if(!busy&&$("lines").children.length<100){invalidate();addLine();}};
   $("lines").onclick=event=>{if(!busy&&event.target.closest("[data-remove]")){event.target.closest(".grid").remove();invalidate();}};

@@ -13,6 +13,7 @@ const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumA
 const executablePath=existsSync("C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe")?"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe":await resolveBrowserExecutable(chromium.executablePath());
 const browser=await chromium.launch({executablePath,headless:true,args:[...chromiumArgs,"--no-proxy-server"]});
 mkdirSync("outputs/pos1-hardening",{recursive:true});
+mkdirSync("outputs/sales-ux1",{recursive:true});
 const report:unknown[]=[];
 try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",width:820,height:1000},{name:"desktop",width:1280,height:800}].filter(p=>!process.env.BD_POS_PROFILE||p.name===process.env.BD_POS_PROFILE)){
   const r=await lifecycleRuntime({overview:"./app/api/assortment/overview/route",events:"./app/api/sales-events/route",documents:"./app/api/sales-batches/route",restaurantMe:"./app/api/restaurants/me/route",store:"./app/api/store/route",storeKey:"./app/api/store/[key]/route",usersMe:"./app/api/users/me/route"});
@@ -39,7 +40,7 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
       const api=url.pathname==="/api/sales-events"?r.api.events:r.api.documents;
       response=await (req.method==="POST"?api.POST(request):api.GET(request));
       if(action==="post"&&failure==="after"){failure="none";res.writeHead(201,{"Content-Type":"application/json","Content-Length":"9999"});res.write("{\"ok\":");setTimeout(()=>res.destroy(),30);return;}
-    }else if(url.pathname==="/catalog")response=barDoctorResponse();
+    }else if(["/catalog","/warehouse","/finance"].includes(url.pathname))response=barDoctorResponse();
     else if(url.pathname==="/cashier")response=cashier();
     else if(url.pathname==="/sales-entry")response=entryPage();
     else if(url.pathname==="/sales-import")response=salesPage(new Request(url));
@@ -58,7 +59,8 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     await page.goto(base+"/cashier?venue="+venue);await page.locator("#open-shift").waitFor();assert.match(await page.locator("#shift-message").innerText(),/Открытых смен нет/);
     await page.locator("#shift-name").fill("Night");await page.getByRole("button",{name:"Открыть смену",exact:true}).click();await page.locator("#cashier").waitFor();
     const shiftId=get("bd_finance_revenue")[0].id;
-    await page.goto(base+"/sales-import?venue="+venue);await page.frameLocator("iframe").getByRole("link",{name:"Открыть кассу"}).click();await page.waitForURL("**/cashier?venue="+venue);await page.locator("#cashier").waitFor();
+    await page.goto(base+"/sales-import?embedded=1&venue="+venue);await page.getByText("Продаж пока нет",{exact:true}).waitFor();await page.screenshot({path:"outputs/sales-ux1/"+profile.name+"-empty-journal.png",fullPage:true});
+    await page.goto(base+"/sales-import?venue="+venue);await page.frameLocator("iframe").getByRole("link",{name:/Открыть кассу|Продолжить заказ/}).first().click();await page.waitForURL("**/cashier?venue="+venue);await page.locator("#cashier").waitFor();
     assert.doesNotMatch(await page.locator("body").innerText(),/SPA 404/);
     for(const [dept,id,category] of [["bar","water","Безалкогольные напитки"],["kitchen","service","Продукты"],["hookah","hookah","Табак"]]){await page.locator('[data-department="'+dept+'"]').click();await page.locator('[data-add="'+id+'"]').waitFor();assert.match(await page.locator("#categories").innerText(),new RegExp(category));await page.locator('[data-category="'+(dept==="bar"?"water":dept==="kitchen"?"food":"tobacco")+'"]').click();}
     assert.equal(await page.locator('[data-department="hookah"]').count(),1);assert.equal(await page.locator('[data-department="hookah"]').innerText(),"Кальянная");
@@ -72,7 +74,7 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     await page.locator("#comment").fill("Не потерять комментарий");await page.locator('[name="payment"][value="CARD_EXTERNAL"]').check();
     await page.reload();await page.locator('[data-remove="water"]').waitFor();assert.equal(await page.locator("#comment").inputValue(),"Не потерять комментарий");assert.equal(await page.locator('[value="CARD_EXTERNAL"]').isChecked(),true);
     await page.goBack();await page.waitForURL("**/sales-import?venue="+venue);await page.goForward();await page.locator('[data-remove="water"]').waitFor();
-    await page.goto(base+"/sales-import?venue="+venue);await page.frameLocator("iframe").getByRole("link",{name:"Открыть кассу"}).click();await page.locator('[data-remove="water"]').waitFor();
+    await page.goto(base+"/sales-import?venue="+venue);await page.frameLocator("iframe").getByRole("link",{name:/^Продолжить заказ/}).click();await page.locator('[data-remove="water"]').waitFor();
     // Separate tabs share the draft, and another account cannot see it.
     const reopened=await context.newPage();await reopened.goto(base+"/cashier?venue="+venue);await reopened.locator('[data-remove="water"]').waitFor();await reopened.locator('[data-add="service"]').click();await page.locator("#work").waitFor({state:"hidden"});await page.locator("#pay").evaluate((button:HTMLButtonElement)=>button.click());assert.equal(postCalls,0);await reopened.close();await page.reload();await page.locator('[data-remove="service"]').click();
     await page.evaluate(({email,token,venue})=>{localStorage.setItem("bd_session",email);localStorage.setItem("bd_session_token",token);localStorage.setItem("bd_active_venue_id",String(venue));},{...other,venue:other.activeVenueId});
@@ -104,8 +106,39 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     const shift=get("bd_finance_revenue").find((s:{id:string})=>s.id===shiftId);assert.equal(shift.revenue,120);assert.equal(shift.receipts,3);
     assert.equal(get("bd_sales_events_v1")[0].batch.totalTheoreticalCost,1);assert.equal(get("bd_sales_events_v1")[1].batch.totalTheoreticalCost,1);
     const event=get("bd_sales_events_v1")[2];await page.goto(base+"/sales-import?embedded=1&venue="+venue+"&batch="+encodeURIComponent(event.id));await page.locator("#editor-dialog[open]").waitFor();assert.equal(await page.locator(".batch-row").count(),3);assert.match(await page.locator("#editor-body").innerText(),/QA Сервис/);assert.match(await page.locator("#editor-body").innerText(),/30.*руб. ПМР/);assert.equal(await page.locator("#editor-footer button").count(),0);assert.equal(await page.locator(".pos-event-summary strong").evaluate(node=>node.getBoundingClientRect().height < 55),true,"receipt revenue is readable on one line");await page.screenshot({path:"outputs/pos1-hardening/"+profile.name+"-document.png"});
-    await page.locator("#editor-close").click();await page.getByRole("button",{name:"+ Добавить продажи",exact:true}).click();await page.locator("#source-dialog[open]").waitFor();assert.equal(await page.locator("body").evaluate(node=>node.scrollWidth<=innerWidth+2),true);await page.locator('#source-dialog button[value="cancel"]').click();
-    await page.goto(base+"/sales-entry?venue="+venue);await page.locator("#events").filter({hasText:/QA Сервис/}).waitFor();assert.match(await page.locator("#events").innerText(),/руб. ПМР/);
+    assert.match(await page.locator('#editor-body').innerText(),/Night/);
+    assert.doesNotMatch(await page.locator('.sale-metadata').innerText(),new RegExp(shiftId));
+    await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-document.png'});
+    const warehouseTarget=await page.locator('.journal-link').getAttribute('href');assert.ok(warehouseTarget?.includes(encodeURIComponent(event.id)));
+
+    await page.locator("#editor-close").click();
+    await page.locator('#journal-receipts').filter({hasText:'3'}).waitFor();
+    assert.match(await page.locator('#journal-revenue').innerText(),/120/);
+    assert.equal(await page.locator('body').evaluate(node=>node.scrollWidth<=innerWidth+2),true);
+    await page.locator('.journal-filters details').evaluate((node:HTMLDetailsElement)=>{node.open=false;});await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-journal.png',fullPage:true});
+    await page.locator('#journal-query').fill('Сервис');assert.equal(await page.locator('.batch-row').count(),1);
+    await page.locator('#journal-query').fill(event.id);assert.equal(await page.locator('.batch-row').count(),1);
+    await page.locator('#journal-query').fill('несуществующий товар');await page.getByText('Ничего не найдено',{exact:true}).waitFor();
+    await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-empty-search.png',fullPage:true});
+    await page.locator('#journal-reset').click();
+    await page.locator('.journal-filters summary').click();
+    await page.locator('#journal-payment').selectOption('CARD_EXTERNAL');assert.equal(await page.locator('.batch-row').count(),1);
+    await page.locator('#journal-reset').click();await page.locator('#journal-source').selectOption('MANUAL');assert.equal(await page.locator('.batch-row').count(),0);
+    await page.locator('#journal-reset').click();await page.locator('#journal-status').selectOption('REVERSED');assert.equal(await page.locator('.batch-row').count(),0);
+    await page.locator('#journal-reset').click();await page.locator('#journal-shift').selectOption(shiftId);assert.equal(await page.locator('.batch-row').count(),3);
+    await page.locator('#journal-actor').selectOption(String(user.userId));assert.equal(await page.locator('.batch-row').count(),3);
+    await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-filters.png',fullPage:true});
+    await page.locator('#journal-reset').click();
+    await page.locator('#journal-from').fill('2099-01-01');assert.equal(await page.locator('.batch-row').count(),0);assert.equal(await page.locator('#journal-receipts').innerText(),'0');await page.locator('#journal-reset').click();
+    await page.locator('[data-sales-view=manual]').click();await page.locator('#manual-entry').waitFor();assert.equal(await page.locator('#journal-layout').isVisible(),false);
+    await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-manual-entry.png',fullPage:true});
+    await page.locator('[data-source=manual]').click();await page.locator('#editor-dialog[open]').waitFor();await page.locator('#editor-close').click();
+    await page.locator("[data-sales-view=import]").click();
+    await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-import.png',fullPage:true});await page.getByRole("button",{name:"Импортировать продажи",exact:true}).click();await page.locator("#source-dialog[open]").waitFor();assert.equal(await page.locator("body").evaluate(node=>node.scrollWidth<=innerWidth+2),true);await page.locator('[data-source=text]').click();await page.locator('#sales-text').fill('QA Сервис 2');await page.locator('#parse-text').click();await page.locator('#post-batch').waitFor();await page.locator('#post-batch').click();await page.locator('#confirm-action').click();await page.locator('#editor-status').filter({hasText:'Проведено'}).waitFor();assert.equal(get('bd_sales_events_v1').length,3);assert.equal(get('bd_finance_revenue').find((s:{id:string})=>s.id===shiftId).revenue,120);assert.equal(get('bd_stock_movements').filter((m:{type:string})=>m.type!=='receipt').length,3);await page.locator('#editor-close').click();await page.locator('[data-sales-view=journal]').click();assert.equal(await page.locator('.batch-row').count(),4);assert.equal(await page.locator('#journal-receipts').innerText(),'3');await page.locator('.journal-filters details').evaluate((node:HTMLDetailsElement)=>{node.open=false;});await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-journal.png',fullPage:true});
+    await page.goto(base+"/sales-entry?venue="+venue+"&event="+encodeURIComponent(event.id));await page.locator("#events").filter({hasText:/QA Сервис/}).waitFor();assert.match(await page.locator("#events").innerText(),/руб. ПМР/);
+    await page.goto(base+warehouseTarget+'&venue='+venue);await page.locator('.bd-warehouse-movement-list article').first().waitFor();assert.equal(await page.locator('.bd-warehouse-movement-list article').count(),1,'only this sale movement');await page.locator('.bd-warehouse-movement-list').getByRole('button',{name:'Документ продаж',exact:true}).click();await page.frameLocator('iframe').locator('#editor-dialog[open]').waitFor();assert.match(await page.frameLocator('iframe').locator('#editor-body').innerText(),/QA Сервис/);
+    await page.goto(base+'/sales-entry?view=shifts&venue='+venue);await page.locator('.cash-shift').first().waitFor();assert.match(await page.locator('#shifts').innerText(),/Night/);assert.equal(await page.locator('#sale').isVisible(),false);await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-shifts.png',fullPage:true});
+    await page.goto(base+'/sales-entry?venue='+venue);await page.locator('#sale').waitFor();assert.equal(await page.locator('#shift-actions').isVisible(),false);assert.equal(await page.locator('#event-actions').isVisible(),false);await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-manual-form.png',fullPage:true});
     await page.goto(base+"/catalog?venue="+venue);await page.locator(".bd-assortment-tabs-v170 button").filter({hasText:/^Меню$/}).click();
     for(const section of ["bar","kitchen","hookah"]){const node=page.locator('[data-assortment-section-id="'+section+'"]');await node.waitFor();const toggle=node.locator('.bd-assortment-section-toggle-v171');if(await toggle.getAttribute('aria-expanded')!=="true")await toggle.click();}
     await page.locator('[data-assortment-section-id="bar"]').getByRole('button',{name:/Безалкогольные напитки/}).click();
@@ -115,7 +148,8 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     assert.match(await page.locator('[data-assortment-section-id="hookah"]').innerText(),/Кальянная/);
     assert.equal(await page.locator('body').evaluate(node=>node.scrollWidth<=innerWidth+2),true);
     await page.screenshot({path:"outputs/pos1-hardening/"+profile.name+"-menu-overview.png",fullPage:true});
-    assert.deepEqual(errors,[]);report.push({profile:profile.name,viewport:profile.width,events:3,revenue:120,stockMovements:3,stockBefore:100,stockAfter:97,beforePostFailure:true,lostResponseReconciled:true,duplicateStableId:true,globalSearch:true,subcategoryRestore:true,postCalls,draftReload:true,accountIsolation:true,venueIsolation:true,shiftIsolation:true,crossTabConflict:true,navigation:true,retry:true,document:true});
+    await page.route('**/api/sales-batches',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'Журнал временно недоступен'})}));await page.goto(base+'/sales-import?embedded=1&venue='+venue);await page.locator('#notice').filter({hasText:'Журнал временно недоступен'}).waitFor();await page.screenshot({path:'outputs/sales-ux1/'+profile.name+'-error.png',fullPage:true});await page.unroute('**/api/sales-batches');await page.locator('#refresh').click();await page.locator('.batch-row').first().waitFor();assert.equal(get('bd_sales_events_v1').length,3);
+    assert.deepEqual(errors,[]);report.push({profile:profile.name,viewport:profile.width,events:3,revenue:120,stockMovements:3,stockBefore:100,stockAfter:97,beforePostFailure:true,lostResponseReconciled:true,duplicateStableId:true,globalSearch:true,subcategoryRestore:true,postCalls,draftReload:true,accountIsolation:true,venueIsolation:true,shiftIsolation:true,crossTabConflict:true,navigation:true,retry:true,document:true,journalFilters:true,importPosted:true,warehouseRoundTrip:true,errorRecovery:true});
   }catch(error){console.error({profile:profile.name,errors,url:page.url(),notice:await page.locator("#notice").textContent().catch(()=>""),postCalls,events:(get("bd_sales_events_v1")||[]).length});await page.screenshot({path:"outputs/pos1-hardening/failure.png"}).catch(()=>{});throw error;}finally{await context.close();await new Promise<void>(done=>server.close(()=>done()));r.close();}
 }}finally{await browser.close();}
 writeFileSync("outputs/pos1-hardening/results.json",JSON.stringify(report,null,2));console.log(JSON.stringify(report));

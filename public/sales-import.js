@@ -83,9 +83,6 @@
     });
     if (value && label) notice(label, "info");
   }
-  function sourceLabel(source) {
-    return ({ MANUAL_GRID: "Вручную", TEXT_IMPORT: "Текст", FILE_IMPORT: "Файл", IMAGE_IMPORT: "Фото / PDF", VOICE_IMPORT: "Голос", POS_API: "Кассовая система", ONE_C: "1С", LOCAL_CONNECTOR: "Подключение", OTHER_API: "Интеграция" })[source] || "Импорт";
-  }
   function statusLabel(status) {
     return ({ DRAFT: "Черновик", READY: "Готово к проведению", PARTIALLY_BLOCKED: "Требует внимания", POSTED: "Проведено", REVERSED: "Отменено", CANCELLED: "Отменено" })[status] || "В обработке";
   }
@@ -110,23 +107,16 @@
       ? ((k.reflectedPercent || 0) + "% продаж отражено на складе. Добавьте следующую смену или откройте документ для проверки.")
       : "Загрузите итоги смены — BarDoctor сам разложит позиции по техкартам и покажет складской расход до проведения.";
     document.body.classList.toggle("has-sales-documents", Boolean((payload.batches || []).length));
-    renderBatches(payload.batches || []);
+    document.querySelector('[data-source="manual"]').hidden=!(payload.capabilities && payload.capabilities.create);
+    renderJournalOptions();
+    renderJournal();
     renderQuality(payload.dataQuality || { issues: [] });
     document.getElementById("add-sales").hidden = !(payload.capabilities && payload.capabilities.create);
   }
   function renderBatches(batches) {
-    var node = document.getElementById("batch-list");
-    if (!batches.length) {
-      node.innerHTML = '<div class="empty-state"><img src="/integration-icons/clipboard-list.svg" alt=""><h3>Продаж за смены пока нет</h3><p>Добавьте итоги вручную, вставьте текст или загрузите отчёт.</p><button type="button" data-open-source>+ Добавить продажи</button></div>';
-      return;
-    }
-    var shifts = (state.payload && state.payload.shifts) || [];
-    node.innerHTML = batches.map(function (batch) {
-      var shift = shifts.find(function (item) { return item.id === batch.shiftId; });
-      var portions = batch.lines.reduce(function (sum, line) { return sum + number(line.quantity); }, 0);
-      var shiftName = shift ? shift.label + ((shift.startTime || shift.endTime) ? " · " + (shift.startTime || "—") + "–" + (shift.endTime || "—") : "") : batch.shiftId ? "Смена" : "Без привязки к смене";
-      return '<button class="batch-row" type="button" data-batch="' + h(batch.id) + '"><span class="batch-date"><b>' + h(formatDateShort(batch.businessDate)) + ' · ' + h(shiftName) + '</b><small>' + h(sourceLabel(batch.source)) + '</small></span><span class="batch-progress"><b>' + batch.lines.length + ' ' + plural(batch.lines.length, "позиция", "позиции", "позиций") + ' · ' + h(formatQuantity(portions)) + ' ' + plural(portions, "порция", "порции", "порций") + '</b><small>' + (batch.blockedLineCount ? batch.blockedLineCount + ' требуют исправления' : 'Себестоимость ' + h(window.bdFormatSalesCost(batch, batch.currency || batch.lines[0] && batch.lines[0].currency))) + '</small></span><span class="status-pill ' + statusClass(batch.status) + '">' + h(statusLabel(batch.status)) + '</span><img class="chevron" src="/integration-icons/chevron-right.svg" alt=""></button>';
-    }).join("");
+    var node=document.getElementById('batch-list');
+    if(!batches.length){node.innerHTML='<div class="empty-state"><h3>'+((state.payload?.batches || []).length?'Ничего не найдено':'Продаж пока нет')+'</h3><p>'+((state.payload?.batches || []).length?'Измените период, запрос или фильтры.':'Откройте кассу, чтобы провести первую продажу. Ручной ввод и импорт доступны отдельно.')+'</p></div>';return;}
+    node.innerHTML=batches.map(function(batch){return '<button type="button" class="batch-row journal-row" data-batch="'+h(batch.id)+'"><span class="journal-row-heading"><b>'+h(journal.receiptNumber(batch))+'</b><strong>'+h(journal.amount(batch)===null?'Сумма не передана':money(batch.revenue,batch.currency))+'</strong></span><span class="journal-row-date">'+h(journal.date(journal.timestamp(batch)))+(batch.readOnly?'':' · Документ создан')+' · Учёт: '+h(journal.businessDate(batch))+'</span><span class="journal-row-details"><span>Оплата: '+h(journal.payment(batch))+'</span><span>Смена: '+h(journal.shiftName(batch,state.payload.shifts || []))+'</span><span>Сотрудник: '+h(journal.actor(batch))+'</span><span>'+batch.lines.length+' '+plural(batch.lines.length,'позиция','позиции','позиций')+'</span></span><span class="journal-row-footer"><span>'+h(journal.sourceLabel(batch))+'</span><span class="status-pill '+statusClass(batch.status)+'">'+h(statusLabel(batch.status))+'</span></span></button>';}).join('');
   }
   function renderQuality(quality) {
     var issues = quality.issues || [];
@@ -138,13 +128,17 @@
     }).join("") : hasDocuments ? '<div class="quality-ok"><img src="/integration-icons/circle-check.svg" alt=""> Нет нерешённых ошибок</div>' : '';
   }
   function load() {
-    notice("", "");
+    notice("Загружаем журнал…", "info");
+    var venue=localStorage.getItem("bd_active_venue_id"),email=localStorage.getItem("bd_session");
     return request("/api/sales-batches").then(function (data) {
+      if(venue!==localStorage.getItem("bd_active_venue_id")||email!==localStorage.getItem("bd_session"))return;
       state.payload = data;
       renderHome();
+      notice("", "");
+      loadPosContext();
       var requested = new URL(location.href).searchParams.get("batch");
       if (requested && !editor.open) openBatch(requested);
-    }).catch(function (error) { notice(error.message, "error"); });
+    }).catch(function (error) { notice(error.message, "error"); document.getElementById("journal-count").textContent="Журнал недоступен. Нажмите «Обновить», чтобы повторить."; });
   }
 
   function setDirty(value) {
@@ -298,15 +292,14 @@
     state.batch = batch; state.mode = "preview"; if(batch.readOnly) renderEventDocument(batch); else renderPreview(); showEditor();
   }
   function renderEventDocument(batch) {
-    header("Проведённая продажа", "ДОКУМЕНТ ПРОДАЖИ", batch.status);
-    editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><span>Выручка</span></div></section>'
-      + '<p>Смена: ' + h(batch.shiftId || 'Без смены') + ' · Сотрудник: ' + h(batch.actor?.name || batch.createdBy?.name || '') + '</p>'
-      + (batch.prices || []).map(function(line){return '<p><b>' + h(line.name) + '</b> × ' + h(line.quantity) + ' · ' + h(money(line.total,batch.currency)) + '</p>';}).join('')
+    header(journal.receiptNumber(batch), "ДОКУМЕНТ ПРОДАЖИ", batch.status);
+    editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><span>Сумма продажи</span></div></section>'
+      + journal.metadata(batch,state.payload.shifts || [],money)
+      + '<section class="sale-document-lines"><h3>Позиции</h3>'+(batch.prices || []).map(function(line){return '<article><b>' + h(line.name) + '</b><span>'+h(line.quantity)+' × '+h(money(line.unitPrice,batch.currency))+'</span><strong>'+h(money(line.total,batch.currency))+'</strong></article>';}).join('')+'</section>'
       + '<p>Себестоимость: ' + h(window.bdFormatSalesCost(batch,batch.currency)) + '</p>'
-      + '<p>Оплата: ' + h((batch.payments || []).map(p=>p.method === 'CASH' ? 'Наличные' : 'Карта · внешняя оплата').join(', ')) + '</p>'
-      + (batch.comment ? '<p>Комментарий: ' + h(batch.comment) + '</p>' : '')
-      + '<p>Складских движений: ' + h((batch.movementIds || []).length) + '. Продажа уже проведена; повторное проведение не требуется.</p>';
-    editorFooter.innerHTML = '<span>Документ из единого журнала продаж</span>';
+      + '<p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>' + journal.movements(batch)
+      + '<details class="journal-technical"><summary>Технические реквизиты</summary><p>Продажа: '+h(batch.salesEventId || batch.id)+'</p><p>Смена: '+h(batch.shiftId || 'Без смены')+'</p></details>';
+    editorFooter.innerHTML = '<span>Документ из единого журнала продаж</span>'+(batch.source!=='POS_API' && batch.status==='POSTED' && state.payload.capabilities.reverse ? '<a href="/sales-entry?event='+encodeURIComponent(batch.salesEventId)+'">Открыть действия продажи</a>' : '');
   }
   function lineState(line) {
     if (line.processingStatus === "POSTED") return { icon: "/integration-icons/circle-check.svg", label: "Отражено на складе", cls: "success" };
@@ -323,13 +316,13 @@
   }
   function renderPreview() {
     var batch = state.batch; if (!batch) return;
-    header("Проверка продаж", "ПРОДАЖИ ЗА " + formatDateShort(batch.businessDate).toUpperCase(), batch.status);
+    header("Проверка продаж · "+journal.receiptNumber(batch), "ПРОДАЖИ ЗА " + formatDateShort(batch.businessDate).toUpperCase(), batch.status);
     var menu = (state.payload && state.payload.menu) || [];
     var canMap = state.payload && state.payload.capabilities && state.payload.capabilities.manageMapping;
     var mappingCount = batch.lines.filter(function (line) { return line.errorCode === "NEEDS_MAPPING"; }).length;
     var noRecipeCount = batch.lines.filter(function (line) { return line.errorCode === "NO_RECIPE"; }).length;
     var readyCount = batch.readyLineCount + batch.postedLineCount;
-    editorBody.innerHTML = '<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.map(function (line) {
+    editorBody.innerHTML = journal.metadata(batch,state.payload.shifts || [],money)+'<p>Себестоимость: '+h(window.bdFormatSalesCost(batch,batch.currency))+'</p><p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>'+journal.movements(batch)+'<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.map(function (line) {
       var lineStatus = lineState(line); var selected = line.menuItemId || line.suggestedMenuItemId || "";
       var mapping = line.processingStatus === "BLOCKED" && line.errorCode === "NEEDS_MAPPING" && canMap ? '<label class="mapping-select">Сопоставить<select data-map-line="' + h(line.id) + '" data-raw-name="' + h(line.rawName) + '"><option value="">Выберите позицию</option>' + menu.map(function (item) { return '<option value="' + h(item.id) + '"' + (item.id === selected ? " selected" : "") + '>' + h(item.name) + '</option>'; }).join("") + '</select></label>' : '<b>' + h((line.recipeSnapshot && line.recipeSnapshot.menuItem.name) || (menu.find(function (item) { return item.id === line.menuItemId; }) || {}).name || "Не сопоставлено") + '</b>';
       var details = line.recipeSnapshot ? line.recipeSnapshot.ingredients.map(function (item) { return h(item.name + " · " + item.baseQuantityTotal + " " + unitLabel(item.baseUnit)); }).join(" · ") : "";
@@ -406,6 +399,7 @@
     if (mode) { state.manualView = mode.dataset.manualView; document.querySelectorAll("[data-manual-view]").forEach(function (button) { button.setAttribute("aria-selected", String(button === mode)); }); renderMenuGrid(); }
     var route = event.target.closest("[data-open-route]");
     if (route) {
+      event.preventDefault();
       if (window.bdNavigate) window.bdNavigate(route.dataset.openRoute);
       else location.assign(route.dataset.openRoute);
     }
@@ -427,5 +421,70 @@
   window.addEventListener("popstate", function () { if (sourceDialog.open) sourceDialog.close(); else if (editor.open) closeEditor(true); });
   sourceDialog.addEventListener("close", function () { if (history.state && history.state.salesSource) history.replaceState({}, "", location.href); });
   editor.addEventListener("cancel", function (event) { event.preventDefault(); closeEditor(false); });
+  var journal = window.bdSalesJournal;
+  var salesView = new URL(location.href).searchParams.get('view') || 'journal';
+  function selectSalesView(view) {
+    salesView = ['manual','import'].includes(view) ? view : 'journal';
+    ['manual-entry','import-entry','import-metrics','import-quality','journal-layout','journal-metrics','journal-metric-note'].forEach(function(id){document.getElementById(id).hidden = id.startsWith('import-') ? salesView !== 'import' : id === 'manual-entry' ? salesView !== 'manual' : salesView !== 'journal';});
+    // Import quality belongs to its workflow, outside the journal layout.
+    document.getElementById('import-entry').after(document.getElementById('import-metrics'),document.getElementById('import-quality'));
+    document.querySelectorAll('[data-sales-view]').forEach(function(node){if(node.dataset.salesView===salesView)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');});
+    var url=new URL(location.href);if(salesView==='journal')url.searchParams.delete('view');else url.searchParams.set('view',salesView);history.replaceState(history.state,'',url);
+  }
+  function journalFilters() {
+    var filters={};['query','from','to','shift','actor','payment','source','status'].forEach(function(key){filters[key]=document.getElementById('journal-'+key).value;});return filters;
+  }
+  function renderJournal() {
+    var all=state.payload?.batches || [], filters=journalFilters();
+    var batches=all.filter(function(b){return journal.matches(b,filters);}).sort(function(a,b){return String(journal.timestamp(b)).localeCompare(String(journal.timestamp(a)));});
+    document.getElementById('journal-reset').hidden=!Object.values(filters).some(Boolean);
+    var invalid=filters.from && filters.to && filters.from>filters.to;
+    document.getElementById('journal-count').textContent=invalid?'Дата начала должна быть не позже даты окончания':batches.length+' из '+all.length+' документов';
+    document.getElementById('journal-filter-count').textContent=Object.entries(filters).filter(function(entry){return !['query','from','to'].includes(entry[0])&&entry[1];}).length || '';
+    var k=journal.totals(all.filter(function(b){return journal.matches(b,{from:filters.from,to:filters.to});}),state.payload?.currency);
+    document.getElementById('journal-revenue').textContent=money(k.revenue,state.payload?.currency);
+    document.getElementById('journal-receipts').textContent=k.count;
+    document.getElementById('journal-average').textContent=k.average===null?'—':money(k.average,state.payload?.currency);
+    document.getElementById('journal-metric-note').textContent=(filters.from || filters.to ? 'Период: '+(filters.from?journal.businessDate({businessDate:filters.from}):'с начала учёта')+' — '+(filters.to?journal.businessDate({businessDate:filters.to}):'по сегодня') : 'За всё время')+' · проведённые чеки POS и ручного ввода в валюте заведения. Импортных документов: '+k.imports+'. Суммы отчётов без выручки не включены.';
+    renderBatches(batches);
+  }
+  function renderJournalOptions() {
+    var batches=state.payload.batches || [], shifts=state.payload.shifts || [];
+    var shift=document.getElementById('journal-shift'),employee=document.getElementById('journal-actor'),selected=shift.value,selectedActor=employee.value;
+    var ids=[...new Set(batches.map(function(b){return b.shiftId;}).filter(Boolean))];
+    shift.innerHTML='<option value="">Все смены</option><option value="NONE">Без смены</option>'+ids.map(function(id){return '<option value="'+h(id)+'">'+h(journal.shiftName({shiftId:id},shifts))+'</option>';}).join('');shift.value=selected;
+    var actors=new Map(batches.map(function(b){return [journal.actorKey(b),journal.actor(b)];}));
+    employee.innerHTML='<option value="">Все сотрудники</option>'+[...actors].map(function(entry){return '<option value="'+h(entry[0])+'">'+h(entry[1])+'</option>';}).join('');employee.value=selectedActor;
+  }
+  async function loadPosContext() {
+    var venue=localStorage.getItem('bd_active_venue_id'),email=localStorage.getItem('bd_session');
+    try {
+      var context=await request('/api/sales-events');
+      if(venue!==localStorage.getItem('bd_active_venue_id')||email!==localStorage.getItem('bd_session')||String(context.venueId)!==String(state.payload?.venueId))return;
+      state.pos=context;
+      // Include every POS shift, including names older than the import API's 60-row selector.
+      state.payload.shifts=[...(context.shifts || []),...(state.payload.shifts || [])];
+      document.getElementById('journal-venue').textContent=context.venueName || 'Ваше заведение';
+      document.getElementById('open-cashier').hidden=!context.permissions.post;
+      document.getElementById('manual-sale-link').hidden=!context.permissions.post;
+      document.querySelector('[data-source="manual"]').hidden=!state.payload.capabilities.create;
+      var open=context.shifts.filter(function(s){return s.closingStatus==='open';});
+      document.getElementById('pos-shift-status').textContent=open.length?'Открытые кассовые смены: '+open.map(function(s){return s.shiftName;}).join(' · '):'Кассовая смена закрыта · откройте её в кассе';
+      var drafts=[];
+      for(var shift of open){
+        var draft=window.bdPosDraft.read(localStorage,window.bdPosDraft.key(context.actor.accountId,context.venueId,shift.id));
+        if(draft && (draft.lines.length || draft.pending))drafts.push({shift:shift,draft:draft});
+      }
+      document.getElementById('pos-drafts').innerHTML=context.permissions.post?drafts.map(function(item){return '<a class="journal-resume" data-resume-shift="'+h(item.shift.id)+'" href="/cashier">Продолжить заказ · '+item.draft.lines.length+' поз. · '+h(item.shift.shiftName)+'</a>';}).join(''):'';
+      renderJournalOptions();renderJournal();
+      if(editor.open && state.batch?.readOnly)renderEventDocument(state.batch);
+    } catch {document.getElementById('pos-shift-status').textContent='Не удалось прочитать кассовую смену или сохранённый заказ. Откройте кассу для проверки.';}
+  }
+  document.querySelectorAll('[data-sales-view]').forEach(function(node){node.onclick=function(){selectSalesView(node.dataset.salesView);};});
+  document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.addEventListener('input',renderJournal);});
+  document.getElementById('journal-reset').onclick=function(){document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.value='';});renderJournal();};
+  document.getElementById('pos-drafts').onclick=function(event){var link=event.target.closest('[data-resume-shift]');if(link&&state.pos){try{localStorage.setItem('bd_pos_shift_v1:'+state.pos.actor.accountId+':'+state.pos.venueId,link.dataset.resumeShift);}catch{event.preventDefault();notice('Не удалось выбрать сохранённую смену. Откройте кассу и выберите её вручную.','error');}}};
+  selectSalesView(salesView);
+
   load();
 }());

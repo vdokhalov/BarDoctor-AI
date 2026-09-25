@@ -5,15 +5,15 @@ import test from "node:test";
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
 
-test("sales UX exposes product language, unified source selection and mobile-safe quick entry", async () => {
+test("sales UX separates journal, import sources and mobile-safe manual entry", async () => {
   const [route, script, styles] = await Promise.all([
     read("app/sales-import/route.ts"),
     read("public/sales-import.js"),
     read("public/sales-import.css"),
   ]);
-  for (const label of ["Загрузить файл / фото", "Вставить текст", "Продиктовать", "Ввести вручную"]) assert.match(route, new RegExp(label));
+  for (const label of ["Загрузить файл / фото", "Вставить текст", "Продиктовать", "Ввести итоги по меню"]) assert.match(route, new RegExp(label));
   assert.match(route, /data-sales-experience="v278"/);
-  for (const label of ["Продажи смен → склад", "Продажи за смены", "Документы", "Что не попало на склад", "НОВЫЙ ДОКУМЕНТ"]) assert.match(route, new RegExp(label));
+  for (const label of ["Журнал и касса", "Журнал продаж", "Импортировать продажи", "Что не попало на склад", "НОВЫЙ ДОКУМЕНТ"]) assert.match(route, new RegExp(label));
   assert.match(script, /\/api\/sales-batches/);
   assert.match(script, /inputmode="decimal"/);
   assert.match(script, /beforeunload/);

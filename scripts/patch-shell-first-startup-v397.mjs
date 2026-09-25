@@ -105,6 +105,18 @@ function patchBootstrap(path) {
     '  injectSupplierAlternativesEntry();',
   );
 
+  // Preserve the v453 registration navigation guard when regenerating from v396.
+  const registrationGuard = `            // Registration is committed on the server before the client leaves this form.
+            // Clear only its dirty state so the beforeunload guard cannot strand setup.
+            if (requestUrl.pathname === "/api/auth/register" && response.ok && result && result.ok) {
+              window.bdMarkNavigationClean?.();
+            }`;
+  if (!source.includes('requestUrl.pathname === "/api/auth/register" && response.ok && result && result.ok')) {
+    const registrationAnchor = '            rememberAccessContext(result);';
+    if (!source.includes(registrationAnchor)) throw new Error('Registration navigation bootstrap anchor missing');
+    source = source.replace(registrationAnchor, registrationAnchor + "\n" + registrationGuard);
+  }
+
   const output = new URL("bardoctor-preview-v397.js", path);
   const observability = readFileSync(new URL("public/bd-request-observability.js", root), "utf8");
   writeFileSync(output, observability + "\n" + source);

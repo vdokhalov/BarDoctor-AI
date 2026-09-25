@@ -59,6 +59,8 @@ for(const scenario of ["KNOWN","UNKNOWN","ZERO","NONE","MIXED"] as const)test("F
  const body={innerHTML:""},footer={innerHTML:""};const window={} as {bdFormatSalesCost:(batch:unknown,currency:string)=>string;bdFormatAccountingMoney:(value:unknown,currency:string)=>string};
  const ui=vm.createContext({window,Intl,header:()=>{},editorBody:body,editorFooter:footer,h:String,batch:{...event.batch,currency:event.currency,revenue:event.revenue,prices:event.prices,payments:event.payments}});
  vm.runInContext(readFileSync("public/accounting-currency.js","utf8"),ui);ui.money=window.bdFormatAccountingMoney;
+ vm.runInContext(readFileSync("public/sales-journal.js","utf8"),ui);
+ vm.runInContext("var journal=window.bdSalesJournal;var state={payload:{shifts:[],capabilities:{}}};",ui);
  vm.runInContext(renderer.slice(begin,end)+"\nrenderEventDocument(batch)",ui);
  if(unknown)assert.match(body.innerHTML,/Себестоимость: не рассчитана/);else assert.doesNotMatch(body.innerHTML,/Себестоимость: не рассчитана/);
  assert.equal(event.originalMovements.length,scenario==="NONE"?0:1);

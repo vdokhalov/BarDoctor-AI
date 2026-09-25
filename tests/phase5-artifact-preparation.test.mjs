@@ -146,6 +146,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
       const published = fs.readFileSync(path.join(temporary, "dist/client/assets", asset[1]), "utf8");
       assert.equal(patchReceiptCost(published), published);
       assert.equal(published.split('if(["/sales-entry","/cashier"].includes(h.pathname)){').length - 1, 1, "standalone navigation bridge must not duplicate across preparations");
+      assert.match(fs.readFileSync(path.join(temporary, "public/bardoctor-preview-v397.js"), "utf8"), /requestUrl\.pathname === "\/api\/auth\/register" && response\.ok && result && result\.ok/, "preparation must preserve the v453 registration navigation guard");
       assert.equal(published, fs.readFileSync(path.join(temporary, bundlePath), "utf8"), "packaged and canonical costing must agree");
       checkBehavior();
       builtRelease = releaseSnapshot();
