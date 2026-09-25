@@ -69,6 +69,21 @@
     node.hidden = !message;
     node.className = "notice " + (kind || "info");
     node.textContent = message || "";
+    // Modal documents must expose a rejected operation above the modal backdrop.
+    var previous = editorBody.querySelector("[data-editor-notice]");
+    if (previous) previous.remove();
+    if (editor.open && message && kind === "error") {
+      var inline = document.createElement("p");
+      inline.dataset.editorNotice = "";
+      inline.className = node.className;
+      inline.style.position = 'static';
+      inline.style.maxWidth = 'calc(100vw - 32px)';
+      inline.style.boxSizing = 'border-box';
+      inline.setAttribute("role", "alert");
+      inline.textContent = message;
+      editorBody.prepend(inline);
+      inline.scrollIntoView({ block: "start" });
+    }
   }
   function setBusy(value, label) {
     state.busy = value;

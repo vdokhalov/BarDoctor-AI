@@ -187,6 +187,7 @@ export function historicalPeriodCost(input: {
     || new Set(movements.map(item => item.id)).size !== movements.length) reasons.push("DUPLICATE_FINANCIAL_HISTORY");
   let cost = 0, adjustment = 0;
   const usedBatches = new Set<string>();
+  const referencedBatches = new Set<string>();
   const addCost = (resolved: CostResult, date: string) => {
     if (!resolved.known) { reasons.push(resolved.reason); return; }
     if (resolved.batchIds.some(id => usedBatches.has(id))) { reasons.push("SALES_BATCH_REFERENCED_TWICE"); return; }
@@ -197,6 +198,10 @@ export function historicalPeriodCost(input: {
   for (const revenue of revenues) {
     const amount = finite(revenue.revenue);
     if (revenue.revenueSource === "sales_documents") {
+      const documentIds = Array.isArray(revenue.salesDocumentIds) ? revenue.salesDocumentIds : [];
+      for (const document of rows(input.documents).filter(doc => scope(doc, venueId) && documentIds.includes(doc.id))) {
+        if (text(document.salesBatchId)) referencedBatches.add(text(document.salesBatchId));
+      }
       addCost(salesDocumentRowCost({ revenue, documents: input.documents, batches: input.batches, venueId,
         accountingCurrency: expectedCurrency }), String(revenue.date));
       continue;
@@ -213,6 +218,7 @@ export function historicalPeriodCost(input: {
       || !sameMoney(active.reduce((sum, event) => sum + Number(event.revenue), 0), amount)
       || finite(revenue.receipts) !== active.length) reasons.push("SALES_REVENUE_HISTORY_MISMATCH");
     for (const event of active) {
+      if (text(row(event.batch).id)) referencedBatches.add(text(row(event.batch).id));
       if (currency(event.currency) !== expectedCurrency) { reasons.push("HISTORICAL_SALES_COST_UNKNOWN"); continue; }
       addCost(capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
     }
@@ -220,6 +226,23 @@ export function historicalPeriodCost(input: {
   if (events.some(event => !revenues.some(revenue => revenue.id === event.revenueRowId && revenue.revenueSource === "sales_events_v1"))) {
     reasons.push("SALES_REVENUE_HISTORY_MISMATCH");
   }
+  // Standalone imports have no proven relationship to recognized revenue.
+  // Do not silently omit their cost, or add it and risk counting the same sale twice.
+  const periodBatches = rows(input.batches).filter(batch => Number(batch.venueId) === venueId
+    && String(batch.businessDate ?? "").slice(0, 7) === monthKey);
+  const reversedBatchIds = new Set([
+    ...periodBatches.filter(batch => batch.status === "REVERSED").map(batch => text(batch.id)),
+    ...events.filter(event => event.status === "REVERSED").map(event => text(row(event.batch).id)),
+  ].filter(Boolean));
+  const unlinkedBatch = periodBatches.some(batch =>
+    (batch.status === "POSTED" || batch.status === "PARTIALLY_BLOCKED" && Number(batch.postedLineCount) > 0)
+    && !referencedBatches.has(text(batch.id)));
+  // Also fail closed if the batch capture was lost but an active consumption remains.
+  const unlinkedMovement = rows(input.movements).some(movement => scope(movement, venueId)
+    && String(movement.businessDate ?? movement.date ?? "").slice(0, 7) === monthKey
+    && movement.type === "sale_consumption" && movement.status !== "cancelled" && !movement.reversedAt
+    && !referencedBatches.has(text(movement.salesBatchId)) && !reversedBatchIds.has(text(movement.salesBatchId)));
+  if (unlinkedBatch || unlinkedMovement) reasons.push("UNLINKED_SALES_CONSUMPTION");
   for (const movement of movements) {
     if (movement.status === "cancelled" || movement.reversedAt) continue;
     const amount = finite(movement.costAmount);
@@ -240,7 +263,9 @@ export function reconcileMonthlyReport(input: {
 }): Row {
   const report = input.report;
   const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
-  const authoritative = opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
+  const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
+  const authoritative = history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
+    || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
     || rows(input.revenues).some(item => scope(item, input.venueId) && ["sales_events_v1", "sales_documents"].includes(String(item.revenueSource))
       && String(item.date ?? "").slice(0, 7) === input.monthKey)
     || rows(input.events).some(item => Number(item.venueId) === input.venueId && String(item.businessDate ?? "").slice(0, 7) === input.monthKey);
@@ -253,7 +278,6 @@ export function reconcileMonthlyReport(input: {
     }
     return report;
   }
-  const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
   const snapshotsKnown = opening.phase7SnapshotKnown === true && closing.phase7SnapshotKnown === true;
   const openingValue = opening.phase7SnapshotKnown === true ? finite(report.openingInventory) : null;
   const closingValue = closing.phase7SnapshotKnown === true ? finite(report.closingInventory) : null;

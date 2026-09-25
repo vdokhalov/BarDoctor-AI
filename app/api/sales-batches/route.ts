@@ -2,7 +2,7 @@ import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { closedMonthsFromStore, compareStoreData, firstClosedMutation, firstClosedPeriod } from "../../../lib/bardoctor/data-trust";
-import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../lib/bardoctor/inventory";
+import { ASSORTMENT_STORE_KEY, SALES_DOCUMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../lib/bardoctor/inventory";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import {
   cancelSalesDraft,
@@ -64,7 +64,7 @@ function upsertStore(database: D1Database, accountId: number, key: string, value
 async function readStores(database: D1Database, accountId: number) {
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     accountId,
     SALES_BATCH_STORE_KEY,
@@ -76,11 +76,13 @@ async function readStores(database: D1Database, accountId: number) {
     MONTH_CLOSING_STORE_KEY,
     REVENUE_STORE_KEY,
     SALES_EVENT_STORE_KEY,
+    SALES_DOCUMENT_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
     events: array(parse(stores.get(SALES_EVENT_STORE_KEY), [])),
+    documents: array(parse(stores.get(SALES_DOCUMENT_STORE_KEY), [])),
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
@@ -273,7 +275,7 @@ async function postOnce(request: Request): Promise<Response> {
   const casSnapshots = await readStoreSnapshots(database, account.id, [
     SALES_BATCH_STORE_KEY, SALES_MAPPING_STORE_KEY, SALES_WAREHOUSE_ROUTE_STORE_KEY,
     ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, WAREHOUSE_STORE_KEY,
-    MONTH_CLOSING_STORE_KEY, REVENUE_STORE_KEY,
+    MONTH_CLOSING_STORE_KEY, REVENUE_STORE_KEY, SALES_DOCUMENT_STORE_KEY,
   ]);
   const stores = await readStores(database, account.id);
   const now = new Date().toISOString();
@@ -415,6 +417,16 @@ async function postOnce(request: Request): Promise<Response> {
   }
 
   if (action === "reverse") {
+    // A confirmed report owns both this batch and its revenue projection.
+    // Stock-only reversal would invalidate that financial capture.
+    const confirmedReport = stores.documents.map(record).some(document =>
+      document.status === "confirmed" && document.salesBatchId === batchId
+      && (document.venueId == null || numeric(document.venueId) === account.venueId)
+    );
+    if (confirmedReport) return Response.json({
+      ok: false, code: "SALES_BATCH_LINKED_CONFIRMED_REPORT",
+      error: "Эти продажи связаны с подтверждённым дневным отчётом. Отдельная отмена складского проведения недоступна: она оставит выручку без связанного списания.",
+    }, { status: 409 });
     if (before && stores.closedMonths.has(before.businessDate.slice(0, 7))) {
       return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${before.businessDate.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     }
