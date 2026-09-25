@@ -88,10 +88,10 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
     return { duplicate:true, event:existing[0], events:c.events, assortment:c.assortment, movements:c.movements, revenues:c.revenues, previewHash:"" };
   }
   contextCheck(c);
-  const date = isPos ? String(shift(c,command.shiftId!).date) : c.now.slice(0,10);
+  // A selected cash shift owns the business date, including an open overnight shift.
+  const date = command.shiftId ? String(shift(c,command.shiftId).date) : c.now.slice(0,10);
   if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED");
   revenueCheck(c,date);
-  if (!isPos && command.shiftId) shift(c,command.shiftId,date);
   const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems as Row[] : [];
   if (menu.some(m => !m || typeof m !== "object" || Array.isArray(m))) fail("MENU_NEEDS_REVIEW");
   const prices = command.lines.map(line => {

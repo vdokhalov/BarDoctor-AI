@@ -24,6 +24,17 @@
     online(true);
     const result = await response.json().catch(() => ({}));
     if (venue !== currentVenue() || initialIdentity !== [localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":")) { frozen=true; throw Error("Заведение изменилось. Обновите кассу."); }
+    if (response.status === 401) {
+      frozen=true;
+      $("work").hidden=true;
+      text("connection","Требуется вход");
+      // Use the shared login entry point; retain venue-scoped POS drafts for recovery.
+      for (const key of ["bd_session","bd_session_token","bd_session_userid"]) localStorage.removeItem(key);
+      const error=Error("Сессия завершена. Войдите снова.");
+      error.status=401; error.authRequired=true;
+      window.location.replace("/login");
+      throw error;
+    }
     if (!response.ok || !result.ok) { const error = Error(result.error || ({SALES_EVENT_CONSUMPTION_NEEDS_REVIEW:"Для этой позиции не настроено безопасное складское списание. Проверьте режим и техкарту.",SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH:"Смена закрыта. Выберите открытую смену.",SALES_EVENT_POS_PAYMENT_MISMATCH:"Сумма оплаты не совпадает с суммой заказа."})[result.code] || "Операция не выполнена. Ничего не изменено."); error.status=response.status; throw error; }
     return result;
   }
@@ -142,6 +153,7 @@
   $("shift-picker").onchange=()=>{activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();};
   $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});data=await request();renderShift();notice("Смена открыта.");});};
   async function handlePendingFailure(error) {
+    if(error.authRequired)return;
     if(error.status>=400&&error.status<500&&pending){
       try{
         data=await request(undefined,pending.command.id);
