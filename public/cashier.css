@@ -3,3 +3,5 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 
 .pos-item small{display:block;font-size:11px;line-height:1.4;color:#667086;overflow-wrap:anywhere}.pos-item small+br{display:none}
+
+@media(max-width:767px){html:has(body.sales-pos.pos-order-view){scroll-padding-bottom:calc(var(--pos-checkout-height,220px) + 16px)}}
