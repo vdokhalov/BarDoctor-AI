@@ -20,7 +20,7 @@ assert.ok(bridge.includes("function bdPrepareEmbeddedPage"));
 const importSource=readFileSync(new URL("../app/sales-import/route.ts",import.meta.url),"utf8");
 const entryLink=importSource.match(/<a[^>]*href="\/sales-entry"[^>]*>[^<]+<\/a>/)?.[0];
 assert.ok(entryLink,"use the actual production sales link");
-const assets=new Set(["/icons/bardoctor-mark-v159.svg","/venue-timezone.js","/accounting-currency.js","/sales-entry.js","/sales-journal.js","/sales-journal.css","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
+const assets=new Set(["/sales-navigation.js","/sales-navigation.css","/icons/bardoctor-mark-v159.svg","/venue-timezone.js","/accounting-currency.js","/sales-entry.js","/sales-journal.js","/sales-journal.css","/inventory-onboarding.css","/venue-switcher.css","/venue-switcher.js","/app-shell-v185.css","/navigation-contract-v247.js","/app-shell-v185.js","/navigation-transient-v247.js","/catalog-accounting-v207.js"]);
 const executablePath=await resolveBrowserExecutable(chromium.executablePath());
 const browser=await chromium.launch({executablePath,headless:true,args:process.platform==="win32"?[]:chromiumArgs});
 try {
