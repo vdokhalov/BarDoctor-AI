@@ -52,7 +52,7 @@ async function loginToUnfinishedSetup(email: string, width: number) {
                     region: string;
                     city: string;
                     seats: number;
-                    openTime: string; closeTime: string; workingDays?: Record<string,boolean>;
+                    openTime: string; closeTime: string; timezone?: string; workingDays?: Record<string,boolean>;
                 } | null;
                 venues: unknown[];
             } }; }, url);
@@ -96,10 +96,13 @@ try {
         assert.equal(await page.getByRole('textbox', { name: 'Название заведения', exact: true }).inputValue(), name);
         await next.click();
         await page.getByLabel('Мест в зале', { exact: true }).fill('42');
+        const timezone=page.getByRole('combobox',{name:'Часовой пояс заведения'});
+        assert.equal(await timezone.inputValue(),await page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone));
+        await timezone.selectOption('America/New_York');
         for (const day of ['Пятница','Суббота','Воскресенье']) await page.locator('bd-venue-schedule').getByRole('button',{name:day}).click();
         await page.locator('bd-venue-schedule input[type=time]').nth(0).fill('22:00');
         await page.locator('bd-venue-schedule input[type=time]').nth(1).fill('06:00');
-        assert.match(await page.locator('.bd-venue-schedule-summary').innerText(),/Пт, Сб, Вс · 22:00–06:00 следующего дня/);
+        assert.match(await page.locator('bd-venue-schedule .bd-venue-schedule-summary').innerText(),/Пт, Сб, Вс · 22:00–06:00 следующего дня/);
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true);
         await page.screenshot({path:out+'/'+width+'-schedule.png'});
         await page.getByRole('button', { name: 'Назад', exact: true }).click();
@@ -108,6 +111,7 @@ try {
         await next.click();
         await page.getByLabel('Мест в зале', { exact: true }).waitFor();
         assert.equal(await page.getByLabel('Мест в зале', { exact: true }).inputValue(), '42');
+        assert.equal(await timezone.inputValue(),'America/New_York');
         assert.equal(await page.locator('bd-venue-schedule').getByRole('button',{name:'Воскресенье'}).getAttribute('aria-pressed'),'true');
         await next.click();
         await page.getByRole('heading').filter({ hasText: /Зоны/ }).waitFor();
@@ -132,6 +136,7 @@ try {
         assert.equal(saved.data.restaurant!.city, 'Тирасполь');
         assert.equal(saved.data.restaurant!.seats, 42);
         assert.equal(saved.data.restaurant!.openTime,'22:00');
+        assert.equal(saved.data.restaurant!.timezone,'America/New_York');
         assert.equal(saved.data.restaurant!.closeTime,'06:00');
         assert.deepEqual([5,6,7].map(day=>saved.data.restaurant!.workingDays?.[String(day)]),[true,true,true]);
         assert.equal((await api(page, '/api/venues')).data.venues.length, 1);
@@ -162,6 +167,7 @@ try {
         await page.locator('[data-bd-profile="profile-v282"]').waitFor();
         const edited=(await api(page,'/api/restaurants/me')).data.restaurant!;
         assert.equal(edited.openTime,'21:00');
+        assert.equal(edited.timezone,'America/New_York');
         assert.equal(edited.workingDays?.['4'],true);
         assert.equal(edited.workingDays?.['7'],true);
         await page.reload();
@@ -203,6 +209,7 @@ try {
             await venueForm.locator('#venue-country').selectOption('Молдова');
             await venueForm.locator('#venue-city').selectOption('Тирасполь');
             await venueForm.locator('select[name=currency]').selectOption('MDL');
+            await venueForm.getByRole('combobox',{name:'Часовой пояс заведения'}).selectOption('Europe/Chisinau');
             for(const day of ['Понедельник','Вторник','Среда','Четверг','Пятница']) await venueForm.locator('bd-venue-schedule').getByRole('button',{name:day}).click();
             await venueForm.locator('bd-venue-schedule input[type=time]').nth(0).fill('09:00');
             await venueForm.locator('bd-venue-schedule input[type=time]').nth(1).fill('18:00');
@@ -212,6 +219,7 @@ try {
             assert.equal((await api(page, '/api/venues')).data.venues.length, 2);
             assert.equal((await api(page, '/api/restaurants/me')).data.restaurant!.name, 'Дополнительное тестовое');
             const secondSchedule=(await api(page,'/api/restaurants/me')).data.restaurant!;
+            assert.equal(secondSchedule.timezone,'Europe/Chisinau');
             assert.deepEqual([1,2,3,4,5,6,7].map(day=>secondSchedule.workingDays?.[String(day)]),[true,true,true,true,true,false,false]);
         }
         await page.goto(server.base + '/settings');
@@ -247,7 +255,7 @@ try {
         await page.goto(server.base+'/profile');
         await page.locator('.bd-profile-venue-head-v280').click();
         await page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule').waitFor();
-        assert.match(await page.locator('[data-bd-profile-editor="venue-v282"] .bd-venue-schedule-summary').innerText(),/Рабочие дни не указаны/);
+        assert.match(await page.locator('[data-bd-profile-editor="venue-v282"] bd-venue-schedule .bd-venue-schedule-summary').innerText(),/Рабочие дни не указаны/);
         assert.equal((await api(page, '/api/venues')).data.venues.length, 1);
         assert.deepEqual(errors, []);
         results.push({ width, layout, pass: true, serverPersisted: true, sameBrowserAccountIsolation: true, duplicatePosts: false, browser: await browser.version() });
