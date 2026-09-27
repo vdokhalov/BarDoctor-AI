@@ -31,6 +31,7 @@ function controlled(error:unknown) {
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
   if (error instanceof Error && error.message.startsWith("SALES_EVENT_")) {
     const messages: Record<string,string> = {
+      SALES_EVENT_SHIFT_ALREADY_OPEN: "В заведении уже есть открытая кассовая смена. Перейдите в неё или сначала закройте её.",
       SALES_EVENT_SHIFT_NOT_FOUND: "Открытая смена не найдена. Выберите другую смену.",
       SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH: "Эта смена уже закрыта. Выберите открытую смену.",
       SALES_EVENT_POS_COMMAND_INVALID: "Укажите открытую смену и один способ оплаты с точной суммой.",

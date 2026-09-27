@@ -22,7 +22,9 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {})
     };
     return statement;
   };
+  let batchQueue: Promise<unknown> = Promise.resolve();
   const db = { prepare, async batch(statements: ReturnType<typeof prepare>[]) {
+    const transaction = batchQueue.then(async () => {
     sqlite.exec('BEGIN');
     try {
       const results = [];
@@ -30,6 +32,9 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {})
       if (failBatch) { failBatch = false; throw new Error('injected database failure'); }
       sqlite.exec('COMMIT'); return results;
     } catch (error) { sqlite.exec('ROLLBACK'); throw error; }
+    });
+    batchQueue = transaction.catch(() => undefined);
+    return transaction;
   } };
   const objects = new Map<string, string>();
   const bucket = {

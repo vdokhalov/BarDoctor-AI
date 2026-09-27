@@ -35,7 +35,7 @@
       window.location.replace("/login");
       throw error;
     }
-    if (!response.ok || !result.ok) { const error = Error(result.error || ({SALES_EVENT_CONSUMPTION_NEEDS_REVIEW:"Для этой позиции не настроено безопасное складское списание. Проверьте режим и техкарту.",SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH:"Смена закрыта. Выберите открытую смену.",SALES_EVENT_POS_PAYMENT_MISMATCH:"Сумма оплаты не совпадает с суммой заказа."})[result.code] || "Операция не выполнена. Ничего не изменено."); error.status=response.status; throw error; }
+    if (!response.ok || !result.ok) { const error = Error(result.error || ({SALES_EVENT_CONSUMPTION_NEEDS_REVIEW:"Для этой позиции не настроено безопасное складское списание. Проверьте режим и техкарту.",SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH:"Смена закрыта. Выберите открытую смену.",SALES_EVENT_POS_PAYMENT_MISMATCH:"Сумма оплаты не совпадает с суммой заказа."})[result.code] || "Операция не выполнена. Ничего не изменено."); error.status=response.status; error.code=result.code; throw error; }
     return result;
   }
   let draftKey=null, draftRevision=null, orderId=null, storageFailed=false;
@@ -68,7 +68,7 @@
     try{if(draftKey)localStorage.removeItem(draftKey);sessionStorage.removeItem(sessionKey());}catch{}
     pending=null;cart.clear();orderId=null;draftRevision=null;$("comment").value="";showReceipt(event,duplicate);
   }
-  function working(task) { if (busy || frozen) return; busy=true; renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
+  function working(task) { if (busy || frozen) return; busy=true; notice("Выполняем действие…"); renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
   function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
   let orderView=false;
   new ResizeObserver(()=>{
@@ -126,7 +126,7 @@
     $("cart-lines").innerHTML=rows.length?rows.map(row=>`<div class="pos-line"><div><strong>${esc(row.item.name)}</strong><small>${esc(money(row.item.salePrice))} × ${row.quantity} = ${esc(row.item.unavailable?"Позиция недоступна":money(Number(row.item.salePrice)*row.quantity))}</small></div><div class="pos-qty"><button type="button" data-decrease="${esc(row.item.id)}" aria-label="Уменьшить ${esc(row.item.name)}">−</button><output>${row.quantity}</output><button type="button" data-increase="${esc(row.item.id)}" aria-label="Увеличить ${esc(row.item.name)}">+</button><button type="button" class="pos-remove" data-remove="${esc(row.item.id)}" aria-label="Убрать ${esc(row.item.name)}">×</button></div></div>`).join(""):`<p class="pos-empty">Нажмите на позицию меню, чтобы добавить её в заказ.</p>`;
     text("total",money(total()));text("jump-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);text("jump-total",money(total()));renderButtons();updateJump();
   }
-  function renderButtons() {$("pay").textContent=busy?"Проводим…":"Оплатить";$("pay").disabled=busy||frozen||storageFailed||[...cart.values()].some(row=>row.item.unavailable)||Boolean(pending)||!activeShift||cart.size===0||!data?.permissions.post;$("retry").hidden=!pending;$("retry").disabled=busy||frozen;$("comment").disabled=busy||Boolean(pending);document.querySelectorAll('input[name="payment"]').forEach(input=>input.disabled=busy||Boolean(pending));}
+  function renderButtons() {$("shift-picker").disabled=busy||Boolean(pending);$("open-shift").querySelector("button").disabled=busy;$("new-order").disabled=busy;$("work").setAttribute("aria-busy",String(busy));$("pay").textContent=busy?"Проводим…":"Оплатить";$("pay").disabled=busy||frozen||storageFailed||[...cart.values()].some(row=>row.item.unavailable)||Boolean(pending)||!activeShift||cart.size===0||!data?.permissions.post;$("retry").hidden=!pending;$("retry").disabled=busy||frozen;$("comment").disabled=busy||Boolean(pending);document.querySelectorAll('input[name="payment"]').forEach(input=>input.disabled=busy||Boolean(pending));}
   function showReceipt(event, duplicate=false) {
     $("cashier").hidden=true;$("shift-gate").hidden=true;$("order-jump").hidden=true;$("receipt").hidden=false;
     const details=event.prices.map(line=>`<p class="receipt-line"><span>${esc(line.name)} <small>× ${line.quantity}</small></span><b>${esc(money(line.total))}</b></p>`).join("");
@@ -165,8 +165,8 @@
   $("search").oninput=renderMenu;
   $("menu").onclick=event=>{const button=event.target.closest("[data-add]");if(!button||busy||pending)return;const item=data.menu.find(item=>String(item.id)===button.dataset.add);if(!item)return;const row=cart.get(String(item.id));if(!row&&cart.size>=100){notice("В одном заказе может быть до 100 позиций.");return;}cart.set(String(item.id),{item,quantity:Math.min(999,(row?.quantity||0)+1)});persistDraft();renderCart();};
   $("cart-lines").onclick=event=>{const button=event.target.closest("[data-increase],[data-decrease],[data-remove]");if(!button||busy||pending)return;const id=button.dataset.increase??button.dataset.decrease??button.dataset.remove,row=cart.get(id);if(!row)return;if(button.hasAttribute("data-remove"))cart.delete(id);else{row.quantity+=button.hasAttribute("data-increase")?1:-1;if(row.quantity<=0)cart.delete(id);else row.quantity=Math.min(row.quantity,999);}persistDraft();renderCart();};
-  $("shift-picker").onchange=()=>{activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();if(cart.size||pending)selectPane(true);};
-  $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});data=await request();renderShift();notice("Смена открыта.");});};
+  $("shift-picker").onchange=()=>{if(busy||pending)return;activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();if(cart.size||pending)selectPane(true);};
+  $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{let conflict=false;try{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});}catch(error){if(error.code!=="SALES_EVENT_SHIFT_ALREADY_OPEN")throw error;conflict=true;}data=await request();renderShift();renderMenu();notice(conflict?"Уже открыта кассовая смена. Продолжайте в ней или сначала закройте её.":"Смена открыта.");});};
   async function handlePendingFailure(error) {
     if(error.authRequired)return;
     if(error.status>=400&&error.status<500&&pending){
@@ -192,7 +192,7 @@
   $("order-jump").onclick=()=>selectPane(true);
   $("show-menu").onclick=()=>selectPane(false);$("show-cart").onclick=()=>selectPane(true);
   $("retry").onclick=()=>working(async()=>{try{data=await request(undefined,pending?.command.id);await submitPending();}catch(error){await handlePendingFailure(error);}});
-  $("new-order").onclick=()=>{selectPane(false);$("comment-panel").open=false;cart.clear();$("comment").value="";$("receipt").hidden=true;working(refresh);};
+  $("new-order").onclick=()=>working(async()=>{await refresh();selectPane(false);$("comment-panel").open=false;$("receipt").hidden=true;updateJump();});
   window.addEventListener("scroll",updateJump,{passive:true});window.addEventListener("resize",updateJump);
   window.addEventListener("online",()=>online(true));window.addEventListener("offline",()=>online(false));
   window.addEventListener("storage",event=>{if(event.key===draftKey||["bd_active_venue_id","bd_session","bd_session_token"].includes(event.key)){frozen=true;$("work").hidden=true;notice("Заведение или аккаунт изменились. Обновите кассу.");}});

@@ -55,7 +55,9 @@ try{
   for(const profile of [{name:"desktop",width:1280,height:800},{name:"mobile-390",width:390,height:844},{name:"tablet",width:820,height:1000}]){
     if(profile.name==="tablet"){
       const response=await fixture.api.POST(new Request("http://localhost/api/sales-events",{method:"POST",headers:{"Content-Type":"application/json","X-Venue-Id":"1"},body:JSON.stringify({venueId:1,action:"open_shift",shiftId:"second-shift",name:"SECOND SHIFT"})}));
-      assert.equal(response.status,201);
+      assert.equal(response.status,409, "new parallel cash shift is rejected");
+      const rows=fixture.get("bd_finance_revenue") as Record<string,unknown>[];
+      fixture.put("bd_finance_revenue",[...rows,{...rows[0],id:"second-shift",shiftName:"SECOND SHIFT",revenue:0,receipts:0}]); // Pre-existing legacy parallel shift.
     }
     const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});
     await context.addInitScript(()=>{localStorage.setItem("bd_session","pos1@isolated.test");localStorage.setItem("bd_session_token","test-session");localStorage.setItem("bd_active_venue_id","1");});

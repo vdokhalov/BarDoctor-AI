@@ -83,7 +83,8 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     const additional=await r.api.venues.POST(r.request(user,"/api/venues","POST",{name:"Second QA venue",businessType:"bar",country:"Молдова",city:"Тирасполь",currency:"PMR_RUB"}));assert.equal(additional.status,201);const secondVenue=(await additional.json() as {activeVenueId:number}).activeVenueId;
     await page.goto(base+"/cashier?venue="+secondVenue);await page.locator("#open-shift").waitFor();assert.equal(await page.locator(".pos-line").count(),0);await page.goto(base+"/cashier?venue="+venue);await page.locator('[data-remove="water"]').waitFor();
     // Select a different open shift: its cart is empty. Return to the first draft.
-    assert.equal((await request({action:"open_shift",venueId:venue,shiftId:"second",name:"Second"})).status,201);
+    assert.equal((await request({action:"open_shift",venueId:venue,shiftId:"second",name:"Second"})).status,409);
+    const legacyRows=get("bd_finance_revenue");put("bd_finance_revenue",[...legacyRows,{...legacyRows.find((s:{id:string})=>s.id===shiftId),id:"second",shiftName:"Second",revenue:0,receipts:0}]); // Legacy data remains selectable.
     await page.evaluate(({account,venue})=>localStorage.removeItem("bd_pos_shift_v1:"+account+":"+venue),{account:user.userId,venue});await page.reload();await page.locator("#shift-picker").selectOption("second");assert.equal(await page.locator(".pos-line").count(),0);
     await page.evaluate(({account,venue})=>localStorage.removeItem("bd_pos_shift_v1:"+account+":"+venue),{account:user.userId,venue});await page.reload();await page.locator("#shift-picker").selectOption(shiftId);await page.locator('[data-remove="water"]').waitFor();
     await orderPane(page,false);for(let i=0;i<14;i++)await page.locator('[data-add="long-'+i+'"]').click();

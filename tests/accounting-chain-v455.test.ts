@@ -96,7 +96,11 @@ test('v455 chain: cash/card/manual, rollback, lost-response retry, reversal, clo
   t.mock.timers.enable({ apis: ['Date'], now: Date.parse(now) });
   const f = await fixture(); t.after(f.close);
   check('Initial independent stock value', { stock: [20,2,1], revenue: 0, receipts: 0, cost: 0, costKnown: true, value: 300 }, f.state());
-  for (const id of ['C','D']) assert.equal((await f.send('events', { action: 'open_shift', shiftId: id, name: id })).status, 201);
+  assert.equal((await f.send('events', { action: 'open_shift', shiftId: 'C', name: 'C' })).status, 201);
+  assert.equal((await f.send('events', { action: 'open_shift', shiftId: 'D', name: 'D' })).status, 409);
+  const legacyShifts=f.read('bd_finance_revenue');
+  f.put('bd_finance_revenue',[...legacyShifts,{...legacyShifts[0],id:'D',shiftName:'D'}]); // Existing parallel records remain valid for historical accounting.
+
   const cash = await f.sale({ ...command('cash','beer',2,'C'), source: 'POS_API', payments: [{ id: 'cash', method: 'CASH', amount: 40 }] });
   check('Cash 2 beer', { stock: [18,2,1], revenue: 40, receipts: 1, cost: 10, costKnown: true, value: 290 }, f.state());
   const card = await f.sale({ ...command('card','coffee',3,'D'), source: 'POS_API', payments: [{ id: 'card', method: 'CARD_EXTERNAL', amount: 45 }] });

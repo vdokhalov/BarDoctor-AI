@@ -515,7 +515,7 @@
   document.querySelectorAll('[data-sales-view]').forEach(function(node){node.onclick=function(){selectSalesView(node.dataset.salesView);};});
   document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.addEventListener('input',renderJournal);});
   document.getElementById('journal-reset').onclick=function(){document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.value='';});renderJournal();};
-  document.getElementById('pos-drafts').onclick=function(event){var link=event.target.closest('[data-resume-shift]');if(link&&state.pos){try{localStorage.setItem('bd_pos_shift_v1:'+state.pos.actor.accountId+':'+state.pos.venueId,link.dataset.resumeShift);}catch{event.preventDefault();notice('Не удалось выбрать сохранённую смену. Откройте кассу и выберите её вручную.','error');}}};
+  document.addEventListener('bd:sales-before-navigate',function(event){var link=event.detail.control?.closest('[data-resume-shift]');if(link&&state.pos){try{localStorage.setItem('bd_pos_shift_v1:'+state.pos.actor.accountId+':'+state.pos.venueId,link.dataset.resumeShift);}catch{event.preventDefault();notice('Не удалось выбрать сохранённую смену. Откройте кассу и выберите её вручную.','error');}}});
   selectSalesView(salesView);
 
   load();

@@ -166,6 +166,7 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
     if (existing.revenueSource !== EVENT_REVENUE_SOURCE || existing.shiftName !== name) fail("IDEMPOTENCY_CONFLICT");
     return c.revenues;
   }
+  if (c.revenues.some(row => row.venueId === c.venueId && row.revenueSource === EVENT_REVENUE_SOURCE && row.closingStatus === "open")) fail("SHIFT_ALREADY_OPEN");
   const timezone = canonicalVenueTimezone(c.timezone) || "UTC";
   const date = venueDate(c.now, timezone); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
   return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,timezone,accountingMonth:date.slice(0,7),shiftName:name,

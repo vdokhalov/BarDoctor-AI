@@ -39,7 +39,9 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
  const get=(key:string)=>JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(user.userId,key)?.data_json||'null'));
  put('bd_assortment_v1',JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1','"venueId":'+venue)));
  const send=(body:object)=>runtime.api.events.POST(runtime.request(user,'/api/sales-events','POST',{venueId:venue,...body}));
- await send({action:'open_shift',shiftId:'C',name:'C overnight'});await send({action:'open_shift',shiftId:'D',name:'D current'});
+ await send({action:'open_shift',shiftId:'C',name:'C overnight'});
+ // Legacy parallel shifts remain selectable; new parallel openings are rejected.
+ put('bd_finance_revenue',[...get('bd_finance_revenue'),{...get('bd_finance_revenue')[0],id:'D',shiftName:'D current'}]);
  const shifts=get('bd_finance_revenue');shifts[0].date=new Date(Date.now()-86400000).toISOString().slice(0,10);shifts[0].accountingMonth=shifts[0].date.slice(0,7);put('bd_finance_revenue',shifts);
  const setup=async(kind:string)=>{const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});if(kind!=='anonymous')await context.addInitScript(({email,token,venue})=>{if(sessionStorage.getItem('qa_initialized'))return;sessionStorage.setItem('qa_initialized','1');localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:kind==='invalid'?'invalid':user.token,venue});return context;};
  for(const kind of ['anonymous','invalid','expired']) for(const suffix of ['', '?venue='+venue]){

@@ -12,14 +12,14 @@ const HTML = `<!doctype html>
   <link rel="stylesheet" href="/sales-import.css?v=sales-ux1">
   <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87">
   <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297">
-  ${canonicalUserShellAssets()}
+  ${canonicalUserShellAssets()}<link rel="stylesheet" href="/sales-navigation.css?v=iphone-hardening"><script src="/sales-navigation.js?v=iphone-hardening" defer></script>
   <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
   <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
-  <link rel="stylesheet" href="/sales-journal.css?v=sales-ux2">
+  <link rel="stylesheet" href="/sales-journal.css?v=iphone-hardening">
   <script src="/pos-draft.js?v=pos1-hardening" defer></script>
-  <script src="/sales-journal.js?v=sales-ux2" defer></script>
-  <script src="/sales-import.js?v=sales-ux2" defer></script>
+  <script src="/sales-journal.js?v=iphone-hardening" defer></script>
+  <script src="/sales-import.js?v=iphone-hardening" defer></script>
 </head>
 <body data-bd-parent-route="/warehouse" data-sales-experience="v278">
   <header class="sales-topbar">

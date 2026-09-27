@@ -68,6 +68,8 @@ jobs:
         run: node --import tsx scripts/pos1-hardening-browser.ts
       - name: Sales UX step 2 journal checkout import mobile tablet desktop
         run: node --import tsx scripts/sales-ux2-browser.ts
+      - name: Sales iPhone safe areas touch navigation and single shift regression
+        run: node --import tsx scripts/sales-iphone-browser.ts
       - name: Venue timezone settings and Sales date mobile tablet desktop
         run: node --import tsx scripts/venue-timezone-browser.ts
       - name: Accounting report reversal guard mobile tablet desktop

@@ -21,7 +21,9 @@ test('OBS01 real handlers: overnight open cash shift accepts manual preview/post
   const get=async()=>await (await r.api.events.GET(r.request(user,'/api/sales-events'))).json<Reply>();
   assert.equal((await send({action:'open_shift',shiftId:'C',name:'C'})).status,201);
   t.mock.timers.setTime(Date.parse('2026-09-25T00:10:00Z'));
-  assert.equal((await send({action:'open_shift',shiftId:'D',name:'D'})).status,201);
+  assert.equal((await send({action:'open_shift',shiftId:'D',name:'D'})).status,409);
+  // Preserve coverage for parallel shifts that were opened before the single-open rule.
+  put('bd_finance_revenue',[...read('bd_finance_revenue'),{...read('bd_finance_revenue')[0],id:'D',shiftName:'D',date:'2026-09-25'}]);
   // Legacy/operational finance rows and an unshifted daily projection are not cash shifts.
   put('bd_finance_revenue',[...read('bd_finance_revenue'),
     {id:'legacy-C',venueId:venue,date:'2026-09-23',shiftName:'C',closingStatus:'open',revenue:0,currency:'MDL'},

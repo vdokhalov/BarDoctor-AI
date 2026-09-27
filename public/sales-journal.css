@@ -26,4 +26,4 @@
 
 @media(max-width:600px){.sales-navigation a,.sales-navigation button{padding-left:8px;padding-right:8px}}
 
-body.sales-entry-shell{padding-top:0!important}.sales-entry-shell>header>a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-weight:600}.sales-entry-shell>header{padding-top:8px}.sales-entry-shell>header .sales-navigation{margin-bottom:0}.sales-entry-shell>main>#entry-explanation{margin-top:8px}
+body.sales-entry-shell{padding-top:var(--bd-safe-top,0px)!important}.sales-entry-shell>header>a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-weight:600}.sales-entry-shell>header{padding-top:8px}.sales-entry-shell>header .sales-navigation{margin-bottom:0}.sales-entry-shell>main>#entry-explanation{margin-top:8px}

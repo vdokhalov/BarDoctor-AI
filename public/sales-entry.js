@@ -25,6 +25,7 @@
     if (venue !== localStorage.getItem("bd_active_venue_id")) throw new Error("Заведение изменилось. Обновите страницу.");
     if (!response.ok || !result.ok) {
       const error = new Error(result.error || result.code || "Не удалось выполнить действие");
+      error.code = result.code;
       error.noWrite = response.status >= 400 && response.status < 500;
       throw error;
     }
@@ -32,7 +33,7 @@
   }
   async function perform(fn) {
     if (busy || frozen) return;
-    busy=true;
+    busy=true;notice("Выполняем действие…");
     const controls=[...document.querySelectorAll("input,select,button")].map(node=>[node,node.disabled]);
     controls.forEach(([node])=>{node.disabled=true;});
     try {await fn();} catch(error) {notice(error.message || "Не удалось выполнить действие");}
@@ -64,7 +65,7 @@
       const events=shiftDocuments.filter(b=>b.readOnly && b.shiftId===shift.id && b.status==='POSTED' && b.currency===shift.currency);
       return '<p>'+['CASH','CARD_EXTERNAL'].map(method=>({CASH:'Наличные',CARD_EXTERNAL:'Карта'})[method]+': '+escape(money(events.flatMap(b=>b.payments || []).filter(p=>p.method===method).reduce((sum,p)=>sum+p.amount,0),shift.currency))).join(' · ')+(events.some(b=>!b.payments?.length)?' · Есть продажи без указанного способа оплаты.':'')+'</p>';
     };
-    $("work").hidden=false;$("sale").hidden=!payload.permissions.post || isShifts || Boolean(selectedEvent);$("shift-actions").hidden=!isShifts;$("open-shift").hidden=!payload.permissions.shifts;$("event-actions").hidden=!selectedEvent;
+    $("work").hidden=false;$("sale").hidden=!payload.permissions.post || isShifts || Boolean(selectedEvent);$("shift-actions").hidden=!isShifts;$("open-shift").hidden=!payload.permissions.shifts || payload.shifts.some(s=>s.closingStatus==="open");$("event-actions").hidden=!selectedEvent;
     $("shift").innerHTML='<option value="">Без смены</option>'+payload.shifts.filter(s=>s.closingStatus==="open").map(s=>`<option value="${escape(s.id)}">${escape(s.shiftName)} · ${escape(journal.businessDate({businessDate:s.date}))}</option>`).join("");
     $("shifts").innerHTML=payload.shifts.length?payload.shifts.slice().sort((a,b)=>Number(b.closingStatus==="open")-Number(a.closingStatus==="open")).map(s=>`<article class="cash-shift" data-state="${escape(s.closingStatus)}"><h3>${escape(s.shiftName)} <span class="shift-state">· ${s.closingStatus==="closed"?"Закрыта":"Открыта"}</span></h3><dl class="sale-metadata">${[["Открыта",journal.date(s.createdAt)],["Закрыта",s.closedAt?journal.date(s.closedAt):"Ещё открыта"],["Ответственный",s.actor?.name || s.createdBy?.name || "Не указан"],["Выручка",money(s.revenue,s.currency)],["Чеки",s.receipts ?? "Не указано"]].map(([label,value])=>`<div><dt>${escape(label)}</dt><dd>${escape(value)}</dd></div>`).join('')}</dl>${shiftPayments(s)}${s.closingStatus==="open"&&payload.permissions.shifts?`<details><summary>Закрыть смену</summary><p>Ввод новых продаж и возвратов в эту смену завершится.</p><button data-close="${escape(s.id)}">Подтвердить закрытие смены</button></details>`:""}</article>`).join(""):"Кассовых смен пока нет.";
     $("events").innerHTML=payload.events.some(e=>e.id===selectedEvent)?payload.events.filter(e=>e.id===selectedEvent).map(e=>`<details><summary>${escape(journal.date(e.acceptedAt))} · ${escape(money(e.revenue,e.currency))} · ${e.status==="POSTED"?"Продажа":"Возвращена"}</summary>${e.prices.map(p=>`<p>${escape(p.name)} × ${escape(p.quantity)}</p>`).join("")}<p>Себестоимость: ${escape(window.bdFormatSalesCost(e.batch,e.currency))}</p>${e.status==="POSTED"&&e.source!=="POS_API"&&payload.permissions.reverse?`<details><summary>Вернуть всю продажу</summary><p>Будут возвращены все товары и отменена выручка этой продажи.</p><button data-reverse="${escape(e.id)}">Подтвердить полный возврат</button></details>`:""}</details>`).join(""):"Продаж ещё нет.";
@@ -98,7 +99,7 @@
     sessionStorage.removeItem(storageKey());pending=undefined;quote=undefined;$("preview").hidden=true;$("discard").hidden=false;$("post").textContent="Подтвердить продажу";
     await load();notice(result.duplicate?"Продажа уже была обработана. Повторного списания нет.":"Продажа сохранена.");
   });
-  $("open-shift").onsubmit=event=>{event.preventDefault();perform(async()=>{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});invalidate();await load();notice("Смена открыта.");});};
+  $("open-shift").onsubmit=event=>{event.preventDefault();perform(async()=>{let conflict=false;try{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});}catch(error){if(error.code!=="SALES_EVENT_SHIFT_ALREADY_OPEN")throw error;conflict=true;}invalidate();await load();notice(conflict?"Уже есть открытая кассовая смена. Перейдите в кассу или сначала закройте её.":"Смена открыта.");});};
   $("shifts").onclick=event=>{const button=event.target.closest("[data-close]");if(button)perform(async()=>{await request({action:"close_shift",shiftId:button.dataset.close});invalidate();await load();notice("Смена закрыта.");});};
   $("events").onclick=event=>{const button=event.target.closest("[data-reverse]");if(button)perform(async()=>{await request({action:"reverse",eventId:button.dataset.reverse});invalidate();await load();notice("Продажа возвращена полностью.");});};
   window.addEventListener("storage",event=>{if(event.key==="bd_active_venue_id"){frozen=true;$("work").hidden=true;notice("Заведение изменилось. Обновите страницу.");}});

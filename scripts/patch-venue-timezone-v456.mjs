@@ -14,5 +14,5 @@ replace('function QCe(e){return e?{name:e.name,','function QCe(e){return e?{time
 replace('openTime:a.openTime,closeTime:a.closeTime,areas:a.areas','openTime:a.openTime,closeTime:a.closeTime,timezone:a.timezone||void 0,areas:a.areas');
 replace('openTime:u.openTime,closeTime:u.closeTime,workingDays:u.workingDays','openTime:u.openTime,closeTime:u.closeTime,workingDays:u.workingDays,timezone:u.timezone');
 fs.writeFileSync(asset,code);
-for(const path of ['public/app.html','app/bar-doctor-response.ts']){let s=fs.readFileSync(path,'utf8');if(!s.includes('/venue-timezone.js?v=venue-time-v456')){const marker='<script src="/venue-schedule.js';if(!s.includes(marker))throw Error('Timezone shell missing '+path);s=s.replace(marker,'<script src="/venue-timezone.js?v=venue-time-v456" defer></script>\n    '+marker);fs.writeFileSync(path,s);}}
+for(const path of ['public/app.html','app/bar-doctor-response.ts']){let s=fs.readFileSync(path,'utf8');if(!s.includes('/venue-timezone.js?v=venue-time-iphone-hardening')){const marker='<script src="/venue-schedule.js';if(!s.includes(marker))throw Error('Timezone shell missing '+path);s=s.replace(marker,'<script src="/venue-timezone.js?v=venue-time-iphone-hardening" defer></script>\n    '+marker);fs.writeFileSync(path,s);}}
 console.log('Venue timezone setting applied');
