@@ -63,7 +63,7 @@ PASS: POS cash/card, Manual Sale с OPEN authoritative shift, смены и sing
 
 Численный POS-контроль на 390/820/1280: 3 события, выручка 120, 3 движения, остаток 100 → 97. Пять post attempts с потерянным ответом и повторами не увеличили число продаж. iPhone hardening regression: 390 с top 59/bottom 34 и без inset, 820×1000, 1280×800; 12 строк корзины, checkout/последняя строка, Back hit target, browser Back/Forward, draft resume, документ ↔ движение.
 
-Build PASS. Typecheck PASS. Lint: 0 errors, два прежних unused warnings. Полный локальный набор: 1865 уникальных тестов, включая 1304 business tests и 6 новых navigation contract tests. После добавления двух SPA routes обновлены строгие route inventories и повторены их проверки. Ошибка записи OneDrive при подготовке артефакта устранена повтором идемпотентного шага; это не application failure.
+Build PASS. Typecheck PASS. Lint: 0 errors, два прежних unused warnings. Полный локальный набор: 1866 уникальных тестов, включая 1304 business tests и 7 новых navigation/layout tests. После добавления двух SPA routes обновлены строгие route inventories и повторены их проверки. Ошибка записи OneDrive при подготовке артефакта устранена повтором идемпотентного шага; это не application failure.
 
 GitHub CI проверяет тот же commit отдельным полным verify job и navigation job (Chromium + WebKit, все три ширины, пять сетевых профилей на 390). Итоговый SHA и CI URL фиксируются в release report после push. Публикация требует отдельного подтверждения пользователя.
 
@@ -98,3 +98,9 @@ GitHub CI проверяет тот же commit отдельным полным 
 - `tests/modern-ux.test.mjs`
 - `tests/navigation-consistency.test.mjs`
 - `tests/sales-navigation-performance.test.mjs`
+
+## Дополнение по WebKit CI
+
+Первый CI на Linux воспроизвёл `ResizeObserver loop completed with undelivered notifications` после переходов при 300 мс. В кассе наблюдатели размеров синхронно записывали CSS-переменные, влияющие на размеры наблюдаемого shell. Расчёты объединены в один `requestAnimationFrame`: сначала оба чтения размеров, затем только изменившиеся значения. Это предотвращает повторное изменение layout внутри одного цикла ResizeObserver; см. [объяснение WebKit](https://webkit.org/blog/9997/resizeobserver-in-webkit/). Ошибка не исключена из тестов: любые pageerror по-прежнему завершают QA с FAIL, теперь сохраняется и контекст. Добавлен тест сходимости размеров checkout. Итоговый тестовый контроль: 1866 тестов (включая 7 новых navigation/layout tests).
+
+T2 берётся из первого bridge/history request либо browser navigation fetchStart для native перехода; инициализация history уже в новом документе не считается началом перехода. T5/T6 относятся к критическим Sales reads (events/batches); полный список остальных API остаётся в trace. Для выхода в Warehouse фиксируются его bootstrap/domain requests.

@@ -71,11 +71,24 @@
   function working(task, message = "Выполняем действие…") { if (busy || frozen) return; busy=true; notice(message); renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
   function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
   let orderView=false;
-  new ResizeObserver(()=>{
-    const top=$("cashier").getBoundingClientRect().top+window.scrollY;
-    document.documentElement.style.setProperty("--pos-cart-offset",top+"px");
-  }).observe(document.querySelector(".pos-shell"));
-  new ResizeObserver(entries=>{document.documentElement.style.setProperty("--pos-checkout-height",entries[0].target.getBoundingClientRect().height+"px");}).observe(document.querySelector(".pos-cart-foot"));
+  let layoutFrame=0;
+  function scheduleLayoutMetrics() {
+    if(layoutFrame)return;
+    layoutFrame=requestAnimationFrame(()=>{
+      layoutFrame=0;
+      const style=document.documentElement.style;
+      const offset=$("cashier").getBoundingClientRect().top+window.scrollY;
+      const height=document.querySelector(".pos-cart-foot").getBoundingClientRect().height;
+      // Read both dimensions before writing, outside ResizeObserver delivery.
+      for(const [key,value] of [["--pos-cart-offset",offset],["--pos-checkout-height",height]]) {
+        const pixels=value+"px";
+        if(style.getPropertyValue(key)!==pixels)style.setProperty(key,pixels);
+      }
+    });
+  }
+  const layoutObserver=new ResizeObserver(scheduleLayoutMetrics);
+  layoutObserver.observe(document.querySelector(".pos-shell"));
+  layoutObserver.observe(document.querySelector(".pos-cart-foot"));
   function selectPane(order) {
     orderView=order;document.body.classList.toggle("pos-order-view",order);
     $("show-menu").setAttribute("aria-pressed",String(!order));$("show-cart").setAttribute("aria-pressed",String(order));

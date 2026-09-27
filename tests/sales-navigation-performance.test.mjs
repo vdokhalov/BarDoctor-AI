@@ -27,3 +27,21 @@ test('capture handler consumes one action and ignores modified or external links
 });
 
 test('leaving Sales refreshes the canonical domain stores via native document',()=>{const f=fixture();f.window.bdSalesNavigation.navigate('/warehouse?sourceDocumentId=sale',f.control);assert.deepEqual(f.routes,[{native:'/warehouse?sourceDocumentId=sale&venue=42'}]);});
+
+test('checkout measurements settle without synchronous resize delivery writes',()=>{
+ const cashier=fs.readFileSync('public/cashier.js','utf8');
+ const source=cashier.slice(cashier.indexOf('  let layoutFrame=0;'),cashier.indexOf('  function selectPane(order)'));
+ const frames=[],writes=[],values=new Map(),observed=[];let callback,top=180,height=240;
+ const footer={getBoundingClientRect:()=>({height})},shell={};
+ const style={getPropertyValue:key=>values.get(key)||'',setProperty(key,value){writes.push([key,value]);values.set(key,value)}};
+ vm.runInNewContext(source,{
+  requestAnimationFrame:f=>{frames.push(f);return frames.length},window:{scrollY:20},
+  $:()=>({getBoundingClientRect:()=>({top})}),
+  document:{documentElement:{style},querySelector:q=>q==='.pos-shell'?shell:footer},
+  ResizeObserver:class{constructor(fn){callback=fn}observe(node){observed.push(node)}}
+ });
+ assert.deepEqual(observed,[shell,footer]);callback();callback();assert.equal(frames.length,1);assert.equal(writes.length,0);
+ frames.shift()();assert.deepEqual(writes,[['--pos-cart-offset','200px'],['--pos-checkout-height','240px']]);
+ callback();frames.shift()();assert.equal(writes.length,2,'stable measurements do not invalidate layout');
+ top=190;height=310;callback();frames.shift()();assert.equal(values.get('--pos-cart-offset'),'210px');assert.equal(values.get('--pos-checkout-height'),'310px');
+});

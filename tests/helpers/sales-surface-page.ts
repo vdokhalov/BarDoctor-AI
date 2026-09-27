@@ -29,4 +29,3 @@ export function salesSurfacePage(page:Page):Page {
     const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
   }});
 }
-
