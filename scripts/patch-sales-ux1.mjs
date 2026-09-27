@@ -15,3 +15,6 @@ console.log('Sales document movement navigation applied (read-only)');
 for (const html of ["public/app.html", "dist/client/app.html"]) {
   if (fs.existsSync(html)) fs.writeFileSync(html, fs.readFileSync(html,"utf8").replace(/navigation-contract-v247\.js\?v=[^"\s]+/g,"navigation-contract-v247.js?v=20260927-sales-workspace-ux2"));
 }
+
+// Last navigation patch: preserve the canonical authenticated host between Sales screens.
+await import("./patch-sales-navigation-performance.mjs");

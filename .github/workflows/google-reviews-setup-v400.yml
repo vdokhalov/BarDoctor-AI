@@ -88,3 +88,29 @@ jobs:
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
         run: npm run test:home-reviews-browser
+
+  sales-navigation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm run install:ci
+      - name: Install Chromium and WebKit
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Measured navigation and embedded auth failures
+        run: |
+          BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,1200 node --import tsx scripts/sales-navigation-performance.ts
+          BD_PERF_LABEL=ci BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0,100,300,600,1200 node --import tsx scripts/sales-navigation-performance.ts
+          for width in 820 1280; do
+            BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
+            BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sales-navigation-timings
+          path: outputs/sales-navigation-performance/ci

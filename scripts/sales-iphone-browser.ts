@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync,existsSync,mkdirSync,writeFileSync } from 'node:fs';
@@ -58,7 +59,7 @@ put('bd_finance_revenue',[...get('bd_finance_revenue'),{...get('bd_finance_reven
 try{
  for(const profile of [{width:390,height:844,top:59,bottom:34,name:'iphone'},{width:390,height:844,top:0,bottom:0,name:'android'},{width:820,height:1000,top:0,bottom:0,name:'tablet'},{width:1280,height:800,top:0,bottom:0,name:'desktop'}]){
  const {width,height,top,bottom,name}=profile;
- const c=await browser.newContext({viewport:{width,height},hasTouch:true,isMobile:width===390,timezoneId:'America/Los_Angeles'}),p=await c.newPage(),errors:string[]=[];
+ const c=await browser.newContext({viewport:{width,height},hasTouch:true,isMobile:width===390,timezoneId:'America/Los_Angeles'}),p=salesSurfacePage(await c.newPage()),errors:string[]=[];
  p.on('pageerror',e=>errors.push(e.message));p.on('dialog',async d=>{errors.push('Unexpected dialog: '+d.type());await d.dismiss();});
  const devtools=await c.newCDPSession(p);await devtools.send('Emulation.setSafeAreaInsetsOverride',{insets:{top,bottom,left:0,right:0}});
  await c.addInitScript(({email,token,venue,account})=>{if(sessionStorage.qa_init)return;sessionStorage.qa_init='1';localStorage.bd_session=email;localStorage.bd_session_token=token;localStorage.bd_active_venue_id=String(venue);localStorage.setItem('bd_pos_shift_v1:'+account+':'+venue,'ux2-open');localStorage.setItem('bd_venue_context__'+email,JSON.stringify({activeVenueId:venue,venues:[{id:venue,name:'Atelier',role:'owner'},{id:999999,name:'Isolated unavailable venue',role:'owner'}]}));},{email:user.email,token:user.token,venue,account:user.userId});
@@ -86,7 +87,7 @@ try{
  await p.goto(base+'/sales-import?venue='+venue);await f.locator('[data-resume-shift="ux2-open"]').waitFor();await f.locator('[data-resume-shift="ux2-open"]').tap();await p.waitForURL('**/cashier?venue='+venue);await p.locator('.pos-line').last().waitFor();assert.equal(await p.locator('.pos-line').count(),12);assert.match(await p.locator('#shift-title').innerText(),/Вечер/);
  let posts=0;await p.route('**/api/sales-events*',async route=>{if(route.request().method()==='POST'&&route.request().postDataJSON().action==='post'){posts++;await new Promise(r=>setTimeout(r,700));}await route.continue();});
  await p.locator('#pay').tap();await p.locator('#notice').filter({hasText:'Выполняем'}).waitFor();await p.locator('#receipt:not([hidden])').waitFor();assert.equal(posts,1);await p.unroute('**/api/sales-events*');await snap('success');
- await p.locator('#receipt-sale').tap();await p.waitForURL(/\/sales-import\?.*batch=/);await f.locator('.pos-event-summary').waitFor();await snap('document');await f.locator('.journal-link').tap();await p.waitForURL(/\/warehouse\?.*sourceDocumentId=/);await p.getByText('Документ продаж',{exact:true}).first().tap();await f.locator('.pos-event-summary').waitFor();
+ await p.locator('#receipt-sale').tap();await p.waitForURL(/\/sales-import\?.*batch=/);await f.locator('.pos-event-summary').waitFor();await snap('document');await f.locator('.journal-link').tap();await p.waitForURL(/\/warehouse\?.*sourceDocumentId=/);await p.getByText('Документ продаж',{exact:true}).first().tap().catch(async error=>{console.error('WAREHOUSE FAILURE',p.url(),await p.locator('body').innerText(),errors);await snap('warehouse-failure');throw error;});await f.locator('.pos-event-summary').waitFor();
  // Canonical document modal owns the first Back; the next Back leaves the journal.
  await p.evaluate(()=>history.back());await f.locator('#editor-dialog:not([open])').waitFor({state:'attached'});await p.evaluate(()=>history.back());await p.waitForURL(/\/warehouse/);await p.evaluate(()=>history.forward());await f.locator('.pos-event-summary').waitFor();
 

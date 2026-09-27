@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
@@ -53,7 +54,7 @@ try {
     });
     await new Promise<void>(resolve=>server.listen(0,"127.0.0.1",resolve));
     const address=server.address();assert.ok(address&&typeof address!=="string");
-    const context=await browser.newContext({viewport});const page=await context.newPage();
+    const context=await browser.newContext({viewport});const page=salesSurfacePage(await context.newPage());
     page.on("pageerror",error=>errors.push(error.message));
     page.on("console",message=>{if(message.type()==="error")errors.push(message.text());});
     try {

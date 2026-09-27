@@ -68,7 +68,7 @@
     try{if(draftKey)localStorage.removeItem(draftKey);sessionStorage.removeItem(sessionKey());}catch{}
     pending=null;cart.clear();orderId=null;draftRevision=null;$("comment").value="";showReceipt(event,duplicate);
   }
-  function working(task) { if (busy || frozen) return; busy=true; notice("Выполняем действие…"); renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
+  function working(task, message = "Выполняем действие…") { if (busy || frozen) return; busy=true; notice(message); renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
   function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
   let orderView=false;
   new ResizeObserver(()=>{
@@ -196,5 +196,5 @@
   window.addEventListener("scroll",updateJump,{passive:true});window.addEventListener("resize",updateJump);
   window.addEventListener("online",()=>online(true));window.addEventListener("offline",()=>online(false));
   window.addEventListener("storage",event=>{if(event.key===draftKey||["bd_active_venue_id","bd_session","bd_session_token"].includes(event.key)){frozen=true;$("work").hidden=true;notice("Заведение или аккаунт изменились. Обновите кассу.");}});
-  working(refresh);
+  working(refresh, "Загружаем кассу…");
 })();

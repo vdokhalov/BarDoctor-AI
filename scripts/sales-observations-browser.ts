@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync,existsSync,mkdirSync,writeFileSync } from 'node:fs';
@@ -46,14 +47,14 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
  const setup=async(kind:string)=>{const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});if(kind!=='anonymous')await context.addInitScript(({email,token,venue})=>{if(sessionStorage.getItem('qa_initialized'))return;sessionStorage.setItem('qa_initialized','1');localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:kind==='invalid'?'invalid':user.token,venue});return context;};
  for(const kind of ['anonymous','invalid','expired']) for(const suffix of ['', '?venue='+venue]){
   if(kind==='expired')runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);
-  const context=await setup(kind),page=await context.newPage();const start=requests.length;
+  const context=await setup(kind),page=salesSurfacePage(await context.newPage());const start=requests.length;
   await page.goto(base+'/cashier'+suffix);
   await page.waitForURL('**/login',{timeout:diagnostic?2000:15000}).catch(e=>{if(!diagnostic)throw e;});
   const result={profile:profile.name,case:kind,deepLink:Boolean(suffix),url:new URL(page.url()).pathname,firstDataStatus:requests.slice(start).find(r=>r.path==='/api/sales-events')?.status,...await page.evaluate(()=>({connection:document.querySelector('#connection')?.textContent||null,notice:document.querySelector('#notice')?.textContent||null}))};
   report.push(result);if(!diagnostic){assert.equal(result.url,'/login');assert.equal(result.firstDataStatus,401);await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);}await context.close();
   if(kind==='expired')runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
  }
- const context=await setup('authenticated'),page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ const context=await setup('authenticated'),page=salesSurfacePage(await context.newPage()),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  try{
   await page.goto(base+'/cashier?venue='+venue);await page.locator('#work:not([hidden])').waitFor();assert.equal(await page.locator('#shift-picker option').count(),3);await page.locator('#shift-picker').selectOption('C');await page.locator('#cashier:not([hidden])').waitFor();
   await page.goto(base+'/sales-entry?view=shifts&venue='+venue);await page.locator('.cash-shift h3').filter({hasText:'C overnight · Открыта'}).waitFor();

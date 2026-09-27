@@ -31,9 +31,9 @@
     }
     return result;
   }
-  async function perform(fn) {
+  async function perform(fn, message = "Выполняем действие…") {
     if (busy || frozen) return;
-    busy=true;notice("Выполняем действие…");
+    busy=true;notice(message);
     const controls=[...document.querySelectorAll("input,select,button")].map(node=>[node,node.disabled]);
     controls.forEach(([node])=>{node.disabled=true;});
     try {await fn();} catch(error) {notice(error.message || "Не удалось выполнить действие");}
@@ -52,6 +52,7 @@
       event.batch.lines.flatMap(l=>l.recipeSnapshot.ingredients).map(i=>`<p>Расход: ${escape(i.name)} — ${escape(i.baseQuantityTotal)} ${escape(i.baseUnit)}</p>`).join("");
   }
   async function load() {
+    const shiftDocumentsRequest = isShifts ? request(undefined, "/api/sales-batches").catch(() => null) : null;
     payload=await request();window.bdVenueTime.context(payload);
     if(selectedEvent && !payload.events.some(e=>e.id===selectedEvent)) {
       const documents=await request(undefined,'/api/sales-batches');
@@ -59,7 +60,7 @@
       if(doc)payload.events=[{...doc,id:doc.salesEventId,batch:doc}];
     }
     let shiftDocuments=null;
-    if(isShifts){try{shiftDocuments=(await request(undefined,'/api/sales-batches')).batches;}catch{notice('Не удалось прочитать разбивку оплат. Обновите страницу.');}}
+    if(isShifts){const documents=await shiftDocumentsRequest;shiftDocuments=documents?.batches || null;}
     const shiftPayments = shift => {
       if(!shiftDocuments)return '<p>Разбивка оплат недоступна.</p>';
       const events=shiftDocuments.filter(b=>b.readOnly && b.shiftId===shift.id && b.status==='POSTED' && b.currency===shift.currency);
@@ -103,5 +104,5 @@
   $("shifts").onclick=event=>{const button=event.target.closest("[data-close]");if(button)perform(async()=>{await request({action:"close_shift",shiftId:button.dataset.close});invalidate();await load();notice("Смена закрыта.");});};
   $("events").onclick=event=>{const button=event.target.closest("[data-reverse]");if(button)perform(async()=>{await request({action:"reverse",eventId:button.dataset.reverse});invalidate();await load();notice("Продажа возвращена полностью.");});};
   window.addEventListener("storage",event=>{if(event.key==="bd_active_venue_id"){frozen=true;$("work").hidden=true;notice("Заведение изменилось. Обновите страницу.");}});
-  perform(load);
+  perform(load, isShifts ? "Загружаем кассовые смены…" : "Загружаем ручной ввод…");
 })();

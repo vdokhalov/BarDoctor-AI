@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync,existsSync,mkdirSync,writeFileSync } from 'node:fs';
@@ -58,7 +59,7 @@ else {
  const get=(key:string)=>JSON.parse(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(user.userId,key)?.data_json as string || 'null');
  try {for(const width of [390,820,1280]){
   const height=width===390?844:width===820?1000:800;
-  const c=await browser.newContext({viewport:{width,height}}),p=await c.newPage(),errors:string[]=[];
+  const c=await browser.newContext({viewport:{width,height}}),p=salesSurfacePage(await c.newPage()),errors:string[]=[];
   p.on('pageerror',e=>errors.push(e.message));
   const snap=async(name:string,fullPage=false)=>{await p.screenshot({path:out+'/'+width+'-'+name+'.png',fullPage});};
   const fits=async(name:string)=>assert.equal(await p.evaluate(()=>document.body.scrollWidth<=innerWidth+1 && [...document.querySelectorAll<HTMLElement>('.editor-body,.editor-header,.pos-cart-foot')].filter(e=>e.getBoundingClientRect().width).every(e=>e.getBoundingClientRect().right<=innerWidth+1&&e.scrollWidth<=e.clientWidth+1)),true,name+' fits '+width);

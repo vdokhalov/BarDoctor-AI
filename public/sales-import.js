@@ -148,13 +148,16 @@
   function load() {
     notice("Загружаем журнал…", "info");
     var venue=localStorage.getItem("bd_active_venue_id"),email=localStorage.getItem("bd_session");
+    // Both read models have independent handlers; preserve rendering/identity guards.
+    var posContext = request('/api/sales-events');
+    posContext.catch(function () {}); // loadPosContext reports its own controlled error.
     return request("/api/sales-batches").then(function (data) {
       if(venue!==localStorage.getItem("bd_active_venue_id")||email!==localStorage.getItem("bd_session"))return;
       state.payload = data;
       window.bdVenueTime.context(data);
       renderHome();
       notice("", "");
-      loadPosContext();
+      loadPosContext(posContext);
       var requested = new URL(location.href).searchParams.get("batch");
       if (requested && !editor.open) openBatch(requested);
     }).catch(function (error) { notice(error.message, "error"); document.getElementById("journal-count").textContent="Журнал недоступен. Нажмите «Обновить», чтобы повторить."; });
@@ -487,10 +490,10 @@
     var actors=new Map(batches.map(function(b){return [journal.actorKey(b),journal.actor(b)];}));
     employee.innerHTML='<option value="">Все сотрудники</option>'+[...actors].map(function(entry){return '<option value="'+h(entry[0])+'">'+h(entry[1])+'</option>';}).join('');employee.value=selectedActor;
   }
-  async function loadPosContext() {
+  async function loadPosContext(pendingContext) {
     var venue=localStorage.getItem('bd_active_venue_id'),email=localStorage.getItem('bd_session');
     try {
-      var context=await request('/api/sales-events');
+      var context=await pendingContext;
       if(venue!==localStorage.getItem('bd_active_venue_id')||email!==localStorage.getItem('bd_session')||String(context.venueId)!==String(state.payload?.venueId))return;
       state.pos=context;
       // Include every POS shift, including names older than the import API's 60-row selector.

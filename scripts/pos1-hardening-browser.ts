@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -51,7 +52,7 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
   }catch(error){console.error(error);res.writeHead(500);res.end("Isolated test failure");}});
   await new Promise<void>(done=>server.listen(0,"127.0.0.1",done));const base="http://127.0.0.1:"+(server.address() as {port:number}).port;
-  const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});const page=await context.newPage();
+  const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});const page=salesSurfacePage(await context.newPage());
   const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
   await page.addInitScript(({email,token,venue})=>{if(!localStorage.getItem("bd_session")){localStorage.setItem("bd_session",email);localStorage.setItem("bd_session_token",token);localStorage.setItem("bd_active_venue_id",String(venue));}},{...user,venue});
   const request=(body:unknown)=>{const req=r.request(user,"/api/sales-events","POST",body);req.headers.set("X-Venue-Id",String(venue));return r.api.events.POST(req);};
@@ -76,7 +77,7 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     await page.goBack();await page.waitForURL("**/sales-import?venue="+venue);await page.goForward();await page.locator('[data-remove="water"]').waitFor();
     await page.goto(base+"/sales-import?venue="+venue);await page.frameLocator("iframe").getByRole("link",{name:/^Продолжить заказ/}).click();await page.locator('[data-remove="water"]').waitFor();
     // Separate tabs share the draft, and another account cannot see it.
-    const reopened=await context.newPage();await reopened.goto(base+"/cashier?venue="+venue);await reopened.locator('[data-remove="water"]').waitFor();await orderPane(reopened,false);await reopened.locator('[data-add="service"]').click();await page.bringToFront();await page.locator("#work").waitFor({state:"hidden"});await page.locator("#pay").evaluate((button:HTMLButtonElement)=>button.click());assert.equal(postCalls,0);await reopened.close();await page.reload();await page.locator('[data-remove="service"]').click();
+    const reopened=salesSurfacePage(await context.newPage());await reopened.goto(base+"/cashier?venue="+venue);await reopened.locator('[data-remove="water"]').waitFor();await orderPane(reopened,false);await reopened.locator('[data-add="service"]').click();await page.bringToFront();await page.locator("#work").waitFor({state:"hidden"});await page.locator("#pay").evaluate((button:HTMLButtonElement)=>button.click());assert.equal(postCalls,0);await reopened.close();await page.reload();await page.locator('[data-remove="service"]').click();
     await page.evaluate(({email,token,venue})=>{localStorage.setItem("bd_session",email);localStorage.setItem("bd_session_token",token);localStorage.setItem("bd_active_venue_id",String(venue));},{...other,venue:other.activeVenueId});
     await page.goto(base+"/cashier?venue="+other.activeVenueId);await page.locator("#open-shift").waitFor();assert.equal(await page.locator(".pos-line").count(),0);
     await page.evaluate(({email,token,venue})=>{localStorage.setItem("bd_session",email);localStorage.setItem("bd_session_token",token);localStorage.setItem("bd_active_venue_id",String(venue));},{...user,venue});await page.goto(base+"/cashier?venue="+venue);await page.locator('[data-remove="water"]').waitFor();

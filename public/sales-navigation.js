@@ -37,9 +37,10 @@
     message('Открываем раздел…');
     // A stalled navigation remains retryable, with no modal or blocking overlay.
     timer = setTimeout(() => { reset(); message('Переход задерживается. Проверьте соединение и нажмите ещё раз.'); }, 12000);
-    const destination = new URL(target, location.href);
-    if (window.top !== window.self && ['/cashier', '/sales-entry'].includes(destination.pathname)) window.top.location.assign(target);
-    else if (typeof window.top.bdNavigate === 'function') window.top.bdNavigate(target);
+    // Reuse the host inside Sales. Other modules hydrate their domain stores on document startup.
+    // Retain that boundary so a just-posted sale is visible in Warehouse/Finance.
+    const salesRoute = ['/sales-import','/sales-entry','/cashier'].includes(new URL(target, location.href).pathname);
+    if (salesRoute && typeof window.top.bdNavigate === 'function') window.top.bdNavigate(target);
     else (window.top === window.self ? window : window.top).location.assign(target);
   }
   window.bdSalesNavigation = { navigate, href };

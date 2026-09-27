@@ -52,6 +52,8 @@
 | `/month-closing` | Redirect | `/reports` | Redirect | Yes | Inherited | Inherited |
 | `/finance/settings` | Settings | `/finance` | Origin/Back | Yes | Compact Back | Header Back |
 | `/notifications` | List/detail | `/more` | Origin/Back | Yes | Compact Back | Header Back |
+| `/cashier` | POS (SPA iframe / direct document) | `/sales-import` | Back, venue retained | Yes | Owned fullscreen | Owned fullscreen |
+| `/sales-entry` | Manual sale / cash shifts (SPA iframe / direct document) | `/sales-import` | Back, query-aware | Yes | Owned fullscreen | Owned fullscreen |
 | `/sales-import` | Wizard | `/warehouse` | Back/Cancel + guard | Yes | Owned fullscreen | Owned fullscreen |
 | `/supplier-alternatives` | List | `/suppliers` | Origin/Back | Yes | Compact Back | Header Back |
 | `/venues/new` | Create | `/more` | Back/Cancel + guard | Yes | Owned fullscreen | Owned fullscreen |

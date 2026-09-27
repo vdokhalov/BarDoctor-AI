@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import {mock} from 'node:test';
 mock.timers.enable({apis:['Date'],now:Date.parse('2026-09-30T21:30:00Z')});
@@ -40,7 +41,7 @@ for(const width of [390,820,1280]){
  const user=await runtime.register('timezone-browser-'+width+'@isolated.test'),venue=user.activeVenueId;
  runtime.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'Timezone QA',currency:'MDL',businessType:'bar',country:'Молдова',city:'Кишинёв',timezone:'Europe/Chisinau',areas:[]}),user.userId);
  runtime.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(user.userId,'bd_assortment_v1',JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1','"venueId":'+venue),new Date().toISOString());
- const c=await browser.newContext({viewport:{width,height:844},timezoneId:'America/Los_Angeles'}),p=await c.newPage(),errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));
+ const c=await browser.newContext({viewport:{width,height:844},timezoneId:'America/Los_Angeles'}),p=salesSurfacePage(await c.newPage()),errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));
  await c.addInitScript(({email,token,venue})=>{localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:user.token,venue});
  try{
   let releaseContext!: ()=>void;

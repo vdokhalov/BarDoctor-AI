@@ -1,3 +1,4 @@
+import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync, mkdirSync, existsSync } from "node:fs";
@@ -61,7 +62,7 @@ try{
     }
     const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});
     await context.addInitScript(()=>{localStorage.setItem("bd_session","pos1@isolated.test");localStorage.setItem("bd_session_token","test-session");localStorage.setItem("bd_active_venue_id","1");});
-    const page=await context.newPage();
+    const page=salesSurfacePage(await context.newPage());
     const errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
     await page.goto(base+"/cashier",{waitUntil:"networkidle"});
     if(await page.locator("#open-shift").isVisible()){await page.locator("#shift-name").fill("TEST SHIFT");await page.getByRole("button",{name:"Открыть смену"}).click();}
