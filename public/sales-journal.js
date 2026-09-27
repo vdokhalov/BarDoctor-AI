@@ -28,7 +28,7 @@
     return {revenue,count:receipts.length,average:receipts.length ? revenue/receipts.length : null,imports:batches.filter(b => !b.readOnly).length};
   }
   function metadata(batch, shifts, money) {
-    return '<dl class="sale-metadata">' + [[batch.readOnly?"Проведена":"Документ создан",date(timestamp(batch))],["Дата учёта",businessDate(batch)],["Смена",shiftName(batch,shifts)],["Сотрудник",actor(batch)],["Источник",sourceLabel(batch)],["Оплата",payment(batch)],["Сумма",amount(batch) === null ? "Не передана источником" : money(amount(batch),batch.currency)]].map(([label,value]) => '<div><dt>'+escape(label)+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'</dl>';
+    return '<dl class="sale-metadata">' + [[batch.readOnly?"Проведена":"Документ создан",date(timestamp(batch))],["Дата учёта",businessDate(batch)],["Смена",shiftName(batch,shifts)],["Сотрудник",actor(batch)],...(batch.readOnly?[]:[["Источник",sourceLabel(batch)],["Оплата",payment(batch)],["Сумма",amount(batch) === null ? "Не передана источником" : money(amount(batch),batch.currency)]])].map(([label,value]) => '<div><dt>'+escape(label)+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'</dl>';
   }
   function movements(batch) {
     const ids = [...(batch.movementIds || []),...(batch.reversalMovementIds || [])];

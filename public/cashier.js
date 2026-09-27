@@ -9,7 +9,7 @@
   const sessionKey = () => `bd_pos_pending:${localStorage.getItem("bd_session")}:${data.venueId}`;
   const notice = message => text("notice",message);
   const currentVenue = () => new URLSearchParams(location.search).get("venue") || localStorage.getItem("bd_active_venue_id");
-  const online = value => text("connection",value ? "● На связи" : "● Нет соединения");
+  const online = value => { text("connection",value ? "На связи" : "Нет соединения"); $("connection").dataset.online=String(value); };
   const initialIdentity = [localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":");
   async function request(body, externalId) {
     if (frozen) throw Error("Заведение изменилось. Обновите кассу.");
@@ -60,7 +60,7 @@
     if(!draft)return;
     orderId=draft.id;draftRevision=draft.revision;pending=draft.pending||null;
     for(const line of draft.lines){const item=data.menu.find(item=>String(item.id)===line.menuItemId)||{id:line.menuItemId,name:line.name||"Недоступная позиция",salePrice:null,unavailable:true};cart.set(String(item.id),{item,quantity:line.quantity});}
-    $("comment").value=String(draft.comment||"").slice(0,500);document.querySelector('input[name="payment"][value="'+(draft.method==="CARD_EXTERNAL"?"CARD_EXTERNAL":"CASH")+'"]').checked=true;
+    $("comment").value=String(draft.comment||"").slice(0,500);$("comment-panel").open=Boolean($("comment").value);document.querySelector('input[name="payment"][value="'+(draft.method==="CARD_EXTERNAL"?"CARD_EXTERNAL":"CASH")+'"]').checked=true;
     if(cart.size)notice("Незавершённый заказ восстановлен. Проверьте позиции и текущие цены перед оплатой.");
   }
   function complete(event,duplicate) {
@@ -70,7 +70,18 @@
   }
   function working(task) { if (busy || frozen) return; busy=true; renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
   function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
-  function updateJump() {const bounds=$("cart").getBoundingClientRect();$("order-jump").hidden=!(activeShift&&data?.permissions.post&&$("receipt").hidden&&!(bounds.top<innerHeight-80&&bounds.bottom>80));}
+  let orderView=false;
+  new ResizeObserver(()=>{
+    const top=$("cashier").getBoundingClientRect().top+window.scrollY;
+    document.documentElement.style.setProperty("--pos-cart-offset",top+"px");
+  }).observe(document.querySelector(".pos-shell"));
+  new ResizeObserver(entries=>{document.documentElement.style.setProperty("--pos-checkout-height",entries[0].target.getBoundingClientRect().height+"px");}).observe(document.querySelector(".pos-cart-foot"));
+  function selectPane(order) {
+    orderView=order;document.body.classList.toggle("pos-order-view",order);
+    $("show-menu").setAttribute("aria-pressed",String(!order));$("show-cart").setAttribute("aria-pressed",String(order));
+    updateJump();window.scrollTo({top:0,behavior:"instant"});
+  }
+  function updateJump() {$("order-jump").hidden=!(matchMedia("(max-width:767px)").matches&&!orderView&&activeShift&&data?.permissions.post&&$("receipt").hidden);}
   function renderShift() {
     const shifts = openShifts();
     if (activeShift && !pending && !shifts.some(shift => shift.id === activeShift.id)) activeShift=null;
@@ -111,16 +122,20 @@
   }
   function total() {if([...cart.values()].some(row=>row.item.unavailable))return null;return Math.round([...cart.values()].reduce((sum,row)=>sum+Number(row.item.salePrice)*row.quantity,0)*100)/100;}
   function renderCart() {
-    const rows=[...cart.values()]; text("cart-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);
+    const rows=[...cart.values()]; text("cart-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);text("mobile-count",rows.reduce((sum,row)=>sum+row.quantity,0));
     $("cart-lines").innerHTML=rows.length?rows.map(row=>`<div class="pos-line"><div><strong>${esc(row.item.name)}</strong><small>${esc(money(row.item.salePrice))} × ${row.quantity} = ${esc(row.item.unavailable?"Позиция недоступна":money(Number(row.item.salePrice)*row.quantity))}</small></div><div class="pos-qty"><button type="button" data-decrease="${esc(row.item.id)}" aria-label="Уменьшить ${esc(row.item.name)}">−</button><output>${row.quantity}</output><button type="button" data-increase="${esc(row.item.id)}" aria-label="Увеличить ${esc(row.item.name)}">+</button><button type="button" class="pos-remove" data-remove="${esc(row.item.id)}" aria-label="Убрать ${esc(row.item.name)}">×</button></div></div>`).join(""):`<p class="pos-empty">Нажмите на позицию меню, чтобы добавить её в заказ.</p>`;
     text("total",money(total()));text("jump-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);text("jump-total",money(total()));renderButtons();updateJump();
   }
   function renderButtons() {$("pay").textContent=busy?"Проводим…":"Оплатить";$("pay").disabled=busy||frozen||storageFailed||[...cart.values()].some(row=>row.item.unavailable)||Boolean(pending)||!activeShift||cart.size===0||!data?.permissions.post;$("retry").hidden=!pending;$("retry").disabled=busy||frozen;$("comment").disabled=busy||Boolean(pending);document.querySelectorAll('input[name="payment"]').forEach(input=>input.disabled=busy||Boolean(pending));}
   function showReceipt(event, duplicate=false) {
     $("cashier").hidden=true;$("shift-gate").hidden=true;$("order-jump").hidden=true;$("receipt").hidden=false;
-    const details=event.prices.map(line=>`<p>${esc(line.name)} × ${line.quantity} — ${esc(money(line.total))}</p>`).join("");
-    const cost=window.bdFormatSalesCost(event.batch,data.currency);
-    $("receipt-detail").innerHTML=details+`<p><strong>Выручка: ${esc(money(event.revenue))}</strong></p><p>Себестоимость: ${esc(cost)}</p><p>Смена: ${esc(event.shiftId||"")}</p><p>Сотрудник: ${esc(event.actor?.name||event.batch.createdBy?.name||"")}</p>`;
+    const details=event.prices.map(line=>`<p class="receipt-line"><span>${esc(line.name)} <small>× ${line.quantity}</small></span><b>${esc(money(line.total))}</b></p>`).join("");
+    const composition=event.prices.length>3?`<details class="receipt-details"><summary>Состав продажи · ${event.prices.length} позиций</summary>${details}</details>`:details;
+    const shift=data.shifts.find(s=>s.id===event.shiftId);
+    const payment=(event.payments||event.batch.payments||[]).map(p=>({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешняя оплата"})[p.method]||"Другой способ").join(", ")||"Не указан";
+    $("receipt-detail").innerHTML=`<strong class="receipt-amount">${esc(money(event.revenue))}</strong><p class="receipt-payment">${esc(payment)}</p><p class="receipt-shift">${esc(shift?.shiftName||activeShift?.shiftName||"Смена без названия")}</p><div class="receipt-lines">${composition}</div><details class="receipt-details"><summary>Детали продажи</summary><p>Себестоимость: ${esc(window.bdFormatSalesCost(event.batch,data.currency))}</p><p>Сотрудник: ${esc(event.actor?.name||event.batch.createdBy?.name||"Не указан")}</p></details>`;
+    $("receipt-sale").href="/sales-import?venue="+encodeURIComponent(data.venueId)+"&batch="+encodeURIComponent(event.id);
+    selectPane(false);
     notice(duplicate?"Продажа уже проведена. Повторного списания нет.":"Продажа проведена и сохранена.");
   }
   async function refresh() {
@@ -133,7 +148,7 @@
     else if(selected){const old=window.bdPosDraft.read(localStorage,draftIdentity(selected));if(old?.pending){activeShift=data.shifts.find(shift=>shift.id===selected)||{id:selected};restoreDraft();}}
 
     if(pending){const checked=await request(undefined,pending.command.id);const event=checked.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");if(event){complete(event,true);return;}notice("Результат оплаты не подтверждён. Проверьте его повторным запросом.");}
-    renderShift();renderMenu();renderCart();if(!pending&&!cart.size)notice("Выберите позиции и способ оплаты.");
+    renderShift();renderMenu();renderCart();if(cart.size||pending)selectPane(true);if(!pending&&!cart.size)notice("Выберите позиции и способ оплаты.");
   }
   async function submitPending() {
     if(!pending)return;
@@ -150,7 +165,7 @@
   $("search").oninput=renderMenu;
   $("menu").onclick=event=>{const button=event.target.closest("[data-add]");if(!button||busy||pending)return;const item=data.menu.find(item=>String(item.id)===button.dataset.add);if(!item)return;const row=cart.get(String(item.id));if(!row&&cart.size>=100){notice("В одном заказе может быть до 100 позиций.");return;}cart.set(String(item.id),{item,quantity:Math.min(999,(row?.quantity||0)+1)});persistDraft();renderCart();};
   $("cart-lines").onclick=event=>{const button=event.target.closest("[data-increase],[data-decrease],[data-remove]");if(!button||busy||pending)return;const id=button.dataset.increase??button.dataset.decrease??button.dataset.remove,row=cart.get(id);if(!row)return;if(button.hasAttribute("data-remove"))cart.delete(id);else{row.quantity+=button.hasAttribute("data-increase")?1:-1;if(row.quantity<=0)cart.delete(id);else row.quantity=Math.min(row.quantity,999);}persistDraft();renderCart();};
-  $("shift-picker").onchange=()=>{activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();};
+  $("shift-picker").onchange=()=>{activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();if(cart.size||pending)selectPane(true);};
   $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});data=await request();renderShift();notice("Смена открыта.");});};
   async function handlePendingFailure(error) {
     if(error.authRequired)return;
@@ -174,9 +189,10 @@
   });
   $("comment").oninput=()=>{if(!busy&&!pending)persistDraft();};
   $("payment").onchange=()=>{if(!busy&&!pending)persistDraft();};
-  $("order-jump").onclick=()=>$("cart").scrollIntoView({behavior:"smooth",block:"start"});
+  $("order-jump").onclick=()=>selectPane(true);
+  $("show-menu").onclick=()=>selectPane(false);$("show-cart").onclick=()=>selectPane(true);
   $("retry").onclick=()=>working(async()=>{try{data=await request(undefined,pending?.command.id);await submitPending();}catch(error){await handlePendingFailure(error);}});
-  $("new-order").onclick=()=>{cart.clear();$("comment").value="";$("receipt").hidden=true;working(refresh);};
+  $("new-order").onclick=()=>{selectPane(false);$("comment-panel").open=false;cart.clear();$("comment").value="";$("receipt").hidden=true;working(refresh);};
   window.addEventListener("scroll",updateJump,{passive:true});window.addEventListener("resize",updateJump);
   window.addEventListener("online",()=>online(true));window.addEventListener("offline",()=>online(false));
   window.addEventListener("storage",event=>{if(event.key===draftKey||["bd_active_venue_id","bd_session","bd_session_token"].includes(event.key)){frozen=true;$("work").hidden=true;notice("Заведение или аккаунт изменились. Обновите кассу.");}});

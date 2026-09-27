@@ -75,13 +75,13 @@ try{
       await page.locator("#search").fill("TEST VODKA");assert.equal(await page.locator(".pos-item").count(),1);await page.locator("#search").fill("");
       await page.locator("[data-department=bar]").click();assert.equal(await page.locator(".pos-item").count(),1);await page.locator("[data-department=all]").click();
       await page.locator('[data-add="vodka40"]').click();
-      await page.locator('[data-add="vodka40"]').click();
+      await orderPane(page,false);await page.locator('[data-add="vodka40"]').click();await orderPane(page);
       assert.match(await page.locator("#cart-lines").innerText(),/× 2/);
-      await page.getByRole("button",{name:"Уменьшить TEST VODKA 40"}).click();
+      await orderPane(page);await page.getByRole("button",{name:"Уменьшить TEST VODKA 40"}).click();
       assert.match(await page.locator("#cart-lines").innerText(),/× 1/);
       await page.getByRole("button",{name:"Убрать TEST VODKA 40"}).click();
       assert.match(await page.locator("#cart-lines").innerText(),/Нажмите на позицию/);
-      await page.locator('[data-add="vodka40"]').click();
+      await orderPane(page,false);await page.locator('[data-add="vodka40"]').click();await orderPane(page);
       assert.match(await page.locator("#total").innerText(),/30.*руб\. ПМР/);
       await page.screenshot({path:"outputs/pos1/mobile-390-order.png",fullPage:true});
       await page.getByRole("button",{name:"Оплатить"}).click();
@@ -115,3 +115,5 @@ try{
   }
   console.log("POS-1 browser QA: desktop 1280, mobile 390, tablet 820 PASS; screenshots outputs/pos1");
 }finally{await browser?.close();await new Promise<void>(resolve=>server.close(()=>resolve()));fixture.close();}
+
+async function orderPane(page: import("playwright-core").Page, order=true){if((page.viewportSize()?.width||1280)<768)await page.locator(order?"#show-cart":"#show-menu").click();}

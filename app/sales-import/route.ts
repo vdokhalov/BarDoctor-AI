@@ -16,10 +16,10 @@ const HTML = `<!doctype html>
   <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
   <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
-  <link rel="stylesheet" href="/sales-journal.css?v=sales-ux1">
+  <link rel="stylesheet" href="/sales-journal.css?v=sales-ux2">
   <script src="/pos-draft.js?v=pos1-hardening" defer></script>
-  <script src="/sales-journal.js?v=venue-time-v456" defer></script>
-  <script src="/sales-import.js?v=venue-time-v456" defer></script>
+  <script src="/sales-journal.js?v=sales-ux2" defer></script>
+  <script src="/sales-import.js?v=sales-ux2" defer></script>
 </head>
 <body data-bd-parent-route="/warehouse" data-sales-experience="v278">
   <header class="sales-topbar">
@@ -41,7 +41,7 @@ const HTML = `<!doctype html>
     </section>
     <p id="journal-metric-note" class="journal-help">По проведённым чекам POS и ручного ввода. Импортные отчёты учитываются отдельно.</p>
     <section id="manual-entry" class="workspace-card journal-entry" hidden><h2>Ручной ввод</h2><p>Внесите операцию через существующую проверку и подтверждение продажи.</p><a class="primary-action" id="manual-sale-link" href="/sales-entry">Добавить продажу вручную</a><hr><h3>Итоги по меню</h3><p>Внесите количество проданных порций для складской обработки. Этот документ не заменяет чек с выручкой.</p><button type="button" data-source="manual">Ввести итоги по меню</button></section>
-    <section id="import-entry" class="journal-entry workspace-card" hidden><h2>Импорт</h2><p>Загрузите внешний отчёт: файл, фото, текст или диктовку. Проверьте сопоставление и складской расход перед проведением.</p><button id="add-sales" class="primary-action" type="button" disabled>Импортировать продажи</button><h3 id="coverage-title">Обработка импорта</h3><p id="coverage-copy"></p></section>
+    <section id="import-entry" class="journal-entry workspace-card" hidden><h2>Импорт</h2><p>Загрузите внешний отчёт: файл, фото, текст или диктовку. Проверьте сопоставление и складской расход перед проведением.</p><button id="add-sales" class="primary-action" type="button" disabled>Импортировать продажи</button><h3 id="coverage-title" class="sr-only">Обработка импорта</h3><p id="coverage-copy" class="sr-only"></p></section>
     <section id="import-metrics" hidden class="sales-kpis" aria-label="Статус отражения продаж">
       <article><span>Загружено</span><strong id="kpi-loaded">0</strong><small>проданных порций</small></article>
       <article class="positive"><span>Отражено на складе</span><strong id="kpi-posted">0</strong><small>порций</small></article>
@@ -60,9 +60,9 @@ const HTML = `<!doctype html>
           <button id="refresh" class="text-button" type="button" aria-label="Обновить документы">Обновить</button>
         </header>
         <div class="journal-filters">
-          <label class="journal-search">Поиск<input id="journal-query" type="search" placeholder="Номер, товар или комментарий"></label>
-          <div class="journal-period"><label>С даты<input type="date" id="journal-from"></label><label>По дату<input type="date" id="journal-to"></label></div>
-          <details><summary>Фильтры <span id="journal-filter-count"></span></summary><div class="journal-filter-grid">
+          <label class="journal-search">Поиск<input id="journal-query" type="search" placeholder="Найти продажу, товар или комментарий"></label>
+
+          <details><summary>Фильтры <span id="journal-filter-count"></span></summary><div class="journal-filter-grid">          <div class="journal-period"><label>С даты<input type="date" id="journal-from"></label><label>По дату<input type="date" id="journal-to"></label></div>
             <label>Смена<select id="journal-shift"><option value="">Все смены</option></select></label><label>Сотрудник<select id="journal-actor"><option value="">Все сотрудники</option></select></label>
             <label>Оплата<select id="journal-payment"><option value="">Любая</option><option value="CASH">Наличные</option><option value="CARD_EXTERNAL">Карта</option><option value="NONE">Не указан</option></select></label>
             <label>Источник<select id="journal-source"><option value="">Все источники</option><option value="POS">POS</option><option value="MANUAL">Ручной ввод</option><option value="IMPORT">Импорт</option></select></label>

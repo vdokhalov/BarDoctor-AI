@@ -132,11 +132,13 @@
   function renderBatches(batches) {
     var node=document.getElementById('batch-list');
     if(!batches.length){node.innerHTML='<div class="empty-state"><h3>'+((state.payload?.batches || []).length?'Ничего не найдено':'Продаж пока нет')+'</h3><p>'+((state.payload?.batches || []).length?'Измените период, запрос или фильтры.':'Откройте кассу, чтобы провести первую продажу. Ручной ввод и импорт доступны отдельно.')+'</p></div>';return;}
-    node.innerHTML=batches.map(function(batch){return '<button type="button" class="batch-row journal-row" data-batch="'+h(batch.id)+'"><span class="journal-row-heading"><b>'+h(journal.receiptNumber(batch))+'</b><strong>'+h(journal.amount(batch)===null?'Сумма не передана':money(batch.revenue,batch.currency))+'</strong></span><span class="journal-row-date">'+h(journal.date(journal.timestamp(batch)))+(batch.readOnly?'':' · Документ создан')+' · Учёт: '+h(journal.businessDate(batch))+'</span><span class="journal-row-details"><span>Оплата: '+h(journal.payment(batch))+'</span><span>Смена: '+h(journal.shiftName(batch,state.payload.shifts || []))+'</span><span>Сотрудник: '+h(journal.actor(batch))+'</span><span>'+batch.lines.length+' '+plural(batch.lines.length,'позиция','позиции','позиций')+'</span></span><span class="journal-row-footer"><span>'+h(journal.sourceLabel(batch))+'</span><span class="status-pill '+statusClass(batch.status)+'">'+h(statusLabel(batch.status))+'</span></span></button>';}).join('');
+    node.innerHTML=batches.map(function(batch){return '<button type="button" class="batch-row journal-row" data-batch="'+h(batch.id)+'"><span class="journal-row-heading"><strong>'+h(journal.amount(batch)===null?'Сумма не передана':money(batch.revenue,batch.currency))+'</strong><span class="status-pill '+statusClass(batch.status)+'">'+h(statusLabel(batch.status))+'</span></span><span class="journal-row-date">'+h(journal.date(journal.timestamp(batch)))+'<span class="journal-payment">'+h(journal.payment(batch))+'</span></span><span class="journal-row-details"><span>'+h(journal.shiftName(batch,state.payload.shifts || []))+'</span><span>'+h(journal.actor(batch))+'</span></span><span class="journal-row-footer"><span>'+h(journal.sourceLabel(batch))+' · '+batch.lines.length+' '+plural(batch.lines.length,'позиция','позиции','позиций')+'</span><span>'+h(journal.receiptNumber(batch))+'</span></span></button>';}).join('');
   }
   function renderQuality(quality) {
     var issues = quality.issues || [];
     document.getElementById("quality-count").textContent = issues.length;
+    document.getElementById("import-quality").classList.toggle("has-issues",issues.length>0);
+    document.querySelector("#import-quality h2").textContent=issues.length?"Требует внимания":"Обработка импорта";
     var hasDocuments = Boolean(state.payload && state.payload.batches && state.payload.batches.length);
     document.getElementById("quality-impact").textContent = issues.length ? ((quality.affectedLineCount || issues.length) + " позиций / " + (quality.affectedQuantity || 0) + " порций не отражено на складе") : hasDocuments ? "Нет нерешённых ошибок." : "После загрузки продаж здесь появятся позиции, которые требуют внимания.";
     document.getElementById("quality-list").innerHTML = issues.length ? issues.slice(0, 12).map(function (issue) {
@@ -310,10 +312,10 @@
   }
   function renderEventDocument(batch) {
     header(journal.receiptNumber(batch), "ДОКУМЕНТ ПРОДАЖИ", batch.status);
-    editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><span>Сумма продажи</span></div></section>'
+    editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><span>Сумма продажи</span><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><p class="document-payment">'+h(journal.payment(batch))+' · '+h(journal.sourceLabel(batch))+'</p></div></section>'
       + journal.metadata(batch,state.payload.shifts || [],money)
       + '<section class="sale-document-lines"><h3>Позиции</h3>'+(batch.prices || []).map(function(line){return '<article><b>' + h(line.name) + '</b><span>'+h(line.quantity)+' × '+h(money(line.unitPrice,batch.currency))+'</span><strong>'+h(money(line.total,batch.currency))+'</strong></article>';}).join('')+'</section>'
-      + '<p>Себестоимость: ' + h(window.bdFormatSalesCost(batch,batch.currency)) + '</p>'
+      + '<section class="document-cost"><span>Себестоимость</span><strong>' + h(window.bdFormatSalesCost(batch,batch.currency)) + '</strong></section>'
       + '<p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>' + journal.movements(batch)
       + '<details class="journal-technical"><summary>Технические реквизиты</summary><p>Продажа: '+h(batch.salesEventId || batch.id)+'</p><p>Смена: '+h(batch.shiftId || 'Без смены')+'</p></details>';
     editorFooter.innerHTML = '<span>Документ из единого журнала продаж</span>'+(batch.source!=='POS_API' && batch.status==='POSTED' && state.payload.capabilities.reverse ? '<a href="/sales-entry?event='+encodeURIComponent(batch.salesEventId)+'">Открыть действия продажи</a>' : '');
@@ -339,12 +341,17 @@
     var mappingCount = batch.lines.filter(function (line) { return line.errorCode === "NEEDS_MAPPING"; }).length;
     var noRecipeCount = batch.lines.filter(function (line) { return line.errorCode === "NO_RECIPE"; }).length;
     var readyCount = batch.readyLineCount + batch.postedLineCount;
-    editorBody.innerHTML = journal.metadata(batch,state.payload.shifts || [],money)+'<p>Себестоимость: '+h(window.bdFormatSalesCost(batch,batch.currency))+'</p><p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>'+journal.movements(batch)+'<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.map(function (line) {
+    editorBody.innerHTML = journal.metadata(batch,state.payload.shifts || [],money)+'<p>Себестоимость: '+h(window.bdFormatSalesCost(batch,batch.currency))+'</p><p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>'+journal.movements(batch)+'<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.slice().sort(function(a,b){return Number(b.processingStatus==='BLOCKED')-Number(a.processingStatus==='BLOCKED');}).map(function (line) {
       var lineStatus = lineState(line); var selected = line.menuItemId || line.suggestedMenuItemId || "";
       var mapping = line.processingStatus === "BLOCKED" && line.errorCode === "NEEDS_MAPPING" && canMap ? '<label class="mapping-select">Сопоставить<select data-map-line="' + h(line.id) + '" data-raw-name="' + h(line.rawName) + '"><option value="">Выберите позицию</option>' + menu.map(function (item) { return '<option value="' + h(item.id) + '"' + (item.id === selected ? " selected" : "") + '>' + h(item.name) + '</option>'; }).join("") + '</select></label>' : '<b>' + h((line.recipeSnapshot && line.recipeSnapshot.menuItem.name) || (menu.find(function (item) { return item.id === line.menuItemId; }) || {}).name || "Не сопоставлено") + '</b>';
       var details = line.recipeSnapshot ? line.recipeSnapshot.ingredients.map(function (item) { return h(item.name + " · " + item.baseQuantityTotal + " " + unitLabel(item.baseUnit)); }).join(" · ") : "";
       return '<article class="preview-line"><div><small>' + h(line.rawName) + '</small>' + mapping + (details ? '<span class="line-details">' + details + '</span>' : '') + '</div><div><b>' + h(formatQuantity(line.quantity)) + '</b></div><div><span class="line-state ' + lineStatus.cls + '"><img src="' + lineStatus.icon + '" alt="">' + h(lineStatus.label) + '</span>' + lineIssueAction(line) + '</div></article>';
     }).join("") + '</div>';
+    if(batch.blockedLineCount){
+      var table=editorBody.querySelector('.preview-table'),warning=editorBody.querySelector('.partial-warning');
+      editorBody.prepend(table);
+      if(warning){warning.innerHTML='<b>'+batch.blockedLineCount+' '+plural(batch.blockedLineCount,'позиция требует','позиции требуют','позиций требуют')+' внимания</b><span>Исправьте выделенные строки. Остальные позиции сохранят свою текущую обработку.</span><button type="button" id="review-import-issues">Перейти к исправлению</button>';editorBody.prepend(warning);}
+    }
     var caps = state.payload && state.payload.capabilities || {}; var editable = ["DRAFT", "READY", "PARTIALLY_BLOCKED"].includes(batch.status);
     editorFooter.innerHTML = '<div><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы</b><span>Складской расход и себестоимость будут рассчитаны при проведении</span></div><div class="footer-actions">' + (editable ? '<button id="save-preview" class="secondary" type="button">Сохранить черновик</button>' : "") + (batch.postedLineCount && batch.status !== "REVERSED" && caps.reverse ? '<button id="reverse-batch" class="secondary danger-text" type="button">Отменить проведение</button>' : "") + (editable && batch.readyLineCount && caps.post ? '<button id="post-batch" class="primary" type="button">Провести продажи</button>' : "") + '</div>';
   }
@@ -414,6 +421,7 @@
   document.addEventListener("click", function (event) {
     if (event.target.closest("[data-open-source]")) openSourceDialog();
     var batchButton = event.target.closest("[data-batch]"); if (batchButton) openBatch(batchButton.dataset.batch);
+    if (event.target.id === "review-import-issues") { var issue=editorBody.querySelector('[data-map-line],.preview-line .line-action');if(issue){issue.scrollIntoView({block:"center",behavior:"smooth"});issue.focus({preventScroll:true});} }
     if (event.target.id === "save-manual") saveManual();
     if (event.target.id === "parse-text") parseText();
     if (event.target.id === "start-voice") startVoice();
@@ -449,7 +457,7 @@
     salesView = ['manual','import'].includes(view) ? view : 'journal';
     ['manual-entry','import-entry','import-metrics','import-quality','journal-layout','journal-metrics','journal-metric-note'].forEach(function(id){document.getElementById(id).hidden = id.startsWith('import-') ? salesView !== 'import' : id === 'manual-entry' ? salesView !== 'manual' : salesView !== 'journal';});
     // Import quality belongs to its workflow, outside the journal layout.
-    document.getElementById('import-entry').after(document.getElementById('import-metrics'),document.getElementById('import-quality'));
+    document.getElementById('import-entry').after(document.getElementById('import-quality'),document.getElementById('import-metrics'));
     document.querySelectorAll('[data-sales-view]').forEach(function(node){if(node.dataset.salesView===salesView)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');});
     var url=new URL(location.href);if(salesView==='journal')url.searchParams.delete('view');else url.searchParams.set('view',salesView);history.replaceState(history.state,'',url);
   }
@@ -460,14 +468,15 @@
     var all=state.payload?.batches || [], filters=journalFilters();
     var batches=all.filter(function(b){return journal.matches(b,filters);}).sort(function(a,b){return String(journal.timestamp(b)).localeCompare(String(journal.timestamp(a)));});
     document.getElementById('journal-reset').hidden=!Object.values(filters).some(Boolean);
+    document.querySelector('.journal-filters details').classList.toggle('has-filters',Object.values(filters).some(Boolean));
     var invalid=filters.from && filters.to && filters.from>filters.to;
     document.getElementById('journal-count').textContent=invalid?'Дата начала должна быть не позже даты окончания':batches.length+' из '+all.length+' документов';
-    document.getElementById('journal-filter-count').textContent=Object.entries(filters).filter(function(entry){return !['query','from','to'].includes(entry[0])&&entry[1];}).length || '';
+    document.getElementById('journal-filter-count').textContent=Object.entries(filters).filter(function(entry){return entry[0]!=='query'&&entry[1];}).length || '';
     var k=journal.totals(all.filter(function(b){return journal.matches(b,{from:filters.from,to:filters.to});}),state.payload?.currency);
-    document.getElementById('journal-revenue').textContent=money(k.revenue,state.payload?.currency);
+    document.getElementById('journal-revenue').textContent=money(k.revenue,state.payload?.currency).replace(/\u00a0/g,' ');
     document.getElementById('journal-receipts').textContent=k.count;
-    document.getElementById('journal-average').textContent=k.average===null?'—':money(k.average,state.payload?.currency);
-    document.getElementById('journal-metric-note').textContent=(filters.from || filters.to ? 'Период: '+(filters.from?journal.businessDate({businessDate:filters.from}):'с начала учёта')+' — '+(filters.to?journal.businessDate({businessDate:filters.to}):'по сегодня') : 'За всё время')+' · проведённые чеки POS и ручного ввода в валюте заведения. Импортных документов: '+k.imports+'. Суммы отчётов без выручки не включены.';
+    document.getElementById('journal-average').textContent=k.average===null?'—':money(k.average,state.payload?.currency).replace(/\u00a0/g,' ');
+    document.getElementById('journal-metric-note').textContent=(filters.from || filters.to ? 'Период: '+(filters.from?journal.businessDate({businessDate:filters.from}):'с начала учёта')+' — '+(filters.to?journal.businessDate({businessDate:filters.to}):'по сегодня') : 'За всё время')+' · POS и ручной ввод. Импорт без выручки не включён: '+k.imports+'.';
     renderBatches(batches);
   }
   function renderJournalOptions() {
@@ -497,6 +506,7 @@
         var draft=window.bdPosDraft.read(localStorage,window.bdPosDraft.key(context.actor.accountId,context.venueId,shift.id));
         if(draft && (draft.lines.length || draft.pending))drafts.push({shift:shift,draft:draft});
       }
+      document.getElementById('open-cashier').hidden=!context.permissions.post||drafts.length>0;
       document.getElementById('pos-drafts').innerHTML=context.permissions.post?drafts.map(function(item){return '<a class="journal-resume" data-resume-shift="'+h(item.shift.id)+'" href="/cashier">Продолжить заказ · '+item.draft.lines.length+' поз. · '+h(item.shift.shiftName)+'</a>';}).join(''):'';
       renderJournalOptions();renderJournal();
       if(editor.open && state.batch?.readOnly)renderEventDocument(state.batch);

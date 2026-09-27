@@ -62,7 +62,10 @@ for(const scenario of ["KNOWN","UNKNOWN","ZERO","NONE","MIXED"] as const)test("F
  vm.runInContext(readFileSync("public/sales-journal.js","utf8"),ui);
  vm.runInContext("var journal=window.bdSalesJournal;var state={payload:{shifts:[],capabilities:{}}};",ui);
  vm.runInContext(renderer.slice(begin,end)+"\nrenderEventDocument(batch)",ui);
- if(unknown)assert.match(body.innerHTML,/Себестоимость: не рассчитана/);else assert.doesNotMatch(body.innerHTML,/Себестоимость: не рассчитана/);
+ const costBlock=body.innerHTML.match(/<section class="document-cost">([\s\S]*?)<\/section>/)?.[1];assert.ok(costBlock,"receipt has a dedicated cost block");
+ const costText=costBlock.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+ assert.ok(costText.includes(display.replace(/\s+/g," ").trim()),"receipt preserves the canonical cost explanation");
+ if(unknown)assert.match(costText,/Себестоимость\s+не рассчитана/);else assert.doesNotMatch(costText,/не рассчитана/);
  assert.equal(event.originalMovements.length,scenario==="NONE"?0:1);
  if(scenario!=="NONE")assert.equal(event.originalMovements[0].costStatus,unknown?"UNKNOWN":scenario==="ZERO"?"KNOWN_ZERO":"KNOWN");
  const read=await r.api.GET(new Request("http://test/api/sales-events",{headers:{"X-Venue-Id":"1"}}));assert.equal((await read.json() as {events:SalesEvent[]}).events[0].batch.costStatus,event.batch.costStatus);

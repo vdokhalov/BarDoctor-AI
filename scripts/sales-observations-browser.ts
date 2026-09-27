@@ -59,7 +59,7 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
   if(diagnostic){await page.locator('#notice').filter({hasText:'Эта смена уже закрыта'}).waitFor();report.push({case:'manual-C',notice:await page.locator('#notice').innerText(),shiftId:await page.locator('#shift').inputValue(),openShifts:get('bd_finance_revenue').filter((s:{closingStatus:string})=>s.closingStatus==='open').map((s:{id:string;date:string})=>({id:s.id,date:s.date}))});continue;}
   await page.locator('#preview:not([hidden])').waitFor();await page.screenshot({path:out+'/'+profile.name+'-manual.png',fullPage:true});await page.locator('#post').click();await page.locator('#notice').filter({hasText:'Продажа сохранена'}).waitFor();
   assert.equal(get('bd_sales_events_v1')[0].shiftId,'C');assert.equal(get('bd_sales_events_v1')[0].businessDate,shifts[0].date);
-  await page.goto(base+'/cashier?venue='+venue);await page.locator('#cashier:not([hidden])').waitFor();await page.locator('[data-add=beer]').click();await page.reload();await page.locator('.pos-line').waitFor();await page.screenshot({path:out+'/'+profile.name+'-cashier.png',fullPage:true});await page.locator('#pay').click();await page.locator('#receipt:not([hidden])').waitFor();
+  await page.goto(base+'/cashier?venue='+venue);await page.locator('#cashier:not([hidden])').waitFor();await page.locator('[data-add=beer]').click();await page.reload();await page.locator('.pos-line').waitFor();await page.screenshot({path:out+'/'+profile.name+'-cashier.png',fullPage:true});await orderPane(page);await page.locator('#pay').click();await page.locator('#receipt:not([hidden])').waitFor();
   assert.equal(get('bd_sales_events_v1').length,2);assert.equal(get('bd_stock_movements').length,2);assert.equal(get('bd_assortment_v1').stockBalances[0].current,18);assert.equal(get('bd_finance_revenue').find((s:{id:string})=>s.id==='C').revenue,40);
   await page.goto(base+'/sales-import?embedded=1&venue='+venue);await page.locator('#journal-receipts').filter({hasText:'2'}).waitFor();assert.equal(await page.locator('.batch-row').count(),2);assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-journal.png',fullPage:true});
   await page.goto(base+'/finance?venue='+venue);await page.getByRole('heading',{name:/Финанс/}).first().waitFor();assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-finance.png',fullPage:true});
@@ -72,7 +72,7 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
   const draftKey='bd_pos_draft_v1:'+user.userId+':'+venue+':D';
   const beforeAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(beforeAuth.lines.length,1);
   runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);
-  await page.locator('#pay').click();await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();
+  await orderPane(page);await page.locator('#pay').click();await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();
   const afterAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(afterAuth.id,beforeAuth.id);assert.equal(afterAuth.pending.command.id,beforeAuth.id);assert.equal(get('bd_sales_events_v1').length,2);
   runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
   // Re-establish the authenticated browser fixture at document start, after the login handoff.
@@ -84,3 +84,5 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
 }}
 finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));runtime.close();writeFileSync(out+'/'+(diagnostic?'baseline':'results')+'.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));
+
+async function orderPane(page: import("playwright-core").Page, order=true){if((page.viewportSize()?.width||1280)<768)await page.locator(order?"#show-cart":"#show-menu").click();}
