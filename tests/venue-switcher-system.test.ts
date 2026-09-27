@@ -32,6 +32,7 @@ type VenueRuntime = {
 async function createRuntime(
   nativeFetch: typeof fetch,
   href = "https://bardoctor.test/equipment/shared-id?tab=history&q=ice&venue=101#event",
+  anonymous = false,
 ): Promise<VenueRuntime> {
   const source = await readFile(new URL("../public/venue-switcher.js", import.meta.url), "utf8");
   const localStorage = new MemoryStorage();
@@ -52,6 +53,9 @@ async function createRuntime(
     ],
   }));
 
+  if (anonymous) {
+    for (const key of ["bd_session", "bd_session_token", "bd_active_venue_id", "bd_venue_context__owner@example.test"]) localStorage.removeItem(key);
+  }
   const parsed = new URL(href);
   const replacements: string[] = [];
   const messages: string[] = [];
@@ -271,4 +275,26 @@ test("production clients cannot change the venue by copying an unverified query 
   assert.match(auth, /eq\(venueMemberships\.accountId, account\.id\)/);
   assert.match(auth, /requestedHeader != null/);
   assert.match(auth, /return selectVenueMembership\(memberships, requestedVenueId, account\.id\)/);
+});
+
+
+test("anonymous venue deep link exposes 401 to auth without trusting the query venue", async () => {
+  const runtime = await createRuntime(async () => new Response(null, {status:401}), "https://bardoctor.test/cashier?venue=101", true);
+  const response = await runtime.window.fetch("/api/sales-events", {headers:{"X-Venue-Id":"101"}});
+  assert.equal(response.status,401);
+  assert.equal(runtime.window.bdVenueSwitcher.currentVenueId(),null);
+});
+
+test("anonymous deep link never releases successful data without a matching selected venue", async () => {
+  const runtime = await createRuntime(async () => Response.json({ok:true}), "https://bardoctor.test/cashier?venue=101", true);
+  await assert.rejects(runtime.window.fetch("/api/sales-events", {headers:{"X-Venue-Id":"101"}}), {name:"AbortError"});
+});
+
+test("an old 401 cannot log out a newly selected venue", async () => {
+  let resolveResponse!: (response:Response)=>void;
+  const runtime = await createRuntime(async () => new Promise<Response>(resolve=>{resolveResponse=resolve;}), "https://bardoctor.test/cashier?venue=101", true);
+  const pending=runtime.window.fetch("/api/sales-events", {headers:{"X-Venue-Id":"101"}});
+  runtime.localStorage.setItem("bd_active_venue_id","202");
+  resolveResponse(new Response(null,{status:401}));
+  await assert.rejects(pending,{name:"AbortError"});
 });

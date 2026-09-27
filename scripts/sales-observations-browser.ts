@@ -42,12 +42,12 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
  await send({action:'open_shift',shiftId:'C',name:'C overnight'});await send({action:'open_shift',shiftId:'D',name:'D current'});
  const shifts=get('bd_finance_revenue');shifts[0].date=new Date(Date.now()-86400000).toISOString().slice(0,10);shifts[0].accountingMonth=shifts[0].date.slice(0,7);put('bd_finance_revenue',shifts);
  const setup=async(kind:string)=>{const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});if(kind!=='anonymous')await context.addInitScript(({email,token,venue})=>{if(sessionStorage.getItem('qa_initialized'))return;sessionStorage.setItem('qa_initialized','1');localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:kind==='invalid'?'invalid':user.token,venue});return context;};
- for(const kind of ['anonymous','invalid','expired']){
+ for(const kind of ['anonymous','invalid','expired']) for(const suffix of ['', '?venue='+venue]){
   if(kind==='expired')runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);
   const context=await setup(kind),page=await context.newPage();const start=requests.length;
-  await page.goto(base+'/cashier');
+  await page.goto(base+'/cashier'+suffix);
   await page.waitForURL('**/login',{timeout:diagnostic?2000:15000}).catch(e=>{if(!diagnostic)throw e;});
-  const result={profile:profile.name,case:kind,url:new URL(page.url()).pathname,firstDataStatus:requests.slice(start).find(r=>r.path==='/api/sales-events')?.status,...await page.evaluate(()=>({connection:document.querySelector('#connection')?.textContent||null,notice:document.querySelector('#notice')?.textContent||null}))};
+  const result={profile:profile.name,case:kind,deepLink:Boolean(suffix),url:new URL(page.url()).pathname,firstDataStatus:requests.slice(start).find(r=>r.path==='/api/sales-events')?.status,...await page.evaluate(()=>({connection:document.querySelector('#connection')?.textContent||null,notice:document.querySelector('#notice')?.textContent||null}))};
   report.push(result);if(!diagnostic){assert.equal(result.url,'/login');assert.equal(result.firstDataStatus,401);await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);}await context.close();
   if(kind==='expired')runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
  }

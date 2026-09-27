@@ -126,6 +126,7 @@
       var requestUrl = null;
       var requestVenueId = null;
       var requestEpoch = contextEpoch;
+      var initialVenueId = currentVenueId();
       var shouldGuard = false;
       try {
         requestUrl = new URL(typeof input === "string" ? input : input.url, window.location.href);
@@ -144,7 +145,10 @@
       var pending = previousFetch.apply(null, arguments);
       if (!shouldGuard) return pending;
       return Promise.resolve(pending).then(function (response) {
-        if (requestEpoch !== contextEpoch || String(currentVenueId() || "") !== String(requestVenueId)) {
+        // An anonymous deep link has a request venue but no selected venue yet.
+        // Let its 401 reach the canonical auth handler; never release stale data.
+        var anonymousUnauthorized = response.status === 401 && !initialVenueId && !currentVenueId();
+        if (requestEpoch !== contextEpoch || !anonymousUnauthorized && String(currentVenueId() || "") !== String(requestVenueId)) {
           try { if (response.body) response.body.cancel(); } catch { /* no-op */ }
           throw staleVenueError();
         }

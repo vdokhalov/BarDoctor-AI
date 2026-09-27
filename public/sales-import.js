@@ -127,6 +127,7 @@
     renderJournal();
     renderQuality(payload.dataQuality || { issues: [] });
     document.getElementById("add-sales").hidden = !(payload.capabilities && payload.capabilities.create);
+    document.getElementById("add-sales").disabled = false;
   }
   function renderBatches(batches) {
     var node=document.getElementById('batch-list');
@@ -387,7 +388,11 @@
     }).then(function (data) { state.batch = data.batch; renderPreview(); showEditor(); return load(); }).catch(function (error) { notice(error.message, "error"); }).finally(function () { setBusy(false); });
   }
 
+  function creationContextReady() {
+    return Boolean(state.payload && state.payload.capabilities?.create && String(state.payload.venueId) === localStorage.getItem("bd_active_venue_id"));
+  }
   function openSourceDialog() {
+    if (!creationContextReady()) return;
     sourceDialog.showModal();
     if (!(history.state && history.state.salesSource)) history.pushState({ salesSource: true }, "", location.href);
   }
@@ -396,6 +401,7 @@
   document.getElementById("editor-close").addEventListener("click", function () { closeEditor(false); });
   document.querySelectorAll("[data-source]").forEach(function (button) {
     button.addEventListener("click", function () {
+      if (!creationContextReady()) return;
       sourceDialog.close();
       if (button.dataset.source === "manual") openManual();
       if (button.dataset.source === "text") openText(false);

@@ -43,7 +43,19 @@ for(const width of [390,820,1280]){
  const c=await browser.newContext({viewport:{width,height:844},timezoneId:'America/Los_Angeles'}),p=await c.newPage(),errors:string[]=[];p.on('pageerror',e=>errors.push(e.message));
  await c.addInitScript(({email,token,venue})=>{localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:user.token,venue});
  try{
-  await p.goto(base+'/sales-import?embedded=1&venue='+venue);await p.locator('#venue-timezone-label').waitFor();assert.match(await p.locator('#venue-timezone-label').innerText(),/Europe\/Chisinau/);
+  let releaseContext!: ()=>void;
+  const contextGate=new Promise<void>(resolve=>{releaseContext=resolve;});
+  await p.route('**/api/sales-batches',async route=>{await contextGate;await route.continue();});
+  await p.goto(base+'/sales-import?embedded=1&venue='+venue);
+  await p.locator('[data-sales-view=import]').click();
+  assert.equal(await p.locator('#add-sales').isDisabled(),true);
+  await p.locator('#add-sales').dispatchEvent('click');
+  await p.locator('[data-source=text]').dispatchEvent('click');
+  assert.equal(await p.locator('#text-date').count(),0);
+  releaseContext();
+  await p.locator('#venue-timezone-label').waitFor();
+  await p.unroute('**/api/sales-batches');
+  assert.equal(await p.locator('#add-sales').isEnabled(),true);assert.match(await p.locator('#venue-timezone-label').innerText(),/Europe\/Chisinau/);
   await p.locator('[data-sales-view=import]').click();await p.locator('#add-sales').click();await p.locator('[data-source=text]').click();await p.locator('#text-date').waitFor();assert.equal(await p.locator('#text-date').inputValue(),'2026-10-01');
   await p.screenshot({path:out+'/'+width+'-import-venue-date.png',fullPage:true});
   const journal=await p.evaluate(()=>{const w=window as unknown as {bdSalesJournal:{date:(v:string)=>string}};return w.bdSalesJournal.date('2026-09-30T21:30:00Z');});assert.match(journal,/01 окт/);assert.match(journal,/00:30/);
