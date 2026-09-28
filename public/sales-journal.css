@@ -38,4 +38,4 @@ body.sales-entry-shell{padding-top:var(--bd-safe-top,0px)!important}.sales-entry
 @media(max-width:767px){body[data-sales-experience] #venue-timezone-label{min-height:1lh}body[data-sales-experience] #notice[hidden]{display:block!important;visibility:hidden;min-height:calc(1lh + 28px)}}
 
 /* Draft restoration and issue status keep the same command/header geometry. */
-@media(max-width:767px){.journal-primary{min-height:50px}#import-quality.has-issues .section-heading{padding-bottom:15px}}
+@media(max-width:767px){.journal-primary{min-height:calc(2 * 13px * 1.5 + 16px);overflow-anchor:none}.journal-primary .journal-resume{line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#import-quality.has-issues .section-heading{padding-bottom:15px}}
