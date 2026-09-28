@@ -7,7 +7,6 @@
   var bodyOverflow = "";
   var htmlOverflow = "";
   var scrollLocked = false;
-  var settling = false;
 
   function visible(element) {
     if (!element || !element.isConnected || element.hidden || element.getAttribute("aria-hidden") === "true") return false;
@@ -83,22 +82,22 @@
   }
 
   function cleanup() {
-    // Release a removed modal before the next gesture, even while history/focus
-    // cleanup is waiting for a frame. Other visible layers keep their lock.
+    var focusTargets = [];
+    records.forEach(function (record, id) {
+      if (visible(record.element)) return;
+      records.delete(id);
+      if (record.trigger && record.trigger.isConnected) focusTargets.push(record.trigger);
+      // Start removal of the temporary history entry with the close itself.
+      // Deferring back() to rAF can restore history during the next scroll gesture.
+      if (record.pushed && !record.closingByHistory && window.history.state && window.history.state.bdTransientLayer === id) {
+        window.history.back();
+      }
+    });
     unlockScrollIfIdle();
-    if (settling) return;
-    settling = true;
-    window.requestAnimationFrame(function () {
-      settling = false;
-      records.forEach(function (record, id) {
-        if (visible(record.element)) return;
-        records.delete(id);
-        if (record.trigger && record.trigger.isConnected) record.trigger.focus({ preventScroll: true });
-        if (record.pushed && !record.closingByHistory && window.history.state && window.history.state.bdTransientLayer === id) {
-          window.history.back();
-        }
+    if (focusTargets.length) window.requestAnimationFrame(function () {
+      focusTargets.forEach(function (trigger) {
+        if (trigger.isConnected) trigger.focus({ preventScroll: true });
       });
-      unlockScrollIfIdle();
     });
   }
 

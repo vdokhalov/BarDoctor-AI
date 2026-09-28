@@ -144,3 +144,28 @@ test("delayed unsaved-confirmation cleanup cannot reopen a prior write-off or re
     assert.equal(document.querySelectorAll().length, 0);
   }
 });
+
+
+test("explicit modal close requests history cleanup before the next scroll frame", async () => {
+  const source = await readFile(new URL("../public/navigation-transient-v247.js", import.meta.url), "utf8");
+  const frames = []; const classes = new Set(); let backCalls = 0;
+  class Element {
+    isConnected = true; hidden = false; dataset = {}; textContent = "Закрыть";
+    getAttribute() { return null; } closest() { return null; } focus() {} contains() { return false; }
+    querySelectorAll() { return [close]; } querySelector() { return close; }
+  }
+  const close = new Element(), layer = new Element();
+  const document = { activeElement: close, body: { style: { overflow: "auto" }, classList: { add: n => classes.add(n), remove: n => classes.delete(n) } }, documentElement: { style: { overflow: "scroll" } }, querySelectorAll: () => layer.isConnected ? [layer] : [], addEventListener() {} };
+  const window = { location: new URL("https://bardoctor.test/cashier?venue=901"), history: { state: {}, pushState(state) { this.state = state; }, back() { backCalls++; } }, getComputedStyle: () => ({ display: "block", visibility: "visible", opacity: "1" }), requestAnimationFrame: fn => frames.push(fn), setTimeout() {}, addEventListener() {} };
+  vm.runInNewContext(source, { window, document, URL, HTMLElement: Element, MutationObserver: class { observe() {} } });
+  assert.equal(document.body.style.overflow, "hidden");
+  window.bdTransientNavigationV247.scan();
+  assert.equal(document.body.style.overflow, "hidden", "visible dialog must retain its lock");
+  layer.isConnected = false;
+  window.bdTransientNavigationV247.scan();
+  assert.equal(backCalls, 1, "history request cannot wait for the next gesture frame");
+  assert.equal(document.body.style.overflow, "auto"); assert.equal(document.documentElement.style.overflow, "scroll");
+  window.bdTransientNavigationV247.scan();
+  while (frames.length) frames.shift()();
+  assert.equal(backCalls, 1, "mutation/focus cleanup must not navigate twice");
+});
