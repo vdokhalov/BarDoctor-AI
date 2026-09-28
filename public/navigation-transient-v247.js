@@ -82,11 +82,11 @@
   }
 
   function cleanup() {
-    var focusTargets = [];
+    var focusRecords = [];
     records.forEach(function (record, id) {
       if (visible(record.element)) return;
       records.delete(id);
-      if (record.trigger && record.trigger.isConnected) focusTargets.push(record.trigger);
+      if (record.trigger && record.trigger.isConnected) focusRecords.push(record);
       // Start removal of the temporary history entry with the close itself.
       // Deferring back() to rAF can restore history during the next scroll gesture.
       if (record.pushed && !record.closingByHistory && window.history.state && window.history.state.bdTransientLayer === id) {
@@ -94,9 +94,9 @@
       }
     });
     unlockScrollIfIdle();
-    if (focusTargets.length) window.requestAnimationFrame(function () {
-      focusTargets.forEach(function (trigger) {
-        if (trigger.isConnected) trigger.focus({ preventScroll: true });
+    if (focusRecords.length) window.requestAnimationFrame(function () {
+      focusRecords.forEach(function (record) {
+        if (record.trigger.isConnected) record.trigger.focus({ preventScroll: true });
       });
     });
   }
