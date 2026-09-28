@@ -7,3 +7,6 @@ body.sales-pos .pos-shell,body.sales-entry-shell{padding-left:max(24px,var(--bd-
 #venue-timezone-label[data-configured=false]{color:#775014;background:#fff5df;border:1px solid #ecd6aa;border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.45}
 #venue-timezone-label a{display:inline-flex;align-items:center;min-height:44px;color:#493bb4;text-decoration:underline;font-weight:600}
 @media(max-width:767px){body.sales-pos .pos-shell,body.sales-entry-shell{padding-left:max(12px,var(--bd-safe-left,0px));padding-right:max(12px,var(--bd-safe-right,0px))}.sales-pos .pos-top .bd-standalone-venue-host{display:block!important;flex-basis:100%;max-width:100%}.sales-pos .pos-top .bd-venue-trigger{max-width:100%}body.sales-pos #order-jump{left:max(12px,var(--bd-safe-left,0px));right:max(12px,var(--bd-safe-right,0px))}}
+
+/* Keep focus from changing the readable input scale on mobile Safari. */
+@media(max-width:767px){body.sales-pos :is(input:not([type=radio]),select,textarea),body.sales-entry-shell :is(input,select,textarea),body[data-sales-experience] :is(input,select,textarea){font-size:16px}}

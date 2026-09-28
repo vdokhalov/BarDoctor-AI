@@ -27,3 +27,15 @@
 @media(max-width:600px){.sales-navigation a,.sales-navigation button{padding-left:8px;padding-right:8px}}
 
 body.sales-entry-shell{padding-top:var(--bd-safe-top,0px)!important}.sales-entry-shell>header>a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-weight:600}.sales-entry-shell>header{padding-top:8px}.sales-entry-shell>header .sales-navigation{margin-bottom:0}.sales-entry-shell>main>#entry-explanation{margin-top:8px}
+
+/* Mobile Import follows the page; issue rows must not consume a second vertical gesture. */
+@media(max-width:767px){#import-quality .quality-list{max-height:none;overflow:visible}}
+
+/* Reserve the compact empty/success result while Import data is arriving. */
+@media(max-width:767px){#import-quality .quality-impact{min-height:calc(2.9em + 12px)}#import-quality .quality-list:empty::before{content:"";display:block;height:calc(1lh + 30px);margin:14px}}
+
+/* Keep the existing feedback row and timezone line stable as loading completes. */
+@media(max-width:767px){body[data-sales-experience] #venue-timezone-label{min-height:1lh}body[data-sales-experience] #notice[hidden]{display:block!important;visibility:hidden;min-height:calc(1lh + 28px)}}
+
+/* Draft restoration and issue status keep the same command/header geometry. */
+@media(max-width:767px){.journal-primary{min-height:50px}#import-quality.has-issues .section-heading{padding-bottom:15px}}

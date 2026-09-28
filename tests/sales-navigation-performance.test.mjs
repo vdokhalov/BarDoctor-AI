@@ -43,5 +43,6 @@ test('checkout measurements settle without synchronous resize delivery writes',(
  assert.deepEqual(observed,[shell,footer]);callback();callback();assert.equal(frames.length,1);assert.equal(writes.length,0);
  frames.shift()();assert.deepEqual(writes,[['--pos-cart-offset','200px'],['--pos-checkout-height','240px']]);
  callback();frames.shift()();assert.equal(writes.length,2,'stable measurements do not invalidate layout');
+ height=0;callback();frames.shift()();assert.equal(values.get('--pos-checkout-height'),'240px','hidden menu must retain checkout reservation');
  top=190;height=310;callback();frames.shift()();assert.equal(values.get('--pos-cart-offset'),'210px');assert.equal(values.get('--pos-checkout-height'),'310px');
 });

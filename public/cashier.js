@@ -72,18 +72,22 @@
   function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
   let orderView=false;
   let layoutFrame=0;
+  function measureLayoutMetrics() {
+    const style=document.documentElement.style;
+    const offset=$("cashier").getBoundingClientRect().top+window.scrollY;
+    const height=document.querySelector(".pos-cart-foot").getBoundingClientRect().height;
+    // A hidden pane has no measurable checkout; retain its last visible reservation.
+    for(const [key,value] of [["--pos-cart-offset",offset],...(height>0?[["--pos-checkout-height",height]]:[])]) {
+      const pixels=value+"px";
+      if(style.getPropertyValue(key)!==pixels)style.setProperty(key,pixels);
+    }
+  }
   function scheduleLayoutMetrics() {
     if(layoutFrame)return;
     layoutFrame=requestAnimationFrame(()=>{
       layoutFrame=0;
-      const style=document.documentElement.style;
-      const offset=$("cashier").getBoundingClientRect().top+window.scrollY;
-      const height=document.querySelector(".pos-cart-foot").getBoundingClientRect().height;
-      // Read both dimensions before writing, outside ResizeObserver delivery.
-      for(const [key,value] of [["--pos-cart-offset",offset],["--pos-checkout-height",height]]) {
-        const pixels=value+"px";
-        if(style.getPropertyValue(key)!==pixels)style.setProperty(key,pixels);
-      }
+      // Resize delivery never writes to the observed layout synchronously.
+      measureLayoutMetrics();
     });
   }
   const layoutObserver=new ResizeObserver(scheduleLayoutMetrics);
@@ -92,6 +96,8 @@
   function selectPane(order) {
     orderView=order;document.body.classList.toggle("pos-order-view",order);
     $("show-menu").setAttribute("aria-pressed",String(!order));$("show-cart").setAttribute("aria-pressed",String(order));
+    // Reserve the visible checkout before the first Order frame, not a frame later.
+    measureLayoutMetrics();
     updateJump();window.scrollTo({top:0,behavior:"instant"});
   }
   function updateJump() {$("order-jump").hidden=!(matchMedia("(max-width:767px)").matches&&!orderView&&activeShift&&data?.permissions.post&&$("receipt").hidden);}
