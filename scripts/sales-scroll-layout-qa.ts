@@ -102,7 +102,8 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
   await f().waitForFunction(start=>Math.abs(((window as unknown as {__scrollQAOwner:Element}).__scrollQAOwner.scrollTop)-start)>1,before.scrollTop,{timeout:1500}).catch(()=>{});
   const responseMs=Date.now()-started;await p.waitForTimeout(250);const after=await metrics();const pass=Math.abs(after.scrollTop-before.scrollTop)>1;
   await f().evaluate(()=>delete (window as unknown as {__scrollQAOwner?:Element}).__scrollQAOwner);
-  checks.push({label,result:pass?'PASS':'FAIL',responseMs,delta:after.scrollTop-before.scrollTop,before,after});
+  const parent=await p.evaluate(()=>({url:location.href,scrollTop:document.scrollingElement?.scrollTop,probe:(window as unknown as {__scrollQA:unknown}).__scrollQA,hit:document.elementFromPoint(innerWidth/2,innerHeight*.52)?.outerHTML.slice(0,500)}));
+  checks.push({label,result:pass?'PASS':'FAIL',responseMs,delta:after.scrollTop-before.scrollTop,before,after,parent});
   writeFileSync(out+'/'+id+'.json',JSON.stringify({profile,delay,engine:engine.name(),gesture:cdp?'CDP touch swipe':'native wheel; touch taps',checks,errors},null,2));
   assert.ok(pass,'FIRST GESTURE '+label+' '+id);assert.deepEqual(errors,[]);
  }

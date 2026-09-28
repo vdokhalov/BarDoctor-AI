@@ -129,6 +129,7 @@ jobs:
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
       - name: First gesture and layout stability with isolated real handlers
         run: |
+          BD_SCROLL_LABEL=ci-first BD_SCROLL_BROWSER=webkit BD_SCROLL_PROFILE=tablet BD_SCROLL_DELAYS=0 node --import tsx scripts/sales-scroll-layout-qa.ts
           BD_SCROLL_LABEL=ci-touch BD_SCROLL_BROWSER=chromium BD_SCROLL_PROFILE=safe BD_SCROLL_DELAYS=0 BD_SCROLL_TOUCH=1 node --import tsx scripts/sales-scroll-layout-qa.ts
           for browser in chromium webkit; do
             BD_SCROLL_LABEL=ci BD_SCROLL_BROWSER=$browser BD_SCROLL_PROFILE=safe node --import tsx scripts/sales-scroll-layout-qa.ts
