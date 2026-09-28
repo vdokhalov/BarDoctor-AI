@@ -510,7 +510,7 @@
         if(draft && (draft.lines.length || draft.pending))drafts.push({shift:shift,draft:draft});
       }
       document.getElementById('open-cashier').hidden=!context.permissions.post||drafts.length>0;
-      document.getElementById('pos-drafts').innerHTML=context.permissions.post?drafts.map(function(item){return '<a class="journal-resume" data-resume-shift="'+h(item.shift.id)+'" href="/cashier">Продолжить заказ · '+item.draft.lines.length+' поз. · '+h(item.shift.shiftName)+'</a>';}).join(''):'';
+      document.getElementById('pos-drafts').innerHTML=context.permissions.post?drafts.map(function(item){return '<a class="journal-resume" data-resume-shift="'+h(item.shift.id)+'" href="/cashier"><span class="journal-resume-label">Продолжить заказ · '+item.draft.lines.length+' поз. · '+h(item.shift.shiftName)+'</span></a>';}).join(''):'';
       renderJournalOptions();renderJournal();
       if(editor.open && state.batch?.readOnly)renderEventDocument(state.batch);
     } catch {document.getElementById('pos-shift-status').textContent='Не удалось прочитать кассовую смену или сохранённый заказ. Откройте кассу для проверки.';}
