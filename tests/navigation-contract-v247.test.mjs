@@ -132,6 +132,8 @@ test("delayed unsaved-confirmation cleanup cannot reopen a prior write-off or re
     confirm.isConnected = false;
     window.location = new URL("https://bardoctor.test/warehouse?venue=901&tab=writeoffs");
     window.bdTransientNavigationV247.scan();
+    assert.equal(document.body.style.overflow, "", "closed layer unlocks before animation frame");
+    assert.equal(document.documentElement.style.overflow, "", "first gesture must not meet a stale html lock");
     while (frames.length) frames.shift()();
     assert.equal(pushCalls, 0, "URL-owned confirmation must not add a second history owner");
     assert.equal(backCalls, 0, "cleanup must not navigate to the previous document");

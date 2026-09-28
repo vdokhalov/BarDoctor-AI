@@ -127,7 +127,7 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  }
  if(width===390)await l('#show-cart').tap();await l('.pos-line').last().scrollIntoViewIfNeeded();const last=await l('.pos-line').last().boundingBox(),foot=await l('.pos-cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last item uncovered');await p.screenshot({path:out+'/'+id+'-checkout.png'});
  await l('#comment-panel summary').tap();if(width===390)assert.ok(await l('#comment').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('#comment').fill('QA comment');await p.setViewportSize({width,height:Math.max(440,height-300)});await l('#comment').blur();await p.setViewportSize({width,height});await gesture('keyboard comment restored');
- await toTop();await l('[data-bd-venue-trigger]').tap();await l('[data-bd-venue-sheet]').waitFor();await l('[data-bd-venue-sheet] [data-close]').tap();await gesture('dropdown closed');
+ await toTop();await l('[data-bd-venue-trigger]').tap();await l('[data-bd-venue-sheet]').waitFor();await l('[data-bd-venue-sheet] [data-close]').tap();assert.equal(await f().evaluate(()=>document.body.classList.contains('bd-transient-layer-open-v247')),false,'closed dropdown releases scroll lock before first gesture');await gesture('dropdown closed');
  await toTop();await l('.pos-back').tap();await readyJournal();await gesture('F cashier journal');
  await toTop();await l('a[href="/sales-entry?view=shifts"]').tap();await l('.cash-shift').first().waitFor();await gesture('G shifts');
  await toTop();await l('#manual-nav').tap();await l('#sale:not([hidden])').waitFor();await gesture('H manual first');for(let i=0;i<8;i++)await l('#add-line').tap();await gesture('H manual long');

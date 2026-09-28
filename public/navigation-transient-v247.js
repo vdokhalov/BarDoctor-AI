@@ -83,6 +83,9 @@
   }
 
   function cleanup() {
+    // Release a removed modal before the next gesture, even while history/focus
+    // cleanup is waiting for a frame. Other visible layers keep their lock.
+    unlockScrollIfIdle();
     if (settling) return;
     settling = true;
     window.requestAnimationFrame(function () {
