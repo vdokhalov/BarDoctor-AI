@@ -164,10 +164,12 @@ test("manual stale editor is blocked; recipe lifecycle preserves identities and 
     const checked = await r.validate(created.body.draft); assert.equal(checked.response.status, 200, JSON.stringify(checked.body)); await r.confirm(checked.body.draft);
     assert.equal(r.get().recipes.length, before.recipes.length); assert.equal(r.get().recipes[0].id, before.recipes[0].id); assert.equal(r.get().recipes[0].lifecycleStatus, "inactive"); assert.deepEqual(r.get().recipes[0].ingredients, before.recipes[0].ingredients);
     const current = r.get().menuItems.find((row: { id: string }) => row.id === coffee.id);
+    const superseded = { ...r.get().recipes[0], id: "superseded-history", status: "confirmed", reviewStatus: "superseded", deactivatedAt: "2030-01-01T00:00:00.000Z" };
+    r.put("bd_assortment_v1", { ...r.get(), recipes: [...r.get().recipes, superseded] });
     const restored = await r.create("MANUAL", [{ ...current, consumptionMode: "RECIPE", baseline: current }], "draft:restore-recipe-123"); const validated = await r.validate(restored.body.draft); assert.equal(validated.response.status, 200, JSON.stringify(validated.body)); await r.confirm(validated.body.draft);
-    assert.equal(r.get().recipes.length, before.recipes.length); assert.equal(r.get().recipes[0].id, before.recipes[0].id); assert.equal(r.get().recipes[0].current, true); assert.deepEqual(r.get().recipes[0].ingredients, before.recipes[0].ingredients);
+    assert.equal(r.get().recipes.length, before.recipes.length + 1); assert.equal(r.get().recipes[0].id, before.recipes[0].id); assert.equal(r.get().recipes[0].current, true); assert.deepEqual(r.get().recipes[0].ingredients, before.recipes[0].ingredients); assert.deepEqual(r.get().recipes[1], superseded);
     const newRecipe = await r.create("MANUAL", [{ ...r.item("Prepared dish"), consumptionMode: "RECIPE" }], "draft:new-recipe-123"); const ready = await r.validate(newRecipe.body.draft); await r.confirm(ready.body.draft); await r.confirm(ready.body.draft);
-    const recipes = r.get().recipes.filter((row: { menuItemId: string }) => row.menuItemId === ready.body.draft.rows[0].item.id); assert.equal(recipes.length, 1); assert.equal(recipes[0].status, "draft"); assert.deepEqual(recipes[0].ingredients, []);
+    const recipes = r.get().recipes.filter((row: { menuItemId: string }) => row.menuItemId === ready.body.draft.rows[0].item.id); assert.equal(recipes.length, 1); assert.equal(recipes[0].version, 1); assert.equal(recipes[0].status, "draft"); assert.deepEqual(recipes[0].ingredients, []);
   } finally { r.close(); }
 });
 

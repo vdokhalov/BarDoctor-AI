@@ -68,9 +68,9 @@ function recipeLifecycle(root: Row, item: Row, line: DraftLine, now: string): Ro
       if (selected) { recipes = recipes.map(recipe => active.includes(recipe) ? recipe === selected ? { ...recipe, current: true, lifecycleStatus: "current" } : { ...recipe, current: false, currentDraft: false, lifecycleStatus: "inactive", inactiveReason: "consumption_mode_review", deactivatedAt: now } : recipe); active = [selected]; }
     }
     if (!active.length) {
-      const restore = recipes.filter(recipe => owner(recipe) && recipe.lifecycleStatus === "inactive" && recipe.status !== "superseded").sort((a, b) => String(b.deactivatedAt || b.updatedAt || "").localeCompare(String(a.deactivatedAt || a.updatedAt || "")))[0];
+      const restore = recipes.filter(recipe => owner(recipe) && recipe.lifecycleStatus === "inactive" && recipe.status !== "superseded" && recipe.reviewStatus !== "superseded").sort((a, b) => String(b.deactivatedAt || b.updatedAt || "").localeCompare(String(a.deactivatedAt || a.updatedAt || "")) || String(b.id).localeCompare(String(a.id)))[0];
       if (restore) recipes = recipes.map(recipe => recipe === restore ? { ...recipe, current: true, currentDraft: recipe.status !== "confirmed", lifecycleStatus: "current", inactiveReason: undefined, deactivatedAt: undefined, reactivatedAt: now } : recipe);
-      else recipes = [...recipes, { id: `recipe:${line.id}`, menuItemId: item.id, ownerId: item.id, ownerType: "menu_item", venueId: item.venueId, status: "draft", reviewStatus: "requires_review", lifecycleStatus: "current", current: true, currentDraft: true, source: "manual", ingredients: [], warnings: [], createdAt: now, updatedAt: now }];
+      else recipes = [...recipes, { id: `recipe:${line.id}`, menuItemId: item.id, ownerId: item.id, ownerType: "menu_item", venueId: item.venueId, version: 1, status: "draft", reviewStatus: "requires_review", lifecycleStatus: "current", current: true, currentDraft: true, source: "manual", ingredients: [], warnings: [], createdAt: now, updatedAt: now }];
     }
   } else if (line.base?.consumptionMode !== item.consumptionMode) {
     recipes = recipes.map(recipe => active.includes(recipe) ? { ...recipe, current: false, currentDraft: false, lifecycleStatus: "inactive", inactiveReason: "consumption_mode_switch", deactivatedAt: now } : recipe);
