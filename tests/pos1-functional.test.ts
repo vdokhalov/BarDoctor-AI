@@ -94,6 +94,12 @@ test("F01 prepared SPA runs the shared canonical hierarchy, including a legacy-o
  context.root=root;context.analytics={menuItems:menu};
  const result=vm.runInContext("bdAssortmentHierarchyV171(analytics,root)",context);
  assert.deepEqual(JSON.parse(JSON.stringify(result)),menuTaxonomyHierarchy(context.analytics,root));
+ context.root={menuItems:menu.map(item=>({...item,taxonomyCategoryId:item.sectionId==="bar"?"alcohol":item.sectionId==="kitchen"?"food":"hookah-tobacco",subcategoryId:""}))};
+ context.analytics={menuItems:context.root.menuItems};
+ const stockFirst=vm.runInContext("bdAssortmentHierarchyV171(analytics,root)",context);
+ assert.deepEqual(JSON.parse(JSON.stringify(stockFirst)),menuTaxonomyHierarchy(context.analytics,context.root));
+ assert.deepEqual(Array.from(stockFirst,(group:{name:string})=>group.name),["Бар","Кухня","Кальянная"]);
+ assert.deepEqual(Array.from(stockFirst,(group:{roots:{name:string}[]})=>group.roots[0].name),["Алкоголь","Продукты","Табак и смеси"]);
  context.root={groups:[{id:"old-kitchen",name:"Кухня"}],subgroups:[{id:"food",groupId:"old-kitchen",name:"Продукты"},{id:"bread",groupId:"old-kitchen",parentId:"food",name:"Выпечка"}],menuItems:[{id:"legacy",groupId:"old-kitchen",subgroupId:"bread",name:"Хлеб"}]};
  context.analytics={menuItems:context.root.menuItems};
  const legacy=vm.runInContext("bdAssortmentHierarchyV171(analytics,root)",context);

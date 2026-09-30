@@ -1,10 +1,12 @@
 import fs from 'node:fs';
-import ts from 'typescript';
+import { buildSync } from 'esbuild';
 const path='public/assets/index-BQGspy0I.js';let source=fs.readFileSync(path,'utf8');
 const typescript=fs.readFileSync('lib/bardoctor/nomenclature-taxonomy.ts','utf8');
 const readonlySource=typescript.slice(0,typescript.indexOf('export function materializeMenuTaxonomy('))+typescript.slice(typescript.indexOf('/** Resolve menu presentation'));
-const compiled=ts.transpileModule(readonlySource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText;
-const shared='/* bd-menu-taxonomy-shared-start */\n(function(){const exports={};\n'+compiled+'\nwindow.bdMenuTaxonomy=exports;})();\n/* bd-menu-taxonomy-shared-end */\n';
+// Bundle the read-only resolver and its existing default structure together so
+// the SPA executes the same source contract as the API, including imports.
+const compiled=buildSync({stdin:{contents:readonlySource,loader:'ts',resolveDir:new URL('../lib/bardoctor/',import.meta.url).pathname},bundle:true,platform:'browser',format:'iife',globalName:'bdMenuTaxonomyShared',target:'es2022',write:false}).outputFiles[0].text;
+const shared='/* bd-menu-taxonomy-shared-start */\n(function(){\n'+compiled+'\nwindow.bdMenuTaxonomy=bdMenuTaxonomyShared;})();\n/* bd-menu-taxonomy-shared-end */\n';
 source=source.replace(/\/\* bd-menu-taxonomy-shared-start \*\/[\s\S]*?\/\* bd-menu-taxonomy-shared-end \*\/\n?/,'');
 source=source.replace(/function bdLegacyAssortmentHierarchyV171\([^\n]*\n/,'');
 const legacySource=fs.readFileSync('scripts/fragments/assortment-command-v170.fragment.txt','utf8');

@@ -1,235 +1,311 @@
 /* bd-menu-taxonomy-shared-start */
-(function(){const exports={};
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.normalizeCanonicalTaxonomy = normalizeCanonicalTaxonomy;
-exports.canonicalTaxonomyForAssortment = canonicalTaxonomyForAssortment;
-exports.menuTaxonomyPresentation = menuTaxonomyPresentation;
-exports.menuTaxonomyHierarchy = menuTaxonomyHierarchy;
-function record(value) {
+(function(){
+var bdMenuTaxonomyShared = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // <stdin>
+  var stdin_exports = {};
+  __export(stdin_exports, {
+    canonicalTaxonomyForAssortment: () => canonicalTaxonomyForAssortment,
+    menuTaxonomyHierarchy: () => menuTaxonomyHierarchy,
+    menuTaxonomyPresentation: () => menuTaxonomyPresentation,
+    normalizeCanonicalTaxonomy: () => normalizeCanonicalTaxonomy
+  });
+
+  // lib/bardoctor/nomenclature.ts
+  function node(id, name, order, parentId) {
+    return { id, name, order, active: true, ...parentId ? { parentId } : {} };
+  }
+  function defaultNomenclatureStructure() {
+    return {
+      version: "v336",
+      sections: [
+        node("bar", "\u0411\u0430\u0440", 10),
+        node("kitchen", "\u041A\u0443\u0445\u043D\u044F", 20),
+        node("hookah", "\u041A\u0430\u043B\u044C\u044F\u043D\u043D\u0430\u044F", 30),
+        node("household", "\u0425\u043E\u0437\u0447\u0430\u0441\u0442\u044C", 40),
+        node("administration", "\u0410\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F", 50),
+        node("unassigned", "\u0422\u0440\u0435\u0431\u0443\u044E\u0442 \u0440\u0430\u0441\u043F\u0440\u0435\u0434\u0435\u043B\u0435\u043D\u0438\u044F", 999)
+      ],
+      categories: [
+        node("alcohol", "\u0410\u043B\u043A\u043E\u0433\u043E\u043B\u044C", 10, "bar"),
+        node("soft-drinks", "\u0411\u0435\u0437\u0430\u043B\u043A\u043E\u0433\u043E\u043B\u044C\u043D\u044B\u0435 \u043D\u0430\u043F\u0438\u0442\u043A\u0438", 20, "bar"),
+        node("bar-supplies", "\u0411\u0430\u0440\u043D\u044B\u0435 \u0440\u0430\u0441\u0445\u043E\u0434\u043D\u0438\u043A\u0438", 30, "bar"),
+        node("food", "\u041F\u0440\u043E\u0434\u0443\u043A\u0442\u044B", 10, "kitchen"),
+        node("kitchen-supplies", "\u041A\u0443\u0445\u043E\u043D\u043D\u044B\u0435 \u0440\u0430\u0441\u0445\u043E\u0434\u043D\u0438\u043A\u0438", 20, "kitchen"),
+        node("hookah-tobacco", "\u0422\u0430\u0431\u0430\u043A \u0438 \u0441\u043C\u0435\u0441\u0438", 10, "hookah"),
+        node("hookah-supplies", "\u0423\u0433\u043E\u043B\u044C \u0438 \u0430\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B", 20, "hookah"),
+        node("cleaning", "\u0423\u0431\u043E\u0440\u043A\u0430 \u0438 \u0433\u0438\u0433\u0438\u0435\u043D\u0430", 10, "household"),
+        node("packaging", "\u0423\u043F\u0430\u043A\u043E\u0432\u043A\u0430 \u0438 \u043E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0430\u044F \u043F\u043E\u0441\u0443\u0434\u0430", 20, "household"),
+        node("office", "\u041E\u0444\u0438\u0441 \u0438 \u043E\u0431\u0441\u043B\u0443\u0436\u0438\u0432\u0430\u043D\u0438\u0435", 10, "administration"),
+        node("services", "\u0423\u0441\u043B\u0443\u0433\u0438", 20, "administration"),
+        node("unassigned-category", "\u0411\u0435\u0437 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438", 999, "unassigned")
+      ],
+      subcategories: [
+        node("cognac", "\u041A\u043E\u043D\u044C\u044F\u043A \u0438 \u0431\u0440\u0435\u043D\u0434\u0438", 10, "alcohol"),
+        node("vodka", "\u0412\u043E\u0434\u043A\u0430", 20, "alcohol"),
+        node("beer", "\u041F\u0438\u0432\u043E", 30, "alcohol"),
+        node("wine", "\u0412\u0438\u043D\u043E \u0438 \u0438\u0433\u0440\u0438\u0441\u0442\u043E\u0435", 40, "alcohol"),
+        node("whisky", "\u0412\u0438\u0441\u043A\u0438", 50, "alcohol"),
+        node("strong-alcohol", "\u0420\u043E\u043C, \u0434\u0436\u0438\u043D \u0438 \u0442\u0435\u043A\u0438\u043B\u0430", 60, "alcohol"),
+        node("liqueurs", "\u041B\u0438\u043A\u0451\u0440\u044B \u0438 \u0432\u0435\u0440\u043C\u0443\u0442\u044B", 70, "alcohol"),
+        node("water-soda", "\u0412\u043E\u0434\u0430 \u0438 \u0433\u0430\u0437\u0438\u0440\u043E\u0432\u043A\u0430", 10, "soft-drinks"),
+        node("juice", "\u0421\u043E\u043A\u0438", 20, "soft-drinks"),
+        node("coffee-tea", "\u041A\u043E\u0444\u0435 \u0438 \u0447\u0430\u0439", 30, "soft-drinks"),
+        node("syrups", "\u0421\u0438\u0440\u043E\u043F\u044B", 40, "soft-drinks"),
+        node("meat", "\u041C\u044F\u0441\u043E \u0438 \u043A\u043E\u043B\u0431\u0430\u0441\u044B", 10, "food"),
+        node("dairy", "\u041C\u043E\u043B\u043E\u0447\u043D\u0430\u044F \u043F\u0440\u043E\u0434\u0443\u043A\u0446\u0438\u044F", 20, "food"),
+        node("fish", "\u0420\u044B\u0431\u0430 \u0438 \u043C\u043E\u0440\u0435\u043F\u0440\u043E\u0434\u0443\u043A\u0442\u044B", 30, "food"),
+        node("produce", "\u041E\u0432\u043E\u0449\u0438 \u0438 \u0444\u0440\u0443\u043A\u0442\u044B", 40, "food"),
+        node("grocery", "\u0411\u0430\u043A\u0430\u043B\u0435\u044F", 50, "food"),
+        node("sauces-spices", "\u0421\u043E\u0443\u0441\u044B \u0438 \u0441\u043F\u0435\u0446\u0438\u0438", 60, "food"),
+        node("frozen", "\u0417\u0430\u043C\u043E\u0440\u043E\u0437\u043A\u0430", 70, "food"),
+        node("bakery", "\u0425\u043B\u0435\u0431 \u0438 \u0432\u044B\u043F\u0435\u0447\u043A\u0430", 80, "food"),
+        node("canned", "\u041A\u043E\u043D\u0441\u0435\u0440\u0432\u044B", 90, "food"),
+        node("tobacco", "\u0422\u0430\u0431\u0430\u043A", 10, "hookah-tobacco"),
+        node("coal", "\u0423\u0433\u043E\u043B\u044C", 10, "hookah-supplies"),
+        node("detergents", "\u041C\u043E\u044E\u0449\u0438\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430", 10, "cleaning"),
+        node("hygiene", "\u0413\u0438\u0433\u0438\u0435\u043D\u0430", 20, "cleaning"),
+        node("disposables", "\u041E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u0430\u044F \u043F\u043E\u0441\u0443\u0434\u0430", 10, "packaging"),
+        node("containers", "\u041A\u043E\u043D\u0442\u0435\u0439\u043D\u0435\u0440\u044B \u0438 \u043F\u0430\u043A\u0435\u0442\u044B", 20, "packaging"),
+        node("maintenance", "\u0420\u0435\u043C\u043E\u043D\u0442 \u0438 \u043E\u0431\u0441\u043B\u0443\u0436\u0438\u0432\u0430\u043D\u0438\u0435", 10, "services"),
+        node("software", "\u0421\u0432\u044F\u0437\u044C \u0438 \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u043D\u043E\u0435 \u043E\u0431\u0435\u0441\u043F\u0435\u0447\u0435\u043D\u0438\u0435", 20, "services"),
+        node("unassigned-subcategory", "\u0411\u0435\u0437 \u043F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438", 999, "unassigned-category")
+      ],
+      locations: [
+        node("bar-store", "\u0421\u043A\u043B\u0430\u0434 \u0431\u0430\u0440\u0430", 10, "bar"),
+        node("bar-fridge", "\u0425\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0438\u043A \u0431\u0430\u0440\u0430", 20, "bar"),
+        node("kitchen-store", "\u0421\u043A\u043B\u0430\u0434 \u043A\u0443\u0445\u043D\u0438", 10, "kitchen"),
+        node("kitchen-fridge", "\u0425\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0438\u043A \u043A\u0443\u0445\u043D\u0438", 20, "kitchen"),
+        node("freezer", "\u041C\u043E\u0440\u043E\u0437\u0438\u043B\u044C\u043D\u0438\u043A", 30, "kitchen"),
+        node("hookah-store", "\u041A\u0430\u043B\u044C\u044F\u043D\u043D\u044B\u0439 \u0441\u043A\u043B\u0430\u0434", 10, "hookah"),
+        node("household-store", "\u0425\u043E\u0437\u044F\u0439\u0441\u0442\u0432\u0435\u043D\u043D\u0430\u044F \u043A\u043B\u0430\u0434\u043E\u0432\u0430\u044F", 10, "household"),
+        node("office-store", "\u0410\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u044F", 10, "administration")
+      ]
+    };
+  }
+
+  // <stdin>
+  function record(value) {
     return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-function array(value) {
+  }
+  function array(value) {
     return Array.isArray(value) ? value : [];
-}
-function text(value, fallback = "", max = 200) {
+  }
+  function text(value, fallback = "", max = 200) {
     return typeof value === "string" && value.trim() ? value.trim().slice(0, max) : fallback;
-}
-function number(value, fallback) {
+  }
+  function number(value, fallback) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
-}
-function slug(value) {
-    return value.toLocaleLowerCase("ru-RU")
-        .replace(/ё/g, "е")
-        .replace(/[^a-zа-я0-9]+/gi, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 48) || "node";
-}
-function normalizedName(value) {
-    return text(value).toLocaleLowerCase("ru-RU").replace(/ё/g, "е").replace(/\s+/g, " ");
-}
-function nodes(value) {
-    const ids = new Set();
+  }
+  function normalizedName(value) {
+    return text(value).toLocaleLowerCase("ru-RU").replace(/ё/g, "\u0435").replace(/\s+/g, " ");
+  }
+  function nodes(value) {
+    const ids = /* @__PURE__ */ new Set();
     return array(value).map(record).flatMap((item, index) => {
-        const id = text(item.id, "", 120);
-        const name = text(item.name ?? item.label, "", 160);
-        if (!id || !name || ids.has(id))
-            return [];
-        ids.add(id);
-        return [{
-                id,
-                name,
-                ...(text(item.parentId, "", 120) ? { parentId: text(item.parentId, "", 120) } : {}),
-                order: number(item.order ?? item.sortOrder, (index + 1) * 10),
-                active: item.active !== false,
-                ...(item.system === true ? { system: true } : {}),
-                ...(text(item.createdAt) ? { createdAt: text(item.createdAt) } : {}),
-                ...(text(item.updatedAt) ? { updatedAt: text(item.updatedAt) } : {}),
-                ...(text(item.archivedAt) ? { archivedAt: text(item.archivedAt) } : {}),
-            }];
+      const id = text(item.id, "", 120);
+      const name = text(item.name ?? item.label, "", 160);
+      if (!id || !name || ids.has(id)) return [];
+      ids.add(id);
+      return [{
+        id,
+        name,
+        ...text(item.parentId, "", 120) ? { parentId: text(item.parentId, "", 120) } : {},
+        order: number(item.order ?? item.sortOrder, (index + 1) * 10),
+        active: item.active !== false,
+        ...item.system === true ? { system: true } : {},
+        ...text(item.createdAt) ? { createdAt: text(item.createdAt) } : {},
+        ...text(item.updatedAt) ? { updatedAt: text(item.updatedAt) } : {},
+        ...text(item.archivedAt) ? { archivedAt: text(item.archivedAt) } : {}
+      }];
     }).sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
-}
-/**
- * The existing structure inside bd_assortment_v1 is the canonical source.
- * Defaults are used only for a genuinely new venue. Existing structures are
- * normalized without re-inserting removed or renamed business categories.
- */
-function normalizeCanonicalTaxonomy(value, fallback) {
+  }
+  function normalizeCanonicalTaxonomy(value, fallback) {
     const root = record(value);
-    const hasExistingStructure = [root.sections, root.categories, root.subcategories]
-        .some((candidate) => Array.isArray(candidate));
+    const hasExistingStructure = [root.sections, root.categories, root.subcategories].some((candidate) => Array.isArray(candidate));
     const source = hasExistingStructure ? root : record(fallback);
     return {
-        version: "v336",
-        sections: nodes(source.sections),
-        categories: nodes(source.categories),
-        subcategories: nodes(source.subcategories),
-        locations: nodes(source.locations),
+      version: "v336",
+      sections: nodes(source.sections),
+      categories: nodes(source.categories),
+      subcategories: nodes(source.subcategories),
+      locations: nodes(source.locations)
     };
-}
-/**
- * Legacy menu groups are read as an additive compatibility source until the
- * venue persists the canonical tree. GET callers can use this projection
- * without writing production data; a later user-authorized save can persist
- * the same stable IDs through materializeMenuTaxonomy().
- */
-function canonicalTaxonomyForAssortment(assortment, fallback) {
+  }
+  function canonicalTaxonomyForAssortment(assortment, fallback = defaultNomenclatureStructure()) {
     const root = record(assortment);
     let taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, fallback);
     const structuralCount = taxonomy.sections.length + taxonomy.categories.length + taxonomy.subcategories.length;
-    if (structuralCount === 0 && fallback)
-        taxonomy = normalizeCanonicalTaxonomy(fallback);
     taxonomy = {
-        ...taxonomy,
-        sections: taxonomy.sections.map((node) => ({ ...node })),
-        categories: taxonomy.categories.map((node) => ({ ...node })),
-        subcategories: taxonomy.subcategories.map((node) => ({ ...node })),
-        locations: taxonomy.locations.map((node) => ({ ...node })),
+      ...taxonomy,
+      sections: taxonomy.sections.map((node2) => ({ ...node2 })),
+      categories: taxonomy.categories.map((node2) => ({ ...node2 })),
+      subcategories: taxonomy.subcategories.map((node2) => ({ ...node2 })),
+      locations: taxonomy.locations.map((node2) => ({ ...node2 }))
     };
-    const groups = array(root.groups).map(record).filter((group) => text(group.id, "", 120) && text(group.name ?? group.label, "", 160) && group.active !== false);
-    const subgroups = array(root.subgroups).map(record).filter((subgroup) => text(subgroup.id, "", 120) && text(subgroup.groupId, "", 120)
-        && text(subgroup.name ?? subgroup.label, "", 160) && subgroup.active !== false);
+    const groups = array(root.groups).map(record).filter(
+      (group) => text(group.id, "", 120) && text(group.name ?? group.label, "", 160) && group.active !== false
+    );
+    const subgroups = array(root.subgroups).map(record).filter(
+      (subgroup) => text(subgroup.id, "", 120) && text(subgroup.groupId, "", 120) && text(subgroup.name ?? subgroup.label, "", 160) && subgroup.active !== false
+    );
     const paths = [];
     let derivedFromMenu = structuralCount === 0 && groups.length > 0;
     const ensureGenericPath = (group, subgroup) => {
-        const groupId = text(group.id, "", 120);
-        const subgroupId = text(subgroup?.id, "", 120);
-        const groupName = text(group.name ?? group.label, "Раздел", 160);
-        const subgroupName = text(subgroup?.name ?? subgroup?.label, "Общее", 160);
-        let section = taxonomy.sections.find(node => node.id === group.sectionId || node.id === group.legacyDepartment || node.id === groupId)
-            ?? taxonomy.sections.find((node) => normalizedName(node.name) === normalizedName(groupName));
-        if (!section) {
-            section = { id: `menu-section:${groupId}`, name: groupName, order: number(group.sortOrder, taxonomy.sections.length * 10 + 10), active: true };
-            taxonomy.sections.push(section);
-            derivedFromMenu = true;
-        }
-        const existingSubcategory = taxonomy.subcategories.find((node) => {
-            if (normalizedName(node.name) !== normalizedName(subgroupName))
-                return false;
-            const category = taxonomy.categories.find((candidate) => candidate.id === node.parentId);
-            return category?.parentId === section?.id;
-        });
-        if (existingSubcategory) {
-            const category = taxonomy.categories.find((node) => node.id === existingSubcategory.parentId);
-            return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: existingSubcategory.id };
-        }
-        let category = taxonomy.categories.find((node) => node.parentId === section?.id && normalizedName(node.name) === normalizedName(subgroupName));
-        if (!category) {
-            category = {
-                id: `menu-category:${subgroupId || groupId}`,
-                name: subgroupName,
-                parentId: section.id,
-                order: number(subgroup?.sortOrder, taxonomy.categories.filter((node) => node.parentId === section?.id).length * 10 + 10),
-                active: true,
-            };
-            taxonomy.categories.push(category);
-            derivedFromMenu = true;
-        }
-        let subcategory = taxonomy.subcategories.find((node) => node.parentId === category?.id && normalizedName(node.name) === "без подкатегории") ?? taxonomy.subcategories.find((node) => node.parentId === category?.id && node.active);
-        if (!subcategory) {
-            subcategory = {
-                id: `menu-subcategory:${subgroupId || groupId}`,
-                name: "Без подкатегории",
-                parentId: category.id,
-                order: 999,
-                active: true,
-            };
-            taxonomy.subcategories.push(subcategory);
-            derivedFromMenu = true;
-        }
-        return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: subcategory.id };
+      const groupId = text(group.id, "", 120);
+      const subgroupId = text(subgroup?.id, "", 120);
+      const groupName = text(group.name ?? group.label, "\u0420\u0430\u0437\u0434\u0435\u043B", 160);
+      const subgroupName = text(subgroup?.name ?? subgroup?.label, "\u041E\u0431\u0449\u0435\u0435", 160);
+      let section = taxonomy.sections.find((node2) => node2.id === group.sectionId || node2.id === group.legacyDepartment || node2.id === groupId) ?? taxonomy.sections.find((node2) => normalizedName(node2.name) === normalizedName(groupName));
+      if (!section) {
+        section = { id: `menu-section:${groupId}`, name: groupName, order: number(group.sortOrder, taxonomy.sections.length * 10 + 10), active: true };
+        taxonomy.sections.push(section);
+        derivedFromMenu = true;
+      }
+      const existingSubcategory = taxonomy.subcategories.find((node2) => {
+        if (normalizedName(node2.name) !== normalizedName(subgroupName)) return false;
+        const category2 = taxonomy.categories.find((candidate) => candidate.id === node2.parentId);
+        return category2?.parentId === section?.id;
+      });
+      if (existingSubcategory) {
+        const category2 = taxonomy.categories.find((node2) => node2.id === existingSubcategory.parentId);
+        return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category2.id, subcategoryId: existingSubcategory.id };
+      }
+      let category = taxonomy.categories.find(
+        (node2) => node2.parentId === section?.id && normalizedName(node2.name) === normalizedName(subgroupName)
+      );
+      if (!category) {
+        category = {
+          id: `menu-category:${subgroupId || groupId}`,
+          name: subgroupName,
+          parentId: section.id,
+          order: number(subgroup?.sortOrder, taxonomy.categories.filter((node2) => node2.parentId === section?.id).length * 10 + 10),
+          active: true
+        };
+        taxonomy.categories.push(category);
+        derivedFromMenu = true;
+      }
+      let subcategory = taxonomy.subcategories.find(
+        (node2) => node2.parentId === category?.id && normalizedName(node2.name) === "\u0431\u0435\u0437 \u043F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438"
+      ) ?? taxonomy.subcategories.find((node2) => node2.parentId === category?.id && node2.active);
+      if (!subcategory) {
+        subcategory = {
+          id: `menu-subcategory:${subgroupId || groupId}`,
+          name: "\u0411\u0435\u0437 \u043F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438",
+          parentId: category.id,
+          order: 999,
+          active: true
+        };
+        taxonomy.subcategories.push(subcategory);
+        derivedFromMenu = true;
+      }
+      return { groupId, subgroupId, sectionId: section.id, taxonomyCategoryId: category.id, subcategoryId: subcategory.id };
     };
     for (const group of groups) {
-        const children = subgroups.filter((subgroup) => text(subgroup.groupId, "", 120) === text(group.id, "", 120));
-        if (!children.length)
-            paths.push(ensureGenericPath(group));
-        else
-            children.forEach((subgroup) => paths.push(ensureGenericPath(group, subgroup)));
+      const children = subgroups.filter((subgroup) => text(subgroup.groupId, "", 120) === text(group.id, "", 120));
+      if (!children.length) paths.push(ensureGenericPath(group));
+      else children.forEach((subgroup) => paths.push(ensureGenericPath(group, subgroup)));
     }
     taxonomy.sections.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
     taxonomy.categories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
     taxonomy.subcategories.sort((left, right) => left.order - right.order || left.name.localeCompare(right.name, "ru"));
     return { taxonomy, legacyMenuPaths: paths, derivedFromMenu };
-}
-/** Resolve menu presentation from its existing canonical links without mutating stored items. */
-function menuTaxonomyPresentation(assortment, value, resolved = canonicalTaxonomyForAssortment(assortment)) {
+  }
+  function menuTaxonomyPresentation(assortment, value, resolved = canonicalTaxonomyForAssortment(assortment)) {
     const root = record(assortment), item = record(value);
     const { taxonomy, legacyMenuPaths } = resolved;
     const canonical = Boolean(item.sectionId || item.taxonomyCategoryId || item.subcategoryId);
-    const paths = canonical ? [] : legacyMenuPaths.filter(path => path.groupId === item.groupId && (!item.subgroupId || path.subgroupId === item.subgroupId));
+    const paths = canonical ? [] : legacyMenuPaths.filter((path2) => path2.groupId === item.groupId && (!item.subgroupId || path2.subgroupId === item.subgroupId));
     const path = canonical ? item : !item.subgroupId && paths.length ? { sectionId: paths[0].sectionId } : paths.length === 1 ? paths[0] : item;
-    const subgroup = taxonomy.subcategories.find(node => node.id === path.subcategoryId);
-    const category = taxonomy.categories.find(node => node.id === path.taxonomyCategoryId || (!path.taxonomyCategoryId && node.id === subgroup?.parentId));
-    let section = taxonomy.sections.find(node => node.id === path.sectionId || (!path.sectionId && node.id === category?.parentId));
-    // Legacy department codes are identities, never translated display labels.
-    if (!canonical && !section && !item.groupId)
-        section = taxonomy.sections.find(node => node.id === item.department);
+    const subgroup = taxonomy.subcategories.find((node2) => node2.id === path.subcategoryId);
+    const category = taxonomy.categories.find((node2) => node2.id === path.taxonomyCategoryId || !path.taxonomyCategoryId && node2.id === subgroup?.parentId);
+    let section = taxonomy.sections.find((node2) => node2.id === path.sectionId || !path.sectionId && node2.id === category?.parentId);
+    if (!canonical && !section && !item.groupId) section = taxonomy.sections.find((node2) => node2.id === item.department);
     const sectionPath = [];
-    if (section)
-        sectionPath.unshift(section);
-    const seen = new Set();
+    if (section) sectionPath.unshift(section);
+    const seen = /* @__PURE__ */ new Set();
     while (section?.parentId && !seen.has(section.id)) {
-        seen.add(section.id);
-        const parent = taxonomy.sections.find(node => node.id === section?.parentId);
-        if (!parent || seen.has(parent.id))
-            break;
-        section = parent;
-        sectionPath.unshift(parent);
+      seen.add(section.id);
+      const parent = taxonomy.sections.find((node2) => node2.id === section?.parentId);
+      if (!parent || seen.has(parent.id)) break;
+      section = parent;
+      sectionPath.unshift(parent);
     }
-    const group = !canonical ? array(root.groups).map(record).find(row => row.id === item.groupId) : undefined;
-    const legacyCategory = !canonical ? array(root.subgroups).map(record).find(row => row.id === item.subgroupId && row.groupId === item.groupId) : undefined;
-    const legacyLabels = { bar: "Бар", kitchen: "Кухня", hookah: "Кальянная", other: "Другое" };
-    const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "Раздел недоступен" : (legacyLabels[text(item.department)] || text(item.department, "Другое")));
-    const categoryLabel = category?.name || text(legacyCategory?.name ?? legacyCategory?.label) || (canonical ? (item.taxonomyCategoryId ? "Категория недоступна" : "Без подраздела") : text(item.category, "Без подраздела"));
-    return { department, sectionId: section?.id || text(path.sectionId) || (group ? "legacy-group:" + text(group.id) : text(item.department, "other")),
-        category: categoryLabel, categoryId: category?.id || text(path.taxonomyCategoryId) || text(legacyCategory?.id) || "",
-        subcategory: subgroup?.name || (path.subcategoryId ? "Подраздел недоступен" : ""), subcategoryId: subgroup?.id || text(path.subcategoryId),
-        sectionPath: sectionPath.map(node => ({ id: node.id, name: node.name })) };
-}
-/** Read-only adapter to the existing Menu accordion; no store writes or alternate taxonomy. */
-function menuTaxonomyHierarchy(analytics, assortment) {
+    const group = !canonical ? array(root.groups).map(record).find((row) => row.id === item.groupId) : void 0;
+    const legacyCategory = !canonical ? array(root.subgroups).map(record).find((row) => row.id === item.subgroupId && row.groupId === item.groupId) : void 0;
+    const legacyLabels = { bar: "\u0411\u0430\u0440", kitchen: "\u041A\u0443\u0445\u043D\u044F", hookah: "\u041A\u0430\u043B\u044C\u044F\u043D\u043D\u0430\u044F", other: "\u0414\u0440\u0443\u0433\u043E\u0435" };
+    const department = section?.name || text(group?.name ?? group?.label) || (canonical ? "\u0420\u0430\u0437\u0434\u0435\u043B \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D" : legacyLabels[text(item.department)] || text(item.department, "\u0414\u0440\u0443\u0433\u043E\u0435"));
+    const categoryLabel = category?.name || text(legacyCategory?.name ?? legacyCategory?.label) || (canonical ? item.taxonomyCategoryId ? "\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430" : "\u0411\u0435\u0437 \u043F\u043E\u0434\u0440\u0430\u0437\u0434\u0435\u043B\u0430" : text(item.category, "\u0411\u0435\u0437 \u043F\u043E\u0434\u0440\u0430\u0437\u0434\u0435\u043B\u0430"));
+    return {
+      department,
+      sectionId: section?.id || text(path.sectionId) || (group ? "legacy-group:" + text(group.id) : text(item.department, "other")),
+      category: categoryLabel,
+      categoryId: category?.id || text(path.taxonomyCategoryId) || text(legacyCategory?.id) || "",
+      subcategory: subgroup?.name || (path.subcategoryId ? "\u041F\u043E\u0434\u0440\u0430\u0437\u0434\u0435\u043B \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D" : ""),
+      subcategoryId: subgroup?.id || text(path.subcategoryId),
+      sectionPath: sectionPath.map((node2) => ({ id: node2.id, name: node2.name }))
+    };
+  }
+  function menuTaxonomyHierarchy(analytics, assortment) {
     const root = record(assortment), resolved = canonicalTaxonomyForAssortment(root);
-    const originals = new Map(array(root.menuItems).map(record).map(item => [item.id, item]));
-    const groups = new Map(), nodes = new Map();
+    const originals = new Map(array(root.menuItems).map(record).map((item) => [item.id, item]));
+    const groups = /* @__PURE__ */ new Map(), nodes2 = /* @__PURE__ */ new Map();
     for (const value of array(record(analytics).menuItems)) {
-        const item = record(value), original = originals.get(item.id) || item;
-        const view = menuTaxonomyPresentation(root, original, resolved);
-        const display = { ...item, groupId: view.sectionId, groupName: view.department, category: view.category, subcategory: view.subcategory };
-        let group = groups.get(view.sectionId);
-        if (!group) {
-            group = { id: view.sectionId, name: view.department, directItems: [], roots: [], allItems: [] };
-            groups.set(group.id, group);
+      const item = record(value), original = originals.get(item.id) || item;
+      const view = menuTaxonomyPresentation(root, original, resolved);
+      const display = { ...item, groupId: view.sectionId, groupName: view.department, category: view.category, subcategory: view.subcategory };
+      let group = groups.get(view.sectionId);
+      if (!group) {
+        group = { id: view.sectionId, name: view.department, directItems: [], roots: [], allItems: [] };
+        groups.set(group.id, group);
+      }
+      let children = group.roots, parent;
+      const path = [
+        ...view.sectionPath.slice(1).map((node2) => ({ ...node2, id: "section:" + node2.id })),
+        ...view.categoryId ? [{ id: "category:" + view.categoryId, name: view.category }] : [],
+        ...view.subcategoryId ? [{ id: "subcategory:" + view.subcategoryId, name: view.subcategory }] : []
+      ];
+      if (!path.length && !view.categoryId && view.category !== "\u0411\u0435\u0437 \u043F\u043E\u0434\u0440\u0430\u0437\u0434\u0435\u043B\u0430") path.push({ id: "legacy-category:" + view.category, name: view.category });
+      for (const part of path) {
+        const key = group.id + ":" + part.id;
+        let node2 = nodes2.get(key);
+        if (!node2) {
+          node2 = { id: key, name: part.name, groupId: group.id, items: [], children: [], allItems: [] };
+          nodes2.set(key, node2);
+          children.push(node2);
         }
-        let children = group.roots, parent;
-        const path = [...view.sectionPath.slice(1).map(node => ({ ...node, id: "section:" + node.id })),
-            ...(view.categoryId ? [{ id: "category:" + view.categoryId, name: view.category }] : []),
-            ...(view.subcategoryId ? [{ id: "subcategory:" + view.subcategoryId, name: view.subcategory }] : [])];
-        // Preserve free-form legacy categories that have no saved structural link.
-        if (!path.length && !view.categoryId && view.category !== "Без подраздела")
-            path.push({ id: "legacy-category:" + view.category, name: view.category });
-        for (const part of path) {
-            const key = group.id + ":" + part.id;
-            let node = nodes.get(key);
-            if (!node) {
-                node = { id: key, name: part.name, groupId: group.id, items: [], children: [], allItems: [] };
-                nodes.set(key, node);
-                children.push(node);
-            }
-            node.allItems.push(display);
-            parent = node;
-            children = node.children;
-        }
-        if (parent)
-            parent.items.push(display);
-        else
-            group.directItems.push(display);
-        group.allItems.push(display);
+        node2.allItems.push(display);
+        parent = node2;
+        children = node2.children;
+      }
+      if (parent) parent.items.push(display);
+      else group.directItems.push(display);
+      group.allItems.push(display);
     }
     return [...groups.values()];
-}
+  }
+  return __toCommonJS(stdin_exports);
+})();
 
-window.bdMenuTaxonomy=exports;})();
+window.bdMenuTaxonomy=bdMenuTaxonomyShared;})();
 /* bd-menu-taxonomy-shared-end */
 function bdLegacyAssortmentHierarchyV171(e,t){const n=bdCatState(t),r=bdCatArray(e?.menuItems),a=new Map;for(const g of bdCatArray(n.groups)){const y=String(g.id);a.set(y,{...g,id:y,name:g.name||g.label||"Раздел",directItems:[],roots:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other");a.has(y)||a.set(y,{id:y,name:g.groupName||"Другое",legacyDepartment:"other",sortOrder:a.size,directItems:[],roots:[],allItems:[]})}const s=new Map;for(const g of bdCatArray(n.subgroups)){const y=String(g.id),j=String(g.groupId||"");y&&j&&a.has(j)&&s.set(y,{...g,id:y,groupId:j,name:g.name||g.label||"Подраздел",items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.subgroupId||"");if(!y||s.has(y))continue;const j=String(g.groupId||g.groupName||"other");a.has(j)&&s.set(y,{id:y,groupId:j,name:g.category||"Без подраздела",sortOrder:9999,items:[],children:[],allItems:[]})}for(const g of r){const y=String(g.groupId||g.groupName||"other"),j=String(g.subgroupId||""),v=s.get(j),b=a.get(y);v&&v.groupId===y?v.items.push(g):b?.directItems.push(g)}const l=(g,y)=>bdCatNumber(g.sortOrder)-bdCatNumber(y.sortOrder)||String(g.name).localeCompare(String(y.name),"ru"),u=g=>{g.children.sort(l);for(const y of g.children)u(y)},d=(g,y,j)=>{let v=y;const b=new Set([g]);for(let N=0;v&&N<=j.size;N++){if(b.has(v))return!0;b.add(v);v=j.get(v)||""}return!1},f=[];for(const g of [...a.values()].sort(l)){const y=[...s.values()].filter(v=>v.groupId===g.id),j=new Map(y.map(v=>[v.id,bdAssortmentNodeParentV171(v)]));g.roots=[];for(const v of y){const b=j.get(v.id)||"",N=s.get(b);b&&N&&N.groupId===g.id&&!d(v.id,b,j)?N.children.push(v):g.roots.push(v)}g.roots.sort(l);for(const v of g.roots)u(v);const b=v=>{const N=[...v.items];for(const E of v.children)N.push(...b(E));return v.allItems=N,N};for(const v of g.roots)b(v);g.allItems=[...g.directItems,...g.roots.flatMap(v=>v.allItems)];g.allItems.length&&f.push(g)}return f}
 const bdOwnerUATFixesV285="owner-uat-v285";function bdMenuIngestionReview({entry,current,products=[],onChange,onCancel,onConfirmed}){

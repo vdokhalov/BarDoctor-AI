@@ -1,3 +1,5 @@
+import { defaultNomenclatureStructure } from "./nomenclature";
+
 type JsonRecord = Record<string, unknown>;
 
 export type TaxonomyLevel = "section" | "category" | "subcategory";
@@ -115,10 +117,13 @@ export function normalizeCanonicalTaxonomy(value: unknown, fallback?: CanonicalT
  * venue persists the canonical tree. GET callers can use this projection
  * without writing production data; a later user-authorized save can persist
  * the same stable IDs through materializeMenuTaxonomy().
+ * All consumers use the same existing defaults when the structure is absent,
+ * including stock-first stores that already contain confirmed menu links.
+ * An explicitly saved tree (even empty) retains precedence over defaults.
  */
 export function canonicalTaxonomyForAssortment(
   assortment: unknown,
-  fallback?: CanonicalTaxonomy,
+  fallback: CanonicalTaxonomy = defaultNomenclatureStructure(),
 ): {
   taxonomy: CanonicalTaxonomy;
   legacyMenuPaths: LegacyMenuTaxonomyPath[];
@@ -127,7 +132,6 @@ export function canonicalTaxonomyForAssortment(
   const root = record(assortment);
   let taxonomy = normalizeCanonicalTaxonomy(root.nomenclatureStructure, fallback);
   const structuralCount = taxonomy.sections.length + taxonomy.categories.length + taxonomy.subcategories.length;
-  if (structuralCount === 0 && fallback) taxonomy = normalizeCanonicalTaxonomy(fallback);
 
   taxonomy = {
     ...taxonomy,

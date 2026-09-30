@@ -7,7 +7,10 @@ import {
   normalizeCanonicalTaxonomy,
   taxonomyItemCount,
   taxonomyPath,
+  menuTaxonomyPresentation,
+  menuTaxonomyHierarchy,
 } from "../lib/bardoctor/nomenclature-taxonomy";
+import { defaultNomenclatureStructure } from "../lib/bardoctor/nomenclature";
 
 const structure = {
   version: "v336",
@@ -60,6 +63,35 @@ test("normalization treats an existing custom tree as source of truth", () => {
   }, structure as never);
   assert.deepEqual(custom.sections.map((node) => node.id), ["custom"]);
   assert.equal(custom.version, "v336");
+});
+
+test("all read consumers share defaults for existing menu links with an absent structure without writing it", () => {
+  const source = { menuItems: [{ id: "existing-v465", sectionId: "bar", taxonomyCategoryId: "alcohol" }] };
+  const before = JSON.stringify(source);
+  const projected = canonicalTaxonomyForAssortment(source);
+  assert.deepEqual(projected.taxonomy, canonicalTaxonomyForAssortment(source, defaultNomenclatureStructure()).taxonomy);
+  assert.equal(menuTaxonomyPresentation(source, source.menuItems[0]).department, "Бар");
+  assert.equal(menuTaxonomyPresentation(source, source.menuItems[0]).category, "Алкоголь");
+  const tree = menuTaxonomyHierarchy({ menuItems: source.menuItems }, source);
+  assert.equal(tree[0].name, "Бар");
+  assert.equal(tree[0].roots[0].name, "Алкоголь");
+  assert.equal(JSON.stringify(source), before);
+});
+
+test("saved renamed, archived, removed and explicitly empty taxonomy never regain defaults", () => {
+  const custom = { ...structuredClone(structure), sections: [{ id: "bar", name: "Авторский бар", order: 10, active: false }], categories: [{ id: "alcohol", name: "Авторская категория", parentId: "bar", order: 10, active: false }], subcategories: [] };
+  const source = { nomenclatureStructure: custom };
+  const before = JSON.stringify(source);
+  const tree = canonicalTaxonomyForAssortment(source).taxonomy;
+  assert.deepEqual(tree.sections.map(row => [row.id, row.name, row.active]), [["bar", "Авторский бар", false]]);
+  assert.deepEqual(tree.categories.map(row => [row.id, row.name, row.active]), [["alcohol", "Авторская категория", false]]);
+  assert.equal(menuTaxonomyPresentation(source, { sectionId: "bar", taxonomyCategoryId: "alcohol" }).category, "Авторская категория");
+  assert.equal(menuTaxonomyPresentation(source, { sectionId: "kitchen", taxonomyCategoryId: "food" }).department, "Раздел недоступен");
+  assert.equal(JSON.stringify(source), before);
+  const empty = { nomenclatureStructure: { sections: [], categories: [], subcategories: [], locations: [] } };
+  assert.deepEqual(canonicalTaxonomyForAssortment(empty).taxonomy.sections, []);
+  assert.deepEqual(canonicalTaxonomyForAssortment(empty, defaultNomenclatureStructure()).taxonomy.categories, []);
+  assert.equal(menuTaxonomyPresentation(empty, { sectionId: "bar", taxonomyCategoryId: "alcohol" }).category, "Категория недоступна");
 });
 
 test("empty canonical taxonomy exposes existing menu sections without writing the source", () => {

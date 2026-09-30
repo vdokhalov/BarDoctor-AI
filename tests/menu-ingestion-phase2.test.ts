@@ -158,6 +158,46 @@ test("first menu entry accepts the existing empty stock-first assortment without
   } finally { r.close(); }
 });
 
+test("stock-first Manual confirm and reload resolve the same taxonomy as the editor without backfilling stores", async () => {
+  const r = await lifecycleRuntime({ ingestion: "./app/api/menu/ingestion/route", taxonomy: "./app/api/nomenclature/taxonomy/route", overview: "./app/api/assortment/overview/route", storeKey: "./app/api/store/[key]/route" });
+  try {
+    const user = await r.register("taxonomy-stock-first@phase2.test"), venueId = user.activeVenueId;
+    r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ currency: "MDL" }), user.userId);
+    const stored = () => String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_assortment_v1'").get(user.userId)?.data_json);
+    const initial = stored();
+    assert.equal("nomenclatureStructure" in JSON.parse(initial), false);
+    const mappings = [["bar", "alcohol", "Бар", "Алкоголь"], ["bar", "soft-drinks", "Бар", "Безалкогольные напитки"], ["kitchen", "food", "Кухня", "Продукты"], ["hookah", "hookah-tobacco", "Кальянная", "Табак и смеси"], ["household", "cleaning", "Хозчасть", "Уборка и гигиена"], ["administration", "services", "Администрация", "Услуги"]];
+    const send = async (body: object) => { const response = await r.api.ingestion.POST(r.request(user, "/api/menu/ingestion", "POST", { venueId, ...body })); return { status: response.status, body: await response.json() as IngestionResponse }; };
+    for (const [sectionId, taxonomyCategoryId] of mappings) {
+      const before = stored();
+      const created = await send({ action: "create", source: "MANUAL", draftId: "draft:mapping-" + taxonomyCategoryId, items: [{ name: "QA " + taxonomyCategoryId, salePrice: 15, currency: "MDL", sectionId, taxonomyCategoryId, consumptionMode: "NONE" }] });
+      assert.equal(created.status, 201);
+      const checked = await send({ action: "validate", draftId: created.body.draft.id, revision: created.body.draft.revision });
+      assert.equal(checked.status, 200);
+      assert.equal(stored(), before);
+      const confirmed = await send({ action: "confirm", draftId: checked.body.draft.id, revision: checked.body.draft.revision, validationHash: checked.body.draft.validationHash });
+      assert.equal(confirmed.status, 201);
+      assert.equal("nomenclatureStructure" in JSON.parse(stored()), false, "confirm must not create another taxonomy or require a data backfill");
+    }
+    const after = stored();
+    for (const pass of ["after confirm", "reload"]) {
+      const read = await r.api.storeKey.GET(r.request(user, "/api/store/bd_assortment_v1"), { params: Promise.resolve({ key: "bd_assortment_v1" }) } as never);
+      const canonical = (await read.json() as { data: { menuItems: { sectionId: string; taxonomyCategoryId: string }[] } }).data;
+      const response = await r.api.overview.GET(r.request(user, "/api/assortment/overview?period=2026-09"));
+      const overview = await response.json() as { analytics: { menuItems: { name: string; sectionId: string; taxonomyCategoryId: string; groupName: string; category: string }[] } };
+      const taxonomy = await (await r.api.taxonomy.GET(r.request(user, "/api/nomenclature/taxonomy"))).json() as { taxonomy: { sections: { id: string; name: string }[]; categories: { id: string; name: string }[] } };
+      for (const [sectionId, taxonomyCategoryId, groupName, category] of mappings) {
+        assert.ok(canonical.menuItems.some(row => row.sectionId === sectionId && row.taxonomyCategoryId === taxonomyCategoryId));
+        const item = overview.analytics.menuItems.find(row => row.name === "QA " + taxonomyCategoryId)!;
+        assert.deepEqual({ sectionId: item.sectionId, taxonomyCategoryId: item.taxonomyCategoryId, groupName: item.groupName, category: item.category }, { sectionId, taxonomyCategoryId, groupName, category }, pass);
+        assert.equal(taxonomy.taxonomy.sections.find(row => row.id === sectionId)?.name, groupName);
+        assert.equal(taxonomy.taxonomy.categories.find(row => row.id === taxonomyCategoryId)?.name, category);
+      }
+      assert.equal(stored(), after, "canonical and read API GETs must leave existing bytes unchanged");
+    }
+  } finally { r.close(); }
+});
+
 test("confirmed menu preserves existing recipe and POS consumption, stock units and warehouse read", async () => {
   const r = await fixture(); try {
     const before = r.get(), existing = before.menuItems.find((row: {id: string}) => row.id === "beer");
