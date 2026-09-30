@@ -70,7 +70,10 @@ try {
       await page.goto(base + "/finance"); await page.locator('[data-bd-finance-dashboard]').waitFor();
       await page.screenshot({ path: out + "/" + profile.name + "-finance.png", fullPage: true });
       assert.equal(get("bd_finance_revenue")[0].revenue, 20); assert.equal(get("bd_stock_movements")[0].amount, -1);
-      assert.deepEqual(errors, []); results.push({ profile: profile.name, readonly: true, operationsSaved: true, finality: true, finance: 20, warehouse: -1 });
+      await context.route("**/api/operational-days", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
+      const malformed = page.waitForResponse(response => response.url().endsWith("/api/operational-days"));
+      await page.reload(); await malformed; await page.locator('[data-bd-finance-dashboard]').waitFor();
+      assert.deepEqual(errors, []); results.push({ profile: profile.name, readonly: true, operationsSaved: true, finality: true, malformedReadFallback: true, finance: 20, warehouse: -1 });
     } finally { await context.close(); }
   }
   writeFileSync(out + "/result.json", JSON.stringify(results, null, 2)); console.log(JSON.stringify(results));
