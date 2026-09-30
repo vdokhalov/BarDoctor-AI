@@ -23,7 +23,7 @@ async function command(request: Request): Promise<Response> {
   let assortment: Record<string, unknown>, drafts: MenuDraft[];
   try {
     const raw = JSON.parse(snapshots[0].dataJson ?? "null");
-    if (raw !== null && (!raw || typeof raw !== "object" || Array.isArray(raw) || !Array.isArray(raw.menuItems) || raw.menuItems.some((row: unknown) => !row || typeof row !== "object" || Array.isArray(row)))) throw Error("assortment");
+    if (raw !== null && (!raw || typeof raw !== "object" || Array.isArray(raw) || "menuItems" in raw && (!Array.isArray(raw.menuItems) || raw.menuItems.some((row: unknown) => !row || typeof row !== "object" || Array.isArray(row))))) throw Error("assortment");
     // Do not backfill an absent canonical store in the presence of history.
     if (raw === null) {
       const dependent = await readStoreSnapshots(db, account.id, ["bd_stock_movements", "bd_purchase_documents", "bd_inventory_snapshots"]);
@@ -31,6 +31,9 @@ async function command(request: Request): Promise<Response> {
       snapshots.push(...dependent);
     }
     assortment = raw ?? { menuItems: [], recipes: [], stockBalances: [], nomenclature: [] };
+    // The existing empty authoritative assortment is stock-first and has no
+    // menuItems property. Project it for draft validation; persist only on confirm.
+    if (!("menuItems" in assortment)) assortment = { ...assortment, menuItems: [] };
     const staging = JSON.parse(snapshots[1].dataJson ?? "[]");
     if (!Array.isArray(staging) || staging.some(row => !row || row.version !== 1 || !Array.isArray(row.rows) || !MENU_SOURCES.includes(row.source) || row.venueId !== account.venueId)) throw Error("drafts");
     drafts = staging;

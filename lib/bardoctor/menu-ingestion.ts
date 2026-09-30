@@ -111,7 +111,7 @@ export function validateMenuDraft(draft: MenuDraft, assortment: Row, currency: s
     const subcategory = item.subcategoryId ? taxonomy.subcategories.find(node => node.id === item.subcategoryId && node.active && node.parentId === category?.id) : null;
     if (!section || !category || (item.subcategoryId && !subcategory)) issues.push("Выберите существующий раздел и категорию; подкатегория должна принадлежать категории.");
     if (!["DIRECT_ITEM", "FIXED_QUANTITY", "RECIPE", "NONE"].includes(String(item.consumptionMode))) issues.push("Выберите способ списания.");
-    if (draft.source !== "MANUAL" && !line.reviewed) issues.push("Проверьте распознанные значения и подтвердите проверку строки.");
+    if (!line.reviewed) issues.push("Проверьте значения и подтвердите проверку строки.");
     if (line.decision === "pending") issues.push(previous ? "Подтвердите изменение существующей позиции или исключите строку." : "Подтвердите добавление или исключите строку.");
     // Explicit mode changes retain the existing recipe lifecycle; ingestion never adopts AI ingredients.
     item.type = item.consumptionMode === "RECIPE" ? "composite" : item.consumptionMode === "NONE" ? "service" : "ready";

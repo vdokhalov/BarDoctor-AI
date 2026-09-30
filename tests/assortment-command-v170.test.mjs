@@ -11,7 +11,7 @@ test("mobile assortment header remains inside the touch viewport", async () => {
   assert.doesNotMatch(css, /@media \(max-width: 767px\)[\s\S]*?\.bd-assortment-header-v170\s*\{[^}]*left: 50%;[^}]*translateX\(-50%\)/);
 });
 
-test("assortment create action stays available and clears the bottom navigation", async () => {
+test("assortment create action waits for authoritative readiness and clears the bottom navigation", async () => {
   const [bundle, css] = await Promise.all([
     readFile(bundleUrl, "utf8"),
     readFile(cssUrl, "utf8"),
@@ -24,7 +24,8 @@ test("assortment create action stays available and clears the bottom navigation"
 
   assert.match(fragment, /bd-assortment-add-fab-v325/);
   assert.match(fragment, /children:"Добавить позицию"/);
-  assert.match(fragment, /me&&d==="menu"/);
+  assert.match(fragment, /me&&n&&Number\(s\.activeVenueId\)>0&&d==="menu"/);
+  assert.match(fragment, /S\.useLayoutEffect\(\(\)=>\{if\(Number\(bdPhase3VenueRefV418\.current\)===Number\(s\.activeVenueId\)\)/);
   assert.doesNotMatch(fragment, /onClick:d,children:\[i\.jsx\(Vt,\{size:16\}\),"Позиция"\]/);
   assert.match(css, /\.bd-assortment-add-fab-v325\s*\{[\s\S]*?position: fixed;/);
   assert.match(css, /bottom: calc\(92px \+ env\(safe-area-inset-bottom\)\)/);

@@ -25,6 +25,8 @@ const server = createServer(async (req, res) => {
       const command = name === "ingestion" ? JSON.parse(body.toString()) : null;
       if (command) requests.push({ action: command.action, source: command.source });
       response = await runtime.api[name][req.method || "GET"](new Request(url, { method: req.method, headers: req.headers as HeadersInit, ...(body.length ? { body } : {}) }), { params: Promise.resolve({ key }) } as never);
+      // Delay authoritative bootstrap to exercise first-click readiness during hydration.
+      if (name === "bootstrap") await new Promise(resolve => setTimeout(resolve, 200));
       if (command?.action === "confirm" && lostConfirm && response.ok) { lostConfirm = false; res.destroy(); return; }
     } else if (url.pathname === "/api/catalog/files") {
       response = Response.json({ ok: true, file: { id: "00000000-0000-4000-8000-000000000001", name: "scan.jpg", type: "image/jpeg" } });
@@ -53,6 +55,8 @@ try {
     runtime.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ name: "Phase 2 " + profile.name, currency: "MDL", timezone: "Europe/Chisinau", workingDays: [0, 1, 2, 3, 4, 5, 6], openTime: "00:00", closeTime: "23:59", areas: ["Бар"] }), user.userId);
     const canonical = JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1', '"venueId":' + venueId));
     canonical.nomenclatureStructure = defaultNomenclatureStructure(); canonical.menuItems.forEach((item: Record<string, unknown>) => Object.assign(item, { sectionId: "bar", taxonomyCategoryId: "alcohol", subcategoryId: "beer" }));
+    // The stock-first assortment used before the first menu entry has no menuItems.
+    if (profile.name === "mobile-wide") { delete canonical.menuItems; canonical.recipes = []; }
     runtime.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,'fixture') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(user.userId, "bd_assortment_v1", JSON.stringify(canonical));
     const get = () => JSON.parse(String(runtime.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_assortment_v1'").get(user.userId)?.data_json || "null"));
     const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height }, isMobile: profile.width < 600, hasTouch: profile.width < 600 });
@@ -75,7 +79,7 @@ try {
       await page.screenshot({ path: `${out}/${profile.name}-manual.png`, fullPage: true });
       lostConfirm = true; await review.locator('[data-bd-menu-ingestion-action="confirm"]').click();
       await page.waitForFunction(() => !document.querySelector(".bd-menu-ingestion-review") || !!document.querySelector(".bd-menu-ingestion-review [role=alert]"));
-      assert.equal(get().menuItems.length, before.menuItems.length + 1); if (await review.isVisible()) await review.locator('[data-bd-menu-ingestion-action="confirm"]').click(); await review.waitFor({ state: "hidden" }); assert.equal(get().menuItems.length, before.menuItems.length + 1);
+      assert.equal(get().menuItems.length, (before.menuItems || []).length + 1); if (await review.isVisible()) await review.locator('[data-bd-menu-ingestion-action="confirm"]').click(); await review.waitFor({ state: "hidden" }); assert.equal(get().menuItems.length, (before.menuItems || []).length + 1);
       // Import uses the existing file entry, then the same server-owned review.
       recognitionName = "Import service " + profile.name;
       await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();

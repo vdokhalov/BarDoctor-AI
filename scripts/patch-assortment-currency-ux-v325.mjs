@@ -19,6 +19,8 @@ function replaceInSection(startMarker, endMarker, from, to, label) {
   if (start < 0 || end < 0) throw new Error(`${label}: section markers not found`);
   const section = source.slice(start, end);
   if (section.includes(to)) return;
+  // Phase 2 preserves this action and adds authoritative ingestion readiness.
+  if (label === "persistent assortment add action" && section.includes(to.replace('me&&d==="menu"', 'me&&n&&Number(s.activeVenueId)>0&&d==="menu"'))) return;
   const count = section.split(from).length - 1;
   if (count !== 1) throw new Error(`${label}: expected one section match, found ${count}`);
   source = source.slice(0, start) + section.replace(from, to) + source.slice(end);

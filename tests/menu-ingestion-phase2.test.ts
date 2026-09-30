@@ -66,6 +66,8 @@ test("import diff: additions, changes, unchanged, invalid and conflicting rows; 
 test("required fields, currency, taxonomy, units and links use the same validation for every source", async () => {
   const r = await fixture(); try {
     for (const source of ["MANUAL", "SCAN", "IMPORT"] as const) {
+      const unreviewed = menuDraft({ id: "unreviewed:" + source, source, venueId: r.venueId, items: [r.item()], assortment: r.get(), now: "2026-09-30T12:00:00.000Z" }); unreviewed.rows.forEach(row => { row.decision = "apply"; row.reviewed = false; });
+      assert.equal(validateMenuDraft(unreviewed, r.get(), "MDL", "2026-09-30T12:00:00.000Z").ok, false, source + " must use the same review acknowledgement rule");
       for (const patch of [{ name: "" }, { salePrice: "" }, { salePrice: "   " }, { salePrice: false }, { salePrice: [] }, { plannedSales: false }, { currency: "RUB" }, { sectionId: "foreign" }, { taxonomyCategoryId: "food" }, { subcategoryId: "foreign" }, { consumptionMode: "" }, { consumptionMode: "FIXED_QUANTITY", readyProduct: { nomenclatureItemId: "missing", productKey: "missing" }, saleSize: { quantity: -1, unit: "unknown" } }]) {
         const draft = menuDraft({ id: "check:" + source, source, venueId: r.venueId, items: [{ ...r.item(), ...patch }], assortment: r.get(), now: "2026-09-30T12:00:00.000Z" }); draft.rows.forEach(row => { row.reviewed = true; row.decision = "apply"; });
         const result = validateMenuDraft(draft, r.get(), "MDL", "2026-09-30T12:00:00.000Z"); assert.equal(result.ok, false, JSON.stringify({ source, patch, result })); assert.ok(result.diff[0].issues.length);
@@ -132,9 +134,27 @@ test("draft metadata is private to authorized commands and cannot be replaced th
       assert.equal(response.status, 400); assert.equal(((await response.json()) as { error: string }).error, "Неизвестный ключ хранилища");
     }
     const other = await r.register("other-menu-phase2@isolated.test");
-    r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,'bd_assortment_v1',?,'fixture') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(other.userId, JSON.stringify({ menuItems: [], recipes: [], nomenclature: [], stockBalances: [] }));
     const response = await r.api.ingestion.POST(r.request(other, "/api/menu/ingestion", "POST", { action: "get", venueId: other.activeVenueId, draftId: created.body.draft.id }));
     assert.equal(response.status, 404); assert.deepEqual(r.get(), before); assert.deepEqual(r.get(MENU_INGESTION_STORE_KEY), staging);
+  } finally { r.close(); }
+});
+
+test("first menu entry accepts the existing empty stock-first assortment without rewriting it before confirm", async () => {
+  const r = await lifecycleRuntime({ ingestion: "./app/api/menu/ingestion/route" }); try {
+    const user = await r.register("first-menu-phase2@isolated.test"), venueId = user.activeVenueId;
+    r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ currency: "MDL" }), user.userId);
+    const bytes = () => String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_assortment_v1'").get(user.userId)?.data_json);
+    const original = bytes(); assert.equal("menuItems" in JSON.parse(original), false);
+    const send = async (body: object) => { const response = await r.api.ingestion.POST(r.request(user, "/api/menu/ingestion", "POST", { venueId, ...body })); return { status: response.status, body: await response.json() as IngestionResponse }; };
+    const items = [{ name: "First service", salePrice: 15, currency: "MDL", sectionId: "bar", taxonomyCategoryId: "alcohol", consumptionMode: "NONE" }];
+    const created = await send({ action: "create", source: "MANUAL", draftId: "draft:first-empty-123", items }); assert.equal(created.status, 201, JSON.stringify(created.body)); assert.equal(bytes(), original);
+    const checked = await send({ action: "validate", draftId: created.body.draft.id, revision: created.body.draft.revision }); assert.equal(checked.status, 200); assert.equal(bytes(), original);
+    const cancelled = await send({ action: "cancel", draftId: checked.body.draft.id, revision: checked.body.draft.revision }); assert.equal(cancelled.status, 200); assert.equal(bytes(), original);
+    const stockFirst = { ...JSON.parse(original), nomenclature: [{ id: "existing-stock", productKey: "existing-stock", name: "Existing stock", unit: "pcs", venueId }], stockBalances: [{ productKey: "existing-stock", current: 7, unit: "pcs", venueId }] };
+    r.sqlite.prepare("UPDATE domain_data SET data_json=? WHERE account_id=? AND store_key='bd_assortment_v1'").run(JSON.stringify(stockFirst), user.userId);
+    const next = await send({ action: "create", source: "MANUAL", draftId: "draft:first-stock-123", items }); const valid = await send({ action: "validate", draftId: next.body.draft.id, revision: next.body.draft.revision });
+    const confirmed = await send({ action: "confirm", draftId: valid.body.draft.id, revision: valid.body.draft.revision, validationHash: valid.body.draft.validationHash }); assert.equal(confirmed.status, 201);
+    const after = JSON.parse(bytes()); assert.equal(after.menuItems.length, 1); assert.deepEqual(after.stockBalances, stockFirst.stockBalances); assert.deepEqual(after.nomenclature, stockFirst.nomenclature); assert.deepEqual(after.recipes, stockFirst.recipes);
   } finally { r.close(); }
 });
 
