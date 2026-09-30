@@ -43,7 +43,7 @@ test("editor save payload contains only fields for the selected consumption mode
       plannedSales: 0, saleQuantityInput: 500, saleUnit: "ml", consumptionMode: mode, ...legacy,
     };
     const context = {
-      h, u: [{ id: "group", legacyDepartment: "bar" }], d: [],
+      e: h, h, u: [{ id: "group", legacyDepartment: "bar" }], d: [],
       _: { id: "sprite-stock", key: "sprite", productKey: "sprite" },
       bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs", bdMenuFixedCompatibleV418: true,
       bdMenuRecipeChoiceRequiredV418: false, bdMenuQuantityV418: 500, bdMenuVenueId: 1,
@@ -69,8 +69,9 @@ test("shells carry the v436 cache identity", () => {
 });
 
 test("returning to recipe mode reactivates the prior tech card instead of creating an empty duplicate", () => {
-  assert.match(bundle, /bdRestorableRecipeV436=oe\.filter/);
+  const ingestion = readFileSync(new URL("../lib/bardoctor/menu-ingestion.ts", import.meta.url), "utf8");
+  assert.match(ingestion, /const restore = recipes\.filter/);
   assert.match(bundle, /bdRestorableRecipeV436=R\.filter/);
   assert.match(bundle, /lifecycleStatus:"current",inactiveReason:void 0,deactivatedAt:void 0,reactivatedAt/);
-  assert.match(bundle, /else\{const Ce=\{id:crypto\.randomUUID\(\),menuItemId:w\.id/);
+  assert.match(ingestion, /id: `recipe:\$\{line\.id\}`/);
 });

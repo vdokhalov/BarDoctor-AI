@@ -368,7 +368,8 @@ function syncConsumptionPersistencePaths(source) {
   const menuEnd = value.indexOf(",ke=async", menuStart);
   if (menuStart < 0 || menuEnd < 0) throw new Error(`${releaseToken}: synchronized menu save boundary missing`);
   const menuSave = commandMenuSaveModel();
-  value = value.slice(0, menuStart) + menuSave + value.slice(menuEnd);
+  // Phase 2 owns menu ingestion; recipe persistence below remains v418.
+  if (!value.includes('/* menu-ingestion-phase2 */')) value = value.slice(0, menuStart) + menuSave + value.slice(menuEnd);
   const recipeStart = value.indexOf("ke=async");
   const recipeEnd = value.indexOf(",Oe=async", recipeStart);
   if (recipeStart < 0 || recipeEnd < 0) throw new Error(`${releaseToken}: synchronized recipe save boundary missing`);
@@ -528,6 +529,7 @@ function importApplyHandlerModel() {
 function patchImportApplyHandler(source) {
   const command = scope(source, "function bdAssortmentCommandPageV170", "/* bd-assortment-command-v170:end */", "import apply handler");
   let value = command.value;
+  if (value.includes('/* menu-ingestion-phase2 */')) return source;
   const start = value.indexOf("Te=async()=>{");
   const end = value.indexOf("},Ae=async", start);
   if (start < 0 || end < 0) throw new Error(`${releaseToken}: import apply refinement boundary missing`);
@@ -602,7 +604,10 @@ function verifyBundle(source) {
     source.includes('function bdEditableRecipesV440(') ? '&&me&&!O&&!B&&!L&&i.jsx(bdExistingRecipeEditorV440' : 'bdLegacyRecipeCanOpenV418(D,E.recipes)',
     "bdImportSavedV418",
   ];
-  for (const token of required) if (!source.includes(token)) throw new Error(`${releaseToken}: bundle invariant missing: ${token}`);
+  for (const token of required) {
+    if (source.includes('/* menu-ingestion-phase2 */') && ["bdImportSavedV418", 'inactiveReason:bdActivateImportedRecipeV418?void 0:bdOtherActiveRecipesV418.length?"existing_recipe_requires_review":"menu_consumption_mode"'].includes(token)) continue;
+    if (!source.includes(token)) throw new Error(`${releaseToken}: bundle invariant missing: ${token}`);
+  }
   const forbidden = [
     "bdMenuExactProductsV352=",
     'ingredients:e.type==="ready"?',

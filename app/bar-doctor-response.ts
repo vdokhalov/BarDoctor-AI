@@ -325,6 +325,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/more-hub-v166.css?v=20260812-more-v166" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/equipment-command-v167.css?v=20260812-equipment-v167" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/procurement-command-v168.css?v=20260814-finance-purchase-delete-v195" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="/menu-ingestion-phase2.css?v=20260930-phase2" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/assortment-command-v170.css?v=20260813-assortment-v171-20260823-tech-card-reconciliation-v257-20260823-tech-card-semantic-matching-v258-20260823-tech-card-entity-resolution-v259-20260826-tech-card-consistency-v299a-20260824-canonical-supplier-v260-20260828-assortment-currency-ux-v325-20260828-venue-currency-lock-v326-catalog-workflow-v353-modal-workspace-v354-publication-readiness-v355-publication-readiness-v355" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/settings-v182.css?v=20260814-notifications-v184" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/profile-v280.css?v=20260825-profile-v280" media="print" onload="this.media='all'" />

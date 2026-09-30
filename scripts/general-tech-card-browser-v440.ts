@@ -38,13 +38,14 @@ try{
   const recipeCopy={...fixture.recipes[0],id:'recipe-volk-qa',menuItemId:menuCopy.id,ownerId:menuCopy.id,ingredients:[{...fixture.recipes[0].ingredients[0],id:'line-volk-qa',name:'Volk',quantity:0.04,unit:'л',normalizedQuantity:40,normalizedUnit:'ml',matchedBaseUnit:'ml',nomenclatureItemId:target.id,productKey:wrong.key,purchaseProductKey:wrong.key}]};
   fixture.menuItems.push(menuCopy);fixture.recipes.push(recipeCopy);
   const runtimes=new Map();
-  for(const [venueId,stores] of state.stores){const runtime=await storeRuntime(venueId);for(const [key,data]of stores)runtime.seed(key,data);runtimes.set(venueId,runtime)}
+  for(const [venueId,stores] of state.stores){const assortment=stores.get('bd_assortment_v1');assert.ok(assortment,'QA canonical menu fixture');const runtime=await storeRuntime(venueId, assortment.menuItems[0].currency);for(const [key,data]of stores)runtime.seed(key,data);runtimes.set(venueId,runtime)}
   let requestCount=0,writeCount=0;
   const api=http.createServer(async(req,res)=>{try{
    const runtime=runtimes.get(Number(req.headers['x-venue-id']));
    if(!runtime){res.writeHead(403);res.end(JSON.stringify({ok:false}));return}
    const url=new URL(req.url||'/', 'http://127.0.0.1');let reply;
-   if(url.pathname==='/api/nomenclature/taxonomy')reply=await runtime.taxonomyGet();
+   if(url.pathname==='/api/menu/ingestion'){const chunks=[];for await(const chunk of req)chunks.push(chunk);reply=await runtime.ingestion(JSON.parse(Buffer.concat(chunks).toString()));if(reply.body.data)writeCount++;if(reply.status>=400)console.log(JSON.stringify({status:reply.status,code:reply.body.code,issues:(reply.body.preview as {diff:{issues:string[]}[]})?.diff.map(row=>row.issues)}))}
+   else if(url.pathname==='/api/nomenclature/taxonomy')reply=await runtime.taxonomyGet();
    else {const key=decodeURIComponent(url.pathname.slice('/api/store/'.length));if(req.method==='GET')reply=await runtime.get(key);else{const chunks=[];for await(const chunk of req)chunks.push(chunk);const body=JSON.parse(Buffer.concat(chunks).toString());reply=await runtime.put(key,body.data,body.reason||'QA editor save',body.baseData);writeCount++}}
    requestCount++;res.writeHead(reply.status,{'Content-Type':'application/json'});res.end(JSON.stringify(reply.body));
   }catch(error){res.writeHead(500);res.end(JSON.stringify({ok:false,error:String(error)}))}});
@@ -55,12 +56,12 @@ try{
   let failTaxonomy=false;
   await context.route('**/api/**',async(route:Route)=>{
    const request=route.request(),url=new URL(request.url());
-   if(url.pathname!=='/api/nomenclature/taxonomy'&&!url.pathname.startsWith('/api/store/'))return route.fallback();
+   if(url.pathname!=='/api/menu/ingestion'&&url.pathname!=='/api/nomenclature/taxonomy'&&!url.pathname.startsWith('/api/store/'))return route.fallback();
    if(failTaxonomy&&url.pathname==='/api/nomenclature/taxonomy'){failTaxonomy=false;return route.fulfill({status:503,contentType:'application/json',body:'{"ok":false}'})}
    const headers=await request.allHeaders();
    const response=await fetch('http://127.0.0.1:'+address.port+url.pathname,{method:request.method(),headers:{'X-Venue-Id':headers['x-venue-id']||'801','Content-Type':'application/json'},...(request.method()==='GET'?{}:{body:request.postData()})});
    const body=await response.text();
-   if(response.ok&&url.pathname.startsWith('/api/store/')){const stores=state.stores.get(Number(headers['x-venue-id']||801));assert.ok(stores,'authorized QA venue store');stores.set(decodeURIComponent(url.pathname.slice('/api/store/'.length)),JSON.parse(body).data);}
+   if(response.ok&&(url.pathname.startsWith('/api/store/')||url.pathname==='/api/menu/ingestion'&&JSON.parse(body).data)){const stores=state.stores.get(Number(headers['x-venue-id']||801));assert.ok(stores,'authorized QA venue store');stores.set(url.pathname==='/api/menu/ingestion'?'bd_assortment_v1':decodeURIComponent(url.pathname.slice('/api/store/'.length)),JSON.parse(body).data);}
    return route.fulfill({status:response.status,contentType:'application/json',body});
   });
   const page=await context.newPage();const errors:string[]=[];page.on('pageerror',(error:Error)=>errors.push(error.message));
@@ -105,8 +106,9 @@ try{
    const selectors=editor.locator('.bd-tax-selectors-v336 select');
    assert.equal(await selectors.nth(0).inputValue(),'stock-bar');assert.equal(await selectors.nth(1).inputValue(),'drinks');
    await page.screenshot({path:path.join(output,viewport.width+'-menu.png')});
-   await editor.getByRole('button',{name:'Сохранить',exact:true}).filter({visible:true}).click();
+   await editor.getByRole('button',{name:'Проверить',exact:true}).filter({visible:true}).click();
    await editor.waitFor({state:'hidden'});
+   const ingestion=page.locator('.bd-menu-ingestion-review');await ingestion.waitFor();await ingestion.locator('[data-bd-menu-ingestion-action=validate]').click();if(await ingestion.getByRole('alert').count())throw new Error(await ingestion.innerText());await ingestion.locator('[data-bd-menu-ingestion-action=confirm]').click();await ingestion.waitFor({state:'hidden'});
    const read=await runtimes.get(801).get('bd_assortment_v1');
    const item=read.body.data.menuItems.find((row:{id:string})=>row.id==='menu-espresso-801');
    assert.equal(item.name,'Espresso QA saved '+viewport.width);assert.equal(item.taxonomyCategoryId,'drinks');

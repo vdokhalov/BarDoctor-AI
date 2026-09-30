@@ -110,7 +110,7 @@ test("menu save locks venue currency across modes and ignores stale item currenc
       let persisted;
       let closed = false;
       const context = {
-        h: original, u: [{ id: "group" }], d: [],
+        e: original, h: original, u: [{ id: "group" }], d: [],
         _: { id: "stock-id", key: "stock-key" },
         bdMenuModeConfiguredV418: true, bdMenuProductUnitV418: "pcs",
         bdMenuFixedCompatibleV418: true, bdMenuRecipeChoiceRequiredV418: false,
@@ -193,13 +193,13 @@ test("mode switching is controlled and preserves inactive legacy configuration",
   assert.match(menu, /\.\.\.K/);
   assert.doesNotMatch(menu, /delete\s+.*readyProduct/);
   assert.doesNotMatch(command, /type==="service"\?R\.recipes\.filter/);
-  assert.match(command, /w\.consumptionMode==="RECIPE"&&!ie\.length/);
-  assert.match(command, /w\.consumptionMode==="RECIPE"&&\(f\("recipes"\),v\("all"\),z\(w\)\)/);
+  assert.match(command, /bdStartMenuDraft\(\{\.\.\.w,activeRecipeId,baseline\},"MANUAL"\)/);
+  assert.match(command, /item\?\.consumptionMode==="RECIPE"\)\{f\("recipes"\);v\("all"\);z\(item\)/);
   assert.match(menu, /bdMenuOwnerRecipesV418\.length>1/);
   assert.match(menu, /bdMenuRecipeTokenV418=\(P,c\)=>String\(P\?\.id\|\|"legacy:"\+c\)/);
   assert.match(menu, /Какая техкарта будет активной\?/);
   assert.match(menu, /ингредиентов/);
-  assert.match(command, /lifecycleStatus:"inactive",inactiveReason:"consumption_mode_switch"/);
+  assert.match(readFileSync(new URL("../lib/bardoctor/menu-ingestion.ts", import.meta.url), "utf8"), /inactiveReason: "consumption_mode_switch"/);
   assert.match(menu, /bdMenuHasReadyV418&&Boolean\(e\?\.saleSize\?\.quantity\)/);
 });
 
@@ -387,10 +387,11 @@ test("OCR import requires one explicit, complete consumption mode before persist
   assert.match(importReview, /bdMenuImportSizeValidV298\(x\)&&C\.unit!=="unknown"&&C\.unit===D\.unit/);
   assert.match(importReview, /g==="RECIPE"/);
   assert.match(importReview, /disabled:s\|\|!E/);
-  assert.match(command, /bdExistingImportV418>=0\?p\[bdExistingImportV418\]=Qe:p\.push\(Qe\)/);
-  assert.match(command, /inactiveReason:bdActivateImportedRecipeV418\?void 0:bdOtherActiveRecipesV418\.length\?"existing_recipe_requires_review":"menu_consumption_mode"/);
-  assert.match(command, /существующие активные версии не заменены/);
-  assert.match(command, /bdAssortmentImportReviewV170,\{draft:A,current:E,onChange:k,onCancel:xe,onConfirm:Te,saving:J,products:bdCatMatchingProductsV258/);
+  assert.match(command, /await bdStartMenuDraft\(p,"SCAN"\)/);
+  assert.match(command, /await bdStartMenuDraft\(ie\.draft,"IMPORT"\)/);
+  assert.match(command, /bdMenuIngestionReview,\{entry:A/);
+  assert.doesNotMatch(command, /A\.recipes|Te=async/);
+
 });
 
 test("venue changes close stale editors and venue IDs travel with persisted objects", () => {

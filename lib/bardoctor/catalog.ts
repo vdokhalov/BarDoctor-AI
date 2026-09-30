@@ -54,6 +54,8 @@ export type ImportedMenuItem = {
   plannedSales: number;
   confidence: number;
   warnings: string[];
+  /** Original invalid source values for ingestion review; never canonical data. */
+  reviewInput?: { name?: unknown; salePrice?: unknown; plannedSales?: unknown };
 };
 
 export type MenuImportDraft = {
@@ -197,6 +199,14 @@ export function normalizeMenuImport(
       : [];
   const menuItems = rawItems.slice(0, 350).map((value) => {
     const item = record(value);
+    const sourceInput = { ...item, ...record(item.reviewInput) };
+    const sourcePrice = sourceInput.salePrice ?? sourceInput.price;
+    const validNumber = (value: unknown) => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && number(value, -1) >= 0;
+    const reviewInput = {
+      ...(!text(sourceInput.name) ? { name: sourceInput.name ?? "" } : {}),
+      ...(!validNumber(sourcePrice) ? { salePrice: sourcePrice ?? null } : {}),
+      ...(sourceInput.plannedSales != null && !validNumber(sourceInput.plannedSales) ? { plannedSales: sourceInput.plannedSales } : {}),
+    };
     const category = text(item.category, "Без подраздела", 120);
     const name = text(item.name, "Позиция меню", 240);
     return {
@@ -234,6 +244,7 @@ export function normalizeMenuImport(
       warnings: Array.isArray(item.warnings)
         ? item.warnings.map((warning) => text(warning, "", 240)).filter(Boolean).slice(0, 8)
         : [],
+      ...(Object.keys(reviewInput).length ? { reviewInput } : {}),
     } satisfies ImportedMenuItem;
   });
   const itemIds = new Set(menuItems.map((item) => item.id));
@@ -330,6 +341,7 @@ function mergedMenuItemKey(item: ImportedMenuItem): string {
     formatMenuSaleSize(resolveMenuItemSaleSize(item)).toLocaleLowerCase("ru"),
     item.salePrice.toFixed(2),
     item.currency,
+    item.reviewInput ? JSON.stringify(item.reviewInput) : "",
   ].join("|");
 }
 

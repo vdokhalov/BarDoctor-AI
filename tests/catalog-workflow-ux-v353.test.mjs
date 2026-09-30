@@ -22,11 +22,11 @@ test("ready menu products cannot be saved without nomenclature", () => {
   assert.match(bundle, /Выберите товар из номенклатуры или создайте его здесь/);
   assert.match(bundle, /Готовый товар/);
   assert.match(bundle, /onNomenclatureCreated:P=>/);
-  assert.match(bundle, /bdCatState\(xr\(bdCatalogStoreKey\)\|\|E\)/);
+  assert.match(bundle, /bdStartMenuDraft\(\{\.\.\.w,activeRecipeId,baseline\},"MANUAL"\)/);
 });
 
 test("prepared menu products continue directly to their recipe", () => {
-  assert.match(bundle, /w\.consumptionMode==="RECIPE"&&\(f\("recipes"\),v\("all"\),z\(w\)\)/);
+  assert.match(bundle, /item\?\.consumptionMode==="RECIPE"\)\{f\("recipes"\);v\("all"\);z\(item\)/);
   assert.match(bundle, /После сохранения откроется одна техкарта этой позиции/);
   assert.match(bundle, /Без списания/);
   assert.doesNotMatch(bundle, /De=\(\)=>\{const w=he\.recipes\?\.find/);

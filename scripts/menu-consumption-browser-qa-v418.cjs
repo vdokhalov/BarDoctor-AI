@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-// Loopback-only acceptance harness: every API call is intercepted and all writes stay in memory.
+// Loopback-only acceptance harness; ingestion uses isolated SQLite and real route handlers.
 const assert = require("node:assert/strict");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
@@ -8,6 +8,7 @@ const path = require("node:path");
 const { once } = require("node:events");
 const { chromium } = require("playwright-core");
 const { chromiumArgs, resolveBrowserExecutable } = require("./browser-runtime.cjs");
+require("tsx/esm/api").register();
 
 const projectRoot = path.resolve(__dirname, "..");
 const qaPort = Number(process.env.BD_QA_PORT || 4178);
@@ -449,6 +450,7 @@ async function configureContext(context, state, baseUrl) {
     return route.continue();
   });
 
+  const ingestionRuntimes = new Map();
   await context.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -464,6 +466,22 @@ async function configureContext(context, state, baseUrl) {
       return route.fulfill(jsonResponse({ ok: false, error: "QA fixture has no active venue" }, 500));
     }
 
+    if (url.pathname === "/api/menu/ingestion") {
+      const body = request.postDataJSON();
+      if (state.assortmentWriteDelayMs > 0 && body.action === "create") await delay(state.assortmentWriteDelayMs);
+      if (state.failNextAssortmentWrite && body.action === "create") {
+        state.failNextAssortmentWrite = false;
+        return route.fulfill(jsonResponse({ ok: false, code: "QA_MENU_SAVE_REJECTED", error: "Не удалось сохранить позицию. Повторите попытку." }, 409));
+      }
+      let runtime = ingestionRuntimes.get(venueId);
+      if (!runtime) { const { storeRuntime } = await import("../tests/helpers/store-runtime.ts"); runtime = await storeRuntime(venueId, catalogFor(state, venueId).menuItems[0].currency); ingestionRuntimes.set(venueId, runtime); }
+      const canonical = clone(venueStores.get("bd_assortment_v1"));
+      canonical.nomenclatureStructure ||= taxonomyPayload(venueId).taxonomy;
+      runtime.seed("bd_assortment_v1", canonical);
+      const reply = await runtime.ingestion(body);
+      if (reply.body.data && reply.status < 300) { venueStores.set("bd_assortment_v1", clone(reply.body.data)); if (!reply.body.idempotent) state.writes.push({ venueId, storeKey: "bd_assortment_v1", data: clone(reply.body.data) }); }
+      return route.fulfill(jsonResponse(reply.body, reply.status));
+    }
     if (url.pathname === "/api/auth/bootstrap") {
       return route.fulfill(jsonResponse({
         ok: true,
@@ -820,8 +838,13 @@ async function assertNoHorizontalOverflow(page, label) {
 }
 
 async function saveMenuEditor(editor) {
-  await editor.getByRole("button", { name: "Сохранить", exact: true }).click();
+  const page = editor.page();
+  await editor.getByRole("button", { name: "Проверить", exact: true }).click();
   await editor.waitFor({ state: "detached", timeout: 15_000 });
+  const review = page.locator(".bd-menu-ingestion-review"); await review.waitFor();
+  await review.locator('[data-bd-menu-ingestion-action="validate"]').click();
+  await review.locator('[data-bd-menu-ingestion-action="confirm"]').click();
+  await review.waitFor({ state: "detached", timeout: 15_000 });
 }
 
 async function saveRecipeDraft(editor, mobile) {
@@ -1088,7 +1111,7 @@ async function runProfile(browser, baseUrl, profile) {
       }
       state.failNextAssortmentWrite = true;
       state.assortmentWriteDelayMs = 800;
-      const saveButton = editor.getByRole("button", { name: "Сохранить", exact: true });
+      const saveButton = editor.getByRole("button", { name: "Проверить", exact: true });
       const rejectedSave = saveButton.click();
       const savingButton = editor.getByRole("button", { name: "Сохраняем…", exact: true });
       await savingButton.waitFor({ state: "visible", timeout: 5_000 });
@@ -1451,7 +1474,7 @@ async function runProfile(browser, baseUrl, profile) {
     assert.equal(await recipeChoice.count(), 1, "multiple active recipes must render a controlled chooser");
     assert.equal(await recipeChoice.inputValue(), "");
     assert.equal(
-      await editor.getByRole("button", { name: /^Сохранить/ }).isDisabled(),
+      await editor.locator(".bd-explicit-save-v438").filter({ visible: true }).isDisabled(),
       true,
       "an ambiguous Recipe mode must not save until one Recipe is selected",
     );

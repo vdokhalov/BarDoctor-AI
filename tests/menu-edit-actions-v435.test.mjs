@@ -40,7 +40,7 @@ test("footer is a persistent sibling of the independently scrolling form", () =>
   assert.match(fragment, /onCancel:bdMenuCloseV435/);
   assert.match(fragment, /saving:bdMenuSavingV418/);
   assert.match(fragment, /saveDisabled:!!bdMenuTaxIssueV440\|\|!h\.name\.trim\(\)/);
-  assert.match(fragment, /error:y,saveLabel:"Сохранить"/);
+  assert.match(fragment, /error:y,saveLabel:"Проверить"/);
   assert.match(fragment, /contextClass:"bd-menu-position-actions-v435"/);
 
   const override = css.slice(css.indexOf("/* bd-menu-edit-actions-v435 */"));

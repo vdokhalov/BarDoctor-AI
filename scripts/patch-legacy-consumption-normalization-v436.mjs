@@ -32,6 +32,7 @@ function restoreHistoricalRecipes(source) {
     },
   ];
   for (const replacement of replacements) {
+    if (replacement.label === "command menu recipe restore" && source.includes('/* menu-ingestion-phase2 */')) continue;
     if (source.includes(replacement.next)) continue;
     const count = source.split(replacement.old).length - 1;
     if (count !== 1) throw new Error(`${marker}: ${replacement.label} expected once, found ${count}`);

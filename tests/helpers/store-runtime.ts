@@ -9,7 +9,7 @@ import { permissionsFor, type AccessRole, type PermissionKey } from "../../lib/b
 type Reply = { status: number; body: Record<string, unknown> };
 
 /** Actual store GET/PUT, permissions and Drizzle SQL; only auth/connection are TEST fixtures. */
-export async function storeRuntime(venueId = 901) {
+export async function storeRuntime(venueId = 901, venueCurrency = "MDL") {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec(`CREATE TABLE domain_data (
     id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL,
@@ -33,11 +33,16 @@ export async function storeRuntime(venueId = 901) {
     };
   }
   const db = drizzle({ prepare } as unknown as D1Database);
+  const d1 = { prepare, async batch(statements: { all(): Promise<unknown> }[]) {
+    sqlite.exec("BEGIN");
+    try { const results = []; for (const statement of statements) results.push(await statement.all()); sqlite.exec("COMMIT"); return results; }
+    catch (error) { sqlite.exec("ROLLBACK"); throw error; }
+  } };
   let role: AccessRole = "owner";
   let permissionOverride: PermissionKey[] | undefined;
   const account = () => ({ id: 7, actorAccountId: 7, venueId, role,
     permissions: permissionOverride ?? permissionsFor(role), firstName: "QA", lastName: "Owner",
-    appEmail: "qa@example.invalid", restaurantJson: '{"currency":"MDL"}' });
+    appEmail: "qa@example.invalid", restaurantJson: JSON.stringify({ currency: venueCurrency }) });
   const route = new URL("../../app/api/store/[key]/route.ts", import.meta.url);
   const source = readFileSync(route, "utf8");
   const pattern = /^import\s+\{([\s\S]*?)\}\s+from\s+"([^"]+)";\r?\n/gm;
@@ -92,9 +97,27 @@ export async function storeRuntime(venueId = 901) {
   }
   const taxonomyCompiled = stripTypeScriptTypes(taxonomySource.replace(pattern, "")).replace(/export async function /g, "async function ");
   const taxonomyApi = new Function("dependencies", "const {" + Object.keys(taxonomyDependencies).join(",") + "} = dependencies;\n" + taxonomyCompiled + "\nreturn {GET,POST};")(taxonomyDependencies);
+  const ingestionRoute = new URL("../../app/api/menu/ingestion/route.ts", import.meta.url);
+  const ingestionSource = readFileSync(ingestionRoute, "utf8");
+  const ingestionDependencies: Record<string, unknown> = {};
+  for (const match of ingestionSource.matchAll(pattern)) {
+    const specifier = match[2];
+    const exports = specifier === "../../../../db" ? { getD1: () => d1 }
+      : specifier === "../../../../lib/bardoctor/auth" ? { authenticateRequest: async () => account(), unauthorized: () => Response.json({ ok: false }, { status: 401 }) }
+      : await import(new URL(specifier + ".ts", ingestionRoute).href);
+    for (const name of match[1].split(",").map(value => value.trim()).filter(value => value && !value.startsWith("type "))) {
+      assert.ok(name in exports, "Missing ingestion dependency " + name); ingestionDependencies[name] = exports[name];
+    }
+  }
+  const ingestionCompiled = stripTypeScriptTypes(ingestionSource.replace(pattern, "")).replace(/export async function /g, "async function ");
+  const ingestionApi = new Function("dependencies", "const {" + Object.keys(ingestionDependencies).join(",") + "} = dependencies;\n" + ingestionCompiled + "\nreturn {POST};")(ingestionDependencies);
   const rows = () => sqlite.prepare("SELECT * FROM domain_data ORDER BY id").all();
   const audits = () => sqlite.prepare("SELECT * FROM audit_log ORDER BY id").all();
   return {
+    async ingestion(body: unknown): Promise<Reply> {
+      const response: Response = await ingestionApi.POST(new Request("https://qa.invalid/api/menu/ingestion", { method: "POST", headers: { "Content-Type": "application/json", "X-Venue-Id": String(venueId) }, body: JSON.stringify(body) }));
+      return { status: response.status, body: await response.json() };
+    },
     async taxonomyGet(): Promise<Reply> {
       const response: Response = await taxonomyApi.GET(new Request("https://qa.invalid/api/nomenclature/taxonomy", {headers:{"X-Venue-Id":String(venueId)}}));
       return {status:response.status,body:await response.json()};
