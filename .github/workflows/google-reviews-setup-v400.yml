@@ -44,6 +44,8 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Operational Day Phase 1A mobile desktop with real isolated handlers
+        run: node --import tsx scripts/operational-day-browser.ts
       - name: Actual compiled Worker and static client release integrity mobile desktop
         run: node --test tests/client-release-browser.test.mjs
       - name: Observability real bootstrap D1 and mobile desktop correlation QA

@@ -5,7 +5,8 @@ import { closedMonthsFromStore, compareStoreData, firstClosedMutation } from "..
 import { ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY } from "../../../../lib/bardoctor/inventory";
 import { EXPENSE_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
-import { closeShiftWithCanonicalWriteOffs } from "../../../../lib/bardoctor/shift-close-write-offs";
+import { saveOperationalReport } from "../../../../lib/bardoctor/operational-report";
+import { OPERATIONAL_REPORT_STORE_KEY } from "../../../../lib/bardoctor/operational-day";
 import { WRITE_OFF_STORE_KEY, writeOffDisplayNumber, type WriteOffDocument } from "../../../../lib/bardoctor/write-offs";
 
 const REVENUE_STORE_KEY = "bd_finance_revenue";
@@ -13,7 +14,6 @@ const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 const MAX_BODY_BYTES = 750_000;
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
@@ -30,11 +30,6 @@ function text(value: unknown, fallback = "", max = 240): string {
 function number(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function parse(value: string | undefined, fallback: unknown): unknown {
-  if (!value) return fallback;
-  try { return JSON.parse(value) as unknown; } catch { return fallback; }
 }
 
 function upsertStore(database: D1Database, accountId: number, key: string, value: unknown, now: string) {
@@ -67,14 +62,16 @@ function auditStatement(input: {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     input.accountId,
-    input.action === "shift.closed" ? REVENUE_STORE_KEY : WRITE_OFF_STORE_KEY,
+    input.action === "operational_report.saved" ? OPERATIONAL_REPORT_STORE_KEY : input.action === "shift.closed" ? REVENUE_STORE_KEY : WRITE_OFF_STORE_KEY,
     input.action,
     input.entityId,
     input.entityLabel,
     input.monthKey,
     null,
     JSON.stringify(input.after),
-    JSON.stringify(input.action === "shift.closed"
+    JSON.stringify(input.action === "operational_report.saved"
+      ? ["staffing", "payrollBreakdown", "note", "writeOffDocumentIds", "incidentIds"]
+      : input.action === "shift.closed"
       ? ["closingStatus", "writeOffDocumentIds", "writeOffTotalCost"]
       : ["status", "shiftId", "items", "movementIds", "totalCost"]),
     input.actorName,
@@ -82,30 +79,6 @@ function auditStatement(input: {
     input.reason,
     input.now,
   );
-}
-
-async function readStores(database: D1Database, accountId: number) {
-  const result = await database.prepare(`
-    SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?)
-  `).bind(
-    accountId,
-    REVENUE_STORE_KEY,
-    WRITE_OFF_STORE_KEY,
-    ASSORTMENT_STORE_KEY,
-    STOCK_MOVEMENT_STORE_KEY,
-    EXPENSE_STORE_KEY,
-    MONTH_CLOSING_STORE_KEY,
-  ).all<StoreRow>();
-  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
-  return {
-    revenues: array(parse(stores.get(REVENUE_STORE_KEY), [])),
-    writeOffs: array(parse(stores.get(WRITE_OFF_STORE_KEY), [])),
-    assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
-    stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
-    expenses: array(parse(stores.get(EXPENSE_STORE_KEY), [])),
-    closedMonths: closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null)),
-  };
 }
 
 async function postOnce(request: Request): Promise<Response> {
@@ -122,15 +95,36 @@ async function postOnce(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "SHIFT_VENUE_MISMATCH", error: "Смена относится к другому заведению" }, { status: 403 });
   }
   const database = getD1();
-  const casSnapshots = await readStoreSnapshots(database, account.id, [REVENUE_STORE_KEY, WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY]);
-  const stores = await readStores(database, account.id);
+  const casSnapshots = await readStoreSnapshots(database, account.id, [REVENUE_STORE_KEY, WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY, OPERATIONAL_REPORT_STORE_KEY, "bd_cases", "bd_sales_events_v1", "bd_sales_documents"]);
+  const read = (key: string, fallback: unknown): unknown => {
+    const raw = casSnapshots.find(snapshot => snapshot.key === key)?.dataJson;
+    return raw == null ? fallback : JSON.parse(raw);
+  };
+  try {
+    for (const snapshot of casSnapshots) {
+      if (snapshot.dataJson == null) continue;
+      const value = JSON.parse(snapshot.dataJson);
+      if (snapshot.key === ASSORTMENT_STORE_KEY) { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assortment"); }
+      else if (snapshot.key !== MONTH_CLOSING_STORE_KEY && (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row)))) throw new Error("Invalid store");
+    }
+  } catch {
+    return Response.json({ ok: false, code: "SHIFT_STORE_NEEDS_REVIEW", error: "Данные отчёта требуют проверки. Ничего не изменено." }, { status: 409 });
+  }
+  const stores = {
+    revenues: array(read(REVENUE_STORE_KEY, [])), writeOffs: array(read(WRITE_OFF_STORE_KEY, [])),
+    assortment: record(read(ASSORTMENT_STORE_KEY, {})), stockMovements: array(read(STOCK_MOVEMENT_STORE_KEY, [])),
+    expenses: array(read(EXPENSE_STORE_KEY, [])), closedMonths: closedMonthsFromStore(read(MONTH_CLOSING_STORE_KEY, null)),
+    reports: array(read(OPERATIONAL_REPORT_STORE_KEY, [])), incidents: array(read("bd_cases", [])),
+    events: array(read("bd_sales_events_v1", [])), documents: array(read("bd_sales_documents", [])),
+  };
+  if (Array.isArray(body.incidents) && body.incidents.length && !hasPermission(account, "incidents.manage")) return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для сохранения происшествий" }, { status: 403 });
   const date = text(record(body.revenueRecord).date, "", 10);
   if (date && stores.closedMonths.has(date.slice(0, 7))) {
     return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   }
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
-  const result = closeShiftWithCanonicalWriteOffs({
+  const result = await saveOperationalReport({
     current: stores,
     request: {
       shiftCloseId: body.shiftCloseId ?? request.headers.get("idempotency-key"),
@@ -138,6 +132,7 @@ async function postOnce(request: Request): Promise<Response> {
       venueId: body.venueId,
       revenueRecord: body.revenueRecord,
       writeOffItems: body.writeOffItems,
+      incidents: body.incidents, sectionsVersion: body.sectionsVersion,
     },
     venueId: account.venueId,
     actor: { accountId: account.actorAccountId, name: actorName, role: account.role },
@@ -162,32 +157,37 @@ async function postOnce(request: Request): Promise<Response> {
       stockMovements: result.stockMovements,
       expenses: result.expenses,
       stockChanged: false,
+      sections: result.sections, operationalReport: result.operationalReport, reports: result.reports, incidents: result.incidents, revenues: result.revenues,
     });
   }
   const lockedMutation = firstClosedMutation([
     ...compareStoreData(stores.revenues, result.revenues),
+    ...compareStoreData(stores.reports, result.reports),
+    ...compareStoreData(stores.incidents, result.incidents),
     ...compareStoreData(stores.writeOffs, result.writeOffs),
     ...compareStoreData(stores.stockMovements, result.stockMovements),
     ...compareStoreData(stores.expenses, result.expenses),
   ], stores.closedMonths);
   if (lockedMutation) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: lockedMutation.monthKey, error: `Месяц ${lockedMutation.monthKey} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   const statements: D1PreparedStatement[] = [
-    upsertStore(database, account.id, REVENUE_STORE_KEY, result.revenues, now),
+    ...(result.sections.revenue.status === "SAVED" ? [upsertStore(database, account.id, REVENUE_STORE_KEY, result.revenues, now)] : []),
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.writeOffs, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, result.expenses, now),
+    upsertStore(database, account.id, OPERATIONAL_REPORT_STORE_KEY, result.reports, now),
+    ...(Array.isArray(body.incidents) && body.incidents.length ? [upsertStore(database, account.id, "bd_cases", result.incidents, now)] : []),
     auditStatement({
       database,
       accountId: account.id,
-      action: "shift.closed",
+      action: result.sections.revenue.status === "SAVED" ? "shift.closed" : "operational_report.saved",
       entityId: result.shiftId,
-      entityLabel: `Смена ${result.revenueRecord.date}`,
-      monthKey: String(result.revenueRecord.date).slice(0, 7),
+      entityLabel: `Смена ${record(result.revenueRecord).date}`,
+      monthKey: String(record(result.revenueRecord).date).slice(0, 7),
       after: result.revenueRecord,
       actorName,
       actorRole: account.role,
-      reason: `Смена закрыта атомарно; canonical write-off документов: ${result.writeOffDocuments.length}`,
+      reason: `Операционные данные сохранены атомарно; canonical write-off документов: ${result.writeOffDocuments.length}`,
       now,
     }),
   ];
@@ -219,6 +219,7 @@ async function postOnce(request: Request): Promise<Response> {
     expenses: result.expenses,
     warnings: result.warnings,
     stockChanged: result.writeOffDocuments.length > 0,
+    sections: result.sections, operationalReport: result.operationalReport, reports: result.reports, incidents: result.incidents, revenues: result.revenues,
   }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
 }
 
