@@ -1,0 +1,2 @@
+name,salePrice,currency,department,category,type,active,plannedSales,warnings
+ASCII Service,17,MDL,bar,Alcohol,service,true,0,Review ingredients

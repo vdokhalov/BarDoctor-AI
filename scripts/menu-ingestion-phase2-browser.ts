@@ -4,16 +4,16 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { createRequire } from "node:module";
 import { chromium } from "playwright-core";
-import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
+import { menuImportRuntime } from "../tests/helpers/menu-import-runtime";
+import * as XLSX from "xlsx";
 import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
 import { barDoctorResponse } from "../app/bar-doctor-response";
 import { defaultNomenclatureStructure } from "../lib/bardoctor/nomenclature";
 import { normalizeMenuImport } from "../lib/bardoctor/catalog";
 import { menuActionReadiness, waitForMenuCloudReady } from "../tests/helpers/menu-action-readiness";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
-const runtime = await lifecycleRuntime({ ingestion: "./app/api/menu/ingestion/route", taxonomy: "./app/api/nomenclature/taxonomy/route", sales: "./app/api/sales-events/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", valuation: "./app/api/inventory/valuation/route" });
+const runtime = await menuImportRuntime({ ingestion: "./app/api/menu/ingestion/route", taxonomy: "./app/api/nomenclature/taxonomy/route", sales: "./app/api/sales-events/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", valuation: "./app/api/inventory/valuation/route" });
 let recognitionName = "Scan service", lostConfirm = false;
-let recognitionItems: Record<string, unknown>[] | null = null;
 let lastConfirm: Record<string, unknown> | null = null;
 let profileHydrationRace = false;
 const requests: { action: string; source?: string }[] = [];
@@ -41,11 +41,15 @@ const server = createServer(async (req, res) => {
     } else if (url.pathname === "/api/catalog/files") {
       response = Response.json({ ok: true, file: { id: "00000000-0000-4000-8000-000000000001", name: "scan.jpg", type: "image/jpeg" } });
     } else if (url.pathname === "/api/catalog/import") {
-      // Only external OCR extraction is fixed; its source adapters, production
-      // normalization, server draft/validation/confirm and SQLite are exercised.
+      // CSV uploads use the actual catalog route. Only the external model is
+      // fixed; production preprocessing, normalization and canonical APIs run.
       const parsed = req.headers["content-type"]?.includes("application/json") ? JSON.parse(body.toString()) : {};
-      const draft = normalizeMenuImport({ currency: "MDL", confidence: .65, warnings: ["Проверьте цену"], menuItems: recognitionItems || [{ name: recognitionName, salePrice: 17, currency: "MDL", type: "service", confidence: .65 }], recipes: [] }, { source: parsed.source || "upload" });
+      if (!req.headers["content-type"]?.includes("application/json")) {
+        response = await runtime.api.catalogImport.POST(new Request(url, { method: "POST", headers: req.headers as HeadersInit, body }));
+      } else {
+      const draft = normalizeMenuImport({ currency: "MDL", confidence: .65, warnings: ["Проверьте цену"], menuItems: [{ name: recognitionName, salePrice: 17, currency: "MDL", type: "service", confidence: .65 }], recipes: [] }, { source: parsed.source || "upload" });
       response = Response.json(parsed.action === "recognise-batch" ? { ok: true, part: draft } : { ok: true, draft });
+      }
     } else if (["/assortment", "/catalog", "/warehouse", "/cashier", "/home", "/login"].includes(url.pathname)) response = barDoctorResponse();
     else {
       const file = resolve("public", "." + url.pathname);
@@ -167,19 +171,33 @@ try {
       await reloadMenu("after Manual reload");
       await assertMapping("Manual service " + profile.name, "bar", "alcohol", "Бар", "Алкоголь");
       // Import uses the existing file entry, then the same server-owned review.
-      recognitionName = "Import service " + profile.name;
-      await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
-      const chooser = page.waitForEvent("filechooser"); await page.getByRole("button", { name: /Импорт · PDF/ }).click();
-      await (await chooser).setFiles({ name: "menu.csv", mimeType: "text/csv", buffer: Buffer.from("name,price\n" + recognitionName + ",17") });
-      await review.waitFor(); const beforeImport = get();
-      const line = review.locator("article").first(); await line.getByLabel("Раздел", { exact: true }).selectOption("bar"); await line.getByLabel("Категория", { exact: true }).selectOption("alcohol"); await line.getByLabel("Как списывать со склада?").selectOption("NONE");
-      await line.getByLabel("Решение для строки").selectOption("apply"); await line.getByRole("checkbox").check();
-      await line.getByLabel("Цена", { exact: true }).fill("-1"); await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.getByRole("alert").waitFor(); assert.deepEqual(get(), beforeImport);
-      await line.getByLabel("Цена", { exact: true }).fill("17"); await line.getByRole("checkbox").check();
-      await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.locator('[data-bd-menu-ingestion-action="confirm"]').waitFor(); await page.screenshot({ path: `${out}/${profile.name}-import-diff.png`, fullPage: true });
-      await review.locator('[data-bd-menu-ingestion-action="confirm"]').click(); await review.waitFor({ state: "hidden" }); assert.equal(get().menuItems.length, beforeImport.menuItems.length + 1);
-      await reloadMenu("after Import reload");
-      await assertMapping("Import service " + profile.name, "bar", "alcohol", "Бар", "Алкоголь");
+      for (const encoding of ["utf8", "utf8-bom", "ascii", "xlsx"]) {
+        const unicode = encoding !== "ascii";
+        const sourceName = unicode ? "Коктейль «Ёжик», №1" : "ASCII Service";
+        const importName = sourceName + " " + encoding + " " + profile.name;
+        const legacyCategory = unicode ? "Без подраздела" : "Alcohol";
+        const csv = readFileSync("tests/fixtures/" + (encoding === "utf8-bom" ? "menu-cyrillic-utf8-bom.csv" : unicode ? "menu-cyrillic-utf8.csv" : "menu-ascii.csv"), "utf8").replace(sourceName, importName);
+        const bytes = encoding === "xlsx" ? XLSX.write(XLSX.read(csv, { type: "string", raw: true }), { type: "buffer", bookType: "xlsx" }) : Buffer.from(csv, "utf8");
+        await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
+        const chooser = page.waitForEvent("filechooser"); await page.getByRole("button", { name: /Импорт · PDF/ }).click();
+        await (await chooser).setFiles({ name: encoding === "xlsx" ? "меню.xlsx" : "меню.csv", mimeType: encoding === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "text/csv", buffer: bytes });
+        await review.waitFor(); const beforeImport = get();
+        const line = review.locator("article").first(); assert.equal(await line.getByLabel("Название", { exact: true }).inputValue(), importName); await line.getByLabel("Раздел", { exact: true }).selectOption("bar"); await line.getByLabel("Категория", { exact: true }).selectOption("alcohol"); await line.getByLabel("Как списывать со склада?").selectOption("NONE");
+        await line.getByLabel("Решение для строки").selectOption("apply"); await line.getByRole("checkbox").check();
+        await line.getByLabel("Цена", { exact: true }).fill("-1"); await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.getByRole("alert").waitFor(); assert.deepEqual(get(), beforeImport);
+        await line.getByLabel("Цена", { exact: true }).fill("17"); await line.getByRole("checkbox").check();
+        await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.locator('[data-bd-menu-ingestion-action="confirm"]').waitFor(); assert.ok((await review.innerText()).includes(legacyCategory)); await page.screenshot({ path: `${out}/${profile.name}-${encoding}-import-diff.png`, fullPage: true });
+        lostConfirm = true; await review.locator('[data-bd-menu-ingestion-action="confirm"]').click();
+        await page.waitForFunction(() => !document.querySelector(".bd-menu-ingestion-review") || !!document.querySelector(".bd-menu-ingestion-review [role=alert]")); assert.equal(get().menuItems.length, beforeImport.menuItems.length + 1);
+        if (await review.isVisible()) await review.locator('[data-bd-menu-ingestion-action="confirm"]').click(); await review.waitFor({ state: "hidden" });
+        const confirmedImport = JSON.stringify(get()), importConfirm: Record<string, unknown> = Object.assign({}, lastConfirm); const repeatImport = await send(importConfirm); assert.equal(repeatImport.status, 200); assert.equal(repeatImport.body.idempotent, true); assert.equal(JSON.stringify(get()), confirmedImport);
+        assert.equal(get().menuItems.find((row: { name: string }) => row.name === importName).category, legacyCategory);
+        const confirmedDraft = await send({ action: "get", draftId: importConfirm.draftId }); assert.equal(confirmedDraft.status, 200); assert.equal(confirmedDraft.body.draft.rows[0].item.name, importName); assert.equal(confirmedDraft.body.draft.rows[0].item.category, legacyCategory);
+        await assertMapping(importName, "bar", "alcohol", "Бар", "Алкоголь");
+        await reloadMenu("after " + encoding + " Import reload");
+        await assertMapping(importName, "bar", "alcohol", "Бар", "Алкоголь");
+      }
+      const line = review.locator("article").first();
       // Camera staging, batch recognition and merge adapter lead to SCAN draft.
       recognitionName = "Scan service " + profile.name;
       await page.getByRole("button", { name: "Добавить позицию", exact: true }).click(); const camera = page.waitForEvent("filechooser"); await page.getByRole("button", { name: /Распознать · камера/ }).click();
@@ -198,11 +216,11 @@ try {
       // The same visible Import Diff blocks duplicate/invalid rows and stale
       // existing targets on each profile before any canonical write.
       const importRows = async (items: Record<string, unknown>[]) => {
-        recognitionItems = items;
+
         await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
         const chooser = page.waitForEvent("filechooser"); await page.getByRole("button", { name: /Импорт · PDF/ }).click();
-        await (await chooser).setFiles({ name: "diff.csv", mimeType: "text/csv", buffer: Buffer.from("name,price\nQA,15") });
-        await review.waitFor(); recognitionItems = null;
+        await (await chooser).setFiles({ name: "diff.csv", mimeType: "text/csv", buffer: Buffer.from(XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(items)), "utf8") });
+        await review.waitFor();
         for (const row of await review.locator("article").all()) {
           await row.getByLabel("Раздел", { exact: true }).selectOption("bar"); await row.getByLabel("Категория", { exact: true }).selectOption("alcohol"); await row.getByLabel("Как списывать со склада?").selectOption("NONE"); await row.getByLabel(/Решение для/).selectOption("apply"); await row.getByRole("checkbox").check();
         }
@@ -247,7 +265,7 @@ try {
       await page.screenshot({ path: `${out}/${profile.name}-taxonomy-reload.png`, fullPage: true });
       if (profile.stockFirst) assert.equal("nomenclatureStructure" in get(), false);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1); assert.equal(overflow, false); assert.deepEqual(errors, []);
-      results.push({ profile: profile.name, role: profile.role, stockFirst: profile.stockFirst, manual: "PASS", scan: "PASS", import: "PASS", importDiff: "PASS", invalid: "PASS", duplicate: "PASS", concurrentConflict: "PASS", cancel: "PASS", lostResponseRetry: "PASS", repeatedConfirm: "PASS", taxonomyMappingsReload: "PASS", actionAfterEveryReload: "PASS", repeatedLoginBootstrap: "PASS", existingMenuRecipesStock: "PASS", physicalDevice: false, recognitionProvider: "fixture at external OCR boundary" });
+      results.push({ profile: profile.name, role: profile.role, stockFirst: profile.stockFirst, manual: "PASS", scan: "PASS", import: "PASS", csvUnicodeNoBom: "PASS", csvUnicodeBom: "PASS", ascii: "PASS", xlsx: "PASS", importRetryIdempotency: "PASS", importDiff: "PASS", invalid: "PASS", duplicate: "PASS", concurrentConflict: "PASS", cancel: "PASS", lostResponseRetry: "PASS", repeatedConfirm: "PASS", taxonomyMappingsReload: "PASS", actionAfterEveryReload: "PASS", repeatedLoginBootstrap: "PASS", existingMenuRecipesStock: "PASS", physicalDevice: false, recognitionProvider: "fixture at external OCR/AI boundary; actual CSV upload/preprocessing/normalization" });
       console.log("PASS " + profile.name);
     } catch (error) { await page.screenshot({ path: `${out}/${profile.name}-failure.png`, fullPage: true }); console.error(await page.locator("body").innerText()); throw error; } finally { await context.close(); }
   }

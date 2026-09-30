@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import { menuSpreadsheetText } from "../../../../lib/bardoctor/menu-spreadsheet";
 import { env } from "cloudflare:workers";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -165,29 +165,12 @@ function normalizedUploadMimeType(
   return declared || inferredMimeType(filename);
 }
 
-function spreadsheetText(bytes: Uint8Array): string {
-  let workbook: XLSX.WorkBook;
+function spreadsheetText(input: SourceDocument): string {
   try {
-    workbook = XLSX.read(bytes, { type: "array", cellDates: true });
+    return menuSpreadsheetText(input.bytes, input);
   } catch {
     throw new AIServiceError("Не удалось открыть таблицу меню.", 422);
   }
-  const blocks: string[] = [];
-  for (const sheetName of workbook.SheetNames.slice(0, 8)) {
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-      header: 1,
-      raw: false,
-      defval: "",
-      blankrows: false,
-    }).slice(0, 900);
-    blocks.push(
-      `Лист: ${sheetName}\n${rows
-        .map((row) => row.slice(0, 30).map((cell) => String(cell ?? "").trim()).join("\t"))
-        .join("\n")}`,
-    );
-  }
-  return blocks.join("\n\n").slice(0, MAX_HTML_CHARS);
 }
 
 function readableWebText(bytes: Uint8Array): string {
@@ -591,7 +574,7 @@ async function recogniseSingleMenu(
       system: MENU_IMPORT_SYSTEM_PROMPT,
       messages: [{
         role: "user",
-        content: `${prompt}\n\nИзвлечённая таблица:\n${spreadsheetText(input.bytes)}`,
+        content: `${prompt}\n\nИзвлечённая таблица:\n${spreadsheetText(input)}`,
       }],
       maxTokens: 16_000,
       responseSchema: {
