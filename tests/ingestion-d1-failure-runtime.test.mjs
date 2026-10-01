@@ -116,7 +116,8 @@ test("early owner D1 faults roll back, fail closed and correlate safely on deskt
           assert.match(response.body.requestId, /^[a-f0-9-]{36}$/);
           assert.equal(response.body.requestId, response.headers["x-bd-request-id"]);
           assert.match(response.headers["x-bd-correlation-id"], /^[a-f0-9-]{36}$/);
-          assert.doesNotMatch(JSON.stringify(response.body), /D1|SQLITE|constraint|stack|cause/);
+          // The validated opaque UUID can contain "d1"; it is not diagnostic text.
+          assert.doesNotMatch(JSON.stringify({ ...response.body, requestId: undefined }), /D1|SQLITE|constraint|stack|cause/);
           const record = await events(), rows = record.events.filter(e => e.requestId === response.body.requestId);
           assert.ok(!record.events.some(e => e.unexpectedFrameworkError || e.unexpectedFrameworkBoundary));
           const failures = rows.filter(e => e.event === "infrastructure.failure"); assert.equal(failures.length, 1);

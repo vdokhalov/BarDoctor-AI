@@ -34,6 +34,8 @@ jobs:
         run: |
           node --import tsx --test tests/google-business-setup-v400.test.ts tests/platform-integrations.test.ts tests/access-control.test.ts
           node --test tests/reviews-experience-v179.test.mjs tests/integrations-experience-v178.test.mjs
+      - name: Phase 3A.1 actual-handler evidence resolver security and read-only regression
+        run: node --import tsx --test tests/evidence-resolver-phase3a1.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -44,6 +46,10 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Phase 3A.1 compiled Worker native D1 and evidence API mobile desktop
+        run: |
+          node --test tests/evidence-worker-phase3a1.test.mjs
+          node --import tsx scripts/evidence-foundation-browser.ts
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts

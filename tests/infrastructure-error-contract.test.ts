@@ -24,6 +24,7 @@ test("early D1 failure has correlated sanitized diagnostics, structured 500 and 
     assert.equal(response.status, 500); assert.equal(body.ok, false); assert.equal(body.code, "INFRASTRUCTURE_ERROR");
     assert.equal(attempts, 1); assert.equal(request.bodyUsed, false);
     assert.equal(body.requestId, response.headers.get("X-BD-Request-Id"));
+    assert.match(body.requestId, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
     assert.equal(response.headers.get("X-BD-Correlation-Id"), correlation);
     assert.equal(response.headers.get("Cache-Control"), "no-store");
     const events = logs.map(line => JSON.parse(line));
@@ -40,7 +41,9 @@ test("early D1 failure has correlated sanitized diagnostics, structured 500 and 
     assert.deepEqual(diagnostic.error.codes, ["D1_ERROR", "SQLITE_CONSTRAINT", "SQLITE_CONSTRAINT_UNIQUE"]);
     assert.ok(events.some(e => e.event === "error.boundary" && e.requestId === body.requestId));
     assert.doesNotMatch(logs.join("") + JSON.stringify(body), /canary|secret-table|secret-bind|Без подраздела|SELECT|Bearer|cookie/i);
-    assert.doesNotMatch(JSON.stringify(body), /D1|SQLITE|constraint|cause|stack/i);
+    // UUIDs can legitimately contain hex "d1" (observed e2d1 in full regression).
+    // Validate the opaque ID separately and scan every diagnostic/payload field.
+    assert.doesNotMatch(JSON.stringify({ ...body, requestId: undefined }), /D1|SQLITE|constraint|cause|stack/i);
   } finally { console.info = original; }
 });
 
