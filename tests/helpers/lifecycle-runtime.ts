@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { build, type Plugin } from "esbuild";
 
 /** Actual route/auth/service modules, all migrations, and transactional isolated SQLite. */
-export async function lifecycleRuntime(extraRoutes: Record<string, string> = {}, options: { plugins?: Plugin[]; bindings?: Record<string, unknown>; modules?: Record<string, unknown> } = {}) {
+export async function lifecycleRuntime(extraRoutes: Record<string, string> = {}, options: { plugins?: Plugin[]; bindings?: Record<string, unknown>; modules?: Record<string, unknown>; now?: string } = {}) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   const dir = new URL('../../drizzle/', import.meta.url);
@@ -47,7 +47,13 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   type Api = { auth: typeof import('../../lib/bardoctor/auth'); lifecycle: typeof import('../../lib/bardoctor/account-lifecycle'); register: Route; login: Route; bootstrap: Route; venue: Route; venues: Route; account: Route };
   const loaded = { exports: {} as Api };
   const require = createRequire(import.meta.url);
-  new Function('require', 'module', 'exports', compiled.outputFiles[0].text)((name: string) => name === 'cloudflare:workers' ? { env: { DB: db, BUCKET: bucket, ...options.bindings } } : options.modules?.[name] ?? require(name), loaded, loaded.exports);
+  // Freeze only the isolated bundled handlers' Date for calendar boundary QA.
+  // Node/Playwright timers and the application sources are unchanged.
+  const clock = options.now ? new Proxy(Date, {
+    construct(target, args) { return Reflect.construct(target, args.length ? args : [options.now]); },
+    get(target, property) { return property === 'now' ? () => Date.parse(options.now!) : Reflect.get(target, property); },
+  }) : Date;
+  new Function('require', 'module', 'exports', 'Date', compiled.outputFiles[0].text)((name: string) => name === 'cloudflare:workers' ? { env: { DB: db, BUCKET: bucket, ...options.bindings } } : options.modules?.[name] ?? require(name), loaded, loaded.exports, clock);
   const api = loaded.exports as Api & Record<string, Route>;
   async function register(email: string) {
     const response = await api.register.POST(new Request('https://isolated.test/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'Isolated-Test-Password-123!', firstName: 'Test' }) }));

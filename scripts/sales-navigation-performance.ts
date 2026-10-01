@@ -1,3 +1,4 @@
+import { waitForSalesHostReads } from '../tests/helpers/sales-navigation-settled';
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -64,7 +65,7 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  await context.exposeBinding('__bdPerfObserve',(_source,event:Trace)=>{trace.push(event)});
  await context.addInitScript({path:resolve('scripts/qa/sales-navigation-probe.js')});
  await context.addInitScript(({email,token,venue})=>{if(sessionStorage.qa_init)return;sessionStorage.qa_init='1';localStorage.bd_session=email;localStorage.bd_session_token=token;localStorage.bd_active_venue_id=String(venue);},{email:user.email,token:user.token,venue});
- const page=salesSurfacePage(await context.newPage());page.setDefaultTimeout(30000);
+ const hostPage=await context.newPage();const page=salesSurfacePage(hostPage);page.setDefaultTimeout(30000);
  page.on('request',request=>trace.push({kind:'request',at:Date.now(),path:new URL(request.url()).pathname,method:request.method(),type:request.resourceType(),top:request.frame()===page.mainFrame()}));
  page.on('response',response=>trace.push({kind:'response',at:Date.now(),path:new URL(response.url()).pathname,status:response.status(),type:response.request().resourceType(),top:response.frame()===page.mainFrame()}));
  const errors:string[]=[];page.on('pageerror',e=>{errors.push(e.message);writeFileSync(out+'/'+browserType.name()+'-'+width+'-'+delay+'-error-context.json',JSON.stringify({errors,url:page.url(),stack:e.stack,trace:trace.slice(-30)},null,2));});
@@ -103,7 +104,7 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  await documentButton.tap();await frame().locator('.pos-event-summary').waitFor();
  await measure('O Document → Warehouse',()=>frame().locator('.journal-link').tap(),()=>page.getByText('Документ продаж',{exact:true}).first().waitFor());
  await measure('P Warehouse → Document',()=>page.getByText('Документ продаж',{exact:true}).first().tap(),()=>frame().locator('.pos-event-summary').waitFor());
- await page.goto(base+'/cashier?venue='+venue);await cashReady();await page.locator('[data-add="menu-0"]').tap();await page.reload();await page.locator('.pos-line').waitFor();
+ await waitForSalesHostReads(hostPage);await page.goto(base+'/cashier?venue='+venue);await cashReady();await page.locator('[data-add="menu-0"]').tap();await waitForSalesHostReads(hostPage);await page.reload();await page.locator('.pos-line').waitFor();
  await page.locator('.pos-back').tap();await frame().locator('[data-resume-shift="ux2-open"]').waitFor();
  await measure('Q Resume → Cashier',()=>frame().locator('[data-resume-shift="ux2-open"]').tap(),()=>page.locator('.pos-line').waitFor());
  await page.locator('#pay').tap();await page.locator('#receipt:not([hidden])').waitFor();
@@ -119,11 +120,11 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
   assert.equal(await page.locator('#sales-navigation-status').count(),0,'no stale pending on destination');
  }
  if(label!=='baseline'&&delay===0){
-  await page.goto(base+'/sales-import?venue='+venue);await journalReady();failure=true;await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
-  await page.goto(base+'/sales-import?venue='+venue);await journalReady();await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await frame().locator('#open-cashier').tap();await page.locator('#connection').filter({hasText:'Нет соединения'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');await page.unroute('**/api/sales-events*');
-  await page.goto(base+'/sales-import?venue='+venue);await journalReady();runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);await frame().locator('#open-cashier').tap();await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
+  await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();failure=true;await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
+  await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await frame().locator('#open-cashier').tap();await page.locator('#connection').filter({hasText:'Нет соединения'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');await page.unroute('**/api/sales-events*');
+  await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);await frame().locator('#open-cashier').tap();await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
   console.log(JSON.stringify({embeddedAuth401:true,embedded503NotLogin:true,embeddedNetworkNotLogin:true,browser:browserType.name(),width}));
  }
- assert.deepEqual(errors,[]);await page.screenshot({path:out+'/'+browserType.name()+'-'+width+'-'+delay+'.png'});writeFileSync(out+'/'+browserType.name()+'-errors.json',JSON.stringify(errors));await context.close();
+ assert.deepEqual(errors,[]);await page.screenshot({path:out+'/'+browserType.name()+'-'+width+'-'+delay+'.png'});writeFileSync(out+'/'+browserType.name()+'-errors.json',JSON.stringify(errors));writeFileSync(out+'/'+browserType.name()+'-server-requests.json',JSON.stringify(requests));await context.close();
 }
 }finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));runtime.close();}

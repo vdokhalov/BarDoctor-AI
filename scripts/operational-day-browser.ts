@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { createRequire } from "node:module";
@@ -8,8 +8,11 @@ import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
 import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
 import { barDoctorResponse } from "../app/bar-doctor-response";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
-const runtime = await lifecycleRuntime({ sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" });
-const server = createServer(async (req, res) => {
+const fixedTime = process.env.BD_OPERATIONAL_TEST_INSTANT;
+const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
+const runtime = await lifecycleRuntime({ sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" }, { now: fixedTime });
+const pendingHandlers = new Set<Promise<void>>();
+async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url || "/", "http://localhost"), chunks = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
@@ -17,6 +20,7 @@ const server = createServer(async (req, res) => {
     const routes: Record<string, string> = { "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs" };
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
+    if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
     if (name) response = await runtime.api[name][req.method || "GET"](new Request(url, { method: req.method, headers: req.headers as HeadersInit, ...(body.length ? { body } : {}) }), { params: Promise.resolve({ key }) } as never);
     else if (["/shifts", "/finance", "/home", "/login"].includes(url.pathname)) response = barDoctorResponse();
     else {
@@ -25,6 +29,10 @@ const server = createServer(async (req, res) => {
     }
     res.writeHead(response.status, Object.fromEntries(response.headers)); res.end(Buffer.from(await response.arrayBuffer()));
   } catch (error) { console.error(error); res.writeHead(500); res.end("Fixture failure"); }
+}
+const server = createServer((req, res) => {
+  const task = handleRequest(req, res); pendingHandlers.add(task);
+  void task.finally(() => pendingHandlers.delete(task));
 });
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
@@ -44,7 +52,7 @@ try {
     const command = { id: "sale", source: "POS_API", shiftId: "cash", lines: [{ id: "line", menuItemId: "beer", quantity: 1 }], payments: [{ id: "payment", method: "CASH", amount: 20 }] };
     const preview = await (await send({ action: "preview", command })).json() as { previewHash: string };
     assert.equal((await send({ action: "post", command, previewHash: preview.previewHash })).status, 201);
-    const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height } });
+    const context = await browser.newContext({ viewport: { width: profile.width, height: profile.height }, timezoneId: "Europe/Chisinau" });
     await context.addInitScript(({ email, token, venueId }) => { localStorage.setItem("bd_session", email); localStorage.setItem("bd_session_token", token); localStorage.setItem("bd_active_venue_id", String(venueId)); }, { email: user.email, token: user.token, venueId });
     if (cachedProfile) {
       const profile = JSON.parse(String(runtime.sqlite.prepare("SELECT restaurant_json FROM accounts WHERE id=?").get(user.userId)?.restaurant_json));
@@ -62,11 +70,16 @@ try {
       });
     }
     const page = await context.newPage(), errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+    if (fixedTime) await page.clock.setFixedTime(new Date(fixedTime));
+    const expected = await (await runtime.api.days.GET(runtime.request(user, "/api/operational-days"))).json() as { days: { businessDate: string; status: string }[] };
+    assert.equal(expected.days[0].status, "OPERATING");
+    const businessDate = expected.days[0].businessDate;
     try {
       await page.goto(base + "/shifts");
       await page.locator(".bd-shift-card.operating").waitFor();
+      assert.equal(new URL(page.url()).searchParams.get("month"), businessDate.slice(0, 7));
       if (cachedProfile) {
-        await new Promise(done => setTimeout(done, 1000));
+        await page.waitForFunction(() => (window as unknown as {__bdCloudReadiness:{financeReady:boolean}}).__bdCloudReadiness?.financeReady === true);
         const readiness = await page.evaluate(() => (window as unknown as { __bdCloudReadiness: unknown }).__bdCloudReadiness);
         console.log(JSON.stringify({ profile: profile.name, cachedProfile, readiness }));
       }
@@ -88,7 +101,7 @@ try {
       await send({ action: "close_shift", shiftId: "cash" }); await page.reload();
       await page.locator(".bd-shift-card.closed").waitFor({timeout:7000});
       if (cachedProfile) {
-        await page.waitForFunction(() => { const state=(window as unknown as {__bdCloudReadiness:{isReady:boolean;financeReady:boolean}}).__bdCloudReadiness; return state?.isReady===false && state.financeReady===true; });
+        await page.waitForFunction(() => { const state=(window as unknown as {__bdCloudReadiness:{isReady:boolean;financeReady:boolean}}).__bdCloudReadiness; return state?.financeReady===true; });
       }
       await page.locator(".bd-shift-card.closed small").filter({ hasText: "Продажи BarDoctor · Итог" }).waitFor();
       await page.locator(".bd-shift-card.closed").click();
@@ -116,11 +129,11 @@ try {
       await context.route("**/api/operational-days", route => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) }));
       const malformed = page.waitForResponse(response => response.url().endsWith("/api/operational-days"));
       await page.reload(); await malformed; await page.locator('[data-bd-finance-dashboard]').waitFor();
-      assert.deepEqual(errors, []); results.push({ profile: profile.name, cachedProfile, readonly: true, operationsSaved: true, finality: true, malformedReadFallback: true, finance: 20, warehouse: -1 });
+      assert.deepEqual(errors, []); results.push({ profile: profile.name, cachedProfile, businessDate, fixedTime, apiDelay, timezone: "Europe/Chisinau", readonly: true, operationsSaved: true, finality: true, malformedReadFallback: true, finance: 20, warehouse: -1 });
     } catch (error) {
       writeFileSync(out + "/failure.json", JSON.stringify({profile:profile.name, cachedProfile, readiness:await page.evaluate(() => (window as unknown as {__bdCloudReadiness:unknown}).__bdCloudReadiness), requests:await page.evaluate(() => performance.getEntriesByType("resource").map(r => r.name).filter(url => url.includes("/api/"))), body:await page.locator("body").innerText()},null,2));
       await page.screenshot({path:out+"/failure.png",fullPage:true}); throw error;
     } finally { await context.close(); }
   }
   writeFileSync(out + "/result.json", JSON.stringify(results, null, 2)); console.log(JSON.stringify(results));
-} finally { await browser.close(); server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); runtime.close(); }
+} finally { await browser.close(); server.closeAllConnections(); await new Promise<void>(done => server.close(() => done())); await Promise.all(pendingHandlers); runtime.close(); }

@@ -48,6 +48,9 @@ jobs:
         run: |
           node --import tsx scripts/operational-day-browser.ts
           BD_OPERATIONAL_CACHED_PROFILE=1 node --import tsx scripts/operational-day-browser.ts
+          BD_OPERATIONAL_TEST_INSTANT=2026-09-30T21:02:00Z node --import tsx scripts/operational-day-browser.ts
+          BD_OPERATIONAL_TEST_INSTANT=2026-09-30T21:02:00Z BD_OPERATIONAL_CACHED_PROFILE=1 BD_OPERATIONAL_API_DELAY=600 node --import tsx scripts/operational-day-browser.ts
+          BD_OPERATIONAL_TEST_INSTANT=2026-12-31T22:02:00Z BD_OPERATIONAL_CACHED_PROFILE=1 BD_OPERATIONAL_API_DELAY=600 node --import tsx scripts/operational-day-browser.ts
       - name: Actual compiled Worker and static client release integrity mobile desktop
         run: node --test tests/client-release-browser.test.mjs
       - name: Observability real bootstrap D1 and mobile desktop correlation QA
@@ -109,8 +112,8 @@ jobs:
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
       - name: Measured navigation and embedded auth failures
         run: |
-          BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,1200 node --import tsx scripts/sales-navigation-performance.ts
-          BD_PERF_LABEL=ci BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0,100,300,600,1200 node --import tsx scripts/sales-navigation-performance.ts
+          BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts
+          BD_PERF_LABEL=ci BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts
           for width in 820 1280; do
             BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
             BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
