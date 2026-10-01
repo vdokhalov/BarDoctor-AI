@@ -11,6 +11,7 @@ import { barDoctorResponse } from "../app/bar-doctor-response";
 import { defaultNomenclatureStructure } from "../lib/bardoctor/nomenclature";
 import { normalizeMenuImport } from "../lib/bardoctor/catalog";
 import { menuActionReadiness, waitForMenuCloudReady } from "../tests/helpers/menu-action-readiness";
+import { menuChooserAnalyticsRegression, menuBackgroundReadPreserves } from "../tests/helpers/menu-analytics-state-qa";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const runtime = await menuImportRuntime({ ingestion: "./app/api/menu/ingestion/route", taxonomy: "./app/api/nomenclature/taxonomy/route", sales: "./app/api/sales-events/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", valuation: "./app/api/inventory/valuation/route" });
 let recognitionName = "Scan service", lostConfirm = false;
@@ -65,6 +66,7 @@ const out = "outputs/menu-ingestion-phase2"; mkdirSync(out, { recursive: true })
 const results: unknown[] = [];
 try {
   for (const profile of [{ name: "mobile", width: 390, height: 844, stockFirst: false, role: "owner" }, { name: "mobile-wide", width: 412, height: 915, stockFirst: true, role: "owner" }, { name: "desktop", width: 1280, height: 800, stockFirst: false, role: "owner" }, { name: "mobile-stock-first", width: 390, height: 844, stockFirst: true, role: "owner" }, { name: "desktop-stock-first", width: 1280, height: 800, stockFirst: true, role: "owner" }, { name: "mobile-manager", width: 390, height: 844, stockFirst: true, role: "manager" }, { name: "desktop-manager", width: 1280, height: 800, stockFirst: true, role: "manager" }, { name: "mobile-without-permission", width: 390, height: 844, stockFirst: true, role: "cashier" }, { name: "desktop-without-permission", width: 1280, height: 800, stockFirst: true, role: "cashier" }]) {
+    if (process.env.BD_PHASE2_PROFILES && !process.env.BD_PHASE2_PROFILES.split(",").includes(profile.name)) continue;
     const user = await runtime.register(profile.name + "@menu-phase2.test"), venueId = user.activeVenueId;
     runtime.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ name: "Phase 2 " + profile.name, currency: "MDL", timezone: "Europe/Chisinau", workingDays: [0, 1, 2, 3, 4, 5, 6], openTime: "00:00", closeTime: "23:59", areas: ["Бар"] }), user.userId);
     const canonical = profile.stockFirst
@@ -146,6 +148,13 @@ try {
         console.log("PASS " + profile.name); continue;
       }
       await page.getByRole("button", { name: "Добавить позицию", exact: true }).waitFor();
+      const analyticsQA = { page, context, getCanonical: get, profile: profile.name, out };
+      await menuChooserAnalyticsRegression(analyticsQA);
+      if (process.env.BD_PHASE2_CHOOSER_ONLY === "1") {
+        assert.deepEqual(errors, []);
+        results.push({ profile: profile.name, chooserAnalyticsRace: "PASS" });
+        console.log("PASS chooser analytics " + profile.name); continue;
+      }
       readinessEvidence.push({ stage: "before confirm", ...await menuActionReadiness(page) });
       await page.getByRole("button", { name: "Добавить позицию", exact: true }).click();
       await page.getByRole("button", { name: /Добавить вручную/ }).click();
@@ -154,6 +163,7 @@ try {
       const selects = editor.locator(".bd-tax-selectors-v336 select"); await selects.first().selectOption("bar"); await selects.nth(1).selectOption("alcohol");
       await editor.getByRole("button", { name: /^Без списания/ }).click();
       const price = editor.locator('input[type="number"]').first(); await price.fill("15");
+      await menuBackgroundReadPreserves(analyticsQA, "manual-editor", async () => ({ visible: await editor.isVisible(), name: await editor.getByLabel("Название", { exact: true }).inputValue(), price: await price.inputValue() }));
       const before = get();
       await editor.getByRole("button", { name: "Проверить", exact: true }).filter({ visible: true }).click();
       const review = page.locator(".bd-menu-ingestion-review"); await review.waitFor(); assert.deepEqual(get(), before);
@@ -185,6 +195,7 @@ try {
         const line = review.locator("article").first(); assert.equal(await line.getByLabel("Название", { exact: true }).inputValue(), importName); await line.getByLabel("Раздел", { exact: true }).selectOption("bar"); await line.getByLabel("Категория", { exact: true }).selectOption("alcohol"); await line.getByLabel("Как списывать со склада?").selectOption("NONE");
         await line.getByLabel("Решение для строки").selectOption("apply"); await line.getByRole("checkbox").check();
         await line.getByLabel("Цена", { exact: true }).fill("-1"); await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.getByRole("alert").waitFor(); assert.deepEqual(get(), beforeImport);
+        await menuBackgroundReadPreserves(analyticsQA, "import-" + encoding + "-validation-error", async () => ({ visible: await review.isVisible(), name: await line.getByLabel("Название", { exact: true }).inputValue(), price: await line.getByLabel("Цена", { exact: true }).inputValue(), alert: await review.getByRole("alert").innerText(), review: await review.innerText() }));
         await line.getByLabel("Цена", { exact: true }).fill("17"); await line.getByRole("checkbox").check();
         await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.locator('[data-bd-menu-ingestion-action="confirm"]').waitFor(); assert.ok((await review.innerText()).includes(legacyCategory)); await page.screenshot({ path: `${out}/${profile.name}-${encoding}-import-diff.png`, fullPage: true });
         lostConfirm = true; await review.locator('[data-bd-menu-ingestion-action="confirm"]').click();
@@ -203,6 +214,7 @@ try {
       await page.getByRole("button", { name: "Добавить позицию", exact: true }).click(); const camera = page.waitForEvent("filechooser"); await page.getByRole("button", { name: /Распознать · камера/ }).click();
       await (await camera).setFiles({ name: "menu.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jBqkAAAAASUVORK5CYII=", "base64") });
       await review.waitFor(); assert.match(await review.innerText(), /Распознавание/);
+      await menuBackgroundReadPreserves(analyticsQA, "scan-draft", async () => ({ visible: await review.isVisible(), name: await review.getByLabel("Название", { exact: true }).inputValue(), review: await review.innerText() }));
       const beforeScan = get(); await line.getByLabel("Раздел", { exact: true }).selectOption("bar"); await line.getByLabel("Категория", { exact: true }).selectOption("alcohol"); await line.getByLabel("Как списывать со склада?").selectOption("NONE"); await line.getByLabel("Решение для строки").selectOption("apply"); await line.getByRole("checkbox").check();
       await review.locator('[data-bd-menu-ingestion-action="validate"]').click(); await review.locator('[data-bd-menu-ingestion-action="confirm"]').waitFor(); await page.screenshot({ path: `${out}/${profile.name}-scan.png`, fullPage: true }); await review.locator('[data-bd-menu-ingestion-action="confirm"]').click(); await review.waitFor({ state: "hidden" }); assert.equal(get().menuItems.length, beforeScan.menuItems.length + 1);
       await reloadMenu("after Scan reload");
@@ -269,6 +281,6 @@ try {
       console.log("PASS " + profile.name);
     } catch (error) { await page.screenshot({ path: `${out}/${profile.name}-failure.png`, fullPage: true }); console.error(await page.locator("body").innerText()); throw error; } finally { await context.close(); }
   }
-  for (const source of ["MANUAL", "SCAN", "IMPORT"]) assert.ok(requests.some(row => row.action === "create" && row.source === source));
+  if (process.env.BD_PHASE2_CHOOSER_ONLY !== "1") for (const source of ["MANUAL", "SCAN", "IMPORT"]) assert.ok(requests.some(row => row.action === "create" && row.source === source));
   writeFileSync(out + "/results.json", JSON.stringify({ results, requests }, null, 2)); console.log(JSON.stringify(results));
 } finally { await browser.close(); server.close(); runtime.close(); }

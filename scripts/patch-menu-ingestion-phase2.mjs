@@ -4,6 +4,24 @@ const path='public/assets/index-BQGspy0I.js';
 let source=fs.readFileSync(path,'utf8').replaceAll('\r\n','\n');
 const ast=()=>parse(source,{ecmaVersion:'latest',sourceType:'module'});
 const fn=(name,change)=>{const node=ast().body.find(n=>n.type==='FunctionDeclaration'&&n.id?.name===name);if(!node)throw Error('Missing Phase 2 function: '+name);source=source.slice(0,node.start)+change(source.slice(node.start,node.end))+source.slice(node.end)};
+// The chooser boolean belongs to source selection. Analytics has an independent
+// loading/error lifecycle and must never write that boolean or read it as status.
+function separateAnalyticsState(code){
+ const pairs=[
+  ['[$,ee]=S.useState(!1),','[$,ee]=S.useState(!1),[bdAnalyticsStatusPhase2,bdSetAnalyticsStatusPhase2]=S.useState(null),'],
+  ['ee("loading")','bdSetAnalyticsStatusPhase2("loading")'],
+  ['Y(c.analytics),ee(null)','Y(c.analytics),bdSetAnalyticsStatusPhase2(null)'],
+  ['Y(null),ee("error")','Y(null),bdSetAnalyticsStatusPhase2("error")'],
+  ['"data-analytics-state":$','"data-analytics-state":bdAnalyticsStatusPhase2'],
+  ['$==="error"&&','bdAnalyticsStatusPhase2==="error"&&'],
+ ];
+ for(const [before,after] of pairs){
+  if(code.includes(after))continue;
+  if(code.split(before).length!==2)throw Error('Missing/ambiguous analytics state ownership boundary: '+before);
+  code=code.replace(before,after);
+ }
+ return code;
+}
 const fragment=fs.readFileSync('scripts/fragments/menu-ingestion-phase2.fragment.txt','utf8');
 for(const node of parse(fragment,{ecmaVersion:'latest',sourceType:'module'}).body){if(node.type!=='FunctionDeclaration')continue;const code=fragment.slice(node.start,node.end);if(ast().body.some(n=>n.id?.name===node.id.name))fn(node.id.name,()=>code);else source=code+'\n'+source;}
 fn('bdAssortmentSourceChoiceV170',code=>{
@@ -12,6 +30,7 @@ fn('bdAssortmentSourceChoiceV170',code=>{
  return code.replace('title:"Камера"','title:"Распознать · камера"').replace('title:"Галерея"','title:"Распознать · галерея"').replace('title:"PDF, Excel или CSV"','title:"Импорт · PDF, Excel или CSV"').replace('title:"Публичная ссылка"','title:"Импорт · публичная ссылка"');
 });
 fn('bdAssortmentCommandPageV170',code=>{
+ code=separateAnalyticsState(code);
  const marker='/* menu-ingestion-phase2 */';
  code=code.replace('bdPhase3VenueRefV418.current===s.activeVenueId','Number(bdPhase3VenueRefV418.current)===Number(s.activeVenueId)').replace('me&&d==="menu"&&i.jsxs("button",','me&&n&&Number(s.activeVenueId)>0&&d==="menu"&&i.jsxs("button",').replace('S.useEffect(()=>{if(Number(bdPhase3VenueRefV418.current)===Number(s.activeVenueId))return;','S.useLayoutEffect(()=>{if(Number(bdPhase3VenueRefV418.current)===Number(s.activeVenueId))return;');
  if(code.includes(marker))return code.replace('bdPhase3VenueRefV418.current===s.activeVenueId','Number(bdPhase3VenueRefV418.current)===Number(s.activeVenueId)').replaceAll('canManage:me})','canManage:me&&n&&Number(s.activeVenueId)>0})').replace('source,items:source===','source,provenance:{sourceFileIds:raw.sourceFileIds||[raw.sourceFileId].filter(Boolean),sourceUrl:raw.sourceUrl,name:raw.sourceFileName||raw.venueName},items:source===').replace('Ae=async(w,activeRecipeId="")=>{await bdStartMenuDraft({...w,activeRecipeId},"MANUAL");return true}','Ae=async(w,activeRecipeId="",baseline=null)=>{await bdStartMenuDraft({...w,activeRecipeId,baseline},"MANUAL");return true}');
@@ -40,5 +59,11 @@ const menuEditorChange=code=>code.replace('s(ce,bdActiveRecipeIdV418||"")','s(ce
 fn('bdCatMenuEditor',menuEditorChange);
 const editorFragment='scripts/fragments/menu-consumption-sot-v418.fragment.txt';fs.writeFileSync(editorFragment,menuEditorChange(fs.readFileSync(editorFragment,'utf8')));
 parse(source,{ecmaVersion:'latest',sourceType:'module'});fs.writeFileSync(path,source);
+// Keep the original React authoring fragment safe when regenerating v170 too.
+const commandFragment='scripts/fragments/assortment-command-v170.fragment.txt';
+const originalFragment=fs.readFileSync(commandFragment,'utf8');
+const commandNode=parse(originalFragment,{ecmaVersion:'latest',sourceType:'script'}).body.find(node=>node.id?.name==='bdAssortmentCommandPageV170');
+if(!commandNode)throw Error('Missing authoring fragment command page');
+fs.writeFileSync(commandFragment,originalFragment.slice(0,commandNode.start)+separateAnalyticsState(originalFragment.slice(commandNode.start,commandNode.end))+originalFragment.slice(commandNode.end));
 const responsePath='app/bar-doctor-response.ts';let response=fs.readFileSync(responsePath,'utf8');if(!response.includes('/menu-ingestion-phase2.css')){const anchor='<link rel="stylesheet" href="/assortment-command-v170.css';const pos=response.indexOf(anchor);if(pos<0)throw Error('Missing Phase 2 stylesheet anchor');response=response.slice(0,pos)+'<link rel="stylesheet" href="/menu-ingestion-phase2.css?v=20260930-phase2" />\n    '+response.slice(pos);fs.writeFileSync(responsePath,response)}
 console.log('Phase 2 unified menu ingestion applied');
