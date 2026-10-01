@@ -1,0 +1,1318 @@
+{
+  "baselineCommit": "5b7f1354930392459aeefca8857c9dd24ee80f4a",
+  "originalCiRun": 36819799592,
+  "verifyJob": 110232709727,
+  "reproductions": [
+    {
+      "run": "outputs/iphone-original-series/iphone-1-trace.json",
+      "events": [
+        {
+          "at": 1790834887703,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "cashier-ready",
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:38635/cashier?venue=1",
+                "history": null,
+                "length": 2,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790834887771,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "history": null,
+            "length": 2,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<strong>Atelier</strong>"
+          }
+        },
+        {
+          "at": 1790834888205,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "history": {
+              "bdTransientLayer": "transient-mup4ur2j-1",
+              "bdTransientVersion": "navigation-transient-v247"
+            },
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<button type=\"button\" data-close=\"\" aria-label=\"Закрыть\">×</button>"
+          }
+        },
+        {
+          "at": 1790834888218,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "before-back-1",
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:38635/cashier?venue=1",
+                "history": null,
+                "length": 3,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790834888254,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790834888288,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\" aria-busy=\"true\" data-sales-pending=\"true\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790834889465,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "after-back-2",
+            "url": "http://127.0.0.1:38635/cashier?venue=1",
+            "frames": [
+              {
+                "error": "Error: frame.evaluate: Execution context was destroyed, most likely because of a navigation"
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:38635/sales-import?venue=1"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790834889975,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "sales-url-matched",
+            "url": "http://127.0.0.1:38635/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:38635/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "e7648b57-a02d-4ac5-9760-5bf4b7840a81",
+                  "bdPreviousEntryId": "a0681ec8-0812-4fda-8a31-b97abd8283ea",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:38635/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:38635/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:38635/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:38635/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:38635/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:38635/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:38635/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:38635/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:38635/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/integration-icons/arrow-left.svg",
+              "http://127.0.0.1:38635/integration-icons/plus.svg",
+              "http://127.0.0.1:38635/integration-icons/file-up.svg",
+              "http://127.0.0.1:38635/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:38635/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:38635/integration-icons/activity.svg",
+              "http://127.0.0.1:38635/integration-icons/shield-check.svg"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790834919984,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "journal-timeout",
+            "url": "http://127.0.0.1:38635/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:38635/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "e7648b57-a02d-4ac5-9760-5bf4b7840a81",
+                  "bdPreviousEntryId": "a0681ec8-0812-4fda-8a31-b97abd8283ea",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:38635/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:38635/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:38635/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:38635/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:38635/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:38635/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:38635/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:38635/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:38635/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:38635/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/integration-icons/arrow-left.svg",
+              "http://127.0.0.1:38635/integration-icons/plus.svg",
+              "http://127.0.0.1:38635/integration-icons/file-up.svg",
+              "http://127.0.0.1:38635/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:38635/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:38635/integration-icons/activity.svg",
+              "http://127.0.0.1:38635/integration-icons/shield-check.svg"
+            ],
+            "errors": [],
+            "pendingNotReceivedByServer": [
+              "http://127.0.0.1:38635/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:38635/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:38635/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:38635/integration-icons/plus.svg",
+              "http://127.0.0.1:38635/integration-icons/file-up.svg",
+              "http://127.0.0.1:38635/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:38635/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:38635/integration-icons/activity.svg",
+              "http://127.0.0.1:38635/integration-icons/shield-check.svg"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "run": "outputs/iphone-early-unroute-series/iphone-13-trace.json",
+      "events": [
+        {
+          "at": 1790835022238,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "cashier-ready",
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:40125/cashier?venue=1",
+                "history": null,
+                "length": 2,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835022317,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "history": null,
+            "length": 2,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<strong>Atelier</strong>"
+          }
+        },
+        {
+          "at": 1790835022649,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "history": {
+              "bdTransientLayer": "transient-mup4xmw2-1",
+              "bdTransientVersion": "navigation-transient-v247"
+            },
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<button type=\"button\" data-close=\"\" aria-label=\"Закрыть\">×</button>"
+          }
+        },
+        {
+          "at": 1790835022677,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "before-back-1",
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:40125/cashier?venue=1",
+                "history": null,
+                "length": 3,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835022701,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790835022736,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\" aria-busy=\"true\" data-sales-pending=\"true\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790835023910,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "after-back-2",
+            "url": "http://127.0.0.1:40125/cashier?venue=1",
+            "frames": [
+              {
+                "error": "Error: frame.evaluate: Execution context was destroyed, most likely because of a navigation"
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:40125/sales-import?venue=1"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835024332,
+          "kind": "unroute-start",
+          "detail": {}
+        },
+        {
+          "at": 1790835024419,
+          "kind": "unroute-end",
+          "detail": {}
+        },
+        {
+          "at": 1790835024447,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "sales-url-matched",
+            "url": "http://127.0.0.1:40125/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:40125/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "05240bb9-d178-4a59-8323-7c91645eb6bb",
+                  "bdPreviousEntryId": "a36bb64e-f1c2-478d-8724-ee914058a786",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:40125/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:40125/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:40125/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:40125/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:40125/venue-switcher.css?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:40125/venue-timezone.js?v=venue-time-iphone-hardening",
+              "http://127.0.0.1:40125/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:40125/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:40125/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:40125/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:40125/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:40125/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:40125/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/integration-icons/activity.svg",
+              "http://127.0.0.1:40125/integration-icons/shield-check.svg"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835054454,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "journal-timeout",
+            "url": "http://127.0.0.1:40125/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:40125/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "05240bb9-d178-4a59-8323-7c91645eb6bb",
+                  "bdPreviousEntryId": "a36bb64e-f1c2-478d-8724-ee914058a786",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:40125/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:40125/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:40125/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:40125/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:40125/venue-switcher.css?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:40125/venue-timezone.js?v=venue-time-iphone-hardening",
+              "http://127.0.0.1:40125/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:40125/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:40125/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:40125/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:40125/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:40125/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:40125/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:40125/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/integration-icons/activity.svg",
+              "http://127.0.0.1:40125/integration-icons/shield-check.svg"
+            ],
+            "errors": [],
+            "pendingNotReceivedByServer": [
+              "http://127.0.0.1:40125/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:40125/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:40125/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:40125/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:40125/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:40125/integration-icons/activity.svg",
+              "http://127.0.0.1:40125/integration-icons/shield-check.svg"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "run": "outputs/iphone-protocol-early/iphone-6-trace.json",
+      "events": [
+        {
+          "at": 1790835080679,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "cashier-ready",
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:44879/cashier?venue=1",
+                "history": null,
+                "length": 2,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835080747,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "history": null,
+            "length": 2,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<strong>Atelier</strong>"
+          }
+        },
+        {
+          "at": 1790835081180,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "history": {
+              "bdTransientLayer": "transient-mup4yvyz-1",
+              "bdTransientVersion": "navigation-transient-v247"
+            },
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<button type=\"button\" data-close=\"\" aria-label=\"Закрыть\">×</button>"
+          }
+        },
+        {
+          "at": 1790835081192,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "before-back-1",
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:44879/cashier?venue=1",
+                "history": null,
+                "length": 3,
+                "load": "complete",
+                "venue": "1",
+                "workspace": null,
+                "notice": "Выберите позиции и способ оплаты.",
+                "iframes": []
+              }
+            ],
+            "pending": [],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835081214,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790835081248,
+          "kind": "pointerdown",
+          "detail": {
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "history": null,
+            "length": 3,
+            "ready": "complete",
+            "venue": "1",
+            "target": "<a href=\"/sales-import\" class=\"pos-back\" aria-label=\"Вернуться в журнал продаж\" aria-busy=\"true\" data-sales-pending=\"true\"><img src=\"/integration-icons/arrow-left.svg\" alt=\"\">Продажи</a>"
+          }
+        },
+        {
+          "at": 1790835082426,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "after-back-2",
+            "url": "http://127.0.0.1:44879/cashier?venue=1",
+            "frames": [
+              {
+                "error": "Error: frame.evaluate: Execution context was destroyed, most likely because of a navigation"
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:44879/sales-import?venue=1"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835082837,
+          "kind": "unroute-start",
+          "detail": {}
+        },
+        {
+          "at": 1790835082882,
+          "kind": "unroute-end",
+          "detail": {}
+        },
+        {
+          "at": 1790835082889,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "sales-url-matched",
+            "url": "http://127.0.0.1:44879/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:44879/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "9d806814-f048-4455-986a-ba1ab836cca6",
+                  "bdPreviousEntryId": "ca00c811-f623-49ea-993e-2d2da761ff72",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:44879/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:44879/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:44879/venue-switcher.css?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:44879/venue-timezone.js?v=venue-time-iphone-hardening",
+              "http://127.0.0.1:44879/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:44879/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:44879/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:44879/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:44879/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:44879/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:44879/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/integration-icons/arrow-left.svg",
+              "http://127.0.0.1:44879/integration-icons/plus.svg",
+              "http://127.0.0.1:44879/integration-icons/file-up.svg",
+              "http://127.0.0.1:44879/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:44879/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:44879/integration-icons/activity.svg",
+              "http://127.0.0.1:44879/integration-icons/shield-check.svg"
+            ],
+            "errors": []
+          }
+        },
+        {
+          "at": 1790835112896,
+          "kind": "checkpoint",
+          "detail": {
+            "label": "journal-timeout",
+            "url": "http://127.0.0.1:44879/sales-import?venue=1",
+            "frames": [
+              {
+                "url": "http://127.0.0.1:44879/sales-import?venue=1",
+                "history": {
+                  "bdEntryId": "9d806814-f048-4455-986a-ba1ab836cca6",
+                  "bdPreviousEntryId": "ca00c811-f623-49ea-993e-2d2da761ff72",
+                  "bdPreviousUrl": "/home",
+                  "bdVenueId": "1",
+                  "bdNavigationVersion": "canonical-navigation-v247",
+                  "bdDirectLink": true
+                },
+                "length": 4,
+                "load": "complete",
+                "venue": "1",
+                "workspace": "/sales-import",
+                "auth": {
+                  "state": "ready",
+                  "reason": "active_venue_ready",
+                  "membershipsLoaded": true,
+                  "venuesLoaded": true,
+                  "activeVenueRestored": false,
+                  "accessibleVenueCount": 1,
+                  "confirmedOwnedVenueCount": 1,
+                  "inaccessibleOwnedVenueCount": 0
+                },
+                "bootstrapPending": false,
+                "iframes": [
+                  {
+                    "src": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+                    "title": "Продажи и склад"
+                  }
+                ]
+              },
+              {
+                "url": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+                "history": null,
+                "length": 4,
+                "load": "loading",
+                "venue": "1",
+                "iframes": []
+              }
+            ],
+            "pending": [
+              "http://127.0.0.1:44879/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:44879/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:44879/venue-switcher.css?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:44879/venue-timezone.js?v=venue-time-iphone-hardening",
+              "http://127.0.0.1:44879/accounting-currency.js?v=pos1-functional",
+              "http://127.0.0.1:44879/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+              "http://127.0.0.1:44879/catalog-accounting-v207.js?v=20260820-catalog-v208",
+              "http://127.0.0.1:44879/sales-navigation.css?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/sales-navigation.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:44879/venue-switcher.js?v=20260826-venue-identity-v297",
+              "http://127.0.0.1:44879/modern-polish.js?v=20260811-modern-v87",
+              "http://127.0.0.1:44879/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:44879/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/integration-icons/arrow-left.svg",
+              "http://127.0.0.1:44879/integration-icons/plus.svg",
+              "http://127.0.0.1:44879/integration-icons/file-up.svg",
+              "http://127.0.0.1:44879/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:44879/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:44879/integration-icons/activity.svg",
+              "http://127.0.0.1:44879/integration-icons/shield-check.svg"
+            ],
+            "errors": [],
+            "pendingNotReceivedByServer": [
+              "http://127.0.0.1:44879/sales-import.css?v=sales-ux1",
+              "http://127.0.0.1:44879/modern-polish.css?v=20260811-modern-v87",
+              "http://127.0.0.1:44879/bd-route-context.js?v=20260822-navigation-v247",
+              "http://127.0.0.1:44879/sales-journal.css?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/pos-draft.js?v=pos1-hardening",
+              "http://127.0.0.1:44879/sales-journal.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/sales-import.js?v=sales-scroll-stability",
+              "http://127.0.0.1:44879/integration-icons/plus.svg",
+              "http://127.0.0.1:44879/integration-icons/file-up.svg",
+              "http://127.0.0.1:44879/integration-icons/chevron-right.svg",
+              "http://127.0.0.1:44879/integration-icons/clipboard-list.svg",
+              "http://127.0.0.1:44879/integration-icons/activity.svg",
+              "http://127.0.0.1:44879/integration-icons/shield-check.svg"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "protocolAroundUnroute": [
+    {
+      "time": "2026-10-01T06:11:22.809Z",
+      "method": "Network.responseReceived",
+      "requestId": "11676.141",
+      "url": "http://127.0.0.1:44879/api/restaurants/me",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.810Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "39CD9AF2B2B042BE09D23743A3100AC0",
+      "url": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.810Z",
+      "method": "Fetch.requestPaused",
+      "requestId": "interception-job-510.0",
+      "url": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.824Z",
+      "method": "Fetch.requestPaused",
+      "requestId": "interception-job-511.0",
+      "url": "http://127.0.0.1:44879/api/store",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.824Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.143",
+      "url": "http://127.0.0.1:44879/api/store",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.825Z",
+      "method": "Fetch.continueRequest",
+      "requestId": "interception-job-511.0",
+      "url": null,
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.826Z",
+      "method": "Fetch.continueRequest",
+      "requestId": "interception-job-510.0",
+      "url": null,
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.827Z",
+      "method": "Network.responseReceived",
+      "requestId": "11676.142",
+      "url": "http://127.0.0.1:44879/api/users/me",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.839Z",
+      "method": "Network.responseReceived",
+      "requestId": "39CD9AF2B2B042BE09D23743A3100AC0",
+      "url": "http://127.0.0.1:44879/sales-import?venue=1&embedded=1",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.840Z",
+      "method": "Network.setCacheDisabled",
+      "requestId": null,
+      "url": null,
+      "cacheDisabled": false
+    },
+    {
+      "time": "2026-10-01T06:11:22.840Z",
+      "method": "Fetch.disable",
+      "requestId": null,
+      "url": null,
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.145",
+      "url": "http://127.0.0.1:44879/sales-import.css?v=sales-ux1",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.146",
+      "url": "http://127.0.0.1:44879/modern-polish.css?v=20260811-modern-v87",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.147",
+      "url": "http://127.0.0.1:44879/venue-switcher.css?v=20260826-venue-identity-v297",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.148",
+      "url": "http://127.0.0.1:44879/venue-timezone.js?v=venue-time-iphone-hardening",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.149",
+      "url": "http://127.0.0.1:44879/accounting-currency.js?v=pos1-functional",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.844Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.150",
+      "url": "http://127.0.0.1:44879/app-shell-v185.css?v=20260927-sales-workspace-ux2",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.151",
+      "url": "http://127.0.0.1:44879/navigation-contract-v247.js?v=20260927-sales-workspace-ux2",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.152",
+      "url": "http://127.0.0.1:44879/app-shell-v185.js?v=20260927-sales-workspace-ux2",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.153",
+      "url": "http://127.0.0.1:44879/navigation-transient-v247.js?v=20260927-sales-workspace-ux2",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.154",
+      "url": "http://127.0.0.1:44879/catalog-accounting-v207.js?v=20260820-catalog-v208",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.155",
+      "url": "http://127.0.0.1:44879/sales-navigation.css?v=sales-scroll-stability",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.156",
+      "url": "http://127.0.0.1:44879/sales-navigation.js?v=sales-scroll-stability",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.157",
+      "url": "http://127.0.0.1:44879/bd-route-context.js?v=20260822-navigation-v247",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.158",
+      "url": "http://127.0.0.1:44879/venue-switcher.js?v=20260826-venue-identity-v297",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.159",
+      "url": "http://127.0.0.1:44879/modern-polish.js?v=20260811-modern-v87",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.160",
+      "url": "http://127.0.0.1:44879/sales-journal.css?v=sales-scroll-stability",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.161",
+      "url": "http://127.0.0.1:44879/pos-draft.js?v=pos1-hardening",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.162",
+      "url": "http://127.0.0.1:44879/sales-journal.js?v=sales-scroll-stability",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.163",
+      "url": "http://127.0.0.1:44879/sales-import.js?v=sales-scroll-stability",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.164",
+      "url": "http://127.0.0.1:44879/integration-icons/arrow-left.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.845Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.165",
+      "url": "http://127.0.0.1:44879/integration-icons/plus.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.846Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.166",
+      "url": "http://127.0.0.1:44879/integration-icons/file-up.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.846Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.167",
+      "url": "http://127.0.0.1:44879/integration-icons/chevron-right.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.846Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.168",
+      "url": "http://127.0.0.1:44879/integration-icons/clipboard-list.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.846Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.170",
+      "url": "http://127.0.0.1:44879/integration-icons/activity.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.846Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.172",
+      "url": "http://127.0.0.1:44879/integration-icons/shield-check.svg",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.881Z",
+      "method": "Network.responseReceived",
+      "requestId": "11676.143",
+      "url": "http://127.0.0.1:44879/api/store",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.972Z",
+      "method": "Network.requestWillBeSent",
+      "requestId": "11676.178",
+      "url": "http://127.0.0.1:44879/api/business-health",
+      "cacheDisabled": null
+    },
+    {
+      "time": "2026-10-01T06:11:22.975Z",
+      "method": "Network.responseReceived",
+      "requestId": "11676.178",
+      "url": "http://127.0.0.1:44879/api/business-health",
+      "cacheDisabled": null
+    }
+  ],
+  "fixedNavigationStability": {
+    "applicationChanged": false,
+    "unchangedAtelierAssertion": true,
+    "timeoutIncreased": false,
+    "series": [
+      {
+        "path": "outputs/iphone-release-normal",
+        "browser": "chromium",
+        "networkDelayMs": 0,
+        "cpuRate": 1,
+        "passed": 25,
+        "viewport": "390x844",
+        "venue": "Atelier",
+        "pageFrameNetworkErrors": 0
+      },
+      {
+        "path": "outputs/iphone-release-stress",
+        "browser": "chromium",
+        "networkDelayMs": 600,
+        "cpuRate": 4,
+        "passed": 20,
+        "viewport": "390x844",
+        "venue": "Atelier",
+        "pageFrameNetworkErrors": 0
+      },
+      {
+        "path": "outputs/iphone-release-webkit-normal",
+        "browser": "webkit",
+        "networkDelayMs": 0,
+        "cpuRate": 1,
+        "passed": 10,
+        "viewport": "390x844",
+        "venue": "Atelier",
+        "pageFrameNetworkErrors": 0
+      },
+      {
+        "path": "outputs/iphone-release-webkit-delayed",
+        "browser": "webkit",
+        "networkDelayMs": 600,
+        "cpuRate": 1,
+        "passed": 10,
+        "viewport": "390x844",
+        "venue": "Atelier",
+        "pageFrameNetworkErrors": 0
+      }
+    ]
+  },
+  "additionalCalendarFailure": {
+    "classification": "E: calendar/fixture assumption",
+    "reproducedOnFreshServer": true,
+    "log": "/tmp/mobile-shift-diagnostic.log",
+    "snapshot": {
+      "url": "http://127.0.0.1:4293/shifts?venue=901&month=2026-10",
+      "activeVenueId": 901,
+      "authState": "ready",
+      "closedShifts": 0,
+      "elapsedScheduledShifts": 0,
+      "rows": [
+        {
+          "date": "2026-10-01",
+          "status": "Запланирована"
+        }
+      ],
+      "expectedMissingShiftButtonCount": 0
+    },
+    "fixedBrowserDate": "2026-08-28T12:00:00.000Z",
+    "timersRemainRunning": true
+  },
+  "fixedFullScenarioStability": [
+    {
+      "path": "outputs/iphone-full-normal-1",
+      "timing": "normal",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 24,
+      "backBackTargetNetworkErrors": 0
+    },
+    {
+      "path": "outputs/iphone-full-normal-2",
+      "timing": "normal",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 24,
+      "backBackTargetNetworkErrors": 0
+    },
+    {
+      "path": "outputs/iphone-full-normal-3",
+      "timing": "normal",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 26,
+      "backBackTargetNetworkErrors": 0
+    },
+    {
+      "path": "outputs/iphone-full-delayed-1",
+      "timing": "delayed",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 42,
+      "backBackTargetNetworkErrors": 0
+    },
+    {
+      "path": "outputs/iphone-full-delayed-2",
+      "timing": "delayed",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 43,
+      "backBackTargetNetworkErrors": 0
+    },
+    {
+      "path": "outputs/iphone-full-delayed-3",
+      "timing": "delayed",
+      "passedProfiles": 4,
+      "pageFrameErrors": 0,
+      "httpErrors": 0,
+      "requestCancellationsCapturedInFullTrace": 41,
+      "backBackTargetNetworkErrors": 0
+    }
+  ],
+  "workspaceTrace": {
+    "path": "outputs/iphone-final-workspace-trace",
+    "passed": 3,
+    "cashierVenue": "1",
+    "cashierWorkspace": null,
+    "salesVenue": "1",
+    "salesWorkspace": 1,
+    "journal": "Atelier"
+  },
+  "localVerification": {
+    "targetedTests": {
+      "passed": 34,
+      "failed": 0
+    },
+    "fullNpmTest": "PASS",
+    "verifiedBuild": "PASS",
+    "typecheck": "PASS",
+    "lint": {
+      "errors": 0,
+      "preExistingWarnings": 2
+    },
+    "operationalDayVariants": 5,
+    "phase2IngestionProfiles": [
+      "mobile",
+      "mobile-wide",
+      "mobile-stock-first",
+      "mobile-manager",
+      "desktop"
+    ],
+    "salesNavigationMatrix": "PASS Chromium/WebKit, delays 0/100/300/600x3/1200 and widths 820/1280",
+    "salesScrollMatrix": "PASS complete rerun outside filesystem sandbox; initial sandbox tablet idle-offset assertion retained in logs",
+    "mobileNavigation": "PASS after fixed-date fixture; initial failure documented",
+    "homeReviews": "PASS mobile and desktop",
+    "applicationSourceChanged": false,
+    "requiredGitHubCiGate": "pending pushed commit; must be all GREEN before saving a Sites version",
+    "productionVersion": 467
+  }
+}

@@ -78,7 +78,10 @@ jobs:
       - name: Sales UX step 2 journal checkout import mobile tablet desktop
         run: node --import tsx scripts/sales-ux2-browser.ts
       - name: Sales iPhone safe areas touch navigation and single shift regression
-        run: node --import tsx scripts/sales-iphone-browser.ts
+        run: |
+          node --import tsx scripts/sales-iphone-browser.ts
+          BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_OUT=outputs/sales-iphone-hardening/normal node --import tsx scripts/sales-iphone-browser.ts
+          BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_DELAY=600 BD_IPHONE_OUT=outputs/sales-iphone-hardening/delayed node --import tsx scripts/sales-iphone-browser.ts
       - name: Venue timezone settings and Sales date mobile tablet desktop
         run: node --import tsx scripts/venue-timezone-browser.ts
       - name: Accounting report reversal guard mobile tablet desktop
@@ -97,6 +100,11 @@ jobs:
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
         run: npm run test:home-reviews-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sales-iphone-navigation-evidence
+          path: outputs/sales-iphone-hardening
 
   sales-navigation:
     runs-on: ubuntu-24.04
@@ -118,6 +126,10 @@ jobs:
             BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
             BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts
           done
+      - name: WebKit iPhone repeated pending Back navigation
+        run: |
+          BD_IPHONE_BROWSER=webkit BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_OUT=outputs/sales-navigation-performance/ci/iphone-normal node --import tsx scripts/sales-iphone-browser.ts
+          BD_IPHONE_BROWSER=webkit BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_DELAY=600 BD_IPHONE_OUT=outputs/sales-navigation-performance/ci/iphone-delayed node --import tsx scripts/sales-iphone-browser.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

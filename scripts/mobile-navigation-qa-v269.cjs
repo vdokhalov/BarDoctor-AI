@@ -800,8 +800,11 @@ async function nomenclatureFlow(browser, profile) {
 }
 
 async function shiftsFlow(browser, profile) {
+  // Past missing shifts must exist even when CI runs on the first day of a month.
+  const fixtureNow = new Date("2026-08-28T12:00:00.000Z");
   const closeRunState = await createRun(browser, profile, "shifts-close");
   let page = closeRunState.page;
+  await page.clock.setFixedTime(fixtureNow);
   await goto(page, "/?venue=901");
   await goto(page, "/shifts?venue=901");
   await mobileAudit(page, profile.name, "shifts-list");
@@ -819,6 +822,7 @@ async function shiftsFlow(browser, profile) {
 
   const refreshRunState = await createRun(browser, profile, "shifts-refresh");
   page = refreshRunState.page;
+  await page.clock.setFixedTime(fixtureNow);
   await goto(page, "/shifts?venue=901");
   shift = page.getByRole("button", { name: /Смена не заполнена/ }).first();
   await shift.click();
@@ -831,6 +835,7 @@ async function shiftsFlow(browser, profile) {
 
   const backRunState = await createRun(browser, profile, "shifts-browser-back");
   page = backRunState.page;
+  await page.clock.setFixedTime(fixtureNow);
   await goto(page, "/?venue=901");
   await goto(page, "/shifts?venue=901");
   shift = page.getByRole("button", { name: /Смена не заполнена/ }).first();
