@@ -357,11 +357,11 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
           WHERE v.id=? AND v.status='active' AND a.owns_venue=1 AND a.account_kind='user')`)
         .bind(row.accountId, row.storeKey, row.dataJson, row.updatedAt, venue.id)));
   }
-  await reconcileVenueOwnerAccess(venue.id);
+  await observedAwait("owner.reconcile", () => reconcileVenueOwnerAccess(venue.id));
 }
 
 export async function membershipsForAccount(account: Account) {
-  await ensureOwnerVenue(account);
+  await observedAwait("auth.ensure_owner_venue", () => ensureOwnerVenue(account));
   await reconcileConfirmedOwnerVenues(account.id);
   const rows = await getDb()
     .select({

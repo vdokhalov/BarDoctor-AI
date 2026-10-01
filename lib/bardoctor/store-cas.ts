@@ -1,3 +1,5 @@
+import { observedCasAttempt } from "./request-observability";
+
 export type StoreSnapshot = {
   key: string;
   dataJson: string | null;
@@ -102,9 +104,9 @@ export async function withStoreCasRetries(
   maxAttempts = 3,
 ): Promise<Response> {
   const attempts = Array.from({ length: maxAttempts }, () => request.clone());
-  for (const attemptRequest of attempts) {
+  for (const [index, attemptRequest] of attempts.entries()) {
     try {
-      return await command(attemptRequest as unknown as Request);
+      return await observedCasAttempt(index + 1, maxAttempts, () => command(attemptRequest as unknown as Request));
     } catch (error) {
       if (!(error instanceof StoreWriteConflictError)) throw error;
     }

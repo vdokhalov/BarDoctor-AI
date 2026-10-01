@@ -4,6 +4,7 @@
   if (window.fetch.__bdRequestObservability) return;
   var native = window.fetch.bind(window);
   function route(path) {
+    if (path === "/api/menu/ingestion" || path === "/api/assortment/overview") return path;
     if (path === "/api/auth/bootstrap") return path;
     if (path.indexOf("/api/auth/") === 0) return "/api/auth/:action";
     if (path === "/api/store" || path.indexOf("/api/store/") === 0) return "/api/store/:key";

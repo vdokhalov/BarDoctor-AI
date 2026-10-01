@@ -118,7 +118,13 @@ test("cancel, revision guard, denied venue, malformed stores and atomic failure 
     const next = await r.create("MANUAL", [r.item()], "draft:atomic-123"), validated = await r.validate(next.body.draft);
     assert.equal((await r.send({ action: "update", draftId: next.body.draft.id, revision: 999, rows: [] })).response.status, 409);
     assert.equal((await r.send({ action: "get", draftId: next.body.draft.id, venueId: 999 })).response.status, 403);
-    r.failDatabase(); await assert.rejects(r.confirm(validated.body.draft), /injected database failure/); assert.deepEqual(r.get(), before); assert.equal(r.get(MENU_INGESTION_STORE_KEY).find((row: { id: string }) => row.id === next.body.draft.id).status, "VALIDATED");
+    r.failDatabase();
+    const failed = await r.confirm(validated.body.draft);
+    assert.equal(failed.response.status, 500);
+    assert.equal((failed.body as unknown as { code: string }).code, "INFRASTRUCTURE_ERROR");
+    assert.equal((failed.body as unknown as { requestId: string }).requestId, failed.response.headers.get("X-BD-Request-Id"));
+    assert.doesNotMatch(JSON.stringify(failed.body), /injected database failure|SQL|stack|cause/);
+    assert.deepEqual(r.get(), before); assert.equal(r.get(MENU_INGESTION_STORE_KEY).find((row: { id: string }) => row.id === next.body.draft.id).status, "VALIDATED");
     assert.equal((await r.confirm(validated.body.draft)).response.status, 201);
     r.put("bd_assortment_v1", { menuItems: "broken" }); assert.equal((await r.create("MANUAL", [r.item()], "draft:broken-123")).response.status, 409);
   } finally { r.close(); }

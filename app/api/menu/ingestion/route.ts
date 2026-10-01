@@ -5,11 +5,12 @@ import { readJsonRequest } from "../../../../lib/bardoctor/http";
 import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { MENU_INGESTION_STORE_KEY, MENU_SOURCES, menuDraft, editMenuDraft, validateMenuDraft, fingerprint, object, menuInput, type MenuDraft, type MenuSource } from "../../../../lib/bardoctor/menu-ingestion";
+import { withInfrastructureErrorBoundary } from "../../../../lib/bardoctor/request-observability";
 
 const ASSORTMENT = "bd_assortment_v1";
 const fail = (code: string, error: string, status = 409) => Response.json({ ok: false, code, error }, { status });
 export async function POST(request: Request): Promise<Response> {
-  return withStoreCasRetries(request, command);
+  return withInfrastructureErrorBoundary(request, () => withStoreCasRetries(request, command));
 }
 async function command(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);

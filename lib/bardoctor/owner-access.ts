@@ -10,6 +10,7 @@ import {
   type VenueMembership,
 } from "../../db/schema";
 import { ACCESS_ROLES, PERMISSION_KEYS, permissionsFor } from "./access-control";
+import { observedAwait } from "./request-observability";
 
 export const OWNER_VENUE_MEMBERSHIP_UPSERT_SQL = `
   INSERT INTO venue_memberships (
@@ -96,10 +97,10 @@ export async function reconcileVenueOwnerAccess(
   }
 
   const d1 = getD1();
-  await d1.batch([
+  await observedAwait("owner.membership_batch", () => d1.batch([
     d1.prepare(OWNER_WORKSPACE_MEMBERSHIP_UPSERT_SQL).bind(venueId),
     d1.prepare(OWNER_VENUE_MEMBERSHIP_UPSERT_SQL).bind(venueId),
-  ]);
+  ]));
   return {
     venueId,
     ownerAccountId: venue.createdByAccountId,
