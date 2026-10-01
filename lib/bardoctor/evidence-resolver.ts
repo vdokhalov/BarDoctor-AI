@@ -2,6 +2,9 @@ import { getD1 } from "../../db";
 import { authenticateRequest } from "./auth";
 import { hasPermission, isAccessRole, permissionPayload, type AuthenticatedAccount, type PermissionKey } from "./access-control";
 import { readStoreSnapshots, type StoreSnapshot } from "./store-cas";
+import { readDailyRevenue, validBusinessDate } from "./daily-revenue";
+import { operationalDay } from "./operational-day";
+import { revenueEvidenceRevision } from "./revenue-evidence";
 import {
   evidenceContentRevision, MAX_EVIDENCE_REFERENCES, MAX_EVIDENCE_OFFSET, parseEvidenceReference,
   type EvidenceDiagnostic, type EvidenceProjection, type EvidenceReference, type EvidenceRelation,
@@ -85,10 +88,8 @@ function resourceRevision(stores: Map<string, Loaded>, reference: EvidenceRefere
   // Revenue-row source classification depends on these canonical events too.
   // Bind that input set, so changing it cannot silently prove an older read model.
   const finance = reference.kind === "CASH_SHIFT" || reference.kind === "FINANCE_REVENUE";
-  const sourceEvents = finance && parent.revenueSource === "sales_events_v1"
-    ? stores.get(adapters.SALE_EVENT.key)?.records.filter(e => belongs(e, scope, true)
-      && e.revenueRowId === parent.id && e.businessDate === parent.date) ?? null : undefined;
-  return evidenceContentRevision(reference, sourceEvents === undefined ? parent : { record: parent, sourceEvents });
+  return finance ? revenueEvidenceRevision(reference, parent, stores.get(adapters.SALE_EVENT.key)?.records ?? null, scope,
+    stores.get("bd_sales_documents")?.records ?? []) : evidenceContentRevision(reference, parent);
 }
 function saleChild(parent: Row, partId: string, scope: EvidenceScope): Row | null {
   const batch = object(parent.batch);
@@ -108,6 +109,19 @@ function draftChild(parent: Row, partId: string, scope: EvidenceScope): Row | nu
 /** Trusted-context core; the public API only obtains context through authentication. */
 async function resolveInContext(context: Context, reference: EvidenceReference, limit: number, offset: number, asOf: string): Promise<EvidenceResolution> {
   if (reference.venueId !== context.venueId || reference.workspaceId !== context.workspaceId) return result("unavailable", asOf);
+  if (reference.kind === "DAILY_REVENUE") {
+    const resolution = await readDailyRevenue(context, reference, limit, offset, asOf);
+    if (!("fact" in resolution)) return resolution;
+    const { fact, binding, page } = resolution;
+    const boundReference = fact.traceTarget!.reference as EvidenceReference & { expectedRevision: typeof fact.revision };
+    return { contractVersion: 1, asOf, outcome: resolution.outcome, code: resolution.code, diagnostics: [...fact.diagnostics], evidence: {
+      reference: boundReference, revision: fact.revision, binding,
+      projection: { type: "DAILY_REVENUE", businessDate: fact.businessDate, revenue: fact.value, currency: fact.currency, sourceType: fact.sourceType },
+      finality: fact.finality, availability: fact.availability === "AVAILABLE" ? "AVAILABLE" : "PARTIAL", evidenceStatus: "PARTIAL",
+      observedAt: fact.observedAt ?? null, updatedAt: fact.updatedAt ?? null, freshness: fact.freshness,
+      relations: fact.evidenceRefs.map(ref => ({ type: "derived_from", reference: ref })), page, traceTarget: fact.traceTarget!,
+    } };
+  }
   if (!Object.hasOwn(adapters, reference.kind)) return result("unsupported", asOf);
   const kind = reference.kind as SupportedKind, adapter = adapters[kind];
   if (!hasPermission(context.account, adapter.permission)) return result("restricted", asOf);
@@ -115,6 +129,7 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
   const keys = [adapter.key];
   if (kind === "SALE_EVENT" && hasPermission(context.account, "shifts.view")) keys.push(adapters.FINANCE_REVENUE.key);
   if (["CASH_SHIFT", "FINANCE_REVENUE"].includes(kind) && hasPermission(context.account, "sales.view")) keys.push(adapters.SALE_EVENT.key);
+  if (["CASH_SHIFT", "FINANCE_REVENUE"].includes(kind)) keys.push("bd_sales_documents");
   if (kind === "MENU_INGESTION_DRAFT" && hasPermission(context.account, "inventory.view")) keys.push(adapters.MENU_ITEM.key);
   let stores: Map<string, Loaded>;
   try { stores = loadedStores(await readStoreSnapshots(getD1(), context.account.id, keys)); }
@@ -156,8 +171,9 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
     if (child) await addRelation("belongs_to", "SALE_EVENT", parent.id);
     else await addRelation("belongs_to", "FINANCE_REVENUE", parent.revenueRowId);
   } else if (kind === "CASH_SHIFT" || kind === "FINANCE_REVENUE") {
-    const events = (stores.get(adapters.SALE_EVENT.key)?.records ?? []).filter(e => belongs(e, context, true)
-      && e.revenueRowId === parent.id && e.businessDate === parent.date && ["POSTED", "REVERSED"].includes(String(e.status)));
+    const sourceEvents = (stores.get(adapters.SALE_EVENT.key)?.records ?? []).filter(e => belongs(e, context, true)
+      && e.revenueRowId === parent.id && e.businessDate === parent.date);
+    const events = sourceEvents.filter(e => ["POSTED", "REVERSED"].includes(String(e.status)));
     const families = new Set(events.map(e => nativeRevenueSource(e.source)));
     let sourceType: RevenueSourceType = "LEGACY_UNKNOWN";
     if (parent.revenueSource === "sales_events_v1") {
@@ -168,8 +184,19 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
         if (!events.length && number(parent.revenue) !== 0) unavailableRelation();
       }
     } else if (parent.revenueSource === "MANUAL_SUMMARY" || ["guided-v17", "canonical-writeoff-v272"].includes(String(parent.closedVia))) sourceType = "MANUAL_SUMMARY";
+    if (validBusinessDate(parent.date) && (parent.revenueSource !== "sales_events_v1" || hasPermission(context.account, "sales.view"))) {
+      const day = operationalDay({ venueId: context.venueId, businessDate: parent.date, asOf, revenues: [parent], events: sourceEvents,
+        // Only document-backed rows depend on the document basis bound above.
+        documents: parent.revenueSource === "sales_documents"
+          ? (stores.get("bd_sales_documents")?.records ?? []).filter(d => belongs(d, context, false)) : [] });
+      sourceType = day.revenue.source;
+      finality = day.revenue.status;
+      if (day.revenue.consistency === "MISMATCH") { diagnostics.push("REVENUE_READ_MODEL_MISMATCH"); partial = true; }
+    }
     const lifecycle = parent.closingStatus === "open" ? "OPEN" : parent.closingStatus === "closed" ? "CLOSED" : null;
-    finality = lifecycle === "OPEN" ? "PROVISIONAL" : sourceType === "MANUAL_SUMMARY" ? "FINAL" : "UNKNOWN";
+    if (lifecycle === "OPEN") finality = "PROVISIONAL";
+    else if (sourceType === "MANUAL_SUMMARY") finality = "FINAL";
+    if (kind === "FINANCE_REVENUE" && sourceType === "BARDOC_POS" && lifecycle !== null) await addRelation("derived_from", "CASH_SHIFT", parent.id);
     projection = { type: kind, businessDate: date(parent.date), revenue: number(parent.revenue), currency: text(parent.currency), receipts: number(parent.receipts), lifecycle, sourceType };
   } else if (kind === "MENU_ITEM") {
     projection = { type: "MENU_ITEM", name: text(parent.name), salePrice: number(parent.salePrice), currency: text(parent.currency), active: typeof parent.active === "boolean" ? parent.active : null, sourceType: menuSource(parent.source) };
@@ -212,6 +239,21 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
     traceTarget: { type: "EVIDENCE_RESOURCE" as const, reference: boundReference } };
   return { contractVersion: 1, asOf, diagnostics: [...new Set(diagnostics)],
     ...(partial ? { outcome: "partial" as const, code: "PARTIAL_EVIDENCE" as const } : { outcome: "resolved" as const, code: "RESOLVED" as const }), evidence };
+}
+
+/** Minimal scalar query; tenant identity comes only from the selected session. */
+export async function readDailyRevenueRequest(request: Request): Promise<Response> {
+  const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "Vary": "Cookie, X-Session-Token, X-Session-Email, X-Venue-Id" } });
+  const context = await authenticatedEvidenceContext(request);
+  if (!context) return reply({ ok: false, code: "AUTHENTICATION_REQUIRED" }, 401);
+  const params = new URL(request.url).searchParams;
+  if ([...params.keys()].some(key => !["businessDate", "expectedRevision"].includes(key) || params.getAll(key).length !== 1)
+    || !validBusinessDate(params.get("businessDate"))) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  const reference = { contractVersion: 1, kind: "DAILY_REVENUE", id: params.get("businessDate"), venueId: context.venueId, workspaceId: context.workspaceId,
+    ...(params.has("expectedRevision") ? { expectedRevision: params.get("expectedRevision") } : {}) };
+  const parsed = parseEvidenceReference(reference);
+  if (!parsed.ok) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  return reply(await readDailyRevenue(context, parsed.reference, MAX_EVIDENCE_REFERENCES, 0, new Date().toISOString()));
 }
 
 /** The only public resolver entry: no caller-supplied account or namespace. */

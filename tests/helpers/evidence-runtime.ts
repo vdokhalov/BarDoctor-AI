@@ -7,8 +7,9 @@ import type { SalesEvent } from "../../lib/bardoctor/sales-events";
 import type { MenuDraft } from "../../lib/bardoctor/menu-ingestion";
 
 /** Real session/auth, canonical writes, and resolver against isolated transactional SQLite. */
-export async function evidenceRuntime() {
-  const r = await lifecycleRuntime({ evidence: "./app/api/evidence/resolve/route", sales: "./app/api/sales-events/route", ingestion: "./app/api/menu/ingestion/route" });
+export async function evidenceRuntime(options: { now?: string } = {}) {
+  const r = await lifecycleRuntime({ evidence: "./app/api/evidence/resolve/route", daily: "./app/api/evidence/facts/daily-revenue/route",
+    days: "./app/api/operational-days/route", sales: "./app/api/sales-events/route", ingestion: "./app/api/menu/ingestion/route" }, options);
   const owner = await r.register("evidence-owner@isolated.test");
   const foreign = await r.register("evidence-foreign@isolated.test");
   const member = await r.register("evidence-member@isolated.test");

@@ -6,6 +6,7 @@ export const MAX_EVIDENCE_OFFSET = 10_000;
 export type EvidenceScope = { venueId: number; workspaceId: number };
 export type ContentRevision = `sha256:${string}`;
 export const EVIDENCE_RESOURCE_KINDS = [
+  "DAILY_REVENUE",
   "SALE_EVENT", "CASH_SHIFT", "FINANCE_REVENUE", "MENU_ITEM", "MENU_INGESTION_DRAFT",
   "SALES_DOCUMENT", "WAREHOUSE_MOVEMENT", "PURCHASE_DOCUMENT", "INVENTORY_DOCUMENT",
   "WRITEOFF_DOCUMENT", "OPERATIONAL_REPORT", "INTEGRATION_EVENT", "REVIEW", "PAYROLL_ENTRY",
@@ -30,7 +31,8 @@ export type MenuSourceType = "MANUAL" | "SCAN" | "IMPORT" | "LEGACY_UNKNOWN";
 export type EvidenceDiagnostic =
   | "NO_HISTORICAL_SNAPSHOT" | "PARTIAL_EVIDENCE" | "SOURCE_UNKNOWN"
   | "SOURCE_METADATA_MISSING" | "RECORD_NEEDS_REVIEW" | "RELATIONS_RESTRICTED"
-  | "RELATED_EVIDENCE_UNAVAILABLE" | "RELATIONS_PAGINATED" | "FRESHNESS_POLICY_UNDEFINED";
+  | "RELATED_EVIDENCE_UNAVAILABLE" | "RELATIONS_PAGINATED" | "FRESHNESS_POLICY_UNDEFINED"
+  | "REVENUE_READ_MODEL_MISMATCH";
 export type FreshnessBasis = {
   basis: "RECORD" | "SOURCE_SYNC" | "STORE_FALLBACK" | "UNKNOWN";
   timestamp: string | null;
@@ -55,7 +57,7 @@ type FactBase = EvidenceScope & {
   diagnostics: readonly EvidenceDiagnostic[];
   traceTarget: TraceTarget | null;
 };
-/** Two small scalar contracts, without a persisted ledger or domain projections yet. */
+/** Scalar read projections; never persisted as a ledger. */
 export type BusinessFact =
   | (FactBase & {
     factType: "DAILY_REVENUE"; businessDate: string; period?: never;
@@ -86,6 +88,7 @@ export type EvidenceRelation = {
 };
 type MoneyProjection = { currency: string | null; revenue: number | null; businessDate: string | null };
 export type EvidenceProjection =
+  | (MoneyProjection & { type: "DAILY_REVENUE"; sourceType: RevenueSourceType })
   | (MoneyProjection & { type: "SALE_EVENT"; lifecycle: "POSTED" | "REVERSED" | null; sourceType: RevenueSourceType })
   | { type: "SALE_LINE"; menuItemId: string | null; quantity: number | null; unitPrice: number | null; total: number | null; currency: string | null }
   | (MoneyProjection & { type: "CASH_SHIFT" | "FINANCE_REVENUE"; lifecycle: "OPEN" | "CLOSED" | null; sourceType: RevenueSourceType; receipts: number | null })
@@ -152,3 +155,13 @@ export async function evidenceContentRevision(reference: EvidenceReference, reco
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
   return `sha256:${Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, "0")).join("")}`;
 }
+
+export type DailyRevenueFact = Extract<BusinessFact, { factType: "DAILY_REVENUE" }>;
+export type EvidencePage = { limit: number; offset: number; nextOffset: number | null };
+export type DailyRevenueResolution = ResolutionBase & (
+  | { outcome: "resolved" | "partial"; code: "RESOLVED" | "PARTIAL_EVIDENCE"; fact: DailyRevenueFact;
+      binding: "CURRENT_RECORD" | "EXPECTED_REVISION"; page: EvidencePage }
+  | { outcome: "unavailable"; code: "EVIDENCE_UNAVAILABLE" }
+  | { outcome: "restricted"; code: "ACCESS_DENIED" }
+  | { outcome: "changed"; code: "READ_MODEL_CHANGED" }
+);

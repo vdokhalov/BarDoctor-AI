@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { Miniflare } from "miniflare";
 
-test("actual compiled Worker routes evidence GET with isolated native D1 and no canonical writes", { timeout: 120000 }, async () => {
+test("actual compiled Worker routes evidence and DAILY_REVENUE GET with isolated native D1 and no canonical writes", { timeout: 120000 }, async () => {
   const server = path.resolve("dist/server");
   const config = JSON.parse(readFileSync(path.join(server, "wrangler.json"), "utf8"));
   const modules = ["index.js", ...readdirSync(server, { recursive: true }).filter(file => file !== "index.js" && /\.(?:m?js)$/.test(file)).sort()]
@@ -33,6 +33,12 @@ test("actual compiled Worker routes evidence GET with isolated native D1 and no 
       db.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role) VALUES(1,1,'owner')"),
       db.prepare("INSERT INTO sessions(token_hash,account_id,active_venue_id,expires_at) VALUES(?,1,1,?)").bind(createHash("sha256").update(token).digest("hex"), new Date(Date.now() + 3600000).toISOString()),
       db.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(1,'bd_assortment_v1',?,'2026-10-01T12:00:00Z')").bind(raw),
+      db.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(1,'bd_finance_revenue',?,'2026-10-01T12:00:00Z')").bind(JSON.stringify([
+        { id: "worker-cash", venueId: 1, date: "2026-10-01", revenueSource: "sales_events_v1", revenue: 60, currency: "MDL", receipts: 3, closingStatus: "open", createdAt: "2026-10-01T12:00:00Z" },
+      ])),
+      db.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(1,'bd_sales_events_v1',?,'2026-10-01T12:00:00Z')").bind(JSON.stringify([10, 20, 30].map((revenue, i) => (
+        { id: "worker-sale:" + i, venueId: 1, businessDate: "2026-10-01", revenueRowId: "worker-cash", shiftId: "worker-cash", source: "POS_API", status: "POSTED", revenue, currency: "MDL", acceptedAt: "2026-10-01T12:00:00Z" }
+      )))),
     ]);
     // Guard canonical mutations inside native D1, in addition to byte comparisons.
     for (const action of ["INSERT", "UPDATE", "DELETE"]) await db.exec(`CREATE TRIGGER evidence_no_${action.toLowerCase()} BEFORE ${action} ON domain_data BEGIN SELECT RAISE(ABORT, 'canonical writes forbidden'); END`);
@@ -47,6 +53,26 @@ test("actual compiled Worker routes evidence GET with isolated native D1 and no 
     assert.equal((await (await call({ ...ref, workspaceId: 999 })).json()).outcome, "unavailable");
     assert.equal((await (await call({ ...ref, expectedRevision: "sha256:" + "0".repeat(64) })).json()).outcome, "changed");
     assert.equal((await call({ ...ref, storeKey: "bd_assortment_v1" })).status, 400);
+    const dailyUrl = "http://localhost/api/evidence/facts/daily-revenue?businessDate=2026-10-01";
+    assert.equal((await mf.dispatchFetch(dailyUrl)).status, 401);
+    const factResponse = await mf.dispatchFetch(dailyUrl, { headers });
+    assert.equal(factResponse.status, 200); assert.equal(factResponse.headers.get("Cache-Control"), "private, no-store");
+    const { fact } = await factResponse.json();
+    assert.equal(fact.value, 60); assert.equal(fact.sourceType, "BARDOC_POS"); assert.equal(fact.finality, "PROVISIONAL"); assert.equal(fact.evidenceStatus, "COMPLETE");
+    assert.equal((await (await mf.dispatchFetch(dailyUrl + "&expectedRevision=" + fact.revision, { headers })).json()).binding, "EXPECTED_REVISION");
+    assert.equal((await (await call({ ...fact.traceTarget.reference, expectedRevision: "sha256:" + "0".repeat(64) })).json()).code, "READ_MODEL_CHANGED");
+    const root = (await (await call(fact.traceTarget.reference)).json()).evidence;
+    const finance = (await (await call(root.relations[0].reference)).json()).evidence;
+    const shift = (await (await call(finance.relations.find(r => r.reference.kind === "CASH_SHIFT").reference)).json()).evidence;
+    let salesTotal = 0;
+    for (const relation of shift.relations) {
+      const sale = (await (await call(relation.reference)).json()).evidence;
+      assert.equal(sale.projection.lifecycle, "POSTED"); salesTotal += sale.projection.revenue;
+    }
+    assert.equal(salesTotal, fact.value); assert.equal(finance.projection.revenue, fact.value);
+    const dayResponse = await mf.dispatchFetch("http://localhost/api/operational-days", { headers });
+    assert.equal((await dayResponse.json()).days[0].revenue.amount, fact.value);
+    assert.equal((await mf.dispatchFetch(dailyUrl + "&dataAccountId=2", { headers })).status, 400);
     assert.deepEqual((await db.prepare("SELECT * FROM domain_data ORDER BY account_id,store_key").all()).results, before);
     assert.equal(outbound, 0);
   } finally { schema.close(); await mf.dispose(); }

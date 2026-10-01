@@ -36,6 +36,8 @@ jobs:
           node --test tests/reviews-experience-v179.test.mjs tests/integrations-experience-v178.test.mjs
       - name: Phase 3A.1 actual-handler evidence resolver security and read-only regression
         run: node --import tsx --test tests/evidence-resolver-phase3a1.test.ts
+      - name: Phase 3A.2 Revenue Trace canonical invariant finality binding tenant security and read-only
+        run: node --import tsx --test tests/revenue-trace-phase3a2.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -46,7 +48,7 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
-      - name: Phase 3A.1 compiled Worker native D1 and evidence API mobile desktop
+      - name: Phase 3A.1 and 3A.2 compiled Worker native D1 and evidence/revenue API mobile desktop
         run: |
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
