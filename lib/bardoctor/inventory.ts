@@ -1,3 +1,4 @@
+import { retainStockMovements } from "./stock-retention";
 import { classifyNomenclatureItemWithRules, defaultNomenclatureStructure } from "./nomenclature";
 import {
   auditCanonicalNomenclature,
@@ -3454,6 +3455,7 @@ export function applyInventoryCount(input: {
     balance.valuationMethod = COST_BASIS_METHOD;
     balance.lastInventoryAt = date;
     balance.lastInventoryDocumentId = snapshotId;
+    balance.quantityAnchorAt = now;
     balance.checkedAt = now;
     balance.updatedAt = now;
 
@@ -3620,7 +3622,7 @@ export function revisePurchaseInInventory(input: {
     return {
       ok: true,
       assortment: parts.root,
-      movements: [...movementHistory, ...nextMovements].slice(0, 20_000) as StockMovement[],
+      movements: retainStockMovements([...movementHistory, ...nextMovements], parts.root) as StockMovement[],
       summary: {
         postedLines: previousReceipts.length,
         movementCount: previousReceipts.length,
@@ -3716,12 +3718,12 @@ export function revisePurchaseInInventory(input: {
     reversalReason: input.reversalReason
       ?? "Закупочная накладная исправлена и проведена повторно",
   }));
-  const finalMovements = [
+  const finalMovements = retainStockMovements([
     ...reapplied.movements,
     ...cancelledPreviousReceipts,
     ...movementHistory,
     ...retained,
-  ].slice(0, 20_000) as StockMovement[];
+  ], reapplied.assortment) as StockMovement[];
   const finalParts = assortmentParts(reapplied.assortment);
   for (const balance of finalParts.balances) {
     if (!affectedKeys.has(text(balance.productKey ?? balance.key, "", 300))) continue;

@@ -1,3 +1,4 @@
+import { retainStockMovements } from "./stock-retention";
 import { canonicalStockUnit, convertStockQuantity, physicalUnit, type CanonicalStockUnit, type PhysicalUnit } from "./stock-units";
 import { inventoryProductKey, type StockMovement } from "./inventory";
 import type { CanonicalTaxonomy } from "./nomenclature-taxonomy";
@@ -19,7 +20,7 @@ export type OpeningInput = {
   costSource?: string;
 };
 export type OpeningDocument = {
-  id: string; venueId: number; version: 1; status: "confirmed";
+  id: string; venueId: number; version: 1; status: "confirmed"; anchorBoundary?: { movements: { id: unknown }[] };
   fingerprint: string; createdAt: string; currency: string;
   selectedRowIds: string[]; skippedRowIds: string[]; items: OpeningPreviewRow[];
 };
@@ -150,7 +151,7 @@ export async function confirmOpeningStock(command: { id: string; inputs: Opening
   const catalog = rows(assortment.nomenclature);
   const balances = rows(assortment.stockBalances);
   const movements = structuredClone(context.movements);
-  const document: OpeningDocument = { id: command.id, version: 1, venueId: context.venueId, fingerprint, status: "confirmed", createdAt: context.now, currency: context.currency,
+  const document: OpeningDocument = { id: command.id, version: 1, venueId: context.venueId, fingerprint, status: "confirmed", anchorBoundary: { movements: context.movements.map(record).filter(row => row.createdAt === context.now).map(row => ({ id: row.id })) }, createdAt: context.now, currency: context.currency,
     selectedRowIds: [...command.selectedRowIds], skippedRowIds: command.inputs.filter(v => !command.selectedRowIds.includes(v.rowId)).map(v => v.rowId), items };
   for (const row of items) {
     const product: Row = { id: row.productKey, key: row.productKey, productKey: row.productKey, venueId: context.venueId,
@@ -165,6 +166,7 @@ export async function confirmOpeningStock(command: { id: string; inputs: Opening
       if (!balance) { balance = { ...catalog.find(v => local(v, context.venueId) && key(v) === row.productKey), current: 0 }; balances.push(balance); }
       balance.current = row.quantity;
       balance.openingDocumentId = command.id;
+      balance.quantityAnchorAt = context.now;
       balance.openingValuation = { unitCost: row.unitCost, currency: context.currency, source: row.costSource || null,
         totalCost: row.unitCost === null ? null : row.unitCost * row.quantity, status: row.unitCost === null ? "UNKNOWN" : row.unitCost === 0 ? "KNOWN_ZERO" : "KNOWN", capturedAt: context.now };
       balance.updatedAt = context.now;
@@ -181,5 +183,5 @@ export async function confirmOpeningStock(command: { id: string; inputs: Opening
   assortment.updatedAt = context.now;
   // Do not discard idempotency/history to make room. Keep the Worker workload bounded.
   if (new TextEncoder().encode(JSON.stringify([...context.documents, document])).length > 4_000_000) throw new Error("OPENING_CAPACITY_REVIEW");
-  return { duplicate: false, document, assortment, movements, documents: [...context.documents, document] };
+  return { duplicate: false, document, assortment, movements: retainStockMovements(movements, assortment), documents: [...context.documents, document] };
 }

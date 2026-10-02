@@ -145,6 +145,8 @@ test("full declared test/build artifact preparation twice preserves behavior and
       assert.ok(asset, "packaged HTML must reference a versioned asset");
       const published = fs.readFileSync(path.join(temporary, "dist/client/assets", asset[1]), "utf8");
       assert.equal(patchReceiptCost(published), published);
+      assert.equal(published.split("/* stock-basis-phase3a7:start */").length, 2, "repeated preparation must retain exactly one shared warehouse contract");
+      assert.match(published, /bdStockBasisPhase3a7/, "receipt valuation helper survives preparation");
       assert.match(published, /bdCanonicalBoundaryClientPhase3a5/, "repeated preparation must retain the source-permission cache guard");
       assert.equal(published.split('if(["/sales-entry","/cashier"].includes(h.pathname)){').length - 1, 1, "standalone navigation bridge must not duplicate across preparations");
       assert.match(fs.readFileSync(path.join(temporary, "public/bardoctor-preview-v397.js"), "utf8"), /requestUrl\.pathname === "\/api\/auth\/register" && response\.ok && result && result\.ok/, "preparation must preserve the v453 registration navigation guard");
@@ -159,7 +161,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
         for (const command of scripts[phase].split(" && ")) {
           const match = /^node (scripts\/[a-z0-9-]+\.mjs)( --restore)?$/.exec(command);
           assert.ok(match, `unsupported preparation command: ${command}`);
-          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
+          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs", "scripts/patch-stock-basis-phase3a7.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
           run([match[1], ...(match[2] ? ["--restore"] : [])]);
         }
         if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);

@@ -1,3 +1,4 @@
+import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -642,6 +643,7 @@ async function postOnce(request: Request): Promise<Response> {
       };
     }),
     completedAt: now,
+    anchorBoundary: { movements: stores.movements.map(record).filter(row => row.createdAt === now).map(row => ({ id: row.id })) },
     updatedAt: now,
     summary,
     adjustmentMovementIds: result.movements.map((movement) => movement.id),
@@ -661,7 +663,7 @@ async function postOnce(request: Request): Promise<Response> {
   completed.summary = inventoryCountSummary(completed);
   completed.differenceTotal = completed.summary.calculatedDifferenceValue;
   snapshots[index] = completed;
-  const nextMovements = [...result.movements, ...stores.movements].slice(0, 20_000);
+  const nextMovements = retainStockMovements([...result.movements, ...stores.movements], result.assortment);
   await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),

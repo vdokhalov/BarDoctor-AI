@@ -23,18 +23,21 @@ export type InventoryValuationReason =
 export type InventoryValuationLine = {
   productKey: string;
   name: string;
-  quantity: number;
+  warehouseId?: string | null;
+  quantity: number | null;
   unit: string;
   status: "valued" | "unvalued" | "excluded_zero_stock";
-  value: number;
+  value: number | null;
   currency: string;
+  costBasis?: ReturnType<typeof resolveCostBasis>;
   reason?: InventoryValuationReason;
 };
 
 export type InventoryValuationSummary = {
   accountingCurrency: AccountingCurrency | null;
   method: typeof INVENTORY_VALUATION_METHOD;
-  total: number;
+  total: number | null;
+  knownSubtotal: number;
   status: "full" | "partial" | "unvalued" | "currency_missing";
   complete: boolean;
   valuedCount: number;
@@ -118,19 +121,19 @@ function balanceLine(
     balance.accountingCurrency ?? balance.normalizedCostCurrency ?? balance.currency,
   );
   if (rawQuantity == null) {
-    return { productKey: key, name, quantity: 0, unit, status: "unvalued", value: 0, currency, reason: "invalid_quantity" };
+    return { productKey: key, name, quantity: null, unit, status: "unvalued", value: null, currency, reason: "invalid_quantity" };
   }
   if (Math.abs(rawQuantity) < 0.0000001) {
     return { productKey: key, name, quantity: 0, unit, status: "excluded_zero_stock", value: 0, currency };
   }
   if (rawQuantity < 0) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "negative_stock" };
+    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: null, currency, reason: "negative_stock" };
   }
   if (!supportedUnit) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "broken_base_unit" };
+    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: null, currency, reason: "broken_base_unit" };
   }
   if (!accountingCurrency) {
-    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: 0, currency, reason: "missing_cost_currency" };
+    return { productKey: key, name, quantity: rawQuantity, unit, status: "unvalued", value: null, currency, reason: "missing_cost_currency" };
   }
   const basis = resolveCostBasis({
     venueId,
@@ -147,8 +150,9 @@ function balanceLine(
       quantity: rawQuantity,
       unit,
       status: "unvalued",
-      value: 0,
+      value: null,
       currency,
+      costBasis: basis,
       reason: basis.reason === "CURRENCY_MISMATCH"
         ? "currency_mismatch"
         : basis.reason === "UNIT_MISMATCH"
@@ -162,11 +166,13 @@ function balanceLine(
   return {
     productKey: key,
     name,
+    warehouseId: (requestedWarehouseId ?? String(balance.warehouseId ?? balance.warehouseExternalId ?? "")) || null,
     quantity: rawQuantity,
     unit,
     status: "valued",
     value,
     currency: accountingCurrency,
+    costBasis: basis,
   };
 }
 
@@ -221,6 +227,7 @@ export function summarizeInventoryValuation(input: {
     asOf,
     input.warehouseId,
   ));
+  for (let index = 0; index < lines.length; index++) lines[index].warehouseId = (input.warehouseId ?? String(active[index].warehouseId ?? active[index].warehouseExternalId ?? "")) || null;
   const valued = lines.filter((line) => line.status === "valued");
   const unvalued = lines.filter((line) => line.status === "unvalued");
   const zeroStockExcluded = lines.filter((line) => line.status === "excluded_zero_stock").length;
@@ -240,7 +247,8 @@ export function summarizeInventoryValuation(input: {
   return {
     accountingCurrency,
     method: INVENTORY_VALUATION_METHOD,
-    total: money(valued.reduce((sum, line) => sum + line.value, 0)),
+    total: status === "full" ? money(valued.reduce((sum, line) => sum + line.value!, 0)) : null,
+    knownSubtotal: money(valued.reduce((sum, line) => sum + line.value!, 0)),
     status,
     complete: status === "full",
     valuedCount: valued.length,

@@ -1,6 +1,7 @@
+import { authenticatedEvidenceContext } from "../../../../lib/bardoctor/evidence-resolver";
 import { env } from "cloudflare:workers";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
-import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { unauthorized } from "../../../../lib/bardoctor/auth";
 
 const MAX_STAGED_IMAGE_BYTES = 700 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -75,7 +76,8 @@ function noStore(data: unknown, status = 200): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const context = await authenticatedEvidenceContext(request);
+  const account = context?.account;
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
     return noStore(
@@ -124,6 +126,9 @@ export async function POST(request: Request): Promise<Response> {
       uploadedAt: new Date().toISOString(),
       source,
       pending: "true",
+      venueId: String(context!.venueId),
+      workspaceId: String(context!.workspaceId),
+      dataAccountId: String(account.id),
     },
   });
 

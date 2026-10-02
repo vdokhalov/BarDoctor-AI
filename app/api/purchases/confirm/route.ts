@@ -1,3 +1,4 @@
+import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { preparePurchaseConversions } from "../../../../lib/bardoctor/purchase-conversion";
 import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
@@ -531,7 +532,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   const nextAssortment = inventory?.assortment ?? assortment;
   const nextStockMovements = inventory
-    ? [...inventory.movements, ...stockMovements].slice(0, 20_000)
+    ? retainStockMovements([...inventory.movements, ...stockMovements], nextAssortment)
     : stockMovements;
   documents.unshift(confirmedDocument);
 

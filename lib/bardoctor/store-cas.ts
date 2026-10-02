@@ -1,3 +1,4 @@
+import { stockCapacityResponse } from "./stock-retention";
 import { observedCasAttempt } from "./request-observability";
 
 export type StoreSnapshot = {
@@ -108,6 +109,8 @@ export async function withStoreCasRetries(
     try {
       return await observedCasAttempt(index + 1, maxAttempts, () => command(attemptRequest as unknown as Request));
     } catch (error) {
+      const capacity = stockCapacityResponse(error);
+      if (capacity) return capacity;
       if (!(error instanceof StoreWriteConflictError)) throw error;
     }
   }

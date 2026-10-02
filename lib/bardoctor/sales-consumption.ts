@@ -1,3 +1,4 @@
+import { retainStockMovements } from "./stock-retention";
 import { convertStockQuantity, physicalUnit } from "./stock-units";
 import {
   resolveInventoryProductKey,
@@ -1362,7 +1363,7 @@ export function postSalesBatch(input: {
     batch: completed,
     batches: replaceSalesBatchInFullCollection(input.batches, completed),
     assortment,
-    stockMovements: [...newMovements, ...currentMovements].slice(0, 20_000),
+    stockMovements: retainStockMovements([...newMovements, ...currentMovements], assortment),
     postedNow: postedLines.size,
   };
 }
@@ -1478,7 +1479,7 @@ export function reverseSalesBatch(input: {
     batch: finalBatch,
     batches: replaceSalesBatchInFullCollection(input.batches, finalBatch),
     assortment,
-    stockMovements: [...reversals, ...currentMovements].slice(0, 20_000),
+    stockMovements: retainStockMovements([...reversals, ...currentMovements], assortment),
   };
 }
 

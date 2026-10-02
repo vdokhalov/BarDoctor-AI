@@ -15,6 +15,7 @@ export type CostBasisResolution = {
   asOf: string;
   venueId: number;
   warehouseId?: string;
+  movementId?: string;
   sourceDocumentId?: string;
   sourceLineId?: string;
   effectiveDate?: string;
@@ -22,7 +23,7 @@ export type CostBasisResolution = {
 };
 
 type ReceiptLike = Pick<StockMovement,
-  "type" | "venueId" | "warehouseId" | "productKey" | "amount" | "unit" | "costAmount" | "costStatus" |
+  "id" | "type" | "venueId" | "warehouseId" | "productKey" | "amount" | "unit" | "costAmount" | "costStatus" |
   "currency" | "date" | "businessDate" | "sourceDocumentId" | "sourceLineId" | "createdAt" | "status" | "reversedAt"
 >;
 
@@ -136,6 +137,7 @@ export function resolveCostBasis(input: {
     || String(right.createdAt ?? "").localeCompare(String(left.createdAt ?? ""))
     || String(right.sourceDocumentId ?? "").localeCompare(String(left.sourceDocumentId ?? ""))
     || String(right.sourceLineId ?? "").localeCompare(String(left.sourceLineId ?? ""))
+    || String(right.id ?? "").localeCompare(String(left.id ?? ""))
   );
   const receipt = scoped[0];
   if (!receipt) return { ...base, reason: "NO_APPLICABLE_RECEIPT" };
@@ -145,6 +147,7 @@ export function resolveCostBasis(input: {
   if (receiptQuantity === null) {
     return {
       ...base,
+      movementId: receipt.id,
       sourceDocumentId: receipt.sourceDocumentId,
       sourceLineId: receipt.sourceLineId,
       effectiveDate: effectiveDate(receipt),
@@ -165,6 +168,7 @@ export function resolveCostBasis(input: {
       ...base,
       currency: normalized.currency,
       baseUnit: receipt.unit,
+      movementId: receipt.id,
       sourceDocumentId: receipt.sourceDocumentId,
       sourceLineId: receipt.sourceLineId,
       effectiveDate: effectiveDate(receipt),
@@ -174,6 +178,7 @@ export function resolveCostBasis(input: {
   return {
     ...base,
     ...normalized,
+    movementId: receipt.id,
     sourceDocumentId: receipt.sourceDocumentId,
     sourceLineId: receipt.sourceLineId,
     effectiveDate: effectiveDate(receipt),

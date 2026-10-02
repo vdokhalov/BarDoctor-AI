@@ -60,7 +60,8 @@ test("partial valuation keeps the known sum and counts only active non-zero stoc
     ],
   });
   assert.equal(summary.method, INVENTORY_VALUATION_METHOD);
-  assert.equal(summary.total, 200);
+  assert.equal(summary.total, null);
+  assert.equal(summary.knownSubtotal, 200);
   assert.equal(summary.status, "partial");
   assert.equal(summary.valuedCount, 2);
   assert.equal(summary.unvaluedCount, 1);
@@ -127,7 +128,8 @@ test("currencies are never summed directly when historical FX is missing", () =>
       { key: "eur", current: 1, unit: "pcs", inventoryValue: 50, currency: "EUR" },
     ],
   });
-  assert.equal(summary.total, 100);
+  assert.equal(summary.total, null);
+  assert.equal(summary.knownSubtotal, 100);
   assert.equal(summary.status, "partial");
   assert.deepEqual(summary.breakdown, { currency_mismatch: 1 });
 });
@@ -202,7 +204,7 @@ test("warehouse scope and venue accounting currency remain isolated inputs", () 
     { key: "b", warehouseId: "kitchen", current: 1, unit: "pcs", inventoryValue: 50, currency: "RUB" },
   ];
   assert.equal(summarizeInventoryValuation({ balances, accountingCurrency: "RUB", warehouseId: "bar" }).total, 100);
-  assert.equal(summarizeInventoryValuation({ balances, accountingCurrency: "MDL", warehouseId: "bar" }).total, 0);
+  assert.equal(summarizeInventoryValuation({ balances, accountingCurrency: "MDL", warehouseId: "bar" }).total, null);
 });
 
 test("an explicit zero purchase cost remains known while a missing cost stays unavailable", () => {

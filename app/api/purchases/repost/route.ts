@@ -1,3 +1,4 @@
+import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -244,7 +245,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   const nextAssortment = inventory?.assortment ?? assortment;
   const nextMovements = inventory
-    ? [...inventory.movements, ...stockMovements].slice(0, 20_000)
+    ? retainStockMovements([...inventory.movements, ...stockMovements], inventory.assortment)
     : stockMovements;
   expenses = expenses.map((expense) => isPurchasePayment(expense, documentId)
     ? {

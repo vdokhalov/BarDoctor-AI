@@ -1,3 +1,4 @@
+import { procurementProductSummary } from "./procurement-basis";
 import { readFinanceInputs } from "./finance-inputs";
 import { aggregateBusinessDates, activeBusinessRow } from "./business-day-rows";
 import type { AuthenticatedAccount } from "./access-control";
@@ -729,27 +730,9 @@ function summarisePurchasesAndInventory(
   });
   const cutoff = shiftDateKey(zonedDateKey(now, timezone), -60);
   const recent = confirmed.filter((item) => (dateOnly(item.date) ?? "") >= cutoff);
-  const purchaseItems = recent.flatMap((document) =>
-    array(document.items).map((value) => ({ document, item: record(value) })),
-  );
-  const spendByProduct = new Map<string, { name: string; spend: number; quantity: number; lastPrice: number | null }>();
-  for (const { document, item } of purchaseItems) {
-    const name = text(item.name, "Позиция", 140);
-    const key = name.toLocaleLowerCase("ru");
-    const current = spendByProduct.get(key) ?? { name, spend: 0, quantity: 0, lastPrice: null };
-    const originalDocumentAmount = number(document.originalAmount ?? document.total) ?? 0;
-    const accountingDocumentAmount = number(document.accountingAmount ?? document.total) ?? 0;
-    const documentRate = number(document.fxRate ?? document.exchangeRateToAccounting)
-      ?? (originalDocumentAmount > 0 ? accountingDocumentAmount / originalDocumentAmount : 0);
-    const accountingLineTotal = number(item.accountingLineTotal)
-      ?? ((number(item.lineTotal) ?? 0) * documentRate);
-    current.spend += accountingLineTotal;
-    current.quantity += number(item.quantity) ?? 0;
-    current.lastPrice = (number(item.quantity) ?? 0) > 0
-      ? accountingLineTotal / (number(item.quantity) ?? 1)
-      : current.lastPrice;
-    spendByProduct.set(key, current);
-  }
+  const topProducts = procurementProductSummary({ venueId: sources.access?.venueId ?? number(sources.accountProfile.venueId) ?? 1,
+    workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, assortment: assortmentStore?.data,
+    documents, movements: array(stockMovementStore?.data), currency: accountingCurrency, startDate: cutoff, asOf: now.toISOString() });
   const inventorySnapshots = array(inventoryStore?.data).map(record);
   const latestSnapshot = inventorySnapshots
     .slice()
@@ -799,10 +782,7 @@ function summarisePurchasesAndInventory(
       recentDocuments60Days: recent.length,
       recentSpend60Days: sum(recent, (item) => number(item.total)),
       byCategory: countsBy(recent, (item) => text(item.expenseCategory, "other", 50)),
-      topProducts: [...spendByProduct.values()]
-        .sort((left, right) => right.spend - left.spend)
-        .slice(0, 12)
-        .map((item) => ({ ...item, spend: rounded(item.spend, 2), quantity: rounded(item.quantity, 3) })),
+      topProducts,
       inventorySnapshots: inventorySnapshots.length,
       latestInventoryDate: latestSnapshot ? dateOnly(latestSnapshot.date ?? latestSnapshot.updatedAt) : null,
       latestInventoryTotals: latestSnapshot

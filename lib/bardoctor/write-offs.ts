@@ -1,3 +1,4 @@
+import { retainStockMovements } from "./stock-retention";
 import { convertStockQuantity, physicalUnit } from "./stock-units";
 import {
   inventoryPackageAmount,
@@ -475,7 +476,7 @@ export function postWriteOffDocument(input: {
   parts.root.updatedAt = now;
   const posted: WriteOffDocument = { ...saved.document, status: "posted", items: postedItems, movementIds, postedAt: now, updatedAt: now };
   const documents = saved.documents.map((item) => item.id === posted.id ? posted : item);
-  return { ok: true, idempotent: false, document: posted, documents, assortment: parts.root, stockMovements: [...movements, ...(array(input.stockMovements) as StockMovement[])].slice(0, 20_000), warnings };
+  return { ok: true, idempotent: false, document: posted, documents, assortment: parts.root, stockMovements: retainStockMovements([...movements, ...(array(input.stockMovements) as StockMovement[])], parts.root), warnings };
 }
 
 export function deleteWriteOffDraft(input: { documents: unknown[]; venueId: number; id: string }):
@@ -547,6 +548,6 @@ export function cancelPostedWriteOff(input: {
     ok: true, idempotent: false, document: cancelled,
     documents: documents.map((item) => item.id === existing.id ? cancelled : item),
     assortment: parts.root,
-    stockMovements: [...reversals, ...(array(input.stockMovements) as StockMovement[])].slice(0, 20_000),
+    stockMovements: retainStockMovements([...reversals, ...(array(input.stockMovements) as StockMovement[])], parts.root),
   };
 }

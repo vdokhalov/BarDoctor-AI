@@ -1,3 +1,4 @@
+import { retainStockMovements } from "../stock-retention";
 import { readStoreSnapshots, runStoreCasBatch, StoreWriteConflictError, type StoreSnapshot } from "../store-cas";
 import { getD1 } from "../../../db";
 import type { AuthenticatedAccount } from "../access-control";
@@ -518,10 +519,10 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   };
   if (existingIndex >= 0) snapshots[existingIndex] = snapshot;
   else snapshots.unshift(snapshot);
-  const movements = [
+  const movements = retainStockMovements([
     ...inventory.movements,
     ...stockMovements,
-  ].slice(0, 20_000);
+  ], inventory.assortment);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, movements, now),
@@ -717,7 +718,7 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   if (existingIndex >= 0) documents[existingIndex] = document;
   else documents.unshift(document);
   const oldMovements = array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), []));
-  const nextMovements = [...movements, ...oldMovements].slice(0, 20_000);
+  const nextMovements = retainStockMovements([...movements, ...oldMovements], assortment);
   const statements = [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),

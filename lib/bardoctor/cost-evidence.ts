@@ -1,3 +1,4 @@
+import { isStockEvidenceKind, bindStockEvidenceReference, readReceiptAcquisition } from "./stock-evidence";
 import { getD1 } from "../../db";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
 import { readStoreSnapshots } from "./store-cas";
@@ -17,8 +18,8 @@ const list = (v: unknown): Row[] => Array.isArray(v) ? v.filter((r): r is Row =>
 const num = (v: unknown): number | null => typeof v === "number" && Number.isFinite(v) ? v : null;
 const txt = (v: unknown): string | null => typeof v === "string" && v.length <= 320 ? v : null;
 const instant = (v: unknown): string | null => typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v) && Number.isFinite(Date.parse(v)) ? v : null;
-const scoped = (r: Row, c: EvidenceScope, strict = false) => (r.venueId === c.venueId || !strict && r.venueId == null) && (r.workspaceId == null || r.workspaceId === c.workspaceId);
-const unique = (rs: Row[], id: unknown, c: EvidenceScope, strict = false): Row | null => {
+const scoped = (r: Row, c: Context, strict = false) => (r.venueId === c.venueId || !strict && r.venueId == null) && (r.workspaceId == null || r.workspaceId === c.workspaceId) && (r.dataAccountId == null || r.dataAccountId === c.account.id);
+const unique = (rs: Row[], id: unknown, c: Context, strict = false): Row | null => {
   const found = rs.filter(r => r.id === id && scoped(r, c, strict)); return found.length === 1 ? found[0] : null;
 };
 const close = (a: unknown, b: unknown) => num(a) !== null && num(b) !== null && Math.abs(Number(a) - Number(b)) < 0.000001;
@@ -258,6 +259,8 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
       businessDate: txt(m.businessDate ?? m.date), sourceDocumentId: txt(m.sourceDocumentId), sourceLineId: txt(m.sourceLineId), saleId: txt(m.salesBatchId), saleLineId: txt(m.salesBatchLineId),
       originalMovementId: txt(m.originalMovementId), lifecycle: txt(m.status), recordBasis: movement!.basis };
     if (m.costStatus === "UNKNOWN" || num(m.costAmount) === null) missing("COST_UNKNOWN");
+    if (m.type === "receipt") { const acquisition = await readReceiptAcquisition(context, m); if (!acquisition.complete) missing(acquisition.diagnostic); }
+    if (m.type === "receipt" && m.sourceDocumentId && m.sourceLineId) add("derived_from", ref("PURCHASE_DOCUMENT", String(m.sourceDocumentId), String(m.sourceLineId)));
     if (m.originalMovementId) { const original = movementById(m.originalMovementId); if (original && original.row.salesBatchId === m.salesBatchId && original.row.salesBatchLineId === m.salesBatchLineId && checkMovementSource(original.row)) add("compensates", ref("WAREHOUSE_MOVEMENT", String(m.originalMovementId))); else missing(); }
     if (["sale_consumption", "sale_reversal"].includes(String(m.type)) && m.salesBatchId && m.salesBatchLineId && sales) add("belongs_to", ref("CAPTURED_COST", String(m.salesBatchId), String(m.salesBatchLineId)));
   } else {
@@ -269,7 +272,10 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
   // Bind each bounded target through this same adapter, never treating a ref as a permission token.
   const boundRelations: EvidenceRelation[] = [];
   for (const relation of relations.slice(offset, offset + limit)) {
-    if (relation.reference.kind === "MENU_ITEM") {
+    if (isStockEvidenceKind(relation.reference.kind)) {
+      const target = await bindStockEvidenceReference(context, relation.reference, asOf);
+      if (target) boundRelations.push({ ...relation, reference: target }); else missing();
+    } else if (relation.reference.kind === "MENU_ITEM") {
       const target = unique(menu, relation.reference.id, context)!;
       boundRelations.push({ ...relation, reference: { ...relation.reference, expectedRevision: await evidenceContentRevision(relation.reference, target) } });
     } else {

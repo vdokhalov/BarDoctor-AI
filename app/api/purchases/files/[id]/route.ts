@@ -1,3 +1,5 @@
+import { authenticatedEvidenceContext } from "../../../../../lib/bardoctor/evidence-resolver";
+import { purchaseFileVisible } from "../../../../../lib/bardoctor/purchase-file-scope";
 import { and, eq } from "drizzle-orm";
 import { env } from "cloudflare:workers";
 import { getDb } from "../../../../../db";
@@ -63,7 +65,8 @@ function fileError(request: Request, status: number, message: string): Response 
 }
 
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const boundary = await authenticatedEvidenceContext(request);
+  const account = boundary?.account;
   if (!account) {
     return fileError(
       request,
@@ -84,6 +87,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
       "Файл не найден в хранилище. Данные накладной сохранены, но исходный документ недоступен.",
     );
   }
+  if (!await purchaseFileVisible({ venueId: boundary!.venueId, workspaceId: boundary!.workspaceId, dataAccountId: account.id }, id, source.customMetadata, new URL(request.url).searchParams.get("documentId") ?? undefined)) return fileError(request, 404, "Оригинал недоступен в этом заведении.");
   const originalName = source.customMetadata?.originalName
     ? decodeURIComponent(source.customMetadata.originalName)
     : "document";

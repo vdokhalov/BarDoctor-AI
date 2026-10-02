@@ -7,9 +7,9 @@ const read = (path: string) => readFile(new URL(path, root), "utf8");
 
 test("valuation diagnostics are read-only, venue-scoped and never cached", async () => {
   const route = await read("app/api/inventory/valuation/route.ts");
-  assert.match(route, /authenticateRequest\(request\)/);
+  assert.match(route, /authenticatedEvidenceContext\(request\)/);
   assert.match(route, /account_id = \?/);
-  assert.match(route, /bind\(account\.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY\)/);
+  assert.match(route, /bind\(account\.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, "bd_warehouses"\)/);
   assert.match(route, /venueId: account\.venueId/);
   assert.match(route, /accountingCurrencyFromProfile\(profile\)/);
   assert.match(route, /"Cache-Control": "no-store"/);

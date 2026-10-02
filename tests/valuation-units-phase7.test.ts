@@ -66,7 +66,8 @@ test("canonical units still reject incompatible dimensions, unknown packages and
   ], [receipt("mass", "l", 2, 100), receipt("volume", "pcs", 2, 100),
     receipt("count", "g", 12, 100), receipt("pack", "pcs", 2, 100)]);
   assert.equal(summary.complete, false);
-  assert.equal(summary.total, 0);
+  assert.equal(summary.total, null);
+  assert.equal(summary.knownSubtotal, 0);
   assert.deepEqual(summary.lines.map(line => line.reason),
     ["broken_base_unit", "broken_base_unit", "broken_base_unit", "broken_base_unit", "missing_cost_basis"]);
 });
@@ -81,14 +82,15 @@ test("canonical zero cost is known, while unknown cost and wrong currency remain
   assert.equal(summary.complete, false);
   assert.equal(summary.valuedCount, 1);
   assert.deepEqual(summary.lines.map(line => [line.status, line.value, line.reason ?? null]),
-    [["valued", 0, null], ["unvalued", 0, "missing_cost_basis"], ["unvalued", 0, "currency_mismatch"]]);
+    [["valued", 0, null], ["unvalued", null, "missing_cost_basis"], ["unvalued", null, "currency_mismatch"]]);
 });
 
 test("canonical negative stock remains a diagnostic and zero stock stays excluded", () => {
   const summary = summarize([{ productKey: "negative", current: -2, unit: "kg" },
     { productKey: "zero", current: 0, unit: "l" }], [receipt("negative", "kg", 2, 100)]);
   assert.equal(summary.complete, false);
-  assert.equal(summary.total, 0);
+  assert.equal(summary.total, null);
+  assert.equal(summary.knownSubtotal, 0);
   assert.deepEqual(summary.breakdown, { negative_stock: 1 });
   assert.equal(summary.zeroStockExcluded, 1);
 });
@@ -98,7 +100,8 @@ test("unknown latest price never silently falls back to an older known receipt",
     [receipt("kg", "kg", 10, 100), receipt("kg", "kg", 2, 0,
       { id: "new", businessDate: "2026-09-05", costStatus: "UNKNOWN" })]);
   assert.equal(summary.complete, false);
-  assert.equal(summary.total, 0);
+  assert.equal(summary.total, null);
+  assert.equal(summary.knownSubtotal, 0);
   assert.equal(summary.lines[0].reason, "missing_cost_basis");
 });
 
@@ -109,7 +112,7 @@ test("canonical values do not become known without an accounting or receipt curr
   assert.equal(noProfile.lines[0].reason, "missing_cost_currency");
   const noReceiptCurrency = summarize(balances, [receipt("kg", "kg", 2, 100, { currency: "" })]);
   assert.equal(noReceiptCurrency.complete, false);
-  assert.equal(noReceiptCurrency.total, 0);
+  assert.equal(noReceiptCurrency.total, null);
   assert.equal(noReceiptCurrency.lines[0].reason, "currency_mismatch");
 });
 
@@ -119,7 +122,7 @@ test("supported unit aliases retain their physical quantity and unknown units re
     { productKey: "unknown", current: 2, unit: "bucket" }],
   [receipt("mass", "g", 1000, 10), receipt("volume", "ml", 1000, 10)]);
   assert.deepEqual(summary.lines.map(line => [line.quantity, line.unit, line.value]),
-    [[2, "kg", 20], [3, "l", 30], [2, "bucket", 0]]);
+    [[2, "kg", 20], [3, "l", 30], [2, "bucket", null]]);
   assert.equal(summary.lines[2].reason, "broken_base_unit");
   assert.equal(summary.complete, false);
 });

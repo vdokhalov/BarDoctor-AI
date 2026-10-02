@@ -7,6 +7,7 @@ export type EvidenceScope = { venueId: number; workspaceId: number };
 export type ContentRevision = `sha256:${string}`;
 export const EVIDENCE_RESOURCE_KINDS = [
   "MENU_ORIGIN", "MENU_SOURCE", "MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "MENU_TAXONOMY",
+  "STOCK_QUANTITY", "STOCK_VALUATION", "COST_BASIS", "SUPPLIER", "WAREHOUSE", "PURCHASE_SOURCE_FILE", "OPENING_STOCK",
   "DAILY_REVENUE", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT", "NOMENCLATURE",
   "SALE_EVENT", "CASH_SHIFT", "FINANCE_REVENUE", "MENU_ITEM", "MENU_INGESTION_DRAFT",
   "SALES_DOCUMENT", "WAREHOUSE_MOVEMENT", "PURCHASE_DOCUMENT", "INVENTORY_DOCUMENT",
@@ -21,7 +22,7 @@ type ReferenceBase = EvidenceScope & {
 /** IDs are references, never capabilities. Every resolve reauthorizes the scope. */
 export type EvidenceReference = {
   [K in EvidenceResourceKind]: ReferenceBase & { kind: K } &
-    (K extends "MENU_SOURCE_FILE" | "MENU_REVIEWED_INPUT" | "MENU_CONFIRMATION" | "MENU_RECIPE" | "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
+    (K extends "STOCK_QUANTITY" | "STOCK_VALUATION" | "COST_BASIS" | "PURCHASE_DOCUMENT" | "PURCHASE_SOURCE_FILE" | "INVENTORY_DOCUMENT" | "OPENING_STOCK" | "WRITEOFF_DOCUMENT" | "MENU_SOURCE_FILE" | "MENU_REVIEWED_INPUT" | "MENU_CONFIRMATION" | "MENU_RECIPE" | "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
 }[EvidenceResourceKind];
 export type TraceTarget = { type: "EVIDENCE_RESOURCE"; reference: EvidenceReference };
 export type Finality = "PROVISIONAL" | "FINAL" | "UNKNOWN";
@@ -35,6 +36,8 @@ export type EvidenceDiagnostic =
   | "RELATED_EVIDENCE_UNAVAILABLE" | "RELATIONS_PAGINATED" | "FRESHNESS_POLICY_UNDEFINED"
   | "REVENUE_READ_MODEL_MISMATCH" | "COST_SNAPSHOT_MISSING" | "COST_READ_MODEL_MISMATCH"
   | "COST_UNKNOWN" | "COST_PARTIAL" | "CURRENT_DEFINITION_ONLY"
+  | "NO_QUANTITY_ANCHOR" | "LEGACY_ANCHOR_BOUNDARY_UNKNOWN" | "STOCK_QUANTITY_READ_MODEL_MISMATCH"
+  | "QUANTITY_HISTORY_BOUNDED" | "ACQUISITION_CONVERSION_UNAVAILABLE"
   | "SOURCE_VALUES_NOT_RETAINED" | "CONFIRMATION_RECORD_MISSING" | "ORIGIN_UNKNOWN" | "ORIGIN_AMBIGUOUS"
   | "CURRENT_MENU_CHANGED" | "HISTORICAL_RECIPE_NOT_RETAINED";
 export type FreshnessBasis = {
@@ -138,6 +141,7 @@ export type EvidenceProjection =
   | (MoneyProjection & { type: "CASH_SHIFT" | "FINANCE_REVENUE"; lifecycle: "OPEN" | "CLOSED" | null; sourceType: RevenueSourceType; receipts: number | null })
   | { type: "MENU_ITEM"; name: string | null; salePrice: number | null; currency: string | null; active: boolean | null; sourceType: MenuSourceType }
   | { type: "MENU_INGESTION_DRAFT"; lifecycle: "DRAFT" | "VALIDATED" | "CONFIRMED" | "CANCELLED" | null; sourceType: MenuSourceType; revisionNumber: number | null; rowCount: number | null }
+  | { type: "STOCK_QUANTITY" | "STOCK_VALUATION" | "COST_BASIS" | "PURCHASE_DOCUMENT" | "PURCHASE_LINE" | "SUPPLIER" | "WAREHOUSE" | "PURCHASE_SOURCE_FILE" | "INVENTORY_DOCUMENT" | "OPENING_STOCK" | "WRITEOFF_DOCUMENT"; [key: string]: unknown }
   | { type: "MENU_INGESTION_LINE"; decision: "pending" | "apply" | "skip" | null; reviewed: boolean | null };
 export type ResolvedEvidence = {
   reference: EvidenceReference & { expectedRevision: ContentRevision };
@@ -187,7 +191,8 @@ export function parseEvidenceReference(value: unknown): ParsedReference {
     || r.kind === "CAPTURED_INGREDIENT" && (!resourceId(r.partId) || !resourceId(r.ingredientId))
     || r.kind === "CAPTURED_RECIPE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
   if (["MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE"].includes(r.kind) && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
-  if ("partId" in r && !["MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
+  if ("partId" in r && !["STOCK_QUANTITY", "STOCK_VALUATION", "COST_BASIS", "PURCHASE_DOCUMENT", "PURCHASE_SOURCE_FILE", "INVENTORY_DOCUMENT", "OPENING_STOCK", "WRITEOFF_DOCUMENT", "MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
+  if (r.kind === "PURCHASE_SOURCE_FILE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
   return { ok: true, reference: r as EvidenceReference };
 }
 
