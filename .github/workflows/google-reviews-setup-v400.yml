@@ -169,7 +169,9 @@ jobs:
         if: always()
         with:
           name: sales-navigation-timings
-          path: outputs/sales-navigation-performance/ci
+          path: |
+            outputs/sales-navigation-performance/ci
+            outputs/finance-inputs-phase3a6/webkit
 
   sales-scroll-layout:
     runs-on: ubuntu-24.04

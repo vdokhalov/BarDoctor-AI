@@ -81,23 +81,29 @@ try {
       await route.fulfill({ response, body: original + '\nwindow.__bdFinanceAcceptance={report:async(profile,month,venueId)=>{const response=await fetch("/api/operational-days",{headers:ca(Ot())}),days=await response.json();return bdBuildMonthlyReport(profile,month,bdOperationalRows(days.revenues,days.days),bdProcArray("bd_finance_expenses"),bdProcArray("bd_inventory_snapshots"),{venueId,accountingCurrency:profile.currency,inventorySections:[]})},payrollAudits:bdPayrollMonthAudits};' });
     });
     const page = await context.newPage(), errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+    const failedRequests: unknown[] = [];
+    page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText, page: page.url() }));
+    // Separate independent page acceptance from navigation-cancellation testing.
+    // Drain the existing background reads before replacing the document; retain
+    // the strict no-page-errors assertion for both browser engines.
+    const navigate = async (path: string) => { await page.waitForLoadState("networkidle"); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
     await page.clock.setFixedTime(new Date(fixedTime));
     try {
-      await page.goto(base + "/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.operating").first().waitFor();
+      await navigate("/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.operating").first().waitFor();
       await page.screenshot({ path: out + "/" + viewport.name + "-open-day.png", fullPage: true });
-      await page.goto(base + "/finance?month=" + date.slice(0, 7)); await page.locator("[data-bd-finance-dashboard]").waitFor();
+      await navigate("/finance?month=" + date.slice(0, 7)); await page.locator("[data-bd-finance-dashboard]").waitFor();
       await page.waitForFunction(() => Boolean((window as unknown as { __bdFinanceAcceptance?: unknown }).__bdFinanceAcceptance));
       const report = await page.evaluate(({ profile, month, venueId }) => (window as unknown as { __bdFinanceAcceptance: { report: (profile: object, month: string, venueId: number) => Promise<Record<string, unknown>> } }).__bdFinanceAcceptance.report(profile, month, venueId), { profile, month: date.slice(0, 7), venueId });
       assert.equal(report.revenue, 300); assert.equal(report.payroll, 90); assert.equal(report.resultBeforeCost, 210); assert.equal(report.isClosed, false);
       assert.match(String(report.payrollSource), /Сохранённый ФОТ отчётов/);
       await page.screenshot({ path: out + "/" + viewport.name + "-finance.png", fullPage: true });
-      await page.goto(base + "/salaries?month=" + date.slice(0, 7)); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90"));
+      await navigate("/salaries?month=" + date.slice(0, 7)); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90"));
       assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       await page.screenshot({ path: out + "/" + viewport.name + "-payroll.png", fullPage: true });
       put("bd_payroll_rules", [{ id: "qa-rule", name: "Changed current QA rule", active: true, blocks: [{ id: "rate", type: "shift_rate", amount: 1999, enabled: true }] }]);
-      await page.reload(); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
+      await page.waitForLoadState("networkidle"); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90);
-      await page.goto(base + "/shifts?month=" + date.slice(0, 7));
+      await navigate("/shifts?month=" + date.slice(0, 7));
       await page.locator(".bd-shift-card.operating").first().click();
       await page.getByRole("dialog").getByRole("button", { name: "Заполнить операционные данные", exact: true }).click();
       await page.getByRole("button", { name: "Далее", exact: true }).click();
@@ -108,12 +114,14 @@ try {
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90, "editor preserves recorded payroll after rule changes");
       assert.equal((await send({ action: "close_shift", shiftId: "C" })).status, 201);
       const completed = (await days()).days[0]; assert.equal(completed.status, "COMPLETE"); assert.equal(completed.revenue.status, "FINAL"); assert.equal(completed.payroll.amount, 90);
-      await page.goto(base + "/reports?month=" + date.slice(0, 7)); await page.getByText("Начисленный ФОТ", { exact: true }).waitFor();
+      await navigate("/reports?month=" + date.slice(0, 7)); await page.getByText("Начисленный ФОТ", { exact: true }).waitFor();
       await page.screenshot({ path: out + "/" + viewport.name + "-report.png", fullPage: true });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "no horizontal viewport overflow");
       assert.deepEqual(errors, []); assert.equal(get("bd_finance_revenue").length, 3); assert.equal(get("bd_sales_events_v1").length, 2);
       results.push({ ...viewport, venueId, businessDate: date, daily: 300, recordedPayroll: 90, preliminaryResult: 210, finalRevenue: true, dayComplete: true, duplicateSale: false, isolated: true, errors });
     } catch (error) {
+      console.error(JSON.stringify({ errors, failedRequests, url: page.url() }));
+      writeFileSync(out + "/failure-network.json", JSON.stringify({ errors, failedRequests }, null, 2));
       if (!page.isClosed()) {
         try { await page.screenshot({ path: out + "/failure.png", fullPage: true }); writeFileSync(out + "/failure.txt", await page.locator("body").innerText()); } catch { /* Preserve the original acceptance failure. */ }
       }
