@@ -62,6 +62,15 @@ jobs:
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance
+        run: |
+          BD_QA_MODE=regression BD_QA_LABEL=ci node scripts/restricted-manager-403-browser.mjs
+          node scripts/restricted-manager-regression.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: restricted-manager-403-evidence
+          path: outputs/restricted-manager-403
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts

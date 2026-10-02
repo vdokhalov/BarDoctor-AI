@@ -2,8 +2,18 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const file = new URL('../public/assets/index-BQGspy0I.js', import.meta.url);
 let source = readFileSync(file, 'utf8');
 const marker = 'const bdCanonicalBoundaryClientPhase3a5=';
+const originalStoreRead = 'async function Yse(e,t){const r=await(await fetch(`${EC}/${e}`,{headers:ca(t)})).json();if(!r.ok)throw new Error(`GET /api/store/${e} failed`);return r.data??void 0}';
+const guardedStoreRead = 'async function Yse(e,t){const response=await fetch(`${EC}/${e}`,{headers:ca(t)}),r=await response.json();if(!response.ok||!r.ok)throw Object.assign(new Error(`GET /api/store/${e} failed`),{status:response.status,code:r.code,storeKey:e});return r.data??void 0}';
+const originalFinanceWarm = 'window.__bdStartupFinanceWarmV349=Promise.all(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].map(async t=>({key:t,data:await Yse(t,e)})))';
+const guardedFinanceWarm = originalFinanceWarm + '.catch(bdHandleFinanceWarmFailurePhase3a5)';
+const originalWarmApply = 'return e.then(t=>{for(const{key:n,data:r}of t)';
+const guardedWarmApply = 'return e.then(t=>{if(t?.availability==="RESTRICTED"||t?.availability==="UNAVAILABLE")return!1;for(const{key:n,data:r}of t)';
+
 if (process.argv.includes('--restore')) {
   if (source.includes(marker)) {
+    if (source.includes(guardedStoreRead)) source = source.replace(guardedStoreRead, originalStoreRead);
+    if (source.includes(guardedFinanceWarm)) source = source.replace(guardedFinanceWarm, originalFinanceWarm);
+    if (source.includes(guardedWarmApply)) source = source.replace(guardedWarmApply, originalWarmApply);
     const start = source.indexOf(marker), end = source.indexOf('// end canonical boundary Phase3a5', start);
     if (end < start) throw new Error('Phase3a5 restoration boundary missing');
     source = source.slice(0, start) + source.slice(end + '// end canonical boundary Phase3a5'.length).replace(/^\n/, '');
@@ -22,6 +32,7 @@ if (!source.includes(marker)) {
   const helpers = `const bdCanonicalBoundaryClientPhase3a5="source-permissions",bdRestrictedAnalysisContextsPhase3a5=new Set,bdRestrictedAnalysisEmptyPhase3a5={snapshot:null,diagnosis:null};
 function bdAnalysisContextRestrictedPhase3a5(){return bdRestrictedAnalysisContextsPhase3a5.has(bdBusinessHealthAccountContextV284())}
 function bdRestrictAnalysisContextPhase3a5(context=bdBusinessHealthAccountContextV284()){bdRestrictedAnalysisContextsPhase3a5.add(context);for(const[key,entry]of bdBusinessHealthSharedStoreV284.entries)if(entry.context===context)bdBusinessHealthSharedStoreV284.entries.delete(key);if(bdBusinessHealthAccountContextV284()!==context)return;for(let version=3;version<=9;version++)localStorage.removeItem(Sz("bd_ai_diagnosis_v"+version));bdBusinessHealthSharedStoreV284.current=bdRestrictedAnalysisEmptyPhase3a5;bdLiveBusinessHealthContextV335="";for(const listener of bdBusinessHealthSharedStoreV284.listeners)listener()}
+function bdHandleFinanceWarmFailurePhase3a5(error){if(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].includes(error?.storeKey)){if(error.status===403&&error.code==="ACCESS_DENIED")return{availability:"RESTRICTED"};if(error.status===401)return{availability:"UNAVAILABLE"}}throw error}
 // end canonical boundary Phase3a5
 `;
   function replace(before, after) {
@@ -36,6 +47,18 @@ function bdRestrictAnalysisContextPhase3a5(context=bdBusinessHealthAccountContex
   replace('q=await L.json().catch(()=>null);if(L.status>=500', 'q=await L.json().catch(()=>null);if(L.status===403||L.status===401){bdRestrictAnalysisContextPhase3a5();E(null)}if(L.status>=500');
   writeFileSync(file, source);
 }
+// Existing v475 bundles already contain the Phase3a5 boundary. Upgrade that
+// boundary idempotently and retain the original rejected contract for unexpected errors.
+if (!source.includes('function bdHandleFinanceWarmFailurePhase3a5(')) {
+  source = source.replace('// end canonical boundary Phase3a5', 'function bdHandleFinanceWarmFailurePhase3a5(error){if(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].includes(error?.storeKey)){if(error.status===403&&error.code==="ACCESS_DENIED")return{availability:"RESTRICTED"};if(error.status===401)return{availability:"UNAVAILABLE"}}throw error}\n// end canonical boundary Phase3a5');
+}
+for (const [before, after] of [[originalStoreRead, guardedStoreRead], [originalFinanceWarm, guardedFinanceWarm], [originalWarmApply, guardedWarmApply]]) {
+  if (!source.includes(after)) {
+    if (!source.includes(before)) throw new Error('Restricted Finance warm-read anchor missing');
+    source = source.replace(before, after);
+  }
+}
+writeFileSync(file, source);
 for (const invariant of ['bdRestrictAnalysisContextPhase3a5(t);if(!r.ok', 'bdRestrictedAnalysisContextsPhase3a5.delete(t);bdBusinessHealthCommitEnvelopeV284', 'bdRestrictAnalysisContextPhase3a5();E(null)', 'function WS(){if(bdAnalysisContextRestrictedPhase3a5())return null;']) {
   if (!source.includes(invariant)) throw new Error('Phase3a5 client permission invariant missing');
 }
