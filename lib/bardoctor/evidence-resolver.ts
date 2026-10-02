@@ -1,3 +1,4 @@
+import { isCostEvidenceKind, readSaleCost, resolveCostEvidence } from "./cost-evidence";
 import { getD1 } from "../../db";
 import { authenticateRequest } from "./auth";
 import { hasPermission, isAccessRole, permissionPayload, type AuthenticatedAccount, type PermissionKey } from "./access-control";
@@ -109,6 +110,7 @@ function draftChild(parent: Row, partId: string, scope: EvidenceScope): Row | nu
 /** Trusted-context core; the public API only obtains context through authentication. */
 async function resolveInContext(context: Context, reference: EvidenceReference, limit: number, offset: number, asOf: string): Promise<EvidenceResolution> {
   if (reference.venueId !== context.venueId || reference.workspaceId !== context.workspaceId) return result("unavailable", asOf);
+  if (isCostEvidenceKind(reference.kind)) return resolveCostEvidence(context, reference, limit, offset, asOf);
   if (reference.kind === "DAILY_REVENUE") {
     const resolution = await readDailyRevenue(context, reference, limit, offset, asOf);
     if (!("fact" in resolution)) return resolution;
@@ -170,6 +172,10 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
       : { type: "SALE_EVENT", businessDate: date(parent.businessDate), revenue: number(parent.revenue), currency: text(parent.currency), lifecycle, sourceType: nativeRevenueSource(parent.source) };
     if (child) await addRelation("belongs_to", "SALE_EVENT", parent.id);
     else await addRelation("belongs_to", "FINANCE_REVENUE", parent.revenueRowId);
+    const costRef: EvidenceReference = { contractVersion: 1, kind: "CAPTURED_COST", id: reference.id, venueId: context.venueId, workspaceId: context.workspaceId, ...(reference.partId ? { partId: reference.partId } : {}) };
+    const cost = await resolveCostEvidence(context, costRef, 1, 0, asOf);
+    if ("evidence" in cost) relations.push({ type: "derived_from", reference: cost.evidence.reference });
+    else unavailableRelation();
   } else if (kind === "CASH_SHIFT" || kind === "FINANCE_REVENUE") {
     const sourceEvents = (stores.get(adapters.SALE_EVENT.key)?.records ?? []).filter(e => belongs(e, context, true)
       && e.revenueRowId === parent.id && e.businessDate === parent.date);
@@ -226,7 +232,7 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
   if (nextOffset !== null || offset > 0) diagnostics.push("RELATIONS_PAGINATED");
   // Only hash the bounded page. Larger canonical collections do not expand the DTO.
   const pageRelations = await Promise.all(relations.slice(offset, offset + limit).map(async relation => ({
-    ...relation, reference: { ...relation.reference, expectedRevision: await resourceRevision(stores,
+    ...relation, reference: relation.reference.kind === "CAPTURED_COST" ? relation.reference : { ...relation.reference, expectedRevision: await resourceRevision(stores,
       relation.reference, uniqueRecord(stores, relation.reference.kind as SupportedKind, relation.reference.id, context)!, context) },
   })));
   const boundReference = { ...reference, expectedRevision: revision };
@@ -254,6 +260,19 @@ export async function readDailyRevenueRequest(request: Request): Promise<Respons
   const parsed = parseEvidenceReference(reference);
   if (!parsed.ok) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
   return reply(await readDailyRevenue(context, parsed.reference, MAX_EVIDENCE_REFERENCES, 0, new Date().toISOString()));
+}
+
+/** One sale/line selector; no client namespace or arbitrary facts engine. */
+export async function readSaleCostRequest(request: Request): Promise<Response> {
+  const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "Vary": "Cookie, X-Session-Token, X-Session-Email, X-Venue-Id" } });
+  const context = await authenticatedEvidenceContext(request);
+  if (!context) return reply({ ok: false, code: "AUTHENTICATION_REQUIRED" }, 401);
+  const params = new URL(request.url).searchParams;
+  if ([...params.keys()].some(key => !["saleId", "lineId", "expectedRevision"].includes(key) || params.getAll(key).length !== 1)) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  const parsed = parseEvidenceReference({ contractVersion: 1, kind: "CAPTURED_COST", id: params.get("saleId"), venueId: context.venueId, workspaceId: context.workspaceId,
+    ...(params.has("lineId") ? { partId: params.get("lineId") } : {}), ...(params.has("expectedRevision") ? { expectedRevision: params.get("expectedRevision") } : {}) });
+  if (!parsed.ok) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  return reply(await readSaleCost(context, parsed.reference, MAX_EVIDENCE_REFERENCES, 0, new Date().toISOString()));
 }
 
 /** The only public resolver entry: no caller-supplied account or namespace. */

@@ -87,7 +87,9 @@ test("private ingestion staging keeps inventory.manage and hides inaccessible re
   for (const id of [r.draft.id, "guessed-draft"]) assert.equal((await r.resolve(r.reference("MENU_INGESTION_DRAFT", id), r.member)).body.outcome, "restricted");
   r.permissions("cashier", ["shifts.view"]);
   const sale = evidence((await r.resolve(r.reference("SALE_EVENT", r.event.id), r.member)).body);
-  assert.deepEqual(sale.relations, []); assert.equal(sale.page.nextOffset, null);
+  assert.deepEqual(sale.relations.map(r => r.reference.kind), ["CAPTURED_COST"]); assert.equal(sale.page.nextOffset, null);
+  const cost = evidence((await r.resolve(sale.relations[0].reference, r.member)).body);
+  assert.ok(cost.relations.every(r => !["WAREHOUSE_MOVEMENT", "NOMENCLATURE", "MENU_ITEM"].includes(r.reference.kind)));
   assert.ok((await r.resolve(r.reference("SALE_EVENT", r.event.id), r.member)).body.diagnostics.includes("RELATIONS_RESTRICTED"));
 });
 
@@ -95,7 +97,7 @@ test("strict parsing, unsupported registry kinds, missing/corrupt/legacy resourc
   const r = await evidenceRuntime(); t.after(r.close);
   const ref = r.reference("MENU_ITEM", "beer");
   for (const value of [null, [], { ...ref, venueId: "1" }, { ...ref, workspaceId: 0 }, { ...ref, expectedRevision: "fake" }, { ...ref, storeKey: "bd_assortment_v1" }, { ...ref, id: "" }, { ...ref, partId: "line" }, { ...ref, contractVersion: 2 }]) assert.equal((await r.resolve(value)).response.status, 400);
-  for (const kind of ["WAREHOUSE_MOVEMENT", "arbitrary_store_key", "__proto__"]) assert.equal((await r.resolve({ ...ref, kind })).body.outcome, "unsupported");
+  for (const kind of ["PURCHASE_DOCUMENT", "arbitrary_store_key", "__proto__"]) assert.equal((await r.resolve({ ...ref, kind })).body.outcome, "unsupported");
   for (const query of ["&limit=21", "&limit=0", "&offset=-1", "&offset=10001", "&limit=2&limit=3", "&storeKey=bd_assortment_v1"]) assert.equal((await r.resolve(ref, r.owner, query)).response.status, 400);
   for (const raw of ["%7Bbroken", encodeURIComponent("x".repeat(2049))]) {
     const req = r.request(r.owner, "/api/evidence/resolve?ref=" + raw); req.headers.set("X-Venue-Id", String(r.venueId));

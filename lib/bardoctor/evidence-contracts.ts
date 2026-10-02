@@ -6,7 +6,7 @@ export const MAX_EVIDENCE_OFFSET = 10_000;
 export type EvidenceScope = { venueId: number; workspaceId: number };
 export type ContentRevision = `sha256:${string}`;
 export const EVIDENCE_RESOURCE_KINDS = [
-  "DAILY_REVENUE",
+  "DAILY_REVENUE", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT", "NOMENCLATURE",
   "SALE_EVENT", "CASH_SHIFT", "FINANCE_REVENUE", "MENU_ITEM", "MENU_INGESTION_DRAFT",
   "SALES_DOCUMENT", "WAREHOUSE_MOVEMENT", "PURCHASE_DOCUMENT", "INVENTORY_DOCUMENT",
   "WRITEOFF_DOCUMENT", "OPERATIONAL_REPORT", "INTEGRATION_EVENT", "REVIEW", "PAYROLL_ENTRY",
@@ -20,7 +20,7 @@ type ReferenceBase = EvidenceScope & {
 /** IDs are references, never capabilities. Every resolve reauthorizes the scope. */
 export type EvidenceReference = {
   [K in EvidenceResourceKind]: ReferenceBase & { kind: K } &
-    (K extends "SALE_EVENT" | "MENU_INGESTION_DRAFT" ? { partId?: string } : { partId?: never });
+    (K extends "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
 }[EvidenceResourceKind];
 export type TraceTarget = { type: "EVIDENCE_RESOURCE"; reference: EvidenceReference };
 export type Finality = "PROVISIONAL" | "FINAL" | "UNKNOWN";
@@ -32,7 +32,8 @@ export type EvidenceDiagnostic =
   | "NO_HISTORICAL_SNAPSHOT" | "PARTIAL_EVIDENCE" | "SOURCE_UNKNOWN"
   | "SOURCE_METADATA_MISSING" | "RECORD_NEEDS_REVIEW" | "RELATIONS_RESTRICTED"
   | "RELATED_EVIDENCE_UNAVAILABLE" | "RELATIONS_PAGINATED" | "FRESHNESS_POLICY_UNDEFINED"
-  | "REVENUE_READ_MODEL_MISMATCH";
+  | "REVENUE_READ_MODEL_MISMATCH" | "COST_SNAPSHOT_MISSING" | "COST_READ_MODEL_MISMATCH"
+  | "COST_UNKNOWN" | "COST_PARTIAL" | "CURRENT_DEFINITION_ONLY";
 export type FreshnessBasis = {
   basis: "RECORD" | "SOURCE_SYNC" | "STORE_FALLBACK" | "UNKNOWN";
   timestamp: string | null;
@@ -57,8 +58,19 @@ type FactBase = EvidenceScope & {
   diagnostics: readonly EvidenceDiagnostic[];
   traceTarget: TraceTarget | null;
 };
+export type CapturedCostStatus = "KNOWN" | "UNKNOWN" | "PARTIAL" | "NONE";
+export type CapturedSaleCost = {
+  saleId: string; saleLineId: string | null; menuItemId: string | null;
+  quantity: number | null; capturedUnitCost: number | null; capturedTotalCost: number | null;
+  costStatus: CapturedCostStatus; canonicalBatchCostStatus: "FULL" | "PARTIAL" | "UNVALUED" | null;
+  costMethod: "latest_confirmed_receipt" | "NOT_APPLICABLE" | null;
+  unitCostBasis: "CAPTURED_TOTAL_PER_SALE_QUANTITY" | null;
+  businessDate: string | null; lifecycle: "POSTED" | "REVERSED";
+  currency: string | null;
+};
 /** Scalar read projections; never persisted as a ledger. */
 export type BusinessFact =
+  | (FactBase & CapturedSaleCost & { factType: "SALE_CAPTURED_COST"; value: number | null; unit: "MONEY" })
   | (FactBase & {
     factType: "DAILY_REVENUE"; businessDate: string; period?: never;
     value: number | null; unit: "MONEY"; currency: string | null; sourceType: RevenueSourceType;
@@ -73,9 +85,11 @@ export type BusinessFactReadModel = {
 export type FactIdentityInput = EvidenceScope & (
   | { factType: "DAILY_REVENUE"; businessDate: string }
   | { factType: "CURRENT_MENU_SALE_PRICE"; menuItemId: string }
+  | { factType: "SALE_CAPTURED_COST"; saleId: string; saleLineId?: string }
 );
 export function businessFactIdentity(input: FactIdentityInput): string {
-  const key = input.factType === "DAILY_REVENUE" ? input.businessDate : input.menuItemId;
+  const key = input.factType === "DAILY_REVENUE" ? input.businessDate : input.factType === "SALE_CAPTURED_COST"
+    ? JSON.stringify([input.saleId, input.saleLineId ?? null]) : input.menuItemId;
   return `fact:v1:${input.workspaceId}:${input.venueId}:${input.factType}:${encodeURIComponent(key)}`;
 }
 export function boundedEvidenceReferences(refs: readonly EvidenceReference[]) {
@@ -83,11 +97,26 @@ export function boundedEvidenceReferences(refs: readonly EvidenceReference[]) {
 }
 
 export type EvidenceRelation = {
-  type: "belongs_to" | "derived_from" | "confirmed_for";
+  type: "belongs_to" | "derived_from" | "confirmed_for" | "current_definition" | "compensates";
   reference: EvidenceReference;
 };
 type MoneyProjection = { currency: string | null; revenue: number | null; businessDate: string | null };
 export type EvidenceProjection =
+  | (CapturedSaleCost & { type: "CAPTURED_COST" })
+  | { type: "CAPTURED_RECIPE"; saleId: string; saleLineId: string; recipeId: string | null; recipeVersion: number | null;
+      capturedAt: string | null; consumptionMode: string | null; menuItemId: string | null; menuItemName: string | null; ingredientCount: number }
+  | { type: "CAPTURED_INGREDIENT"; saleId: string; saleLineId: string; ingredientId: string; nomenclatureItemId: string | null;
+      productKey: string | null; name: string | null; recipeQuantity: number | null; recipeUnit: string | null;
+      baseQuantityPerPortion: number | null; baseQuantityTotal: number | null; baseUnit: string | null; warehouseId: string | null;
+      unitCost: number | null; totalCost: number | null; costStatus: string | null; costBasisMethod: string | null;
+      currency: string | null; costSourceDocumentId: string | null; costSourceLineId: string | null; costEffectiveDate: string | null;
+      conversion: { inputQuantity: number | null; inputUnit: string | null; factor: number | null; outputUnit: string | null; source: string | null } | null }
+  | { type: "NOMENCLATURE"; id: string; productKey: string | null; name: string | null; unit: string | null; currentDefinitionOnly: true }
+  | { type: "WAREHOUSE_MOVEMENT"; movementType: string | null; warehouseId: string | null; productKey: string | null;
+      quantity: number | null; unit: string | null; direction: "IN" | "OUT" | "ZERO" | null; costAmount: number | null;
+      costStatus: string | null; currency: string | null; businessDate: string | null; sourceDocumentId: string | null;
+      sourceLineId: string | null; saleId: string | null; saleLineId: string | null; originalMovementId: string | null;
+      lifecycle: string | null; recordBasis: "MOVEMENT_STORE" | "SALE_ORIGINAL_MOVEMENT" }
   | (MoneyProjection & { type: "DAILY_REVENUE"; sourceType: RevenueSourceType })
   | (MoneyProjection & { type: "SALE_EVENT"; lifecycle: "POSTED" | "REVERSED" | null; sourceType: RevenueSourceType })
   | { type: "SALE_LINE"; menuItemId: string | null; quantity: number | null; unitPrice: number | null; total: number | null; currency: string | null }
@@ -127,7 +156,7 @@ export type ParsedReference =
 export function parseEvidenceReference(value: unknown): ParsedReference {
   if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, code: "INVALID_REFERENCE" };
   const r = value as Record<string, unknown>;
-  const allowed = ["contractVersion", "kind", "id", "venueId", "workspaceId", "partId", "expectedRevision"];
+  const allowed = ["contractVersion", "kind", "id", "venueId", "workspaceId", "partId", "ingredientId", "expectedRevision"];
   if (Object.keys(r).some(key => !allowed.includes(key)) || r.contractVersion !== 1
     || typeof r.kind !== "string" || !resourceId(r.id)
     || !Number.isSafeInteger(r.venueId) || Number(r.venueId) <= 0
@@ -139,7 +168,10 @@ export function parseEvidenceReference(value: unknown): ParsedReference {
   if (!EVIDENCE_RESOURCE_KINDS.includes(r.kind as EvidenceResourceKind)) {
     return { ok: false, code: "UNSUPPORTED_REFERENCE_KIND", scope: { venueId: Number(r.venueId), workspaceId: Number(r.workspaceId) } };
   }
-  if ("partId" in r && !["SALE_EVENT", "MENU_INGESTION_DRAFT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
+  if ("ingredientId" in r && (r.kind !== "CAPTURED_INGREDIENT" || !resourceId(r.ingredientId))
+    || r.kind === "CAPTURED_INGREDIENT" && (!resourceId(r.partId) || !resourceId(r.ingredientId))
+    || r.kind === "CAPTURED_RECIPE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
+  if ("partId" in r && !["SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
   return { ok: true, reference: r as EvidenceReference };
 }
 
@@ -150,8 +182,8 @@ function canonical(value: unknown): string {
 }
 /** Bind the full canonical parent, including children, but never persist a copy. */
 export async function evidenceContentRevision(reference: EvidenceReference, record: unknown): Promise<ContentRevision> {
-  const { contractVersion, kind, id, venueId, workspaceId, partId } = reference;
-  const content = canonical({ contractVersion, kind, id, venueId, workspaceId, partId: partId ?? null, record });
+  const { contractVersion, kind, id, venueId, workspaceId, partId, ingredientId } = reference;
+  const content = canonical({ contractVersion, kind, id, venueId, workspaceId, partId: partId ?? null, ...(ingredientId !== undefined ? { ingredientId } : {}), record });
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(content));
   return `sha256:${Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, "0")).join("")}`;
 }
@@ -161,6 +193,14 @@ export type EvidencePage = { limit: number; offset: number; nextOffset: number |
 export type DailyRevenueResolution = ResolutionBase & (
   | { outcome: "resolved" | "partial"; code: "RESOLVED" | "PARTIAL_EVIDENCE"; fact: DailyRevenueFact;
       binding: "CURRENT_RECORD" | "EXPECTED_REVISION"; page: EvidencePage }
+  | { outcome: "unavailable"; code: "EVIDENCE_UNAVAILABLE" }
+  | { outcome: "restricted"; code: "ACCESS_DENIED" }
+  | { outcome: "changed"; code: "READ_MODEL_CHANGED" }
+);
+
+export type SaleCostFact = Extract<BusinessFact, { factType: "SALE_CAPTURED_COST" }>;
+export type SaleCostResolution = { contractVersion: 1; asOf: string; diagnostics: EvidenceDiagnostic[] } & (
+  | { outcome: "resolved" | "partial"; code: "RESOLVED" | "PARTIAL_EVIDENCE"; fact: SaleCostFact; binding: "CURRENT_RECORD" | "EXPECTED_REVISION"; page: EvidencePage }
   | { outcome: "unavailable"; code: "EVIDENCE_UNAVAILABLE" }
   | { outcome: "restricted"; code: "ACCESS_DENIED" }
   | { outcome: "changed"; code: "READ_MODEL_CHANGED" }

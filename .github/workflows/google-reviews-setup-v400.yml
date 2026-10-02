@@ -38,6 +38,8 @@ jobs:
         run: node --import tsx --test tests/evidence-resolver-phase3a1.test.ts
       - name: Phase 3A.2 Revenue Trace canonical invariant finality binding tenant security and read-only
         run: node --import tsx --test tests/revenue-trace-phase3a2.test.ts
+      - name: Phase 3A.3 captured cost recipe warehouse invariant binding RBAC and read-only
+        run: node --import tsx --test tests/cost-warehouse-trace-phase3a3.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -52,6 +54,7 @@ jobs:
         run: |
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
+          node --import tsx scripts/cost-warehouse-trace-browser.ts
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts
