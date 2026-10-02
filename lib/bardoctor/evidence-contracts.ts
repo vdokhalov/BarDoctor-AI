@@ -6,6 +6,7 @@ export const MAX_EVIDENCE_OFFSET = 10_000;
 export type EvidenceScope = { venueId: number; workspaceId: number };
 export type ContentRevision = `sha256:${string}`;
 export const EVIDENCE_RESOURCE_KINDS = [
+  "MENU_ORIGIN", "MENU_SOURCE", "MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "MENU_TAXONOMY",
   "DAILY_REVENUE", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT", "NOMENCLATURE",
   "SALE_EVENT", "CASH_SHIFT", "FINANCE_REVENUE", "MENU_ITEM", "MENU_INGESTION_DRAFT",
   "SALES_DOCUMENT", "WAREHOUSE_MOVEMENT", "PURCHASE_DOCUMENT", "INVENTORY_DOCUMENT",
@@ -20,7 +21,7 @@ type ReferenceBase = EvidenceScope & {
 /** IDs are references, never capabilities. Every resolve reauthorizes the scope. */
 export type EvidenceReference = {
   [K in EvidenceResourceKind]: ReferenceBase & { kind: K } &
-    (K extends "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
+    (K extends "MENU_SOURCE_FILE" | "MENU_REVIEWED_INPUT" | "MENU_CONFIRMATION" | "MENU_RECIPE" | "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
 }[EvidenceResourceKind];
 export type TraceTarget = { type: "EVIDENCE_RESOURCE"; reference: EvidenceReference };
 export type Finality = "PROVISIONAL" | "FINAL" | "UNKNOWN";
@@ -33,7 +34,9 @@ export type EvidenceDiagnostic =
   | "SOURCE_METADATA_MISSING" | "RECORD_NEEDS_REVIEW" | "RELATIONS_RESTRICTED"
   | "RELATED_EVIDENCE_UNAVAILABLE" | "RELATIONS_PAGINATED" | "FRESHNESS_POLICY_UNDEFINED"
   | "REVENUE_READ_MODEL_MISMATCH" | "COST_SNAPSHOT_MISSING" | "COST_READ_MODEL_MISMATCH"
-  | "COST_UNKNOWN" | "COST_PARTIAL" | "CURRENT_DEFINITION_ONLY";
+  | "COST_UNKNOWN" | "COST_PARTIAL" | "CURRENT_DEFINITION_ONLY"
+  | "SOURCE_VALUES_NOT_RETAINED" | "CONFIRMATION_RECORD_MISSING" | "ORIGIN_UNKNOWN" | "ORIGIN_AMBIGUOUS"
+  | "CURRENT_MENU_CHANGED" | "HISTORICAL_RECIPE_NOT_RETAINED";
 export type FreshnessBasis = {
   basis: "RECORD" | "SOURCE_SYNC" | "STORE_FALLBACK" | "UNKNOWN";
   timestamp: string | null;
@@ -69,7 +72,11 @@ export type CapturedSaleCost = {
   currency: string | null;
 };
 /** Scalar read projections; never persisted as a ledger. */
+export type MenuValues = { id: string | null; name: string | null; salePrice: number | null; currency: string | null; sectionId: string | null; taxonomyCategoryId: string | null; subcategoryId: string | null; consumptionMode: string | null; type: string | null; active: boolean | null };
+export type MenuConfirmationOutcome = "ADDED" | "CHANGED" | "UNCHANGED" | "UNKNOWN";
+export type MenuOriginView = { menuItemId: string; currentMenu: MenuValues; originSourceType: MenuSourceType; originDraftId: string | null; originRowId: string | null; confirmationResult: MenuConfirmationOutcome | null; latestConfirmationDraftId: string | null; latestConfirmationRowId: string | null; latestConfirmationResult: MenuConfirmationOutcome | null; currentMatchesConfirmed: boolean | null; originalSourceValuesAvailable: false };
 export type BusinessFact =
+  | (FactBase & MenuOriginView & { factType: "MENU_ORIGIN"; value: string; unit: "IDENTITY" })
   | (FactBase & CapturedSaleCost & { factType: "SALE_CAPTURED_COST"; value: number | null; unit: "MONEY" })
   | (FactBase & {
     factType: "DAILY_REVENUE"; businessDate: string; period?: never;
@@ -84,6 +91,7 @@ export type BusinessFactReadModel = {
 };
 export type FactIdentityInput = EvidenceScope & (
   | { factType: "DAILY_REVENUE"; businessDate: string }
+  | { factType: "MENU_ORIGIN"; menuItemId: string }
   | { factType: "CURRENT_MENU_SALE_PRICE"; menuItemId: string }
   | { factType: "SALE_CAPTURED_COST"; saleId: string; saleLineId?: string }
 );
@@ -102,6 +110,13 @@ export type EvidenceRelation = {
 };
 type MoneyProjection = { currency: string | null; revenue: number | null; businessDate: string | null };
 export type EvidenceProjection =
+  | (MenuOriginView & { type: "MENU_ORIGIN" })
+  | { type: "MENU_SOURCE"; sourceType: MenuSourceType; draftId: string; sourceFileCount: number; originalValues: null; recognitionRecordAvailable: false; originalUploadHashAvailable: false }
+  | { type: "MENU_SOURCE_FILE"; draftId: string; fileId: string; name: string | null; mimeType: string | null; sizeBytes: number | null; uploadedAt: string | null; contentBinding: { type: "R2_ETAG"; value: string } | null; downloadPath: string }
+  | { type: "MENU_REVIEWED_INPUT"; draftId: string; rowId: string; values: MenuValues; targetMenuItemId: string | null; reviewed: boolean | null; decision: "pending" | "apply" | "skip" | null; draftLifecycle: string | null; validationState: string | null; outcome: "ADDED" | "CHANGED" | "UNCHANGED" | "SKIPPED" | "INVALID" | "CONFLICT" | "UNKNOWN"; outcomeBasis: "CONFIRMATION_AUDIT" | "CURRENT_VALIDATION_PREVIEW" | "STORED_DECISION"; sourceValues: null }
+  | { type: "MENU_CONFIRMATION"; draftId: string; rowId: string; menuItemId: string; outcome: MenuConfirmationOutcome; decision: "apply"; reviewed: true; draftRevision: number | null; confirmedAt: string | null; validationHash: string | null; reviewedValues: MenuValues; appliedValues: MenuValues; currentMatchesConfirmed: boolean | null; recordBasis: "EXISTING_CONFIRMATION_AUDIT" }
+  | { type: "MENU_RECIPE"; menuItemId: string; recipeId: string; version: number | null; status: string | null; reviewStatus: string | null; lifecycleStatus: string | null; current: boolean | null; ingredientCount: number; currentDefinitionOnly: true; historicalConfirmationSnapshotAvailable: false }
+  | { type: "MENU_TAXONOMY"; menuItemId: string; basis: "STORED_TREE" | "DEFAULT_FALLBACK"; section: { id: string; name: string; active: boolean } | null; category: { id: string; name: string; active: boolean } | null; subcategory: { id: string; name: string; active: boolean } | null; currentDefinitionOnly: true }
   | (CapturedSaleCost & { type: "CAPTURED_COST" })
   | { type: "CAPTURED_RECIPE"; saleId: string; saleLineId: string; recipeId: string | null; recipeVersion: number | null;
       capturedAt: string | null; consumptionMode: string | null; menuItemId: string | null; menuItemName: string | null; ingredientCount: number }
@@ -171,7 +186,8 @@ export function parseEvidenceReference(value: unknown): ParsedReference {
   if ("ingredientId" in r && (r.kind !== "CAPTURED_INGREDIENT" || !resourceId(r.ingredientId))
     || r.kind === "CAPTURED_INGREDIENT" && (!resourceId(r.partId) || !resourceId(r.ingredientId))
     || r.kind === "CAPTURED_RECIPE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
-  if ("partId" in r && !["SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
+  if (["MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE"].includes(r.kind) && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
+  if ("partId" in r && !["MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
   return { ok: true, reference: r as EvidenceReference };
 }
 
@@ -201,6 +217,14 @@ export type DailyRevenueResolution = ResolutionBase & (
 export type SaleCostFact = Extract<BusinessFact, { factType: "SALE_CAPTURED_COST" }>;
 export type SaleCostResolution = { contractVersion: 1; asOf: string; diagnostics: EvidenceDiagnostic[] } & (
   | { outcome: "resolved" | "partial"; code: "RESOLVED" | "PARTIAL_EVIDENCE"; fact: SaleCostFact; binding: "CURRENT_RECORD" | "EXPECTED_REVISION"; page: EvidencePage }
+  | { outcome: "unavailable"; code: "EVIDENCE_UNAVAILABLE" }
+  | { outcome: "restricted"; code: "ACCESS_DENIED" }
+  | { outcome: "changed"; code: "READ_MODEL_CHANGED" }
+);
+
+export type MenuOriginFact = Extract<BusinessFact, { factType: "MENU_ORIGIN" }>;
+export type MenuOriginResolution = ResolutionBase & (
+  | { outcome: "resolved" | "partial"; code: "RESOLVED" | "PARTIAL_EVIDENCE"; fact: MenuOriginFact; binding: "CURRENT_RECORD" | "EXPECTED_REVISION"; page: EvidencePage }
   | { outcome: "unavailable"; code: "EVIDENCE_UNAVAILABLE" }
   | { outcome: "restricted"; code: "ACCESS_DENIED" }
   | { outcome: "changed"; code: "READ_MODEL_CHANGED" }

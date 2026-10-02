@@ -40,6 +40,8 @@ jobs:
         run: node --import tsx --test tests/revenue-trace-phase3a2.test.ts
       - name: Phase 3A.3 captured cost recipe warehouse invariant binding RBAC and read-only
         run: node --import tsx --test tests/cost-warehouse-trace-phase3a3.test.ts
+      - name: Phase 3A.4 Menu Origin real ingestion confirmation source binding RBAC and read-only
+        run: node --import tsx --test tests/menu-origin-trace-phase3a4.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -50,11 +52,12 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
-      - name: Phase 3A.1 and 3A.2 compiled Worker native D1 and evidence/revenue API mobile desktop
+      - name: Phase 3A.1–3A.4 compiled Worker native D1 and evidence API mobile desktop
         run: |
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
+          node --import tsx scripts/menu-origin-trace-browser.ts
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts

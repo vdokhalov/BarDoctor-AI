@@ -1,10 +1,12 @@
+import { createHash } from "node:crypto";
 import * as XLSX from "xlsx";
 import { lifecycleRuntime } from "./lifecycle-runtime";
 
 /** Stub only the external AI model; upload, decoding, normalization and APIs stay real. */
-export async function menuImportRuntime(extraRoutes: Record<string, string> = {}) {
+export async function menuImportRuntime(extraRoutes: Record<string, string> = {}, options: { recognition?: () => unknown } = {}) {
   const prompts: string[] = [];
   const uploads = new Map<string, Uint8Array>();
+  const uploadMetadata = new Map<string, Record<string, unknown>>();
   const runtime = await lifecycleRuntime({ ...extraRoutes, catalogImport: "./app/api/catalog/import/route" }, {
     plugins: [{ name: "menu-import-model", setup(builder) {
       builder.onResolve({ filter: /^menu-import-test-model$/ }, () => ({ path: "menu-import-test-model", external: true }));
@@ -15,11 +17,17 @@ export async function menuImportRuntime(extraRoutes: Record<string, string> = {}
       }));
     } }],
     bindings: { BUCKET: {
-      async put(key: string, bytes: Uint8Array) { uploads.set(key, new Uint8Array(bytes)); },
-      async delete(keys: string | string[]) { for (const key of typeof keys === "string" ? [keys] : keys) uploads.delete(key); },
+      async put(key: string, bytes: Uint8Array, metadata?: { httpMetadata?: object; customMetadata?: object }) {
+        uploads.set(key, new Uint8Array(bytes));
+        uploadMetadata.set(key, { key, size: bytes.byteLength, etag: createHash("md5").update(bytes).digest("hex"), ...metadata });
+      },
+      async head(key: string) { return uploadMetadata.get(key) ?? null; },
+      async delete(keys: string | string[]) { for (const key of typeof keys === "string" ? [keys] : keys) { uploads.delete(key); uploadMetadata.delete(key); } },
     } },
-    modules: { "menu-import-test-model": { aiText: async (input: { messages: { content: string }[] }) => {
-      const prompt = input.messages[0].content; prompts.push(prompt);
+    modules: { "menu-import-test-model": { aiText: async (input: { messages: { content: string | { type: string; text?: string }[] }[] }) => {
+      const content = input.messages[0].content;
+      const prompt = typeof content === "string" ? content : content.filter(p => p.type === "text").map(p => p.text ?? "").join("\n"); prompts.push(prompt);
+      if (options.recognition) return JSON.stringify(options.recognition());
       const table = prompt.split("Извлечённая таблица:\n")[1]?.replace(/^Лист: [^\n]*\n/, "");
       if (!table) throw new Error("Expected production spreadsheet preprocessing before model boundary");
       const workbook = XLSX.read(table, { type: "string", raw: true });
@@ -30,5 +38,5 @@ export async function menuImportRuntime(extraRoutes: Record<string, string> = {}
       })) });
     } } },
   });
-  return { ...runtime, prompts, uploads };
+  return { ...runtime, prompts, uploads, uploadMetadata };
 }

@@ -1,3 +1,4 @@
+import { isMenuEvidenceKind, resolveMenuEvidence, readMenuOrigin, menuTraceRelations } from "./menu-evidence";
 import { isCostEvidenceKind, readSaleCost, resolveCostEvidence } from "./cost-evidence";
 import { getD1 } from "../../db";
 import { authenticateRequest } from "./auth";
@@ -110,6 +111,7 @@ function draftChild(parent: Row, partId: string, scope: EvidenceScope): Row | nu
 /** Trusted-context core; the public API only obtains context through authentication. */
 async function resolveInContext(context: Context, reference: EvidenceReference, limit: number, offset: number, asOf: string): Promise<EvidenceResolution> {
   if (reference.venueId !== context.venueId || reference.workspaceId !== context.workspaceId) return result("unavailable", asOf);
+  if (isMenuEvidenceKind(reference.kind)) return resolveMenuEvidence(context, reference, limit, offset, asOf);
   if (isCostEvidenceKind(reference.kind)) return resolveCostEvidence(context, reference, limit, offset, asOf);
   if (reference.kind === "DAILY_REVENUE") {
     const resolution = await readDailyRevenue(context, reference, limit, offset, asOf);
@@ -221,6 +223,13 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
     }
     if (parent.source !== "MANUAL" && !rows([parent.provenance])[0]?.sourceFileIds) diagnostics.push("SOURCE_METADATA_MISSING");
   }
+  if (kind === "MENU_ITEM") {
+    if (hasPermission(context.account, "inventory.manage")) {
+      const trace = await menuTraceRelations(context, reference); relations.push(...trace);
+      if (!trace.length) unavailableRelation();
+    }
+    else { diagnostics.push("RELATIONS_RESTRICTED"); partial = true; }
+  }
   if ("sourceType" in projection && projection.sourceType === "LEGACY_UNKNOWN") { diagnostics.push("SOURCE_UNKNOWN"); partial = true; }
   if (Object.values(projection).some(v => v === null)) { diagnostics.push("RECORD_NEEDS_REVIEW"); partial = true; }
 
@@ -232,7 +241,7 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
   if (nextOffset !== null || offset > 0) diagnostics.push("RELATIONS_PAGINATED");
   // Only hash the bounded page. Larger canonical collections do not expand the DTO.
   const pageRelations = await Promise.all(relations.slice(offset, offset + limit).map(async relation => ({
-    ...relation, reference: relation.reference.kind === "CAPTURED_COST" ? relation.reference : { ...relation.reference, expectedRevision: await resourceRevision(stores,
+    ...relation, reference: relation.reference.expectedRevision ? relation.reference : { ...relation.reference, expectedRevision: await resourceRevision(stores,
       relation.reference, uniqueRecord(stores, relation.reference.kind as SupportedKind, relation.reference.id, context)!, context) },
   })));
   const boundReference = { ...reference, expectedRevision: revision };
@@ -298,4 +307,16 @@ export async function resolveEvidenceRequest(request: Request): Promise<Response
   if (!Number.isInteger(limit) || limit < 1 || limit > MAX_EVIDENCE_REFERENCES || !Number.isInteger(offset) || offset < 0 || offset > MAX_EVIDENCE_OFFSET) return reply({ ok: false, code: "INVALID_PAGINATION" }, 400);
   const resolution = await resolveInContext(context, parsed.reference, limit, offset, asOf);
   return reply(resolution);
+}
+
+/** One canonical Menu selector. Tenant identity is server-derived. */
+export async function readMenuOriginRequest(request: Request): Promise<Response> {
+  const reply = (body: unknown, status = 200) => Response.json(body, { status, headers: { "Cache-Control": "private, no-store", "Vary": "Cookie, X-Session-Token, X-Session-Email, X-Venue-Id" } });
+  const context = await authenticatedEvidenceContext(request);
+  if (!context) return reply({ ok: false, code: "AUTHENTICATION_REQUIRED" }, 401);
+  const params = new URL(request.url).searchParams;
+  if ([...params.keys()].some(key => !["menuItemId", "expectedRevision"].includes(key) || params.getAll(key).length !== 1)) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  const parsed = parseEvidenceReference({ contractVersion: 1, kind: "MENU_ORIGIN", id: params.get("menuItemId"), venueId: context.venueId, workspaceId: context.workspaceId, ...(params.has("expectedRevision") ? { expectedRevision: params.get("expectedRevision") } : {}) });
+  if (!parsed.ok) return reply({ ok: false, code: "INVALID_REFERENCE" }, 400);
+  return reply(await readMenuOrigin(context, parsed.reference, MAX_EVIDENCE_REFERENCES, 0, new Date().toISOString()));
 }

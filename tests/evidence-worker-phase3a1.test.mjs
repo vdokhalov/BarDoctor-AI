@@ -8,7 +8,7 @@ import { Miniflare } from "miniflare";
 import { register } from "tsx/esm/api";
 register();
 
-test("actual compiled Worker routes evidence, DAILY_REVENUE and captured cost GET with isolated native D1 and no canonical writes", { timeout: 120000 }, async () => {
+test("actual compiled Worker routes evidence, DAILY_REVENUE, captured cost and Menu Origin GET with isolated native D1 and no canonical writes", { timeout: 120000 }, async () => {
   const server = path.resolve("dist/server");
   const config = JSON.parse(readFileSync(path.join(server, "wrangler.json"), "utf8"));
   const modules = ["index.js", ...readdirSync(server, { recursive: true }).filter(file => file !== "index.js" && /\.(?:m?js)$/.test(file)).sort()]
@@ -48,11 +48,19 @@ test("actual compiled Worker routes evidence, DAILY_REVENUE and captured cost GE
       ))])),
       db.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(1,'bd_stock_movements',?,'2026-10-01T12:00:00Z')").bind(JSON.stringify(costPlan.movements)),
     ]);
+    const headers = { "X-Session-Token": token, "X-Session-Email": "worker@isolated.test", "X-Venue-Id": "1" };
+    const ingestion = async body => {
+      const response = await mf.dispatchFetch("http://localhost/api/menu/ingestion", { method: "POST", headers: { ...headers, "Content-Type": "application/json" }, body: JSON.stringify({ venueId: 1, ...body }) });
+      const result = await response.json(); assert.ok(response.ok, JSON.stringify(result)); return result;
+    };
+    const created = await ingestion({ action: "create", draftId: "draft:native-menu-origin", source: "MANUAL", items: [{ name: "Native Menu origin", salePrice: 17, currency: "MDL", sectionId: "bar", taxonomyCategoryId: "alcohol", consumptionMode: "RECIPE", active: true }] });
+    const validated = await ingestion({ action: "validate", draftId: created.draft.id, revision: created.draft.revision });
+    const confirmed = await ingestion({ action: "confirm", draftId: validated.draft.id, revision: validated.draft.revision, validationHash: validated.draft.validationHash });
+    const originMenuId = confirmed.draft.resultIds[0];
     // Guard canonical mutations inside native D1, in addition to byte comparisons.
-    for (const action of ["INSERT", "UPDATE", "DELETE"]) await db.exec(`CREATE TRIGGER evidence_no_${action.toLowerCase()} BEFORE ${action} ON domain_data BEGIN SELECT RAISE(ABORT, 'canonical writes forbidden'); END`);
+    for (const table of ["domain_data", "audit_log"]) for (const action of ["INSERT", "UPDATE", "DELETE"]) await db.exec(`CREATE TRIGGER evidence_no_${table}_${action.toLowerCase()} BEFORE ${action} ON ${table} ${table === 'domain_data' && action === 'INSERT' ? 'WHEN NOT EXISTS (SELECT 1 FROM domain_data WHERE account_id=NEW.account_id AND store_key=NEW.store_key)' : ''} BEGIN SELECT RAISE(ABORT, 'canonical writes forbidden'); END`);
     const before = (await db.prepare("SELECT * FROM domain_data ORDER BY account_id,store_key").all()).results;
     const ref = { contractVersion: 1, kind: "MENU_ITEM", id: "worker-menu", venueId: 1, workspaceId: 1 };
-    const headers = { "X-Session-Token": token, "X-Session-Email": "worker@isolated.test", "X-Venue-Id": "1" };
     const call = (reference, auth = headers) => mf.dispatchFetch("http://localhost/api/evidence/resolve?ref=" + encodeURIComponent(JSON.stringify(reference)), { headers: auth });
     assert.equal((await call(ref, {})).status, 401);
     const response = await call(ref); assert.equal(response.status, 200); assert.equal(response.headers.get("Cache-Control"), "private, no-store");
@@ -61,6 +69,19 @@ test("actual compiled Worker routes evidence, DAILY_REVENUE and captured cost GE
     assert.equal((await (await call({ ...ref, workspaceId: 999 })).json()).outcome, "unavailable");
     assert.equal((await (await call({ ...ref, expectedRevision: "sha256:" + "0".repeat(64) })).json()).outcome, "changed");
     assert.equal((await call({ ...ref, storeKey: "bd_assortment_v1" })).status, 400);
+    const originUrl = "http://localhost/api/evidence/facts/menu-origin?menuItemId=" + encodeURIComponent(originMenuId);
+    assert.equal((await mf.dispatchFetch(originUrl)).status, 401);
+    const originResponse = await mf.dispatchFetch(originUrl, { headers }); assert.equal(originResponse.status, 200); assert.equal(originResponse.headers.get("Cache-Control"), "private, no-store");
+    const origin = (await originResponse.json()).fact; assert.equal(origin.originSourceType, "MANUAL"); assert.equal(origin.currentMenu.salePrice, 17); assert.equal(origin.originDraftId, created.draft.id); assert.equal(origin.evidenceStatus, "PARTIAL");
+    const confirmationRef = origin.evidenceRefs.find(r => r.kind === "MENU_CONFIRMATION");
+    const originConfirmation = (await (await call(confirmationRef)).json()).evidence;
+    assert.equal(originConfirmation.binding, "EXPECTED_REVISION"); assert.equal(originConfirmation.projection.menuItemId, originMenuId); assert.equal(originConfirmation.projection.appliedValues.salePrice, 17); assert.equal(originConfirmation.projection.outcome, "ADDED");
+    const reviewed = (await (await call(originConfirmation.relations.find(r => r.reference.kind === "MENU_REVIEWED_INPUT").reference)).json()).evidence;
+    assert.equal(reviewed.projection.values.salePrice, 17); assert.equal(reviewed.projection.sourceValues, null);
+    const originSource = (await (await call(reviewed.relations.find(r => r.reference.kind === "MENU_SOURCE").reference)).json()).evidence; assert.equal(originSource.projection.sourceType, "MANUAL"); assert.equal(originSource.projection.sourceFileCount, 0);
+    const originRecipe = (await (await call(origin.evidenceRefs.find(r => r.kind === "MENU_RECIPE"))).json()).evidence; assert.equal(originRecipe.projection.menuItemId, originMenuId); assert.equal(originRecipe.projection.currentDefinitionOnly, true);
+    assert.equal((await (await mf.dispatchFetch(originUrl + "&expectedRevision=sha256:" + "0".repeat(64), { headers })).json()).code, "READ_MODEL_CHANGED");
+    assert.equal((await mf.dispatchFetch(originUrl + "&dataAccountId=2", { headers })).status, 400);
     const dailyUrl = "http://localhost/api/evidence/facts/daily-revenue?businessDate=2026-10-01";
     assert.equal((await mf.dispatchFetch(dailyUrl)).status, 401);
     const factResponse = await mf.dispatchFetch(dailyUrl, { headers });
