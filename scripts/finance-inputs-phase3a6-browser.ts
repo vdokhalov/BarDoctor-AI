@@ -37,7 +37,7 @@ const server = createServer((req, res) => {
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
 const engine = process.env.BD_FINANCE_BROWSER === "webkit" ? webkit : chromium;
-const browser = await engine.launch({ ...(engine === chromium ? { executablePath: process.env.BD_QA_BROWSER || await resolveBrowserExecutable(chromium.executablePath()) } : {}), headless: true, args: chromiumArgs });
+const browser = await engine.launch({ ...(engine === chromium ? { executablePath: process.env.BD_QA_BROWSER || await resolveBrowserExecutable(chromium.executablePath()), args: chromiumArgs } : {}), headless: true });
 const out = "outputs/finance-inputs-phase3a6/" + (engine === webkit ? "webkit" : "chromium"); mkdirSync(out, { recursive: true });
 const results: unknown[] = [];
 try {
