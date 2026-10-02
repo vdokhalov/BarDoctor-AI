@@ -65,7 +65,7 @@ Original stack in both trees: `Yse` at bundle `574:4581`, warm map at `619:373`,
 Only the canonical client bundle and its existing reversible preparation script change application behavior:
 
 - `Yse` retains HTTP status, source key, and response code on errors; both HTTP status and JSON `ok` must indicate success. A success-shaped 500 is rejected.
-- The Finance warm Promise gets an immediate catch at construction. Only the three expected Finance warm source keys with 403/`ACCESS_DENIED` produce `{availability:"RESTRICTED"}`. Source 401 produces `{availability:"UNAVAILABLE"}` for expired/revoked auth. Neither contains financial data.
+- Each Finance warm read handles its expected denial immediately; the aggregate rejection also has an immediate handler. Only the three expected Finance warm source keys with 403/`ACCESS_DENIED` produce `{availability:"RESTRICTED"}`. Source 401 produces `{availability:"UNAVAILABLE"}` for expired/revoked auth. Neither contains financial data. A denial cannot mask a later 500 from another warm source: the aggregate waits for all resolved reads and remains rejected on any unexpected error.
 - The existing warm consumer skips these explicit unavailable results without cache writes. The authoritative RBAC-filtered bootstrap remains responsible for hydration/clearing; no parallel state or persistence framework is introduced.
 - Unexpected 403 contracts, server 5xx (including misleading denial/success bodies), malformed responses, and network failures remain rejected and detectable.
 - The patch's restore/reapply lifecycle preserves existing artifact preparation and content-versioned release behavior.
@@ -74,7 +74,7 @@ There is no UI redesign, permission grant, server-error suppression, schema chan
 
 ## Regression acceptance
 
-`tests/restricted-finance-warm-phase3a5.test.mjs` executes actual generated getter/producer/consumer code in an isolated child process, deliberately delaying the React consumer. It tests denial timing/no cache fabrication, successful owner/permitted warm data, expired auth, unexpected 403, server 500, misleading 500 denial/success bodies, and connection failure. Running against either exact old v474/v475 bundle fails the expected-denial, expired-auth and success-shaped-500 regressions (5 pass / 3 fail, deliberately retained as negative baseline evidence); corrected source passes all eight. Existing boundary and Home readiness tests remain unchanged and green.
+`tests/restricted-finance-warm-phase3a5.test.mjs` executes actual generated getter/producer/consumer code in an isolated child process, deliberately delaying the React consumer. It tests denial timing/no cache fabrication, successful owner/permitted warm data, expired auth, unexpected 403, server 500, misleading 500 denial/success bodies, connection failure, and mixed expected 403/401 followed by another source's 500. Running against either exact old v474/v475 bundle fails five regressions (5 pass / 5 fail, deliberately retained as negative baseline evidence); corrected source passes all ten. The initial aggregate-only candidate also failed the two mixed-error controls and was replaced before any Sites version/deployment. Existing boundary and Home readiness tests remain unchanged and green.
 
 `scripts/restricted-manager-regression.mjs` uses actual UI/handlers on desktop/mobile for restricted manager, permitted manager and owner: Home, Finance, Sales journal, Shifts, Menu catalog, Warehouse, Equipment, Reviews, Health and AI analysis; bootstrap/reload; normal profile logout and manager login; owner venue switching with isolated store verification; foreign identity denial. Permitted roles avoid real AI/provider invocation. Strict request acceptance allows expected 403 only for the restricted scenario's exact source endpoints and contract. Unexpected 401/403/5xx and every pageerror still fail. Negative acceptance probes explicitly prove this validator remains strict.
 
@@ -88,9 +88,9 @@ Local gates on the prepared source:
 
 | Check | Result |
 |---|---|
-| Targeted generated-code, analysis boundary, Home readiness | 13 PASS |
+| Targeted generated-code, analysis boundary, Home readiness | 15 PASS |
 | Phase 3A.1–3A.5 actual-handler security/evidence/writer tests | 87 PASS |
-| Full `npm test` including verified build/typecheck and the new regression | 2018 PASS; 0 fail; 0 skipped |
+| Full `npm test` including verified build/typecheck and the new regression | 2020 PASS; 0 fail; 0 skipped |
 | Lint | PASS; 0 errors; two unchanged warnings in the existing migration route and warehouse patch |
 | Actual compiled Worker / native D1 phase boundaries and evidence | 2 PASS |
 | Repeated artifact preparation, stable packaged/canonical bytes | 5 PASS |
@@ -101,7 +101,7 @@ Local gates on the prepared source:
 | Operational Day browser, desktop/mobile | PASS; businessDate/finality; Finance 20; Warehouse -1 |
 | Corrected actual-client Finance denial, desktop/mobile | PASS; 403 retained; no uncaught rejection/pageerror; bootstrap ready; Sales usable |
 | Final actual-client role/route/CloudSync/logout/reload/switch matrix | 6 role/width cases PASS; 10 routes each; valid foreign identity denied; three real fault controls rejected by acceptance |
-| Compiled Worker and emitted static client release integrity, desktop/mobile | 1 PASS; content-versioned bundle `index-BQGspy0I-d4f67ba29aa6.js` agrees with canonical source across five emitted entrypoints |
+| Compiled Worker and emitted static client release integrity, desktop/mobile | 1 PASS; content-versioned bundle agrees with canonical source across five emitted entrypoints |
 
 Changed files: `public/assets/index-BQGspy0I.js`, `scripts/patch-canonical-boundary-phase3a5.mjs`, `tests/restricted-finance-warm-phase3a5.test.mjs`, `scripts/qa/restricted-manager-runtime.mjs`, `scripts/restricted-manager-403-browser.mjs`, `scripts/restricted-manager-regression.mjs`, `package.json`, `.github/workflows/google-reviews-setup-v400.yml`, this RCA report and the preserved historical production smoke report. Application scope is only the first two files; other changes are QA, CI and evidence documentation. Manual diff review confirms no backend/RBAC/schema/business-writer changes.
 

@@ -17,11 +17,12 @@ function scenario(status=403,code='ACCESS_DENIED',failure='response'){
  process.on('unhandledRejection',error=>events.push({message:error.message,status:error.status,code:error.code}));
  process.on('rejectionHandled',()=>handled.push(true));
  const context={window:{},EC:'/api/store',Ot:()=> 'isolated QA session',ca:()=>({}),bdFetchBusinessHealthV377:()=>Promise.resolve({}),bdClearMissingServerStoreV324:key=>applied.push(key),Kse:(key,data)=>applied.push({key,data}),fetch:async path=>{
+   if(${JSON.stringify(failure)}==='mixed'&&path.endsWith('bd_finance_revenue')){await new Promise(done=>setTimeout(done,15));return{ok:false,status:500,json:async()=>({ok:false,code:'SERVER_ERROR'})};}
    if(!path.endsWith('bd_finance_expenses'))return{ok:true,status:200,json:async()=>({ok:true,data:[]})};
    if(${JSON.stringify(failure)}==='network')throw new Error('Synthetic connection failed');
    return {ok:${status}<400,status:${status},json:async()=>(${status}===200?{ok:true,data:[{id:'synthetic',amount:12}]}:${JSON.stringify(failure)}==='fake-success'?{ok:true,data:[{amount:98765}]}:{ok:false,code:${JSON.stringify(code)},error:'Synthetic denial/failure'})};
  }};
- vm.createContext(context);vm.runInContext(${JSON.stringify(getter+'\n'+guard+'\n'+warm+'\n'+apply+'\nbdWarmCriticalHomeV349();')},context);
+ context.setTimeout=setTimeout;vm.createContext(context);vm.runInContext(${JSON.stringify(getter+'\n'+guard+'\n'+warm+'\n'+apply+'\nbdWarmCriticalHomeV349();')},context);
  setTimeout(async()=>{
   const result=await vm.runInContext('bdApplyHomeFinanceWarmV349()',context);
   const settled=await context.window.__bdStartupFinanceWarmV349.catch(error=>({failed:true,status:error.status,code:error.code}));
@@ -33,6 +34,9 @@ function scenario(status=403,code='ACCESS_DENIED',failure='response'){
 
 test('expected Finance ACCESS_DENIED is handled before delayed React consumer; no fabricated finance/cache data',()=>{
  const result=scenario();assert.deepEqual(result.events,[]);assert.deepEqual(result.handled,[]);assert.deepEqual(result.applied,[]);assert.equal(result.result,false);assert.equal(result.settled.availability,'RESTRICTED');assert.ok(!('data' in result.settled));
+});
+for(const status of [403,401])test(`expected ${status} does not mask a later 500 from another Finance warm source`,()=>{
+ const result=scenario(status,'ACCESS_DENIED','mixed');assert.equal(result.events.length,1);assert.equal(result.events[0].status,500);assert.equal(result.settled.failed,true);assert.equal(result.settled.status,500);assert.deepEqual(result.applied,[]);assert.equal(result.result,false);
 });
 test('authenticated Finance success retains all three canonical warm reads for owner/permitted manager',()=>{
  const result=scenario(200);assert.deepEqual(result.events,[]);assert.equal(result.result,true);assert.equal(result.applied.length,3);assert.equal(result.applied.find(x=>x.key==='bd_finance_expenses').data[0].amount,12);

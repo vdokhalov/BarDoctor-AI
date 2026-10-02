@@ -5,7 +5,8 @@ const marker = 'const bdCanonicalBoundaryClientPhase3a5=';
 const originalStoreRead = 'async function Yse(e,t){const r=await(await fetch(`${EC}/${e}`,{headers:ca(t)})).json();if(!r.ok)throw new Error(`GET /api/store/${e} failed`);return r.data??void 0}';
 const guardedStoreRead = 'async function Yse(e,t){const response=await fetch(`${EC}/${e}`,{headers:ca(t)}),r=await response.json();if(!response.ok||!r.ok)throw Object.assign(new Error(`GET /api/store/${e} failed`),{status:response.status,code:r.code,storeKey:e});return r.data??void 0}';
 const originalFinanceWarm = 'window.__bdStartupFinanceWarmV349=Promise.all(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].map(async t=>({key:t,data:await Yse(t,e)})))';
-const guardedFinanceWarm = originalFinanceWarm + '.catch(bdHandleFinanceWarmFailurePhase3a5)';
+const previousFinanceWarm = originalFinanceWarm + '.catch(bdHandleFinanceWarmFailurePhase3a5)';
+const guardedFinanceWarm = 'window.__bdStartupFinanceWarmV349=Promise.all(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].map(async t=>{try{return{key:t,data:await Yse(t,e)}}catch(error){return bdHandleFinanceWarmFailurePhase3a5(error)}})).then(rows=>rows.find(row=>row?.availability==="RESTRICTED"||row?.availability==="UNAVAILABLE")||rows).catch(bdHandleFinanceWarmFailurePhase3a5)';
 const originalWarmApply = 'return e.then(t=>{for(const{key:n,data:r}of t)';
 const guardedWarmApply = 'return e.then(t=>{if(t?.availability==="RESTRICTED"||t?.availability==="UNAVAILABLE")return!1;for(const{key:n,data:r}of t)';
 
@@ -13,6 +14,7 @@ if (process.argv.includes('--restore')) {
   if (source.includes(marker)) {
     if (source.includes(guardedStoreRead)) source = source.replace(guardedStoreRead, originalStoreRead);
     if (source.includes(guardedFinanceWarm)) source = source.replace(guardedFinanceWarm, originalFinanceWarm);
+    if (source.includes(previousFinanceWarm)) source = source.replace(previousFinanceWarm, originalFinanceWarm);
     if (source.includes(guardedWarmApply)) source = source.replace(guardedWarmApply, originalWarmApply);
     const start = source.indexOf(marker), end = source.indexOf('// end canonical boundary Phase3a5', start);
     if (end < start) throw new Error('Phase3a5 restoration boundary missing');
@@ -52,6 +54,7 @@ function bdHandleFinanceWarmFailurePhase3a5(error){if(["bd_finance_revenue","bd_
 if (!source.includes('function bdHandleFinanceWarmFailurePhase3a5(')) {
   source = source.replace('// end canonical boundary Phase3a5', 'function bdHandleFinanceWarmFailurePhase3a5(error){if(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].includes(error?.storeKey)){if(error.status===403&&error.code==="ACCESS_DENIED")return{availability:"RESTRICTED"};if(error.status===401)return{availability:"UNAVAILABLE"}}throw error}\n// end canonical boundary Phase3a5');
 }
+if (source.includes(previousFinanceWarm)) source = source.replace(previousFinanceWarm, originalFinanceWarm);
 for (const [before, after] of [[originalStoreRead, guardedStoreRead], [originalFinanceWarm, guardedFinanceWarm], [originalWarmApply, guardedWarmApply]]) {
   if (!source.includes(after)) {
     if (!source.includes(before)) throw new Error('Restricted Finance warm-read anchor missing');
