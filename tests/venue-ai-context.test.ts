@@ -187,7 +187,7 @@ test("current open month aggregates authoritative revenue and expenses without a
       ["bd_finance_revenue", stored([
         { date: "2026-07-28", revenue: 9_999, receipts: 99 },
         { date: "2026-08-01", revenue: 1_000, receipts: 10, payrollBreakdown: { total: 200 } },
-        { date: "2026-08-28", revenue: 2_000, receipts: 20 },
+        { date: "2026-08-28", revenue: 2_000, receipts: 20, payrollBreakdown: { total: 0 } },
       ], "2026-08-28T10:00:00.000Z")],
       ["bd_finance_expenses", stored([
         { date: "2026-07-28", accountingMonth: "2026-07", accountingAmount: 4_000, status: "posted" },

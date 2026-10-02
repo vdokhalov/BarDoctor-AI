@@ -159,7 +159,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
         for (const command of scripts[phase].split(" && ")) {
           const match = /^node (scripts\/[a-z0-9-]+\.mjs)( --restore)?$/.exec(command);
           assert.ok(match, `unsupported preparation command: ${command}`);
-          if (match[2]) assert.equal(match[1], "scripts/patch-canonical-boundary-phase3a5.mjs", "only the scoped security patch accepts restore");
+          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
           run([match[1], ...(match[2] ? ["--restore"] : [])]);
         }
         if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);

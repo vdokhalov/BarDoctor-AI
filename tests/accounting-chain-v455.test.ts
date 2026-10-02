@@ -82,7 +82,9 @@ const dailyDocument = (venue: number, date = '2026-09-24') => ({ id: 'daily-repo
 function actualReport(f: Fixture, closingValue: number) {
   const snapshots = [{ date: '2026-09-01', venueId: f.venue, sections: { Бар: 300 }, total: 300 },
     { date: '2026-09-30', venueId: f.venue, sections: { Бар: closingValue }, total: closingValue }];
-  const extra = new Map<string, unknown>([['bd_inventory_snapshots', snapshots], ['bd_finance_expenses', []], ['bd_finance_settings', []]]);
+  // Explicit synthetic known-zero operations keep this cost-only oracle complete.
+  const knownZeroReports = [...new Set(f.read('bd_finance_revenue').map(row => row.date))].map(date => ({ venueId: f.venue, date, closingStatus: 'closed', payrollBreakdown: { total: 0 } }));
+  const extra = new Map<string, unknown>([['bd_operational_reports_v1', knownZeroReports], ['bd_inventory_snapshots', snapshots], ['bd_finance_expenses', []], ['bd_finance_settings', []]]);
   const ls = new Map([['bd_session', 'isolated-audit'], ['bd_active_venue_id', String(f.venue)],
     ['bd_venue_context__isolated-audit', JSON.stringify({ activeVenueId: f.venue, venues: [{ id: f.venue }] })]]);
   const client = compileFinancialClient(readFileSync(new URL('../public/assets/index-BQGspy0I.js', import.meta.url), 'utf8'),

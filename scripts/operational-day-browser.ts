@@ -98,7 +98,17 @@ try {
       await page.getByRole("button",{name:"Сохранить изменения",exact:true}).waitFor({state:"detached"});
       await page.locator(".bd-shift-card.operating").waitFor();
       await page.screenshot({ path: out + "/" + profile.name + "-operating.png", fullPage: true });
-      await send({ action: "close_shift", shiftId: "cash" }); await page.reload();
+      await send({ action: "close_shift", shiftId: "cash" });
+      // The legacy wizard omits FOT when no staff inputs were recorded. Cash
+      // closure + report existence is not proof of a complete operational day.
+      assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown, undefined);
+      const incomplete = await (await runtime.api.days.GET(runtime.request(user, "/api/operational-days"))).json() as { days: { status: string; payroll: { amount: number | null } }[] };
+      assert.equal(incomplete.days[0].status, "AWAITING_OPERATIONAL_DATA"); assert.equal(incomplete.days[0].payroll.amount, null);
+      // Explicit synthetic known-zero input completes this separate UI/finality
+      // oracle via the existing real report handler; never guess/backfill zero.
+      const knownZero = await runtime.api.close.POST(runtime.request(user, "/api/shifts/close", "POST", { venueId, sectionsVersion: 1, shiftCloseId: "qa-explicit-known-zero", revenueRecord: { date: businessDate, staffing: [], payrollBreakdown: { total: 0 } }, writeOffItems: [] }));
+      assert.equal(knownZero.status, 201);
+      await page.reload();
       await page.locator(".bd-shift-card.closed").waitFor({timeout:7000});
       if (cachedProfile) {
         await page.waitForFunction(() => { const state=(window as unknown as {__bdCloudReadiness:{isReady:boolean;financeReady:boolean}}).__bdCloudReadiness; return state?.financeReady===true; });

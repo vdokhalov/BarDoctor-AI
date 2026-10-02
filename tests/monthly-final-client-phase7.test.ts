@@ -26,10 +26,14 @@ function localStorageFixture(activeVenueId = 901) {
 }
 function fixture(options: { realProfile?: boolean; conflictingProfile?: boolean } = {}) {
   const stores = recorded();
+  // The old captured cost fixture has no recorded FOT. Supply an explicitly
+  // synthetic known-zero report for the complete-result cost oracle; the
+  // missing-basis behaviour is separately tested in Phase3a6.
+  stores.set("bd_operational_reports_v1", [{ id: "qa-phase3a6-known-zero", venueId: 901, date: "2026-09-02", closingStatus: "closed", payrollBreakdown: { total: 0 } }]);
   stores.set("bd_month_closings", []);
   const localStorage = localStorageFixture();
   const actual = compileFinancialClient(actualBundle, key => stores.get(key), { localStorage });
-  assert.equal(actual.extraction.reportBindings, 4, "Base + payroll + Phase 7 + closure all execute");
+  assert.equal(actual.extraction.reportBindings, 5, "Base + payroll + Phase 7 + closure + Phase3a6 all execute");
   assert.equal(actual.extraction.units.filter((item: { name: string }) => item.name === "bdMonthClosingSnapshot").length, 2);
   assert.equal(actual.extraction.bundleSha256, bundleHash);
   const selectedProfile: Row = structuredClone(profile);

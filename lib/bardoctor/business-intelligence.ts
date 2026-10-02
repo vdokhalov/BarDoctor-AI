@@ -1,3 +1,4 @@
+import { aggregateBusinessDates } from "./business-day-rows";
 import { buildSelfServiceAnalytics, type SelfServiceAnalytics } from "./self-service-analytics";
 
 type JsonRecord = Record<string, unknown>;
@@ -12,6 +13,9 @@ export type DailyBusinessMetric = {
   checks: number | null;
   guests: number | null;
   averageCheck: number | null;
+  revenueStatus?: string;
+  operationalStatus?: string;
+  currency?: string;
 };
 
 export type ComparableBaseline = {
@@ -429,17 +433,18 @@ function money(value: number | null, currency: string, approximate = false): str
 
 export function normaliseDailyMetrics(value: unknown[]): DailyBusinessMetric[] {
   const byDate = new Map<string, DailyBusinessMetric>();
-  for (const raw of value) {
+  for (const raw of aggregateBusinessDates(value)) {
     const item = record(raw);
     const date = validDate(item.date ?? item.operatingDate);
     if (!date) continue;
-    const revenue = numeric(item.revenue ?? item.amount) ?? 0;
+    const revenue = numeric(item.revenue ?? item.amount);
+    if (revenue == null) continue;
     const checks = numeric(item.checks ?? item.receipts);
     const guests = numeric(item.guests ?? item.guestCount);
     const explicitAverage = numeric(item.averageCheck ?? item.avgReceipt);
     const averageCheck = explicitAverage
       ?? (checks !== null && checks > 0 ? rounded(revenue / checks, 2) : null);
-    byDate.set(date, { date, revenue, checks, guests, averageCheck });
+    byDate.set(JSON.stringify([item.workspaceId, item.dataAccountId, item.venueId, item.currency, date]), { date, revenue, checks, guests, averageCheck, revenueStatus: text(item.revenueStatus), operationalStatus: text(item.operationalStatus), currency: text(item.currency) });
   }
   return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
 }
@@ -451,7 +456,7 @@ export function comparableWeekdayBaseline(
 ): ComparableBaseline | null {
   const targetWeekday = weekday(targetDate);
   const comparable = rows
-    .filter((row) => row.date < targetDate && weekday(row.date) === targetWeekday)
+    .filter((row) => row.date < targetDate && row.revenueStatus !== "PROVISIONAL" && weekday(row.date) === targetWeekday)
     .sort((left, right) => right.date.localeCompare(left.date))
     .slice(0, maximumSample);
   if (!comparable.length) return null;
@@ -688,7 +693,7 @@ function utcWeekday(dateKey: string): number {
 }
 
 function comparableCompletedShiftWindows(rows: DailyBusinessMetric[], today: string) {
-  const available = rows.filter((row) => row.date <= today).sort((left, right) => right.date.localeCompare(left.date));
+  const available = rows.filter((row) => row.date <= today && row.revenueStatus === "FINAL" && row.operationalStatus === "COMPLETE").sort((left, right) => right.date.localeCompare(left.date));
   const current: DailyBusinessMetric[] = [];
   const comparison: DailyBusinessMetric[] = [];
   const used = new Set<string>();

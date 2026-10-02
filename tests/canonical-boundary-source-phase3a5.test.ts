@@ -19,6 +19,7 @@ async function fixture() {
   put("bd_employees", [{ id: "private-employee", name: "TEAM-SECRET", salary: 321987 }]);
   put("bd_guest_reviews", [{ id: "private-review", source: "manual", text: "REVIEW-SECRET", rating: 1, date: "2026-10-01" }]);
   put("bd_assortment_v1", { nomenclature: [{ id: "private-item", name: "INVENTORY-SECRET", price: 654321 }], menuItems: [] });
+  put("bd_operational_reports_v1", [{ venueId, date: "2026-10-01", closingStatus: "closed", payrollBreakdown: { total: 0 } }]);
   put("bd_ai_diagnosis_v9", { summary: "FINANCE-SECRET 876543" });
   put("bd_tasks", [{ id: "private-task", title: "TASK-SECRET" }]);
   return { ...r, owner, member, foreign, venueId, workspaceId, put, permissions, request, account };

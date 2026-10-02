@@ -44,6 +44,10 @@ jobs:
         run: node --import tsx --test tests/menu-origin-trace-phase3a4.test.ts
       - name: Phase 3A.5 source permissions, mixed reviews, provider identity and competing canonical writers
         run: node --import tsx --test tests/canonical-boundary-source-phase3a5.test.ts tests/canonical-boundary-review-phase3a5.test.ts tests/canonical-writer-safety-phase3a5.test.ts tests/google-review-source-phase3a5.test.ts
+      - name: Phase 3A.6 scoped business day recorded Finance inputs and client contracts
+        run: |
+          node --import tsx --test tests/finance-inputs-phase3a6.test.ts
+          node --test tests/finance-inputs-client-phase3a6.test.mjs tests/payroll-recorded-provider-phase3a6.test.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -71,6 +75,8 @@ jobs:
         with:
           name: restricted-manager-403-evidence
           path: outputs/restricted-manager-403
+      - name: Phase 3A.6 isolated multi-session Finance report recorded payroll mobile tablet desktop
+        run: node --import tsx scripts/finance-inputs-phase3a6-browser.ts
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts
@@ -145,6 +151,8 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Phase 3A.6 WebKit isolated Finance report and payroll mobile tablet desktop
+        run: BD_FINANCE_BROWSER=webkit node --import tsx scripts/finance-inputs-phase3a6-browser.ts
       - name: Measured navigation and embedded auth failures
         run: |
           BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts

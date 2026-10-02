@@ -6,9 +6,9 @@ import { canReadStore } from "./data-trust";
 export const VENUE_CONTEXT_SOURCES: Record<string, string[]> = {
   location: [], format: [], schedule: [],
   pricePosition: ["bd_assortment_v1"],
-  performanceHistory: ["bd_finance_revenue", "bd_finance_expenses", "bd_payroll_entries", "bd_month_closings", "bd_sales_documents", "bd_assortment_v1"],
+  performanceHistory: ["bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_finance_expenses", "bd_payroll_entries", "bd_month_closings", "bd_sales_documents", "bd_assortment_v1"],
   menuAndRecipes: ["bd_assortment_v1", "bd_purchase_documents", "bd_sales_documents", "bd_sales_batches", "bd_finance_revenue"],
-  salesAndCost: ["bd_assortment_v1", "bd_purchase_documents", "bd_sales_documents", "bd_sales_batches", "bd_finance_revenue", "bd_finance_expenses", "bd_payroll_entries", "bd_month_closings"],
+  salesAndCost: ["bd_assortment_v1", "bd_purchase_documents", "bd_sales_documents", "bd_sales_batches", "bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_finance_expenses", "bd_payroll_entries", "bd_month_closings"],
   purchasesAndInventory: ["bd_purchase_documents", "bd_suppliers", "bd_inventory_snapshots", "bd_assortment_v1", "bd_stock_movements", "bd_finance_expenses", "bd_supplier_alternatives_v1", "bd_inventory_writeoffs"],
   team: ["bd_employees", "bd_payroll_entries"],
   guestFeedback: ["bd_guest_reviews"],
@@ -17,6 +17,7 @@ export const VENUE_CONTEXT_SOURCES: Record<string, string[]> = {
 };
 
 export function canReadVenueSource(account: AuthenticatedAccount, key: string): boolean {
+  if (key === "bd_sales_events_v1" || key === "bd_operational_reports_v1") return hasPermission(account, "shifts.view");
   if (key === "bd_market_analysis_v1") return hasPermission(account, "analysis.view");
   if (key === "bd_supplier_alternatives_v1" || key === "bd_inventory_writeoffs") return hasPermission(account, "inventory.view");
   return canReadStore(account, key);

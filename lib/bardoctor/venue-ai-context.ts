@@ -1,7 +1,9 @@
+import { readFinanceInputs } from "./finance-inputs";
+import { aggregateBusinessDates, activeBusinessRow } from "./business-day-rows";
 import type { AuthenticatedAccount } from "./access-control";
 import { canReadVenueBlock, canReadVenueSource, VENUE_CONTEXT_SOURCES } from "./venue-context-access";
 import { and, eq, inArray } from "drizzle-orm";
-import { domainData } from "../../db/schema";
+import { domainData, venues } from "../../db/schema";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
 import { accountingCurrencyFromProfile } from "./currency";
@@ -50,6 +52,7 @@ export type StoredVenueValue = {
 
 export type VenueAIContextSources = {
   access?: AuthenticatedAccount;
+  workspaceId?: number;
   accountProfile: JsonRecord;
   accountUpdatedAt?: string | null;
   request?: JsonRecord;
@@ -421,7 +424,13 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const expenseRows = array(storedExpenses?.data);
   const payrollRows = array(storedPayroll?.data);
   const requestRecent = array(requestFinance.recentDaily);
-  const rows = requestRecent.length ? requestRecent : revenueRows;
+  const venueId = sources.access?.venueId ?? number(sources.accountProfile.venueId) ?? 1;
+  const currency = accountingCurrencyFromProfile({ ...sources.accountProfile, currency: sources.accountProfile.currency ?? sources.accountProfile.accountingCurrency });
+  const canonical = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: "0000-01-01", endDate: zonedDateKey(now, timezone),
+    revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
+    documents: array(store(sources, "bd_sales_documents")?.data), expenses: expenseRows, payrollEntries: payrollRows });
+  // Client-body authority is an existing G05 boundary and remains out of scope.
+  const rows = requestRecent.length ? aggregateBusinessDates(requestRecent) : canonical.daily;
   const salesDocuments = array(store(sources, "bd_sales_documents")?.data).map(record)
     .filter((item) => !item.status || text(item.status) === "confirmed")
     .sort((left, right) => text(right.date).localeCompare(text(left.date)))
@@ -458,50 +467,26 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
     const accountingMonth = text(item.accountingMonth, date?.slice(0, 7) ?? "", 7);
     return accountingMonth === currentMonthKey
       && (!date || date <= today)
-      && !["cancelled", "void", "draft"].includes(text(item.status, "posted", 30));
+      && activeBusinessRow(item);
   });
   const currentMonthPayrollEntries = payrollRows.filter((value) => {
     const item = record(value);
     const date = dateOnly(item.date);
     return Boolean(date && date >= `${currentMonthKey}-01` && date <= today)
-      && !["cancelled", "void", "draft"].includes(text(item.status, "posted", 30));
+      && activeBusinessRow(item);
   });
   const storedMonthRevenue = sum(currentMonthRows, revenueOf);
   const storedMonthReceipts = sum(currentMonthRows, receiptsOf);
   const storedMonthGuests = sum(currentMonthRows, guestsOf);
-  const storedMonthNonPayrollExpenses = sum(currentMonthExpenses, (value) => {
-    const item = record(value);
-    if (text(item.category, "", 50) === "payroll") return 0;
-    return number(item.accountingAmount ?? item.amount) ?? 0;
-  });
-  const storedMonthPayrollByShift = sum(currentMonthRows, (value) => {
-    const item = record(value);
-    const payroll = record(item.payrollBreakdown);
-    return number(payroll.total ?? payroll.totalPayroll) ?? 0;
-  });
-  const storedMonthPayrollExpenses = sum(currentMonthExpenses, (value) => {
-    const item = record(value);
-    if (text(item.category, "", 50) !== "payroll") return 0;
-    return number(item.accountingAmount ?? item.amount) ?? 0;
-  });
-  const storedMonthPayrollBonuses = sum(currentMonthPayrollEntries, (value) => {
-    const item = record(value);
-    return text(item.type, "", 50) === "bonus" ? number(item.amount) ?? 0 : 0;
-  });
-  // This mirrors the Finance report's source precedence: calculated payroll
-  // from completed shifts wins over manually entered payroll expenses, and
-  // confirmed bonuses are added once. Payments/deductions affect settlement,
-  // not the accrued preliminary operating result.
-  const storedMonthPayroll = (storedMonthPayrollByShift > 0
-    ? storedMonthPayrollByShift
-    : storedMonthPayrollExpenses) + storedMonthPayrollBonuses;
-  const effectiveRevenue = number(monthToDate.revenue) ?? storedMonthRevenue;
+  const monthInputs = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
+    revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
+    documents: array(store(sources, "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries });
+  const effectiveRevenue = number(monthToDate.revenue) ?? (requestRecent.length ? storedMonthRevenue : monthInputs.revenue);
   const effectiveReceipts = number(monthToDate.receipts) ?? storedMonthReceipts;
-  const effectivePayroll = number(monthToDate.payroll) ?? storedMonthPayroll;
-  const effectiveExpenses = number(monthToDate.expenses)
-    ?? rounded(storedMonthNonPayrollExpenses + effectivePayroll, 2);
+  const effectivePayroll = number(monthToDate.payroll) ?? monthInputs.payroll;
+  const effectiveExpenses = number(monthToDate.expenses) ?? monthInputs.expenses;
   const effectiveResult = number(monthToDate.result ?? monthToDate.preliminaryResult ?? monthToDate.cashResult)
-    ?? rounded(effectiveRevenue - effectiveExpenses, 2);
+    ?? (effectiveRevenue != null && effectiveExpenses != null ? rounded(effectiveRevenue - effectiveExpenses, 2) : null);
   const closedMonths = summariseClosedMonths(sources);
 
   return {
@@ -523,9 +508,10 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       ),
       revenue: effectiveRevenue,
       receipts: effectiveReceipts,
+      inputContract: { ...monthInputs, days: undefined, daily: undefined, revenueRows: undefined },
       guests: (number(monthToDate.guests) ?? storedMonthGuests) || null,
       averageReceipt: number(monthToDate.avgReceipt)
-        ?? (effectiveReceipts > 0 ? rounded(effectiveRevenue / effectiveReceipts, 2) : null),
+        ?? (effectiveReceipts > 0 && effectiveRevenue != null ? rounded(effectiveRevenue / effectiveReceipts, 2) : null),
       expenses: effectiveExpenses,
       payroll: effectivePayroll,
       result: effectiveResult,
@@ -547,7 +533,8 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       .slice(0, 90)
       .map((item) => ({
         date: dateOnly(item.date),
-        revenue: revenueOf(item),
+        revenueStatus: item.revenueStatus, operationalStatus: item.operationalStatus, currency: item.currency, grain: item.grain, sourceIds: item.sourceIds,
+        revenue: number(item.revenue),
         receipts: receiptsOf(item),
         guests: number(item.guests),
         avgReceipt: number(item.avgReceipt ?? item.averageReceipt)
@@ -1296,6 +1283,8 @@ export async function loadVenueAIContext(
     .select({ storeKey: domainData.storeKey, dataJson: domainData.dataJson, updatedAt: domainData.updatedAt })
     .from(domainData)
     .where(and(eq(domainData.accountId, account.id), inArray(domainData.storeKey, keys))) : [];
+  const [venueBoundary] = await getDb().select({ workspaceId: venues.workspaceId }).from(venues)
+    .where(and(eq(venues.id, account.venueId), eq(venues.dataAccountId, account.id))).limit(1);
   const stores = new Map<string, StoredVenueValue>();
   for (const row of rows) {
     try {
@@ -1317,6 +1306,7 @@ export async function loadVenueAIContext(
   }
   return buildVenueAIContextFromSources(purpose, {
     access: account,
+    workspaceId: venueBoundary?.workspaceId ?? undefined,
     accountProfile,
     accountUpdatedAt: account.updatedAt,
     request,

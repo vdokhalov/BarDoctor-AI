@@ -1433,7 +1433,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
     mainBundle,
     /steps=\["Выручка","Команда","Списания","Происшествия","Проверка"\]/,
   );
-  assert.match(mainBundle, /ФОТ смены · автоматически/);
+  assert.match(mainBundle, /ce\.payrollBasis==="RECORDED"\?"ФОТ смены · сохранённый"/);
+  assert.match(mainBundle, /ce\.payrollBasis==="MISSING"\?"ФОТ смены · нужны данные":"ФОТ смены · оценка по текущим правилам"/);
   assert.match(mainBundle, /Происшествий не указано/);
   assert.match(mainBundle, /Результат смены/);
   assert.match(mainBundle, /до себестоимости проданного товара/);
@@ -2992,41 +2993,12 @@ test("only an explicit closing record marks a month closed and its snapshot stay
     new URL("../public/assets/index-BQGspy0I.js", import.meta.url),
     "utf8",
   );
-  const start = bundle.indexOf('const bdReleaseCandidateVersion="rc-v163"');
-  const end = bundle.indexOf("function bdShiftsPage(", start);
-  const closedFields = bundle.split("\n").filter(line => line.startsWith("function bdMonthlyClosedFieldsPhase7("));
-  assert.equal(closedFields.length, 1);
-  const venueId = bundle.split("\n").filter(line => line.startsWith("function bdMonthlyVenueIdPhase7("));
-  assert.equal(venueId.length, 1);
-  assert.notEqual(start, -1);
-  assert.notEqual(end, -1);
-
+  // Execute all final financial wrappers, rather than slicing up to a neighbouring
+  // screen declaration (which now also includes the shared Phase3a6 adapter).
+  const { compileFinancialClient } = await import("./helpers/financial-client-phase7.mjs");
   let closings = [];
-  const context = {
-    bdMonthClosingsKey: "bd_month_closings",
-    bdArrayStore() {
-      return closings;
-    },
-    bdBuildMonthlyReport() {
-      return {
-        status: "closed",
-        isClosed: true,
-        revenue: 999_999,
-        payroll: 88_888,
-        taxes: 77_777,
-        operatingResult: 66_666,
-        cashResult: 55_555,
-        resultBeforeCost: 44_444,
-        sections: [],
-      };
-    },
-  };
-  vm.runInNewContext(
-    `${closedFields[0]}\n${venueId[0]}\n${bundle.slice(start, end)}\nglobalThis.build=bdBuildMonthlyReport;`,
-    context,
-  );
-
-  const build = context.build;
+  const client = compileFinancialClient(bundle, key => key === "bd_month_closings" ? closings : []);
+  const build = (...args) => client.report({ venueId: 1, currency: "MDL" }, args[1], args[2], args[3], args[4], { venueId: 1, accountingCurrency: "MDL", inventorySections: [] }, args[6]);
   const openReport = build({}, "2026-07", [], [], [], { id: "primary" }, []);
   assert.equal(openReport.isClosed, false);
   assert.equal(openReport.status, "preliminary");
