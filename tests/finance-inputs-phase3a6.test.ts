@@ -37,6 +37,7 @@ test("recorded zero beats expense fallback; missing FOT is unknown; partial days
   const source = input({ reports: [{ venueId: 1, date, closingStatus: "closed", payrollBreakdown: { total: 0 } }], expenses: [{ id: "pay", date, category: "payroll", amount: 900, currency: "MDL" }] });
   assert.equal(readFinanceInputs(source).payroll, 0); assert.equal(readFinanceInputs(source).preliminaryResult, 300);
   const missing = readFinanceInputs(input({ reports: [{ venueId: 1, date, closingStatus: "closed" }] })); assert.equal(missing.payroll, null); assert.equal(missing.days[0].status, "AWAITING_OPERATIONAL_DATA"); assert.ok(missing.missing.includes("PAYROLL")); assert.equal(missing.resultStatus, "PARTIAL");
+  const invalidLegacy = readFinanceInputs(input({ reports: [{ venueId: 1, date, closingStatus: "closed", payrollBreakdown: { total: false } }] })); assert.equal(invalidLegacy.payroll, null); assert.equal(invalidLegacy.days[0].status, "AWAITING_OPERATIONAL_DATA");
   const partial = readFinanceInputs({ ...input(), revenues: [...input().revenues, { id: "next", venueId: 1, date: "2026-10-02", revenue: 10, currency: "MDL" }] }); assert.equal(partial.payroll, null);
 });
 test("changing employees/rules cannot recalculate saved FOT; bonus accrues once, payments/deductions settle only", () => {

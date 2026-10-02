@@ -7,6 +7,7 @@ import { chromium, webkit } from "playwright-core";
 import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
 import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
 import { barDoctorResponse } from "../app/bar-doctor-response";
+import { waitForSalesHostReads } from "../tests/helpers/sales-navigation-settled";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const fixedTime = "2026-10-02T12:00:00Z";
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
@@ -72,6 +73,9 @@ try {
     const period = canonical.promptData.performanceHistory.period as Record<string, unknown>;
     assert.equal(period.revenue, 300); assert.equal(period.payroll, 90); assert.equal(period.result, 210);
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, timezoneId: profile.timezone });
+    const fetchTrace: unknown[] = [];
+    await context.exposeBinding("__bdPerfObserve", (_source, event) => { fetchTrace.push(event); });
+    await context.addInitScript({ path: resolve("scripts/qa/sales-navigation-probe.js") });
     await context.addInitScript(({ email, token, venueId }) => { localStorage.setItem("bd_session", email); localStorage.setItem("bd_session_token", token); localStorage.setItem("bd_active_venue_id", String(venueId)); }, { email: user.email, token: user.token, venueId });
     // Observe actual final module bindings in this isolated browser only.
     await context.route("**/assets/index-BQGspy0I*.js*", async route => {
@@ -80,13 +84,14 @@ try {
       assert.equal(original, readFileSync("public/assets/index-BQGspy0I.js", "utf8"), "served bundle equals final canonical source");
       await route.fulfill({ response, body: original + '\nwindow.__bdFinanceAcceptance={report:async(profile,month,venueId)=>{const response=await fetch("/api/operational-days",{headers:ca(Ot())}),days=await response.json();return bdBuildMonthlyReport(profile,month,bdOperationalRows(days.revenues,days.days),bdProcArray("bd_finance_expenses"),bdProcArray("bd_inventory_snapshots"),{venueId,accountingCurrency:profile.currency,inventorySections:[]})},payrollAudits:bdPayrollMonthAudits};' });
     });
-    const page = await context.newPage(), errors: string[] = []; page.on("pageerror", error => errors.push(error.message));
+    const page = await context.newPage(), errors: string[] = [], errorEvents: unknown[] = [];
+    page.on("pageerror", error => { errors.push(error.message); errorEvents.push({ message: error.message, stack: error.stack, url: page.url(), fetchTrace: fetchTrace.slice(-10) }); });
     const failedRequests: unknown[] = [];
     page.on("requestfailed", request => failedRequests.push({ url: request.url(), error: request.failure()?.errorText, page: page.url() }));
     // Separate independent page acceptance from navigation-cancellation testing.
     // Drain the existing background reads before replacing the document; retain
     // the strict no-page-errors assertion for both browser engines.
-    const navigate = async (path: string) => { await page.waitForLoadState("networkidle"); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
+    const navigate = async (path: string) => { if (await page.locator("#root").count()) await waitForSalesHostReads(page); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
     await page.clock.setFixedTime(new Date(fixedTime));
     try {
       await navigate("/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.operating").first().waitFor();
@@ -101,7 +106,7 @@ try {
       assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       await page.screenshot({ path: out + "/" + viewport.name + "-payroll.png", fullPage: true });
       put("bd_payroll_rules", [{ id: "qa-rule", name: "Changed current QA rule", active: true, blocks: [{ id: "rate", type: "shift_rate", amount: 1999, enabled: true }] }]);
-      await page.waitForLoadState("networkidle"); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
+      await waitForSalesHostReads(page); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90);
       await navigate("/shifts?month=" + date.slice(0, 7));
       await page.locator(".bd-shift-card.operating").first().click();
@@ -120,8 +125,8 @@ try {
       assert.deepEqual(errors, []); assert.equal(get("bd_finance_revenue").length, 3); assert.equal(get("bd_sales_events_v1").length, 2);
       results.push({ ...viewport, venueId, businessDate: date, daily: 300, recordedPayroll: 90, preliminaryResult: 210, finalRevenue: true, dayComplete: true, duplicateSale: false, isolated: true, errors });
     } catch (error) {
-      console.error(JSON.stringify({ errors, failedRequests, url: page.url() }));
-      writeFileSync(out + "/failure-network.json", JSON.stringify({ errors, failedRequests }, null, 2));
+      console.error(JSON.stringify({ errors, errorEvents, failedRequests, fetchTrace: fetchTrace.slice(-30), url: page.url() }));
+      writeFileSync(out + "/failure-network.json", JSON.stringify({ errors, errorEvents, failedRequests, fetchTrace }, null, 2));
       if (!page.isClosed()) {
         try { await page.screenshot({ path: out + "/failure.png", fullPage: true }); writeFileSync(out + "/failure.txt", await page.locator("body").innerText()); } catch { /* Preserve the original acceptance failure. */ }
       }

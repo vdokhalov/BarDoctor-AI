@@ -67,7 +67,7 @@ export function operationalDay(input: OperationalDayInput) {
   const writeOffs = rows(input.writeOffs).filter(row => belongs(row) && row.date === input.businessDate && row.status !== "cancelled");
   const incidents = rows(input.incidents).filter(row => belongs(row) && String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10) === input.businessDate);
   const payroll = object(report?.payrollBreakdown), rawPayroll = payroll.total ?? payroll.totalPayroll;
-  const payrollAmount = rawPayroll == null || rawPayroll === "" || !Number.isFinite(Number(rawPayroll)) ? null : Number(rawPayroll);
+  const payrollAmount = finiteBusinessNumber(rawPayroll);
   const dayStatus = open ? "OPERATING" : recorded && payrollAmount != null && revenues.length && status === "FINAL" && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
   return {
     venueId: input.venueId, businessDate: input.businessDate,
