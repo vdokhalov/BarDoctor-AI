@@ -90,7 +90,8 @@ test("Equipment work-order API is venue-scoped, sequential, idempotent and month
   assert.match(route, /equipmentWorkOrderId/);
   assert.match(route, /MONTH_LOCKED/);
   assert.match(route, /Стоимость работы нельзя изменить через Equipment/);
-  assert.match(route, /database\.batch/);
+  assert.match(route, /runStoreCasBatch\(database, account\.id, casSnapshots, statements, now\)/);
+  assert.match(route, /readStoreSnapshots\(database, account\.id/);
   assert.match(domain, /equipment-work-order:/);
   assert.match(domain, /finance/);
   assert.match(domain, /seenTuples/);

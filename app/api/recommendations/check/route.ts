@@ -1,3 +1,4 @@
+import { canReadDiagnosisSources, restrictedVenueContext } from "../../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import {
@@ -22,6 +23,8 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     );
   }
+
+  if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
   const raw = await request.text();
   if (new TextEncoder().encode(raw).byteLength > 120_000) {

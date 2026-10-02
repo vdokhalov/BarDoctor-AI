@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries, type StoreSnapshot } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -12,7 +13,6 @@ import {
 } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { data_json: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
@@ -53,15 +53,10 @@ function currentItems(assortment: JsonRecord): JsonRecord[] {
     .sort((left, right) => String(left.name).localeCompare(String(right.name), "ru"));
 }
 
-async function load(accountId: number): Promise<{ assortment: JsonRecord; updatedAt: string }> {
-  const database = getD1();
-  const row = await database.prepare(`
-    SELECT data_json, updated_at
-    FROM domain_data
-    WHERE account_id = ? AND store_key = ?
-    LIMIT 1
-  `).bind(accountId, ASSORTMENT_STORE_KEY).first<StoreRow & { updated_at?: string }>();
-  return { assortment: parse(row?.data_json), updatedAt: text(row?.updated_at) };
+async function load(accountId: number): Promise<{ assortment: JsonRecord; updatedAt: string; snapshots: StoreSnapshot[] }> {
+  const snapshots = await readStoreSnapshots(getD1(), accountId, [ASSORTMENT_STORE_KEY]);
+  const row = snapshots[0];
+  return { assortment: parse(row?.dataJson ?? undefined), updatedAt: text(row?.updatedAt), snapshots };
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -85,7 +80,7 @@ export async function GET(request: Request): Promise<Response> {
   }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -116,7 +111,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Неизвестная операция со структурой" }, { status: 400 });
   }
 
-  const { assortment, updatedAt } = await load(account.id);
+  const { assortment, updatedAt, snapshots } = await load(account.id);
   const expectedUpdatedAt = text(body.expectedUpdatedAt, "", 80);
   if (expectedUpdatedAt && updatedAt && expectedUpdatedAt !== updatedAt) {
     return Response.json({
@@ -138,7 +133,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
   const database = getD1();
-  await database.batch([
+  await runStoreCasBatch(database, account.id, snapshots, [
     database.prepare(`
       INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
       VALUES (?, ?, ?, ?)
@@ -164,7 +159,7 @@ export async function POST(request: Request): Promise<Response> {
       "Пользовательское изменение canonical taxonomy",
       now,
     ),
-  ]);
+  ], now);
   return Response.json({
     ok: true,
     venueId: account.venueId,
@@ -175,4 +170,8 @@ export async function POST(request: Request): Promise<Response> {
     node: result.node,
     updatedAt: now,
   }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

@@ -1,3 +1,4 @@
+import { canReadSavedDiagnosis, restrictedVenueContext } from "../../../../lib/bardoctor/venue-context-access";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { auditLog, domainData } from "../../../../db/schema";
@@ -89,6 +90,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   if (!isAllowedStoreKey(key)) {
     return Response.json({ ok: false, error: "Неизвестный ключ хранилища" }, { status: 400 });
   }
+  if (/^bd_ai_diagnosis_v[3-9]$/.test(key) && !canReadSavedDiagnosis(account)) return restrictedVenueContext();
   if (!canReadStore(account, key)) {
     return Response.json(
       { ok: false, code: "ACCESS_DENIED", error: "У вас нет доступа к этому разделу" },
@@ -402,6 +404,17 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     { status: monthKey ? 423 : 409 });
   }
   const mutations = compareStoreData(auditBefore, auditAfter);
+  if (/^bd_ai_diagnosis_v[3-9]$/.test(key) && !canReadSavedDiagnosis(account)) return restrictedVenueContext();
+  if ((key === EXPENSE_STORE_KEY || key === "bd_equipment_work_orders") && mutations.some(mutation =>
+    [mutation.before, mutation.after].some(value => {
+      const item = record(value);
+      return key === EXPENSE_STORE_KEY
+        ? Boolean(item.equipmentWorkOrderId || item.source === "equipment_work_order")
+        : Boolean(item.financeExpenseId);
+    }))) {
+    return Response.json({ ok: false, code: "USE_EQUIPMENT_WORK_ORDER_API", error: "Связанные обслуживание и расход изменяются вместе через Equipment." }, { status: 409 });
+  }
+
   if (key === SALES_BATCH_STORE_KEY) {
     const protectedMutations = protectedSalesBatchMutations(before, after);
     if (protectedMutations.length) {

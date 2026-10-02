@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { manualReferencePrice } from "../../../../lib/bardoctor/manual-reference-price";
 import { canonicalStockUnit } from "../../../../lib/bardoctor/stock-units";
@@ -40,7 +41,6 @@ import {
 } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 import { changedConsumptionModeIssues } from "../../../../lib/bardoctor/consumption-mode";
 
-type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
 
 function record(value: unknown): JsonRecord {
@@ -128,7 +128,7 @@ function auditUpdate(
   );
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -154,12 +154,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
-  const storesResult = await database.prepare(`
-    SELECT store_key, data_json
-    FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?)
-  `).bind(account.id, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY).all<StoreRow>();
-  const stores = new Map((storesResult.results ?? []).map((row) => [row.store_key, row.data_json]));
+  const casSnapshots = await readStoreSnapshots(database, account.id, [ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY]);
+  const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
   const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
   const purchaseDocuments = array(stores.get(PURCHASE_STORE_KEY));
@@ -177,7 +173,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!restored.ok || !restored.product) {
       return Response.json(restored, { status: 404 });
     }
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, restored.assortment, now),
       auditUpdate(database, {
         accountId: account.id,
@@ -190,7 +186,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: "Восстановление canonical-позиции из архива",
         createdAt: now,
       }),
-    ]);
+    ], now);
     return Response.json({ ok: true, assortment: restored.assortment, product: restored.product, restored: true });
   }
 
@@ -201,7 +197,7 @@ export async function POST(request: Request): Promise<Response> {
       const status = archived.code === "PRODUCT_NOT_FOUND" ? 404 : 409;
       return Response.json(archived, { status });
     }
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, archived.assortment, now),
       auditUpdate(database, {
         accountId: account.id,
@@ -216,7 +212,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: "Удаление ошибочной нулевой позиции из активной номенклатуры",
         createdAt: now,
       }),
-    ]);
+    ], now);
     return Response.json({ ok: true, assortment: archived.assortment, product: archived.product, archived: true });
   }
 
@@ -263,7 +259,7 @@ export async function POST(request: Request): Promise<Response> {
         now,
       ));
     }
-    await database.batch(statements);
+    await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
     return Response.json({ ok: true, ...result, duplicateRepair: consolidated.summary });
   }
 
@@ -342,7 +338,7 @@ export async function POST(request: Request): Promise<Response> {
           now,
         ));
       }
-      await database.batch(statements);
+      await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
     }
     return Response.json({
       ok: true,
@@ -567,7 +563,7 @@ export async function POST(request: Request): Promise<Response> {
       purchaseDocuments,
       venueId: account.venueId,
     });
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, enriched, now),
       auditUpdate(database, {
         accountId: account.id,
@@ -580,7 +576,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: "Ручное добавление позиции в номенклатуру",
         createdAt: now,
       }),
-    ]);
+    ], now);
     return Response.json({
       ok: true,
       assortment: enriched,
@@ -651,7 +647,7 @@ export async function POST(request: Request): Promise<Response> {
       const issue = consumptionIssues[0];
       return Response.json({ ok: false, code: "PRODUCT_IN_USE", error: issue.error }, { status: 409 });
     }
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, root, now),
       auditUpdate(database, {
         accountId: account.id,
@@ -664,7 +660,7 @@ export async function POST(request: Request): Promise<Response> {
         reason: "Изменение услуги в номенклатуре",
         createdAt: now,
       }),
-    ]);
+    ], now);
     return Response.json({ ok: true, assortment: root, product: item, linkedRecipes: 0 });
   }
   const requestedUnit = text(body.unit, "", 20) as BaseInventoryUnit;
@@ -741,7 +737,7 @@ export async function POST(request: Request): Promise<Response> {
       now,
     );
   }
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, updatedRoot, now),
     auditUpdate(database, {
       accountId: account.id,
@@ -754,11 +750,15 @@ export async function POST(request: Request): Promise<Response> {
       reason: "Изменение карточки складского товара",
       createdAt: now,
     }),
-  ]);
+  ], now);
   return Response.json({
     ok: true,
     assortment: updatedRoot,
     product: updatedItem ?? updated.product,
     linkedRecipes: updated.linkedRecipes,
   });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

@@ -67,7 +67,7 @@ test("inventory product route scopes create and rejects deactivation that invali
   const stockUpdate = source.indexOf("const updatedRoot = record(updated.assortment)");
   const activeMutation = source.indexOf("active: requestedActive", stockUpdate);
   const consumptionGuard = source.indexOf("changedConsumptionModeIssues(assortment, updatedRoot", activeMutation);
-  const persistence = source.indexOf("await database.batch", consumptionGuard);
+  const persistence = source.indexOf("await runStoreCasBatch", consumptionGuard);
   assert.ok(stockUpdate >= 0 && activeMutation > stockUpdate && consumptionGuard > activeMutation && persistence > consumptionGuard);
   assert.match(source.slice(consumptionGuard, persistence), /code: "PRODUCT_IN_USE"/);
 });

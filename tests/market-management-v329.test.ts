@@ -61,7 +61,7 @@ test("page and Home share canonical server snapshot and keep saved data during r
   assert.match(client, /bd_active_venue_id/);
   assert.match(apiRoute, /MARKET_KEY = "bd_market_analysis_v1"/);
   assert.match(apiRoute, /shouldRunAutomaticMarketRefresh/);
-  assert.match(apiRoute, /await saveAnalysis\(account\.id, payload\)/);
+  assert.match(apiRoute, /await saveAnalysis\(account\.id, payload, casSnapshots\)/);
   assert.match(apiRoute, /locationChangePending = true/);
   assert.match(apiRoute, /pendingLocation = \{ address, latitude, longitude, focus, updatedAt \}/);
 });

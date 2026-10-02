@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -9,7 +10,6 @@ import {
 } from "../../../../lib/bardoctor/nomenclature-identity";
 import { SUPPLIER_STORE_KEY } from "../../../../lib/bardoctor/purchases";
 
-type StoreRow = { store_key: string; data_json: string };
 type JsonRecord = Record<string, unknown>;
 
 function record(value: unknown): JsonRecord {
@@ -33,7 +33,7 @@ function parsed(value: string | undefined, fallback: unknown): unknown {
   }
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -58,12 +58,8 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
-  const result = await database.prepare(`
-    SELECT store_key, data_json
-    FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?)
-  `).bind(account.id, ASSORTMENT_STORE_KEY, SUPPLIER_STORE_KEY).all<StoreRow>();
-  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  const casSnapshots = await readStoreSnapshots(database, account.id, [ASSORTMENT_STORE_KEY, SUPPLIER_STORE_KEY]);
+  const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const assortment = record(parsed(stores.get(ASSORTMENT_STORE_KEY), {}));
   const suppliers = array(parsed(stores.get(SUPPLIER_STORE_KEY), [])).map(record);
   let supplier = supplierId
@@ -128,7 +124,7 @@ export async function POST(request: Request): Promise<Response> {
       text(record(value).sourceItemKey, "", 500) !== resolution.sourceMapping.sourceItemKey
     );
     assortment.updatedAt = now;
-    await database.batch([
+    await runStoreCasBatch(database, account.id, casSnapshots, [
       database.prepare(`
         INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
         VALUES (?, ?, ?, ?)
@@ -159,7 +155,7 @@ export async function POST(request: Request): Promise<Response> {
         "Пользователь отменил ошибочное соответствие строки накладной",
         now,
       ),
-    ]);
+    ], now);
     console.info("INVOICE_RECOGNITION_V2_MAPPING_REMOVED", {
       accountId: account.id,
       venueId: account.venueId,
@@ -218,7 +214,7 @@ export async function POST(request: Request): Promise<Response> {
       DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at
     `).bind(account.id, SUPPLIER_STORE_KEY, JSON.stringify(suppliers), now));
   }
-  await database.batch(statements);
+  await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
   console.info("INVOICE_RECOGNITION_V2_MAPPING_CONFIRMED", {
     accountId: account.id,
     venueId: account.venueId,
@@ -238,4 +234,8 @@ export async function POST(request: Request): Promise<Response> {
     supplierId,
     supplierCreated,
   }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

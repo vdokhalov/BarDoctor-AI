@@ -1,5 +1,6 @@
+import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../db";
+import { getDb, getD1 } from "../../../db";
 import { accounts, domainData } from "../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
@@ -115,20 +116,13 @@ function competitorNameKey(value: JsonRecord): string {
   return text(value.name, "", 160).toLocaleLowerCase("ru");
 }
 
-async function saveAnalysis(accountId: number, analysis: JsonRecord): Promise<void> {
-  const updatedAt = new Date().toISOString();
-  await getDb()
-    .insert(domainData)
-    .values({
-      accountId,
-      storeKey: MARKET_KEY,
-      dataJson: JSON.stringify(analysis),
-      updatedAt,
-    })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify(analysis), updatedAt },
-    });
+async function saveAnalysis(accountId: number, data: JsonRecord, snapshots: StoreSnapshot[]): Promise<void> {
+  const now = new Date().toISOString();
+  const database = getD1();
+  await runStoreCasBatch(database, accountId, snapshots, [database.prepare(`
+    INSERT INTO domain_data (account_id, store_key, data_json, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(account_id, store_key) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at
+  `).bind(accountId, MARKET_KEY, JSON.stringify(data), now)], now);
 }
 
 function normaliseMarketResult(
@@ -287,6 +281,7 @@ export async function PATCH(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, [MARKET_KEY]);
   try {
     const rawBody = await request.text();
     if (new TextEncoder().encode(rawBody).byteLength > 5_000) {
@@ -343,7 +338,7 @@ export async function PATCH(request: Request): Promise<Response> {
           current.focus = focus;
           current.locationChangePending = true;
           current.pendingLocation = { address, latitude, longitude, focus, updatedAt };
-          await saveAnalysis(account.id, current);
+          await saveAnalysis(account.id, current, casSnapshots);
         }
       }
       return noStore(Response.json({ ok: true, changed, restaurant: nextRestaurant, focus, analysis: current }));
@@ -374,7 +369,7 @@ export async function PATCH(request: Request): Promise<Response> {
           competitorNameKey(removed),
         ]),
       ].slice(-100);
-      await saveAnalysis(account.id, current);
+      await saveAnalysis(account.id, current, casSnapshots);
       return noStore(Response.json({ ok: true, data: current }));
     }
     if (typeof body.confirmed !== "boolean") {
@@ -393,7 +388,7 @@ export async function PATCH(request: Request): Promise<Response> {
       };
     });
     if (!found) throw new AIServiceError("Конкурент не найден в последнем анализе.", 404);
-    await saveAnalysis(account.id, current);
+    await saveAnalysis(account.id, current, casSnapshots);
     return noStore(Response.json({ ok: true, data: current }));
   } catch (error) {
     return noStore(aiErrorResponse(error));
@@ -409,6 +404,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, [MARKET_KEY]);
   try {
     const rawBody = await request.text();
     if (new TextEncoder().encode(rawBody).byteLength > 30_000) {
@@ -560,7 +556,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
       deletedCompetitorNames: [...deletedCompetitorNames],
     };
 
-    await saveAnalysis(account.id, payload);
+    await saveAnalysis(account.id, payload, casSnapshots);
 
     if (address || latitude !== null || longitude !== null) {
       const nextRestaurant = {

@@ -29,7 +29,7 @@ import {
 } from "./google-oauth-error";
 import { parseGoogleMapsUrl } from "./google-maps-url";
 import { readJsonRequest } from "./http";
-import { homeReviewMetrics } from "./review-model";
+import { homeReviewMetrics, reviewsForGoogleLocation } from "./review-model";
 import {
   loadReviewLayer,
   logReviewLayerEvent,
@@ -79,7 +79,7 @@ export async function loadHomeReviewSnapshot(account: AuthenticatedAccount) {
       lastSyncedAt: connection?.lastSyncedAt ?? null,
       lastSyncError: connection?.lastSyncError ?? null,
     },
-    metrics: homeReviewMetrics(layer.reviews),
+    metrics: homeReviewMetrics(layer.reviews, new Date(), connection ? { googleAccountId: connection.googleAccountId, googleLocationId: connection.googleLocationId } : {}),
     layerUpdatedAt: layer.updatedAt,
   };
 }
@@ -235,7 +235,7 @@ export async function reviewSourcesStatus(request: Request): Promise<Response> {
   }
 }
 
-async function mergeReviews(accountId: number, incoming: Awaited<ReturnType<typeof fetchGoogleReviews>>) {
+async function mergeReviews(accountId: number, incoming: Awaited<ReturnType<typeof fetchGoogleReviews>>, connection: Connection) {
   const [venue] = await getDb()
     .select({ id: venues.id })
     .from(venues)
@@ -259,12 +259,24 @@ async function mergeReviews(accountId: number, incoming: Awaited<ReturnType<type
       text: review.text,
       publishedAt: review.date,
       ownerReply: review.ownerReply,
-      sourceMetadata: { provider: "google_business_profile" },
+      sourceMetadata: { provider: "google_business_profile", googleAccountId: connection.googleAccountId, googleLocationId: connection.googleLocationId },
     })),
     method: "sync",
     fallbackSource: "google",
     reason: "Синхронизация Google Business Profile",
   });
+}
+
+async function updateSyncedConnection(connection: Connection, values: Partial<typeof googleConnections.$inferInsert>): Promise<void> {
+  await getDb().update(googleConnections).set({ ...values, updatedAt: new Date().toISOString() })
+    .where(and(eq(googleConnections.id, connection.id), eq(googleConnections.accountId, connection.accountId),
+      eq(googleConnections.googleAccountId, connection.googleAccountId!), eq(googleConnections.googleLocationId, connection.googleLocationId!),
+      eq(googleConnections.status, "connected")));
+}
+
+export async function reviewsForCurrentGoogleLocation(accountId: number, reviews: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const connection = await connectionFor(accountId);
+  return reviewsForGoogleLocation(reviews, connection ? { googleAccountId: connection.googleAccountId, googleLocationId: connection.googleLocationId } : {});
 }
 
 export async function syncGoogleReviews(accountId: number): Promise<{
@@ -288,15 +300,15 @@ export async function syncGoogleReviews(accountId: number): Promise<{
         await decryptGoogleToken(accountId, connection.refreshTokenEncrypted),
       );
       accessToken = refreshed.accessToken;
-      await upsertConnection(accountId, {
+      await updateSyncedConnection(connection, {
         accessTokenEncrypted: await encryptGoogleToken(accountId, accessToken),
         tokenExpiresAt: refreshed.expiresAt,
       });
     }
     const incoming = await fetchGoogleReviews(accessToken, connection.googleAccountId, connection.googleLocationId);
-    const merged = await mergeReviews(accountId, incoming);
+    const merged = await mergeReviews(accountId, incoming, connection);
     const now = new Date().toISOString();
-    await upsertConnection(accountId, { lastSyncedAt: now, lastSyncError: null });
+    await updateSyncedConnection(connection, { lastSyncedAt: now, lastSyncError: null });
     await logReviewSourceEvent(
       accountId,
       "sync_completed",
@@ -305,7 +317,7 @@ export async function syncGoogleReviews(accountId: number): Promise<{
     return { ok: true, added: merged.created, updated: merged.updated, skipped: merged.skipped };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Неизвестная ошибка синхронизации";
-    await upsertConnection(accountId, { lastSyncError: message });
+    await updateSyncedConnection(connection, { lastSyncError: message });
     await logReviewSourceEvent(accountId, "sync_failed", message);
     return { ok: false, error: message };
   }

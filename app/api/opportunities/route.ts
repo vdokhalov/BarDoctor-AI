@@ -1,3 +1,5 @@
+import { getD1 } from "../../../db";
+import { readStoreSnapshots, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import {
@@ -200,7 +202,7 @@ function opportunityCalendarIsStale(
     || calendar.windowEnd < today;
 }
 
-export async function GET(request: Request): Promise<Response> {
+async function getOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "calendar.view")) {
@@ -209,6 +211,7 @@ export async function GET(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, ["bd_opportunity_calendar_v1"]);
   const restaurant = account.restaurantJson
     ? record(JSON.parse(account.restaurantJson)) ?? {}
     : {};
@@ -244,7 +247,7 @@ export async function GET(request: Request): Promise<Response> {
   // provider work and belongs to refresh/decision mutations below. A newly
   // built canonical baseline is persisted immediately before it is returned.
   if (calendar && opportunityCalendarNeedsPersistence(storedCalendar, calendar)) {
-    await saveOpportunityCalendar(account.id, calendar);
+    await saveOpportunityCalendar(account.id, calendar, casSnapshots);
   }
   const stale = opportunityCalendarIsStale(calendar, storedMatchesProfile, today);
   return noStore(Response.json({
@@ -272,6 +275,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, ["bd_opportunity_calendar_v1"]);
   try {
     const body = await requestRecord(request, 8_000);
     if (body.action !== "refresh") throw new AIServiceError("Неизвестное действие.", 400);
@@ -452,7 +456,7 @@ ${baseline.searchHints.map((hint) => `- ${hint}`).join("\n")}
       previous,
       next: calendar,
     });
-    await saveOpportunityCalendar(account.id, calendar);
+    await saveOpportunityCalendar(account.id, calendar, casSnapshots);
     const baselineCount = calendar.events.filter((event) => event.origin === "baseline").length;
     const localCount = calendar.events.filter((event) => event.origin === "web").length;
     return noStore(Response.json({
@@ -478,6 +482,7 @@ export async function PATCH(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, ["bd_opportunity_calendar_v1"]);
   try {
     const body = await requestRecord(request, 4_000);
     if (!["set-decision", "delete-event"].includes(text(body.action))) {
@@ -521,7 +526,7 @@ export async function PATCH(request: Request): Promise<Response> {
         previous: stored,
         next,
       });
-      await saveOpportunityCalendar(account.id, calendar);
+      await saveOpportunityCalendar(account.id, calendar, casSnapshots);
       return noStore(Response.json({
         ok: true,
         calendar: publicCalendar(calendar),
@@ -537,7 +542,7 @@ export async function PATCH(request: Request): Promise<Response> {
       previous: stored,
       next,
     });
-    await saveOpportunityCalendar(account.id, calendar);
+    await saveOpportunityCalendar(account.id, calendar, casSnapshots);
     return noStore(Response.json({
       ok: true,
       calendar: publicCalendar(calendar),
@@ -551,3 +556,5 @@ export async function PATCH(request: Request): Promise<Response> {
     return noStore(aiErrorResponse(error));
   }
 }
+
+export async function GET(request: Request): Promise<Response> { return withStoreCasRetries(request, getOnce, 1); }

@@ -1,3 +1,4 @@
+import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { buildBusinessHealthSnapshot } from "../../../lib/bardoctor/business-health-snapshot";
@@ -19,6 +20,8 @@ export async function GET(request: Request): Promise<Response> {
       { status: 403 },
     ));
   }
+
+  if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
   const context = await loadVenueAIContext(account, "diagnosis");
   const intelligence = buildBusinessIntelligenceFromVenueContext({

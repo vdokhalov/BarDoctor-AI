@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 import { verifyClientRelease } from "../scripts/lib/client-release-integrity.mjs";
@@ -575,7 +575,8 @@ test("purchase lifecycle is venue-scoped and preserves stock and payment history
   ]);
 
   for (const route of [remove, cancel, payment, reversePayment]) {
-    assert.match(route, /WHERE account_id = \?/);
+    assert.match(route, /readStoreSnapshots\(database, account\.id/);
+    assert.match(route, /runStoreCasBatch\(database, account\.id, casSnapshots/);
     assert.match(route, /account\.venueId/);
   }
   assert.match(remove, /PURCHASE_MUST_BE_CANCELLED/);
@@ -642,7 +643,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
     localConnectorMigration,
     deliveryRetryMigration,
   ] = await Promise.all([
-    readFile(new URL("../dist/server/index.js", import.meta.url), "utf8"),
+    readdir(new URL("../dist/server/", import.meta.url), { recursive: true }).then(files => Promise.all(files.filter(file => /\.(?:m?js)$/.test(file)).map(file => readFile(new URL("../dist/server/" + file, import.meta.url), "utf8")))).then(chunks => chunks.join("\n")),
     readFile(new URL("../dist/client/bardoctor-preview.js", import.meta.url), "utf8"),
     readFile(new URL("../dist/client/integrations.js", import.meta.url), "utf8"),
     readFile(new URL("../dist/.openai/hosting.json", import.meta.url), "utf8"),

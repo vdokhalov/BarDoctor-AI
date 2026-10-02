@@ -1,3 +1,4 @@
+import { StoreWriteConflictError } from "./store-cas";
 import { runtimeEnv } from "./runtime-env";
 import { getIntegrationValue } from "./integration-secrets";
 import {
@@ -136,6 +137,7 @@ export function parseAIJson<T>(raw: string): T {
 }
 
 export function aiErrorResponse(error: unknown): Response {
+  if (error instanceof StoreWriteConflictError) return Response.json({ success: false, ok: false, code: "STORE_WRITE_CONFLICT", retryable: true, error: "Данные изменились параллельно. Обновите состояние и повторите операцию." }, { status: 409 });
   const serviceError = error instanceof AIServiceError
     ? error
     : new AIServiceError("Не удалось выполнить AI-анализ.", 502);

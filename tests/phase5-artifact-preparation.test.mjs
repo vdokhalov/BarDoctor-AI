@@ -117,7 +117,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
     const scripts = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8")).scripts;
     const build = fs.readFileSync(path.join(root, "scripts/build-verified.sh"), "utf8").split('  "${vinext}" build');
     assert.equal(build.length, 2, "verified build compiler boundary must be unique");
-    const buildCommands = block => [...block.matchAll(/^node "\$\{script_dir\}\/([a-z0-9-]+\.mjs)"\r?$/gm)].map(match => "scripts/" + match[1]);
+    const buildCommands = block => [...block.matchAll(/^node "\$\{script_dir\}\/([a-z0-9-]+\.mjs)"( --restore)?\r?$/gm)].map(match => ["scripts/" + match[1], ...(match[2] ? ["--restore"] : [])]);
     const checkBehavior = () => run(["--import", "tsx", "--test", "tests/manual-nomenclature-cost-fallback-v409.test.ts", "tests/manual-reference-price-phase5.test.ts"]);
     const releaseSnapshot = () => Object.fromEntries([bundlePath, "public/catalog.css", "dist/client/catalog.css", "dist/client/app.html", "dist/client/bardoctor-preview.js", "dist/client/bardoctor-preview-v396.js", "dist/client/bardoctor-preview-v397.js", "dist/server/index.js"]
       .map(file => [file, fs.readFileSync(path.join(temporary, file))]));
@@ -133,18 +133,19 @@ test("full declared test/build artifact preparation twice preserves behavior and
     };
     let builtRelease;
     const prepareBuildArtifact = () => {
-      for (const command of buildCommands(build[0])) run([command]);
+      for (const command of buildCommands(build[0])) run(command);
       // Model only the compiler's public-file copy; actual compilation stays in the full CI build gate.
       fs.cpSync(path.join(temporary, "public"), path.join(temporary, "dist/client"), { recursive: true });
       // Model the compiled HTML string too; real Worker compilation is the CI gate.
       fs.mkdirSync(path.join(temporary, "dist/server"), { recursive: true });
       fs.writeFileSync(path.join(temporary, "dist/server/index.js"), "export const html=" + JSON.stringify(fs.readFileSync(path.join(temporary, "public/app.html"), "utf8")) + ";");
-      for (const command of buildCommands(build[1])) run([command]);
+      for (const command of buildCommands(build[1])) run(command);
       const html = fs.readFileSync(path.join(temporary, "dist/client/app.html"), "utf8");
       const asset = html.match(/\/assets\/(index-BQGspy0I-[a-f0-9]{12}\.js)/);
       assert.ok(asset, "packaged HTML must reference a versioned asset");
       const published = fs.readFileSync(path.join(temporary, "dist/client/assets", asset[1]), "utf8");
       assert.equal(patchReceiptCost(published), published);
+      assert.match(published, /bdCanonicalBoundaryClientPhase3a5/, "repeated preparation must retain the source-permission cache guard");
       assert.equal(published.split('if(["/sales-entry","/cashier"].includes(h.pathname)){').length - 1, 1, "standalone navigation bridge must not duplicate across preparations");
       assert.match(fs.readFileSync(path.join(temporary, "public/bardoctor-preview-v397.js"), "utf8"), /requestUrl\.pathname === "\/api\/auth\/register" && response\.ok && result && result\.ok/, "preparation must preserve the v453 registration navigation guard");
       assert.equal(published, fs.readFileSync(path.join(temporary, bundlePath), "utf8"), "packaged and canonical costing must agree");
@@ -156,9 +157,10 @@ test("full declared test/build artifact preparation twice preserves behavior and
       for (const phase of ["pretest:artifact", "prebuild", "verified-build-preparation", "pretest:artifact"]) {
         if (phase === "verified-build-preparation") { prepareBuildArtifact(); continue; }
         for (const command of scripts[phase].split(" && ")) {
-          const match = /^node (scripts\/[a-z0-9-]+\.mjs)$/.exec(command);
+          const match = /^node (scripts\/[a-z0-9-]+\.mjs)( --restore)?$/.exec(command);
           assert.ok(match, `unsupported preparation command: ${command}`);
-          run([match[1]]);
+          if (match[2]) assert.equal(match[1], "scripts/patch-canonical-boundary-phase3a5.mjs", "only the scoped security patch accepts restore");
+          run([match[1], ...(match[2] ? ["--restore"] : [])]);
         }
         if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);
       }

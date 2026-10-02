@@ -1,6 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
-import { getDb } from "../../../db";
-import { auditLog, domainData } from "../../../db/schema";
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
+import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
@@ -22,7 +21,7 @@ function validIsoDate(value: unknown): value is string {
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "expenses.create")) {
@@ -60,6 +59,9 @@ export async function POST(request: Request): Promise<Response> {
       },
       { status: 422 },
     );
+  }
+  if (entry.equipmentWorkOrderId || entry.source === "equipment_work_order") {
+    return Response.json({ ok: false, code: "USE_EQUIPMENT_WORK_ORDER_API", error: "Связанный расход изменяется через обслуживание оборудования." }, { status: 409 });
   }
   if (entry.sourceDocumentId || entry.purchaseId || entry.source === "purchase_payment") {
     return Response.json(
@@ -100,28 +102,21 @@ export async function POST(request: Request): Promise<Response> {
     updatedAt: now,
     createdByAccountId: account.actorAccountId,
   };
-  const db = getDb();
-  const storedRows = await db
-    .select()
-    .from(domainData)
-    .where(
-      and(
-        eq(domainData.accountId, account.id),
-        inArray(domainData.storeKey, [STORE_KEY, MONTH_CLOSING_STORE_KEY]),
-      ),
-    );
-  const stored = storedRows.find((row) => row.storeKey === STORE_KEY);
-  const closingStore = storedRows.find((row) => row.storeKey === MONTH_CLOSING_STORE_KEY);
+  const database = getD1();
+  const snapshots = await readStoreSnapshots(database, account.id, [STORE_KEY, MONTH_CLOSING_STORE_KEY]);
+  const stored = snapshots.find(row => row.key === STORE_KEY);
+  const closingStore = snapshots.find(row => row.key === MONTH_CLOSING_STORE_KEY);
   let expenses: unknown[] = [];
   try {
-    const parsed = stored ? JSON.parse(stored.dataJson) as unknown : [];
-    expenses = Array.isArray(parsed) ? parsed : [];
+    const parsed = stored?.dataJson ? JSON.parse(stored.dataJson) as unknown : [];
+    if (!Array.isArray(parsed)) throw new Error("Invalid expense store");
+    expenses = parsed;
   } catch {
-    expenses = [];
+    return Response.json({ ok: false, code: "EXPENSE_STORE_NEEDS_REVIEW", error: "Существующие расходы требуют проверки; данные не изменены." }, { status: 409 });
   }
   let closingData: unknown = null;
   try {
-    closingData = closingStore ? JSON.parse(closingStore.dataJson) as unknown : null;
+    closingData = closingStore?.dataJson ? JSON.parse(closingStore.dataJson) as unknown : null;
   } catch {
     closingData = null;
   }
@@ -140,39 +135,29 @@ export async function POST(request: Request): Promise<Response> {
     return value?.id === nextEntry.id
       || Boolean(idempotencyKey && value?.idempotencyKey === idempotencyKey);
   });
+  if (record(duplicate)?.equipmentWorkOrderId || record(duplicate)?.source === "equipment_work_order") {
+    return Response.json({ ok: false, code: "USE_EQUIPMENT_WORK_ORDER_API", error: "Связанный расход изменяется через обслуживание оборудования." }, { status: 409 });
+  }
   if (duplicate) {
     return Response.json({ ok: true, duplicate: true, data: duplicate, updatedAt: stored?.updatedAt ?? now });
   }
-  await db
-    .insert(domainData)
-    .values({
-      accountId: account.id,
-      storeKey: STORE_KEY,
-      dataJson: JSON.stringify([nextEntry, ...expenses]),
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify([nextEntry, ...expenses]), updatedAt: now },
-    });
-  await db.insert(auditLog).values({
-    accountId: account.id,
-    storeKey: STORE_KEY,
-    action: "create",
-    entityId: String(nextEntry.id),
-    entityLabel: typeof nextEntry.description === "string"
-      ? nextEntry.description.slice(0, 180)
-      : typeof nextEntry.category === "string"
-        ? nextEntry.category.slice(0, 180)
-        : "Расход",
-    monthKey,
-    beforeJson: null,
-    afterJson: JSON.stringify(nextEntry),
-    changedFieldsJson: JSON.stringify(Object.keys(nextEntry)),
-    actorName: [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,
-    actorRole: account.role,
-    reason: "Расход добавлен пользователем с ограниченным финансовым доступом",
-    createdAt: now,
-  });
+  await runStoreCasBatch(database, account.id, snapshots, [
+    database.prepare(`INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
+      VALUES (?, ?, ?, ?) ON CONFLICT(account_id, store_key)
+      DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+      .bind(account.id, STORE_KEY, JSON.stringify([nextEntry, ...expenses]), now),
+    database.prepare(`INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key,
+      before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
+      VALUES (?, ?, 'create', ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`)
+      .bind(account.id, STORE_KEY, String(nextEntry.id),
+        typeof nextEntry.description === "string" ? nextEntry.description.slice(0, 180) : category,
+        monthKey, JSON.stringify(nextEntry), JSON.stringify(Object.keys(nextEntry)),
+        [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail,
+        account.role, "Расход добавлен пользователем с ограниченным финансовым доступом", now),
+  ], now);
   return Response.json({ ok: true, data: nextEntry, updatedAt: now }, { status: 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce);
 }

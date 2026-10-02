@@ -1,5 +1,6 @@
+import { runStoreCasBatch, type StoreSnapshot } from "./store-cas";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../db";
+import { getDb, getD1 } from "../../db";
 import { domainData } from "../../db/schema";
 import {
   cancelScheduledPush,
@@ -408,23 +409,13 @@ export async function loadOpportunityCalendar(accountId: number): Promise<Opport
   }
 }
 
-export async function saveOpportunityCalendar(
-  accountId: number,
-  calendar: OpportunityCalendar,
-): Promise<void> {
-  const updatedAt = new Date().toISOString();
-  await getDb()
-    .insert(domainData)
-    .values({
-      accountId,
-      storeKey: OPPORTUNITY_CALENDAR_KEY,
-      dataJson: JSON.stringify(calendar),
-      updatedAt,
-    })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify(calendar), updatedAt },
-    });
+export async function saveOpportunityCalendar(accountId: number, calendar: OpportunityCalendar, snapshots: StoreSnapshot[]): Promise<void> {
+  const now = new Date().toISOString();
+  const database = getD1();
+  await runStoreCasBatch(database, accountId, snapshots, [database.prepare(`
+    INSERT INTO domain_data (account_id, store_key, data_json, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(account_id, store_key) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at
+  `).bind(accountId, OPPORTUNITY_CALENDAR_KEY, JSON.stringify(calendar), now)], now);
 }
 
 function addDays(dateKey: string, days: number): string {

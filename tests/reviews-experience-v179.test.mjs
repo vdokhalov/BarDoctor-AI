@@ -42,7 +42,8 @@ test("review APIs enforce authentication, permissions and server-side idempotenc
   assert.match(layer, /mergeReviewRecords/);
   assert.match(model, /reviewDeduplicationKey/);
   assert.match(model, /source.*externalId/s);
-  assert.match(layer, /onConflictDoUpdate/);
+  assert.match(layer, /ON CONFLICT\(account_id, store_key\)/);
+  assert.match(layer, /runStoreCasBatch\(getD1\(\), input\.tenant\.accountId, stored\.snapshots/);
   assert.match(google, /upsertReviewRecords/);
   assert.doesNotMatch(google, /const storeKey = "bd_guest_reviews"/);
 });

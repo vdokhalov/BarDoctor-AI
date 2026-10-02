@@ -138,10 +138,14 @@ export function reviewDeduplicationKey(input: {
   rating?: number | null;
   text: string;
   publishedAt: string;
+  sourceMetadata?: JsonRecord;
 }): string {
   const source = reviewSourceId(input.source);
   const externalId = reviewOptionalText(input.externalId, 240);
-  if (externalId) return `${source}:external:${externalId}`;
+  const binding = googleReviewLocation(input.sourceMetadata);
+  if (externalId) return source === "google" && binding
+    ? `${source}:external:${encodeURIComponent(binding.googleAccountId)}:${encodeURIComponent(binding.googleLocationId)}:${externalId}`
+    : `${source}:external:${externalId}`;
   const fingerprint = [
     source,
     input.publishedAt.slice(0, 10),
@@ -150,6 +154,24 @@ export function reviewDeduplicationKey(input: {
     normalizedText(input.text),
   ].join("|");
   return `${source}:content:${stableHash(fingerprint)}`;
+}
+
+/** Provider location is an origin identity, never inferred from today's connection. */
+export function googleReviewLocation(value: unknown): { googleAccountId: string; googleLocationId: string } | null {
+  const metadata = reviewRecord(value);
+  const googleAccountId = reviewText(metadata.googleAccountId, "", 240);
+  const googleLocationId = reviewText(metadata.googleLocationId, "", 240);
+  return googleAccountId && googleLocationId ? { googleAccountId, googleLocationId } : null;
+}
+
+export function reviewsForGoogleLocation<T extends JsonRecord>(reviews: T[], selection: unknown): T[] {
+  const location = googleReviewLocation(selection);
+  if (!location) return selection === undefined ? reviews : reviews.filter(review => reviewSourceId(review.source) !== "google");
+  return reviews.filter(review => {
+    if (reviewSourceId(review.source) !== "google") return true;
+    const origin = googleReviewLocation(review.sourceMetadata);
+    return origin?.googleAccountId === location.googleAccountId && origin.googleLocationId === location.googleLocationId;
+  });
 }
 
 function safeMetadata(value: unknown): JsonRecord | undefined {
@@ -190,6 +212,7 @@ export function cleanReviewInput(
   const authorName = reviewOptionalText(input.authorName ?? input.author ?? input.displayName ?? input.display_name, 300);
   const externalId = reviewOptionalText(input.externalId ?? input.external_id ?? input.reviewId ?? input.review_id, 240);
   const normalizedRating = reviewRating(input.rating ?? input.score ?? input.stars);
+  const metadata = safeMetadata(input.sourceMetadata ?? input.source_metadata);
   const result: NormalizedReview = {
     venueId: tenant.venueId,
     source,
@@ -198,7 +221,7 @@ export function cleanReviewInput(
     date: dateValue.slice(0, 10),
     publishedAt: dateValue,
     ingestionMethod: method,
-    deduplicationKey: reviewDeduplicationKey({ source, externalId, authorName, rating: normalizedRating, text: body, publishedAt: dateValue }),
+    deduplicationKey: reviewDeduplicationKey({ source, externalId, authorName, rating: normalizedRating, text: body, publishedAt: dateValue, sourceMetadata: metadata }),
     aiStatus: reviewText(input.aiStatus, "pending", 40),
   };
   if (externalId) result.externalId = externalId;
@@ -207,7 +230,6 @@ export function cleanReviewInput(
   if (authorAvatarUrl) result.authorAvatarUrl = authorAvatarUrl;
   const ownerReply = reviewOptionalText(input.ownerReply, 10_000);
   if (ownerReply) result.ownerReply = ownerReply;
-  const metadata = safeMetadata(input.sourceMetadata ?? input.source_metadata);
   if (metadata) result.sourceMetadata = metadata;
   if (method === "sync") result.syncedAt = now;
   if (method === "file_import") result.importedAt = now;
@@ -220,6 +242,7 @@ export function canonicalizeStoredReview(
   fallbackNow = new Date().toISOString(),
 ): CanonicalReview | null {
   const input = reviewRecord(value);
+  if (input.venueId != null && Number(input.venueId) !== venueId) return null;
   const method = inferredMethod(input);
   const normalized = cleanReviewInput(input, { venueId }, method, fallbackNow);
   if (!normalized) return null;
@@ -274,7 +297,14 @@ export function mergeReviewRecords(
 ) {
   const reviews = [...existing];
   const byDedup = new Map(reviews.map((review, index) => [review.deduplicationKey, index]));
-  const byExternal = new Map(reviews.filter((review) => review.externalId).map((review, index) => [`${review.source}:${review.externalId}`, index]));
+  const byExternal = new Map<string, number>();
+  const ambiguousExternal = new Set<string>();
+  reviews.forEach((review, index) => {
+    if (!review.externalId) return;
+    const key = reviewDeduplicationKey(review);
+    if (byExternal.has(key)) ambiguousExternal.add(key);
+    else byExternal.set(key, index);
+  });
   const changes: ReviewMergeChange[] = [];
   let created = 0;
   let updated = 0;
@@ -282,13 +312,33 @@ export function mergeReviewRecords(
   let invalid = 0;
   const idFactory = options.idFactory ?? (() => crypto.randomUUID());
 
-  for (const raw of incoming.slice(0, options.maxRecords ?? 2_000)) {
-    const normalized = cleanReviewInput(raw, options, options.method, options.now, options.fallbackSource);
+  const normalizedRecords = incoming.slice(0, options.maxRecords ?? 2_000)
+    .map(raw => cleanReviewInput(raw, options, options.method, options.now, options.fallbackSource));
+  const incomingSignatures = new Map<string, string>();
+  const ambiguousIncoming = new Set<string>();
+  for (const review of normalizedRecords) {
+    if (!review || review.source !== "google" || !review.externalId) continue;
+    const key = reviewDeduplicationKey(review);
+    const signature = meaningfulReviewSignature(review as CanonicalReview);
+    const previous = incomingSignatures.get(key);
+    if (previous !== undefined && previous !== signature) ambiguousIncoming.add(key);
+    incomingSignatures.set(key, signature);
+  }
+  for (const normalized of normalizedRecords) {
     if (!normalized) {
       invalid += 1;
       continue;
     }
-    const externalKey = normalized.externalId ? `${normalized.source}:${normalized.externalId}` : null;
+    const externalKey = normalized.externalId ? reviewDeduplicationKey(normalized) : null;
+    const legacyKey = normalized.source === "google" && normalized.externalId && googleReviewLocation(normalized.sourceMetadata)
+      ? `google:external:${normalized.externalId}` : null;
+    // An unbound historical review cannot be assigned to the current location,
+    // nor can ambiguous duplicates be repaired by picking/deleting an arbitrary row.
+    if (externalKey && (ambiguousIncoming.has(externalKey) || ambiguousExternal.has(externalKey)
+      || (!byExternal.has(externalKey) && legacyKey && byExternal.has(legacyKey)))) {
+      invalid += 1;
+      continue;
+    }
     const existingIndex = externalKey && byExternal.has(externalKey)
       ? byExternal.get(externalKey)!
       : byDedup.get(normalized.deduplicationKey) ?? -1;
@@ -315,7 +365,7 @@ export function mergeReviewRecords(
         candidate.aiStatus = before.aiStatus;
         skipped += 1;
       }
-      reviews[existingIndex] = candidate;
+      reviews[existingIndex] = meaningfulReviewSignature(before) !== meaningfulReviewSignature(candidate) ? candidate : before;
       byDedup.delete(before.deduplicationKey);
       byDedup.set(candidate.deduplicationKey, existingIndex);
       if (externalKey) byExternal.set(externalKey, existingIndex);
@@ -426,8 +476,8 @@ export function reviewNeedsAttention(review: CanonicalReview): boolean {
   return (review.rating !== null && review.rating <= 3) || sentiment === "negative";
 }
 
-export function homeReviewMetrics(reviews: CanonicalReview[], now = new Date()) {
-  const googleReviews = reviews.filter((review) => review.source === "google");
+export function homeReviewMetrics(reviews: CanonicalReview[], now = new Date(), selection?: unknown) {
+  const googleReviews = reviewsForGoogleLocation(reviews, selection).filter((review) => review.source === "google");
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000);
   const summary = reviewLayerSummary(googleReviews, now);

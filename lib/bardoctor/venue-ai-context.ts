@@ -1,5 +1,7 @@
-import { eq } from "drizzle-orm";
-import { domainData, type Account } from "../../db/schema";
+import type { AuthenticatedAccount } from "./access-control";
+import { canReadVenueBlock, canReadVenueSource, VENUE_CONTEXT_SOURCES } from "./venue-context-access";
+import { and, eq, inArray } from "drizzle-orm";
+import { domainData } from "../../db/schema";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
 import { accountingCurrencyFromProfile } from "./currency";
@@ -47,6 +49,7 @@ export type StoredVenueValue = {
 };
 
 export type VenueAIContextSources = {
+  access?: AuthenticatedAccount;
   accountProfile: JsonRecord;
   accountUpdatedAt?: string | null;
   request?: JsonRecord;
@@ -1005,6 +1008,19 @@ export function buildVenueAIContextFromSources(
   purpose: VenueAIContextPurpose,
   sources: VenueAIContextSources,
 ): VenueAIContext {
+  if (sources.access) {
+    const access = sources.access;
+    const request = { ...sources.request };
+    if (!canReadVenueBlock(access, "performanceHistory")) { delete request.finance; delete request.operationalCalendar; }
+    if (!canReadVenueBlock(access, "team")) { delete request.employees; delete request.employeeDetails; }
+    sources = { ...sources, request,
+      stores: new Map([...sources.stores ?? []].filter(([key]) => canReadVenueSource(access, key))),
+      external: {
+        ...(canReadVenueBlock(access, "guestFeedback") ? { reviews: sources.external?.reviews } : {}),
+        ...(canReadVenueBlock(access, "market") ? { confirmedCompetitors: sources.external?.confirmedCompetitors } : {}),
+      },
+    };
+  }
   const now = sources.now ?? new Date();
   const generatedAt = now.toISOString();
   const request = sources.request ?? {};
@@ -1253,7 +1269,11 @@ export function buildVenueAIContextFromSources(
   ];
 
   const allowed = new Set(PURPOSE_BLOCKS[purpose]);
-  const selected = blocks.filter((item) => allowed.has(item.id));
+  const selected = blocks.filter((item) => allowed.has(item.id)).map(item =>
+    sources.access && !canReadVenueBlock(sources.access, item.id)
+      ? { ...item, available: false, freshness: "missing" as const, updatedAt: null,
+          detail: "Источник недоступен: недостаточно прав", missingAction: null, data: { availability: "RESTRICTED" } }
+      : item);
   return {
     version: "venue-ai-context-v1",
     purpose,
@@ -1265,16 +1285,17 @@ export function buildVenueAIContextFromSources(
 }
 
 export async function loadVenueAIContext(
-  account: Account,
+  account: AuthenticatedAccount,
   purpose: VenueAIContextPurpose,
   request: JsonRecord = {},
   external?: VenueAIContextSources["external"],
 ): Promise<VenueAIContext> {
   const { getDb } = await import("../../db");
-  const rows = await getDb()
+  const keys = [...new Set(Object.values(VENUE_CONTEXT_SOURCES).flat())].filter(key => canReadVenueSource(account, key));
+  const rows = keys.length ? await getDb()
     .select({ storeKey: domainData.storeKey, dataJson: domainData.dataJson, updatedAt: domainData.updatedAt })
     .from(domainData)
-    .where(eq(domainData.accountId, account.id));
+    .where(and(eq(domainData.accountId, account.id), inArray(domainData.storeKey, keys))) : [];
   const stores = new Map<string, StoredVenueValue>();
   for (const row of rows) {
     try {
@@ -1283,6 +1304,11 @@ export async function loadVenueAIContext(
       // A damaged optional store must not prevent the remaining context from being used.
     }
   }
+  const reviewStore = stores.get("bd_guest_reviews");
+  if (reviewStore && Array.isArray(reviewStore.data)) {
+    const { reviewsForCurrentGoogleLocation } = await import("./review-sources");
+    reviewStore.data = await reviewsForCurrentGoogleLocation(account.id, reviewStore.data.map(record));
+  }
   let accountProfile: JsonRecord = {};
   try {
     accountProfile = account.restaurantJson ? record(JSON.parse(account.restaurantJson) as unknown) : {};
@@ -1290,6 +1316,7 @@ export async function loadVenueAIContext(
     accountProfile = {};
   }
   return buildVenueAIContextFromSources(purpose, {
+    access: account,
     accountProfile,
     accountUpdatedAt: account.updatedAt,
     request,

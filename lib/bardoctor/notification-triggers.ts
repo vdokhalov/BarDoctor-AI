@@ -1,3 +1,4 @@
+import { storeSnapshots } from "./store-cas";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
@@ -116,7 +117,7 @@ async function runForMembership(
         next,
       });
       if (JSON.stringify(synced) !== JSON.stringify(previous)) {
-        await saveOpportunityCalendar(membershipContext.dataAccount.id, synced);
+        await saveOpportunityCalendar(membershipContext.dataAccount.id, synced, storeSnapshots(rows.map(row => ({ store_key: row.storeKey, data_json: row.dataJson, updated_at: row.updatedAt })), [OPPORTUNITY_CALENDAR_KEY]));
       }
       stores.set(OPPORTUNITY_CALENDAR_KEY, synced);
     } catch {

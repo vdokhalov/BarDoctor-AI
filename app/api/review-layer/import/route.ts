@@ -1,3 +1,4 @@
+import { withStoreCasRetries, StoreWriteConflictError } from "../../../../lib/bardoctor/store-cas";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import type { FieldMapping } from "../../../../lib/bardoctor/integrations/contracts";
@@ -24,7 +25,7 @@ function mapping(value: FormDataEntryValue | null): FieldMapping {
   return parsed as FieldMapping;
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "reviews.manage") || !hasPermission(account, "data.import")) {
@@ -74,6 +75,7 @@ export async function POST(request: Request): Promise<Response> {
     );
     return noStore(Response.json({ ok: true, result, warnings: mapped.warnings }, { status: 201 }));
   } catch (error) {
+    if (error instanceof StoreWriteConflictError) throw error;
     await logReviewLayerEvent(
       account.id,
       defaultSource,
@@ -85,4 +87,8 @@ export async function POST(request: Request): Promise<Response> {
       error: error instanceof Error ? error.message : "Импорт не выполнен",
     }, { status: 422 }));
   }
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

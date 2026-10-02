@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -16,7 +17,6 @@ import {
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -128,7 +128,7 @@ function audit(
   );
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "expenses.create") || !hasPermission(account, "inventory.view")) {
@@ -164,17 +164,10 @@ export async function POST(request: Request): Promise<Response> {
 
   const now = new Date().toISOString();
   const database = getD1();
-  const result = await database.prepare(`
-    SELECT store_key, data_json
-    FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?)
-  `).bind(
-    account.id,
-    PURCHASE_STORE_KEY,
+  const casSnapshots = await readStoreSnapshots(database, account.id, [PURCHASE_STORE_KEY,
     EXPENSE_STORE_KEY,
-    MONTH_CLOSING_STORE_KEY,
-  ).all<StoreRow>();
-  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+    MONTH_CLOSING_STORE_KEY]);
+  const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const migrated = migratePurchaseLedger({
     documents: array(stores.get(PURCHASE_STORE_KEY)),
     expenses: array(stores.get(EXPENSE_STORE_KEY)),
@@ -337,7 +330,7 @@ export async function POST(request: Request): Promise<Response> {
 
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ")
     || account.appEmail;
-  await database.batch([
+  await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     audit(database, {
@@ -368,7 +361,7 @@ export async function POST(request: Request): Promise<Response> {
       reason: "Пересчитан статус оплаты закупки",
       createdAt: now,
     }),
-  ]);
+  ], now);
 
   return Response.json({
     ok: true,
@@ -377,4 +370,8 @@ export async function POST(request: Request): Promise<Response> {
     documents,
     expenses,
   }, { status: 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

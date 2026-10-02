@@ -1,3 +1,4 @@
+import { withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../../lib/bardoctor/http";
@@ -11,7 +12,7 @@ function noStore(response: Response): Response {
   return response;
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "reviews.manage")) {
@@ -39,4 +40,8 @@ export async function POST(request: Request): Promise<Response> {
     result.created ? "Отзыв добавлен вручную." : "Повторный отзыв пропущен.",
   );
   return noStore(Response.json({ ok: true, result }, { status: result.created ? 201 : 200 }));
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

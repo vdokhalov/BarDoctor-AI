@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, StoreWriteConflictError, type StoreSnapshot } from "../store-cas";
 import { getD1 } from "../../../db";
 import type { AuthenticatedAccount } from "../access-control";
 import { closedMonthsFromStore } from "../data-trust";
@@ -38,7 +39,6 @@ const RETURN_STORE_KEY = "bd_inventory_returns";
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -156,13 +156,9 @@ function batchedAuditStatements(
   return statements;
 }
 
-async function stores(accountId: number, keys: readonly string[]): Promise<Map<string, string>> {
-  const placeholders = keys.map(() => "?").join(", ");
-  const result = await getD1().prepare(`
-    SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (${placeholders})
-  `).bind(accountId, ...keys).all<StoreRow>();
-  return new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+async function stores(accountId: number, keys: readonly string[]): Promise<[Map<string, string>, StoreSnapshot[]]> {
+  const snapshots = await readStoreSnapshots(getD1(), accountId, [...keys]);
+  return [new Map(snapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!])), snapshots];
 }
 
 function sourceMetadata(envelope: CanonicalEnvelope): JsonRecord {
@@ -303,7 +299,7 @@ function closedMonthFailure(store: Map<string, string>, date: string): BusinessW
 async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(input.account.id, [ASSORTMENT_STORE_KEY]);
+  const [loaded, casSnapshots] = await stores(input.account.id, [ASSORTMENT_STORE_KEY]);
   const assortment = record(parse(loaded.get(ASSORTMENT_STORE_KEY), {}));
   const balances = array(assortment.stockBalances);
   const value = record(input.data);
@@ -389,7 +385,7 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
   else balances.unshift(next);
   assortment.stockBalances = balances;
   assortment.updatedAt = now;
-  await database.batch([
+  await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     auditStatement(database, {
       account: input.account,
@@ -402,14 +398,14 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
       reason: `Номенклатура синхронизирована из ${input.envelope.externalSystem}`,
       now,
     }),
-  ]);
+  ], now);
   return { ok: true, internalId: productKey };
 }
 
 async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(input.account.id, [
+  const [loaded, casSnapshots] = await stores(input.account.id, [
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
     INVENTORY_SNAPSHOT_STORE_KEY,
@@ -526,7 +522,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
     ...inventory.movements,
     ...stockMovements,
   ].slice(0, 20_000);
-  await database.batch([
+  await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, movements, now),
     upsertStore(database, input.account.id, INVENTORY_SNAPSHOT_STORE_KEY, snapshots, now),
@@ -542,14 +538,14 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
       reason: `Остаток синхронизирован из ${input.envelope.externalSystem}`,
       now,
     }),
-  ]);
+  ], now);
   return { ok: true, internalId: input.internalId };
 }
 
 async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(input.account.id, [
+  const [loaded, casSnapshots] = await stores(input.account.id, [
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
     WRITE_OFF_STORE_KEY,
@@ -601,7 +597,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
   if (!result.ok) return { ok: false, code: result.code, error: result.error };
   if (result.idempotent) return { ok: true, internalId: result.document.id, duplicate: true };
   const expenses = syncWriteOffExpense(array(parse(loaded.get(EXPENSE_STORE_KEY), [])), result.document);
-  await database.batch([
+  await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, input.account.id, WRITE_OFF_STORE_KEY, result.documents, now),
@@ -617,7 +613,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
       reason: `Canonical write-off синхронизирован из ${input.envelope.externalSystem}; движений: ${result.document.movementIds.length}`,
       now,
     }),
-  ]);
+  ], now);
   return { ok: true, internalId: result.document.id };
 }
 
@@ -625,7 +621,7 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   const database = getD1();
   const now = new Date().toISOString();
   const documentStoreKey = RETURN_STORE_KEY;
-  const loaded = await stores(input.account.id, [
+  const [loaded, casSnapshots] = await stores(input.account.id, [
     ASSORTMENT_STORE_KEY,
     STOCK_MOVEMENT_STORE_KEY,
     documentStoreKey,
@@ -772,14 +768,14 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
     else expenses.unshift(expense);
     statements.push(upsertStore(database, input.account.id, EXPENSE_STORE_KEY, expenses, now));
   }
-  await database.batch(statements);
+  await runStoreCasBatch(database, input.account.id, casSnapshots, statements, now);
   return { ok: true, internalId: input.internalId };
 }
 
 async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(input.account.id, [ASSORTMENT_STORE_KEY]);
+  const [loaded, casSnapshots] = await stores(input.account.id, [ASSORTMENT_STORE_KEY]);
   const assortment = record(parse(loaded.get(ASSORTMENT_STORE_KEY), {}));
   const originalAssortment = structuredClone(assortment);
   const recipes = array(assortment.recipes);
@@ -966,7 +962,7 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
     const issue = consumptionIssues[0];
     return { ok: false, code: issue.code, error: issue.error };
   }
-  await database.batch([
+  await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     auditStatement(database, {
       account: input.account,
@@ -979,7 +975,7 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
       reason: `Техкарта синхронизирована из ${input.envelope.externalSystem}`,
       now,
     }),
-  ]);
+  ], now);
   return { ok: true, internalId: text(recipe.id) };
 }
 
@@ -1047,14 +1043,14 @@ function applySimpleListMutation(input: WriterInput & {
 async function writeSimpleList(input: WriterInput & { storeKey: string; label: string }): Promise<BusinessWriteResult> {
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(input.account.id, [input.storeKey]);
+  const [loaded, casSnapshots] = await stores(input.account.id, [input.storeKey]);
   const values = array(parse(loaded.get(input.storeKey), []));
   const mutation = applySimpleListMutation({ ...input, values, now });
   if (!mutation.audit) return mutation.result;
-  await database.batch([
+  await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, input.storeKey, values, now),
     auditStatement(database, mutation.audit),
-  ]);
+  ], now);
   return mutation.result;
 }
 
@@ -1066,7 +1062,7 @@ export type WriterInput = {
   internalId: string;
 };
 
-export async function writeCanonicalSimpleListBatch(
+async function writeCanonicalSimpleListBatchOnce(
   inputs: WriterInput[],
 ): Promise<BusinessWriteResult[]> {
   if (!inputs.length) return [];
@@ -1087,7 +1083,7 @@ export async function writeCanonicalSimpleListBatch(
   }
   const database = getD1();
   const now = new Date().toISOString();
-  const loaded = await stores(first.account.id, [definition.storeKey]);
+  const [loaded, casSnapshots] = await stores(first.account.id, [definition.storeKey]);
   const values = array(parse(loaded.get(definition.storeKey), []));
   const audits: AuditInput[] = [];
   const results = inputs.map((item) => {
@@ -1113,16 +1109,16 @@ export async function writeCanonicalSimpleListBatch(
     return mutation.result;
   });
   if (audits.length) {
-    await database.batch([
+    await runStoreCasBatch(database, first.account.id, casSnapshots, [
       upsertStore(database, first.account.id, definition.storeKey, values, now),
       ...batchedAuditStatements(database, audits),
-    ]);
+    ], now);
   }
   return results;
 }
 
 /** Writes canonical entities into the same domain stores used by BarDoctor UI and analytics. */
-export async function writeCanonicalDomainEntity(input: WriterInput): Promise<BusinessWriteResult> {
+async function writeCanonicalDomainEntityOnce(input: WriterInput): Promise<BusinessWriteResult> {
   if (input.envelope.venueId !== input.account.venueId) {
     return { ok: false, code: "TENANT_MISMATCH", error: "Запись относится к другому заведению" };
   }
@@ -1141,4 +1137,17 @@ export async function writeCanonicalDomainEntity(input: WriterInput): Promise<Bu
     return writeSimpleList({ ...input, storeKey: EMPLOYEE_STORE_KEY, label: "Сотрудник" });
   }
   return { ok: false, code: "WRITER_NOT_SUPPORTED", error: "Для типа данных не найден доменный write-path" };
+}
+
+export async function writeCanonicalDomainEntity(input: WriterInput): Promise<BusinessWriteResult> {
+  try { return await writeCanonicalDomainEntityOnce(input); } catch (error) {
+    if (!(error instanceof StoreWriteConflictError)) throw error;
+    return { ok: false, code: "STORE_WRITE_CONFLICT", error: "Canonical state changed; retry the integration command." };
+  }
+}
+export async function writeCanonicalSimpleListBatch(inputs: WriterInput[]): Promise<BusinessWriteResult[]> {
+  try { return await writeCanonicalSimpleListBatchOnce(inputs); } catch (error) {
+    if (!(error instanceof StoreWriteConflictError)) throw error;
+    return inputs.map(() => ({ ok: false, code: "STORE_WRITE_CONFLICT", error: "Canonical state changed; retry the integration command." }));
+  }
 }

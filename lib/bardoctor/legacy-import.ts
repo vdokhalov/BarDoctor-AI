@@ -226,7 +226,7 @@ export async function importLegacyAccount(input: {
   for (const storeKey of ALLOWED_STORE_KEYS) {
     const entry = entries[storeKey];
     if (!entry) continue;
-    await db
+    const imported = await db
       .insert(domainData)
       .values({
         accountId: account.id,
@@ -234,14 +234,9 @@ export async function importLegacyAccount(input: {
         dataJson: JSON.stringify(entry.data ?? null),
         updatedAt: entry.updatedAt ?? now,
       })
-      .onConflictDoUpdate({
-        target: [domainData.accountId, domainData.storeKey],
-        set: {
-          dataJson: JSON.stringify(entry.data ?? null),
-          updatedAt: entry.updatedAt ?? now,
-        },
-      });
-    importedDomains += 1;
+      .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] })
+      .returning({ id: domainData.id });
+    importedDomains += imported.length;
   }
 
   const summary = {

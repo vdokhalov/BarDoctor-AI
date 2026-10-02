@@ -1,5 +1,7 @@
+import type { AuthenticatedAccount } from "./access-control";
+import { canReadStore } from "./data-trust";
 import { and, eq, inArray } from "drizzle-orm";
-import { domainData, type Account } from "../../db/schema";
+import { domainData } from "../../db/schema";
 import type { VenueAIContext } from "./venue-ai-context";
 
 type JsonRecord = Record<string, unknown>;
@@ -1004,9 +1006,10 @@ function parsedArray(value: string): JsonRecord[] {
   }
 }
 
-export async function loadAIDoctorMemory(account: Account): Promise<AIDoctorMemory> {
+export async function loadAIDoctorMemory(account: AuthenticatedAccount): Promise<AIDoctorMemory> {
   const { getDb } = await import("../../db");
-  const keys = ["bd_tasks", "bd_action_tasks", "bd_decisions"];
+  const keys = ["bd_tasks", "bd_action_tasks", "bd_decisions"].filter(key => canReadStore(account, key));
+  if (!keys.length) return { tasks: [], actionTasks: [], decisions: [] };
   const rows = await getDb()
     .select({ storeKey: domainData.storeKey, dataJson: domainData.dataJson })
     .from(domainData)

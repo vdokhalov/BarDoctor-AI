@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -16,7 +17,6 @@ import {
 } from "../../../../lib/bardoctor/equipment";
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
 
 const KINDS = new Set(["problem", "repair", "maintenance"]);
 const PRIORITIES = new Set(["critical", "high", "medium", "low"]);
@@ -94,7 +94,7 @@ function workflowLabel(status: EquipmentWorkflowStatus): string {
   }[status];
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "equipment.manage")) {
@@ -120,19 +120,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
-  const rows = await database.prepare(`
-    SELECT store_key, data_json FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?)
-  `).bind(
-    account.id,
-    EQUIPMENT_STORE_KEY,
+  const casSnapshots = await readStoreSnapshots(database, account.id, [EQUIPMENT_STORE_KEY,
     EQUIPMENT_HISTORY_STORE_KEY,
     EQUIPMENT_WORK_ORDER_STORE_KEY,
     EQUIPMENT_EXPENSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY,
-    EMPLOYEE_STORE_KEY,
-  ).all<StoreRow>();
-  const stores = new Map(rows.results.map((row) => [row.store_key, row.data_json]));
+    EMPLOYEE_STORE_KEY]);
+  const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const equipment = array(stores.get(EQUIPMENT_STORE_KEY));
   const history = array(stores.get(EQUIPMENT_HISTORY_STORE_KEY));
   const workOrders = array(stores.get(EQUIPMENT_WORK_ORDER_STORE_KEY));
@@ -141,13 +135,14 @@ export async function POST(request: Request): Promise<Response> {
 
   const equipmentId = text(requested.equipmentId, 100);
   const equipmentIndex = equipment.findIndex((item) => text(item.id, 100) === equipmentId);
-  if (equipmentIndex < 0) {
+  if (equipmentIndex < 0 || (equipment[equipmentIndex].venueId != null && Number(equipment[equipmentIndex].venueId) !== account.venueId)) {
     return Response.json({ ok: false, error: "Оборудование не найдено в текущем заведении" }, { status: 404 });
   }
   const equipmentItem = equipment[equipmentIndex];
   const id = text(requested.id, 100) || crypto.randomUUID();
   const existingIndex = workOrders.findIndex((item) => text(item.id, 100) === id);
   const existing = existingIndex >= 0 ? workOrders[existingIndex] : null;
+  if (existing?.venueId != null && Number(existing.venueId) !== account.venueId) return Response.json({ ok: false, error: "Запись не найдена" }, { status: 404 });
   if (existing && text(existing.equipmentId, 100) !== equipmentId) {
     return Response.json({ ok: false, error: "Нельзя перенести запись к другому оборудованию" }, { status: 409 });
   }
@@ -212,6 +207,19 @@ export async function POST(request: Request): Promise<Response> {
   const previousCost = optionalNumber(existing?.cost);
   const previousCostDate = text(existing?.costDate, 10);
   const costChanged = previousCost !== cost || (cost !== undefined && previousCostDate !== costDate);
+  const expectedExpenseId = equipmentExpenseId(id);
+  const linkedExpense = expenses.find(item => text(item.id, 120) === expectedExpenseId);
+  if (existing?.financeExpenseId || linkedExpense) {
+    if (!existing || text(existing.financeExpenseId, 120) !== expectedExpenseId || !linkedExpense
+      || text(linkedExpense.equipmentWorkOrderId, 100) !== id || text(linkedExpense.equipmentId, 100) !== equipmentId
+      || optionalNumber(linkedExpense.amount) !== previousCost || text(linkedExpense.date, 10) !== previousCostDate) {
+      return Response.json({ ok: false, code: "LINKED_EXPENSE_CONFLICT", error: "Связанные данные обслуживания и расхода требуют проверки. Сумма не изменена." }, { status: 409 });
+    }
+    if (costChanged && body.syncExpense !== true) {
+      return Response.json({ ok: false, code: "USE_EQUIPMENT_WORK_ORDER_API", error: "Изменение связанной стоимости требует синхронизации с Финансами." }, { status: 409 });
+    }
+  }
+
   const closedMonths = closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY)));
   if (costChanged && (previousCost !== undefined || cost !== undefined)) {
     const affectedCostMonths = new Set([
@@ -245,6 +253,7 @@ export async function POST(request: Request): Promise<Response> {
     ...(existing ?? {}),
     id,
     equipmentId,
+    venueId: account.venueId,
     kind,
     title,
     problem: title,
@@ -297,6 +306,7 @@ export async function POST(request: Request): Promise<Response> {
       description: `${kind === "maintenance" ? "ТО" : "Ремонт"}: ${text(equipmentItem.name, 180) || "оборудование"} — ${title}`,
       equipmentId,
       equipmentWorkOrderId: id,
+      venueId: account.venueId,
       equipmentCostType: kind === "maintenance" ? "maintenance" : "repair",
       contractor: text(requested.serviceCompany, 240) || undefined,
       source: "equipment_work_order",
@@ -460,7 +470,7 @@ export async function POST(request: Request): Promise<Response> {
     ));
   }
 
-  await database.batch(statements);
+  await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
   return Response.json({
     ok: true,
     workOrder,
@@ -472,4 +482,8 @@ export async function POST(request: Request): Promise<Response> {
     expenseCreated: expenseChanged && expenseAction === "create",
     expenseUpdated: expenseChanged && expenseAction === "update",
   }, { status: existing ? 200 : 201 });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

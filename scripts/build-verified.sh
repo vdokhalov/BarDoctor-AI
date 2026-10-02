@@ -19,6 +19,7 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+node "${script_dir}/patch-canonical-boundary-phase3a5.mjs" --restore
 node "${script_dir}/patch-inventory-layer-v246.mjs"
 node "${script_dir}/patch-inventory-delete-v270.mjs"
 node "${script_dir}/patch-writeoff-workflow-v271.mjs"
@@ -102,6 +103,7 @@ node "${script_dir}/patch-venue-timezone-v456.mjs"
 node "${script_dir}/patch-register-navigation-v448.mjs"
 node "${script_dir}/patch-login-navigation-v450.mjs"
 node "${script_dir}/patch-monthly-financial-model-phase7.mjs"
+node "${script_dir}/patch-canonical-boundary-phase3a5.mjs"
 node "${script_dir}/prepare-versioned-client-asset-v379.mjs"
 timeout \
   --signal=TERM \
@@ -110,6 +112,7 @@ timeout \
   "${vinext}" build
 
 node "${script_dir}/restore-canonical-client-asset-name-v379.mjs"
+node "${script_dir}/patch-canonical-boundary-phase3a5.mjs" --restore
 
 node "${script_dir}/patch-inventory-layer-v246.mjs"
 node "${script_dir}/patch-inventory-delete-v270.mjs"
@@ -223,6 +226,7 @@ node "${script_dir}/patch-pos1-functional.mjs"
 node "${script_dir}/patch-sales-ux1.mjs"
 node "${script_dir}/patch-operational-day-phase1a.mjs"
 node "${script_dir}/patch-menu-ingestion-phase2.mjs"
+node "${script_dir}/patch-canonical-boundary-phase3a5.mjs"
 node "${script_dir}/finalize-versioned-client-asset-v385.mjs"
 node "${script_dir}/verify-versioned-client-asset-v379.mjs"
 "${script_dir}/validate-artifact.sh"

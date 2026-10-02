@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
-import { getDb } from "../../db";
-import { auditLog, domainData, reviewSourceEvents, type Account } from "../../db/schema";
+import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "./store-cas";
+import { desc, eq } from "drizzle-orm";
+import { getDb, getD1 } from "../../db";
+import { reviewSourceEvents, type Account } from "../../db/schema";
 import type { AuthenticatedAccount } from "./access-control";
 import {
   REVIEW_SOURCE_LABELS,
@@ -60,23 +61,27 @@ export async function logReviewLayerEvent(accountId: number, source: string, eve
   }
 }
 
-async function storedReviews(accountId: number, venueId: number): Promise<{ reviews: CanonicalReview[]; updatedAt: string | null }> {
-  const [stored] = await getDb()
-    .select({ dataJson: domainData.dataJson, updatedAt: domainData.updatedAt })
-    .from(domainData)
-    .where(and(eq(domainData.accountId, accountId), eq(domainData.storeKey, REVIEW_STORE_KEY)))
-    .limit(1);
-  if (!stored) return { reviews: [], updatedAt: null };
+async function storedReviews(accountId: number, venueId: number, forWrite = false): Promise<{ reviews: CanonicalReview[]; updatedAt: string | null; snapshots: StoreSnapshot[] }> {
+  const snapshots = await readStoreSnapshots(getD1(), accountId, [REVIEW_STORE_KEY]);
+  const stored = snapshots[0];
+  if (!stored?.dataJson) return { reviews: [], updatedAt: null, snapshots };
   try {
     const parsed = JSON.parse(stored.dataJson) as unknown;
-    const reviews = Array.isArray(parsed)
-      ? parsed.map((item) => canonicalizeStoredReview(item, venueId, stored.updatedAt))
-        .filter((item): item is CanonicalReview => Boolean(item))
-      : [];
-    return { reviews: sortReviews(reviews), updatedAt: stored.updatedAt };
+    if (!Array.isArray(parsed)) throw new Error("Invalid review store");
+    const reviews = parsed.map(item => canonicalizeStoredReview(item, venueId, stored.updatedAt ?? undefined));
+    if (forWrite && reviews.some(item => !item)) throw new Error("Invalid review record");
+    return { reviews: sortReviews(reviews.filter((item): item is CanonicalReview => Boolean(item))), updatedAt: stored.updatedAt, snapshots };
   } catch {
-    return { reviews: [], updatedAt: stored.updatedAt };
+    if (forWrite) throw new Error("REVIEW_STORE_NEEDS_REVIEW: existing review data cannot be safely rewritten");
+    return { reviews: [], updatedAt: stored.updatedAt, snapshots };
   }
+}
+
+function reviewStoreWrite(accountId: number, reviews: CanonicalReview[], now: string): D1PreparedStatement {
+  return getD1().prepare(`INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
+    VALUES (?, ?, ?, ?) ON CONFLICT(account_id, store_key)
+    DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`)
+    .bind(accountId, REVIEW_STORE_KEY, JSON.stringify(reviews), now);
 }
 
 function actorFromAccount(account: AuthenticatedAccount): ReviewTenant {
@@ -101,7 +106,7 @@ export async function upsertReviewRecords(input: {
   reason: string;
 }): Promise<ReviewUpsertResult> {
   const now = new Date().toISOString();
-  const stored = await storedReviews(input.tenant.accountId, input.tenant.venueId);
+  const stored = await storedReviews(input.tenant.accountId, input.tenant.venueId, true);
   const merged = mergeReviewRecords(stored.reviews, input.records, {
     venueId: input.tenant.venueId,
     method: input.method,
@@ -110,36 +115,23 @@ export async function upsertReviewRecords(input: {
     maxRecords: REVIEW_IMPORT_MAX_RECORDS,
   });
   const sorted = merged.reviews;
-  await getDb()
-    .insert(domainData)
-    .values({ accountId: input.tenant.accountId, storeKey: REVIEW_STORE_KEY, dataJson: JSON.stringify(sorted), updatedAt: now })
-    .onConflictDoUpdate({
-      target: [domainData.accountId, domainData.storeKey],
-      set: { dataJson: JSON.stringify(sorted), updatedAt: now },
-    });
-
+  // An ambiguous legacy/provider identity must not be guessed or partly synced.
+  if (input.method === "sync" && merged.invalid) throw new Error("GOOGLE_REVIEW_SOURCE_NEEDS_REVIEW");
   if (merged.changes.length) {
     const only = merged.changes.length === 1 ? merged.changes[0]! : null;
-    await getDb().insert(auditLog).values({
-      accountId: input.tenant.accountId,
-      storeKey: REVIEW_STORE_KEY,
-      action: only?.action ?? "update",
-      entityId: only?.after.id ?? `review-batch-${now}`,
-      entityLabel: only
-        ? `Отзыв · ${REVIEW_SOURCE_LABELS[only.after.source] ?? only.after.source}`
-        : `Отзывы · ${merged.changes.length} изменений`,
-      beforeJson: only?.before ? JSON.stringify(only.before) : null,
-      afterJson: only
-        ? JSON.stringify(only.after)
-        : JSON.stringify({ created: merged.created, updated: merged.updated, source: input.fallbackSource ?? "mixed" }),
-      changedFieldsJson: JSON.stringify(only?.action === "create"
-        ? ["source", "rating", "text", "publishedAt"]
-        : ["authorName", "rating", "text", "publishedAt", "sourceMetadata"]),
-      actorName: input.tenant.actorName,
-      actorRole: input.tenant.actorRole,
-      reason: input.reason.slice(0, 500),
-      createdAt: now,
-    });
+    await runStoreCasBatch(getD1(), input.tenant.accountId, stored.snapshots, [
+      reviewStoreWrite(input.tenant.accountId, sorted, now),
+      getD1().prepare(`INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label,
+        before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(input.tenant.accountId, REVIEW_STORE_KEY, only?.action ?? "update",
+          only?.after.id ?? `review-batch-${now}`,
+          only ? `Отзыв · ${REVIEW_SOURCE_LABELS[only.after.source] ?? only.after.source}` : `Отзывы · ${merged.changes.length} изменений`,
+          only?.before ? JSON.stringify(only.before) : null,
+          JSON.stringify(only?.after ?? { created: merged.created, updated: merged.updated, source: input.fallbackSource ?? "mixed" }),
+          JSON.stringify(only?.action === "create" ? ["source", "rating", "text", "publishedAt"] : ["authorName", "rating", "text", "publishedAt", "sourceMetadata"]),
+          input.tenant.actorName, input.tenant.actorRole, input.reason.slice(0, 500), now),
+    ], now);
   }
 
   return {
@@ -149,7 +141,7 @@ export async function upsertReviewRecords(input: {
     skipped: merged.skipped,
     invalid: merged.invalid,
     changedIds: merged.changes.map((change) => change.after.id),
-    updatedAt: now,
+    updatedAt: merged.changes.length ? now : stored.updatedAt ?? now,
   };
 }
 
@@ -171,9 +163,11 @@ export async function loadReviewLayer(account: AuthenticatedAccount) {
     .where(eq(reviewSourceEvents.accountId, account.id))
     .orderBy(desc(reviewSourceEvents.createdAt))
     .limit(50);
+  const { reviewsForCurrentGoogleLocation } = await import("./review-sources");
+  const currentReviews = await reviewsForCurrentGoogleLocation(account.id, stored.reviews);
   return {
     reviews: stored.reviews,
-    summary: reviewLayerSummary(stored.reviews),
+    summary: reviewLayerSummary(currentReviews as CanonicalReview[]),
     updatedAt: stored.updatedAt,
     sourceEvents: events.map((event) => ({
       id: event.id,
@@ -190,7 +184,7 @@ export async function applyReviewAnalysis(
   updates: unknown[],
 ): Promise<{ updated: number; data: Awaited<ReturnType<typeof loadReviewLayer>> }> {
   const now = new Date().toISOString();
-  const stored = await storedReviews(account.id, account.venueId);
+  const stored = await storedReviews(account.id, account.venueId, true);
   const byId = new Map(stored.reviews.map((review) => [review.id, review]));
   let updated = 0;
   for (const raw of updates.slice(0, 25)) {
@@ -214,13 +208,9 @@ export async function applyReviewAnalysis(
     updated += 1;
   }
   if (updated) {
-    await getDb()
-      .insert(domainData)
-      .values({ accountId: account.id, storeKey: REVIEW_STORE_KEY, dataJson: JSON.stringify(sortReviews(stored.reviews)), updatedAt: now })
-      .onConflictDoUpdate({
-        target: [domainData.accountId, domainData.storeKey],
-        set: { dataJson: JSON.stringify(sortReviews(stored.reviews)), updatedAt: now },
-      });
+    await runStoreCasBatch(getD1(), account.id, stored.snapshots, [
+      reviewStoreWrite(account.id, sortReviews(stored.reviews), now),
+    ], now);
   }
   return { updated, data: await loadReviewLayer(account) };
 }

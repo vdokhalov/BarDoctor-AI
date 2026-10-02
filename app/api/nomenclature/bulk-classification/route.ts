@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -6,7 +7,6 @@ import { defaultNomenclatureStructure } from "../../../../lib/bardoctor/nomencla
 import { normalizeCanonicalTaxonomy } from "../../../../lib/bardoctor/nomenclature-taxonomy";
 
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { data_json: string; updated_at?: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
@@ -29,7 +29,7 @@ function parse(value: string | undefined): JsonRecord {
   }
 }
 
-export async function POST(request: Request): Promise<Response> {
+async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -54,22 +54,18 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const database = getD1();
-  const row = await database.prepare(`
-    SELECT data_json, updated_at
-    FROM domain_data
-    WHERE account_id = ? AND store_key = ?
-    LIMIT 1
-  `).bind(account.id, ASSORTMENT_STORE_KEY).first<StoreRow>();
+  const snapshots = await readStoreSnapshots(database, account.id, [ASSORTMENT_STORE_KEY]);
+  const row = snapshots[0];
   const expectedUpdatedAt = text(body.expectedUpdatedAt, "", 80);
-  if (expectedUpdatedAt && row?.updated_at && expectedUpdatedAt !== row.updated_at) {
+  if (expectedUpdatedAt && row?.updatedAt && expectedUpdatedAt !== row.updatedAt) {
     return Response.json({
       ok: false,
       code: "DATA_STALE",
       error: "Номенклатура изменилась в другой сессии. Обновите данные и повторите операцию.",
-      updatedAt: row.updated_at,
+      updatedAt: row.updatedAt,
     }, { status: 409 });
   }
-  const assortment = parse(row?.data_json);
+  const assortment = parse(row?.dataJson ?? undefined);
   const taxonomy = normalizeCanonicalTaxonomy(assortment.nomenclatureStructure, defaultNomenclatureStructure());
   const section = taxonomy.sections.find((node) => node.id === sectionId && node.active);
   const category = taxonomy.categories.find((node) => node.id === taxonomyCategoryId && node.active && node.parentId === sectionId);
@@ -106,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "PRODUCTS_NOT_FOUND", error: "Выбранные позиции не найдены" }, { status: 404 });
   }
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
-  await database.batch([
+  await runStoreCasBatch(database, account.id, snapshots, [
     database.prepare(`
       INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
       VALUES (?, ?, ?, ?)
@@ -131,7 +127,7 @@ export async function POST(request: Request): Promise<Response> {
       "Пользовательская массовая классификация без изменения истории",
       now,
     ),
-  ]);
+  ], now);
   return Response.json({
     ok: true,
     venueId: account.venueId,
@@ -139,4 +135,8 @@ export async function POST(request: Request): Promise<Response> {
     assortment: next,
     updatedAt: now,
   }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
+export async function POST(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, postOnce, 1);
 }

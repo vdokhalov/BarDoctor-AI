@@ -1,7 +1,8 @@
+import { hasPermission, type AuthenticatedAccount } from "./access-control";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
-import { domainData, type Account } from "../../db/schema";
-import { syncGoogleReviewsIfDue } from "./review-sources";
+import { domainData } from "../../db/schema";
+import { syncGoogleReviewsIfDue, reviewsForCurrentGoogleLocation } from "./review-sources";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -37,11 +38,12 @@ export type ConfirmedCompetitor = {
 
 export type DiagnosisExternalContext = {
   reviews: {
-    total: number;
+    availability?: "RESTRICTED";
+    total: number | null;
     averageRating: number | null;
-    positive: number;
-    neutral: number;
-    negative: number;
+    positive: number | null;
+    neutral: number | null;
+    negative: number | null;
     commonTopics: Array<{ topic: string; count: number }>;
     recent: TrustedReview[];
     lastUpdatedAt: string | null;
@@ -177,14 +179,17 @@ function uniqueCompetitors(items: ConfirmedCompetitor[]): ConfirmedCompetitor[] 
   }).slice(0, 15);
 }
 
-export async function loadDiagnosisExternalContext(account: Account): Promise<DiagnosisExternalContext> {
-  const sync = await syncGoogleReviewsIfDue(account.id).catch(() => ({ attempted: true, ok: false }));
+export async function loadDiagnosisExternalContext(account: AuthenticatedAccount): Promise<DiagnosisExternalContext> {
+  const reviewsAllowed = hasPermission(account, "reviews.view");
+  const sync = reviewsAllowed
+    ? await syncGoogleReviewsIfDue(account.id).catch(() => ({ attempted: true, ok: false }))
+    : { attempted: false, ok: false };
   const syncAdded = "added" in sync ? sync.added : undefined;
   const [reviewStore, marketStore] = await Promise.all([
-    stored(account.id, REVIEW_KEY),
-    stored(account.id, MARKET_KEY),
+    hasPermission(account, "reviews.view") ? stored(account.id, REVIEW_KEY) : null,
+    hasPermission(account, "analysis.view") ? stored(account.id, MARKET_KEY) : null,
   ]);
-  const reviews = trustedReviews(reviewStore?.data);
+  const reviews = trustedReviews(hasPermission(account, "reviews.view") ? await reviewsForCurrentGoogleLocation(account.id, (Array.isArray(reviewStore?.data) ? reviewStore.data : []).map(item => record(item)).filter((item): item is JsonRecord => Boolean(item))) : []);
   const ratings = reviews.map((review) => review.rating).filter((rating): rating is number => rating !== null);
   const topicCounts = new Map<string, number>();
   for (const review of reviews) {
@@ -192,7 +197,7 @@ export async function loadDiagnosisExternalContext(account: Account): Promise<Di
   }
 
   return {
-    reviews: {
+    reviews: !reviewsAllowed ? { availability: "RESTRICTED", total: null, averageRating: null, positive: null, neutral: null, negative: null, commonTopics: [], recent: [], lastUpdatedAt: null } : {
       total: reviews.length,
       averageRating: ratings.length
         ? Math.round(ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length * 10) / 10
@@ -209,7 +214,7 @@ export async function loadDiagnosisExternalContext(account: Account): Promise<Di
     },
     confirmedCompetitors: uniqueCompetitors([
       ...confirmedCompetitors(marketStore?.data),
-      ...legacyConfirmedCompetitors(account.competitorsJson),
+      ...(hasPermission(account, "analysis.view") ? legacyConfirmedCompetitors(account.competitorsJson) : []),
     ]),
     reviewSync: {
       attempted: sync.attempted,

@@ -55,7 +55,7 @@ test("notification reconciliation changes are persisted without creating identic
 
 test("GET persists a canonical baseline without blocking on notification reconciliation", () => {
   const route = readFileSync(new URL("../app/api/opportunities/route.ts", import.meta.url), "utf8");
-  const getBody = route.slice(route.indexOf("export async function GET"), route.indexOf("export async function POST"));
+  const getBody = route.slice(route.indexOf("async function getOnce"), route.indexOf("export async function POST"));
   assert.match(getBody, /opportunityCalendarNeedsPersistence\(storedCalendar, calendar\)[\s\S]*saveOpportunityCalendar/);
   assert.doesNotMatch(getBody, /reconcileOpportunityNotifications/);
   assert.doesNotMatch(route, /const before = JSON\.stringify\(calendar\)/);
@@ -121,7 +121,7 @@ test("planned, watching, dismissed and delete remain PATCH-backed server decisio
   for (const decision of ["planned", "watching", "dismissed"]) assert.match(client, new RegExp('"' + decision + '"'));
   assert.match(client, /action: "delete-event"/);
   assert.match(route, /deletedEventIds/);
-  assert.match(route, /saveOpportunityCalendar\(account\.id, calendar\)/);
+  assert.match(route, /saveOpportunityCalendar\(account\.id, calendar, casSnapshots\)/);
 });
 
 test("compact mobile and desktop layouts preserve bottom-nav clearance", () => {

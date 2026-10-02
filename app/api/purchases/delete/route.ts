@@ -1,3 +1,4 @@
+import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -13,7 +14,6 @@ import {
 
 const MONTH_CLOSING_STORE_KEY = "bd_month_closings";
 type JsonRecord = Record<string, unknown>;
-type StoreRow = { store_key: string; data_json: string };
 
 function record(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -77,7 +77,7 @@ function fileKey(accountId: number, id: string): string {
   return `purchases/${accountId}/${id}`;
 }
 
-export async function DELETE(request: Request): Promise<Response> {
+async function deleteOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "inventory.manage")) {
@@ -100,18 +100,11 @@ export async function DELETE(request: Request): Promise<Response> {
 
   const now = new Date().toISOString();
   const database = getD1();
-  const result = await database.prepare(`
-    SELECT store_key, data_json
-    FROM domain_data
-    WHERE account_id = ? AND store_key IN (?, ?, ?, ?)
-  `).bind(
-    account.id,
-    PURCHASE_STORE_KEY,
+  const casSnapshots = await readStoreSnapshots(database, account.id, [PURCHASE_STORE_KEY,
     EXPENSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY,
-    STOCK_MOVEMENT_STORE_KEY,
-  ).all<StoreRow>();
-  const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+    STOCK_MOVEMENT_STORE_KEY]);
+  const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const migrated = migratePurchaseLedger({
     documents: array(stores.get(PURCHASE_STORE_KEY)),
     expenses: array(stores.get(EXPENSE_STORE_KEY)),
@@ -212,7 +205,7 @@ export async function DELETE(request: Request): Promise<Response> {
   if (migrated.changed) {
     statements.push(upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now));
   }
-  await database.batch(statements);
+  await runStoreCasBatch(database, account.id, casSnapshots, statements, now);
 
   const ids = sourceFileIds(document);
   let sourceFilesDeleted = true;
@@ -230,4 +223,8 @@ export async function DELETE(request: Request): Promise<Response> {
     expenses,
     sourceFilesDeleted,
   });
+}
+
+export async function DELETE(request: Request): Promise<Response> {
+  return withStoreCasRetries(request, deleteOnce, 1);
 }

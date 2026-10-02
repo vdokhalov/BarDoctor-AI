@@ -1,5 +1,6 @@
+import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../db";
+import { getDb, getD1 } from "../../../db";
 import { domainData } from "../../../db/schema";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
@@ -46,9 +47,13 @@ async function loadStore(accountId: number, key: string): Promise<unknown> {
   const [row] = await getDb().select().from(domainData).where(and(eq(domainData.accountId, accountId), eq(domainData.storeKey, key))).limit(1);
   return row ? JSON.parse(row.dataJson) : null;
 }
-async function saveStore(accountId: number, data: JsonRecord): Promise<void> {
-  const updatedAt = new Date().toISOString();
-  await getDb().insert(domainData).values({ accountId, storeKey: STORE_KEY, dataJson: JSON.stringify(data), updatedAt }).onConflictDoUpdate({ target: [domainData.accountId, domainData.storeKey], set: { dataJson: JSON.stringify(data), updatedAt } });
+async function saveStore(accountId: number, data: JsonRecord, snapshots: StoreSnapshot[]): Promise<void> {
+  const now = new Date().toISOString();
+  const database = getD1();
+  await runStoreCasBatch(database, accountId, snapshots, [database.prepare(`
+    INSERT INTO domain_data (account_id, store_key, data_json, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(account_id, store_key) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at
+  `).bind(accountId, STORE_KEY, JSON.stringify(data), now)], now);
 }
 function canonicalUrl(value: string): string {
   try {
@@ -187,6 +192,7 @@ export async function PATCH(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "inventory.manage")) return noStore(Response.json({ ok: false, error: "Изменять предложения вам не разрешено" }, { status: 403 }));
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, [STORE_KEY]);
   try {
     const parsed = await readJsonRequest<JsonRecord>(request, { maxBytes: 128 * 1024 });
     if (!parsed.ok) return noStore(parsed.response);
@@ -205,7 +211,7 @@ export async function PATCH(request: Request): Promise<Response> {
       current.alternatives = alternatives.map(value => text(record(value)?.id, "", 600) === id ? { ...record(value), decision: text(body.decision) } : value);
     } else throw new AIServiceError("Неизвестное действие.", 400);
     const updated = rebuildCoverage(current, targetNames, plan.length);
-    await saveStore(account.id, updated);
+    await saveStore(account.id, updated, casSnapshots);
     return noStore(Response.json({ ok: true, data: updated }));
   } catch (error) { return noStore(aiErrorResponse(error)); }
 }
@@ -214,6 +220,7 @@ export async function POST(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "analysis.run") || !hasPermission(account, "inventory.view")) return noStore(Response.json({ ok: false, error: "Запускать поиск вам не разрешено" }, { status: 403 }));
+  const casSnapshots = await readStoreSnapshots(getD1(), account.id, [STORE_KEY]);
   try {
     const parsed = await readJsonRequest<JsonRecord>(request, { maxBytes: 128 * 1024 });
     if (!parsed.ok) return noStore(parsed.response);
@@ -238,7 +245,7 @@ export async function POST(request: Request): Promise<Response> {
     const segmentTargets = targetNames.slice(batchIndex * SEARCH_BATCH_SIZE, batchIndex * SEARCH_BATCH_SIZE + SEARCH_BATCH_SIZE);
     if (!segmentTargets.length) {
       const data = normalise({ summary: "В этом поисковом проходе нет позиций активного меню.", alternatives: [] }, [], previous, segment.id, targetNames, plan.length);
-      await saveStore(account.id, data);
+      await saveStore(account.id, data, casSnapshots);
       return noStore(Response.json({ ok: true, data }));
     }
     const venueContext = JSON.stringify({ name: text(restaurant.name), city, region, country, businessType: text(restaurant.businessType), venueFormat: text(restaurant.venueFormat) });
@@ -247,7 +254,7 @@ export async function POST(request: Request): Promise<Response> {
     const commonPrompt = `Заведение: ${venueContext}\nВ этом запросе разрешены только эти точные позиции активного меню: ${JSON.stringify(segmentTargets)}\nЗакупочные документы используются только для справки о текущей цене, но не создают новые цели: ${JSON.stringify(relevantPurchases)}`;
     const web = await openAIWebSearch({ accountId: account.id, observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "supplier_alternatives" }, maxTokens: 9_000, location: { city: city || undefined, region: region || undefined }, system: searchSystem, prompt: `${commonPrompt}\nТекущий точечный проход: ${segment.label}.\nЦели именно этого прохода: ${JSON.stringify(segmentTargets)}\nДля КАЖДОЙ из этих ${segmentTargets.length} целей сделай несколько отдельных поисковых запросов с точным брендом и линейкой на русском, румынском и латинице. Проверь минимум: интернет-магазины Молдовы, каталоги дистрибьюторов/импортёров, HoReCa-поставщиков и крупные магазины с доставкой в ${city || region || country || "регион заведения"}. Верни до 5 разных продавцов на каждую цель, если есть подтверждённые страницы с ценой. Сначала покрой все цели хотя бы одним предложением, затем добавляй альтернативных продавцов.` });
     const data = normalise(parseAIJson(web.text), web.sources, previous, segment.id, targetNames, plan.length);
-    await saveStore(account.id, data);
+    await saveStore(account.id, data, casSnapshots);
     return noStore(Response.json({ ok: true, data }));
   } catch (error) { return noStore(aiErrorResponse(error)); }
 }

@@ -1,3 +1,4 @@
+import { canReadSavedDiagnosis } from "../../../lib/bardoctor/venue-context-access";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { AUTHORITATIVE_STORE_KEYS } from "../../../lib/bardoctor/authoritative-persistence";
@@ -20,6 +21,7 @@ export async function GET(request: Request): Promise<Response> {
     // Opening documents are read only through the venue-scoped domain endpoint.
     if (["bd_opening_stock_v1", "bd_sales_events_v1"].includes(row.store_key)) continue;
     if (!canReadStore(account, row.store_key)) continue;
+    if (/^bd_ai_diagnosis_v[3-9]$/.test(row.store_key) && !canReadSavedDiagnosis(account)) continue;
     entries[row.store_key] = {
       data: JSON.parse(row.data_json),
       updatedAt: row.updated_at,

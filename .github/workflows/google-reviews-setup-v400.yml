@@ -42,6 +42,8 @@ jobs:
         run: node --import tsx --test tests/cost-warehouse-trace-phase3a3.test.ts
       - name: Phase 3A.4 Menu Origin real ingestion confirmation source binding RBAC and read-only
         run: node --import tsx --test tests/menu-origin-trace-phase3a4.test.ts
+      - name: Phase 3A.5 source permissions, mixed reviews, provider identity and competing canonical writers
+        run: node --import tsx --test tests/canonical-boundary-source-phase3a5.test.ts tests/canonical-boundary-review-phase3a5.test.ts tests/canonical-writer-safety-phase3a5.test.ts tests/google-review-source-phase3a5.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -54,6 +56,8 @@ jobs:
         run: npm run browser:install
       - name: Phase 3A.1–3A.4 compiled Worker native D1 and evidence API mobile desktop
         run: |
+          node --test tests/canonical-boundary-worker-phase3a5.test.mjs
+          node scripts/canonical-boundary-browser-phase3a5.mjs
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts

@@ -1,3 +1,4 @@
+import { canReadDiagnosisSources, restrictedVenueContext } from "./venue-context-access";
 import { authenticateRequest, unauthorized } from "./auth";
 import {
   hasPermission,
@@ -413,7 +414,7 @@ function buildEvidenceCatalog(
     });
   }
 
-  if (external.reviews.total > 0) {
+  if (external.reviews.total !== null && external.reviews.total > 0) {
     push({
       id: "reviews:summary",
       source: "review",
@@ -1359,6 +1360,7 @@ function normaliseDiagnosis(
 export async function handleDiagnosis(request: Request): Promise<Response> {
   const account = await requireLocalAccount(request, "analysis.run");
   if (account instanceof Response) return account;
+  if (!canReadDiagnosisSources(account) || !hasPermission(account, "tasks.view")) return restrictedVenueContext();
 
   try {
     const body = await requestBody(request, 100_000);
