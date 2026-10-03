@@ -1,3 +1,6 @@
+import { derivedInputBelongs } from "./derived-input-scope";
+import { capturedBatchCost } from "./financial-reconciliation";
+import { itemSalesInputs } from "./item-sales-inputs";
 import { canonicalTaxonomyForAssortment, menuTaxonomyPresentation } from "./nomenclature-taxonomy";
 import {
   inventoryPackageAmount,
@@ -620,13 +623,21 @@ export function buildAssortmentAnalytics(input: {
   assortment: unknown;
   purchaseDocuments?: unknown[];
   stockMovements?: unknown[];
+  salesEvents?: unknown[];
   salesDocuments?: unknown[];
   salesBatches?: unknown[];
   financeRevenue?: unknown[];
   period?: string;
   venueId?: number;
+  workspaceId?: number;
+  dataAccountId?: number;
   now?: Date;
 }) {
+  if (input.venueId) {
+    const boundary = { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId };
+    const scoped = (values: unknown[] = []) => values.filter(value => derivedInputBelongs(value, boundary));
+    input = { ...input, salesEvents: scoped(input.salesEvents), salesDocuments: scoped(input.salesDocuments), salesBatches: scoped(input.salesBatches), financeRevenue: scoped(input.financeRevenue), purchaseDocuments: scoped(input.purchaseDocuments), stockMovements: scoped(input.stockMovements) };
+  }
   const now = input.now ?? new Date();
   const period = periodWindow(input.period, now);
   const scopedInput = venueScopedAssortment(record(input.assortment), input.venueId);
@@ -705,8 +716,9 @@ export function buildAssortmentAnalytics(input: {
       name: text(product.name, "Складская позиция", 240),
     };
   });
-  const sales = confirmedSales(input.salesDocuments ?? [], input.venueId);
-  const salesBatches = new Map(deduplicated(input.salesBatches ?? [], input.venueId)
+  const salesInput = itemSalesInputs({ events: input.salesEvents, documents: input.salesDocuments, batches: input.salesBatches, venueId: input.venueId ?? 0, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId });
+  const sales = confirmedSales(salesInput.documents, input.venueId);
+  const salesBatches = new Map(deduplicated(salesInput.batches, input.venueId)
     .filter((batch) => ["POSTED", "PARTIALLY_BLOCKED"].includes(text(batch.status)))
     .map((batch) => [text(batch.id), batch]));
   const currentSales = sales.filter((document) => inRange(document.date, period.start, period.end));
@@ -724,15 +736,22 @@ export function buildAssortmentAnalytics(input: {
     historicalCostComplete: boolean;
     documents: Set<string>;
   }>();
+  const seenAcceptedLines = new Set<string>();
   for (const document of currentSales) {
     const batch = salesBatches.get(text(document.salesBatchId));
     const batchLinesById = new Map(array(batch?.lines).map((value) => {
       const line = record(value);
       return [text(line.externalLineId ?? line.id), line];
     }));
+    const seenLines = new Set<string>();
     for (const value of array(document.items)) {
       const line = record(value);
-      const item = menuById.get(text(line.menuItemId)) ?? menuByName.get(normalizedName(line.name));
+      const lineId = text(line.saleLineId ?? line.id);
+      const acceptedLineKey = batch?.id && lineId ? `${batch.id}:${lineId}` : null;
+      if (lineId && seenLines.has(lineId) || acceptedLineKey && seenAcceptedLines.has(acceptedLineKey)) continue;
+      if (acceptedLineKey) seenAcceptedLines.add(acceptedLineKey);
+      if (lineId) seenLines.add(lineId);
+      const item = line.menuItemId ? menuById.get(text(line.menuItemId)) : menuByName.get(normalizedName(line.name));
       if (!item) continue;
       const id = text(item.id);
       const metric = salesMetrics.get(id) ?? {
@@ -748,7 +767,8 @@ export function buildAssortmentAnalytics(input: {
       if (grossSales === null) metric.revenueComplete = false;
       else metric.revenue += grossSales;
       const postedLine = batchLinesById.get(text(line.id));
-      const historicalCost = postedLine ? nonNegative(postedLine.theoreticalCost) : null;
+      const captured = postedLine && batch?.salesEventId ? capturedBatchCost({ ...batch, lines: [postedLine], costStatus: "FULL", totalTheoreticalCost: postedLine.theoreticalCost }, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null;
+      const historicalCost = captured ? captured.known ? captured.cost : null : postedLine ? nonNegative(postedLine.theoreticalCost) : null;
       if (!postedLine || !["POSTED", "REVERSED"].includes(text(postedLine.processingStatus)) || historicalCost === null) {
         metric.historicalCostComplete = false;
       } else {
@@ -1200,7 +1220,8 @@ export function buildAssortmentAnalytics(input: {
   let unresolvedSalesLines = 0;
   for (const document of currentSales) {
     const batch = salesBatches.get(text(document.salesBatchId));
-    const batchCost = batch ? nonNegative(batch.totalTheoreticalCost) : null;
+    const captured = batch?.salesEventId ? capturedBatchCost(batch, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null;
+    const batchCost = captured ? captured.known ? captured.cost : null : batch ? nonNegative(batch.totalTheoreticalCost) : null;
     if (!batch || batchCost === null || text(batch.costStatus) !== "FULL") {
       salesCostComplete = false;
       unresolvedSalesLines += Math.max(1, array(document.items).length);
@@ -1225,7 +1246,7 @@ export function buildAssortmentAnalytics(input: {
   for (const document of recentSales) {
     for (const value of array(document.items)) {
       const line = record(value);
-      const item = menuById.get(text(line.menuItemId)) ?? menuByName.get(normalizedName(line.name));
+      const item = line.menuItemId ? menuById.get(text(line.menuItemId)) : menuByName.get(normalizedName(line.name));
       if (!item) continue;
       const id = text(item.id);
       const current = recentByItem.get(id) ?? { quantity: 0, dates: new Set<string>() };

@@ -448,6 +448,9 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     if (monthKey) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey,
       error: `Итоги месяца ${monthKey} зафиксированы. Сначала откройте его штатным действием повторного открытия периода.`,
     }, { status: 423 });
+    if (mutations.some(mutation => record(mutation.after).status === "closed" && record(mutation.before).status !== "closed")) {
+      return Response.json({ ok: false, code: "USE_VERIFIED_MONTH_CLOSE_API", error: "Закрытие требует проверки согласованного набора финансовых данных." }, { status: 409 });
+    }
   }
 
   if (key === PURCHASE_STORE_KEY) {

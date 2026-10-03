@@ -6,26 +6,30 @@ import { storeRuntime } from "./helpers/store-runtime";
 import { purchaseVenueScopeIssue } from "../lib/bardoctor/purchase-venue-scope";
 
 const key = "bd_month_closings";
-test("actual packaged closing hook writes numeric active venue and preserves reopen history", () => {
+test("actual packaged closing hook writes numeric active venue and preserves reopen history", async () => {
   const bundle = readFileSync(new URL("../public/assets/index-BQGspy0I.js", import.meta.url), "utf8");
   const hook = bundle.split("\n").find(line => line.startsWith("function bdUseMonthClosingStore("));
   const resolver = bundle.split("\n").find(line => line.startsWith("function bdMonthlyVenueIdPhase7("));
-  assert.ok(hook); assert.ok(resolver);
+  const requestHelper = bundle.split("\n").find(line => line.startsWith("async function bdMonthRequestPhase3a8("));
+  const saveHelper = bundle.split("\n").find(line => line.startsWith("async function bdSaveVerifiedMonthPhase3a8("));
+  assert.ok(hook); assert.ok(resolver); assert.ok(requestHelper); assert.ok(saveHelper);
   for (const venueId of [1, 3293]) {
     let rows: unknown[] = [];
     const context = vm.createContext({ Ai: () => ({ isReady: true }), bdMonthClosingsKey: key,
       bdProcVenueContextV168: () => ({ activeVenueId: venueId }), bdArrayStore: () => rows,
+      Sz: (store: string) => `${venueId}:${store}`, Kse: (store: string, values: unknown[]) => { assert.equal(store,key); rows=values; },
+      fetch: async (_path: string, init: {body:string}) => { const input = JSON.parse(init.body); assert.equal(input.previewRevision, "verified-preview"); return Response.json({ok:true,closing:{id:venueId+":"+input.monthKey,venueId,monthKey:input.monthKey,status:"closed",snapshot:{revenue:1320},reopenHistory:[{reason:"QA reopen"}]}}); },
       qr: (store: string, value: unknown[]) => { assert.equal(store, key); rows = value; },
       S: { useState: (init: () => unknown) => [init(), () => {}], useEffect: () => {},
         useMemo: (fn: () => unknown) => fn(), useCallback: (fn: unknown) => fn },
     });
-    vm.runInContext(`${resolver}\n${hook}\nglobalThis.hook=bdUseMonthClosingStore;`, context);
+    vm.runInContext(`${resolver}\n${requestHelper}\n${saveHelper}\n${hook}\nglobalThis.hook=bdUseMonthClosingStore;`, context);
     const history = [{ reason: "QA reopen" }];
-    context.hook("primary").saveClosing({ monthKey: "2026-08", status: "closed", snapshot: { revenue: 1320 }, reopenHistory: history });
+    await context.hook("primary").saveClosing({ monthKey: "2026-08", status: "closed", previewRevision: "verified-preview", snapshot: { revenue: 1320 }, reopenHistory: history });
     assert.equal((rows[0] as Record<string, unknown>).venueId, venueId);
     assert.equal((rows[0] as Record<string, unknown>).id, `${venueId}:2026-08`);
     context.hook("primary").reopenClosing(rows[0]);
-    context.hook("primary").saveClosing({ ...(rows[0] as object), status: "closed" });
+    await context.hook("primary").saveClosing({ ...(rows[0] as object), status: "closed", previewRevision: "verified-preview" });
     assert.equal(rows.length, 1);
     assert.equal(context.hook("primary").closings.length, 1);
     assert.equal((rows[0] as Record<string, unknown>).venueId, venueId);
@@ -38,6 +42,7 @@ for (const venueId of [1, 3293]) test(`period alias is canonical across close, r
     const original = { id: "primary:2026-08", venueId: "primary", monthKey: "2026-08", status: "closed",
       snapshot: { revenue: 1320, costOfGoods: 780, venueId }, closedAt: "2026-09-01T00:00:00Z" };
     const saved = { ...original, venueId };
+    runtime.seed(key, [original]);
     assert.equal((await runtime.put(key, [original])).status, 200);
     assert.deepEqual((await runtime.get(key)).body.data, [saved]);
     assert.equal(purchaseVenueScopeIssue(venueId, (await runtime.get(key)).body.data), null);
@@ -48,9 +53,11 @@ for (const venueId of [1, 3293]) test(`period alias is canonical across close, r
     const reopened = { ...saved, venueId: "primary", status: "reopened", reopenedAt: "2026-09-02T00:00:00Z",
       reopenHistory: [{ reason: "QA correction", at: "2026-09-02T00:00:00Z" }] };
     assert.equal((await runtime.put(key, [reopened], "QA explicit reopen")).status, 200);
-    assert.equal((await runtime.put(key, [{ ...reopened, status: "closed" }])).status, 200);
+    assert.equal((await runtime.put(key, [{ ...reopened, status: "closed" }])).status, 409);
+    // Existing frozen fixture: actual verified reclose is covered in Phase3A.8.
+    runtime.seed(key, [{ ...reopened, status: "closed", venueId }]);
     assert.deepEqual((await runtime.get(key)).body.data, [{ ...reopened, status: "closed", venueId }]);
-    assert.equal(runtime.audits().length, 3);
+    assert.equal(runtime.audits().length, 2);
     const before = runtime.bytes();
     assert.equal((await runtime.put(key, [{ ...saved, snapshot: { revenue: 0 } }])).status, 423);
     assert.equal(runtime.bytes(), before);

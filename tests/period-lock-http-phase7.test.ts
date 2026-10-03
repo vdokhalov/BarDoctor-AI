@@ -90,7 +90,8 @@ test("explicit owner reopen enables correction; manager denied; reclose blocks a
     const desired = [{ ...expense, date: "2026-09-05" }];
     assert.equal((await r.put(expenses, desired)).status, 200);
     assert.deepEqual((await r.get(expenses)).body.data, desired);
-    assert.equal((await r.put(closings, [closed])).status, 200);
+    assert.equal((await r.put(closings, [closed])).status, 409);
+    r.seed(closings, [closed]);
     await rejectWithoutWrites(r, expenses, [expense], "2026-08");
   } finally { r.close(); }
 });
@@ -272,7 +273,8 @@ test("native reopen may fill missing legacy createdAt but cannot replace an exis
     assert.deepEqual((await r.get(closings)).body.data, [{ ...reopened, venueId: 901 }]);
     assert.deepEqual(JSON.parse(String(r.audits()[0].before_json)), original);
     const reclosed = { ...reopened, status: "closed" };
-    assert.equal((await r.put(closings, [reclosed])).status, 200);
+    assert.equal((await r.put(closings, [reclosed])).status, 409);
+    r.seed(closings, [reclosed]);
     await rejectWithoutWrites(r, closings, [{ ...reclosed, status: "reopened",
       createdAt: "2026-10-02T10:00:00.000Z", updatedAt: "2026-10-02T10:00:00.000Z" }], "2026-08");
   } finally { r.close(); }
@@ -286,7 +288,8 @@ test("signed no-op and another month close work; separate audited reopen permits
     assert.equal((await r.put(closings, [original])).status, 200);
     assert.deepEqual((await r.get(closings)).body.data, [original]); assert.equal(r.audits().length, 0);
     const other = closing("2026-09");
-    assert.equal((await r.put(closings, [original, other])).status, 200); assert.equal(r.audits().length, 1);
+    assert.equal((await r.put(closings, [original, other])).status, 409); assert.equal(r.audits().length, 0);
+    r.seed(closings, [original, other]);
     const reopened = { ...original, status: "reopened", reopenedAt: "2026-10-01T10:00:00.000Z", reopenedBy: "QA Owner",
       updatedAt: "2026-10-01T10:00:00.000Z", reopenReason: "Explicit correction",
       reopenHistory: [...original.reopenHistory, { reason: "Explicit correction" }] };
@@ -301,9 +304,10 @@ test("signed no-op and another month close work; separate audited reopen permits
     const corrected = { ...reopened, snapshot: { finalProfit: 344 } };
     assert.equal((await r.put(closings, [corrected, other])).status, 200);
     const reclosed = { ...corrected, status: "closed", closedAt: "2026-10-01T11:00:00.000Z" };
-    assert.equal((await r.put(closings, [reclosed, other])).status, 200);
+    assert.equal((await r.put(closings, [reclosed, other])).status, 409);
+    r.seed(closings, [reclosed, other]);
     assert.deepEqual((await r.get(closings)).body.data, [reclosed, other]);
-    assert.equal(r.audits().length, 4);
+    assert.equal(r.audits().length, 2);
     await rejectWithoutWrites(r, closings, [{ ...reclosed, snapshot: { finalProfit: 999 } }, other], "2026-08");
   } finally { r.close(); }
 });

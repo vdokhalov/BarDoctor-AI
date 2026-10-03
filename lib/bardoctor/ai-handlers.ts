@@ -1,3 +1,4 @@
+import { reviewMetricRating } from "./review-aggregate";
 import { canReadDiagnosisSources, restrictedVenueContext } from "./venue-context-access";
 import { authenticateRequest, unauthorized } from "./auth";
 import {
@@ -518,7 +519,8 @@ function buildReviewEvidenceCatalog(
   const insights = asRecord(body.insights) ?? {};
   const sentiment = asRecord(insights.sentiment) ?? {};
   const total = number(insights.totalReviews) ?? number(sentiment.total) ?? 0;
-  const average = number(insights.avgRating);
+  const analyzed = number(insights.analyzedCount) ?? number(sentiment.total) ?? 0;
+  const average = reviewMetricRating(insights.avgRating);
   const negative = number(sentiment.negative);
   if (total > 0) {
     evidence.push({
@@ -526,7 +528,8 @@ function buildReviewEvidenceCatalog(
       source: "review",
       label: "Сводка отзывов гостей",
       fact: evidenceFact([
-        `проанализировано ${total}`,
+        `всего отзывов ${total}`,
+        `проанализировано ${analyzed}`,
         average !== null ? `средняя оценка ${average}/5` : null,
         negative !== null ? `негативных ${negative}` : null,
       ]),

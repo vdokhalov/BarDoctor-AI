@@ -1,3 +1,4 @@
+import { aggregateReviews, reviewMetricRating } from "./review-aggregate";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
@@ -12,9 +13,10 @@ export type TrustedReview = {
   date: string;
   rating: number | null;
   text: string;
-  sentiment: "positive" | "neutral" | "negative";
+  sentiment: "positive" | "neutral" | "negative" | null;
   topics: string[];
   summary: string | null;
+  aiStatus: string;
 };
 
 export type ConfirmedCompetitor = {
@@ -40,6 +42,7 @@ export type DiagnosisExternalContext = {
   reviews: {
     availability?: "RESTRICTED";
     total: number | null;
+    aggregate?: ReturnType<typeof aggregateReviews>;
     averageRating: number | null;
     positive: number | null;
     neutral: number | null;
@@ -85,11 +88,8 @@ function number(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function sentiment(value: unknown, rating: number | null): "positive" | "neutral" | "negative" {
-  if (value === "positive" || value === "neutral" || value === "negative") return value;
-  if (rating !== null && rating <= 2) return "negative";
-  if (rating !== null && rating >= 4) return "positive";
-  return "neutral";
+function sentiment(value: unknown): "positive" | "neutral" | "negative" | null {
+  return value === "positive" || value === "neutral" || value === "negative" ? value : null;
 }
 
 function competitorKey(value: JsonRecord): string {
@@ -119,14 +119,15 @@ function trustedReviews(value: unknown): TrustedReview[] {
     .map(record)
     .filter((item): item is JsonRecord => Boolean(item))
     .map((item) => {
-      const rating = number(item.rating);
+      const rating = reviewMetricRating(item.rating);
       return {
         id: string(item.id, crypto.randomUUID(), 160),
         source: string(item.source, "manual", 40),
         date: string(item.date, "", 32),
         rating,
+        aiStatus: string(item.aiStatus, "pending", 40),
         text: string(item.text, "Без текстового комментария", 1_200),
-        sentiment: sentiment(item.sentiment, rating),
+        sentiment: item.aiStatus === "done" ? sentiment(item.sentiment) : null,
         topics: strings(item.topics, 8),
         summary: string(item.aiSummary, "", 500) || null,
       };
@@ -189,26 +190,17 @@ export async function loadDiagnosisExternalContext(account: AuthenticatedAccount
     hasPermission(account, "reviews.view") ? stored(account.id, REVIEW_KEY) : null,
     hasPermission(account, "analysis.view") ? stored(account.id, MARKET_KEY) : null,
   ]);
-  const reviews = trustedReviews(hasPermission(account, "reviews.view") ? await reviewsForCurrentGoogleLocation(account.id, (Array.isArray(reviewStore?.data) ? reviewStore.data : []).map(item => record(item)).filter((item): item is JsonRecord => Boolean(item))) : []);
-  const ratings = reviews.map((review) => review.rating).filter((rating): rating is number => rating !== null);
-  const topicCounts = new Map<string, number>();
-  for (const review of reviews) {
-    for (const topic of review.topics) topicCounts.set(topic, (topicCounts.get(topic) ?? 0) + 1);
-  }
+  const population = reviewsAllowed ? await reviewsForCurrentGoogleLocation(account.id, (Array.isArray(reviewStore?.data) ? reviewStore.data : []).map(item => record(item)).filter((item): item is JsonRecord => Boolean(item))) : [];
+  const reviews = trustedReviews(population);
+  const aggregate = aggregateReviews(population);
 
   return {
     reviews: !reviewsAllowed ? { availability: "RESTRICTED", total: null, averageRating: null, positive: null, neutral: null, negative: null, commonTopics: [], recent: [], lastUpdatedAt: null } : {
-      total: reviews.length,
-      averageRating: ratings.length
-        ? Math.round(ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length * 10) / 10
-        : null,
-      positive: reviews.filter((review) => review.sentiment === "positive").length,
-      neutral: reviews.filter((review) => review.sentiment === "neutral").length,
-      negative: reviews.filter((review) => review.sentiment === "negative").length,
-      commonTopics: [...topicCounts.entries()]
-        .sort((left, right) => right[1] - left[1])
-        .slice(0, 8)
-        .map(([topic, count]) => ({ topic, count })),
+      aggregate,
+      total: aggregate.total,
+      averageRating: aggregate.averageRating,
+      ...aggregate.sentiment,
+      commonTopics: aggregate.complaints.slice(0, 8).map(item => ({topic: item.topic, count: item.negative})),
       recent: reviews.slice(0, 20),
       lastUpdatedAt: reviewStore?.updatedAt ?? null,
     },

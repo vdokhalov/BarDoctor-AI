@@ -146,6 +146,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
       const published = fs.readFileSync(path.join(temporary, "dist/client/assets", asset[1]), "utf8");
       assert.equal(patchReceiptCost(published), published);
       assert.equal(published.split("/* stock-basis-phase3a7:start */").length, 2, "repeated preparation must retain exactly one shared warehouse contract");
+      assert.equal(published.split("/* derived-metrics-phase3a8:start */").length, 2);
       assert.match(published, /bdStockBasisPhase3a7/, "receipt valuation helper survives preparation");
       assert.match(published, /bdCanonicalBoundaryClientPhase3a5/, "repeated preparation must retain the source-permission cache guard");
       assert.equal(published.split('if(["/sales-entry","/cashier"].includes(h.pathname)){').length - 1, 1, "standalone navigation bridge must not duplicate across preparations");
@@ -161,7 +162,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
         for (const command of scripts[phase].split(" && ")) {
           const match = /^node (scripts\/[a-z0-9-]+\.mjs)( --restore)?$/.exec(command);
           assert.ok(match, `unsupported preparation command: ${command}`);
-          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs", "scripts/patch-stock-basis-phase3a7.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
+          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs", "scripts/patch-stock-basis-phase3a7.mjs", "scripts/patch-derived-metrics-phase3a8.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
           run([match[1], ...(match[2] ? ["--restore"] : [])]);
         }
         if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);

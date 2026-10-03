@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches:
+      - fix/phase3a8-derived-metrics
       - fix/product-inventory-phase1
       - feature/google-reviews-setup-v400-2026-09-02
       - fix/google-oauth-top-level-v405-2026-09-03
@@ -50,6 +51,8 @@ jobs:
           node --test tests/finance-inputs-client-phase3a6.test.mjs tests/payroll-recorded-provider-phase3a6.test.mjs
       - name: Phase 3A.7 acquisition quantity valuation retention procurement and nested security
         run: node --import tsx --test tests/acquisition-stock-phase3a7.test.ts tests/stock-evidence-rca-phase3a7.test.ts
+      - name: Phase 3A.8 verified month close, review denominators and native item analytics
+        run: node --import tsx --test tests/derived-metrics-phase3a8.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -64,6 +67,7 @@ jobs:
         run: |
           node --test tests/canonical-boundary-worker-phase3a5.test.mjs
           node --test tests/acquisition-stock-worker-phase3a7.test.mjs
+          node --test tests/derived-metrics-worker-phase3a8.test.mjs
           node scripts/canonical-boundary-browser-phase3a5.mjs
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
@@ -82,6 +86,8 @@ jobs:
         run: node --import tsx scripts/finance-inputs-phase3a6-browser.ts
       - name: Phase 3A.7 isolated acquisition stock and historical cost mobile tablet desktop
         run: node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
+      - name: Phase 3A.8 Chromium verified close, stale-tab rejection, review aggregate, reload and venue switch
+        run: node --import tsx scripts/derived-metrics-phase3a8-browser.ts
       - name: Phase 3A.7 warehouse readiness and valuation coverage contract
         run: node --test tests/warehouse-readonly-client-phase3a7.test.mjs
       - name: Phase 3A.7 Chromium read-only warehouse navigation and venue switch
@@ -166,6 +172,8 @@ jobs:
         run: BD_STOCK_BROWSER=webkit node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
       - name: Phase 3A.6 WebKit isolated Finance report and payroll mobile tablet desktop
         run: BD_FINANCE_BROWSER=webkit node --import tsx scripts/finance-inputs-phase3a6-browser.ts
+      - name: Phase 3A.8 WebKit verified close, stale-tab rejection, review aggregate, reload and venue switch
+        run: BD_DERIVED_BROWSER=webkit node --import tsx scripts/derived-metrics-phase3a8-browser.ts
       - name: Measured navigation and embedded auth failures
         run: |
           BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts

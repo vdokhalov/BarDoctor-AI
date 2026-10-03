@@ -1,3 +1,4 @@
+import { aggregateReviews } from "./review-aggregate";
 import { procurementProductSummary } from "./procurement-basis";
 import { readFinanceInputs } from "./finance-inputs";
 import { aggregateBusinessDates, activeBusinessRow } from "./business-day-rows";
@@ -643,9 +644,12 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
   const analytics = buildAssortmentAnalytics({
     assortment: stored?.data,
     purchaseDocuments,
+    salesEvents: array(store(sources, "bd_sales_events_v1")?.data),
+    stockMovements: array(store(sources, "bd_stock_movements")?.data),
     salesDocuments: array(store(sources, "bd_sales_documents")?.data),
     salesBatches: array(store(sources, "bd_sales_batches")?.data),
     financeRevenue: array(store(sources, "bd_finance_revenue")?.data),
+    workspaceId: sources.workspaceId, dataAccountId: sources.access?.id,
     venueId,
     now,
   });
@@ -842,14 +846,10 @@ function summariseReviews(sources: VenueAIContextSources) {
   const reviewStore = store(sources, "bd_guest_reviews");
   const external = record(sources.external?.reviews);
   const storedReviews = array(reviewStore?.data).map(record);
-  const ratings = storedReviews
-    .map((item) => number(item.rating))
-    .filter((value): value is number => value !== null);
-  const total = number(external.total) ?? storedReviews.length;
-  const averageRating = number(external.averageRating)
-    ?? (ratings.length ? rounded(ratings.reduce((sum, value) => sum + value, 0) / ratings.length) : null);
-  const negative = number(external.negative)
-    ?? storedReviews.filter((item) => text(item.sentiment) === "negative" || (number(item.rating) ?? 5) <= 2).length;
+  const aggregate = aggregateReviews(storedReviews);
+  const total = aggregate.total;
+  const averageRating = aggregate.averageRating;
+  const negative = aggregate.sentiment.negative;
   return {
     available: total > 0,
     updatedAt: maxIso(
@@ -860,10 +860,15 @@ function summariseReviews(sources: VenueAIContextSources) {
     data: {
       total,
       averageRating,
-      positive: number(external.positive),
-      neutral: number(external.neutral),
+      positive: aggregate.sentiment.positive,
+      neutral: aggregate.sentiment.neutral,
+      analyzed: aggregate.analyzed,
+      rated: aggregate.rated,
+      negativeDenominator: aggregate.negativeDenominator,
+      negativeShare: aggregate.negativeShare,
+      aggregate,
       negative,
-      commonTopics: array(external.commonTopics).slice(0, 8),
+      commonTopics: aggregate.complaints.slice(0, 8).map(item => ({ topic: item.topic, count: item.negative })),
       recent: array(external.recent).slice(0, 12),
     },
   };

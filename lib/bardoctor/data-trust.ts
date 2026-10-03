@@ -129,6 +129,9 @@ function subjectHas(subject: AccessSubject, permission: PermissionKey): boolean 
 }
 
 export function canReadStore(subject: AccessSubject, storeKey: string): boolean {
+  // A closing contains the combined financial result and input manifest. Its
+  // raw/bulk read must not bypass the permissions of those nested sources.
+  if (storeKey === "bd_month_closings" && !["finance.view", "payroll.view", "inventory.view", "shifts.view", "sales.view"].every(permission => subjectHas(subject, permission as PermissionKey))) return false;
   const access = STORE_ACCESS[storeKey];
   return Boolean(access && subjectHas(subject, access.read));
 }

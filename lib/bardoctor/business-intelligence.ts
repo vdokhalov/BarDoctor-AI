@@ -321,6 +321,7 @@ export type BusinessIntelligenceInput = {
     total?: number;
     averageRating?: number | null;
     negative?: number;
+    negativeDenominator?: number;
     recurringComplaints?: number;
   };
   dataBlocks?: Array<{
@@ -991,7 +992,8 @@ function guestsComponent(value: NonNullable<BusinessIntelligenceInput["reviews"]
   const rating = numeric(value.averageRating);
   const negative = Math.max(0, Math.round(value.negative ?? 0));
   const recurring = Math.max(0, Math.round(value.recurringComplaints ?? 0));
-  const negativeShare = total > 0 ? negative / total : 0;
+  const negativeDenominator = Math.max(0, value.negativeDenominator ?? total);
+  const negativeShare = negativeDenominator > 0 ? negative / negativeDenominator : 0;
   const score = (rating !== null ? rating / 5 * 85 : 70) - negativeShare * 25 - Math.min(20, recurring * 5);
   return {
     id: "guests",
@@ -1001,7 +1003,7 @@ function guestsComponent(value: NonNullable<BusinessIntelligenceInput["reviews"]
     confidence: total >= 12 ? "high" : total >= 4 ? "medium" : "low",
     evidence: [
       rating !== null ? `Средняя оценка ${rounded(rating)}/5` : `Отзывы: ${total}`,
-      `Негативные отзывы: ${negative} из ${total}`,
+      `Негативные отзывы: ${negative} из ${negativeDenominator} проанализированных`,
       recurring ? `Повторяющиеся темы жалоб: ${recurring}` : "Повторяющихся тем жалоб не зафиксировано",
     ],
     gaps: [],
@@ -1872,6 +1874,7 @@ export function buildBusinessIntelligenceFromVenueContext(input: {
       total: reviewsTotal,
       averageRating: numeric(guestFeedback.averageRating),
       negative: numeric(guestFeedback.negative) ?? 0,
+      negativeDenominator: numeric(guestFeedback.negativeDenominator) ?? 0,
       recurringComplaints: list(guestFeedback.commonTopics).filter((item) => (numeric(record(item).count) ?? 0) >= 2).length,
     },
     dataBlocks: input.context.blocks,

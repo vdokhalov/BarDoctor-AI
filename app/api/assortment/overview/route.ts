@@ -1,9 +1,11 @@
+import { authenticatedEvidenceContext } from "../../../../lib/bardoctor/evidence-resolver";
+import { canReadVenueSource } from "../../../../lib/bardoctor/venue-context-access";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import {
   buildAssortmentAnalytics,
 } from "../../../../lib/bardoctor/assortment-analytics";
-import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
+import { unauthorized } from "../../../../lib/bardoctor/auth";
 import { reconcileTechCards } from "../../../../lib/bardoctor/tech-card-reconciliation";
 
 const STORE_KEYS = [
@@ -11,6 +13,7 @@ const STORE_KEYS = [
   "bd_purchase_documents",
   "bd_sales_documents",
   "bd_sales_batches",
+  "bd_sales_events_v1",
   "bd_stock_movements",
   "bd_finance_revenue",
 ] as const;
@@ -39,9 +42,10 @@ function noStore(value: unknown, status = 200): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const context = await authenticatedEvidenceContext(request);
+  const account = context?.account;
   if (!account) return noStore(await unauthorized().json(), 401);
-  if (!hasPermission(account, "inventory.view")) {
+  if (!hasPermission(account, "inventory.view") || !STORE_KEYS.every(key => canReadVenueSource(account, key))) {
     return noStore(
       { ok: false, code: "ACCESS_DENIED", error: "Ассортимент недоступен" },
       403,
@@ -67,11 +71,14 @@ export async function GET(request: Request): Promise<Response> {
     assortment: reconciliation.assortment,
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
     stockMovements: values(stores.get("bd_stock_movements")),
+    salesEvents: values(stores.get("bd_sales_events_v1")),
     salesDocuments: values(stores.get("bd_sales_documents")),
     salesBatches: values(stores.get("bd_sales_batches")),
     financeRevenue: values(stores.get("bd_finance_revenue")),
     period,
     venueId: account.venueId,
+    workspaceId: context!.workspaceId,
+    dataAccountId: account.id,
   });
 
   return noStore({

@@ -188,7 +188,9 @@ test("Cost analytics only use confirmed normalized venue data", async () => {
 test("Overview endpoint is authenticated, permission and venue scoped, and uncached", async () => {
   const route = await readFile(new URL("../app/api/assortment/overview/route.ts", import.meta.url), "utf8");
 
-  assert.match(route, /authenticateRequest/);
+  assert.match(route, /const context = await authenticatedEvidenceContext\(request\)/);
+  assert.match(route, /const account = context\?\.account/);
+  assert.match(route, /STORE_KEYS\.every\(key => canReadVenueSource\(account, key\)\)/);
   assert.match(route, /hasPermission\(account, "inventory\.view"\)/);
   assert.match(route, /WHERE account_id = \?/);
   assert.match(route, /venueId: account\.venueId/);

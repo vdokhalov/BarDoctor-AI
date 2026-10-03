@@ -113,7 +113,7 @@ function assertStock(r: ReturnType<typeof runtime>, quantity: number, unitCost: 
 for (const venueId of [1, 3293]) test(`canonical close permits next-month receipt and sale/refund but locks August in venue ${venueId}`, async () => {
   const closingStore = await storeRuntime(venueId), r = runtime(venueId);
   try {
-    assert.equal((await closingStore.put("bd_month_closings", [{ id: "primary:2026-08", venueId: "primary", monthKey: "2026-08", status: "closed" }])).status, 200);
+    closingStore.seed("bd_month_closings", [{ id: "primary:2026-08", venueId, monthKey: "2026-08", status: "closed" }]);
     r.put("bd_month_closings", (await closingStore.get("bd_month_closings")).body.data);
     const receipt = { ...document("next-month", 20, 14), venueId, date: "2026-09-08" };
     const before = r.allStores(), audit = r.audit();

@@ -1,3 +1,4 @@
+import { aggregateReviews, reviewMetricRating, reviewMetricBuckets } from "./review-aggregate";
 export const REVIEW_SOURCE_LABELS: Record<string, string> = {
   google: "Google",
   instagram: "Instagram",
@@ -388,74 +389,43 @@ export function mergeReviewRecords(
   return { reviews: sortReviews(reviews), created, updated, skipped, invalid, changes };
 }
 
-function average(values: number[]): number | null {
-  if (!values.length) return null;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length * 100) / 100;
-}
-
-function topicSummary(reviews: CanonicalReview[]) {
-  const topics = new Map<string, { topic: string; count: number; positive: number; negative: number }>();
-  for (const review of reviews) {
-    const sentiment = reviewText(review.sentiment).toLocaleLowerCase("en");
-    const reviewTopics = Array.isArray(review.topics) ? review.topics : [];
-    for (const rawTopic of reviewTopics) {
-      const topic = reviewText(rawTopic, "", 80);
-      if (!topic) continue;
-      const item = topics.get(topic) ?? { topic, count: 0, positive: 0, negative: 0 };
-      item.count += 1;
-      if (sentiment === "positive") item.positive += 1;
-      if (sentiment === "negative") item.negative += 1;
-      topics.set(topic, item);
-    }
-  }
-  return [...topics.values()].sort((left, right) => right.count - left.count || left.topic.localeCompare(right.topic));
-}
 
 export function reviewLayerSummary(reviews: CanonicalReview[], now = new Date()) {
-  const ratings = reviews.map((review) => review.rating).filter((value): value is number => value !== null);
-  const analyzed = reviews.filter((review) => review.aiStatus === "done" && review.sentiment);
+  const aggregate = aggregateReviews(reviews);
+  const ratings = reviews.map((review) => reviewMetricRating(review.rating)).filter((value): value is number => value !== null);
   const methods: Record<ReviewIngestionMethod, number> = { sync: 0, manual: 0, file_import: 0 };
   const sources: Record<string, number> = {};
   for (const review of reviews) {
     methods[review.ingestionMethod] += 1;
     sources[review.source] = (sources[review.source] ?? 0) + 1;
   }
-  const currentStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000);
-  const previousStart = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1_000);
-  const currentRatings = reviews.filter((review) => new Date(review.publishedAt) >= currentStart && review.rating !== null).map((review) => review.rating as number);
-  const previousRatings = reviews.filter((review) => {
-    const date = new Date(review.publishedAt);
-    return date >= previousStart && date < currentStart && review.rating !== null;
-  }).map((review) => review.rating as number);
-  const currentAverage = average(currentRatings);
-  const previousAverage = average(previousRatings);
-  const topicItems = topicSummary(analyzed);
+  const buckets = reviewMetricBuckets(reviews, now);
+  const currentRatingCount = buckets.current.rated, previousRatingCount = buckets.previous.rated;
+  const currentAverage = buckets.current.averageRating, previousAverage = buckets.previous.averageRating;
+  const topicItems = aggregate.topics;
   return {
+    ...aggregate,
     total: reviews.length,
     rated: ratings.length,
-    averageRating: average(ratings),
-    analyzed: analyzed.length,
+    averageRating: aggregate.averageRating,
+    analyzed: aggregate.analyzed,
     pendingAnalysis: reviews.filter((review) => review.aiStatus === "pending" || review.aiStatus === "analyzing").length,
     failedAnalysis: reviews.filter((review) => review.aiStatus === "failed").length,
-    confidence: analyzed.length >= 10 ? "high" : analyzed.length >= 3 ? "medium" : "low",
-    confidenceReason: analyzed.length >= 3 ? `Вывод основан на ${analyzed.length} проанализированных отзывах.` : "Для устойчивых выводов нужно не менее трёх проанализированных отзывов.",
-    sentiment: {
-      positive: analyzed.filter((review) => review.sentiment === "positive").length,
-      neutral: analyzed.filter((review) => review.sentiment === "neutral").length,
-      negative: analyzed.filter((review) => review.sentiment === "negative").length,
-    },
+    confidence: aggregate.analyzed >= 10 ? "high" : aggregate.analyzed >= 3 ? "medium" : "low",
+    confidenceReason: aggregate.analyzed >= 3 ? `Вывод основан на ${aggregate.analyzed} проанализированных отзывах.` : "Для устойчивых выводов нужно не менее трёх проанализированных отзывов.",
+    sentiment: aggregate.sentiment,
     trend: {
-      available: currentRatings.length >= 2 && previousRatings.length >= 2,
+      available: currentRatingCount >= 2 && previousRatingCount >= 2,
       currentAverage,
       previousAverage,
-      delta: currentRatings.length >= 2 && previousRatings.length >= 2 && currentAverage !== null && previousAverage !== null ? Math.round((currentAverage - previousAverage) * 100) / 100 : null,
-      currentCount: currentRatings.length,
-      previousCount: previousRatings.length,
-      reason: currentRatings.length >= 2 && previousRatings.length >= 2 ? null : "Недостаточно оценок в текущем или предыдущем 30-дневном периоде.",
+      delta: currentRatingCount >= 2 && previousRatingCount >= 2 && currentAverage !== null && previousAverage !== null ? Math.round((currentAverage - previousAverage) * 100) / 100 : null,
+      currentCount: currentRatingCount,
+      previousCount: previousRatingCount,
+      reason: currentRatingCount >= 2 && previousRatingCount >= 2 ? null : "Недостаточно оценок в текущем или предыдущем 30-дневном периоде.",
     },
     topics: topicItems.slice(0, 10),
-    complaints: topicItems.filter((item) => item.negative > 0).sort((left, right) => right.negative - left.negative).slice(0, 5),
-    compliments: topicItems.filter((item) => item.positive > 0).sort((left, right) => right.positive - left.positive).slice(0, 5),
+    complaints: aggregate.complaints.slice(0, 5),
+    compliments: aggregate.compliments.slice(0, 5),
     sources,
     methods,
     lastReceivedAt: reviews.reduce<string | null>((latest, review) => {
@@ -473,7 +443,7 @@ export function reviewHasOwnerReply(review: CanonicalReview): boolean {
 export function reviewNeedsAttention(review: CanonicalReview): boolean {
   if (reviewHasOwnerReply(review)) return false;
   const sentiment = reviewText(review.sentiment).toLocaleLowerCase("en");
-  return (review.rating !== null && review.rating <= 3) || sentiment === "negative";
+  return (reviewMetricRating(review.rating) !== null && reviewMetricRating(review.rating)! <= 3) || sentiment === "negative";
 }
 
 export function homeReviewMetrics(reviews: CanonicalReview[], now = new Date(), selection?: unknown) {
