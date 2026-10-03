@@ -49,7 +49,7 @@ jobs:
           node --import tsx --test tests/finance-inputs-phase3a6.test.ts
           node --test tests/finance-inputs-client-phase3a6.test.mjs tests/payroll-recorded-provider-phase3a6.test.mjs
       - name: Phase 3A.7 acquisition quantity valuation retention procurement and nested security
-        run: node --import tsx --test tests/acquisition-stock-phase3a7.test.ts
+        run: node --import tsx --test tests/acquisition-stock-phase3a7.test.ts tests/stock-evidence-rca-phase3a7.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint

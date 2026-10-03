@@ -3,11 +3,13 @@ import { lifecycleRuntime } from './lifecycle-runtime';
 import { consolidateInventoryDuplicates } from '../../lib/bardoctor/inventory';
 import type { EvidenceReference, EvidenceResourceKind, EvidenceResolution } from '../../lib/bardoctor/evidence-contracts';
 export type StockRow = Record<string, unknown>;
-export async function stockRuntime() {
+export async function stockRuntime(options: { now?: string | null } = {}) {
   const heads = new Map<string, { size: number; etag: string; httpMetadata: { contentType: string }; customMetadata?: Record<string,string> }>();
+  const clock = { now: options.now === undefined ? '2026-10-02T12:00:00.000Z' : options.now ?? undefined,
+    bindings: { BUCKET: { head: async (key: string) => heads.get(key) ?? null, get: async (key: string) => {const meta=heads.get(key);return meta?{...meta,body:'SYNTHETIC FILE',writeHttpMetadata:(headers:Headers)=>headers.set('Content-Type',meta.httpMetadata.contentType)}:null;} } } };
   const r = await lifecycleRuntime({ confirm: './app/api/purchases/confirm/route', evidence: './app/api/evidence/resolve/route',
     file: './app/api/purchases/files/[id]/route', valuation: './app/api/inventory/valuation/route', counts: './app/api/inventory/counts/route', opening: './app/api/inventory/opening/route', sales: './app/api/sales-events/route' },
-    { now: '2026-10-02T12:00:00.000Z', bindings: { BUCKET: { head: async (key: string) => heads.get(key) ?? null, get: async (key: string) => {const meta=heads.get(key);return meta?{...meta,body:'SYNTHETIC FILE',writeHttpMetadata:(headers:Headers)=>headers.set('Content-Type',meta.httpMetadata.contentType)}:null;} } } });
+    clock);
   const owner = await r.register('stock-owner@isolated.test'), member = await r.register('stock-manager@isolated.test'), foreign = await r.register('stock-foreign@isolated.test');
   const venueId = owner.activeVenueId, workspaceId = Number(r.sqlite.prepare('SELECT workspace_id id FROM venues WHERE id=?').get(venueId)!.id);
   const put = (key: string, data: unknown) => r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').run(owner.userId, key, JSON.stringify(data), '2026-10-02T11:00:00.000Z');
@@ -27,5 +29,6 @@ export async function stockRuntime() {
     return call('confirm','/api/purchases/confirm','POST',{venueId,document});
   };
   const resolve = async (ref:unknown,user=owner,query='') => { const before=snapshot();const result=await call('evidence','/api/evidence/resolve?ref='+encodeURIComponent(JSON.stringify(ref))+query,'GET',undefined,user);assert.deepEqual(snapshot(),before,'Every success/failed evidence read preserves canonical bytes, timestamps, audit and files');return {...result,body:result.body as unknown as EvidenceResolution}; };
-  return {...r,owner,member,foreign,venueId,workspaceId,put,get,reference,snapshot,call,confirm,resolve,permissions,heads};
+  return {...r,owner,member,foreign,venueId,workspaceId,put,get,reference,snapshot,call,confirm,resolve,permissions,heads,
+    setTime: (now: string) => { assert.ok(clock.now, 'Use real elapsed time for an unfrozen runtime'); clock.now = now; } };
 }

@@ -122,7 +122,23 @@ async function load(c: Context, ref: EvidenceReference, asOf: string): Promise<N
           for (const id of warehouseIds) add("STOCK_VALUATION", ref.id, id);
         } else { add("STOCK_QUANTITY", ref.id, ref.partId); add("COST_BASIS", ref.id, ref.partId); }
         if (!valuation.complete) missing("COST_UNKNOWN");
-        revisionInput = { balance: record, currency, lines: valuation.lines, selectedReceipt: movements.find(row => row.id === basis.movementId) ?? null,
+        const lines = valuation.lines.map(line => {
+          if (!line.costBasis) return line;
+          const { asOf: _asOf, ...costBasis } = line.costBasis; void _asOf;
+          return { ...line, costBasis };
+        });
+        // Reuse the live acquisition contract for every selected valuation basis,
+        // including warehouse-specific bases and zero-stock's selected receipt.
+        const receiptIds = [...new Set([basis.movementId, ...valuation.lines.map(line => line.costBasis?.movementId)].filter(Boolean))];
+        const acquisitions = [];
+        for (const id of receiptIds) {
+          const receipt = movements.find(row => row.id === id);
+          if (!receipt) continue;
+          const acquisition = await readReceiptAcquisition(c, receipt);
+          acquisitions.push({ receipt, acquisition: acquisition.revisionInput });
+          if (!acquisition.complete) { missing(acquisition.diagnostic); projection.evidenceComplete = false; }
+        }
+        revisionInput = { balance: record, currency, lines, acquisitions, selectedReceipt: movements.find(row => row.id === basis.movementId) ?? null,
           anchor: counts[0] ?? openings[0] ?? null, contributors: quantity.contributors };
       }
     }

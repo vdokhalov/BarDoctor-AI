@@ -15,14 +15,18 @@ export function stockQuantityEvidence(input: { balance: Row; venueId: number; wo
   const balance = input.balance, key = product(balance), unit = String(balance.unit ?? "unknown") as BaseInventoryUnit;
   const quantity = finite(balance.current ?? balance.quantity ?? balance.onHand);
   const exactWarehouse = input.warehouseId ?? warehouse(balance);
-  const inWarehouse = (row: Row) => exactWarehouse ? warehouse(row) === exactWarehouse || exactWarehouse === "__venue__" && !warehouse(row) : !warehouse(row) || warehouse(row) === "__venue__";
+  // A balance without a warehouse is the authoritative aggregate. Named-warehouse
+  // consumption also changes that balance; its proof must retain those movements.
+  const inWarehouse = (row: Row) => !exactWarehouse || warehouse(row) === exactWarehouse || exactWarehouse === "__venue__" && !warehouse(row);
+  // An aggregate count/opening does not prove any particular warehouse quantity.
+  const anchorInWarehouse = (row: Row) => exactWarehouse ? warehouse(row) === exactWarehouse : !warehouse(row);
   const owned = rows(input.movements).filter(row => Object.entries({ venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).every(([field, expected]) => expected == null || row[field] == null || Number(row[field]) === expected));
   const selected = owned.filter(row => product(row) === key && inWarehouse(row));
   const seen = new Set<unknown>();
   const duplicateIds = selected.some(row => { if (!row.id || seen.has(row.id)) return true; seen.add(row.id); return false; });
   const countId = balance.lastInventoryDocumentId, openingId = balance.openingDocumentId;
-  const countCandidates = scopedBusinessRows(input.counts, scope).filter(row => row.id === countId && row.status === "completed" && inWarehouse(row));
-  const openingCandidates = scopedBusinessRows(input.openings, scope).filter(row => row.id === openingId && row.status === "confirmed" && inWarehouse(row));
+  const countCandidates = scopedBusinessRows(input.counts, scope).filter(row => row.id === countId && row.status === "completed" && anchorInWarehouse(row));
+  const openingCandidates = scopedBusinessRows(input.openings, scope).filter(row => row.id === openingId && row.status === "confirmed" && anchorInWarehouse(row));
   const anchor = countCandidates.length === 1 ? countCandidates[0] : !countId && openingCandidates.length === 1 ? openingCandidates[0] : null;
   const isCount = Boolean(anchor && countCandidates.length === 1);
   const anchorLines = anchor ? scopedBusinessRows(rows(anchor.items ?? anchor.rows), scope).filter(row => product(row) === key) : [];
