@@ -82,6 +82,10 @@ jobs:
         run: node --import tsx scripts/finance-inputs-phase3a6-browser.ts
       - name: Phase 3A.7 isolated acquisition stock and historical cost mobile tablet desktop
         run: node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
+      - name: Phase 3A.7 warehouse readiness and valuation coverage contract
+        run: node --test tests/warehouse-readonly-client-phase3a7.test.mjs
+      - name: Phase 3A.7 Chromium read-only warehouse navigation and venue switch
+        run: node --import tsx scripts/warehouse-readonly-phase3a7-browser.ts
       - name: Operational Day Phase 1A mobile desktop with real isolated handlers
         run: |
           node --import tsx scripts/operational-day-browser.ts
@@ -156,6 +160,8 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Phase 3A.7 WebKit read-only warehouse navigation and venue switch
+        run: BD_STOCK_BROWSER=webkit node --import tsx scripts/warehouse-readonly-phase3a7-browser.ts
       - name: Phase 3A.7 WebKit isolated acquisition stock and historical cost mobile tablet desktop
         run: BD_STOCK_BROWSER=webkit node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
       - name: Phase 3A.6 WebKit isolated Finance report and payroll mobile tablet desktop

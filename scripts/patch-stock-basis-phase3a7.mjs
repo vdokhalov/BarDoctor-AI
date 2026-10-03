@@ -6,6 +6,11 @@ const start='/* stock-basis-phase3a7:start */',end='/* stock-basis-phase3a7:end 
 let source=fs.readFileSync(file,'utf8');
 const from=source.indexOf(start);
 if(from>=0){const to=source.indexOf(end,from);if(to<from||source.indexOf(start,from+start.length)>=0)throw new Error('Unique Phase3a7 boundary required');source=source.slice(0,from)+source.slice(to+end.length).replace(/^\n/,'');}
+// Readiness must remain a read: explicit repair is an authorized command, never a mount side effect.
+const automaticRepair='S.useEffect(()=>{t&&(L(),bdWarehouseRepairProducts())},[t])';
+const readOnlyReady='S.useEffect(()=>{t&&L()},[t])';
+if(source.split(automaticRepair).length===2)source=source.replace(automaticRepair,readOnlyReady);
+else if(source.split(readOnlyReady).length!==2)throw new Error('Unique warehouse readiness effect required');
 if(process.argv.includes('--restore')){fs.writeFileSync(file,source);process.exit(0);}
 const domain=await build({entryPoints:[path.join(root,'lib/bardoctor/valuation.ts')],bundle:true,format:'iife',globalName:'bdStockBasisPhase3a7',platform:'browser',write:false,minify:true});
 const client=`

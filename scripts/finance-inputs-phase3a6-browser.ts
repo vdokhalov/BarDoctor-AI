@@ -114,8 +114,15 @@ try {
       await page.getByRole("button", { name: "Далее", exact: true }).click();
       await page.getByText("ФОТ смены · сохранённый", { exact: true }).waitFor();
       for (let step = 0; step < 3; step++) await page.getByRole("button", { name: "Далее", exact: true }).click();
+      // Closing the editor does not drain bdShiftCloseApiV272's two scheduled
+      // store-notification batches. Register before save, then observe all six
+      // real notifications before a test-forced replacement of this document.
+      await page.evaluate(readFileSync("scripts/qa/finance-save-refresh-observer.js", "utf8"));
       await page.getByRole("button", { name: "Сохранить изменения", exact: true }).click();
       await page.getByRole("button", { name: "Сохранить изменения", exact: true }).waitFor({ state: "detached" });
+      await page.waitForFunction(() => (window as unknown as { __bdFinanceSaveRefresh?: { pending: string[] } }).__bdFinanceSaveRefresh?.pending.length === 0);
+      await page.waitForLoadState("networkidle");
+      await waitForSalesHostReads(page);
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90, "editor preserves recorded payroll after rule changes");
       assert.equal((await send({ action: "close_shift", shiftId: "C" })).status, 201);
       const completed = (await days()).days[0]; assert.equal(completed.status, "COMPLETE"); assert.equal(completed.revenue.status, "FINAL"); assert.equal(completed.payroll.amount, 90);
