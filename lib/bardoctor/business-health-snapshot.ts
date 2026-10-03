@@ -8,7 +8,7 @@ import type {
 import { businessHealthStatusForScore } from "./business-intelligence";
 import type { VenueAIContext } from "./venue-ai-context";
 
-export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v4" as const;
+export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v5" as const;
 
 export type BusinessHealthFactorAvailability = "measured" | "unavailable";
 
@@ -150,6 +150,7 @@ export function businessHealthActionTarget(issueKey: string): NonNullable<Busine
 }
 
 function operationalInterpretation(component: BusinessHealthComponent): string {
+  if (component.score === null) return "Операционная оценка недоступна: полнота источников не подтверждена.";
   const issue = component.evidence.find((item) => /:\s*[1-9]\d*/.test(item));
   const status = businessHealthStatusForScore(component.score);
   if (issue && status !== "healthy") return `Операционная зона требует внимания: ${issue.charAt(0).toLocaleLowerCase("ru")}${issue.slice(1)}.`;

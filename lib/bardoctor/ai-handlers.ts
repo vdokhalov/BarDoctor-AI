@@ -34,11 +34,8 @@ import {
   loadAIDoctorMemory,
   type AIDoctorMemory,
 } from "./ai-doctor-attention";
-import {
-  buildBusinessIntelligenceFromVenueContext,
-  type AIDoctorIntelligence,
-} from "./business-intelligence";
-import { buildBusinessHealthSnapshot } from "./business-health-snapshot";
+import { buildBusinessIntelligenceFromVenueContext, type AIDoctorIntelligence } from "./business-intelligence";
+import { loadCanonicalHealthInputs } from "./canonical-health-inputs";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -899,8 +896,6 @@ function normaliseDiagnosis(
   venueContext: VenueAIContext,
   memory: AIDoctorMemory,
   intelligence: AIDoctorIntelligence,
-  venueId: string | number,
-  dataAccountId: string | number,
 ): JsonRecord {
   const result = asRecord(rawResult) ?? {};
   const equipment = Array.isArray(body.equipment) ? body.equipment : [];
@@ -1341,12 +1336,6 @@ function normaliseDiagnosis(
     contextVersion: venueContext.version,
     intelligence: managementIntelligence,
     businessHealth: managementIntelligence.businessHealth,
-    businessHealthSnapshot: buildBusinessHealthSnapshot({
-      venueId,
-      dataAccountId,
-      intelligence: managementIntelligence,
-      context: venueContext,
-    }),
     financialAssessment,
     summary: briefingDiagnosis?.summary ?? attention.diagnosticSentence,
     topPriority: managementTopPriority,
@@ -1368,6 +1357,9 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
   try {
     const body = await requestBody(request, 100_000);
     if (!asRecord(body.profile)) throw new AIServiceError("Профиль заведения обязателен.", 400);
+    const canonicalHealth = await loadCanonicalHealthInputs(account);
+    if (!canonicalHealth) return unauthorized();
+    if (canonicalHealth.restricted) return restrictedVenueContext();
     const external = await loadDiagnosisExternalContext(account);
     const venueContext = await loadVenueAIContext(account, "diagnosis", body, {
       reviews: external.reviews as unknown as JsonRecord,
@@ -1375,17 +1367,16 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
     });
     const memory = await loadAIDoctorMemory(account);
     const memoryItems = [...memory.tasks, ...memory.actionTasks, ...memory.decisions];
-    const intelligence = buildBusinessIntelligenceFromVenueContext({
+    // G06: only Health uses the shared canonical snapshot. Preserve the existing
+    // contextual briefing/memory path; its remaining provenance debt is G05.
+    const contextualIntelligence = buildBusinessIntelligenceFromVenueContext({
       venueId: account.venueId,
       context: venueContext,
+      canonicalOperations: canonicalHealth.snapshot.operationsInputs,
       operationalInput: {
         ...body,
         accountingCurrency: venueContext.accountingCurrency,
-        externalProviderStatus: {
-          attempted: external.reviewSync.attempted,
-          ok: external.reviewSync.ok,
-          coverage: "insufficient",
-        },
+        externalProviderStatus: { attempted: external.reviewSync.attempted, ok: external.reviewSync.ok, coverage: "insufficient" },
       },
       previousHypotheses: memoryItems
         .map((item) => asRecord(item.hypothesisData) ?? asRecord(item.hypothesis) ?? item)
@@ -1394,6 +1385,7 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
         .map((item) => asRecord(item.verificationPlan) ?? item)
         .filter((item) => Boolean(text(item.id) || text(item.verificationPlanId))),
     });
+    const intelligence = { ...contextualIntelligence, businessHealth: canonicalHealth.intelligence.businessHealth };
     const evidenceCatalog = [
       ...buildEvidenceCatalog(body, external, venueContext),
       ...intelligenceEvidenceCatalog(intelligence),
@@ -1483,12 +1475,10 @@ Management briefing формируется сервером. Не смешива
       venueContext,
       memory,
       intelligence,
-      account.venueId,
-      account.id,
     );
     return Response.json({
       success: true,
-      data,
+      data: { ...data, businessHealth: canonicalHealth.intelligence.businessHealth, businessHealthSnapshot: canonicalHealth.snapshot },
       generatedAt: new Date().toISOString(),
       context: {
         reviewsIncluded: external.reviews.total,

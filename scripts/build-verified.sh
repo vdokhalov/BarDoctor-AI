@@ -19,6 +19,7 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+node "${script_dir}/patch-health-inputs-phase3a9.mjs" --restore
 node "${script_dir}/patch-derived-metrics-phase3a8.mjs" --restore
 node "${script_dir}/patch-stock-basis-phase3a7.mjs" --restore
 node "${script_dir}/patch-finance-inputs-phase3a6.mjs" --restore
@@ -110,6 +111,7 @@ node "${script_dir}/patch-canonical-boundary-phase3a5.mjs"
 node "${script_dir}/patch-finance-inputs-phase3a6.mjs"
 node "${script_dir}/patch-stock-basis-phase3a7.mjs"
 node "${script_dir}/patch-derived-metrics-phase3a8.mjs"
+node "${script_dir}/patch-health-inputs-phase3a9.mjs"
 node "${script_dir}/prepare-versioned-client-asset-v379.mjs"
 timeout \
   --signal=TERM \
@@ -118,6 +120,7 @@ timeout \
   "${vinext}" build
 
 node "${script_dir}/restore-canonical-client-asset-name-v379.mjs"
+node "${script_dir}/patch-health-inputs-phase3a9.mjs" --restore
 node "${script_dir}/patch-derived-metrics-phase3a8.mjs" --restore
 node "${script_dir}/patch-stock-basis-phase3a7.mjs" --restore
 node "${script_dir}/patch-finance-inputs-phase3a6.mjs" --restore
@@ -239,6 +242,7 @@ node "${script_dir}/patch-canonical-boundary-phase3a5.mjs"
 node "${script_dir}/patch-finance-inputs-phase3a6.mjs"
 node "${script_dir}/patch-stock-basis-phase3a7.mjs"
 node "${script_dir}/patch-derived-metrics-phase3a8.mjs"
+node "${script_dir}/patch-health-inputs-phase3a9.mjs"
 node "${script_dir}/finalize-versioned-client-asset-v385.mjs"
 node "${script_dir}/verify-versioned-client-asset-v379.mjs"
 "${script_dir}/validate-artifact.sh"

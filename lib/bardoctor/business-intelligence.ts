@@ -1,3 +1,4 @@
+import type { HealthOperationsInputs, HealthCounter } from "./health-operations-inputs";
 import { aggregateBusinessDates } from "./business-day-rows";
 import { buildSelfServiceAnalytics, type SelfServiceAnalytics } from "./self-service-analytics";
 
@@ -39,6 +40,8 @@ export type BusinessHealthComponent = {
   confidence: ConfidenceLevel;
   evidence: string[];
   gaps: string[];
+  availability?: "AVAILABLE" | "PARTIAL" | "UNAVAILABLE" | "RESTRICTED";
+  inputCounters?: HealthOperationsInputs["counters"];
 };
 
 export type StructuredHypothesis = {
@@ -312,10 +315,11 @@ export type BusinessIntelligenceInput = {
   closedMonthComparison?: JsonRecord | null;
   currentFinancialPeriod?: JsonRecord | null;
   operations?: {
-    unclosedShifts?: number;
-    stockAnomalies?: number;
-    criticalBlockers?: number;
-    recurringEquipmentFailures?: number;
+    unclosedShifts?: number | null;
+    stockAnomalies?: number | null;
+    criticalBlockers?: number | null;
+    recurringEquipmentFailures?: number | null;
+    counters?: HealthOperationsInputs["counters"];
   };
   reviews?: {
     total?: number;
@@ -972,18 +976,28 @@ function demandComponent(input: {
 }
 
 function operationsComponent(value: NonNullable<BusinessIntelligenceInput["operations"]>): BusinessHealthComponent {
-  const unclosed = Math.max(0, Math.round(value.unclosedShifts ?? 0));
-  const stock = Math.max(0, Math.round(value.stockAnomalies ?? 0));
-  const blockers = Math.max(0, Math.round(value.criticalBlockers ?? 0));
-  const equipment = Math.max(0, Math.round(value.recurringEquipmentFailures ?? 0));
-  const evidence = [
-    unclosed ? `Незакрытые смены: ${unclosed}` : "Незакрытых смен не зафиксировано",
-    stock ? `Аномалии остатков: ${stock}` : "Критичных аномалий остатков не зафиксировано",
-    blockers ? `Критические операционные блокеры: ${blockers}` : "Критических блокеров не зафиксировано",
-    equipment ? `Повторяющиеся сбои оборудования: ${equipment}` : "Повторяющихся сбоев оборудования не зафиксировано",
-  ];
-  const score = 90 - Math.min(30, unclosed * 5) - Math.min(20, stock * 7) - Math.min(60, blockers * 30) - Math.min(25, equipment * 8);
-  return { id: "operations", label: "Операции", score: clamp(score), weight: 25, confidence: "high", evidence, gaps: [] };
+  const labels = {
+    unclosedShifts: ["Дни, ожидающие операционных данных", "Дней, ожидающих операционных данных, не зафиксировано"],
+    stockAnomalies: ["Аномалии остатков", "Критичных аномалий остатков не зафиксировано"],
+    criticalBlockers: ["Критические операционные блокеры", "Критических блокеров не зафиксировано"],
+    recurringEquipmentFailures: ["Повторяющиеся сбои оборудования / просроченное ТО", "Повторяющихся сбоев оборудования и просроченного ТО не зафиксировано"],
+  };
+  const evidence: string[] = [], gaps: string[] = [];
+  const states: string[] = [];
+  for (const key of Object.keys(labels) as Array<keyof typeof labels>) {
+    const input: HealthCounter | undefined = value.counters?.[key];
+    const known = input ? input.availability === "AVAILABLE" && input.evidenceStatus === "COMPLETE" : typeof value[key] === "number" && Number.isFinite(value[key]);
+    const state = known ? "AVAILABLE" : input?.availability ?? "UNAVAILABLE";
+    states.push(state);
+    if (!known) gaps.push(`${labels[key][0]}: ${state} — полнота источника не подтверждена`);
+    else evidence.push(value[key]! > 0 ? `${labels[key][0]}: ${value[key]}` : labels[key][1]);
+  }
+  const availability = states.includes("RESTRICTED") ? "RESTRICTED" : states.includes("UNAVAILABLE") ? "UNAVAILABLE" : states.includes("PARTIAL") ? "PARTIAL" : "AVAILABLE";
+  const complete = availability === "AVAILABLE";
+  const unclosed = Math.max(0, Math.round(value.unclosedShifts ?? 0)), stock = Math.max(0, Math.round(value.stockAnomalies ?? 0));
+  const blockers = Math.max(0, Math.round(value.criticalBlockers ?? 0)), equipment = Math.max(0, Math.round(value.recurringEquipmentFailures ?? 0));
+  const score = complete ? clamp(90 - Math.min(30, unclosed * 5) - Math.min(20, stock * 7) - Math.min(60, blockers * 30) - Math.min(25, equipment * 8)) : null;
+  return { id: "operations", label: "Операции", score, weight: 25, confidence: complete ? "high" : "low", availability, inputCounters: value.counters, evidence, gaps };
 }
 
 function guestsComponent(value: NonNullable<BusinessIntelligenceInput["reviews"]>): BusinessHealthComponent {
@@ -1822,6 +1836,7 @@ export function buildBusinessIntelligenceFromVenueContext(input: {
   venueId?: string | number | null;
   context: { generatedAt: string; accountingCurrency?: string | null; blocks: Array<{ id: string; label: string; available: boolean; freshness: string; detail: string }>; promptData: Record<string, JsonRecord> };
   operationalInput?: unknown;
+  canonicalOperations?: HealthOperationsInputs;
   previousHypotheses?: unknown[];
   previousVerificationPlans?: unknown[];
 }): AIDoctorIntelligence {
@@ -1832,10 +1847,6 @@ export function buildBusinessIntelligenceFromVenueContext(input: {
   const guestFeedback = record(input.context.promptData.guestFeedback);
   const seasonality = record(input.context.promptData.seasonalityAndEvents);
   const market = record(input.context.promptData.market);
-  const calendar = record(operational.operatingCalendar);
-  const equipment = list(operational.equipment).map(record);
-  const cases = list(operational.cases).map(record);
-  const stock = record(input.context.promptData.purchasesAndInventory);
   const menu = record(input.context.promptData.menuAndRecipes);
   const reviewsTotal = numeric(guestFeedback.total) ?? 0;
   return buildBusinessIntelligence({
@@ -1864,12 +1875,7 @@ export function buildBusinessIntelligenceFromVenueContext(input: {
     latestClosedMonth: record(performance.latestClosedMonth),
     previousClosedMonth: record(performance.previousClosedMonth),
     closedMonthComparison: record(performance.closedMonthComparison),
-    operations: {
-      unclosedShifts: list(calendar.unexplainedRevenueGapDates).length,
-      stockAnomalies: list(stock.lowStock).length + (numeric(record(stock.procurementIntegrity).negativeStock) ?? 0),
-      criticalBlockers: cases.filter((item) => text(item.priority) === "critical" && !["closed", "resolved"].includes(text(item.status))).length,
-      recurringEquipmentFailures: equipment.filter((item) => (numeric(item.repairCount) ?? 0) >= 2 || item.maintenanceOverdue === true).length,
-    },
+    operations: input.canonicalOperations,
     reviews: {
       total: reviewsTotal,
       averageRating: numeric(guestFeedback.averageRating),

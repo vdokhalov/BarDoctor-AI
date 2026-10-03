@@ -1,9 +1,8 @@
 import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
-import { buildBusinessHealthSnapshot } from "../../../lib/bardoctor/business-health-snapshot";
-import { buildBusinessIntelligenceFromVenueContext } from "../../../lib/bardoctor/business-intelligence";
-import { loadVenueAIContext } from "../../../lib/bardoctor/venue-ai-context";
+import { loadCanonicalHealthInputs } from "../../../lib/bardoctor/canonical-health-inputs";
+
 
 function noStore(response: Response): Response {
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
@@ -23,17 +22,10 @@ export async function GET(request: Request): Promise<Response> {
 
   if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
-  const context = await loadVenueAIContext(account, "diagnosis");
-  const intelligence = buildBusinessIntelligenceFromVenueContext({
-    venueId: account.venueId,
-    context,
-  });
-  const snapshot = buildBusinessHealthSnapshot({
-    venueId: account.venueId,
-    dataAccountId: account.id,
-    intelligence,
-    context,
-  });
+  const canonical = await loadCanonicalHealthInputs(account);
+  if (!canonical) return noStore(unauthorized());
+  if (canonical.restricted) return restrictedVenueContext();
+  const { context, intelligence, snapshot } = canonical;
 
   return noStore(Response.json({
     success: true,

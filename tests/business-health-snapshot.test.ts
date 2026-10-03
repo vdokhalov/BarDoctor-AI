@@ -140,7 +140,7 @@ test("operations warning explains its canonical stock factor and deep-links to t
       { date: "2026-08-02", revenue: 120, receipts: 11 },
     ],
     latestClosedMonth: { monthKey: "2026-07", revenue: 10_000, finalProfit: 1_000 },
-    operations: { stockAnomalies: 6 },
+    operations: { stockAnomalies: 6, unclosedShifts: 0, criticalBlockers: 0, recurringEquipmentFailures: 0 },
     dataBlocks: [],
   });
   const snapshot = buildBusinessHealthSnapshot({ venueId: "venue-a", intelligence: source, context });
@@ -272,7 +272,7 @@ test("venue, calculation version and reporting period isolate cache identities",
   const nextVersion = businessHealthSnapshotCacheKey({
     ...base,
     venueId: "3280",
-    calculationVersion: "business-health-engine-v5",
+    calculationVersion: "business-health-engine-v6",
   });
 
   assert.notEqual(venueA, venueB);

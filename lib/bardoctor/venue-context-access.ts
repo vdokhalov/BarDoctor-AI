@@ -33,7 +33,8 @@ export function canReadDiagnosisSources(account: AuthenticatedAccount): boolean 
 }
 
 export function canReadSavedDiagnosis(account: AuthenticatedAccount): boolean {
-  return canReadDiagnosisSources(account) && hasPermission(account, "tasks.view");
+  return canReadDiagnosisSources(account) && hasPermission(account, "tasks.view")
+    && hasPermission(account, "incidents.view") && hasPermission(account, "equipment.view");
 }
 
 export function restrictedVenueContext(): Response {
