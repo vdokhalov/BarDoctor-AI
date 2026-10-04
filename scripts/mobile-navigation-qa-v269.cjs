@@ -154,7 +154,7 @@ function freshBusinessHealthEnvelope(venueId, healthy = false) {
   const snapshot = envelope.data.businessHealthSnapshot;
   snapshot.snapshotId = `business-health-snapshot:${venueId}:mobile-qa-fresh${healthy ? "-healthy" : ""}`;
   snapshot.dataAccountId = String(venueId === 901 ? 1 : 2);
-  snapshot.calculationVersion = "business-health-engine-v4";
+  snapshot.calculationVersion = "business-health-engine-v5";
   snapshot.generatedAt = "2026-08-28T12:30:00.000Z";
   envelope.generatedAt = snapshot.generatedAt;
   envelope.data.intelligence.generatedAt = snapshot.generatedAt;

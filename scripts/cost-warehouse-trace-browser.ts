@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 import { costTraceRuntime, costFact } from "../tests/helpers/cost-trace-runtime";
 import { resolvedEvidence } from "../tests/helpers/revenue-trace-runtime";
 import type { EvidenceReference, EvidenceResolution, SaleCostResolution } from "../lib/bardoctor/evidence-contracts";
@@ -21,10 +21,11 @@ const server = createServer(async (req, res) => {
 });
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
-const browser = await chromium.launch({ executablePath: await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
+const engine = process.env.BD_EVIDENCE_BROWSER === "webkit" ? webkit : chromium;
+const browser = await engine.launch({ headless: true, ...(engine === chromium ? { executablePath: await resolveBrowserExecutable(chromium.executablePath()), args: chromiumArgs } : {}) });
 const results = [];
 try {
-  for (const width of [390, 1280]) {
+  for (const width of [390, 820, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: width < 600, hasTouch: width < 600 });
     try {
       const page = await context.newPage(), errors: string[] = []; page.on("pageerror", error => errors.push(error.message)); await page.goto(base);
@@ -71,5 +72,5 @@ try {
       results.push({ width, capturedCost: fact.value, writeOffValuation: Math.round(total * 100) / 100, ingredients, movements: ids.size, pagination: "PASS", security: "PASS", readOnly: "PASS", errors: 0 });
     } finally { await context.close(); }
   }
-  mkdirSync("outputs/cost-warehouse-phase3a3", { recursive: true }); writeFileSync("outputs/cost-warehouse-phase3a3/browser.json", JSON.stringify(results, null, 2)); console.info(JSON.stringify(results));
+  mkdirSync(("outputs/cost-warehouse-phase3a3" + (engine === webkit ? "/webkit" : "")), { recursive: true }); writeFileSync(("outputs/cost-warehouse-phase3a3" + (engine === webkit ? "/webkit" : "") + "/browser.json"), JSON.stringify(results, null, 2)); console.info(JSON.stringify(results));
 } finally { await browser.close(); await new Promise<void>(done => server.close(() => done())); runtime.close(); }

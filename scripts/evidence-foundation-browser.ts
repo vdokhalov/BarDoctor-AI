@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 import { revenueTraceRuntime, revenueFact, resolvedEvidence } from "../tests/helpers/revenue-trace-runtime";
 import type { DailyRevenueResolution, EvidenceResolution } from "../lib/bardoctor/evidence-contracts";
 
@@ -23,10 +23,11 @@ const server = createServer(async (req, res) => {
 });
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
-const browser = await chromium.launch({ executablePath: await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
+const engine = process.env.BD_EVIDENCE_BROWSER === "webkit" ? webkit : chromium;
+const browser = await engine.launch({ headless: true, ...(engine === chromium ? { executablePath: await resolveBrowserExecutable(chromium.executablePath()), args: chromiumArgs } : {}) });
 const results = [];
 try {
-  for (const width of [390, 1280]) {
+  for (const width of [390, 820, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: width < 600, hasTouch: width < 600 });
     try {
       const page = await context.newPage(), errors: string[] = [];
@@ -79,8 +80,8 @@ try {
         authenticated: "PASS", foreign: "PASS", anonymous: "PASS", revoked: "PASS", readOnly: "PASS", pageErrors: errors.length });
     } finally { await context.close(); }
   }
-  mkdirSync("outputs/evidence-phase3a1", { recursive: true });
-  writeFileSync("outputs/evidence-phase3a1/browser.json", JSON.stringify(results, null, 2));
+  mkdirSync(("outputs/evidence-phase3a1" + (engine === webkit ? "/webkit" : "")), { recursive: true });
+  writeFileSync(("outputs/evidence-phase3a1" + (engine === webkit ? "/webkit" : "") + "/browser.json"), JSON.stringify(results, null, 2));
   console.info(JSON.stringify(results));
 } finally {
   await browser.close(); await new Promise<void>((done, reject) => server.close(error => error ? reject(error) : done())); runtime.close();

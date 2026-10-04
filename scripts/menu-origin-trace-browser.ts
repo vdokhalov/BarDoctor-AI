@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 import { menuTraceRuntime, menuFact, menuEvidence, service } from "../tests/helpers/menu-trace-runtime";
 import type { EvidenceReference, EvidenceResolution, MenuOriginResolution } from "../lib/bardoctor/evidence-contracts";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
@@ -18,10 +18,11 @@ const server = createServer(async (req, res) => {
 });
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
-const browser = await chromium.launch({ executablePath: await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
+const engine = process.env.BD_EVIDENCE_BROWSER === "webkit" ? webkit : chromium;
+const browser = await engine.launch({ headless: true, ...(engine === chromium ? { executablePath: await resolveBrowserExecutable(chromium.executablePath()), args: chromiumArgs } : {}) });
 const results = [];
 try {
-  for (const width of [390, 1280]) {
+  for (const width of [390, 820, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: 844 }, isMobile: width < 600, hasTouch: width < 600 });
     try {
       const page = await context.newPage(), errors: string[] = []; page.on("pageerror", e => errors.push(e.message)); await page.goto(base);
@@ -44,5 +45,5 @@ try {
       assert.deepEqual(r.snapshot(), before); assert.deepEqual(errors, []); results.push({ width, status: "PASS", resolvedRecords: seen.size, types: [...types], readOnly: true, tenantRBAC: "PASS" });
     } finally { await context.close(); }
   }
-  mkdirSync("outputs/menu-origin-trace", { recursive: true }); writeFileSync("outputs/menu-origin-trace/summary.json", JSON.stringify(results, null, 2)); console.log(JSON.stringify(results));
+  mkdirSync(("outputs/menu-origin-trace" + (engine === webkit ? "/webkit" : "")), { recursive: true }); writeFileSync(("outputs/menu-origin-trace" + (engine === webkit ? "/webkit" : "") + "/summary.json"), JSON.stringify(results, null, 2)); console.log(JSON.stringify(results));
 } finally { await browser.close(); await new Promise<void>(done => server.close(() => done())); r.close(); }

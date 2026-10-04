@@ -48,7 +48,11 @@ Final local check counts, local commit SHA and any eventual GitHub CI/prepared S
 
 Migration: NO. Backfill: NO. Production business-data mutations: NO. Remaining GAPs until production smoke: G05, G06, G16, G18; after approved Phase 3A.9 smoke PASS: G05, G16, G18.
 
-## Final local release gates
+## Historical local release gates before required-CI RCA
+
+The entries below record the earlier local verification. They do not clear the subsequently
+reproduced native WebKit environment blocker. The current independent-gate results and
+release decision are in [the current report](phase3a9-release-decision-report.md).
 
 - `npm test`: 2,144/2,144 PASS, including verified build, typecheck and previous Phase 3A.1–3A.8 unit/artifact/security suites.
 - Targeted G06: 22/22 PASS; preceding Health/RBAC focused regression: 77/77 PASS.

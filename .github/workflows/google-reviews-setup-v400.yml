@@ -172,16 +172,18 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
-      - name: Phase 3A.7 WebKit read-only warehouse navigation and venue switch
-        run: BD_STOCK_BROWSER=webkit node --import tsx scripts/warehouse-readonly-phase3a7-browser.ts
-      - name: Phase 3A.7 WebKit isolated acquisition stock and historical cost mobile tablet desktop
-        run: BD_STOCK_BROWSER=webkit node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
-      - name: Phase 3A.6 WebKit isolated Finance report and payroll mobile tablet desktop
-        run: BD_FINANCE_BROWSER=webkit node --import tsx scripts/finance-inputs-phase3a6-browser.ts
-      - name: Phase 3A.9 WebKit canonical Health, source revisions, reload and venue switch
-        run: BD_HEALTH_BROWSER=webkit node --import tsx scripts/health-inputs-phase3a9-browser.ts
-      - name: Phase 3A.8 WebKit verified close, stale-tab rejection, review aggregate, reload and venue switch
-        run: BD_DERIVED_BROWSER=webkit node --import tsx scripts/derived-metrics-phase3a8-browser.ts
+      - name: Narrow WebKit environment classifier negative controls
+        run: node --import tsx --test tests/webkit-environment-gate.test.ts
+      - name: Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280
+        run: node scripts/webkit-stable-gate.mjs
+      - name: Native process observation for the two allowlisted Health lifecycle suites
+        run: |
+          if ! command -v strace >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y strace
+          fi
+      - name: WebKit Health lifecycle PASS FAIL or evidenced ENVIRONMENT_BLOCKED
+        run: node scripts/webkit-health-lifecycle-gate.mjs
       - name: Measured navigation and embedded auth failures
         run: |
           BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts
@@ -201,6 +203,14 @@ jobs:
           path: |
             outputs/sales-navigation-performance/ci
             outputs/finance-inputs-phase3a6/webkit
+            outputs/health-inputs-phase3a9/webkit
+            outputs/health-inputs-phase3a9/webkit-stable
+            outputs/webkit-health-lifecycle
+            outputs/webkit-stable-gate
+            outputs/derived-metrics-phase3a8/webkit
+            outputs/evidence-phase3a1/webkit
+            outputs/cost-warehouse-phase3a3/webkit
+            outputs/menu-origin-trace/webkit
 
   sales-scroll-layout:
     runs-on: ubuntu-24.04
