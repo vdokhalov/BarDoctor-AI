@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import {createRequire}from'node:module';import{readFileSync,writeFileSync,mkdirSync}from'node:fs';import{createHash}from'node:crypto';
-const require=createRequire(process.cwd()+'/package.json');const {webkit,chromium}=require('playwright-core');const{resolveBrowserExecutable,chromiumArgs}=require(process.cwd()+'/scripts/browser-runtime.cjs');
+const require=createRequire(process.cwd()+'/package.json');const {webkit,chromium}=require('playwright-core');const{resolveBrowserExecutable}=require(process.cwd()+'/scripts/browser-runtime.cjs');
 const access=JSON.parse(readFileSync(process.env.UAT_ACCESS_FILE));const root=process.env.UAT_EVIDENCE_DIR;mkdirSync(root,{recursive:true});
-const useWebkit=process.env.UAT_ENGINE==='webkit';const engine=useWebkit?webkit:chromium;const browser=await engine.launch({headless:true,...(useWebkit?{}:{executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs}),...(process.env.HTTPS_PROXY||process.env.HTTP_PROXY?{proxy:{server:process.env.HTTPS_PROXY||process.env.HTTP_PROXY}}:{})});
+const useWebkit=process.env.UAT_ENGINE==='webkit';const engine=useWebkit?webkit:chromium;const browser=await engine.launch({headless:true,...(useWebkit?{}:{executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:["--no-sandbox","--disable-setuid-sandbox"]}),...(process.env.HTTPS_PROXY||process.env.HTTP_PROXY?{proxy:{server:process.env.HTTPS_PROXY||process.env.HTTP_PROXY}}:{})});
 const results=[];
 try{for(const scenario of [1,2,3]){
  const link=access.links.find(x=>x.scenario===scenario);assert.ok(link);
