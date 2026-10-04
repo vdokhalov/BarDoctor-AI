@@ -163,7 +163,10 @@ and exit1 for failure, cancelled and skipped browser jobs; these cannot turn it 
 The mobile harness adds scenario/profile duration reporting without changing
 flows/assertions. Its server teardown now terminates the complete owned QA process
 group, avoiding the observed orphan Vite left by killing only npm. strictPort
-prevents automatic port fallback. This is test orchestration, not an application fix.
+prevents automatic port fallback. The mobile harness defaults to its isolated
+4188 port, avoiding the procurement harness's existing 4175 server on the same CI
+runner. Explicit BD_QA_PORT overrides remain supported. This is test orchestration,
+not an application fix.
 Fresh CI must still complete GREEN at the exact release SHA before any Sites version
 is saved. Production remains v482 until separately approved deployment and smoke.
 

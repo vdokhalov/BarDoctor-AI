@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-qa_port="${BD_QA_PORT:-4175}"
+# Keep this server separate from the procurement harness's default port 4175.
+qa_port="${BD_QA_PORT:-4188}"
 qa_log="$(mktemp /tmp/bardoctor-mobile-navigation-qa.XXXXXX.log)"
 
 # Run the same Vite CLI as npm dev directly so teardown can await the server itself.
