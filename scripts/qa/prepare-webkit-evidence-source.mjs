@@ -5,12 +5,12 @@ import { createHash } from "node:crypto";
 export function prepareEvidenceSource(source) {
   const changes = [
     ["import { waitForSalesHostReads }", 'import { WebKitEvidenceCompletion } from "./qa/webkit-evidence-completion";\n'],
-    [" const r=await closingFixture();", '\n const diagnostic=new WebKitEvidenceCompletion(r.sqlite); const diagnosticPreview=await(await r.get()).json(); assert.equal(diagnosticPreview.eligible,true); diagnostic.checkpoint("pre-navigation-preview",{eligible:diagnosticPreview.eligible});', "after"],
+    [" const r=await closingFixture();", '\n const diagnostic=new WebKitEvidenceCompletion(r.sqlite);', "after"],
     [" const request=new Request(url,{method:req.method,headers:req.headers as HeadersInit,...(body.length?{body}:{})});", '\n diagnostic.apiRequest(request);', "after"],
     [" if(url.pathname===\'/api/business-health\')await evidence.health(request,response);", '\n await diagnostic.apiResponse(request,response);', "after"],
     [" try{\n await evidence.attach(context,base,r.user.token);", '\n await diagnostic.attach(context);', "beforeSuffix"],
     [" const page=await context.newPage();", 'diagnostic.bindPage(page);', "after"],
-    ["const metric=await page.evaluate", 'await diagnostic.state("before-review-assertions");', "before"],
+    ["assert.equal(text,readFileSync(\'public/assets/index-BQGspy0I.js\',\'utf8\'));", 'diagnostic.checkpoint("canonical-client-bytes",{exactClientBytes:true});', "after"],
     ["assert.equal(metric.negativeDenominator,1);", 'diagnostic.checkpoint("review-assertions",{avgRating:metric.avgRating,analyzedCount:metric.analyzedCount,negativeDenominator:metric.negativeDenominator});', "after"],
     [" const preview=await(await r.get()).json();assert.equal(preview.eligible,true);", 'diagnostic.checkpoint("month-preview-assertions",{eligible:preview.eligible});', "after"],
     [" await evidence.completed(page,context);", 'await diagnostic.state("all-business-assertions-completed");diagnostic.checkpoint("all-business-assertions-completed",{result:"PASS"});', "after"],

@@ -27,7 +27,7 @@ jobs:
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
       - name: Require native process observer
         run: command -v strace
-      - name: Three retained diagnostic occurrences, no release classification
+      - name: Six retained diagnostic occurrences, no release classification
         run: node scripts/qa/run-webkit-evidence-completion.mjs
       - uses: actions/upload-artifact@v4
         if: always()

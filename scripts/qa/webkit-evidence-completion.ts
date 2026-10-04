@@ -47,8 +47,6 @@ export class WebKitEvidenceCompletion {
   private requests = new WeakMap<Request, string>();
   private nativeLines = new Set<string>();
   private monitor: ReturnType<typeof setInterval>;
-  private cookieMonitor?: ReturnType<typeof setInterval>;
-  private cookieBusy = false;
   constructor(private sqlite: DatabaseSync) {
     this.record("collector-start", { contextId: this.contextId, fixture: "in-memory QA only", recovery: false });
     this.snapshot("fixture-before-navigation");
@@ -75,14 +73,14 @@ export class WebKitEvidenceCompletion {
     if (!new URL(request.url).pathname.startsWith("/api/")) return;
     const id = randomUUID(); this.requests.set(request, id);
     this.record("server-request", { id, method: request.method, path: new URL(request.url).pathname, headers: safeHeaders(request.headers) });
-    this.snapshot(`request:${id}:before`);
+    if (["/api/business-health", "/api/month-close"].includes(new URL(request.url).pathname)) this.snapshot(`request:${id}:before`);
   }
   async apiResponse(request: Request, response: Response) {
     const id = this.requests.get(request); if (!id) return;
     let body: unknown;
     if (response.status >= 400) body = await response.clone().text();
     this.record("server-response", { id, path: new URL(request.url).pathname, status: response.status, body });
-    this.snapshot(`request:${id}:after`);
+    if (["/api/business-health", "/api/month-close"].includes(new URL(request.url).pathname)) this.snapshot(`request:${id}:after`);
   }
   async attach(context: BrowserContext) {
     this.context = context;
@@ -105,8 +103,6 @@ export class WebKitEvidenceCompletion {
       page.on("requestfailed", request => this.record("browser-request-failed", { pageId, path: new URL(request.url()).pathname, error: request.failure()?.errorText }));
       page.on("response", response => this.record("browser-response", { pageId, path: new URL(response.url()).pathname, status: response.status() }));
     });
-    this.cookieMonitor = setInterval(() => { if (this.cookieBusy) return; this.cookieBusy = true;
-      void this.cookies("periodic").finally(() => { this.cookieBusy = false; }); }, 100);
   }
   bindPage(page: Page) { this.page = page; this.record("original-page-bound", { contextId: this.contextId, pageId: this.pageIds.get(page) }); }
   async cookies(label: string) {
@@ -141,7 +137,7 @@ export class WebKitEvidenceCompletion {
     await this.state("after-diagnostic-read"); this.snapshot("after-diagnostic-read");
   }
   close() {
-    clearInterval(this.monitor); if (this.cookieMonitor) clearInterval(this.cookieMonitor);
+    clearInterval(this.monitor);
     this.native(); this.snapshot("before-fixture-teardown");
     this.record("collector-complete", { contextId: this.contextId, pageCount: this.pageCount });
   }

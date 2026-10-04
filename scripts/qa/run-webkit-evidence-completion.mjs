@@ -11,10 +11,10 @@ const generated = resolve(`scripts/.derived-webkit-evidence-${process.pid}.ts`);
 writeFileSync(generated, prepared.output);
 const equivalence = { sourceSHA256: prepared.sourceSHA256, insertions: prepared.insertions, byteForByteRecovered: prepared.byteForByteRecovered };
 writeFileSync(resolve(out,"coverage-equivalence.json"), JSON.stringify({ ...equivalence, applicationSHA: "e48ac83476850bc33cc433a4ffe21804300da20a", allOriginalActionsAssertionsTimeoutsPreserved: true }, null, 2));
-// Three bounded, individually retained diagnostic observations planned in advance.
+// Six bounded, individually retained low-impact observations planned in advance.
 // Every original failure remains exit=1. There is no retry-to-green or release pass.
 const results = [];
-try { for (let occurrence = 1; occurrence <= 3; occurrence++) {
+try { for (let occurrence = 1; occurrence <= 6; occurrence++) {
   const stem = resolve(out, `occurrence-${occurrence}`), log = createWriteStream(`${stem}.log`);
   const child = spawn(process.execPath, ["--import", "tsx", generated], {env: {...process.env,
     DEBUG:"pw:browser", BD_DERIVED_BROWSER:"webkit", BD_DERIVED_WIDTH:"1280", BD_WEBKIT_EVIDENCE:`${stem}-evidence.json`,
@@ -24,5 +24,5 @@ try { for (let occurrence = 1; occurrence <= 3; occurrence++) {
   const exitCode = await new Promise((done,reject)=>{child.on("close",done);child.on("error",reject);});
   await new Promise(done=>log.end(done));
   results.push({occurrence, originalSuiteExitCode:exitCode});
-  writeFileSync(resolve(out,"diagnostic-results.json"),JSON.stringify({releaseGate:"NOT_EVALUATED", results},null,2));
+  writeFileSync(resolve(out,"diagnostic-results.json"),JSON.stringify({releaseGate:"NOT_EVALUATED", plannedOccurrences:6, results},null,2));
 } } finally { rmSync(generated,{force:true}); }
