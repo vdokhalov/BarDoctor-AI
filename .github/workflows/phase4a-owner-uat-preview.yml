@@ -1,0 +1,89 @@
+name: Phase 4A isolated owner UAT preview
+on:
+  push:
+    branches: [qa/phase4a-owner-uat-preview]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  temporary-preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: control
+      - uses: actions/checkout@v4
+        with:
+          ref: 3688c6bd88194f39dd886f813614f01df03a0b68
+          path: candidate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+          cache-dependency-path: candidate/package-lock.json
+      - name: Install locked candidate dependencies
+        working-directory: candidate
+        run: npm run install:ci
+      - name: Validate pinned candidate and install temporary tunnel
+        working-directory: candidate
+        run: |
+          node ../control/scripts/qa/phase4a-external-uat-gateway-check.mjs
+          test "$(git rev-parse HEAD)" = 3688c6bd88194f39dd886f813614f01df03a0b68
+          echo '18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e  public/assets/index-BQGspy0I.js' | sha256sum -c -
+          curl --fail --location --retry 3 https://github.com/cloudflare/cloudflared/releases/download/2026.9.3/cloudflared-linux-amd64 -o "$RUNNER_TEMP/cloudflared"
+          echo "77e26d8d900e0b8469f416239d14b5f296525fdf79fee6f511ef55609e3fbac2  $RUNNER_TEMP/cloudflared" | sha256sum -c -
+          chmod 700 "$RUNNER_TEMP/cloudflared"
+      - name: Start two private isolated fixtures and external HTTPS previews
+        working-directory: candidate
+        env:
+          UAT_ACCESS_SEED: ${{ secrets.PHASE4A_OWNER_UAT_PREVIEW_SEED }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/uat"
+          for scenario in 1 2; do
+            target=$((4389 + scenario)); gateway=$((4499 + scenario))
+            key=$(UAT_SCENARIO="$scenario" node -e 'const c=require("node:crypto");if(!process.env.UAT_ACCESS_SEED)process.exit(1);process.stdout.write(c.createHmac("sha256",process.env.UAT_ACCESS_SEED).update(process.env.GITHUB_RUN_ID+":"+process.env.UAT_SCENARIO).digest("base64url"))')
+            echo "::add-mask::$key"
+            BD_COST_UAT_PORT="$target" node --import tsx scripts/management-cost-phase4a-owner-uat.ts > "$RUNNER_TEMP/uat/fixture-$scenario.log" 2>&1 &
+            UAT_TARGET_PORT="$target" UAT_GATEWAY_PORT="$gateway" UAT_SCENARIO="$scenario" UAT_ACCESS_KEY="$key" node ../control/scripts/qa/phase4a-external-uat-gateway.mjs > "$RUNNER_TEMP/uat/gateway-$scenario.log" 2>&1 &
+          done
+          for scenario in 1 2; do
+            target=$((4389 + scenario)); gateway=$((4499 + scenario))
+            for attempt in $(seq 1 60); do
+              if curl --silent --fail "http://127.0.0.1:$target/home" -o /dev/null; then break; fi
+              sleep 1
+            done
+            curl --silent --fail "http://127.0.0.1:$target/home" -o /dev/null
+            "$RUNNER_TEMP/cloudflared" tunnel --no-autoupdate --url "http://127.0.0.1:$gateway" --protocol http2 > "$RUNNER_TEMP/uat/tunnel-$scenario.log" 2>&1 &
+          done
+          python3 - <<'PY'
+          import os, re, time, json, pathlib, datetime
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'uat'
+          links=[]
+          for scenario in [1,2]:
+            for attempt in range(120):
+              log=(root/f'tunnel-{scenario}.log').read_text()
+              match=re.search(r'https://[a-z0-9-]+\.trycloudflare\.com',log)
+              if match: break
+              time.sleep(1)
+            if not match: raise RuntimeError('External tunnel unavailable')
+            links.append({'scenario':scenario,'origin':match[0]})
+          (root/'access.json').write_text(json.dumps({'candidateCommit':'3688c6bd88194f39dd886f813614f01df03a0b68','startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'lifetime':'up to 5 hours from readiness, cancelled earlier only on user request','links':links},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-owner-uat-access
+          path: ${{ runner.temp }}/uat/access.json
+          retention-days: 1
+      - name: Keep temporary QA preview available for owner UAT
+        run: |
+          echo 'Two independent QA scenarios ready; credentials are in private workflow artifact. Production is untouched.'
+          end=$((SECONDS + 18000))
+          while [ "$SECONDS" -lt "$end" ]; do
+            for scenario in 1 2; do
+              target=$((4389 + scenario)); gateway=$((4499 + scenario))
+              curl --silent --fail "http://127.0.0.1:$target/home" -o /dev/null
+              curl --silent --fail "http://127.0.0.1:$gateway/start" -o /dev/null
+            done
+            sleep 45
+          done

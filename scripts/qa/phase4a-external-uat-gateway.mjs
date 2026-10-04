@@ -1,0 +1,54 @@
+// QA infrastructure only. Candidate application remains pinned to 3688c6b.
+import { createServer, request as httpRequest } from 'node:http';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+
+const targetPort = Number(process.env.UAT_TARGET_PORT);
+const port = Number(process.env.UAT_GATEWAY_PORT);
+const key = process.env.UAT_ACCESS_KEY;
+if (!key || !/^[A-Za-z0-9_-]{43}$/.test(key)) throw new Error('Private QA access key missing');
+const session = randomBytes(32).toString('base64url');
+const equal = (a, b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const cookieName = '__Host-bd_uat';
+const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+const server = createServer(async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Content-Security-Policy', csp);
+  const url = new URL(req.url || '/', 'https://' + req.headers.host);
+  if (url.pathname === '/start' && req.method === 'GET') {
+    // Key is in the URL fragment: never sent to the tunnel or request logs.
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    return res.end('<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BarDoctor isolated UAT</title><p id="status">Открываем отдельный QA-сценарий…</p><script>(async()=>{const key=location.hash.slice(1);history.replaceState(null,"","/start");const r=await fetch("/__uat/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});if(r.ok)location.replace("/home");else document.getElementById("status").textContent="Доступ закрыт. Откройте исходную UAT-ссылку."})().catch(()=>document.getElementById("status").textContent="Preview недоступен; сообщите об этом.")</script></html>');
+  }
+  const origin = req.headers.origin;
+  const expectedOrigin = 'https://' + req.headers.host;
+  if (!['GET', 'HEAD'].includes(req.method || '') && origin !== expectedOrigin) {
+    res.writeHead(403); return res.end('Forbidden origin');
+  }
+  if (url.pathname === '/__uat/session' && req.method === 'POST') {
+    let body = '';
+    for await (const bytes of req) { body += bytes; if (body.length > 1024) { res.writeHead(413); return res.end(); } }
+    let valid = false;
+    try { valid = equal(JSON.parse(body).key, key); } catch {}
+    if (!valid) { res.writeHead(403); return res.end('Access denied'); }
+    res.setHeader('Set-Cookie', `${cookieName}=${session}; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=21600`);
+    res.writeHead(204); return res.end();
+  }
+  const supplied = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith(cookieName + '='))?.slice(cookieName.length + 1);
+  if (!equal(supplied, session)) { res.writeHead(403); return res.end('Private isolated QA; open your UAT link.'); }
+  if (url.pathname === '/__uat/manifest') {
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify({ commit: '3688c6bd88194f39dd886f813614f01df03a0b68', clientHash: '18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e', scenario: process.env.UAT_SCENARIO, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
+  }
+  const headers = { ...req.headers, host: `127.0.0.1:${targetPort}` };
+  delete headers.cookie;
+  const proxy = httpRequest({ host: '127.0.0.1', port: targetPort, path: req.url, method: req.method, headers }, upstream => {
+    for (const [name, value] of Object.entries(upstream.headers)) if (value !== undefined && !['cache-control', 'set-cookie', 'content-security-policy'].includes(name)) res.setHeader(name, value);
+    res.writeHead(upstream.statusCode || 502);
+    upstream.pipe(res);
+  });
+  proxy.on('error', () => { res.writeHead(502); res.end('Isolated QA unavailable'); });
+  req.pipe(proxy);
+});
+server.listen(port, '127.0.0.1', () => console.log(`QA gateway ${port} ready; no production bindings`));
