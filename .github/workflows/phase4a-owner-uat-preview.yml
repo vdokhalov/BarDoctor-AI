@@ -92,7 +92,7 @@ jobs:
             const key=readFileSync(root+'/key-'+link.scenario,'utf8');
             for(const base of ['http://127.0.0.1:'+(4499+link.scenario),link.origin]){
               const response=await fetch(base+'/__uat/session',{method:'POST',headers:{Origin:link.origin,'Content-Type':'application/json'},body:JSON.stringify({key})});
-              console.log('QA gateway entry',link.scenario,base,response.status(),(await response.text()).slice(0,200));
+              console.log('QA gateway entry',link.scenario,base,response.status,(await response.text()).slice(0,200));
               if(response.status!==204)throw new Error('QA gateway entry failed');
             }
           }
