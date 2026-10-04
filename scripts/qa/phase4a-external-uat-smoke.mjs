@@ -6,7 +6,7 @@ const useWebkit=process.env.UAT_ENGINE==='webkit';const engine=useWebkit?webkit:
 const results=[];
 try{for(const scenario of [1,2,3]){
  const link=access.links.find(x=>x.scenario===scenario);assert.ok(link);
- const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'ru-RU'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));let assetHash; page.on('response',async response=>{if(response.url().endsWith('/__uat/session')&&!response.ok())console.log('Private QA entry rejected',response.status(),await response.text());});
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'ru-RU'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));let assetHash; page.on('response',async response=>{if(response.url().endsWith('/__uat/session')&&!response.ok())try{console.log('Private QA entry rejected',response.status(),await response.text());}catch{console.log('Private QA entry rejected',response.status());}});
  page.on('response',async r=>{if(r.url().includes('/assets/index-BQGspy0I')&&r.status()===200)try{assetHash=createHash('sha256').update(await r.body()).digest('hex');}catch{}});
  try{
   await page.goto(link.url,{timeout:60000});await page.waitForURL('**/home',{timeout:45000});const home=page.locator('.bd-cost-management');await home.locator('.bd-cost-signal').first().waitFor({timeout:60000});

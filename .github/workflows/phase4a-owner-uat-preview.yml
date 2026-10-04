@@ -82,6 +82,21 @@ jobs:
           const wrappedKey=publicEncrypt({key:readFileSync('../control/scripts/qa/phase4a-owner-uat-public-key.pub'),padding:constants.RSA_PKCS1_OAEP_PADDING,oaepHash:'sha256'},key);
           writeFileSync(root+'/encrypted-access.json',JSON.stringify({wrappedKey:wrappedKey.toString('base64'),iv:iv.toString('base64'),ciphertext:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}));
           JS
+      - name: Verify local and external gateway entry before browser
+        working-directory: candidate
+        run: |
+          node --input-type=module - <<'JS'
+          import{readFileSync}from'node:fs';
+          const root=process.env.RUNNER_TEMP+'/uat',access=JSON.parse(readFileSync(root+'/private-access.json'));
+          for(const link of access.links){
+            const key=readFileSync(root+'/key-'+link.scenario,'utf8');
+            for(const base of ['http://127.0.0.1:'+(4499+link.scenario),link.origin]){
+              const response=await fetch(base+'/__uat/session',{method:'POST',headers:{Origin:link.origin,'Content-Type':'application/json'},body:JSON.stringify({key})});
+              console.log('QA gateway entry',link.scenario,base,response.status(),(await response.text()).slice(0,200));
+              if(response.status!==204)throw new Error('QA gateway entry failed');
+            }
+          }
+          JS
       - name: Install Chromium for external preview acceptance
         working-directory: candidate
         run: npm run browser:install
@@ -91,6 +106,12 @@ jobs:
           UAT_ACCESS_FILE: ${{ runner.temp }}/uat/private-access.json
           UAT_EVIDENCE_DIR: ${{ runner.temp }}/uat/evidence
         run: node ../control/scripts/qa/phase4a-external-uat-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-gateway-diagnostics
+          path: ${{ runner.temp }}/uat/gateway-*.log
+          retention-days: 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:

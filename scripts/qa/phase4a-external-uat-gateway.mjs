@@ -28,6 +28,7 @@ const server = createServer(async (req, res) => {
     try { expectedOrigin = readFileSync(process.env.UAT_ORIGIN_FILE, 'utf8').trim(); } catch {}
   }
   if (!['GET', 'HEAD'].includes(req.method || '') && origin !== expectedOrigin) {
+    console.warn('QA origin mismatch', JSON.stringify({origin, expectedOrigin, host:req.headers.host}));
     res.writeHead(403); return res.end('Forbidden origin');
   }
   if (url.pathname === '/__uat/session' && req.method === 'POST') {
@@ -35,7 +36,7 @@ const server = createServer(async (req, res) => {
     for await (const bytes of req) { body += bytes; if (body.length > 1024) { res.writeHead(413); return res.end(); } }
     let valid = false;
     try { valid = equal(JSON.parse(body).key, key); } catch {}
-    if (!valid) { res.writeHead(403); return res.end('Access denied'); }
+    if (!valid) { console.warn('QA access key mismatch'); res.writeHead(403); return res.end('Access denied'); }
     res.setHeader('Set-Cookie', `${cookieName}=${session}; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=21600`);
     res.writeHead(204); return res.end();
   }
