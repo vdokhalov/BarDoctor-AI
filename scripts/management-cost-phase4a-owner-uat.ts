@@ -7,7 +7,28 @@ import { barDoctorResponse } from '../app/bar-doctor-response';
 
 // Local-only human UAT. Every process has its own isolated SQLite database;
 // all writes use the actual application route handlers, never production.
-const fixture = await costFixture();
+const fixture = await costFixture({}, {realClock:true});
+// Fresh owner studies use distinct synthetic entities and qualifying reasons;
+// the original fixture remains the default for existing automation.
+const scenario = process.env.BD_COST_UAT_SCENARIO;
+if (scenario) {
+  if (!['citrus-empty', 'mint-missing'].includes(scenario)) throw new Error('Invalid isolated QA scenario');
+  const citrus = scenario === 'citrus-empty';
+  const itemId = citrus ? 'qa-citrus' : 'qa-mint';
+  const ingredientId = itemId + '-base', productKey = 'product:' + ingredientId;
+  const itemName = citrus ? 'QA лимонад «Цитрус»' : 'QA чай «Мята»';
+  const ingredientName = citrus ? 'QA основа лимонада' : 'QA порция чая';
+  const assortment = fixture.read('bd_assortment_v1');
+  Object.assign(assortment.menuItems[0], { id: itemId, name: itemName });
+  Object.assign(assortment.nomenclature[0], { id: ingredientId, key: productKey, productKey, name: ingredientName });
+  Object.assign(assortment.recipes[0], { id: itemId + '-recipe', menuItemId: itemId, ownerId: itemId });
+  if (!citrus) assortment.recipes = [];
+  fixture.seed('bd_assortment_v1', assortment);
+  const purchases = fixture.read('bd_purchase_documents');
+  purchases[0].id = itemId + '-price';
+  Object.assign(purchases[0].items[0], { id: itemId + '-source', name: ingredientName, purchaseProductKey: productKey, nomenclatureItemId: ingredientId });
+  fixture.seed('bd_purchase_documents', purchases);
+}
 const port = Number(process.env.BD_COST_UAT_PORT || 4390);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid QA port');
 const routes: Record<string, string> = {

@@ -18,6 +18,8 @@ const patches=[
 const homeAttention='i.jsx(bdHomeAttention,{profile:e,report:E,revenue:t,gapReasons:r,equipmentAlerts:l,settings:u,snapshots:d,health:m,employees:a,reviewsState:bdHomeReviewState,onNavigate:g}),';
 const healthHero='i.jsx(bdHomeHealthIndexV200,{snapshot:bdHealthSnapshot,diagnosis:f,loading:bdHealthLoading,onNavigate:g}),';
 const reviews='i.jsx(bdHomeReviewsCardV409,{state:bdHomeReviewState,onNavigate:g}),';
+const homeCost='i.jsx(bdCostHomePhase4a,{onNavigate:g}),';
+source=source.replace(homeCost+healthHero,healthHero);
 source=source.replace(healthHero+homeAttention,healthHero).replace(reviews+'i.jsx(bdHomeTodayCard',reviews+homeAttention+'i.jsx(bdHomeTodayCard');
 const at=source.indexOf(start);if(at>=0){const to=source.indexOf(end,at);if(to<0)throw new Error('Incomplete cost client boundary');source=source.slice(0,at)+source.slice(to+end.length).replace(/^\n/,'');}
 for(const [before,after]of patches)source=source.replace(after,before);
@@ -26,10 +28,11 @@ for(const [before,after]of patches){if(source.split(before).length!==2)throw new
 const bundle=await build({entryPoints:[path.join(root,'lib/bardoctor/client/management-cost.tsx')],bundle:true,format:'iife',platform:'browser',globalName:'bdCostModulePhase4a',jsx:'transform',jsxFactory:'React.createElement',tsconfigRaw:{compilerOptions:{jsx:'react'}},minify:true,write:false});
 const client=`
 const bdCostClientPhase4a=bdCostModulePhase4a.createCostManagementClient(S,{headers:()=>ca(Ot()),venue:()=>Number(localStorage.getItem("bd_active_venue_id")),navigate:path=>window.bdNavigate(path),enabled:()=>window.__bdDisableCostManagementPhase4a!==true});
-function bdHomeAttention(props){const context=bdUseProcVenueContextV168();const[revision,refresh]=S.useState(0);S.useEffect(()=>{const listener=()=>refresh(value=>value+1);window.addEventListener("bd-cost-projection-updated",listener);return()=>window.removeEventListener("bd-cost-projection-updated",listener)},[]);return i.jsxs(i.Fragment,{children:[i.jsx(bdHomeAttentionBeforePhase4a,{...props,managementCostRevision:revision}),i.jsx(bdCostClientPhase4a.Center,{surface:"home",venue:Number(context.activeVenueId),onNavigate:props.onNavigate})]})}
+function bdHomeAttention(props){const[revision,refresh]=S.useState(0);S.useEffect(()=>{const listener=()=>refresh(value=>value+1);window.addEventListener("bd-cost-projection-updated",listener);return()=>window.removeEventListener("bd-cost-projection-updated",listener)},[]);return i.jsx(bdHomeAttentionBeforePhase4a,{...props,managementCostRevision:revision})}
+function bdCostHomePhase4a(props){const context=bdUseProcVenueContextV168();return i.jsx(bdCostClientPhase4a.Center,{surface:"home",venue:Number(context.activeVenueId),onNavigate:props.onNavigate})}
 function bdCostHealthPhase4a(props){const query=ste(),params=new URLSearchParams(query);return i.jsx(bdCostClientPhase4a.Center,{...props,surface:"health",signalId:Number(params.get("venueId"))===props.venue?params.get("signalId"):null})}
 `;
-source=source.replace(reviews+homeAttention,reviews).replace(healthHero,healthHero+homeAttention);
+source=source.replace(reviews+homeAttention,reviews).replace(healthHero,homeCost+healthHero+homeAttention);
 const anchor='function bdShiftDateLabelV156(';if(source.split(anchor).length!==2)throw new Error('Unique cost module insertion anchor required');
 source=source.replace(anchor,`${start}\n${bundle.outputFiles[0].text}\n${client}\n${end}\n${anchor}`);
 fs.writeFileSync(file,source);console.info('Phase 4A cost signal lifecycle client applied.');

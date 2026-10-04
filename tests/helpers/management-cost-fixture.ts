@@ -1,8 +1,8 @@
 import { HEALTH_OPERATIONS_KEYS } from '../../lib/bardoctor/health-operations-inputs';
 import { VENUE_CONTEXT_SOURCES } from '../../lib/bardoctor/venue-context-access';
 import { lifecycleRuntime } from './lifecycle-runtime';
-export async function costFixture(bindings:Record<string,unknown>={}) {
-  const r = await lifecycleRuntime({ activeVenue:'./app/api/access/active-venue/route',costs:'./app/api/management/cost-signals/route', evaluate:'./app/api/management/cost-signals/evaluate/route', detail:'./app/api/management/cost-signals/[id]/route', verify:'./app/api/management/cost-signals/[id]/verify/route', store:'./app/api/store/[key]/route', bulkStore:'./app/api/store/route', overview:'./app/api/assortment/overview/route', health:'./app/api/business-health/route', restaurant:'./app/api/restaurants/me/route', users:'./app/api/users/me/route', evidence:'./app/api/evidence/resolve/route', taxonomy:'./app/api/nomenclature/taxonomy/route' }, {now:'2026-10-04T12:00:00Z',bindings});
+export async function costFixture(bindings:Record<string,unknown>={}, options:{realClock?:boolean}={}) {
+  const r = await lifecycleRuntime({ activeVenue:'./app/api/access/active-venue/route',costs:'./app/api/management/cost-signals/route', evaluate:'./app/api/management/cost-signals/evaluate/route', detail:'./app/api/management/cost-signals/[id]/route', verify:'./app/api/management/cost-signals/[id]/verify/route', store:'./app/api/store/[key]/route', bulkStore:'./app/api/store/route', overview:'./app/api/assortment/overview/route', health:'./app/api/business-health/route', restaurant:'./app/api/restaurants/me/route', users:'./app/api/users/me/route', evidence:'./app/api/evidence/resolve/route', taxonomy:'./app/api/nomenclature/taxonomy/route' }, {...(!options.realClock?{now:'2026-10-04T12:00:00Z'}:{}),bindings});
   const owner = await r.register('cost-owner@phase4a.isolated.test'), venueId=owner.activeVenueId;
   const venue=r.sqlite.prepare('SELECT * FROM venues WHERE id=?').get(venueId)!;
   const accountId=Number(venue.data_account_id),workspaceId=Number(venue.workspace_id);

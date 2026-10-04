@@ -1220,6 +1220,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.ok(homeDailyStart >= 0 && homeDailyEnd > homeDailyStart);
   const homeDailySource = mainBundle.slice(homeDailyStart, homeDailyEnd);
   const homeOrder = [
+    "i.jsx(bdCostHomePhase4a",
     "i.jsx(bdHomeHealthIndexV200",
     "i.jsx(bdHomeAttention",
     "i.jsx(bdHomeMoneyCard",
