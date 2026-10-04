@@ -5,7 +5,7 @@ import type { EvidenceReference, EvidenceResolution } from "../../lib/bardoctor/
 import type { CanonicalEnvelope } from "../../lib/bardoctor/integrations/contracts";
 
 export async function provenanceFixture() {
-  const r = await lifecycleRuntime({ context: "./lib/bardoctor/venue-ai-context", metrics: "./lib/bardoctor/recommendation-outcomes", evidence: "./app/api/evidence/resolve/route", integration: "./lib/bardoctor/integrations/domain-writer", sync: "./lib/bardoctor/integrations/sync-engine", writer: "./app/api/integration-hub/business-writer", doctor: "./lib/bardoctor/ai-handlers", external: "./lib/bardoctor/diagnosis-context", hub: "./app/api/integration-hub/route" }, { now: "2026-10-04T12:00:00Z" });
+  const r = await lifecycleRuntime({ context: "./lib/bardoctor/venue-ai-context", metrics: "./lib/bardoctor/recommendation-outcomes", evidence: "./app/api/evidence/resolve/route", health: "./app/api/business-health/route", integration: "./lib/bardoctor/integrations/domain-writer", sync: "./lib/bardoctor/integrations/sync-engine", writer: "./app/api/integration-hub/business-writer", doctor: "./lib/bardoctor/ai-handlers", external: "./lib/bardoctor/diagnosis-context", hub: "./app/api/integration-hub/route" }, { now: "2026-10-04T12:00:00Z" });
   const owner = await r.register("provenance-owner@isolated.test"), foreign = await r.register("provenance-foreign@isolated.test");
   const venueId = owner.activeVenueId, workspaceId = Number(r.sqlite.prepare("SELECT workspace_id FROM venues WHERE id=?").get(venueId)!.workspace_id), accountId = owner.userId;
   const put = (key: string, data: unknown) => r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,'2026-10-04T12:00:00Z') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at").run(accountId, key, JSON.stringify(data));
@@ -18,7 +18,14 @@ export async function provenanceFixture() {
   const write = r.api.integration as unknown as typeof import("../../lib/bardoctor/integrations/domain-writer");
   const sync = r.api.sync as unknown as typeof import("../../lib/bardoctor/integrations/sync-engine");
   const writer = r.api.writer as unknown as typeof import("../../app/api/integration-hub/business-writer");
-  const snapshot = () => ({ stores: r.sqlite.prepare("SELECT * FROM domain_data ORDER BY account_id,store_key").all(), audit: r.sqlite.prepare("SELECT * FROM audit_log ORDER BY id").all(), items: r.sqlite.prepare("SELECT * FROM integration_sync_items ORDER BY id").all() });
+  const snapshot = () => {
+    const schema = r.sqlite.prepare("SELECT * FROM sqlite_schema ORDER BY type,name").all();
+    const tables = schema.filter(row => row.type === "table").map(row => {
+      const name = String(row.name).replaceAll('"', '""');
+      return { name, rows: r.sqlite.prepare(`SELECT * FROM "${name}" ORDER BY rowid`).all() };
+    });
+    return { schema, databaseBytes: JSON.stringify(tables), objects: [...r.objects.entries()], changes: r.sqlite.prepare("SELECT total_changes() AS count").get() };
+  };
   const ref = (kind: EvidenceReference["kind"], id: string, more = {}) => ({ contractVersion: 1, kind, id, venueId, workspaceId, ...more }) as EvidenceReference;
   const resolve = async (reference: unknown, user = owner, selectedVenue?: number) => {
     const before = snapshot(); const request = r.request(user, "/api/evidence/resolve?ref=" + encodeURIComponent(JSON.stringify(reference))); if (selectedVenue) request.headers.set("X-Venue-Id", String(selectedVenue)); const response = await r.api.evidence.GET(request);

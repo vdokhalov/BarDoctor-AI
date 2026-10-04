@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  verify-core:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -115,6 +115,35 @@ jobs:
         run: node --test tests/client-release-browser.test.mjs
       - name: Observability real bootstrap D1 and mobile desktop correlation QA
         run: BD_OBSERVABILITY_BROWSER_QA=1 node --test --test-concurrency=1 tests/request-observability-runtime.test.mjs tests/ingestion-d1-failure-runtime.test.mjs
+      - name: Retain exact verified build for remaining browser gates
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-browser-build-${{ github.sha }}
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  verify-browser:
+    needs: verify-core
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Install locked dependencies
+        run: npm run install:ci
+      - name: Restore exact verified build from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-browser-build-${{ github.sha }}
+          path: dist/
+      - name: Validate restored build integrity
+        run: npm run validate:artifact
+      - name: Install Chromium for browser QA
+        run: npm run browser:install
       - name: Phase 2 unified menu ingestion mobile desktop isolated HTTP
         run: node --import tsx scripts/menu-ingestion-phase2-browser.ts
       - name: Phase 3 menu consumption browser QA
@@ -249,3 +278,15 @@ jobs:
         with:
           name: sales-scroll-layout-evidence
           path: outputs/scroll-stability/ci*
+
+  verify:
+    if: always()
+    needs: [verify-core, verify-browser, sales-navigation, sales-scroll-layout]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every application and browser gate
+        env:
+          REQUIRED_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node -e 'const jobs = JSON.parse(process.env.REQUIRED_RESULTS); for (const [name, job] of Object.entries(jobs)) { console.log(name + ": " + job.result); if (job.result !== "success") process.exitCode = 1; }'

@@ -22,6 +22,18 @@ const homeReviewProfiles = [
 ];
 const profiles = process.env.BD_QA_SCENARIO === "home-reviews" ? homeReviewProfiles : standardProfiles;
 const desktopProfile = { name: "desktop-chrome", descriptor: devices["Desktop Chrome"] };
+const timings = [];
+
+async function timedFlow(browser, profile, name, flow) {
+  const started = performance.now();
+  try {
+    return await flow(browser, profile);
+  } finally {
+    const timing = { browser: "chromium", profile: profile.name, scenario: name, durationMs: Math.round(performance.now() - started) };
+    timings.push(timing);
+    process.stderr.write(`[mobile-qa-timing] ${JSON.stringify(timing)}\n`);
+  }
+}
 
 const permissions = [
   "inventory.view", "inventory.manage", "finance.view", "finance.manage",
@@ -1588,7 +1600,7 @@ async function runProfile(browser, profile) {
   ]) {
     if (process.env.BD_QA_SCENARIO && process.env.BD_QA_SCENARIO !== name) continue;
     process.stderr.write(`[mobile-qa] ${profile.name}/${name}\n`);
-    results.push(await flow(browser, profile));
+    results.push(await timedFlow(browser, profile, name, flow));
   }
   return results;
 }
@@ -1611,27 +1623,27 @@ async function runProfile(browser, profile) {
     if (!process.env.BD_QA_PROFILE || process.env.BD_QA_PROFILE === desktopProfile.name) {
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "embedded-modules") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/embedded-modules\n`);
-        results.push(await embeddedModulesFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "embedded-modules", embeddedModulesFlow));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "writeoffs") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/writeoffs\n`);
-        results.push(await writeoffFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "writeoffs", writeoffFlow));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "shift-canonical-writeoffs") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/shift-canonical-writeoffs\n`);
-        results.push(await shiftCanonicalWriteoffFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "shift-canonical-writeoffs", shiftCanonicalWriteoffFlow));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "inventory-delete") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/inventory-delete\n`);
-        results.push(await inventoryDeleteFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "inventory-delete", inventoryDeleteFlow));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "business-health-cold-start") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/business-health-cold-start\n`);
-        results.push(await businessHealthColdStartFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "business-health-cold-start", businessHealthColdStartFlow));
       }
       if (!process.env.BD_QA_SCENARIO || process.env.BD_QA_SCENARIO === "home-reviews") {
         process.stderr.write(`[mobile-qa] ${desktopProfile.name}/home-reviews\n`);
-        results.push(await homeReviewsFlow(browser, desktopProfile));
+        results.push(await timedFlow(browser, desktopProfile, "home-reviews", homeReviewsFlow));
       }
     }
   } catch (error) {
@@ -1647,6 +1659,7 @@ async function runProfile(browser, profile) {
     browserPath,
     profiles: [...profiles, desktopProfile].map((profile) => ({ name: profile.name, viewport: profile.descriptor.viewport, screen: profile.descriptor.screen, deviceScaleFactor: profile.descriptor.deviceScaleFactor, isMobile: profile.descriptor.isMobile, hasTouch: profile.descriptor.hasTouch, userAgent: profile.descriptor.userAgent })),
     results,
+    timings,
     failures,
     passed: failures.length === 0,
   };

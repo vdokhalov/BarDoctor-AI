@@ -188,7 +188,7 @@ export async function synchronizeServerSession(
   return account ? { account, token } : null;
 }
 
-async function sessionForRequest(request: Request): Promise<{
+async function sessionForRequest(request: Request, readOnly = false): Promise<{
   account: Account;
   activeVenueId: number | null;
 } | null> {
@@ -196,7 +196,7 @@ async function sessionForRequest(request: Request): Promise<{
   if (!credentials) return null;
   const { email, token } = credentials;
 
-  await ensureAuthSchema();
+  if (!readOnly) await ensureAuthSchema();
   const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
   const [row] = await getDb()
@@ -360,9 +360,11 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
   await observedAwait("owner.reconcile", () => reconcileVenueOwnerAccess(venue.id));
 }
 
-export async function membershipsForAccount(account: Account) {
-  await observedAwait("auth.ensure_owner_venue", () => ensureOwnerVenue(account));
-  await reconcileConfirmedOwnerVenues(account.id);
+export async function membershipsForAccount(account: Account, readOnly = false) {
+  if (!readOnly) {
+    await observedAwait("auth.ensure_owner_venue", () => ensureOwnerVenue(account));
+    await reconcileConfirmedOwnerVenues(account.id);
+  }
   const rows = await getDb()
     .select({
       membership: venueMemberships,
@@ -413,8 +415,9 @@ export async function membershipsForAccount(account: Account) {
 export async function venueContextForAccount(
   account: Account,
   requestedVenueId?: number | null,
+  readOnly = false,
 ) {
-  const memberships = await membershipsForAccount(account);
+  const memberships = await membershipsForAccount(account, readOnly);
   // A venue explicitly selected by the client is part of the authorization
   // boundary. Never silently fall back to another membership: doing so can
   // write a valid payload into the wrong venue after access was revoked or a
@@ -425,7 +428,23 @@ export async function venueContextForAccount(
 export async function authenticateRequest(
   request: Request,
 ): Promise<AuthenticatedAccount | null> {
-  const identitySession = await observedAwait("auth.identity", () => sessionForRequest(request));
+  return authenticateScopedRequest(request, false);
+}
+
+/** Evidence and canonical input reads authorize against existing, live state only.
+ * Schema/bootstrap/owner repair belongs to explicit authentication/bootstrap paths.
+ */
+export async function authenticateReadOnlyRequest(
+  request: Request,
+): Promise<AuthenticatedAccount | null> {
+  return authenticateScopedRequest(request, true);
+}
+
+async function authenticateScopedRequest(
+  request: Request,
+  readOnly: boolean,
+): Promise<AuthenticatedAccount | null> {
+  const identitySession = await observedAwait("auth.identity", () => sessionForRequest(request, readOnly));
   observedScope(Boolean(identitySession));
   if (!identitySession) return null;
   const requestedHeader = request.headers.get("x-venue-id");
@@ -441,7 +460,7 @@ export async function authenticateRequest(
     : requestedHeader == null
       ? identitySession.activeVenueId
       : null;
-  const context = await observedAwait("auth.memberships", () => venueContextForAccount(identitySession.account, requestedVenueId));
+  const context = await observedAwait("auth.memberships", () => venueContextForAccount(identitySession.account, requestedVenueId, readOnly));
   if (!context) return null;
   observedScope(true, true);
   const role = context.role as AccessRole;

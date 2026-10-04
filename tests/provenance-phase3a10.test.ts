@@ -58,6 +58,47 @@ test("G05 absent guest/receipt fields remain UNKNOWN; captured zero remains know
   assert.equal(r.metrics.recommendationMetricSnapshot("current_period_guests", zero)!.value, 0);
 });
 
+test("G05 unrelated missing sources cannot hide known zero or invalidate another metric's calculation", async t => {
+  const r = await fixture(); t.after(r.close);
+  r.put("bd_finance_revenue", []);
+  const context = await r.context.loadVenueAIContext(r.account, "diagnosis");
+  const employee = r.metrics.recommendationMetricSnapshot("active_employees", context)!;
+  const revenue = r.metrics.recommendationMetricSnapshot("current_period_revenue", context)!;
+  r.sqlite.prepare("UPDATE domain_data SET updated_at='2026-10-04T12:01:00Z' WHERE account_id=? AND store_key='bd_payroll_entries'").run(r.accountId);
+  assert.equal((await r.resolve(employee.provenance!.evidenceRef!)).body.outcome, "resolved", "unrelated freshness cannot change the metric binding");
+  r.sqlite.prepare("DELETE FROM domain_data WHERE account_id=? AND store_key IN ('bd_payroll_entries','bd_finance_expenses','bd_purchase_documents')").run(r.accountId);
+  const next = await r.context.loadVenueAIContext(r.account, "diagnosis");
+  assert.equal(r.metrics.recommendationMetricSnapshot("active_employees", next)!.value, 0);
+  assert.equal(r.metrics.recommendationMetricSnapshot("current_period_revenue", next)!.value, 0);
+  assert.equal((await r.resolve(employee.provenance!.evidenceRef!)).body.outcome, "resolved");
+  assert.equal((await r.resolve(revenue.provenance!.evidenceRef!)).body.outcome, "resolved");
+  const before = r.snapshot();
+  for (let repeat = 0; repeat < 3; repeat++) {
+    await r.context.loadVenueAIContext(r.account, "diagnosis");
+    assert.equal((await r.api.health.GET(r.request(r.owner, "/api/business-health"))).status, 200);
+    assert.equal((await r.api.hub.GET(r.request(r.owner, "/api/integration-hub"))).status, 200);
+    assert.equal((await r.resolve(r.ref("CANONICAL_SOURCE", "bd_purchase_documents"))).body.outcome, "unavailable");
+    assert.equal((await r.resolve(employee.provenance!.evidenceRef!)).body.outcome, "resolved");
+    assert.equal(r.sqlite.prepare("SELECT 1 FROM domain_data WHERE account_id=? AND store_key='bd_purchase_documents'").get(r.accountId), undefined);
+  }
+  assert.deepEqual(r.snapshot(), before, "repeated reads preserve schema, all record bytes, timestamps, audit, population and DML count");
+  r.put("bd_purchase_documents", [{ id: "existing", venueId: r.venueId, status: "draft", items: [] }]);
+  for (let repeat = 0; repeat < 3; repeat++) assert.equal((await r.resolve(r.ref("CANONICAL_SOURCE", "bd_purchase_documents"))).body.outcome, "resolved");
+});
+
+test("G05 missing assortment collection stays UNKNOWN while explicit empty collection proves known zero", async t => {
+  const r = await fixture(); t.after(r.close);
+  r.put("bd_assortment_v1", {});
+  const missing = await r.context.loadVenueAIContext(r.account, "diagnosis");
+  assert.equal(r.metrics.recommendationMetricSnapshot("menu_active_items", missing), null);
+  assert.equal(r.metrics.recommendationMetricSnapshot("low_stock_items", missing), null);
+  assert.equal((await r.resolve(r.ref("CANONICAL_SOURCE", "bd_assortment_v1.menuItems"))).body.outcome, "unavailable");
+  r.put("bd_assortment_v1", { menuItems: [], stockBalances: [] });
+  const zero = await r.context.loadVenueAIContext(r.account, "diagnosis");
+  assert.equal(r.metrics.recommendationMetricSnapshot("menu_active_items", zero)!.value, 0);
+  assert.equal(r.metrics.recommendationMetricSnapshot("low_stock_items", zero)!.value, 0);
+});
+
 test("G05 source and metric scope/RBAC/closed registry reject foreign, restricted and arbitrary selectors", async t => {
   const r = await fixture(); t.after(r.close);
   assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), r.foreign)).body.outcome, "unavailable");
@@ -68,6 +109,17 @@ test("G05 source and metric scope/RBAC/closed registry reject foreign, restricte
   r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,permissions_json,status) VALUES(?,?,'manager',?,'active')").run(r.venueId, member.userId, JSON.stringify({ deny: ["finance.view"] }));
   assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), member, r.venueId)).body.outcome, "restricted");
   assert.equal((await r.resolve(r.ref("CANONICAL_SOURCE", "bd_finance_expenses"), member, r.venueId)).body.outcome, "restricted");
+  r.put("bd_finance_revenue", [{ id: "nested", venueId: r.venueId, items: [{ venueId: r.foreign.activeVenueId, revenue: 999 }] }]);
+  for (let repeat = 0; repeat < 3; repeat++) {
+    assert.equal((await r.resolve(r.ref("CANONICAL_SOURCE", "bd_finance_revenue", { partId: "nested" }))).body.outcome, "unavailable");
+    assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), member, r.venueId)).body.outcome, "restricted");
+    assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), r.foreign)).body.outcome, "unavailable");
+  }
+  r.sqlite.prepare("UPDATE venue_memberships SET status='revoked' WHERE venue_id=? AND account_id=?").run(r.venueId, member.userId);
+  for (let repeat = 0; repeat < 3; repeat++) assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), member, r.venueId)).status, 401);
+  // Even confirmed owner access must not be repaired by an evidence read.
+  r.sqlite.prepare("UPDATE venue_memberships SET status='revoked' WHERE venue_id=? AND account_id=?").run(r.venueId, r.owner.userId);
+  for (let repeat = 0; repeat < 3; repeat++) assert.equal((await r.resolve(r.ref("AI_METRIC", "current_period_revenue"), r.owner, r.venueId)).status, 401);
 });
 
 test("G16 all six authorities are distinct; URLs/confirmation do not certify external provider facts", () => {

@@ -3,7 +3,7 @@ import { isStockEvidenceKind, resolveStockEvidence } from "./stock-evidence";
 import { isMenuEvidenceKind, resolveMenuEvidence, readMenuOrigin, menuTraceRelations } from "./menu-evidence";
 import { isCostEvidenceKind, readSaleCost, resolveCostEvidence } from "./cost-evidence";
 import { getD1 } from "../../db";
-import { authenticateRequest } from "./auth";
+import { authenticateReadOnlyRequest } from "./auth";
 import { hasPermission, isAccessRole, permissionPayload, type AuthenticatedAccount, type PermissionKey } from "./access-control";
 import { readStoreSnapshots, type StoreSnapshot } from "./store-cas";
 import { readDailyRevenue, validBusinessDate } from "./daily-revenue";
@@ -47,7 +47,7 @@ const menuSource = (v: unknown): MenuSourceType => ["MANUAL", "SCAN", "IMPORT"].
 
 /** Reuse session authentication once; add SELECT-only validation of its selected tenant. */
 export async function authenticatedEvidenceContext(request: Request): Promise<Context | null> {
-  const account = await authenticateRequest(request);
+  const account = await authenticateReadOnlyRequest(request);
   if (!account) return null;
   const boundary = await getD1().prepare(`
     SELECT v.workspace_id, vm.role, vm.permissions_json FROM venues v

@@ -118,13 +118,10 @@ export function isRecommendationMetricId(value: unknown): value is Recommendatio
 export function recommendationMetricSnapshot(metricId: RecommendationMetricId, context: VenueAIContext): RecommendationMetricSnapshot | null {
   const value = unboundRecommendationMetricSnapshot(metricId, context);
   if (!value || !context.canonicalInputs) return value;
-  const block = metricId.startsWith("closed_month_") || metricId.startsWith("current_period_") ? "performanceHistory"
-    : metricId.startsWith("review_") ? "guestFeedback"
-    : ["recipe_coverage_percent", "menu_active_items"].includes(metricId) ? "menuAndRecipes"
-    : metricId === "active_employees" ? "team" : "purchasesAndInventory";
-  const facts = context.canonicalInputs.blocks[block] ?? [];
+  const facts = context.canonicalInputs.metrics[metricId] ?? [];
   if (value.value === 0 && (!facts.length || facts.some(fact => fact.state !== "AVAILABLE"))) return null;
-  return { ...value, provenance: { authority: "CANONICAL_SERVER", calculationVersion: AI_METRIC_CALCULATION_VERSION, metricId,
+  const observedAt = metricId.startsWith("closed_month_") ? value.observedAt : facts.map(fact => iso(fact.updatedAt)).filter((timestamp): timestamp is string => timestamp !== null).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+  return { ...value, observedAt, provenance: { authority: "CANONICAL_SERVER", calculationVersion: AI_METRIC_CALCULATION_VERSION, metricId,
     accountingCurrency: value.unit === "currency" ? context.accountingCurrency : null,
     state: facts.length && facts.every(fact => fact.state === "AVAILABLE") ? "AVAILABLE" : "PARTIAL", facts,
     ...(context.metricEvidence?.[metricId] ? { evidenceRef: context.metricEvidence[metricId] } : {}) } };

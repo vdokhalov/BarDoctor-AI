@@ -11,6 +11,8 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   const dir = new URL('../../drizzle/', import.meta.url);
   for (const file of readdirSync(dir).filter(name => name.endsWith('.sql')).sort()) sqlite.exec(readFileSync(new URL(file, dir), 'utf8').replaceAll('--> statement-breakpoint', ''));
   let failBatch = false, failStorage = false;
+  let failRead = false;
+  const checkReadFailure = () => { if (failRead) { failRead = false; throw new Error('injected database read failure'); } };
   let beforeDomainWrite: (() => void | Promise<void>) | null = null;
   let inBatch = false;
   const isDomainWrite = (sql: string) => /(?:INSERT\s+INTO|UPDATE)\s+["`]?domain_data\b/i.test(sql);
@@ -20,9 +22,9 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
     const statement = {
       bind(...args: SQLInputValue[]) { values = args; return statement; },
       sql,
-      async all() { if (!inBatch && isDomainWrite(sql)) await interleave(); const results = sqlite.prepare(sql).all(...values); return { results, success: true, meta: { changes: Number(sqlite.prepare('SELECT changes() n').get()?.n ?? 0) } }; },
-      async first(column?: string) { const row = sqlite.prepare(sql).get(...values); return column ? row?.[column] ?? null : row ?? null; },
-      async raw() { const query = sqlite.prepare(sql); query.setReturnArrays(true); return query.all(...values); },
+      async all() { checkReadFailure(); if (!inBatch && isDomainWrite(sql)) await interleave(); const results = sqlite.prepare(sql).all(...values); return { results, success: true, meta: { changes: Number(sqlite.prepare('SELECT changes() n').get()?.n ?? 0) } }; },
+      async first(column?: string) { checkReadFailure(); const row = sqlite.prepare(sql).get(...values); return column ? row?.[column] ?? null : row ?? null; },
+      async raw() { checkReadFailure(); const query = sqlite.prepare(sql); query.setReturnArrays(true); return query.all(...values); },
       async run() { if (!inBatch && isDomainWrite(sql)) await interleave(); const result = sqlite.prepare(sql).run(...values); return { results: [], success: true, meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) } }; },
     };
     return statement;
@@ -72,5 +74,5 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   function request(user: { email: string; token: string }, path: string, method = 'GET', data?: unknown) {
     return new Request(`https://isolated.test${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Session-Email': user.email, 'X-Session-Token': user.token }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   }
-  return { api, sqlite, objects, register, request, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
+  return { api, sqlite, objects, register, request, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failDatabaseRead: () => { failRead = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
 }

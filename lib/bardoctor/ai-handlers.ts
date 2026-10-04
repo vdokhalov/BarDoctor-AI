@@ -3,7 +3,7 @@ import type { ContextProvenance } from "./context-provenance";
 import type { EvidenceReference } from "./evidence-contracts";
 import { reviewMetricRating } from "./review-aggregate";
 import { canReadDiagnosisSources, restrictedVenueContext } from "./venue-context-access";
-import { authenticateRequest, unauthorized } from "./auth";
+import { authenticateReadOnlyRequest, unauthorized } from "./auth";
 import {
   hasPermission,
   type AuthenticatedAccount,
@@ -743,7 +743,7 @@ async function requestBody(request: Request, maxBytes: number): Promise<JsonReco
 }
 
 async function requireLocalAccount(request: Request, permission: PermissionKey) {
-  const account = await authenticateRequest(request);
+  const account = await authenticateReadOnlyRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, permission)) {
     return Response.json(

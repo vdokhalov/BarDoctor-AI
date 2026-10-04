@@ -1,6 +1,6 @@
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
-import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
+import { authenticateReadOnlyRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { ASSORTMENT_STORE_KEY } from "../../../lib/bardoctor/inventory";
 import { integrationAdapterDescriptors } from "../../../lib/bardoctor/integrations/adapter-registry";
 import { listFieldMappingTemplates } from "../../../lib/bardoctor/integrations/field-mapping-repository";
@@ -43,7 +43,7 @@ type DeliveryOverview = {
 };
 
 export async function GET(request: Request): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const account = await authenticateReadOnlyRequest(request);
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "integrations.manage")) {
     return noStore(Response.json(

@@ -24,11 +24,14 @@ export async function resolveProvenanceEvidence(context: Context, ref: EvidenceR
     try { const raw: unknown = JSON.parse(stored.data_json); partial = !derivedInputBelongs(raw, scope); data = scopedSource(raw, scope); } catch { return fail("unavailable", asOf); }
     if (selector.key === "bd_guest_reviews" && Array.isArray(data)) data = await reviewsForCurrentGoogleLocation(scope.dataAccountId, data);
     if (data == null) return fail("unavailable", asOf);
-    if (selector.collection) data = (data as Record<string, unknown>)[selector.collection];
+    if (selector.collection) {
+      data = (data as Record<string, unknown>)[selector.collection];
+      if (!Array.isArray(data)) return fail("unavailable", asOf);
+    }
     if (Array.isArray(data) && data.length > 10000) return fail("unavailable", asOf);
     if (ref.partId) {
       if (!Array.isArray(data)) return fail("unavailable", asOf);
-      const matches = data.filter(row => row && typeof row === "object" && String(row.id ?? row.productKey ?? row.key) === ref.partId);
+      const matches = data.filter(row => row && typeof row === "object" && String(row.id ?? row.productKey ?? row.key ?? "") === ref.partId);
       if (matches.length !== 1) return fail("unavailable", asOf);
       data = matches[0];
     } else {

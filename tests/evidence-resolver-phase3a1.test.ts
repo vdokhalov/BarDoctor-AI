@@ -206,7 +206,7 @@ test("fact identities stay logical; scoped content binding and bounded reference
 
 test("infrastructure failure stays private/no-store, fails closed and emits no raw error or canonical payload", async t => {
   const r = await evidenceRuntime(); t.after(r.close);
-  r.failDatabase();
+  r.failDatabaseRead();
   const { response, body } = await r.resolve(r.reference("MENU_ITEM", "beer"));
   assert.equal(response.status, 500); assert.equal(body.code as string, "INFRASTRUCTURE_ERROR");
   assert.equal(response.headers.get("Cache-Control"), "private, no-store");

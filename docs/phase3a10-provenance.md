@@ -40,6 +40,26 @@ and its paginated entity references. Revision disagreement returns READ_MODEL_CH
 Partial/missing/foreign-filtered inputs cannot establish KNOWN ZERO.
 Missing guest/receipt fields remain UNKNOWN; captured zero stays known. A canonical
 currency change invalidates a monetary metric reference even if its number is unchanged.
+Completeness and freshness bind each metric's actual source selectors, rather than
+unrelated stores in a whole context block. Missing nested collections stay UNKNOWN;
+an explicitly captured empty collection can prove zero.
+
+Evidence, AI action authorization, canonical Health and integration Hub reads use
+SELECT-only authentication against existing session and live membership state.
+They skip lazy schema initialization, owner venue bootstrap and reconciliation.
+Explicit login/bootstrap and all purchase writers retain their original behavior.
+Missing membership/access fails closed; a read never repairs access or seeds stores.
+The original mutation chain was evidence resolve → authenticateRequest →
+venueContextForAccount → membershipsForAccount → ensureOwnerVenue →
+authoritativeVenueStoreRows → INSERT OR IGNORE domain_data. The existing
+server_authoritative owner branch seeded an empty bd_purchase_documents on a read.
+The isolated regression compares schema, every table's serialized bytes (including
+all timestamps/audit/population) and SQLite total_changes across repeated reads.
+Missing purchase store remains missing; existing purchase documents are retained.
+Owner/member revocation, restricted sources, foreign and nested scopes remain guarded.
+The infrastructure failure regression now injects failure into an actual SELECT,
+rather than into the removed auth write batch; HTTP500/private/no-store remains required.
+
 No source projection returns an arbitrary store payload. Live tenant/source permissions are
 checked for every resolver request. Unsupported/ambiguous identities remain honest.
 
@@ -78,10 +98,10 @@ production deployment and smoke PASS in a new isolated QA venue. No next phase s
 
 ## Local release verification
 
-Targeted G05/G16/G18 13/13; full npm test 2192/2192; typecheck and verified build
+Targeted G05/G16/G18 15/15; full npm test 2194/2194; typecheck and verified build
 PASS; lint zero errors and two unchanged warnings. Compiled native Worker/D1 7/7,
 artifact repeatability 5/5 and integrity PASS. Source RBAC/security and critical
-Phase3A.1–3A.9 regression selection 190/190; additional writer/CAS selection 47/47.
+Phase3A.1–3A.9 regression selection 192/192; additional writer/CAS/security selection 64/64.
 Chromium critical suites, provenance 390/820/1280, Operational Day, navigation and
 compiled-client release integrity passed on isolated fixtures. The final monetary
 provenance change was rechecked with full npm test, typecheck, native Worker/D1,
@@ -90,3 +110,68 @@ Chromium provenance, compiled-client integrity and artifact repeatability.
 Cloud-local WebKit remains ENVIRONMENT_BLOCKED. Required GitHub CI (including
 stable WebKit and the existing narrow native lifecycle policy) remains a release
 gate; a local PASS does not substitute for it. No deployment is authorized yet.
+
+## Required CI timeout RCA and coverage preservation
+
+Run [37192809908](https://github.com/vdokhalov/BarDoctor-AI/actions/runs/37192809908)
+used implementation commit `1db1e01d379020ffba0dff41fdbe2195a5e88256`.
+Fresh GitHub job/check APIs establish a cancelled verify job from 09:38:36 to
+10:08:37 UTC, with annotation “The job has exceeded the maximum execution time
+of 30m0s”. This run is not GREEN.
+
+The final step detail is more precise than the initial STOP description:
+Home reviews ran 10:08:06–10:08:32 and returned SUCCESS in 26 seconds.
+The job had already consumed 29m30s when that step began. All recorded application
+steps returned SUCCESS; the cancellation belongs to the overall job limit, not
+a proven hanging Home reviews assertion. Sales navigation/WebKit and scroll jobs
+completed SUCCESS in 13m35s and 8m34s respectively. The native lifecycle blocker
+is not declared fixed by those job results.
+
+| Original verify step | GitHub duration |
+| --- | ---: |
+| Locked dependency installation | 22s |
+| Full regression and verified build | 185s |
+| Repeated artifact preparation | 129s |
+| Chromium preparation | 7s |
+| Restricted manager QA | 154s |
+| Operational Day: five declared variants | 106s |
+| Menu ingestion | 275s |
+| Menu consumption | 79s |
+| iPhone: complete, repeated normal, repeated delayed | 93s |
+| Mobile and desktop navigation | 247s |
+| Home reviews: five viewport profiles | 26s |
+
+Existing repeats are declared retry/idempotency, delayed navigation or calendar
+boundary coverage, not harness retries of a failing gate. Each original verify
+runner installs Chromium once; the other two jobs prepare both browsers on their
+own isolated runners. No additional browser download happens in the mobile harness
+when its installed executable is present. Full navigation covers two mobile plus
+desktop scenarios, while Home reviews adds 320px/normal/430px iPhone, Pixel and
+desktop checks; these overlapping scenarios are intentionally retained.
+
+The 54 original verify steps (complete step objects, including all commands and
+environment variants) remain exactly present in verify-core + verify-browser.
+The split is before Phase2 menu ingestion: the old measured step totals are
+849s and 949s. Both retain the original 30-minute limit. The downstream runner
+restores this exact run/SHA's already verified dist artifact, checks integrity,
+and prepares its own Chromium. No build or test step is silently skipped.
+Both existing WebKit/navigation and scroll job definitions are unchanged.
+The existing required verify job now aggregates all four jobs with always(),
+requiring success for every result. Local negative controls prove exit0 for all-success
+and exit1 for failure, cancelled and skipped browser jobs; these cannot turn it green.
+
+The mobile harness adds scenario/profile duration reporting without changing
+flows/assertions. Its server teardown now terminates the complete owned QA process
+group, avoiding the observed orphan Vite left by killing only npm. strictPort
+prevents automatic port fallback. This is test orchestration, not an application fix.
+Fresh CI must still complete GREEN at the exact release SHA before any Sites version
+is saved. Production remains v482 until separately approved deployment and smoke.
+
+Final immutable harness reruns passed: Home reviews five profiles in 35.337s
+including server startup; general navigation all 32 declared mobile/desktop flows
+in 238.693s. Immediate socket-bind checks after both runs prove the QA port is
+released, and the second starts a new server. Per-scenario timing reporting confirms
+no harness retries. Home review Chromium timings were 5286/5156/5299/5175/4977ms
+for small/normal/large iPhone, Pixel and desktop respectively. Original run APIs
+only expose whole-step durations; these finer viewport measurements are from the
+fresh local reproduction, not invented historical CI timings.

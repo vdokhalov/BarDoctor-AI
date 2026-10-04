@@ -48,7 +48,8 @@ test("review reply remains scoped by authenticated venue context", async () => {
   assert.match(reply, /loadVenueAIContext\(account, "reviews", body\)/);
   assert.match(context, /\.where\(and\(eq\(domainData\.accountId, account\.id\), inArray\(domainData\.storeKey, keys\)\)\)/);
   assert.match(context, /filter\(key => canReadVenueSource\(account, key\)\)/);
-  assert.match(auth, /const context = await observedAwait\("auth\.memberships", \(\) => venueContextForAccount\(identitySession\.account, requestedVenueId\)\)/);
+  assert.match(handler, /const account = await authenticateReadOnlyRequest\(request\)/);
+  assert.match(auth, /const context = await observedAwait\("auth\.memberships", \(\) => venueContextForAccount\(identitySession\.account, requestedVenueId, readOnly\)\)/);
   assert.match(auth, /\.\.\.context\.dataAccount/);
   assert.match(auth, /venueId: context\.venue\.id/);
 });

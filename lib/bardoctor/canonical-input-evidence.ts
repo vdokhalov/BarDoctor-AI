@@ -2,13 +2,32 @@ import type { AuthenticatedAccount } from "./access-control";
 import { derivedInputBelongs } from "./derived-input-scope";
 import { evidenceContentRevision, type EvidenceReference, type EvidenceScope, type ContentRevision } from "./evidence-contracts";
 import { canReadVenueSource, VENUE_CONTEXT_SOURCES } from "./venue-context-access";
-import { RECOMMENDATION_METRIC_IDS, recommendationMetricSnapshot } from "./recommendation-outcomes";
+import { RECOMMENDATION_METRIC_IDS, recommendationMetricSnapshot, type RecommendationMetricId } from "./recommendation-outcomes";
 import type { StoredVenueValue, VenueAIContext } from "./venue-ai-context";
 
 export const AI_METRIC_CALCULATION_VERSION = "canonical-ai-metrics-v1";
 export type CanonicalInputScope = EvidenceScope & { dataAccountId: number };
-export type SourceBinding = { key: string; state: "AVAILABLE" | "UNAVAILABLE" | "PARTIAL"; factId: string; reference: EvidenceReference | null };
-export type CanonicalInputs = { scope: CanonicalInputScope; blocks: Record<string, SourceBinding[]> };
+export type SourceBinding = { key: string; state: "AVAILABLE" | "UNAVAILABLE" | "PARTIAL"; updatedAt: string | null; factId: string; reference: EvidenceReference | null };
+export type CanonicalInputs = { scope: CanonicalInputScope; blocks: Record<string, SourceBinding[]>; metrics: Partial<Record<RecommendationMetricId, SourceBinding[]>> };
+/** Completeness follows the calculation, independently of unrelated data quality. */
+export function metricSourceSelectors(id: RecommendationMetricId): string[] {
+  if (id.startsWith("closed_month_")) return VENUE_CONTEXT_SOURCES.performanceHistory;
+  if (id.startsWith("review_")) return ["bd_guest_reviews"];
+  const selectors: Partial<Record<RecommendationMetricId, string[]>> = {
+    current_period_revenue: ["bd_finance_revenue"],
+    current_period_receipts: ["bd_finance_revenue", "bd_operational_reports_v1"],
+    current_period_guests: ["bd_finance_revenue", "bd_operational_reports_v1"],
+    current_period_average_receipt: ["bd_finance_revenue", "bd_operational_reports_v1"],
+    current_period_expenses: ["bd_finance_revenue", "bd_operational_reports_v1", "bd_finance_expenses", "bd_payroll_entries"],
+    active_employees: ["bd_employees"],
+    confirmed_purchase_documents: ["bd_purchase_documents"],
+    inventory_snapshots: ["bd_inventory_snapshots"],
+    low_stock_items: ["bd_assortment_v1.stockBalances"],
+    menu_active_items: ["bd_assortment_v1.menuItems"],
+    recipe_coverage_percent: ["bd_assortment_v1.menuItems", "bd_assortment_v1.recipes", "bd_assortment_v1.nomenclature", "bd_assortment_v1.stockBalances"],
+  };
+  return selectors[id] ?? [];
+}
 // Closed selectors. A public reference can never choose an arbitrary store/field.
 export const SOURCE_SELECTORS: Record<string, { key: string; collection?: string }> = Object.fromEntries([
   ...new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(), "bd_warehouses", "bd_inventory_returns"]),
@@ -35,14 +54,17 @@ export async function canonicalInputScope(account: AuthenticatedAccount): Promis
   return row ? { venueId: account.venueId, workspaceId: row.workspace_id, dataAccountId: account.id } : null;
 }
 export async function bindCanonicalContext(context: VenueAIContext, scope: CanonicalInputScope, stores: Map<string, StoredVenueValue>) {
-  const inputs: CanonicalInputs = { scope, blocks: {} };
+  const inputs: CanonicalInputs = { scope, blocks: {}, metrics: {} };
   const bindings = new Map<string, SourceBinding>();
-  for (const key of new Set(context.blocks.flatMap(block => VENUE_CONTEXT_SOURCES[block.id] ?? []))) {
-    const stored = stores.get(key), data = stored ? scopedSource(stored.data, scope) : null;
+  for (const key of new Set([...context.blocks.flatMap(block => VENUE_CONTEXT_SOURCES[block.id] ?? []), ...RECOMMENDATION_METRIC_IDS.flatMap(metricSourceSelectors)])) {
+    const selector = SOURCE_SELECTORS[key], stored = stores.get(selector.key), root = stored ? scopedSource(stored.data, scope) : null;
+    const selected = selector.collection && object(root) ? root[selector.collection] : root;
+    const data = selector.collection && !Array.isArray(selected) ? null : selected;
     const state = !stored ? "UNAVAILABLE" : data == null || stored.sourceState === "PARTIAL" || !derivedInputBelongs(stored.data, scope) || Array.isArray(stored.data) && !stored.data.every(object) ? "PARTIAL" : "AVAILABLE";
-    bindings.set(key, { key, state, factId: sourceFactId(scope, key), reference: stored && data != null ? await boundSource(scope, key, data) : null });
+    bindings.set(key, { key, state, updatedAt: stored?.updatedAt ?? null, factId: sourceFactId(scope, key), reference: stored && data != null ? await boundSource(scope, key, data) : null });
   }
   for (const block of context.blocks) inputs.blocks[block.id] = (VENUE_CONTEXT_SOURCES[block.id] ?? []).map(key => bindings.get(key)!);
+  for (const id of RECOMMENDATION_METRIC_IDS) inputs.metrics[id] = metricSourceSelectors(id).map(key => bindings.get(key)!);
   context.canonicalInputs = inputs;
   context.metricEvidence = {};
   for (const id of RECOMMENDATION_METRIC_IDS) {

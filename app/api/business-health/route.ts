@@ -1,6 +1,6 @@
 import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
-import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
+import { authenticateReadOnlyRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { loadCanonicalHealthInputs } from "../../../lib/bardoctor/canonical-health-inputs";
 
 
@@ -11,7 +11,7 @@ function noStore(response: Response): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const account = await authenticateReadOnlyRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "analysis.run")) {
     return noStore(Response.json(
