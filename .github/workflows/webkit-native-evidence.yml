@@ -27,7 +27,13 @@ jobs:
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
       - name: Require native process observer
         run: command -v strace
-      - name: Six retained diagnostic occurrences, no release classification
+      - name: Original mandatory stable WebKit prelude
+        run: node scripts/webkit-stable-gate.mjs
+      - name: Original Phase 3A.10 WebKit prelude
+        run: BD_PROVENANCE_BROWSER=webkit node --import tsx scripts/provenance-phase3a10-browser.ts
+      - name: Verify prelude left the application unchanged
+        run: git diff --exit-code e48ac83476850bc33cc433a4ffe21804300da20a -- app lib public
+      - name: Original six lifecycle sequences with target evidence, no release classification
         run: node scripts/qa/run-webkit-evidence-completion.mjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -36,3 +42,6 @@ jobs:
           path: |
             outputs/webkit-evidence-completion
             outputs/derived-metrics-phase3a8/webkit
+            outputs/health-inputs-phase3a9/webkit
+            outputs/webkit-stable-gate
+            outputs/provenance-phase3a10

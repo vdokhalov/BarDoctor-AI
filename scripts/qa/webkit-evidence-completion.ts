@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
-import type { BrowserContext, Page } from "playwright-core";
+import type { BrowserContext, Page, Request as BrowserRequest } from "playwright-core";
 
 /** Diagnostic only: isolated fixture SELECTs, browser observations and one explicitly
  * labelled post-failure read. No recovery, auth injection, context/page creation or
@@ -45,6 +45,7 @@ export class WebKitEvidenceCompletion {
   private pageIds = new WeakMap<Page, string>();
   private pageCount = 0;
   private requests = new WeakMap<Request, string>();
+  private browserRequests = new WeakMap<BrowserRequest, string>();
   private nativeLines = new Set<string>();
   private monitor: ReturnType<typeof setInterval>;
   constructor(private sqlite: DatabaseSync) {
@@ -82,6 +83,10 @@ export class WebKitEvidenceCompletion {
     this.record("server-response", { id, path: new URL(request.url).pathname, status: response.status, body });
     if (["/api/business-health", "/api/month-close"].includes(new URL(request.url).pathname)) this.snapshot(`request:${id}:after`);
   }
+  private browserRequestId(request: BrowserRequest) {
+    if (!this.browserRequests.has(request)) this.browserRequests.set(request, randomUUID());
+    return this.browserRequests.get(request)!;
+  }
   async attach(context: BrowserContext) {
     this.context = context;
     this.record("context-attached", { contextId: this.contextId });
@@ -97,11 +102,11 @@ export class WebKitEvidenceCompletion {
       page.on("request", request => {
         const path = new URL(request.url()).pathname;
         if (!path.startsWith("/api/")) return;
-        this.record("browser-request", { pageId, path, method: request.method(), headers: safeHeaders(new Headers(request.headers())) });
-        void request.allHeaders().then(headers => this.record("browser-request-all-headers", { pageId, path, headers: safeHeaders(new Headers(headers)) })).catch(error => this.record("browser-header-read-error", { pageId, path, error: String(error) }));
+        this.record("browser-request", { id: this.browserRequestId(request), pageId, path, method: request.method(), headers: safeHeaders(new Headers(request.headers())) });
+        void request.allHeaders().then(headers => this.record("browser-request-all-headers", { id: this.browserRequestId(request), pageId, path, headers: safeHeaders(new Headers(headers)) })).catch(error => this.record("browser-header-read-error", { id: this.browserRequestId(request), pageId, path, error: String(error) }));
       });
-      page.on("requestfailed", request => this.record("browser-request-failed", { pageId, path: new URL(request.url()).pathname, error: request.failure()?.errorText }));
-      page.on("response", response => this.record("browser-response", { pageId, path: new URL(response.url()).pathname, status: response.status() }));
+      page.on("requestfailed", request => this.record("browser-request-failed", { id: this.browserRequestId(request), pageId, path: new URL(request.url()).pathname, error: request.failure()?.errorText }));
+      page.on("response", response => this.record("browser-response", { id: this.browserRequestId(response.request()), pageId, path: new URL(response.url()).pathname, status: response.status() }));
     });
   }
   bindPage(page: Page) { this.page = page; this.record("original-page-bound", { contextId: this.contextId, pageId: this.pageIds.get(page) }); }

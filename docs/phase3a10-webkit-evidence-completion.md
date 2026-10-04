@@ -22,3 +22,6 @@ Local controls verify source equivalence, fail-closed anchors, missing/existing-
 
 
 The first diagnostic run `37198549166` retained three successful executions with no fatal native signal. It did not reproduce the failed occurrence and grants no environment exception. A lower-impact collector revision removes the additional pre-navigation preview API call and periodic cookie IPC queries; those queries could perturb timing. It records only passive browser/API events before failure, snapshots existing fixture rows and obtains pre-crash cookie evidence from actual server request headers. The original byte-equality assertion is now timestamped as an application checkpoint. No native crash is forced.
+
+
+The low-impact isolated run `37198937011` also retained six successful executions without a fatal native signal. A final bounded sequence diagnostic restores the original stable/provenance prelude and the original six lifecycle sequences, rather than repeating the isolated 1280 case again. Only the derived-metrics 1280 target receives the additional collector; other raw suite exits/native traces stay separate. Browser request IDs correlate headers, responses and failures for the same request. These diagnostic sequences do not supply missing evidence for the original failed occurrence or change its RED release gate.
