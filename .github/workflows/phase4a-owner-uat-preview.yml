@@ -75,11 +75,27 @@ jobs:
           const root=process.env.RUNNER_TEMP+'/uat';
           const access=JSON.parse(readFileSync(root+'/origins.json'));
           for(const link of access.links) link.url=link.origin+'/start#'+readFileSync(root+'/key-'+link.scenario,'utf8');
+          writeFileSync(root+'/private-access.json',JSON.stringify(access),{mode:0o600});
           const key=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);
           const ciphertext=Buffer.concat([cipher.update(JSON.stringify(access),'utf8'),cipher.final()]);
           const wrappedKey=publicEncrypt({key:readFileSync('../control/scripts/qa/phase4a-owner-uat-public-key.pub'),padding:constants.RSA_PKCS1_OAEP_PADDING,oaepHash:'sha256'},key);
           writeFileSync(root+'/encrypted-access.json',JSON.stringify({wrappedKey:wrappedKey.toString('base64'),iv:iv.toString('base64'),ciphertext:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}));
           JS
+      - name: Install Chromium for external preview acceptance
+        working-directory: candidate
+        run: npm run browser:install
+      - name: External HTTPS private access and real mobile editor verification smoke
+        working-directory: candidate
+        env:
+          UAT_ACCESS_FILE: ${{ runner.temp }}/uat/private-access.json
+          UAT_EVIDENCE_DIR: ${{ runner.temp }}/uat/evidence
+        run: node ../control/scripts/qa/phase4a-external-uat-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: external-uat-preview-smoke
+          path: ${{ runner.temp }}/uat/evidence
+          retention-days: 2
       - uses: actions/upload-artifact@v4
         with:
           name: private-owner-uat-access

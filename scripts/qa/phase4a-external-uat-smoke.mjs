@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {createRequire}from'node:module';import{readFileSync,writeFileSync,mkdirSync}from'node:fs';import{createHash}from'node:crypto';
+const require=createRequire(process.cwd()+'/package.json');const {webkit,chromium}=require('playwright-core');const{resolveBrowserExecutable,chromiumArgs}=require(process.cwd()+'/scripts/browser-runtime.cjs');
+const access=JSON.parse(readFileSync(process.env.UAT_ACCESS_FILE));const root=process.env.UAT_EVIDENCE_DIR;mkdirSync(root,{recursive:true});
+const useWebkit=process.env.UAT_ENGINE==='webkit';const engine=useWebkit?webkit:chromium;const browser=await engine.launch({headless:true,...(useWebkit?{}:{executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs}),...(process.env.HTTPS_PROXY||process.env.HTTP_PROXY?{proxy:{server:process.env.HTTPS_PROXY||process.env.HTTP_PROXY}}:{})});
+const results=[];
+try{for(const scenario of [1,2,3]){
+ const link=access.links.find(x=>x.scenario===scenario);assert.ok(link);
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:'ru-RU'});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));let assetHash;
+ page.on('response',async r=>{if(r.url().includes('/assets/index-BQGspy0I')&&r.status()===200)try{assetHash=createHash('sha256').update(await r.body()).digest('hex');}catch{}});
+ try{
+  await page.goto(link.url,{timeout:60000});await page.waitForURL('**/home',{timeout:45000});const home=page.locator('.bd-cost-management');await home.locator('.bd-cost-signal').first().waitFor({timeout:60000});
+  const manifest=await page.evaluate(async()=>await(await fetch('/__uat/manifest')).json());assert.equal(manifest.commit,'3688c6bd88194f39dd886f813614f01df03a0b68');assert.equal(manifest.scenario,String(scenario));
+  await page.waitForFunction(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1);
+  assert.equal(await page.evaluate(()=>innerWidth),390);
+  const id=await home.locator('.bd-cost-signal').first().getAttribute('data-signal-id');await page.screenshot({path:root+'/scenario-'+scenario+'-home.png',fullPage:true});
+  await home.locator('.bd-cost-signal').first().click();await page.locator('.bd-cost-management article').waitFor();assert.equal(await page.locator('.bd-cost-management article').getAttribute('data-signal-id'),id);
+  await page.getByText('В текущей техкарте нет ингредиентов.',{exact:true}).first().waitFor();await page.getByText('Данные и источники',{exact:true}).click();await page.getByRole('button',{name:'Проверить источник: water',exact:true}).click();await page.getByText('Источник проверен; запись соответствует основанию расчёта.',{exact:true}).waitFor();
+  if(scenario===3){
+   await page.getByRole('button',{name:'Открыть техкарту',exact:true}).click();await page.waitForSelector('[role="dialog"]',{timeout:30000});const dialog=page.locator('[role="dialog"]').last();await dialog.getByRole('button',{name:/Добавить ингредиент/}).click();await dialog.getByPlaceholder('Ингредиент или готовый товар').fill('QA вода');await dialog.locator('select').first().selectOption({label:'шт.'});await dialog.locator('button').filter({hasText:/Изменить товар|Найти в номенклатуре/}).first().click();await dialog.getByLabel('Поиск по всей номенклатуре').fill('QA вода');await dialog.locator('.bd-tech-card-groups-v375 button').filter({hasText:'QA вода'}).click();await dialog.locator('input[type="number"]').first().fill('1');await dialog.getByRole('button',{name:'Сохранить',exact:true}).filter({visible:true}).click();await dialog.waitFor({state:'hidden'});await page.getByRole('button',{name:'Вернуться к сигналу',exact:true}).click();await page.getByRole('heading',{name:'Проверено: себестоимость рассчитана',exact:true}).first().waitFor({timeout:45000});await page.reload();await page.getByRole('heading',{name:'Проверено: себестоимость рассчитана',exact:true}).first().waitFor({timeout:45000});assert.ok((await page.locator('.bd-cost-result').innerText()).includes('5'));await page.screenshot({path:root+'/scenario-3-verified-reload.png',fullPage:true});
+  }else{assert.equal(await page.locator('.bd-cost-result').count(),0);}
+  assert.equal(assetHash,'18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e');assert.deepEqual(errors,[]);results.push({scenario,engine:useWebkit?'webkit':'chromium',status:'PASS',manifest,assetHash,width:await page.evaluate(()=>innerWidth),height:await page.evaluate(()=>innerHeight),fullCorrection:scenario===3});
+ }catch(error){await page.screenshot({path:root+'/failure-'+scenario+'.png',fullPage:true});writeFileSync(root+'/failure-'+scenario+'.html',await page.content());throw error;}finally{await context.close();}
+}}finally{await browser.close();writeFileSync(root+'/results.json',JSON.stringify(results,null,2));}
+console.log(JSON.stringify(results.map(x=>({scenario:x.scenario,status:x.status,engine:x.engine,width:x.width,height:x.height,fullCorrection:x.fullCorrection}))));
