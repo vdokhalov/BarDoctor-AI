@@ -11,7 +11,7 @@ await new Promise(resolve => reserve.listen(0, '127.0.0.1', resolve));
 const port = reserve.address().port;
 await new Promise(resolve => reserve.close(resolve));
 const key = randomBytes(32).toString('base64url');
-const child = spawn(process.execPath, [new URL('./phase4a-external-uat-gateway.mjs', import.meta.url).pathname], { env: { ...process.env, UAT_TARGET_PORT: String(upstream.address().port), UAT_GATEWAY_PORT: String(port), UAT_SCENARIO: 'check-only', UAT_ACCESS_KEY: key }, stdio: ['ignore', 'pipe', 'inherit'] });
+const child = spawn(process.execPath, [new URL('./phase4a-external-uat-gateway.mjs', import.meta.url).pathname], { env: { ...process.env, UAT_TARGET_PORT: String(upstream.address().port), UAT_GATEWAY_PORT: String(port), UAT_SCENARIO: 'check-only', UAT_ACCESS_KEY: key, UAT_PUBLIC_ORIGIN: 'https://127.0.0.1:' + port }, stdio: ['ignore', 'pipe', 'inherit'] });
 try {
   await new Promise((resolve, reject) => { child.stdout.once('data', resolve); child.once('exit', code => reject(new Error('Gateway exited ' + code))); });
   const base = 'http://127.0.0.1:' + port;

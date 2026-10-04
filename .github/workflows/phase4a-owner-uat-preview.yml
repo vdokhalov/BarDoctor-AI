@@ -44,7 +44,7 @@ jobs:
             echo "::add-mask::$key"
             (umask 077; printf '%s' "$key" > "$RUNNER_TEMP/uat/key-$scenario")
             BD_COST_UAT_PORT="$target" node --import tsx scripts/management-cost-phase4a-owner-uat.ts > "$RUNNER_TEMP/uat/fixture-$scenario.log" 2>&1 &
-            UAT_TARGET_PORT="$target" UAT_GATEWAY_PORT="$gateway" UAT_SCENARIO="$scenario" UAT_ACCESS_KEY="$key" node ../control/scripts/qa/phase4a-external-uat-gateway.mjs > "$RUNNER_TEMP/uat/gateway-$scenario.log" 2>&1 &
+            UAT_TARGET_PORT="$target" UAT_GATEWAY_PORT="$gateway" UAT_SCENARIO="$scenario" UAT_ACCESS_KEY="$key" UAT_ORIGIN_FILE="$RUNNER_TEMP/uat/origin-$scenario" node ../control/scripts/qa/phase4a-external-uat-gateway.mjs > "$RUNNER_TEMP/uat/gateway-$scenario.log" 2>&1 &
           done
           for scenario in 1 2 3; do
             target=$((4389 + scenario)); gateway=$((4499 + scenario))
@@ -66,6 +66,7 @@ jobs:
               if match: break
               time.sleep(1)
             if not match: raise RuntimeError('External tunnel unavailable')
+            (root/f'origin-{scenario}').write_text(match[0])
             links.append({'scenario':scenario,'origin':match[0]})
           (root/'origins.json').write_text(json.dumps({'candidateCommit':'3688c6bd88194f39dd886f813614f01df03a0b68','startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'lifetime':'up to 5 hours from readiness, cancelled earlier only on user request','links':links},indent=2))
           PY

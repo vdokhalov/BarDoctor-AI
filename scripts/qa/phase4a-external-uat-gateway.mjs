@@ -1,6 +1,7 @@
 // QA infrastructure only. Candidate application remains pinned to 3688c6b.
 import { createServer, request as httpRequest } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 const targetPort = Number(process.env.UAT_TARGET_PORT);
 const port = Number(process.env.UAT_GATEWAY_PORT);
@@ -22,7 +23,10 @@ const server = createServer(async (req, res) => {
     return res.end('<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BarDoctor isolated UAT</title><p id="status">Открываем отдельный QA-сценарий…</p><script>(async()=>{const key=location.hash.slice(1);history.replaceState(null,"","/start");const r=await fetch("/__uat/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});if(r.ok)location.replace("/home");else document.getElementById("status").textContent="Доступ закрыт. Откройте исходную UAT-ссылку."})().catch(()=>document.getElementById("status").textContent="Preview недоступен; сообщите об этом.")</script></html>');
   }
   const origin = req.headers.origin;
-  const expectedOrigin = 'https://' + req.headers.host;
+  let expectedOrigin = process.env.UAT_PUBLIC_ORIGIN;
+  if (!expectedOrigin && process.env.UAT_ORIGIN_FILE) {
+    try { expectedOrigin = readFileSync(process.env.UAT_ORIGIN_FILE, 'utf8').trim(); } catch {}
+  }
   if (!['GET', 'HEAD'].includes(req.method || '') && origin !== expectedOrigin) {
     res.writeHead(403); return res.end('Forbidden origin');
   }
