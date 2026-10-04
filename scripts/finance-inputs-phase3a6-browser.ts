@@ -82,7 +82,7 @@ try {
       const response = await route.fetch(), original = await response.text();
       assert.ok(original.includes("bdFinanceInputsPhase3a6"));
       assert.equal(original, readFileSync("public/assets/index-BQGspy0I.js", "utf8"), "served bundle equals final canonical source");
-      await route.fulfill({ response, body: original + '\nwindow.__bdFinanceAcceptance={report:async(profile,month,venueId)=>{const response=await fetch("/api/operational-days",{headers:ca(Ot())}),days=await response.json();return bdBuildMonthlyReport(profile,month,bdOperationalRows(days.revenues,days.days),bdProcArray("bd_finance_expenses"),bdProcArray("bd_inventory_snapshots"),{venueId,accountingCurrency:profile.currency,inventorySections:[]})},payrollAudits:bdPayrollMonthAudits};' });
+      await route.fulfill({ response, body: original + '\nwindow.__bdFinanceAcceptance={report:async(profile,month,venueId)=>{const response=await fetch("/api/operational-days",{headers:ca(Ot())}),days=await response.json();return bdBuildMonthlyReport(profile,month,bdOperationalRows(days.revenues,days.days),bdProcArray("bd_finance_expenses"),bdProcArray("bd_inventory_snapshots"),{venueId,accountingCurrency:profile.currency,inventorySections:[]})},payrollAudits:bdPayrollMonthAudits,healthSettled:()=>bdLiveBusinessHealthPromiseV335===null&&bdLiveBusinessHealthContextV335===bdBusinessHealthAccountContextV284()&&Boolean(bdBusinessHealthGetSharedV284().snapshot)};' });
     });
     const page = await context.newPage(), errors: string[] = [], errorEvents: unknown[] = [];
     page.on("pageerror", error => { errors.push(error.message); errorEvents.push({ message: error.message, stack: error.stack, url: page.url(), fetchTrace: fetchTrace.slice(-10) }); });
@@ -91,10 +91,27 @@ try {
     // Separate independent page acceptance from navigation-cancellation testing.
     // Drain the existing background reads before replacing the document; retain
     // the strict no-page-errors assertion for both browser engines.
-    const navigate = async (path: string) => { if (await page.locator("#root").count()) await waitForSalesHostReads(page); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
+    // Header readiness alone does not drain Health's 120ms store-refresh debounce
+    // or its JSON/commit promise. Observe the actual existing accepted provider
+    // before test-forced document replacement; never suppress browser errors.
+    const settle = async () => {
+      await waitForSalesHostReads(page);
+      await page.waitForFunction(() => (window as unknown as { __bdFinanceAcceptance?: { healthSettled: () => boolean } }).__bdFinanceAcceptance?.healthSettled() === true);
+    };
+    const navigate = async (path: string) => { if (await page.locator("#root").count()) await settle(); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
     await page.clock.setFixedTime(new Date(fixedTime));
     try {
       await navigate("/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.operating").first().waitFor();
+      await settle();
+      // Deterministic negative control: the actual store notification schedules
+      // a Health refresh before its fetch starts. Header-only readiness must
+      // not permit forced navigation during that interval.
+      const deferredReady = await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent("bd:store-updated", { detail: { storeKey: "bd_assortment_v1" } }));
+        return (window as unknown as { __bdFinanceAcceptance: { healthSettled: () => boolean } }).__bdFinanceAcceptance.healthSettled();
+      });
+      assert.equal(deferredReady, false, "scheduled Health refresh is not an accepted canonical state");
+      await settle();
       await page.screenshot({ path: out + "/" + viewport.name + "-open-day.png", fullPage: true });
       await navigate("/finance?month=" + date.slice(0, 7)); await page.locator("[data-bd-finance-dashboard]").waitFor();
       await page.waitForFunction(() => Boolean((window as unknown as { __bdFinanceAcceptance?: unknown }).__bdFinanceAcceptance));
@@ -106,7 +123,7 @@ try {
       assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       await page.screenshot({ path: out + "/" + viewport.name + "-payroll.png", fullPage: true });
       put("bd_payroll_rules", [{ id: "qa-rule", name: "Changed current QA rule", active: true, blocks: [{ id: "rate", type: "shift_rate", amount: 1999, enabled: true }] }]);
-      await waitForSalesHostReads(page); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
+      await settle(); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90);
       await navigate("/shifts?month=" + date.slice(0, 7));
       await page.locator(".bd-shift-card.operating").first().click();
@@ -122,7 +139,7 @@ try {
       await page.getByRole("button", { name: "Сохранить изменения", exact: true }).waitFor({ state: "detached" });
       await page.waitForFunction(() => (window as unknown as { __bdFinanceSaveRefresh?: { pending: string[] } }).__bdFinanceSaveRefresh?.pending.length === 0);
       await page.waitForLoadState("networkidle");
-      await waitForSalesHostReads(page);
+      await settle();
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90, "editor preserves recorded payroll after rule changes");
       assert.equal((await send({ action: "close_shift", shiftId: "C" })).status, 201);
       const completed = (await days()).days[0]; assert.equal(completed.status, "COMPLETE"); assert.equal(completed.revenue.status, "FINAL"); assert.equal(completed.payroll.amount, 90);

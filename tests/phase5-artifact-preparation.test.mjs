@@ -147,6 +147,8 @@ test("full declared test/build artifact preparation twice preserves behavior and
       assert.equal(patchReceiptCost(published), published);
       assert.equal(published.split("/* stock-basis-phase3a7:start */").length, 2, "repeated preparation must retain exactly one shared warehouse contract");
       assert.equal(published.split("/* derived-metrics-phase3a8:start */").length, 2);
+      assert.equal(published.split("/* management-cost-phase4a:start */").length, 2, "exactly one cost lifecycle adapter survives preparation");
+      assert.ok(published.includes('await bdCostClientPhase4a.afterSave(bdCostSaveVenue'), "accepted save retains authoritative cost verification");
       assert.equal(published.split('bdBusinessHealthCalculationVersionV284="business-health-engine-v5"').length, 2, "canonical Health version survives repeated preparation exactly once");
       assert.match(published, /bdStockBasisPhase3a7/, "receipt valuation helper survives preparation");
       assert.match(published, /bdCanonicalBoundaryClientPhase3a5/, "repeated preparation must retain the source-permission cache guard");
@@ -163,7 +165,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
         for (const command of scripts[phase].split(" && ")) {
           const match = /^node (scripts\/[a-z0-9-]+\.mjs)( --restore)?$/.exec(command);
           assert.ok(match, `unsupported preparation command: ${command}`);
-          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs", "scripts/patch-stock-basis-phase3a7.mjs", "scripts/patch-derived-metrics-phase3a8.mjs", "scripts/patch-health-inputs-phase3a9.mjs"].includes(match[1]), "only the scoped security/read-contract patches accept restore");
+          if (match[2]) assert.ok(["scripts/patch-canonical-boundary-phase3a5.mjs", "scripts/patch-finance-inputs-phase3a6.mjs", "scripts/patch-stock-basis-phase3a7.mjs", "scripts/patch-derived-metrics-phase3a8.mjs", "scripts/patch-health-inputs-phase3a9.mjs", "scripts/patch-management-cost-phase4a.mjs"].includes(match[1]), "only the scoped security/read-contract/cost-lifecycle patches accept restore");
           run([match[1], ...(match[2] ? ["--restore"] : [])]);
         }
         if (phase === "pretest:artifact" && fs.existsSync(path.join(temporary, "dist/server/index.js"))) verifyClientRelease(temporary);
