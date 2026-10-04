@@ -38,7 +38,7 @@ jobs:
         working-directory: candidate
         run: |
           mkdir -p "$RUNNER_TEMP/uat"
-          for scenario in 1 2; do
+          for scenario in 1 2 3; do
             target=$((4389 + scenario)); gateway=$((4499 + scenario))
             key=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
             echo "::add-mask::$key"
@@ -46,7 +46,7 @@ jobs:
             BD_COST_UAT_PORT="$target" node --import tsx scripts/management-cost-phase4a-owner-uat.ts > "$RUNNER_TEMP/uat/fixture-$scenario.log" 2>&1 &
             UAT_TARGET_PORT="$target" UAT_GATEWAY_PORT="$gateway" UAT_SCENARIO="$scenario" UAT_ACCESS_KEY="$key" node ../control/scripts/qa/phase4a-external-uat-gateway.mjs > "$RUNNER_TEMP/uat/gateway-$scenario.log" 2>&1 &
           done
-          for scenario in 1 2; do
+          for scenario in 1 2 3; do
             target=$((4389 + scenario)); gateway=$((4499 + scenario))
             for attempt in $(seq 1 60); do
               if curl --silent --fail "http://127.0.0.1:$target/home" -o /dev/null; then break; fi
@@ -59,7 +59,7 @@ jobs:
           import os, re, time, json, pathlib, datetime
           root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'uat'
           links=[]
-          for scenario in [1,2]:
+          for scenario in [1,2,3]:
             for attempt in range(120):
               log=(root/f'tunnel-{scenario}.log').read_text()
               match=re.search(r'https://[a-z0-9-]+\.trycloudflare\.com',log)
@@ -90,7 +90,7 @@ jobs:
           echo 'Two independent QA scenarios ready; credentials are in private workflow artifact. Production is untouched.'
           end=$((SECONDS + 18000))
           while [ "$SECONDS" -lt "$end" ]; do
-            for scenario in 1 2; do
+            for scenario in 1 2 3; do
               target=$((4389 + scenario)); gateway=$((4499 + scenario))
               curl --silent --fail "http://127.0.0.1:$target/home" -o /dev/null
               curl --silent --fail "http://127.0.0.1:$gateway/start" -o /dev/null
