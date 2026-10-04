@@ -36,14 +36,13 @@ jobs:
           chmod 700 "$RUNNER_TEMP/cloudflared"
       - name: Start two private isolated fixtures and external HTTPS previews
         working-directory: candidate
-        env:
-          UAT_ACCESS_SEED: ${{ secrets.PHASE4A_OWNER_UAT_PREVIEW_SEED }}
         run: |
           mkdir -p "$RUNNER_TEMP/uat"
           for scenario in 1 2; do
             target=$((4389 + scenario)); gateway=$((4499 + scenario))
-            key=$(UAT_SCENARIO="$scenario" node -e 'const c=require("node:crypto");if(!process.env.UAT_ACCESS_SEED)process.exit(1);process.stdout.write(c.createHmac("sha256",process.env.UAT_ACCESS_SEED).update(process.env.GITHUB_RUN_ID+":"+process.env.UAT_SCENARIO).digest("base64url"))')
+            key=$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')
             echo "::add-mask::$key"
+            (umask 077; printf '%s' "$key" > "$RUNNER_TEMP/uat/key-$scenario")
             BD_COST_UAT_PORT="$target" node --import tsx scripts/management-cost-phase4a-owner-uat.ts > "$RUNNER_TEMP/uat/fixture-$scenario.log" 2>&1 &
             UAT_TARGET_PORT="$target" UAT_GATEWAY_PORT="$gateway" UAT_SCENARIO="$scenario" UAT_ACCESS_KEY="$key" node ../control/scripts/qa/phase4a-external-uat-gateway.mjs > "$RUNNER_TEMP/uat/gateway-$scenario.log" 2>&1 &
           done
@@ -68,12 +67,23 @@ jobs:
               time.sleep(1)
             if not match: raise RuntimeError('External tunnel unavailable')
             links.append({'scenario':scenario,'origin':match[0]})
-          (root/'access.json').write_text(json.dumps({'candidateCommit':'3688c6bd88194f39dd886f813614f01df03a0b68','startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'lifetime':'up to 5 hours from readiness, cancelled earlier only on user request','links':links},indent=2))
+          (root/'origins.json').write_text(json.dumps({'candidateCommit':'3688c6bd88194f39dd886f813614f01df03a0b68','startedAt':datetime.datetime.now(datetime.timezone.utc).isoformat(),'lifetime':'up to 5 hours from readiness, cancelled earlier only on user request','links':links},indent=2))
           PY
+          node --input-type=module - <<'JS'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          import {randomBytes,createCipheriv,publicEncrypt,constants} from 'node:crypto';
+          const root=process.env.RUNNER_TEMP+'/uat';
+          const access=JSON.parse(readFileSync(root+'/origins.json'));
+          for(const link of access.links) link.url=link.origin+'/start#'+readFileSync(root+'/key-'+link.scenario,'utf8');
+          const key=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv);
+          const ciphertext=Buffer.concat([cipher.update(JSON.stringify(access),'utf8'),cipher.final()]);
+          const wrappedKey=publicEncrypt({key:readFileSync('../control/scripts/qa/phase4a-owner-uat-public-key.pem'),padding:constants.RSA_PKCS1_OAEP_PADDING,oaepHash:'sha256'},key);
+          writeFileSync(root+'/encrypted-access.json',JSON.stringify({wrappedKey:wrappedKey.toString('base64'),iv:iv.toString('base64'),ciphertext:ciphertext.toString('base64'),tag:cipher.getAuthTag().toString('base64')}));
+          JS
       - uses: actions/upload-artifact@v4
         with:
           name: private-owner-uat-access
-          path: ${{ runner.temp }}/uat/access.json
+          path: ${{ runner.temp }}/uat/encrypted-access.json
           retention-days: 1
       - name: Keep temporary QA preview available for owner UAT
         run: |
