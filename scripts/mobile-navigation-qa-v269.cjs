@@ -1140,11 +1140,11 @@ async function homeReviewsFlow(browser, profile) {
   });
   assert.ok(homeLayout.rects.every(Boolean), `${profile.name}: a required Home block is missing`);
   if (profile.descriptor.isMobile) {
-    assert.ok(homeLayout.rects[0].top < homeLayout.rects[1].top && homeLayout.rects[1].top < homeLayout.rects[2].top && homeLayout.rects[2].top < homeLayout.rects[3].top, `${profile.name}: mobile Home hierarchy is incorrect`);
+    assert.ok(homeLayout.rects[0].top < homeLayout.rects[3].top && homeLayout.rects[3].top < homeLayout.rects[1].top && homeLayout.rects[1].top < homeLayout.rects[2].top, `${profile.name}: mobile Home hierarchy is incorrect`);
     assert.equal(homeLayout.navVisible, true, `${profile.name}: bottom navigation is missing`);
     assert.ok(homeLayout.navTop < homeLayout.viewportHeight, `${profile.name}: bottom navigation is outside viewport`);
   } else {
-    assert.ok(homeLayout.rects[0].top < homeLayout.rects[1].top && homeLayout.rects[1].top === homeLayout.rects[2].top, `${profile.name}: desktop Health/Finance/Reviews hierarchy is incorrect`);
+    assert.ok(homeLayout.rects[0].top < homeLayout.rects[3].top && homeLayout.rects[3].top < homeLayout.rects[1].top && homeLayout.rects[1].top === homeLayout.rects[2].top, `${profile.name}: desktop Health/attention/Finance/Reviews hierarchy is incorrect`);
     assert.ok(await page.locator('[data-bd-nav-key="reviews"]').isVisible(), `${profile.name}: direct Reviews navigation is hidden`);
   }
   assert.ok(homeLayout.scrollWidth <= homeLayout.clientWidth + 1, `${profile.name}: Home has horizontal overflow`);
@@ -1253,19 +1253,24 @@ async function businessHealthColdStartFlow(browser, profile) {
   const homeLayout = await page.evaluate(() => {
     const card = document.querySelector('[data-bd-home-health-index="business-health-snapshot-v334"]');
     const money = document.querySelector(".bd-home-money");
+    const attention = document.querySelector('[data-bd-home-attention="universal-v198"]');
     const cardRect = card?.getBoundingClientRect();
     const moneyRect = money?.getBoundingClientRect();
     return {
       cardHeight: cardRect?.height ?? null,
       moneyTop: moneyRect?.top ?? null,
+      attentionTop: attention?.getBoundingClientRect().top ?? null,
       viewportHeight: innerHeight,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
   assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
-  assert.ok((homeLayout.moneyTop ?? Infinity) < homeLayout.viewportHeight, `${profile.name}: financial result is not visible on the first screen`);
+  // Phase 4A approved hierarchy: attention comes before the existing money card.
+  assert.ok((homeLayout.attentionTop ?? Infinity) < (homeLayout.moneyTop ?? -Infinity), `${profile.name}: attention must precede financial details`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
+  await page.locator(".bd-home-money").scrollIntoViewIfNeeded();
+  assert.ok(await page.locator(".bd-home-money").isVisible(), `${profile.name}: financial details remain available`);
 
   await home.getByRole("button", { name: /Проверить остатки/ }).click();
   assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: anomaly CTA did not open warehouse`);

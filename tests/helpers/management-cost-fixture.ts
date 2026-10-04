@@ -1,0 +1,23 @@
+import { HEALTH_OPERATIONS_KEYS } from '../../lib/bardoctor/health-operations-inputs';
+import { VENUE_CONTEXT_SOURCES } from '../../lib/bardoctor/venue-context-access';
+import { lifecycleRuntime } from './lifecycle-runtime';
+export async function costFixture(bindings:Record<string,unknown>={}) {
+  const r = await lifecycleRuntime({ activeVenue:'./app/api/access/active-venue/route',costs:'./app/api/management/cost-signals/route', evaluate:'./app/api/management/cost-signals/evaluate/route', detail:'./app/api/management/cost-signals/[id]/route', verify:'./app/api/management/cost-signals/[id]/verify/route', store:'./app/api/store/[key]/route', bulkStore:'./app/api/store/route', overview:'./app/api/assortment/overview/route', health:'./app/api/business-health/route', restaurant:'./app/api/restaurants/me/route', users:'./app/api/users/me/route', evidence:'./app/api/evidence/resolve/route', taxonomy:'./app/api/nomenclature/taxonomy/route' }, {now:'2026-10-04T12:00:00Z',bindings});
+  const owner = await r.register('cost-owner@phase4a.isolated.test'), venueId=owner.activeVenueId;
+  const venue=r.sqlite.prepare('SELECT * FROM venues WHERE id=?').get(venueId)!;
+  const accountId=Number(venue.data_account_id),workspaceId=Number(venue.workspace_id);
+  const seed=(key:string,data:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').run(accountId,key,JSON.stringify(data),'2026-10-04T12:00:00Z');
+  for(const key of new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(),...HEALTH_OPERATIONS_KEYS]))seed(key,key==='bd_assortment_v1'?{menuItems:[],recipes:[],nomenclature:[],stockBalances:[]}:[]);
+  const read=(key:string)=>JSON.parse(String(r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,key)!.data_json));
+  r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'Isolated Phase 4A QA',currency:'RUB',timezone:'UTC',inventorySections:['bar']}),accountId);
+  const assortment={menuItems:[{id:'water',name:'QA вода — длинное название позиции для проверки переноса текста',venueId,active:true,type:'composite',consumptionMode:'RECIPE',currency:'RUB',salePrice:50,department:'bar'},{id:'neighbor',name:'Соседняя позиция',venueId,active:true,type:'simple',consumptionMode:'NONE',currency:'RUB',salePrice:10}],recipes:[{id:'recipe-water',menuItemId:'water',ownerId:'water',ownerType:'menu_item',venueId,status:'draft',reviewStatus:'requires_review',lifecycleStatus:'current',current:true,version:1,ingredients:[] as object[]}],nomenclature:[{id:'nom-water',key:'product:water',productKey:'product:water',name:'QA вода',unit:'pcs',unitModelVersion:4,venueId,active:true}],stockBalances:[],priceHistory:[]};
+  seed('bd_assortment_v1',assortment);
+  seed('bd_purchase_documents',[{id:'purchase-water',venueId,status:'confirmed',documentType:'invoice',date:'2026-10-01',currency:'RUB',confirmedAt:'2026-10-01T12:00:00Z',items:[{id:'line-water',name:'QA вода',quantity:1,unit:'шт.',lineTotal:5,unitPrice:5,purchaseProductKey:'product:water',nomenclatureItemId:'nom-water'}]}]);
+  seed('bd_stock_movements',[]);
+  const request=(path:string,method='GET',body?:unknown,user=owner,selectedVenue=venueId)=>{const req=r.request(user,path,method,body);req.headers.set('X-Venue-Id',String(selectedVenue));return req;};
+  const evaluate=()=>r.api.evaluate.POST(request('/api/management/cost-signals/evaluate','POST',{menuItemId:'water'}));
+  const verify=(id:string,trigger='OWNER_CHECK')=>r.api.verify.POST(request('/api/management/cost-signals/'+id+'/verify','POST',{trigger}),{params:Promise.resolve({id})});
+  const detail=(id:string)=>r.api.detail.GET(request('/api/management/cost-signals/'+id),{params:Promise.resolve({id})});
+  const correct=()=>{const value=read('bd_assortment_v1');Object.assign(value.recipes[0],{status:'confirmed',reviewStatus:'approved',currentDraft:false,ingredients:[{id:'ingredient-water',name:'QA вода',quantity:1,unit:'pcs',nomenclatureItemId:'nom-water',purchaseProductKey:'product:water',productKey:'product:water',venueId,linkSource:'manual',linkConfirmedByUser:true,linkStatus:'linked'}]});return value;};
+  return {...r,owner,venueId,workspaceId,accountId,seed,read,request,evaluate,verify,detail,correct,assortment};
+}

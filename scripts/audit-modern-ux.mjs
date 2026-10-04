@@ -155,9 +155,9 @@ export async function runModernUxAudit() {
   assert.ok(homeStart >= 0 && homeEnd > homeStart, "Home hierarchy component not found");
   const home = bundle.slice(homeStart, homeEnd);
   requireOrder(home, [
+    "bdHomeAttention",
     "bdHomeMoneyCard",
     "bdHomeReviewsCardV409",
-    "bdHomeAttention",
     "bdHomeTodayCard",
     "bdHomeFreshAi",
     "bdHomeContextCardsV151",

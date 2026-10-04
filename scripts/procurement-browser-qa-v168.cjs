@@ -49,6 +49,15 @@ async function openPage(browser, {
     body: "",
   }));
   await context.route("**/api/business-health**", (route) => route.fulfill(jsonResponse({ ok: true, snapshot: null })));
+  // This legacy local fixture has no recorded operational days. Keep the
+  // authenticated empty-day contract explicit instead of hitting a real API
+  // without its mocked session (Finance real-handler coverage is separate).
+  await context.route("**/api/operational-days", (route) => {
+    assert.equal(route.request().method(), "GET");
+    const headers = route.request().headers();
+    const venueId = Number(headers["x-venue-id"] || headers["x-bd-venue-id"] || extras.venue || 401);
+    return route.fulfill(jsonResponse({ ok: true, venueId, asOf: "2026-10-04T12:00:00.000Z", days: [], revenues: [] }));
+  });
   if (setupRoutes) await setupRoutes(context);
   const page = await context.newPage();
   const issues = [];
@@ -275,7 +284,11 @@ async function manualPurchaseCreationFlow(browser) {
   await editor.locator(".bd-purchase-supplier-results-v356 button").filter({ hasText: "ВПРОК" }).first().click();
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Название в документе" }).locator("input").fill("Лайм 1 кг");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Количество" }).locator("input").fill("3");
-  await editor.getByLabel("Единица прихода", { exact: true }).selectOption("kg");
+  // This manual line is not yet bound to a stock item; the existing editor
+  // exposes a raw unit field until reconciliation on save (v421 contract).
+  const unit = editor.locator("label.bd-procurement-field").filter({ hasText: /^Единица$/ }).locator("input");
+  assert.equal(await unit.count(), 1);
+  await unit.fill("kg");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Цена за единицу" }).locator("input").fill("200");
   await editor.locator("label.bd-procurement-field").filter({ hasText: "Сумма строки" }).locator("input").fill("600");
   assert.equal(await editor.getByLabel("Итог документа", { exact: true }).inputValue(), "600");

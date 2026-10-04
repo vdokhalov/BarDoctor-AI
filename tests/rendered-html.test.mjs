@@ -1221,9 +1221,9 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   const homeDailySource = mainBundle.slice(homeDailyStart, homeDailyEnd);
   const homeOrder = [
     "i.jsx(bdHomeHealthIndexV200",
+    "i.jsx(bdHomeAttention",
     "i.jsx(bdHomeMoneyCard",
     "i.jsx(bdHomeReviewsCardV409",
-    "i.jsx(bdHomeAttention",
     "i.jsx(bdHomeTodayCard",
     "i.jsx(bdHomeFreshAi",
     "i.jsx(bdHomeContextCardsV151",

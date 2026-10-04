@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches:
+      - main
+      - fix/phase4a-cost-resolution
       - fix/phase3a10-provenance
       - fix/phase3a9-health-inputs
       - fix/phase3a8-derived-metrics
@@ -59,6 +61,8 @@ jobs:
         run: node --import tsx --test tests/health-inputs-phase3a9.test.ts
       - name: Phase 3A.10 G05 G16 G18 canonical metric and context provenance accepted revisions RBAC
         run: node --import tsx --test tests/provenance-phase3a10.test.ts
+      - name: Phase 4A real handler UNKNOWN cost episode verification history concurrency and venue isolation
+        run: npm run test:management-cost
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -81,6 +85,10 @@ jobs:
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: Phase 4A compiled Worker native D1 and real editor 390 820 1280 lifecycle
+        run: |
+          node --test tests/management-cost-worker-phase4a.test.mjs
+          npm run test:management-cost-browser
       - name: Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance
         run: |
           BD_QA_MODE=regression BD_QA_LABEL=ci node scripts/restricted-manager-403-browser.mjs
