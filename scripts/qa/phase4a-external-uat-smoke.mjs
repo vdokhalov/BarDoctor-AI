@@ -10,7 +10,7 @@ try{for(const scenario of [1,2,3]){
  page.on('response',async r=>{if(r.url().includes('/assets/index-BQGspy0I')&&r.status()===200)try{assetHash=createHash('sha256').update(await r.body()).digest('hex');}catch{}});
  try{
   await page.goto(link.url,{timeout:60000});await page.waitForURL('**/home',{timeout:45000});const home=page.locator('.bd-cost-management');await home.locator('.bd-cost-signal').first().waitFor({timeout:60000});
-  const manifest=await page.evaluate(async()=>await(await fetch('/__uat/manifest')).json());assert.equal(manifest.commit,'3688c6bd88194f39dd886f813614f01df03a0b68');assert.equal(manifest.scenario,String(scenario));
+  const manifest=await page.evaluate(async()=>await(await fetch('/__uat/manifest')).json());assert.equal(manifest.commit,'3688c6bd88194f39dd886f813614f01df03a0b68');assert.equal(manifest.scenario,String(scenario));assert.equal(manifest.entryViewport.width,390);
   await page.waitForFunction(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1);
   assert.equal(await page.evaluate(()=>innerWidth),390);
   const id=await home.locator('.bd-cost-signal').first().getAttribute('data-signal-id');await page.screenshot({path:root+'/scenario-'+scenario+'-home.png',fullPage:true});

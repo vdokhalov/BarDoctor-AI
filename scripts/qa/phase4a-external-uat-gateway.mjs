@@ -10,6 +10,7 @@ if (!key || !/^[A-Za-z0-9_-]{43}$/.test(key)) throw new Error('Private QA access
 const session = randomBytes(32).toString('base64url');
 const equal = (a, b) => typeof a === 'string' && Buffer.byteLength(a) === Buffer.byteLength(b) && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 const cookieName = '__Host-bd_uat';
+let entryViewport = null;
 const csp = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 const server = createServer(async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -20,7 +21,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === '/start' && req.method === 'GET') {
     // Key is in the URL fragment: never sent to the tunnel or request logs.
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    return res.end('<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BarDoctor isolated UAT</title><p id="status">Открываем отдельный QA-сценарий…</p><script>(async()=>{const key=location.hash.slice(1);history.replaceState(null,"","/start");const r=await fetch("/__uat/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key})});if(r.ok)location.replace("/home");else document.getElementById("status").textContent="Доступ закрыт. Откройте исходную UAT-ссылку."})().catch(()=>document.getElementById("status").textContent="Preview недоступен; сообщите об этом.")</script></html>');
+    return res.end('<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BarDoctor isolated UAT</title><p id="status">Открываем отдельный QA-сценарий…</p><script>(async()=>{const key=location.hash.slice(1);history.replaceState(null,"","/start");const r=await fetch("/__uat/session",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key,viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio}})});if(r.ok)location.replace("/home");else document.getElementById("status").textContent="Доступ закрыт. Откройте исходную UAT-ссылку."})().catch(()=>document.getElementById("status").textContent="Preview недоступен; сообщите об этом.")</script></html>');
   }
   const origin = req.headers.origin;
   let expectedOrigin = process.env.UAT_PUBLIC_ORIGIN;
@@ -35,8 +36,10 @@ const server = createServer(async (req, res) => {
     let body = '';
     for await (const bytes of req) { body += bytes; if (body.length > 1024) { res.writeHead(413); return res.end(); } }
     let valid = false;
-    try { valid = equal(JSON.parse(body).key, key); } catch {}
+    let payload;
+    try { payload = JSON.parse(body); valid = equal(payload.key, key); } catch {}
     if (!valid) { console.warn('QA access key mismatch'); res.writeHead(403); return res.end('Access denied'); }
+    if (payload.viewport && [payload.viewport.width,payload.viewport.height,payload.viewport.dpr].every(x => Number.isFinite(x) && x > 0 && x < 10000)) entryViewport = { ...payload.viewport, checkedAt: new Date().toISOString() };
     res.setHeader('Set-Cookie', `${cookieName}=${session}; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=21600`);
     res.writeHead(204); return res.end();
   }
@@ -44,7 +47,7 @@ const server = createServer(async (req, res) => {
   if (!equal(supplied, session)) { res.writeHead(403); return res.end('Private isolated QA; open your UAT link.'); }
   if (url.pathname === '/__uat/manifest') {
     res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({ commit: '3688c6bd88194f39dd886f813614f01df03a0b68', clientHash: '18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e', scenario: process.env.UAT_SCENARIO, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
+    return res.end(JSON.stringify({ commit: '3688c6bd88194f39dd886f813614f01df03a0b68', clientHash: '18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e', scenario: process.env.UAT_SCENARIO, entryViewport, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
   }
   const headers = { ...req.headers, host: `127.0.0.1:${targetPort}` };
   delete headers.cookie;
