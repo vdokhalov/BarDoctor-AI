@@ -1,3 +1,5 @@
+import { captureAcceptedWrite, type AcceptedRecord } from "./accepted-write";
+import { canonicalInputScope } from "../canonical-input-evidence";
 import { retainStockMovements } from "../stock-retention";
 import { readStoreSnapshots, runStoreCasBatch, StoreWriteConflictError, type StoreSnapshot } from "../store-cas";
 import { getD1 } from "../../../db";
@@ -386,6 +388,7 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
   else balances.unshift(next);
   assortment.stockBalances = balances;
   assortment.updatedAt = now;
+  const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: "bd_assortment_v1.stockBalances", id: text(next.id ?? next.productKey), data: next }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     auditStatement(database, {
@@ -400,7 +403,7 @@ async function writeProduct(input: WriterInput): Promise<BusinessWriteResult> {
       now,
     }),
   ], now);
-  return { ok: true, internalId: productKey };
+  return { ok: true, internalId: productKey, acceptedWrite };
 }
 
 async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResult> {
@@ -523,6 +526,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
     ...inventory.movements,
     ...stockMovements,
   ], inventory.assortment);
+  const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: INVENTORY_SNAPSHOT_STORE_KEY, id: input.internalId, data: snapshot }, { selector: ASSORTMENT_STORE_KEY, data: inventory.assortment }, { selector: STOCK_MOVEMENT_STORE_KEY, data: movements }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, movements, now),
@@ -540,7 +544,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
       now,
     }),
   ], now);
-  return { ok: true, internalId: input.internalId };
+  return { ok: true, internalId: input.internalId, acceptedWrite };
 }
 
 async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWriteResult> {
@@ -598,6 +602,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
   if (!result.ok) return { ok: false, code: result.code, error: result.error };
   if (result.idempotent) return { ok: true, internalId: result.document.id, duplicate: true };
   const expenses = syncWriteOffExpense(array(parse(loaded.get(EXPENSE_STORE_KEY), [])), result.document);
+  const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: WRITE_OFF_STORE_KEY, id: result.document.id, data: result.document }, { selector: ASSORTMENT_STORE_KEY, data: result.assortment }, { selector: STOCK_MOVEMENT_STORE_KEY, data: result.stockMovements }, { selector: EXPENSE_STORE_KEY, data: expenses }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
     upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
@@ -615,7 +620,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
       now,
     }),
   ], now);
-  return { ok: true, internalId: result.document.id };
+  return { ok: true, internalId: result.document.id, acceptedWrite };
 }
 
 async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteResult> {
@@ -736,6 +741,7 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
       now,
     }),
   ];
+  const acceptedRecords: AcceptedRecord[] = [{ selector: documentStoreKey, id: input.internalId, data: document }, { selector: ASSORTMENT_STORE_KEY, data: assortment }, { selector: STOCK_MOVEMENT_STORE_KEY, data: nextMovements }];
   if (total > 0) {
     const expenses = array(parse(loaded.get(EXPENSE_STORE_KEY), []));
     const expenseId = `integration:${input.internalId}`;
@@ -768,9 +774,11 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
     if (expenseIndex >= 0) expenses[expenseIndex] = expense;
     else expenses.unshift(expense);
     statements.push(upsertStore(database, input.account.id, EXPENSE_STORE_KEY, expenses, now));
+    acceptedRecords.push({ selector: EXPENSE_STORE_KEY, id: expense.id, data: expense });
   }
+  const acceptedWrite = await captureAcceptedWrite(input.account, acceptedRecords, now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, statements, now);
-  return { ok: true, internalId: input.internalId };
+  return { ok: true, internalId: input.internalId, acceptedWrite };
 }
 
 async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
@@ -963,6 +971,7 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
     const issue = consumptionIssues[0];
     return { ok: false, code: issue.code, error: issue.error };
   }
+  const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: "bd_assortment_v1.recipes", id: text(recipe.id), data: recipe }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
     auditStatement(database, {
@@ -977,7 +986,7 @@ async function writeRecipe(input: WriterInput): Promise<BusinessWriteResult> {
       now,
     }),
   ], now);
-  return { ok: true, internalId: text(recipe.id) };
+  return { ok: true, internalId: text(recipe.id), acceptedWrite };
 }
 
 function applySimpleListMutation(input: WriterInput & {
@@ -1048,11 +1057,12 @@ async function writeSimpleList(input: WriterInput & { storeKey: string; label: s
   const values = array(parse(loaded.get(input.storeKey), []));
   const mutation = applySimpleListMutation({ ...input, values, now });
   if (!mutation.audit) return mutation.result;
+  const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: input.storeKey, id: mutation.result.internalId, data: mutation.audit.after }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, input.storeKey, values, now),
     auditStatement(database, mutation.audit),
   ], now);
-  return mutation.result;
+  return { ...mutation.result, acceptedWrite };
 }
 
 export type WriterInput = {
@@ -1109,13 +1119,15 @@ async function writeCanonicalSimpleListBatchOnce(
     if (mutation.audit) audits.push(mutation.audit);
     return mutation.result;
   });
+  const acceptedScope = audits.length ? await canonicalInputScope(first.account) : null;
+  const boundResults = await Promise.all(results.map(async result => result.ok && !result.duplicate && acceptedScope ? { ...result, acceptedWrite: await captureAcceptedWrite(first.account, [{ selector: definition.storeKey, id: result.internalId, data: values.find(row => text(row.id) === result.internalId) }], now, acceptedScope) } : result));
   if (audits.length) {
     await runStoreCasBatch(database, first.account.id, casSnapshots, [
       upsertStore(database, first.account.id, definition.storeKey, values, now),
       ...batchedAuditStatements(database, audits),
     ], now);
   }
-  return results;
+  return boundResults;
 }
 
 /** Writes canonical entities into the same domain stores used by BarDoctor UI and analytics. */

@@ -12,6 +12,7 @@ export const EVIDENCE_RESOURCE_KINDS = [
   "SALE_EVENT", "CASH_SHIFT", "FINANCE_REVENUE", "MENU_ITEM", "MENU_INGESTION_DRAFT",
   "SALES_DOCUMENT", "WAREHOUSE_MOVEMENT", "PURCHASE_DOCUMENT", "INVENTORY_DOCUMENT",
   "WRITEOFF_DOCUMENT", "OPERATIONAL_REPORT", "INTEGRATION_EVENT", "REVIEW", "PAYROLL_ENTRY",
+  "CANONICAL_SOURCE", "AI_METRIC",
 ] as const;
 export type EvidenceResourceKind = typeof EVIDENCE_RESOURCE_KINDS[number];
 type ReferenceBase = EvidenceScope & {
@@ -22,7 +23,7 @@ type ReferenceBase = EvidenceScope & {
 /** IDs are references, never capabilities. Every resolve reauthorizes the scope. */
 export type EvidenceReference = {
   [K in EvidenceResourceKind]: ReferenceBase & { kind: K } &
-    (K extends "STOCK_QUANTITY" | "STOCK_VALUATION" | "COST_BASIS" | "PURCHASE_DOCUMENT" | "PURCHASE_SOURCE_FILE" | "INVENTORY_DOCUMENT" | "OPENING_STOCK" | "WRITEOFF_DOCUMENT" | "MENU_SOURCE_FILE" | "MENU_REVIEWED_INPUT" | "MENU_CONFIRMATION" | "MENU_RECIPE" | "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
+    (K extends "CANONICAL_SOURCE" | "AI_METRIC" | "STOCK_QUANTITY" | "STOCK_VALUATION" | "COST_BASIS" | "PURCHASE_DOCUMENT" | "PURCHASE_SOURCE_FILE" | "INVENTORY_DOCUMENT" | "OPENING_STOCK" | "WRITEOFF_DOCUMENT" | "MENU_SOURCE_FILE" | "MENU_REVIEWED_INPUT" | "MENU_CONFIRMATION" | "MENU_RECIPE" | "SALE_EVENT" | "MENU_INGESTION_DRAFT" | "CAPTURED_COST" | "CAPTURED_RECIPE" | "CAPTURED_INGREDIENT" ? { partId?: string } : { partId?: never }) & (K extends "CAPTURED_INGREDIENT" ? { ingredientId: string } : { ingredientId?: never });
 }[EvidenceResourceKind];
 export type TraceTarget = { type: "EVIDENCE_RESOURCE"; reference: EvidenceReference };
 export type Finality = "PROVISIONAL" | "FINAL" | "UNKNOWN";
@@ -113,6 +114,7 @@ export type EvidenceRelation = {
 };
 type MoneyProjection = { currency: string | null; revenue: number | null; businessDate: string | null };
 export type EvidenceProjection =
+  | { type: "CANONICAL_SOURCE" | "AI_METRIC" | "INTEGRATION_EVENT"; [key: string]: unknown }
   | (MenuOriginView & { type: "MENU_ORIGIN" })
   | { type: "MENU_SOURCE"; sourceType: MenuSourceType; draftId: string; sourceFileCount: number; originalValues: null; recognitionRecordAvailable: false; originalUploadHashAvailable: false }
   | { type: "MENU_SOURCE_FILE"; draftId: string; fileId: string; name: string | null; mimeType: string | null; sizeBytes: number | null; uploadedAt: string | null; contentBinding: { type: "R2_ETAG"; value: string } | null; downloadPath: string }
@@ -191,7 +193,7 @@ export function parseEvidenceReference(value: unknown): ParsedReference {
     || r.kind === "CAPTURED_INGREDIENT" && (!resourceId(r.partId) || !resourceId(r.ingredientId))
     || r.kind === "CAPTURED_RECIPE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
   if (["MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE"].includes(r.kind) && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
-  if ("partId" in r && !["STOCK_QUANTITY", "STOCK_VALUATION", "COST_BASIS", "PURCHASE_DOCUMENT", "PURCHASE_SOURCE_FILE", "INVENTORY_DOCUMENT", "OPENING_STOCK", "WRITEOFF_DOCUMENT", "MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
+  if ("partId" in r && !["CANONICAL_SOURCE", "AI_METRIC", "STOCK_QUANTITY", "STOCK_VALUATION", "COST_BASIS", "PURCHASE_DOCUMENT", "PURCHASE_SOURCE_FILE", "INVENTORY_DOCUMENT", "OPENING_STOCK", "WRITEOFF_DOCUMENT", "MENU_SOURCE_FILE", "MENU_REVIEWED_INPUT", "MENU_CONFIRMATION", "MENU_RECIPE", "SALE_EVENT", "MENU_INGESTION_DRAFT", "CAPTURED_COST", "CAPTURED_RECIPE", "CAPTURED_INGREDIENT"].includes(r.kind)) return { ok: false, code: "INVALID_REFERENCE" };
   if (r.kind === "PURCHASE_SOURCE_FILE" && !resourceId(r.partId)) return { ok: false, code: "INVALID_REFERENCE" };
   return { ok: true, reference: r as EvidenceReference };
 }

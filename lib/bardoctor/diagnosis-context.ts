@@ -1,3 +1,4 @@
+import { contextProvenance, type ContextProvenance } from "./context-provenance";
 import { aggregateReviews, reviewMetricRating } from "./review-aggregate";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
 import { and, eq } from "drizzle-orm";
@@ -20,6 +21,7 @@ export type TrustedReview = {
 };
 
 export type ConfirmedCompetitor = {
+  provenance?: ContextProvenance;
   key: string;
   name: string;
   category: string;
@@ -135,13 +137,14 @@ function trustedReviews(value: unknown): TrustedReview[] {
     .sort((left, right) => right.date.localeCompare(left.date));
 }
 
-function confirmedCompetitors(value: unknown): ConfirmedCompetitor[] {
+function confirmedCompetitors(value: unknown, legacy = false): ConfirmedCompetitor[] {
   const root = record(value);
   const competitors = Array.isArray(root?.competitors) ? root.competitors : [];
   return competitors
     .map(record)
     .filter((item): item is JsonRecord => Boolean(item && item.confirmed === true && string(item.name)))
     .map((item) => ({
+      provenance: contextProvenance(item, legacy ? "accounts.competitorsJson" : MARKET_KEY, legacy),
       key: competitorKey(item),
       name: string(item.name, "Без названия", 160),
       category: string(item.category, "Заведение", 120),
@@ -164,7 +167,7 @@ function confirmedCompetitors(value: unknown): ConfirmedCompetitor[] {
 function legacyConfirmedCompetitors(value: string | null): ConfirmedCompetitor[] {
   if (!value) return [];
   try {
-    return confirmedCompetitors(JSON.parse(value) as unknown);
+    return confirmedCompetitors(JSON.parse(value) as unknown, true);
   } catch {
     return [];
   }
@@ -173,9 +176,10 @@ function legacyConfirmedCompetitors(value: string | null): ConfirmedCompetitor[]
 function uniqueCompetitors(items: ConfirmedCompetitor[]): ConfirmedCompetitor[] {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = item.name.trim().toLocaleLowerCase("ru");
+    const key = JSON.stringify([item.provenance?.sourceKey, item.key, item.sourceUrls]);
     if (seen.has(key)) return false;
     seen.add(key);
+    if (items.some(other => other !== item && other.name.trim().toLocaleLowerCase("ru") === item.name.trim().toLocaleLowerCase("ru") && JSON.stringify([other.provenance?.sourceKey, other.key, other.sourceUrls]) !== key) && item.provenance) item.provenance.identityConflict = "SAME_NAME_DIFFERENT_SOURCE";
     return true;
   }).slice(0, 15);
 }

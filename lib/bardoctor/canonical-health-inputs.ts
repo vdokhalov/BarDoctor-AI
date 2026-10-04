@@ -1,3 +1,4 @@
+import { bindCanonicalContext } from "./canonical-input-evidence";
 import { getD1 } from "../../db";
 import { hasPermission, isAccessRole, permissionPayload, type AuthenticatedAccount } from "./access-control";
 import { canReadDiagnosisSources, canReadVenueSource, VENUE_CONTEXT_SOURCES } from "./venue-context-access";
@@ -54,7 +55,7 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
             source.data = await reviewsForCurrentGoogleLocation(account.id, source.data as Row[]);
             source.revision = await revision("REVIEW", key, { sourceRevision: source.revision, selected: source.data });
           }
-          stores.set(key, { data: source.data, updatedAt: source.updatedAt ?? "" });
+          stores.set(key, { data: source.data, sourceState: source.state === "AVAILABLE" ? "AVAILABLE" : "PARTIAL", updatedAt: source.updatedAt ?? "" });
         }
       } catch { source.state = "PARTIAL"; }
     } else if (present) source.state = "PARTIAL";
@@ -63,6 +64,7 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   let profile: Row = {};
   try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
   const context = buildVenueAIContextFromSources("diagnosis", { access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) });
+  await bindCanonicalContext(context, scope, stores);
   const operations = buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency });
   const inputManifest = { contractVersion: 1 as const, scope, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };
   const inputRevision = await revision("OPERATIONAL_REPORT", "business-health-inputs", { inputManifest, operations, localDate: operations.counters.unclosedShifts.window });

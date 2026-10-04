@@ -71,6 +71,14 @@ export async function GET(request: Request): Promise<Response> {
       LIMIT 100
     `).bind(account.venueId, account.id).all<DeliveryOverview>(),
   ]);
+  const requestedRun = new URL(request.url).searchParams.get("runId");
+  const itemOffset = Number(new URL(request.url).searchParams.get("itemOffset") ?? 0);
+  if (!Number.isSafeInteger(itemOffset) || itemOffset < 0 || itemOffset > 10000) return noStore(Response.json({ ok: false, error: "Invalid item offset" }, { status: 400 }));
+  const itemRows = requestedRun && requestedRun.length <= 200 ? await getD1().prepare(`SELECT i.id,i.run_id,i.status,i.entity_type FROM integration_sync_items i
+    JOIN integration_sync_runs r ON r.id=i.run_id AND r.connection_id=i.connection_id
+    WHERE i.run_id=? AND i.venue_id=? AND i.data_account_id=? AND r.venue_id=? AND r.data_account_id=? ORDER BY i.created_at DESC,i.id LIMIT 21 OFFSET ?`)
+    .bind(requestedRun, account.venueId, account.id, account.venueId, account.id, itemOffset).all<{ id: string; run_id: string; status: string; entity_type: string }>() : null;
+  const workspace = itemRows ? await getD1().prepare("SELECT workspace_id FROM venues WHERE id=? AND data_account_id=? AND status='active'").bind(account.venueId, account.id).first<{ workspace_id: number }>() : null;
   const assortment = parse(assortmentRow?.data_json, {});
   const stockCandidates = candidatesFromAssortment(assortment, "stock_product", account.venueId);
   const menuCandidates = candidatesFromAssortment(assortment, "menu_item", account.venueId);
@@ -85,6 +93,8 @@ export async function GET(request: Request): Promise<Response> {
   return noStore(Response.json({
     ok: true,
     data: {
+      syncItemsPage: { limit: 20, offset: itemOffset, nextOffset: (itemRows?.results.length ?? 0) > 20 ? itemOffset + 20 : null },
+      syncItems: (itemRows?.results ?? []).slice(0, 20).map(item => ({ id: item.id, runId: item.run_id, status: item.status, entityType: item.entity_type, resultEvidenceRef: workspace ? { contractVersion: 1, kind: "INTEGRATION_EVENT", id: item.id, venueId: account.venueId, workspaceId: workspace.workspace_id } : null })),
       adapters: integrationAdapterDescriptors(),
       connections: connections.map((item) => {
         const agent = latestAgent.get(item.id) ?? null;

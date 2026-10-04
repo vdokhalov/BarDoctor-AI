@@ -1,3 +1,5 @@
+import { canonicalInputScope, type CanonicalInputScope } from "../../../lib/bardoctor/canonical-input-evidence";
+import { captureAcceptedWrite } from "../../../lib/bardoctor/integrations/accepted-write";
 import { and, eq } from "drizzle-orm";
 import { POST as confirmPurchase } from "../purchases/confirm/route";
 import { POST as updatePurchase } from "../purchases/update/route";
@@ -48,7 +50,7 @@ function authenticatedJsonRequest(original: Request, path: string, body: unknown
   });
 }
 
-async function result(response: Response): Promise<BusinessWriteResult> {
+async function result(response: Response, account: AuthenticatedAccount, entityType: "purchase_document" | "sale", scope: CanonicalInputScope): Promise<BusinessWriteResult> {
   let payload: JsonRecord = {};
   try {
     payload = record(await response.json());
@@ -56,7 +58,12 @@ async function result(response: Response): Promise<BusinessWriteResult> {
     return { ok: false, code: "INVALID_BUSINESS_RESPONSE", error: "BarDoctor вернул некорректный ответ" };
   }
   const document = record(payload.document);
+  const accepted = response.ok && payload.ok === true && payload.duplicate !== true && typeof document.id === "string";
+  const selector = entityType === "sale" ? "bd_sales_documents" : "bd_purchase_documents";
+  const records = [{ selector, id: String(document.id), data: document },
+    ...Object.entries({ bd_assortment_v1: payload.assortment, bd_stock_movements: payload.stockMovements, bd_finance_expenses: payload.expenses, bd_suppliers: payload.suppliers, bd_sales_batches: payload.batches, bd_finance_revenue: payload.revenues }).filter(([, data]) => data !== undefined).map(([selector, data]) => ({ selector, data }))];
   return {
+    acceptedWrite: accepted ? await captureAcceptedWrite(account, records, typeof document.updatedAt === "string" ? document.updatedAt : new Date().toISOString(), scope) : undefined,
     ok: response.ok && payload.ok === true,
     internalId: typeof document.id === "string" ? document.id : undefined,
     duplicate: payload.duplicate === true,
@@ -72,6 +79,8 @@ export function integrationBusinessWriter(
 ): IntegrationBusinessWriter {
   return {
     async write(input) {
+      const scope = ["purchase_document", "sale"].includes(input.entityType) ? await canonicalInputScope(account) : null;
+      if (["purchase_document", "sale"].includes(input.entityType) && !scope) return { ok: false, code: "TENANT_MISMATCH", error: "Active canonical scope is unavailable." };
       if (input.entityType === "purchase_document") {
         const handler = input.isUpdate ? updatePurchase : confirmPurchase;
         return result(await handler(
@@ -81,14 +90,14 @@ export function integrationBusinessWriter(
               ? `Накладная обновлена из ${input.envelope.externalSystem}`
               : undefined,
           }),
-        ));
+        ), account, input.entityType, scope!);
       }
       if (input.entityType === "sale") {
         return result(await confirmSale(
           authenticatedJsonRequest(request, "/api/sales/confirm", {
             document: input.data as CanonicalSale,
           }),
-        ));
+        ), account, input.entityType, scope!);
       }
       return writeCanonicalDomainEntity({ account, ...input });
     },

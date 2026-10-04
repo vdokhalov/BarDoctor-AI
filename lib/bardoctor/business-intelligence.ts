@@ -1,3 +1,4 @@
+import { contextProvenance, type ContextProvenance } from "./context-provenance";
 import type { HealthOperationsInputs, HealthCounter } from "./health-operations-inputs";
 import { aggregateBusinessDates } from "./business-day-rows";
 import { buildSelfServiceAnalytics, type SelfServiceAnalytics } from "./self-service-analytics";
@@ -226,6 +227,7 @@ export type AIDoctorIntelligence = {
     scheduleOverlap: boolean | null;
     reason: string;
     source: "external_data";
+    provenance?: ContextProvenance;
   }>;
   hypotheses: StructuredHypothesis[];
   prioritySignals: JsonRecord[];
@@ -1200,6 +1202,7 @@ function externalContext(input: BusinessIntelligenceInput) {
         : venueDistance !== null
           ? `Расстояние до заведения ${venueDistance} км; влияние проверяется по фактической смене.`
           : "Географическая точность ограничена; событие учитывается как контекст, а не как доказанная причина.",
+      provenance: event.provenance as ContextProvenance | undefined ?? contextProvenance(event, "bd_opportunity_calendar_v1"),
       source: "external_data" as const,
     };
   }).sort((left, right) => right.relevanceScore - left.relevanceScore);

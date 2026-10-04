@@ -1,3 +1,5 @@
+import { AI_METRIC_CALCULATION_VERSION } from "./canonical-input-evidence";
+import type { EvidenceReference } from "./evidence-contracts";
 import type { VenueAIContext } from "./venue-ai-context";
 
 type JsonRecord = Record<string, unknown>;
@@ -39,6 +41,7 @@ export type RecommendationOutcomeStatus =
   | "insufficient_data";
 
 export type RecommendationMetricSnapshot = {
+  provenance?: { authority: "CANONICAL_SERVER"; calculationVersion: string; metricId: RecommendationMetricId; accountingCurrency: string | null; state: "AVAILABLE" | "PARTIAL"; facts: import("./canonical-input-evidence").SourceBinding[]; evidenceRef?: EvidenceReference };
   metricId: RecommendationMetricId;
   label: string;
   value: number;
@@ -112,7 +115,22 @@ export function isRecommendationMetricId(value: unknown): value is Recommendatio
     && (RECOMMENDATION_METRIC_IDS as readonly string[]).includes(value);
 }
 
-export function recommendationMetricSnapshot(
+export function recommendationMetricSnapshot(metricId: RecommendationMetricId, context: VenueAIContext): RecommendationMetricSnapshot | null {
+  const value = unboundRecommendationMetricSnapshot(metricId, context);
+  if (!value || !context.canonicalInputs) return value;
+  const block = metricId.startsWith("closed_month_") || metricId.startsWith("current_period_") ? "performanceHistory"
+    : metricId.startsWith("review_") ? "guestFeedback"
+    : ["recipe_coverage_percent", "menu_active_items"].includes(metricId) ? "menuAndRecipes"
+    : metricId === "active_employees" ? "team" : "purchasesAndInventory";
+  const facts = context.canonicalInputs.blocks[block] ?? [];
+  if (value.value === 0 && (!facts.length || facts.some(fact => fact.state !== "AVAILABLE"))) return null;
+  return { ...value, provenance: { authority: "CANONICAL_SERVER", calculationVersion: AI_METRIC_CALCULATION_VERSION, metricId,
+    accountingCurrency: value.unit === "currency" ? context.accountingCurrency : null,
+    state: facts.length && facts.every(fact => fact.state === "AVAILABLE") ? "AVAILABLE" : "PARTIAL", facts,
+    ...(context.metricEvidence?.[metricId] ? { evidenceRef: context.metricEvidence[metricId] } : {}) } };
+}
+
+function unboundRecommendationMetricSnapshot(
   metricId: RecommendationMetricId,
   context: VenueAIContext,
 ): RecommendationMetricSnapshot | null {
@@ -126,7 +144,7 @@ export function recommendationMetricSnapshot(
   const closedPeriodKey = text(closed.monthKey) || null;
   const closedPeriodLabel = text(closed.periodLabel, closedPeriodKey ?? "Закрытый месяц");
   const closedObservedAt = iso(closed.closedAt) ?? blockUpdatedAt(context, "performanceHistory");
-  const currentPeriodKey = context.generatedAt.slice(0, 7);
+  const currentPeriodKey = text(period.monthKey, context.generatedAt.slice(0, 7));
   const currentPeriodLabel = "Текущий учётный период";
   const currentObservedAt = blockUpdatedAt(context, "performanceHistory");
 

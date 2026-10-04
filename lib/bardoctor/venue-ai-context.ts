@@ -1,7 +1,10 @@
+import { derivedInputBelongs } from "./derived-input-scope";
+import { contextProvenance } from "./context-provenance";
+import { bindCanonicalContext, scopedSource, type CanonicalInputs, type MetricEvidenceMap } from "./canonical-input-evidence";
 import { aggregateReviews } from "./review-aggregate";
 import { procurementProductSummary } from "./procurement-basis";
 import { readFinanceInputs } from "./finance-inputs";
-import { aggregateBusinessDates, activeBusinessRow } from "./business-day-rows";
+import { activeBusinessRow } from "./business-day-rows";
 import type { AuthenticatedAccount } from "./access-control";
 import { canReadVenueBlock, canReadVenueSource, VENUE_CONTEXT_SOURCES } from "./venue-context-access";
 import { and, eq, inArray } from "drizzle-orm";
@@ -39,6 +42,9 @@ export type VenueAIContextBlock = {
 };
 
 export type VenueAIContext = {
+  canonicalInputs?: CanonicalInputs;
+  metricEvidence?: MetricEvidenceMap;
+  ownerProvidedContext?: JsonRecord;
   version: "venue-ai-context-v1";
   purpose: VenueAIContextPurpose;
   generatedAt: string;
@@ -48,6 +54,7 @@ export type VenueAIContext = {
 };
 
 export type StoredVenueValue = {
+  sourceState?: "AVAILABLE" | "PARTIAL";
   data: unknown;
   updatedAt: string;
 };
@@ -418,21 +425,19 @@ function summariseClosedMonths(sources: VenueAIContextSources) {
 }
 
 function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, now: Date, timezone: string) {
-  const requestFinance = record(request.finance);
+  void request;
   const storedRevenue = store(sources, "bd_finance_revenue");
   const storedExpenses = store(sources, "bd_finance_expenses");
   const storedPayroll = store(sources, "bd_payroll_entries");
   const revenueRows = array(storedRevenue?.data);
   const expenseRows = array(storedExpenses?.data);
   const payrollRows = array(storedPayroll?.data);
-  const requestRecent = array(requestFinance.recentDaily);
   const venueId = sources.access?.venueId ?? number(sources.accountProfile.venueId) ?? 1;
   const currency = accountingCurrencyFromProfile({ ...sources.accountProfile, currency: sources.accountProfile.currency ?? sources.accountProfile.accountingCurrency });
   const canonical = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: "0000-01-01", endDate: zonedDateKey(now, timezone),
     revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
     documents: array(store(sources, "bd_sales_documents")?.data), expenses: expenseRows, payrollEntries: payrollRows });
-  // Client-body authority is an existing G05 boundary and remains out of scope.
-  const rows = requestRecent.length ? aggregateBusinessDates(requestRecent) : canonical.daily;
+  const rows = canonical.daily;
   const salesDocuments = array(store(sources, "bd_sales_documents")?.data).map(record)
     .filter((item) => !item.status || text(item.status) === "confirmed")
     .sort((left, right) => text(right.date).localeCompare(text(left.date)))
@@ -454,10 +459,8 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   });
   const revenueOf = (item: JsonRecord) => number(item.revenue ?? item.amount) ?? 0;
   const receiptsOf = (item: JsonRecord) => number(item.receipts ?? item.checks) ?? 0;
-  const guestsOf = (item: JsonRecord) => number(item.guests) ?? 0;
   const currentRevenue = sum(current, revenueOf);
   const previousRevenue = sum(previous, revenueOf);
-  const monthToDate = record(requestFinance.monthToDate);
   const currentMonthKey = today.slice(0, 7);
   const currentMonthRows = rows.filter((value) => {
     const date = dateOnly(record(value).date);
@@ -477,23 +480,21 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
     return Boolean(date && date >= `${currentMonthKey}-01` && date <= today)
       && activeBusinessRow(item);
   });
-  const storedMonthRevenue = sum(currentMonthRows, revenueOf);
-  const storedMonthReceipts = sum(currentMonthRows, receiptsOf);
-  const storedMonthGuests = sum(currentMonthRows, guestsOf);
   const monthInputs = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
     revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
     documents: array(store(sources, "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries });
-  const effectiveRevenue = number(monthToDate.revenue) ?? (requestRecent.length ? storedMonthRevenue : monthInputs.revenue);
-  const effectiveReceipts = number(monthToDate.receipts) ?? storedMonthReceipts;
-  const effectivePayroll = number(monthToDate.payroll) ?? monthInputs.payroll;
-  const effectiveExpenses = number(monthToDate.expenses) ?? monthInputs.expenses;
-  const effectiveResult = number(monthToDate.result ?? monthToDate.preliminaryResult ?? monthToDate.cashResult)
-    ?? (effectiveRevenue != null && effectiveExpenses != null ? rounded(effectiveRevenue - effectiveExpenses, 2) : null);
+  const effectiveRevenue = monthInputs.revenue;
+  const receiptValues = monthInputs.revenueRows.map(row => number(row.receipts ?? row.checks));
+  const guestValues = monthInputs.revenueRows.map(row => number(row.guests ?? row.guestCount));
+  const effectiveReceipts = receiptValues.every(value => value !== null) ? receiptValues.reduce<number>((total, value) => total + value!, 0) : null;
+  const effectiveGuests = guestValues.length && guestValues.every(value => value !== null) ? guestValues.reduce<number>((total, value) => total + value!, 0) : null;
+  const effectivePayroll = monthInputs.payroll;
+  const effectiveExpenses = monthInputs.expenses;
+  const effectiveResult = (effectiveRevenue != null && effectiveExpenses != null ? rounded(effectiveRevenue - effectiveExpenses, 2) : null);
   const closedMonths = summariseClosedMonths(sources);
 
   return {
-    tracked: requestFinance.tracked === true
-      || rows.length > 0
+    tracked: rows.length > 0
       || expenseRows.length > 0
       || closedMonths.available,
     period: {
@@ -511,9 +512,8 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       revenue: effectiveRevenue,
       receipts: effectiveReceipts,
       inputContract: { ...monthInputs, days: undefined, daily: undefined, revenueRows: undefined },
-      guests: (number(monthToDate.guests) ?? storedMonthGuests) || null,
-      averageReceipt: number(monthToDate.avgReceipt)
-        ?? (effectiveReceipts > 0 && effectiveRevenue != null ? rounded(effectiveRevenue / effectiveReceipts, 2) : null),
+      guests: effectiveGuests,
+      averageReceipt: (effectiveReceipts != null && effectiveReceipts > 0 && effectiveRevenue != null ? rounded(effectiveRevenue / effectiveReceipts, 2) : null),
       expenses: effectiveExpenses,
       payroll: effectivePayroll,
       result: effectiveResult,
@@ -543,7 +543,6 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
           ?? (receiptsOf(item) > 0 ? rounded(revenueOf(item) / receiptsOf(item), 2) : null),
       })),
     hourly: [
-      ...array(requestFinance.hourly),
       ...rows.flatMap((value) => {
         const item = record(value);
         const date = dateOnly(item.date);
@@ -817,11 +816,11 @@ function summariseTeam(request: JsonRecord, sources: VenueAIContextSources) {
   const employeeStore = store(sources, "bd_employees");
   const payrollStore = store(sources, "bd_payroll_entries");
   const employees = array(employeeStore?.data).map(record);
-  const requestSummary = record(request.employees);
+  void request;
   const active = employees.filter((item) => text(item.status, "active") === "active");
   const payroll = array(payrollStore?.data).map(record);
-  const total = number(requestSummary.total) ?? employees.length;
-  const activeTotal = number(requestSummary.active) ?? active.length;
+  const total = employees.length;
+  const activeTotal = active.length;
   return {
     available: total > 0,
     updatedAt: maxIso(
@@ -833,11 +832,11 @@ function summariseTeam(request: JsonRecord, sources: VenueAIContextSources) {
     data: {
       total,
       active: activeTotal,
-      onLeave: number(requestSummary.onLeave),
+      onLeave: employees.filter(item => text(item.status) === "on_leave").length,
       departments: countsBy(active, (item) => text(item.department, "Не указан", 80)),
       positions: countsBy(active, (item) => text(item.position ?? item.role, "Не указана", 80)),
       recentPayrollEntries: payroll.length,
-      requestDetails: array(request.employeeDetails).slice(0, 20),
+      requestDetails: [],
     },
   };
 }
@@ -888,6 +887,7 @@ function summariseSeasonality(request: JsonRecord, sources: VenueAIContextSource
     .sort((left, right) => text(left.startDate).localeCompare(text(right.startDate)))
     .slice(0, 12)
     .map((item) => ({
+      provenance: contextProvenance(item, "bd_opportunity_calendar_v1", false, sources.workspaceId ? { venueId: sources.access?.venueId ?? 1, workspaceId: sources.workspaceId } : undefined),
       id: text(item.id, "", 140) || null,
       title: text(item.title, "Событие", 150),
       date: dateOnly(item.startDate ?? item.eventDate),
@@ -908,7 +908,7 @@ function summariseSeasonality(request: JsonRecord, sources: VenueAIContextSource
         .filter((url): url is string => typeof url === "string" && /^https?:\/\//i.test(url))
         .slice(0, 4),
     }));
-  const recentDaily = array(record(request.finance).recentDaily).map(record);
+  const recentDaily = array(summariseRevenue({}, sources, now, timezone).recentDaily).map(record);
   const weekday = new Map<number, { revenue: number; shifts: number }>();
   for (const item of recentDaily) {
     const date = dateOnly(item.date);
@@ -951,6 +951,7 @@ function summariseMarket(sources: VenueAIContextSources) {
     updatedAt: maxIso(marketStore?.updatedAt, iso(market.refreshedAt ?? market.generatedAt)),
     data: {
       confirmedCompetitors: competitors.slice(0, 12).map((item) => ({
+        provenance: contextProvenance({ ...item, confirmed: true }, externalCompetitors.length && record(item.provenance).sourceKey === "accounts.competitorsJson" ? "accounts.competitorsJson" : "bd_market_analysis_v1", Boolean(externalCompetitors.length && record(item.provenance).sourceKey === "accounts.competitorsJson"), sources.workspaceId ? { venueId: sources.access?.venueId ?? 1, workspaceId: sources.workspaceId } : undefined),
         key: text(item.key, "", 300) || null,
         name: text(item.name, "Конкурент", 140),
         category: text(item.category, "Заведение", 80),
@@ -997,7 +998,8 @@ export function buildVenueAIContextFromSources(
   const generatedAt = now.toISOString();
   const request = sources.request ?? {};
   const requestProfile = record(request.profile);
-  const profile = { ...sources.accountProfile, ...requestProfile };
+  const profile = sources.accountProfile;
+  void requestProfile;
   const timezone = text(profile.timezone, "Europe/Chisinau", 80);
   const accountingCurrency = accountingCurrencyFromProfile(profile);
   const menu = summariseMenu(sources, now);
@@ -1247,6 +1249,7 @@ export function buildVenueAIContextFromSources(
           detail: "Источник недоступен: недостаточно прав", missingAction: null, data: { availability: "RESTRICTED" } }
       : item);
   return {
+    ownerProvidedContext: { authority: "OWNER_PROVIDED_CONTEXT", canonicalOverride: false, profile: record(request.profile), finance: record(request.finance), employeeDetails: array(request.employeeDetails) },
     version: "venue-ai-context-v1",
     purpose,
     generatedAt,
@@ -1289,7 +1292,9 @@ export async function loadVenueAIContext(
   } catch {
     accountProfile = {};
   }
-  return buildVenueAIContextFromSources(purpose, {
+  const scope = venueBoundary?.workspaceId != null ? { venueId: account.venueId, workspaceId: venueBoundary.workspaceId, dataAccountId: account.id } : null;
+  if (scope) for (const stored of stores.values()) { stored.sourceState = derivedInputBelongs(stored.data, scope) ? "AVAILABLE" : "PARTIAL"; stored.data = scopedSource(stored.data, scope); }
+  const context = buildVenueAIContextFromSources(purpose, {
     access: account,
     workspaceId: venueBoundary?.workspaceId ?? undefined,
     accountProfile,
@@ -1298,10 +1303,14 @@ export async function loadVenueAIContext(
     stores,
     external,
   });
+  return scope ? bindCanonicalContext(context, scope, stores) : context;
 }
 
 export function venueAIContextForPrompt(context: VenueAIContext): JsonRecord {
   return {
+    canonicalInputs: context.canonicalInputs,
+    metricEvidence: context.metricEvidence,
+    ownerProvidedContext: context.ownerProvidedContext,
     version: context.version,
     generatedAt: context.generatedAt,
     purpose: context.purpose,

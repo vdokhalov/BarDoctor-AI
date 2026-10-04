@@ -21,6 +21,13 @@ class FakeStatement {
     return this;
   }
 
+  async first<T>() {
+    // This fixture's authenticated tenant is venue1/account17/workspace1.
+    // Other selectors cannot supply an accepted-write scope.
+    if (this.sql.includes("FROM venues") && Number(this.args[0]) === 1 && Number(this.args[1]) === 17) return { workspace_id: 1 } as T;
+    return null;
+  }
+
   async all<T>() {
     if (!this.sql.includes("FROM domain_data")) return { results: [] as T[] };
     const accountId = Number(this.args[0]);

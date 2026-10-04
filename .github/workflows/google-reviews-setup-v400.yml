@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches:
+      - fix/phase3a10-provenance
       - fix/phase3a9-health-inputs
       - fix/phase3a8-derived-metrics
       - fix/product-inventory-phase1
@@ -56,6 +57,8 @@ jobs:
         run: node --import tsx --test tests/derived-metrics-phase3a8.test.ts
       - name: Phase 3A.9 complete canonical Health inputs and operational source security
         run: node --import tsx --test tests/health-inputs-phase3a9.test.ts
+      - name: Phase 3A.10 G05 G16 G18 canonical metric and context provenance accepted revisions RBAC
+        run: node --import tsx --test tests/provenance-phase3a10.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -72,6 +75,7 @@ jobs:
           node --test tests/acquisition-stock-worker-phase3a7.test.mjs
           node --test tests/derived-metrics-worker-phase3a8.test.mjs
           node --test tests/health-inputs-worker-phase3a9.test.mjs
+          node --test tests/provenance-worker-phase3a10.test.mjs
           node scripts/canonical-boundary-browser-phase3a5.mjs
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
@@ -90,6 +94,8 @@ jobs:
         run: node --import tsx scripts/finance-inputs-phase3a6-browser.ts
       - name: Phase 3A.7 isolated acquisition stock and historical cost mobile tablet desktop
         run: node --import tsx scripts/acquisition-stock-phase3a7-browser.ts
+      - name: Phase 3A.10 Chromium metric source and integration accepted revisions 390 820 1280
+        run: node --import tsx scripts/provenance-phase3a10-browser.ts
       - name: Phase 3A.9 Chromium canonical Health, source revisions, reload and venue switch
         run: node --import tsx scripts/health-inputs-phase3a9-browser.ts
       - name: Phase 3A.8 Chromium verified close, stale-tab rejection, review aggregate, reload and venue switch
@@ -176,6 +182,8 @@ jobs:
         run: node --import tsx --test tests/webkit-environment-gate.test.ts
       - name: Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280
         run: node scripts/webkit-stable-gate.mjs
+      - name: Mandatory Phase 3A.10 stable WebKit metric source integration accepted revisions 390 820 1280
+        run: BD_PROVENANCE_BROWSER=webkit node --import tsx scripts/provenance-phase3a10-browser.ts
       - name: Native process observation for the two allowlisted Health lifecycle suites
         run: |
           if ! command -v strace >/dev/null; then
@@ -206,6 +214,7 @@ jobs:
             outputs/health-inputs-phase3a9/webkit
             outputs/health-inputs-phase3a9/webkit-stable
             outputs/webkit-health-lifecycle
+            outputs/provenance-phase3a10
             outputs/webkit-stable-gate
             outputs/derived-metrics-phase3a8/webkit
             outputs/evidence-phase3a1/webkit

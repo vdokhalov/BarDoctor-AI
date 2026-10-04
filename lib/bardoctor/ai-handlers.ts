@@ -1,3 +1,6 @@
+import { RECOMMENDATION_METRIC_IDS as CANONICAL_METRIC_IDS } from "./recommendation-outcomes";
+import type { ContextProvenance } from "./context-provenance";
+import type { EvidenceReference } from "./evidence-contracts";
 import { reviewMetricRating } from "./review-aggregate";
 import { canReadDiagnosisSources, restrictedVenueContext } from "./venue-context-access";
 import { authenticateRequest, unauthorized } from "./auth";
@@ -34,7 +37,7 @@ import {
   loadAIDoctorMemory,
   type AIDoctorMemory,
 } from "./ai-doctor-attention";
-import { buildBusinessIntelligenceFromVenueContext, type AIDoctorIntelligence } from "./business-intelligence";
+import { type AIDoctorIntelligence } from "./business-intelligence";
 import { loadCanonicalHealthInputs } from "./canonical-health-inputs";
 
 type JsonRecord = Record<string, unknown>;
@@ -132,6 +135,8 @@ type RecommendationEvidence = {
   fact: string;
   observedAt?: string;
   sourceUrl?: string;
+  provenance?: ContextProvenance | { authority: "CANONICAL_INTERNAL_FACT" | "OWNER_PROVIDED_CONTEXT"; evidenceRefs?: EvidenceReference[] };
+  metricId?: RecommendationMetricId;
 };
 
 function asRecord(value: unknown): JsonRecord | null {
@@ -184,7 +189,7 @@ function buildEvidenceCatalog(
   const evidence: RecommendationEvidence[] = [];
   const push = (item: RecommendationEvidence) => {
     if (!item.fact.trim() || evidence.some((existing) => existing.id === item.id)) return;
-    evidence.push(item);
+    evidence.push({ provenance: { authority: "OWNER_PROVIDED_CONTEXT" }, ...item });
   };
 
   const profile = asRecord(body.profile) ?? {};
@@ -298,8 +303,8 @@ function buildEvidenceCatalog(
     }
   }
 
-  const finance = asRecord(body.finance) ?? {};
-  const month = asRecord(finance.monthToDate);
+  const finance = asRecord(venueContext?.promptData.performanceHistory) ?? {};
+  const month = asRecord(finance.period);
   if (month) {
     push({
       id: "finance:month-to-date",
@@ -446,7 +451,8 @@ function buildEvidenceCatalog(
     push({
       id: `competitor:${evidenceEntityId(competitor.key, evidenceEntityId(competitor.name, `row-${index + 1}`))}`,
       source: "competitor",
-      label: `Подтверждённый конкурент: ${competitor.name}`,
+      provenance: competitor.provenance,
+      label: `${competitor.provenance?.authority === "LEGACY_CONTEXT" ? "Legacy context" : "Контекст подтверждён владельцем"}: ${competitor.name}`,
       fact: evidenceFact([
         competitor.category,
         competitor.distance,
@@ -803,7 +809,8 @@ function normaliseFinancialAssessment(
         .filter((entry): entry is RecommendationEvidence => Boolean(entry));
       return {
         label: text(item.label).slice(0, 100),
-        fact: text(item.fact).slice(0, 400),
+        fact: (evidence[0]?.fact ?? "Фактор требует подтверждения canonical metric").slice(0, 400),
+        interpretationAuthority: "HYPOTHESIS",
         implication: text(
           item.implication,
           "Влияние нужно проверить на следующем сопоставимом закрытом месяце.",
@@ -840,6 +847,7 @@ function normaliseFinancialAssessment(
           ? "finance:closed-month-other-expenses"
           : `finance:closed-month-${id}`;
       rawDrivers.push({
+        interpretationAuthority: "HYPOTHESIS",
         label: text(item.label),
         fact: `${formatNumber(item.amount)}${currentShare !== null ? ` · ${formatNumber(currentShare)}% от выручки` : ""}${shareDelta !== null ? ` · ${shareDelta >= 0 ? "+" : ""}${formatNumber(shareDelta)} п.п. к прошлому закрытому месяцу` : ""}`,
         implication: shareDelta === null
@@ -983,7 +991,9 @@ function normaliseDiagnosis(
       id: contextBlock.id,
       label: contextBlock.label,
       status: validChoice(rawArea.status, AREA_STATUSES, "stable"),
-      fact: text(rawArea.fact, contextBlock.detail),
+      fact: evidence[0]?.fact ?? contextBlock.detail,
+      interpretationAuthority: "HYPOTHESIS",
+      metricEvidenceRefs: evidence.flatMap(entry => entry.provenance && "evidenceRefs" in entry.provenance ? entry.provenance.evidenceRefs ?? [] : []),
       hypothesis: text(
         rawArea.hypothesis,
         "Причина не подтверждена; направление учтено как контекст, а не как доказанная проблема.",
@@ -1039,10 +1049,7 @@ function normaliseDiagnosis(
         item.verificationDate ?? item.deadline ?? item.estimatedTime,
         venueContext.generatedAt,
       );
-      const fact = text(
-        item.fact,
-        evidence[0]?.fact ?? "Исходный факт требует подтверждения в учёте BarDoctor",
-      ).slice(0, 600);
+      const fact = (evidence.find(entry => entry.metricId === metricId)?.fact ?? evidence[0]?.fact ?? "Исходный факт требует подтверждения в учёте BarDoctor").slice(0, 600);
       const factPeriod = text(
         item.factPeriod,
         baselineMetric?.periodLabel
@@ -1335,6 +1342,8 @@ function normaliseDiagnosis(
   return {
     contextVersion: venueContext.version,
     intelligence: managementIntelligence,
+    metricProvenance: Object.fromEntries(CANONICAL_METRIC_IDS.map(id => [id, recommendationMetricSnapshot(id, venueContext)])),
+    inputAuthority: { metrics: "CANONICAL_SERVER", ownerContext: "OWNER_PROVIDED_CONTEXT", canonicalOverride: false },
     businessHealth: managementIntelligence.businessHealth,
     financialAssessment,
     summary: briefingDiagnosis?.summary ?? attention.diagnosticSentence,
@@ -1344,7 +1353,12 @@ function normaliseDiagnosis(
     areas,
     topThree: managementTopThree,
     analysis,
-    actions: managementIntelligence.briefing.todayActions,
+    actions: managementIntelligence.briefing.todayActions.map(action => {
+      const candidate = actions.find(item => item.recommendationId === action.recommendationId);
+      const metricId = candidate?.baselineMetric?.metricId ?? recommendationMetricId(action, actionEvidence(action, evidenceCatalog));
+      const baselineMetric = metricId ? recommendationMetricSnapshot(metricId, venueContext) : null;
+      return { ...action, metricRelation: "SUPPORTING_METRIC", baselineMetric, metricProvenance: baselineMetric?.provenance ?? { state: "UNKNOWN" }, interpretationAuthority: "HYPOTHESIS" };
+    }),
     attention,
   };
 }
@@ -1361,40 +1375,25 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
     if (!canonicalHealth) return unauthorized();
     if (canonicalHealth.restricted) return restrictedVenueContext();
     const external = await loadDiagnosisExternalContext(account);
-    const venueContext = await loadVenueAIContext(account, "diagnosis", body, {
-      reviews: external.reviews as unknown as JsonRecord,
-      confirmedCompetitors: external.confirmedCompetitors,
-    });
+    const venueContext = canonicalHealth.context;
+    venueContext.ownerProvidedContext = { authority: "OWNER_PROVIDED_CONTEXT", canonicalOverride: false, supplied: body };
     const memory = await loadAIDoctorMemory(account);
     const memoryItems = [...memory.tasks, ...memory.actionTasks, ...memory.decisions];
-    // G06: only Health uses the shared canonical snapshot. Preserve the existing
-    // contextual briefing/memory path; its remaining provenance debt is G05.
-    const contextualIntelligence = buildBusinessIntelligenceFromVenueContext({
-      venueId: account.venueId,
-      context: venueContext,
-      canonicalOperations: canonicalHealth.snapshot.operationsInputs,
-      operationalInput: {
-        ...body,
-        accountingCurrency: venueContext.accountingCurrency,
-        externalProviderStatus: { attempted: external.reviewSync.attempted, ok: external.reviewSync.ok, coverage: "insufficient" },
-      },
-      previousHypotheses: memoryItems
-        .map((item) => asRecord(item.hypothesisData) ?? asRecord(item.hypothesis) ?? item)
-        .filter((item) => text(item.id).startsWith("hypothesis:")),
-      previousVerificationPlans: memoryItems
-        .map((item) => asRecord(item.verificationPlan) ?? item)
-        .filter((item) => Boolean(text(item.id) || text(item.verificationPlanId))),
+    // Health, deterministic metrics and their evidence share one server snapshot.
+    const intelligence = canonicalHealth.intelligence;
+    const metricCatalog: RecommendationEvidence[] = CANONICAL_METRIC_IDS.flatMap(metricId => {
+      const metric = recommendationMetricSnapshot(metricId, venueContext);
+      return metric ? [{ id: `metric:${metricId}`, metricId, source: "finance" as const, label: metric.label,
+        fact: `${metric.label}: ${metric.value} ${metric.unit}; ${metric.periodLabel}`,
+        provenance: { authority: "CANONICAL_INTERNAL_FACT" as const, evidenceRefs: metric.provenance?.evidenceRef ? [metric.provenance.evidenceRef] : [] } }] : [];
     });
-    const intelligence = { ...contextualIntelligence, businessHealth: canonicalHealth.intelligence.businessHealth };
     const evidenceCatalog = [
-      ...buildEvidenceCatalog(body, external, venueContext),
+      ...metricCatalog,
+      ...buildEvidenceCatalog({ profile: body.profile }, external, venueContext),
       ...intelligenceEvidenceCatalog(intelligence),
     ].filter((item, index, items) => items.findIndex((candidate) => candidate.id === item.id) === index);
     const trustedInput = {
-      operationalInput: {
-        ...body,
-        competitorBenchmark: undefined,
-      },
+      ownerProvidedContext: { authority: "OWNER_PROVIDED_CONTEXT", canonicalOverride: false, supplied: body },
       venueContext: venueAIContextForPrompt(venueContext),
       trustedReviews: external.reviews,
       confirmedCompetitors: external.confirmedCompetitors,
@@ -1432,6 +1431,7 @@ venueContext — единственный централизованный ко�
 
 financialAssessment не должен дублировать вкладки «Финансы» и «Отчёты». Не переписывай полный отчёт и не перечисляй все статьи. Оставь только: чистую прибыль и рентабельность; ФОТ как сумму и долю выручки; сравнение с предыдущим закрытым месяцем или указание, что сравнения пока нет; максимум 3 фактора, которые действительно объясняют результат; управленческий вывод. Отличай закупки от себестоимости проданного: закупки показывают движение денег и запас, но не уменьшают финальную прибыль второй раз. Каждый фактор должен содержать точный факт, его управленческое значение и evidenceIds.
 
+Источник числовых фактов — только canonical metricCatalog и venueContext. ownerProvidedContext не переопределяет метрики. Для каждого утверждения о метрике используй его metric:id из evidenceCatalog. OWNER_CONFIRMED_CONTEXT означает подтверждение контекста владельцем, не независимую проверку внешнего источника; EXTERNAL_OBSERVATION, HYPOTHESIS и LEGACY_CONTEXT не называй каноническими внутренними фактами.
 Не называй ФОТ, себестоимость, маржу или расходы «нормальными», «высокими», «низкими», «хорошими» или «плохими» только из-за универсального процента. Если доступен один закрытый месяц, можно объективно назвать результат прибыльным, убыточным или нулевым, но остальные показатели считай исходной точкой. Ключевым фактором называй не просто крупнейшую статью, а статью, чьё влияние подтверждается сравнением, структурой результата или конкретными операционными данными. Если закрытый месяц есть, минимум одно действие в actions должно управлять прибылью или подтверждённым финансовым драйвером и ссылаться на finance:closed-month-result плюс релевантный финансовый evidenceId. Критический риск безопасности может оставаться приоритетом №1, но финансовый итог всё равно показывается первым.
 
 Конкретика обязательна. Используй точные значения, периоды, позиции, статьи, роли и названия из входных данных. Формулировки «сигнал может повлиять», «требует внимания», «важно обратить внимание» и «рекомендуется оптимизировать» запрещены как самостоятельная аналитика: после утверждения должен идти evidence, а без evidence это явно помеченная гипотеза со способом проверки. Не пиши отдельно «проверить», «проработать», «усилить», «оптимизировать» или «взять под контроль» без объекта, способа выполнения, ответственного, срока и измеримого результата. Не придумывай числовой эффект: если его нельзя обосновать, укажи, какой показатель и с какой исходной точкой нужно измерить. Каждый элемент actions должен содержать 2–5 последовательных шагов, ответственного, конкретный срок, однозначный критерий «готово, когда» и ожидаемый эффект.

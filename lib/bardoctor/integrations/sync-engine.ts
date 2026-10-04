@@ -1,3 +1,4 @@
+import type { AcceptedWrite } from "./accepted-write";
 import { getD1 } from "../../../db";
 import type { AuthenticatedAccount } from "../access-control";
 import { ASSORTMENT_STORE_KEY, inventoryProductKey } from "../inventory";
@@ -34,6 +35,7 @@ import { validateCanonicalEnvelope } from "./validation";
 type JsonRecord = Record<string, unknown>;
 
 export type BusinessWriteResult = {
+  acceptedWrite?: AcceptedWrite;
   ok: boolean;
   internalId?: string;
   duplicate?: boolean;
@@ -564,7 +566,8 @@ export async function runIntegrationSync(input: {
       internalId: writeResult.internalId,
       status: writeResult.duplicate ? "skipped" : "success",
       payloadHash: hash,
-      payloadJson,
+      // Strip an untrusted reserved field; only the accepted writer may bind it.
+      payloadJson: JSON.stringify({ ...JSON.parse(payloadJson), bardoctorAcceptedWrite: writeResult.acceptedWrite ?? null }),
     });
   };
 

@@ -1,3 +1,4 @@
+import { resolveProvenanceEvidence } from "./provenance-evidence";
 import { isStockEvidenceKind, resolveStockEvidence } from "./stock-evidence";
 import { isMenuEvidenceKind, resolveMenuEvidence, readMenuOrigin, menuTraceRelations } from "./menu-evidence";
 import { isCostEvidenceKind, readSaleCost, resolveCostEvidence } from "./cost-evidence";
@@ -112,6 +113,7 @@ function draftChild(parent: Row, partId: string, scope: EvidenceScope): Row | nu
 /** Trusted-context core; the public API only obtains context through authentication. */
 async function resolveInContext(context: Context, reference: EvidenceReference, limit: number, offset: number, asOf: string): Promise<EvidenceResolution> {
   if (reference.venueId !== context.venueId || reference.workspaceId !== context.workspaceId) return result("unavailable", asOf);
+  if (["CANONICAL_SOURCE", "AI_METRIC", "INTEGRATION_EVENT"].includes(reference.kind)) return resolveProvenanceEvidence(context, reference, limit, offset, asOf);
   if (isMenuEvidenceKind(reference.kind)) return resolveMenuEvidence(context, reference, limit, offset, asOf);
   if (isStockEvidenceKind(reference.kind)) return resolveStockEvidence(context, reference, limit, offset, asOf);
   if (isCostEvidenceKind(reference.kind)) return resolveCostEvidence(context, reference, limit, offset, asOf);
