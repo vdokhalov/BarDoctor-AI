@@ -1,8 +1,11 @@
 // QA infrastructure only. Candidate application remains pinned to 3688c6b.
 import { createServer, request as httpRequest } from 'node:http';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+const candidateCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+const clientHash = createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex');
 const targetPort = Number(process.env.UAT_TARGET_PORT);
 const port = Number(process.env.UAT_GATEWAY_PORT);
 const key = process.env.UAT_ACCESS_KEY;
@@ -47,7 +50,7 @@ const server = createServer(async (req, res) => {
   if (!equal(supplied, session)) { res.writeHead(403); return res.end('Private isolated QA; open your UAT link.'); }
   if (url.pathname === '/__uat/manifest') {
     res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({ commit: '3688c6bd88194f39dd886f813614f01df03a0b68', clientHash: '18b93db6cb164ff2b5a8d4e2909af8dc98c4c99449553a084ad7dac80050846e', scenario: process.env.UAT_SCENARIO, entryViewport, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
+    return res.end(JSON.stringify({ commit: candidateCommit, clientHash, scenario: process.env.UAT_SCENARIO, entryViewport, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
   }
   const headers = { ...req.headers, host: `127.0.0.1:${targetPort}` };
   delete headers.cookie;
