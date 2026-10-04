@@ -1,0 +1,38 @@
+name: phase3a10-webkit-evidence-diagnostic
+on:
+  push:
+    branches: [diagnostics/phase3a10-webkit-evidence-20261004]
+permissions:
+  contents: read
+jobs:
+  evidence-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - name: Verify exact unchanged application and original QA suite
+        run: |
+          git fetch origin e48ac83476850bc33cc433a4ffe21804300da20a
+          git diff --exit-code e48ac83476850bc33cc433a4ffe21804300da20a -- app lib public drizzle package.json package-lock.json scripts/derived-metrics-phase3a8-browser.ts scripts/qa/webkit-lifecycle-evidence.ts scripts/qa/webkit-environment-classifier.mjs
+      - run: npm run install:ci
+      - name: Validate diagnostic collector and equivalence
+        run: |
+          npm run typecheck
+          node --import tsx --test tests/webkit-evidence-completion.test.ts tests/webkit-environment-gate.test.ts
+      - name: Official Playwright WebKit environment
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Require native process observer
+        run: command -v strace
+      - name: Three retained diagnostic occurrences, no release classification
+        run: node scripts/qa/run-webkit-evidence-completion.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: webkit-evidence-completion
+          path: |
+            outputs/webkit-evidence-completion
+            outputs/derived-metrics-phase3a8/webkit
