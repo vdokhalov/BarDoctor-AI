@@ -1220,16 +1220,16 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.ok(homeDailyStart >= 0 && homeDailyEnd > homeDailyStart);
   const homeDailySource = mainBundle.slice(homeDailyStart, homeDailyEnd);
   const homeOrder = [
-    "i.jsx(bdCostHomePhase4a",
     "i.jsx(bdHomeHealthIndexV200",
+    "i.jsx(bdCostHomePhase4a",
     "i.jsx(bdHomeAttention",
     "i.jsx(bdHomeMoneyCard",
     "i.jsx(bdHomeReviewsCardV409",
     "i.jsx(bdHomeTodayCard",
-    "i.jsx(bdHomeFreshAi",
     "i.jsx(bdHomeContextCardsV151",
   ].map((token) => homeDailySource.indexOf(token));
   assert.ok(homeOrder.every((position) => position >= 0));
+  assert.doesNotMatch(homeDailySource, /i\.jsx\(bdHomeFreshAi/);
   assert.deepEqual([...homeOrder].sort((a, b) => a - b), homeOrder);
   assert.match(mainBundle, /bdAiEvidenceVersion="evidence-and-proposals-v32"/);
   assert.match(mainBundle, /bdUnifiedAiContextVersion="venue-ai-context-v45"/);

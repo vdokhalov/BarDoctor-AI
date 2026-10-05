@@ -46,17 +46,38 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     React.useEffect(()=>{setState(null);setHistory([]);setHistoryCursor(null);setNames({});if(runtime.enabled()&&venue>0)void refresh();const listener=()=>void refresh();window.addEventListener('bd-cost-management-refresh',listener);return()=>{window.removeEventListener('bd-cost-management-refresh',listener);invalidate();}},[venue,refresh,invalidate]);
     if(!runtime.enabled()||disabled.has(venue)||!venue)return null;
     const data=state?.venue===venue?state.data:null;
-    const all=data?.items||[],active=all.filter(e=>e.condition==='ACTIVE').sort((a,b)=>b.generation-a.generation||a.detectedAt.localeCompare(b.detectedAt)||a.menuItemId.localeCompare(b.menuItemId));
+    const all=data?.items||[],active=all.filter(e=>e.condition==='ACTIVE').sort((a,b)=>a.detectedAt.localeCompare(b.detectedAt)||a.menuItemId.localeCompare(b.menuItemId));
     const recent=all.filter(e=>e.condition==='VERIFIED_RESOLVED').sort((a,b)=>b.verificationResult!.checkedAt.localeCompare(a.verificationResult!.checkedAt));
     const detail=selected?all.find(e=>e.signalId===selected):null;
     async function verify(e:Episode){const stamp=++epoch.current;setBusy(true);setError('');try{await request('/api/management/cost-signals/'+encodeURIComponent(e.signalId)+'/verify',venue,{trigger:'OWNER_CHECK'});if(stamp===epoch.current)await refresh()}catch(value){if(stamp===epoch.current){setError(value instanceof Error?value.message:'Проверка недоступна');setBusy(false)}}}
-    const go=(e:Episode)=>{sessionStorage.setItem('bd-cost-origin:'+venue+':'+e.signalId,JSON.stringify({surface,scroll:window.scrollY,returnLocation:e.targets.health}));onNavigate(e.targets.health)};
-    // Only this slice receives the first Home slot. Empty successful reads do
-    // not add a new dashboard card or reorder the existing healthy Home.
-    if(surface==='home'&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!error&&!busy)return null;
-    const Heading=surface==='home'?'h3':'h2';
-    return <section id="management" className={'bd-cost-management'+(surface==='home'?' bd-cost-home-priority':'')} data-cost-venue={venue} data-cost-surface={surface} aria-label="Себестоимость: управление сигналами">
-      <header><Heading>{surface==='home'?(active.length?'Требует внимания':recent.length?'Результат проверки':'Проверка себестоимости'):'Себестоимость — проверка и результат'}</Heading><button type="button" disabled={busy} onClick={()=>void refresh()}>Обновить</button></header>
+    const remember=(e:Episode)=>sessionStorage.setItem('bd-cost-origin:'+venue+':'+e.signalId,JSON.stringify({surface,scroll:window.scrollY,returnLocation:e.targets.health}));
+    const go=(e:Episode)=>{remember(e);onNavigate(e.targets.health)};
+    const correct=(e:Episode)=>{remember(e);onNavigate(e.targets.techCard)};
+    if(surface==='home'){
+      const partial=!!data?.evaluationCursor||!!data?.nextCursor;
+      const state=error?'ERROR':busy&&!data?'LOADING':data?.coverage!=='AVAILABLE'||partial&&!active.length?'INSUFFICIENT_STALE':active.length?'ATTENTION':'STABLE';
+      const top=active[0];
+      return <section id="management" className="bd-cost-management bd-cost-home-priority" data-cost-venue={venue} data-cost-surface="home" data-cost-state={state} aria-label="Сигналы себестоимости">
+        <p className={'bd-cost-home-status is-'+state.toLowerCase()} data-cost-count role="status">{state==='LOADING'?'Проверяем себестоимость…':state==='ERROR'?'Проверка себестоимости недоступна':state==='INSUFFICIENT_STALE'&&!top?'Недостаточно данных для проверки себестоимости':top?'Требует внимания: '+(partial?'≥':'')+active.length+' · Себестоимость':recent.length?'Исправление себестоимости проверено':'Себестоимость: подтверждённых вопросов нет'}</p>
+        {partial&&<small className="bd-cost-home-coverage">Проверка охватывает часть позиций. Остальные — в полном Business Health.</small>}
+        {error&&<p role="alert">{error} Сигнал не закрыт.</p>}
+        {data?.coverage==='UNAVAILABLE'&&<p role="status">Не все источники доступны. Подтверждать исправление пока нельзя.</p>}
+        {top&&<article className="bd-cost-home-top" data-top-signal={top.signalId}>
+          <button type="button" className="bd-cost-signal bd-cost-home-signal" data-signal-id={top.signalId} onClick={()=>go(top)}>
+            <strong>Себестоимость не рассчитана</strong><span className="bd-cost-item-name" title={top.menuItemName||top.menuItemId}>{top.menuItemName||top.menuItemId}</span>
+            <span data-cost-why>Почему: {top.why[0]}</span>
+            <span className="bd-cost-home-source" data-cost-source>Источник: меню и техкарта · {new Date(top.latest.asOf).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}. {top.latest.quality.availability==='UNAVAILABLE'?'Данные неполные. ':''}UNKNOWN ≠ 0.</span>
+          </button>
+          <p className="bd-cost-home-limit" data-cost-limitation>Маржу этой позиции пока нельзя подтвердить.</p>
+          <p className="bd-cost-home-next">{top.latest.reasonCodes.includes('RECIPE_MISSING')?'Создайте техкарту для этой позиции.':top.latest.reasonCodes.includes('RECIPE_EMPTY')?'Добавьте ингредиенты в техкарту.':top.latest.reasonCodes.includes('RECIPE_UNAPPROVED')?'Проверьте и подтвердите техкарту.':'Проверьте техкарту и данные расчёта.'}</p>
+          <button type="button" className="bd-cost-home-cta" data-cost-primary-action onClick={()=>correct(top)}>Исправить техкарту <span aria-hidden="true">→</span></button>
+        </article>}
+        {!top&&recent.slice(0,1).map(e=><button type="button" className="bd-cost-signal verified" data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}><strong>Проверено: себестоимость рассчитана</strong><span>{e.menuItemName||e.menuItemId} · Было: UNKNOWN · Стало: {format(e.verificationResult!.after)}</span><small>Проверка и история →</small></button>)}
+        {error&&<button type="button" disabled={busy} onClick={()=>void refresh()}>Повторить проверку</button>}
+      </section>
+    }
+    return <section id="management" className="bd-cost-management" data-cost-venue={venue} data-cost-surface="health" aria-label="Себестоимость: управление сигналами">
+      <header><h2>Себестоимость — проверка и результат</h2><button type="button" disabled={busy} onClick={()=>void refresh()}>Обновить</button></header>
       {busy&&<p role="status">Проверяем данные на сервере…</p>}{error&&<p role="alert">{error} Сигнал не закрыт.</p>}
       {data?.coverage==='UNAVAILABLE'&&<p role="status">Не все источники доступны. Подтверждать исправление пока нельзя.</p>}
       {!busy&&!error&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!selected&&<p>Нет подтверждённых проблем с обязательной техкартой. Другие проверки доступны ниже.</p>}
@@ -70,14 +91,9 @@ export function createCostManagementClient(React: typeof import('react'), runtim
         {history.map(e=><div key={e.signalId} data-history-signal={e.signalId}><p>Эпизод {e.generation} · {e.condition==='VERIFIED_RESOLVED'?'Проверено':e.condition==='ACTIVE'?'Нужна проверка':'Больше не применимо'}</p>{e.verificationResult&&<Result result={e.verificationResult}/>}</div>)}
         {historyCursor&&<button type="button" onClick={async()=>{const stamp=epoch.current;try{const value=await request('/api/management/cost-signals?state=all&menuItemId='+encodeURIComponent(detail.menuItemId)+'&cursor='+encodeURIComponent(historyCursor),venue);if(stamp===epoch.current){setHistory(old=>[...old,...value.items||[]]);setHistoryCursor(value.nextCursor||null)}}catch(value){if(stamp===epoch.current)setError((value as Error).message)}}}>Предыдущие проверки</button>}
         <button type="button" onClick={()=>onNavigate('/health?venueId='+venue+'&section=management')}>Все сигналы себестоимости</button><button type="button" onClick={()=>{const raw=sessionStorage.getItem('bd-cost-origin:'+venue+':'+detail.signalId);let origin:{surface?:string;scroll?:number}={};try{origin=JSON.parse(raw||'{}')}catch{}onNavigate(origin.surface==='home'?'/home':'/health');if(origin.surface==='home')window.setTimeout(()=>window.scrollTo(0,Number(origin.scroll)||0),100)}}>Назад к обзору</button>
-      </article>:<><div>{active.slice(0,surface==='home'?2:active.length).map(e=><button type="button" className={'bd-cost-signal'+(surface==='home'?' bd-cost-home-signal':'')} data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}>
-        <strong>Себестоимость не рассчитана</strong><span className="bd-cost-item-name" title={e.menuItemName||e.menuItemId}>{e.menuItemName||e.menuItemId}{surface==='health'?' · Нужна проверка':''}</span>
-        <span data-cost-why>{surface==='home'?'Почему: ':''}{e.why[0]}</span>
-        {surface==='home'&&<><span className="bd-cost-home-source" data-cost-source>Источник: меню и проверка техкарты. {e.latest.quality.availability==='UNAVAILABLE'?'Данные расчёта неполные. ':'Проверено '+new Date(e.latest.asOf).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})+'. '}UNKNOWN ≠ 0.</span><span className="bd-cost-home-limit" data-cost-limitation>Маржу этой позиции пока нельзя подтвердить.</span><span className="bd-cost-home-next">Следующий шаг: {e.latest.reasonCodes.includes('RECIPE_MISSING')?'создайте техкарту для этой позиции.':e.latest.reasonCodes.includes('RECIPE_EMPTY')?'добавьте ингредиенты в техкарту.':e.latest.reasonCodes.includes('RECIPE_UNAPPROVED')?'проверьте и подтвердите техкарту.':'проверьте техкарту и данные расчёта.'}</span><span className="bd-cost-home-cta" data-cost-primary-action>Разобраться и исправить <span aria-hidden="true">→</span></span><small className="bd-cost-home-destination">Открыть сигнал в Business Health</small></>}
-      </button>)}</div>{recent.slice(0,surface==='home'?1:3).map(e=><button type="button" className="bd-cost-signal verified" data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}><strong>Проверено: себестоимость рассчитана</strong><span>{e.menuItemName||e.menuItemId} · Было: UNKNOWN · Стало: {format(e.verificationResult!.after)}</span><small>Последний проверенный результат: {new Date(e.verificationResult!.checkedAt).toLocaleString('ru-RU')}</small></button>)}</>}
+      </article>:<><div>{active.map(e=><button type="button" className="bd-cost-signal" data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}><strong>Себестоимость не рассчитана</strong><span>{e.menuItemName||e.menuItemId} · Нужна проверка</span><span>{e.why[0]}</span></button>)}</div>{recent.slice(0,3).map(e=><button type="button" className="bd-cost-signal verified" data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}><strong>Проверено: себестоимость рассчитана</strong><span>{e.menuItemName||e.menuItemId} · Было: UNKNOWN · Стало: {format(e.verificationResult!.after)}</span><small>Последний проверенный результат: {new Date(e.verificationResult!.checkedAt).toLocaleString('ru-RU')}</small></button>)}</>}
       {data?.evaluationCursor&&<button type="button" disabled={busy} onClick={()=>void refresh(data.evaluationCursor!)}>Проверить следующие позиции</button>}
       {data?.nextCursor&&<button type="button" disabled={busy} onClick={async()=>{try{const more=await request('/api/management/cost-signals?state=all&cursor='+encodeURIComponent(data.nextCursor!),venue);setState({venue,data:{...data,items:[...data.items||[],...more.items||[]],nextCursor:more.nextCursor}})}catch(value){setError((value as Error).message)}}}>Показать ещё сигналы</button>}
-      {surface==='home'&&<button type="button" onClick={()=>onNavigate('/health?venueId='+venue+'&section=management')}>Все сигналы</button>}
     </section>
   }
   function useCatalogContext({venue,item,onTarget,canOpen}:{venue:number;item:Record<string,unknown>|undefined;onTarget:(item:Record<string,unknown>)=>void;canOpen:boolean}) {

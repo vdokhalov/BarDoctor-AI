@@ -1246,8 +1246,8 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.deepEqual(await page.evaluate(() => window.__bdHealthRenderedSnapshotIds), ["business-health-snapshot:901:mobile-qa-fresh"], `${profile.name}: stale Health flashed before the canonical response`);
   assert.equal(firstHome.score, "83");
   assert.equal(firstHome.status, "Хорошее состояние");
-  assert.deepEqual(firstHome.zones, ["Финансы86хорошо", "Спрос94хорошо", "Операции70внимание", "Данные91хорошо"]);
-  assert.match(firstHome.priority || "", /Главный приоритет.*Проверить 6 аномалий остатков.*Проверить остатки/);
+  assert.deepEqual(firstHome.zones, [], "Approved compact Home leaves the zone dashboard in full Health");
+  assert.equal(firstHome.priority, undefined, "Home top cost signal is separate from the full Health priority");
   assert.equal(firstHome.confidence, undefined, `${profile.name}: Home exposes confidence as a score`);
   assert.doesNotMatch(await home.textContent(), /Загрузка|Достоверность диагноза/i, `${profile.name}: Home returned to loading or exposed confidence`);
   const homeLayout = await page.evaluate(() => {
@@ -1271,11 +1271,6 @@ async function businessHealthColdStartFlow(browser, profile) {
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
   await page.locator(".bd-home-money").scrollIntoViewIfNeeded();
   assert.ok(await page.locator(".bd-home-money").isVisible(), `${profile.name}: financial details remain available`);
-
-  await home.getByRole("button", { name: /Проверить остатки/ }).click();
-  assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: anomaly CTA did not open warehouse`);
-  await page.goBack({ waitUntil: "networkidle" });
-  await home.waitFor({ timeout: 10_000 });
 
   await page.locator(".bd-home-health-score-v332").click();
   const detail = page.locator(".bd-health-detail-v332");
@@ -1321,7 +1316,7 @@ async function businessHealthColdStartFlow(browser, profile) {
   run.state.healthMode = "healthy";
   await page.reload({ waitUntil: "networkidle" });
   await home.waitFor({ timeout: 10_000 });
-  await home.getByRole("button", { name: /Подробнее о состоянии/ }).click();
+  await home.getByRole("button", { name: /Открыть полный Business Health/ }).click();
   await detail.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/health", `${profile.name}: Home detail CTA is dead`);
   await page.goBack({ waitUntil: "networkidle" });

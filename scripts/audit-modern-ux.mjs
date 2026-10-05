@@ -159,9 +159,9 @@ export async function runModernUxAudit() {
     "bdHomeMoneyCard",
     "bdHomeReviewsCardV409",
     "bdHomeTodayCard",
-    "bdHomeFreshAi",
     "bdHomeContextCardsV151",
   ], "home information hierarchy");
+  assert.doesNotMatch(home, /i\.jsx\(bdHomeFreshAi/, 'Approved Phase4A Home has no competing AI card');
   assert.ok(!home.includes("bdHomeSections"), "Duplicate Home section grid remains");
   requireText(bundle, 'const bdHomeVisualVersion="home-v151"', "Home visual version");
   requireText(bundle, '"data-bd-opportunity-entry":"home-v151"', "compact opportunity context");

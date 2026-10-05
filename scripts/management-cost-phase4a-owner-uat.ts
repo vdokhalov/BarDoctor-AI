@@ -23,6 +23,7 @@ if (scenario) {
   Object.assign(assortment.nomenclature[0], { id: ingredientId, key: productKey, productKey, name: ingredientName });
   Object.assign(assortment.recipes[0], { id: itemId + '-recipe', menuItemId: itemId, ownerId: itemId });
   if (!citrus) assortment.recipes = [];
+  assortment.menuItems.push({...assortment.menuItems[0],id:itemId+'-secondary',name:'QA дополнительная позиция'});
   fixture.seed('bd_assortment_v1', assortment);
   const purchases = fixture.read('bd_purchase_documents');
   purchases[0].id = itemId + '-price';
