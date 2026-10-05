@@ -6,6 +6,8 @@ import { readFileSync } from 'node:fs';
 
 const candidateCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 const clientHash = createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex');
+const fixtureFiles = ['phase4a-owner-uat-fixture.ts','phase4a-owner-uat-fixture-seed.mjs'];
+const fixtureRevision = createHash('sha256').update(fixtureFiles.map(file => readFileSync(new URL(file, import.meta.url))).reduce((a,b)=>Buffer.concat([a,b]),Buffer.alloc(0))).digest('hex');
 const targetPort = Number(process.env.UAT_TARGET_PORT);
 const port = Number(process.env.UAT_GATEWAY_PORT);
 const key = process.env.UAT_ACCESS_KEY;
@@ -50,7 +52,7 @@ const server = createServer(async (req, res) => {
   if (!equal(supplied, session)) { res.writeHead(403); return res.end('Private isolated QA; open your UAT link.'); }
   if (url.pathname === '/__uat/manifest') {
     res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify({ commit: candidateCommit, clientHash, scenario: process.env.UAT_SCENARIO, entryViewport, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
+    return res.end(JSON.stringify({ commit: candidateCommit, clientHash, fixtureVersion: 'phase4a-owner-water-v2', fixtureRevision, ingredientName:'QA вода', scenario: process.env.UAT_SCENARIO, entryViewport, data: 'isolated in-memory SQLite; no production API; reset when runner stops' }));
   }
   const headers = { ...req.headers, host: `127.0.0.1:${targetPort}` };
   delete headers.cookie;
