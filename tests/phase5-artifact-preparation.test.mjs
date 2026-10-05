@@ -145,6 +145,7 @@ test("full declared test/build artifact preparation twice preserves behavior and
       assert.ok(asset, "packaged HTML must reference a versioned asset");
       const published = fs.readFileSync(path.join(temporary, "dist/client/assets", asset[1]), "utf8");
       assert.equal(patchReceiptCost(published), published);
+      assert.equal(published.split('"data-bd-home-management":"business-health"').length, 2, "repeated preparation must retain one unified Home management block");
       assert.equal(published.split("/* stock-basis-phase3a7:start */").length, 2, "repeated preparation must retain exactly one shared warehouse contract");
       assert.equal(published.split("/* derived-metrics-phase3a8:start */").length, 2);
       assert.equal(published.split("/* management-cost-phase4a:start */").length, 2, "exactly one cost lifecycle adapter survives preparation");

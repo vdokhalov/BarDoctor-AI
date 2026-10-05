@@ -4,3 +4,15 @@
 @media(min-width:820px){.bd-cost-management article{max-width:720px}.bd-cost-management{padding:20px}}@media(max-width:430px){.bd-cost-management{padding:12px}.bd-cost-management header{align-items:flex-start}.bd-cost-management header button{flex:none}.bd-cost-management h2{font-size:17px}.bd-cost-management button{width:100%}.bd-cost-management header button{width:auto}}
 /* Follow the same attention-first DOM order on the existing desktop grid. */
 @media(min-width:1024px){.bd-home-daily.bd-home-daily>.bd-home-health-card-v332,.bd-home-daily.bd-home-daily>.bd-home-money,.bd-home-daily.bd-home-daily>.bd-home-money-loading-v344,.bd-home-daily.bd-home-daily>.bd-home-reviews-v409{grid-row:auto}.bd-home-daily>.bd-cost-management{grid-column:1/-1}}
+/* One Home management block: the actionable signal precedes the reused summary. */
+.bd-home-management-phase4a{box-sizing:border-box;width:100%;min-width:0;padding:16px;background:#fff;border:1px solid #e3e5ef;border-radius:18px;color:#272b40;overflow-wrap:anywhere}
+.bd-home-management-phase4a>h2{margin:0 0 10px;font-size:18px;line-height:1.3;color:#5754d8}
+.bd-home-management-phase4a:has(.bd-cost-home-signal){border-color:#edc680;border-left:4px solid #d99019}
+.bd-home-management-phase4a>.bd-cost-home-priority{margin:0;padding:0;border:0;border-radius:0;background:transparent}
+.bd-home-management-phase4a .bd-cost-home-priority header h3{margin:0;font-size:17px;line-height:1.3;color:#79500c}
+.bd-home-management-summary-phase4a>.bd-home-health-card-v332{margin:0;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.bd-home-management-summary-phase4a .bd-home-health-kicker-v332{display:none}
+.bd-home-management-phase4a:has(>.bd-cost-home-priority)>.bd-home-management-summary-phase4a{margin-top:12px;padding-top:14px;border-top:1px solid #e3e5ef}
+@media(max-width:430px){.bd-home-management-phase4a{padding:12px}}
+@media(min-width:820px){.bd-home-management-phase4a{padding:20px}}
+@media(min-width:1024px){.bd-home-daily>.bd-home-management-phase4a{grid-column:1/-1;grid-row:1}}

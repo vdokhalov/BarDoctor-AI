@@ -54,8 +54,9 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     // Only this slice receives the first Home slot. Empty successful reads do
     // not add a new dashboard card or reorder the existing healthy Home.
     if(surface==='home'&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!error&&!busy)return null;
+    const Heading=surface==='home'?'h3':'h2';
     return <section id="management" className={'bd-cost-management'+(surface==='home'?' bd-cost-home-priority':'')} data-cost-venue={venue} data-cost-surface={surface} aria-label="Себестоимость: управление сигналами">
-      <header><h2>{surface==='home'?(active.length?'Требует внимания':recent.length?'Результат проверки':'Проверка себестоимости'):'Себестоимость — проверка и результат'}</h2><button type="button" disabled={busy} onClick={()=>void refresh()}>Обновить</button></header>
+      <header><Heading>{surface==='home'?(active.length?'Требует внимания':recent.length?'Результат проверки':'Проверка себестоимости'):'Себестоимость — проверка и результат'}</Heading><button type="button" disabled={busy} onClick={()=>void refresh()}>Обновить</button></header>
       {busy&&<p role="status">Проверяем данные на сервере…</p>}{error&&<p role="alert">{error} Сигнал не закрыт.</p>}
       {data?.coverage==='UNAVAILABLE'&&<p role="status">Не все источники доступны. Подтверждать исправление пока нельзя.</p>}
       {!busy&&!error&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!selected&&<p>Нет подтверждённых проблем с обязательной техкартой. Другие проверки доступны ниже.</p>}

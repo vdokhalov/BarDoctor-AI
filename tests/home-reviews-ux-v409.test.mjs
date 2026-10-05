@@ -14,6 +14,8 @@ test("Home keeps canonical Health and Finance ahead of the saved Reviews card", 
     source("scripts/build-verified.sh"),
   ]);
   const daily = bundle.slice(bundle.indexOf("function bdHomeDaily"), bundle.indexOf("function bdHealthSafeComputeV342"));
+  assert.equal(daily.split('"data-bd-home-management":"business-health"').length, 2);
+  assert.ok(daily.indexOf('id:"bd-home-management-title-phase4a"') < daily.indexOf("bdCostHomePhase4a"));
   assert.ok(daily.indexOf("bdCostHomePhase4a") < daily.indexOf("bdHomeHealthIndexV200"));
   assert.ok(daily.indexOf("bdHomeHealthIndexV200") < daily.indexOf("bdHomeMoneyCard"));
   assert.ok(daily.indexOf("bdHomeMoneyCard") < daily.indexOf("bdHomeReviewsCardV409"));

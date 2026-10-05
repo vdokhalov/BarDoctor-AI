@@ -19,6 +19,8 @@ const homeAttention='i.jsx(bdHomeAttention,{profile:e,report:E,revenue:t,gapReas
 const healthHero='i.jsx(bdHomeHealthIndexV200,{snapshot:bdHealthSnapshot,diagnosis:f,loading:bdHealthLoading,onNavigate:g}),';
 const reviews='i.jsx(bdHomeReviewsCardV409,{state:bdHomeReviewState,onNavigate:g}),';
 const homeCost='i.jsx(bdCostHomePhase4a,{onNavigate:g}),';
+const homeManagement='i.jsxs("section",{className:"bd-home-management-phase4a","data-bd-home-management":"business-health","aria-labelledby":"bd-home-management-title-phase4a",children:[i.jsx("h2",{id:"bd-home-management-title-phase4a",children:"Business Health"}),'+homeCost+'i.jsx("div",{className:"bd-home-management-summary-phase4a",children:'+healthHero.slice(0,-1)+'})]}),';
+source=source.replace(homeManagement,healthHero);
 source=source.replace(homeCost+healthHero,healthHero);
 source=source.replace(healthHero+homeAttention,healthHero).replace(reviews+'i.jsx(bdHomeTodayCard',reviews+homeAttention+'i.jsx(bdHomeTodayCard');
 const at=source.indexOf(start);if(at>=0){const to=source.indexOf(end,at);if(to<0)throw new Error('Incomplete cost client boundary');source=source.slice(0,at)+source.slice(to+end.length).replace(/^\n/,'');}
@@ -32,7 +34,7 @@ function bdHomeAttention(props){const[revision,refresh]=S.useState(0);S.useEffec
 function bdCostHomePhase4a(props){const context=bdUseProcVenueContextV168();return i.jsx(bdCostClientPhase4a.Center,{surface:"home",venue:Number(context.activeVenueId),onNavigate:props.onNavigate})}
 function bdCostHealthPhase4a(props){const query=ste(),params=new URLSearchParams(query);return i.jsx(bdCostClientPhase4a.Center,{...props,surface:"health",signalId:Number(params.get("venueId"))===props.venue?params.get("signalId"):null})}
 `;
-source=source.replace(reviews+homeAttention,reviews).replace(healthHero,homeCost+healthHero+homeAttention);
+source=source.replace(reviews+homeAttention,reviews).replace(healthHero,homeManagement+homeAttention);
 const anchor='function bdShiftDateLabelV156(';if(source.split(anchor).length!==2)throw new Error('Unique cost module insertion anchor required');
 source=source.replace(anchor,`${start}\n${bundle.outputFiles[0].text}\n${client}\n${end}\n${anchor}`);
 fs.writeFileSync(file,source);console.info('Phase 4A cost signal lifecycle client applied.');
