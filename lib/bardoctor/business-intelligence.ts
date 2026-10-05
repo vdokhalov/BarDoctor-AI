@@ -5,6 +5,24 @@ import { buildSelfServiceAnalytics, type SelfServiceAnalytics } from "./self-ser
 
 type JsonRecord = Record<string, unknown>;
 
+/** One selection policy for Health and Doctor. Time buckets describe deadlines;
+ * they never hide an active critical problem from the management queue. */
+export function rankManagementSignals(values: JsonRecord[], now = new Date()): JsonRecord[] {
+  const deadline = (value: JsonRecord) => String(value.taskDeadlineDate ?? value.canonicalDeadlineDate ?? value.recommendationDeadlineDate ?? value.deadline ?? "").match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? "9999-12-31";
+  const critical = (value: JsonRecord) => value.criticalOverride === true || value.priority === "critical" || value.operationalImpact === "critical";
+  const impact = (value: JsonRecord) => value.financialImpact === "high" || value.demandImpact === "high" || value.businessWideImpact === true ? 2 : value.managementActionable === true ? 1 : 0;
+  const identity = (value: JsonRecord) => String(value.managementId ?? value.problemFingerprint ?? value.recommendationId ?? value.issueKey ?? value.title ?? "");
+  const today = now.toISOString().slice(0, 10);
+  return values.map<JsonRecord>(value => ({...value, ...(critical(value) ? {priority:"critical",criticalOverride:true} : {}),
+    managementPriorityReason: critical(value) && deadline(value)<today ? "Просрочен критический риск: срок прошёл, результат ещё не подтверждён." : critical(value) ? "Активный критический риск требует внимания первым." : deadline(value) < today ? "Срок действия прошёл; результат ещё требует проверки." : impact(value) === 2 ? "Подтверждённый сигнал влияет на финансовый результат бизнеса." : value.managementActionable === true ? "Есть конкретная проблема и доступное действие по её источнику." : "Следующий подтверждённый сигнал по важности и сроку.",
+  })).sort((a, b) => Number(critical(b)) - Number(critical(a))
+    || Number(deadline(b) < today) - Number(deadline(a) < today)
+    || impact(b) - impact(a)
+    || Number(b.priorityScore ?? 0) - Number(a.priorityScore ?? 0)
+    || deadline(a).localeCompare(deadline(b))
+    || identity(a).localeCompare(identity(b)));
+}
+
 export type IntelligencePhase = "before_shift" | "during_shift" | "after_shift";
 export type ConfidenceLevel = "high" | "medium" | "low";
 export type BusinessHealthStatus = "healthy" | "attention" | "critical" | "insufficient_data";
@@ -231,6 +249,9 @@ export type AIDoctorIntelligence = {
   }>;
   hypotheses: StructuredHypothesis[];
   prioritySignals: JsonRecord[];
+  /** Server-selected queue; Doctor may explain it, but cannot replace it. */
+  managementQueue?: JsonRecord[];
+  managementTopActions?: JsonRecord[];
   periods: {
     currentFinance: MetricPeriod | null;
     closedFinance: MetricPeriod | null;
@@ -1793,7 +1814,7 @@ export function buildBusinessIntelligence(input: BusinessIntelligenceInput): AID
       phase,
       previous: previousById.get(`hypothesis:external-traffic:${context.id}`) ?? null,
     }));
-  const signals = prioritySignals({ health: businessHealth, demand, traffic, operations, hypotheses, phase });
+  const signals = rankManagementSignals(prioritySignals({ health: businessHealth, demand, traffic, operations, hypotheses, phase }), now);
   const abstained = signals.length === 0;
   const briefing = managementBriefing({
     now,

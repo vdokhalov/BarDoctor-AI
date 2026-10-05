@@ -9,13 +9,17 @@ type Row = Record<string, unknown>;
 export type HealthSourceState = Availability | "RESTRICTED";
 export type HealthSource = { key: string; state: HealthSourceState; revision: string | null; updatedAt: string | null; data: unknown };
 export type HealthCounter = { value: number | null; availability: HealthSourceState; evidenceStatus: "COMPLETE" | "PARTIAL" | "NONE"; zero: "KNOWN_ZERO" | null; sources: string[]; grain: string; window: string; diagnostics: string[] };
+export type HealthOperationIssue = Row & { managementId: string; issueKey: string; title: string; target: {path:string;label:string}; verificationKind?: "day" | "stock" };
+export type HealthStockFact = { managementId:string; productKey:string; warehouseKey:string; unit:string; name:string; quantity:number|null; minimum:number|null; evidenceComplete:boolean; active:boolean };
 export type HealthOperationsInputs = {
   unclosedShifts: number | null;
   stockAnomalies: number | null;
   criticalBlockers: number | null;
   recurringEquipmentFailures: number | null;
   counters: Record<"unclosedShifts" | "stockAnomalies" | "criticalBlockers" | "recurringEquipmentFailures", HealthCounter>;
-  days: Array<{ businessDate: string; status: string; cashShiftStatuses: string[]; reportSaved: boolean }>;
+  days: Array<{ businessDate: string; status: string; cashShiftStatuses: string[]; reportSaved: boolean; managementId?:string }>;
+  issues?: HealthOperationIssue[];
+  stockFacts?: HealthStockFact[];
 };
 export const HEALTH_OPERATIONS_KEYS = ["bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_cases", "bd_equipment", "bd_equipment_history", "bd_equipment_work_orders", "bd_finance_expenses", "bd_assortment_v1", "bd_inventory_snapshots", "bd_opening_stock_v1", "bd_stock_movements"];
 export const MAX_HEALTH_ROWS = 10_000;
@@ -78,18 +82,61 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
     || values("bd_stock_movements").some(movement => activeBusinessRow(movement) && !projectedProducts.has(movement.productKey ?? movement.key))) stockDiagnostics.push("RELATED_EVIDENCE_UNAVAILABLE");
   const seenStock = new Set<string>();
   let anomalyCount = 0;
+  const stockFacts: HealthStockFact[] = [];
   for (const balance of balances) {
     const identity = JSON.stringify([balance.productKey ?? balance.key, balance.warehouseId ?? balance.warehouseExternalId ?? null, balance.unit]);
     if (!derivedInputBelongs(balance, scope) || !(balance.productKey ?? balance.key) || seenStock.has(identity)) { stockDiagnostics.push("RECORD_NEEDS_REVIEW"); continue; }
     seenStock.add(identity);
     const proof = stockQuantityEvidence({ ...scope, balance, movements: values("bd_stock_movements"), counts: values("bd_inventory_snapshots"), openings: values("bd_opening_stock_v1") });
+    const productKey = String(balance.productKey ?? balance.key), warehouseKey = String(balance.warehouseId ?? balance.warehouseExternalId ?? ""), unit = String(balance.unit ?? "");
+    const minimum = finite(balance.safety ?? balance.minimum ?? balance.minStock);
+    stockFacts.push({ managementId: `health:${input.venueId}:stock:${encodeURIComponent(JSON.stringify([productKey,warehouseKey,unit]))}`, productKey,warehouseKey,unit,
+      name:String(catalogue.find(item => (item.productKey ?? item.key) === productKey)?.name ?? balance.name ?? productKey).slice(0,240),
+      quantity:proof.quantity,minimum,evidenceComplete:proof.evidenceComplete,active:proof.evidenceComplete && (proof.quantity! <= 0 || minimum !== null && proof.quantity! <= minimum) });
     if (!proof.evidenceComplete) { stockDiagnostics.push(...proof.diagnostics, "PARTIAL_EVIDENCE"); continue; }
     const quantity = proof.quantity!, safety = finite(balance.safety ?? balance.minimum ?? balance.minStock);
     if (quantity <= 0 || safety !== null && quantity <= safety) anomalyCount += 1;
   }
   // Never double count the same low/negative balance or count a capped UI sample.
   const stockCounter = counter(stockKeys, anomalyCount, "PRODUCT_WAREHOUSE_UNIT", "current captured stock balances", [...new Set(stockDiagnostics)]);
+  const context = (managementId:string) => `venueId=${input.venueId}&healthAction=${encodeURIComponent(managementId)}&returnTo=health`;
+  const evidence = (source:string, entityId:string, fact:string) => [{id:entityId,source,label:fact,fact}];
+  const issues: HealthOperationIssue[] = [];
+  if (blockers.availability === "AVAILABLE") for (const item of cases.filter(row => activeBusinessRow(row) && row.priority === "critical" && !["closed","resolved"].includes(String(row.status)))) {
+    const entityId=String(item.id), managementId=`health:${input.venueId}:case:${encodeURIComponent(entityId)}`;
+    issues.push({managementId,issueKey:"operational-blocker",caseId:entityId,affectedEntity:entityId,title:String(item.title ?? "Проверить критическую проблему").slice(0,240),
+      priority:"critical",criticalOverride:true,managementActionable:true,signalClass:"problem",fact:"В заведении зафиксировано активное критическое происшествие.",
+      consequence:"Критический статус требует внимания прежде менее срочных вопросов. Причина и безопасное состояние проверяются по происшествию.",
+      action:"Открыть происшествие и проверить безопасное состояние и план устранения.",successCriterion:"Состояние и результат проверки зафиксированы в исходном происшествии.",deadline:"Сейчас",evidence:evidence("operations",entityId,"Активное critical происшествие"),
+      target:{path:`/cases/${encodeURIComponent(entityId)}?venueId=${input.venueId}`,label:"Открыть происшествие"}});
+  }
+  if (unclosed.availability === "AVAILABLE") for (const day of days.filter(day => day.status === "AWAITING_OPERATIONAL_DATA")) {
+    const managementId=`health:${input.venueId}:day:${day.businessDate}`,shiftId=day.cashShifts[0]?.id;
+    issues.push({managementId,issueKey:"unclosed-shifts",affectedEntity:day.businessDate,businessDate:day.businessDate,verificationKind:"day",managementActionable:true,signalClass:"data_quality",
+      title:`Заполнить операционный отчёт за ${day.businessDate}`,fact:`Рабочий день ${day.businessDate}: операционные данные неполны.`,
+      consequence:"Пока отчёт не заполнен, операционные расходы и результат этого дня нельзя полноценно проверить.",
+      action:"Проверить данные рабочего дня и сохранить операционный отчёт.",successCriterion:"Для этого рабочего дня выручка окончательная, операционный отчёт и ФОТ заполнены; день COMPLETE.",
+      evidence:evidence("shifts",day.businessDate,"Рабочий день ожидает операционные данные"),
+      target:{path:`/shifts?month=${day.businessDate.slice(0,7)}&${context(managementId)}&businessDate=${day.businessDate}${shiftId?"&shift="+encodeURIComponent(String(shiftId)):""}`,label:"Заполнить отчёт дня"}});
+  }
+  if (stockCounter.availability === "AVAILABLE") for (const fact of stockFacts.filter(item=>item.active)) issues.push({
+    ...fact,issueKey:"stock",affectedEntity:JSON.stringify([fact.productKey,fact.warehouseKey,fact.unit]),verificationKind:"stock",managementActionable:true,signalClass:"problem",
+    title:`Проверить остаток: ${fact.name}`,fact:`${fact.name}: ${fact.quantity} ${fact.unit}${fact.minimum!==null?`, минимум ${fact.minimum} ${fact.unit}`:""}.`,
+    consequence:"Остаток требует проверки обеспеченности позиции. Время до исчерпания и денежный эффект пока не установлены.",
+    action:"Открыть точную складскую позицию и проверить пополнение или фактический остаток через существующие складские операции.",
+    successCriterion:"Подтверждённый остаток этой позиции больше нуля и установленного минимального уровня.",evidence:evidence("warehouse",fact.managementId,"Подтверждённый низкий остаток"),
+    target:{path:`/warehouse?${context(fact.managementId)}&product=${encodeURIComponent(fact.productKey)}&warehouseKey=${encodeURIComponent(fact.warehouseKey)}&unit=${encodeURIComponent(fact.unit)}`,label:"Проверить эту позицию"},
+  });
+  if (equipmentCounter.availability === "AVAILABLE") for (const item of affected) issues.push({
+    managementId:`health:${input.venueId}:equipment:${encodeURIComponent(String(item.id))}`,issueKey:"equipment-recurring",equipmentId:String(item.id),affectedEntity:String(item.id),managementActionable:true,signalClass:"problem",
+    title:validDate(item.nextMaintenance)&&item.nextMaintenance<today?`Проверить просроченное ТО: ${String(item.name ?? item.id)}`:`Проверить повторные ремонты: ${String(item.name ?? item.id)}`,
+    fact:validDate(item.nextMaintenance)&&item.nextMaintenance<today?`Срок обслуживания: ${item.nextMaintenance}.` : "В истории оборудования есть повторные ремонтные события.",
+    consequence:"Нужно проверить обслуживание и состояние оборудования. Финансовый эффект и физическое устранение неисправности не доказаны.",
+    action:"Открыть карточку оборудования и проверить историю и план обслуживания.",successCriterion:"Результат обслуживания проверен и зафиксирован в существующих источниках.",deadline:"До следующей смены",
+    evidence:evidence("equipment",String(item.id),"Оборудование требует проверки"),target:{path:`/equipment/${encodeURIComponent(String(item.id))}?venueId=${input.venueId}`,label:"Проверить оборудование"},
+  });
   return { unclosedShifts: unclosed.value, criticalBlockers: blockers.value, recurringEquipmentFailures: equipmentCounter.value, stockAnomalies: stockCounter.value,
     counters: { unclosedShifts: unclosed, criticalBlockers: blockers, recurringEquipmentFailures: equipmentCounter, stockAnomalies: stockCounter },
-    days: days.slice(0, 100).map(day => ({ businessDate: day.businessDate, status: day.status, cashShiftStatuses: day.cashShifts.map(shift => shift.status), reportSaved: day.report !== null })) };
+    issues,stockFacts,
+    days: days.map(day => ({ managementId:`health:${input.venueId}:day:${day.businessDate}`,businessDate: day.businessDate, status: day.status, cashShiftStatuses: day.cashShifts.map(shift => shift.status), reportSaved: day.report !== null })) };
 }

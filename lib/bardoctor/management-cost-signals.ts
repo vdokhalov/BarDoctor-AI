@@ -52,11 +52,12 @@ async function findState(scope: CostScope, fingerprint: string) {
   return state && state.version === 1 && sameScope(state.scope, scope) && canonicalItemId(state.menuItemId) ? state : null;
 }
 
-async function project(episode: CostEpisodeV1, menuItemName?: string) {
+export async function projectManagementCostEpisode(episode: CostEpisodeV1, menuItemName?: string) {
   const resolved = episode.condition === "VERIFIED_RESOLVED";
   const missingCost = episode.condition === "ACTIVE" && episode.latest.quality.freshness === "CURRENT_READ" && episode.latest.quality.availability !== "UNAVAILABLE" ? episode.latest.blockingIngredients?.find(ingredient => ingredient.reason === "PRICE_UNKNOWN" && ingredient.productKey && ingredient.nomenclatureItemId && ingredient.unit) : null;
   return { ...episode, ...(menuItemName ? { menuItemName: menuItemName.slice(0, 240) } : {}), why: (resolved ? episode.before : episode.latest).reasonCodes.map(code => COST_WHY[code]), effect: resolved ? "Текущая себестоимость подтверждена по сохранённой техкарте. Историческая стоимость продаж не изменяется." : "Без текущей себестоимости нельзя подтвердить текущую маржу позиции. Историческая стоимость продаж не изменяется.", targets: { health: `/health?venueId=${episode.scope.venueId}&signalId=${encodeURIComponent(episode.signalId)}&section=management`, techCard: `/catalog?venueId=${episode.scope.venueId}&tab=recipes&filter=review&menuItemId=${encodeURIComponent(episode.menuItemId)}&signalId=${encodeURIComponent(episode.signalId)}&returnTo=health`, ...(missingCost ? { purchase: `/suppliers?create=1&costCorrection=1&venueId=${episode.scope.venueId}&signalId=${encodeURIComponent(episode.signalId)}&menuItemId=${encodeURIComponent(episode.menuItemId)}&productKey=${encodeURIComponent(missingCost.productKey!)}&returnTo=health` } : {}) } };
 }
+const project = projectManagementCostEpisode;
 
 async function transition(context: NonNullable<Awaited<ReturnType<typeof authorized>>>, menuItemId: string, expectedSignal: string | null, trigger: "OWNER_CHECK" | "VIEW_REEVALUATION") {
   const scope: CostScope = { venueId: context.venueId, workspaceId: context.workspaceId, dataAccountId: context.account.id };

@@ -34,7 +34,6 @@ import {
 } from "./recommendation-outcomes";
 import {
   buildAIDoctorAttention,
-  loadAIDoctorMemory,
   type AIDoctorMemory,
 } from "./ai-doctor-attention";
 import { type AIDoctorIntelligence } from "./business-intelligence";
@@ -1303,14 +1302,16 @@ function normaliseDiagnosis(
   const attention = buildAIDoctorAttention({
     // Server-derived signals are authoritative. Model candidates can add
     // explanation and context, while the attention layer deduplicates them.
-    candidates: [...intelligence.prioritySignals, ...actions],
+    candidates: intelligence.managementQueue ?? [...intelligence.prioritySignals, ...actions],
     context: venueContext,
     memory,
     operationalInput: body,
     evidenceCatalog,
-    areas,
+    areas: intelligence.managementQueue ? [] : areas,
     dataReliabilityPercent: intelligence.dataQuality.percent,
     now: new Date(venueContext.generatedAt),
+    canonicalPriorities: intelligence.managementTopActions,
+    canonicalQueue: intelligence.managementQueue,
   });
   const managementIntelligence: AIDoctorIntelligence = {
     ...intelligence,
@@ -1333,11 +1334,17 @@ function normaliseDiagnosis(
         category: text(firstPriority.issueKey, topPriority.category),
         urgency: text(firstPriority.priority, topPriority.urgency),
       }
-    : topPriority;
+    : {title:"Нет подтверждённых управленческих действий",category:"management",urgency:"low"};
   const managementTopThree = managementIntelligence.briefing.todayActions.map((action) => ({
     text: `${action.title} — ${action.responsibleRole}, ${action.deadlineLabel.toLocaleLowerCase("ru")}: ${action.deadline}`.slice(0, 200),
     category: action.issueKey,
   }));
+  if (firstPriority) {
+    analysis.what = text(firstPriority.fact, text(firstPriority.title));
+    analysis.why = text(firstPriority.hypothesis, text(firstPriority.consequence, "Причина требует проверки по источнику."));
+    analysis.impact = text(firstPriority.consequence, "Эффект пока нельзя надёжно оценить.");
+    analysis.how = text(firstPriority.action, "Проверить источник приоритетного сигнала.");
+  }
 
   return {
     contextVersion: venueContext.version,
@@ -1377,7 +1384,7 @@ export async function handleDiagnosis(request: Request): Promise<Response> {
     const external = await loadDiagnosisExternalContext(account);
     const venueContext = canonicalHealth.context;
     venueContext.ownerProvidedContext = { authority: "OWNER_PROVIDED_CONTEXT", canonicalOverride: false, supplied: body };
-    const memory = await loadAIDoctorMemory(account);
+    const memory = canonicalHealth.memory;
     const memoryItems = [...memory.tasks, ...memory.actionTasks, ...memory.decisions];
     // Health, deterministic metrics and their evidence share one server snapshot.
     const intelligence = canonicalHealth.intelligence;

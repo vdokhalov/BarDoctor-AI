@@ -153,7 +153,7 @@ test("moves an accepted recommendation to in progress without creating a duplica
   assert.equal(result.inProgress.find((item) => item.issueKey === "climate")?.lifecycle, "in_progress");
 });
 
-test("keeps an omitted active task visible but separates overdue work from Today", () => {
+test("keeps overdue work in the management queue and its separate time bucket", () => {
   const task = { id: "task-climate", recommendationId: "ai:climate", title: "Починить кондиционер", fact: "Кондиционер неисправен", aiGenerated: true, approvalStatus: "approved", status: "in_progress", deadline: "2026-08-14", updatedAt: "2026-08-14T08:00:00.000Z" };
   const result = build({
     candidates: [],
@@ -162,7 +162,7 @@ test("keeps an omitted active task visible but separates overdue work from Today
     memory: { tasks: [task], actionTasks: [], decisions: [] },
   });
 
-  assert.equal(result.priorities.some((item) => item.issueKey === "climate"), false);
+  assert.equal(result.priorities.some((item) => item.issueKey === "climate"), true);
   assert.equal(result.timeBuckets.overdue[0]?.issueKey, "climate");
   assert.equal(result.timeBuckets.overdue[0]?.lifecycle, "overdue");
   assert.equal(result.activeProblems.filter((item) => item.issueKey === "climate").length, 1);
@@ -407,7 +407,8 @@ test("management briefing read-model separates Today, Overdue, Upcoming and Back
   assert.equal(result.timeBuckets.today.length, 1);
   assert.equal(result.timeBuckets.upcoming.length, 1);
   assert.equal(result.timeBuckets.backlog.length, 1);
-  assert.ok(result.priorities.every((item) => item.timeBucket === "today"));
+  assert.deepEqual(result.priorities, result.managementQueue.slice(0,3));
+  assert.ok(result.priorities.some(item=>item.timeBucket === "overdue"));
 });
 
 test("management briefing keeps recommendation, task and verification deadlines explicitly labelled", () => {

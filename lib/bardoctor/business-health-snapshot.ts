@@ -61,6 +61,8 @@ export type BusinessHealthSnapshot = {
       label: string;
     } | null;
   } | null;
+  managementQueue?: Record<string, unknown>[];
+  managementTopActions?: Record<string, unknown>[];
   trend: {
     periodDays: 7;
     baselineDate: string;
@@ -133,14 +135,24 @@ function statusLabel(
   return "Недостаточно данных";
 }
 
-export function businessHealthActionTarget(issueKey: string): NonNullable<BusinessHealthSnapshot["priorityAction"]>["target"] {
+export function businessHealthActionTarget(issueKey: string, context: Record<string,unknown> = {}): NonNullable<BusinessHealthSnapshot["priorityAction"]>["target"] {
+  if (issueKey === "operational-blocker") {
+    if (typeof context.caseId === "string" && context.caseId) return {path:"/cases/"+encodeURIComponent(context.caseId),label:"Открыть происшествие"};
+    if (context.linkedTaskId) return {path:"/tasks",label:"Открыть поручения"};
+    return null;
+  }
+  if (context.target && typeof context.target === "object") {
+    const target=context.target as {path:string;label:string};
+    if (/^\/equipment(?:[/?]|$)/.test(String(target.path)) && issueKey!=="equipment-recurring") return null;
+    return target;
+  }
   if (issueKey === "profit") return { path: "/finance", label: "Посмотреть финансы" };
   if (["traffic", "average-check", "demand-and-average-check", "revenue"].includes(issueKey)) {
     return { path: "/reports", label: "Посмотреть динамику" };
   }
   if (issueKey === "stock") return { path: "/warehouse", label: "Проверить остатки" };
   if (["unclosed-shift", "unclosed-shifts"].includes(issueKey)) return { path: "/shifts", label: "Проверить смены" };
-  if (["operational-blocker", "equipment-recurring"].includes(issueKey)) return { path: "/equipment", label: "Проверить оборудование" };
+  if (issueKey === "equipment-recurring") return { path: "/equipment", label: "Проверить оборудование" };
   if (issueKey === "external-traffic-risk") return { path: "/opportunities", label: "Проверить контекст" };
   if (["data-quality", "recipes", "ingredient-mapping", "purchase-prices"].includes(issueKey)) {
     return { path: "/data-control", label: "Проверить данные" };
@@ -244,9 +256,7 @@ export function buildBusinessHealthSnapshot(input: {
   const period = input.intelligence.periods.currentFinance ?? input.intelligence.periods.demand;
   const venueId = String(input.venueId);
   const generatedAt = input.intelligence.generatedAt;
-  const primaryAction = input.intelligence.briefing.todayActions.find((action) => businessHealthActionTarget(action.issueKey))
-    ?? input.intelligence.briefing.todayActions[0]
-    ?? null;
+  const primaryAction = input.intelligence.briefing.todayActions[0] ?? null;
   const dataQualityGaps = Object.values(input.intelligence.dataQuality.gapsByScope).flat();
   return {
     snapshotId: businessHealthSnapshotIdentity({
@@ -296,9 +306,11 @@ export function buildBusinessHealthSnapshot(input: {
           action: primaryAction.action,
           successCriterion: primaryAction.successCriterion,
           expectedScore: null,
-          target: businessHealthActionTarget(primaryAction.issueKey),
+          target: businessHealthActionTarget(primaryAction.issueKey, primaryAction),
         }
       : null,
+    managementQueue: input.intelligence.managementQueue,
+    managementTopActions: input.intelligence.managementTopActions,
     // Health history is not persisted yet. Keeping trend explicitly null prevents
     // the client from manufacturing a delta from local or incomparable data.
     trend: null,

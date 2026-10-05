@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - fix/phase4b-management-flow
       - fix/phase4a-cost-resolution
       - fix/phase3a10-provenance
       - fix/phase3a9-health-inputs
@@ -63,6 +64,8 @@ jobs:
         run: node --import tsx --test tests/provenance-phase3a10.test.ts
       - name: Phase 4A real handler UNKNOWN cost episode verification history concurrency and venue isolation
         run: npm run test:management-cost
+      - name: Phase 4B canonical management queue and authoritative day/stock checks
+        run: node --import tsx --test tests/management-prioritization-phase4b.test.ts tests/management-actions-phase4b.test.ts
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -85,6 +88,10 @@ jobs:
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: Phase 4B management queue and real day editor 390 820 1280
+        run: |
+          node --test tests/management-actions-worker-phase4b.test.mjs
+          npm run test:management-actions-browser
       - name: Phase 4A compiled Worker native D1 and real editor 390 820 1280 lifecycle
         run: |
           node --test tests/management-cost-worker-phase4a.test.mjs
@@ -94,6 +101,7 @@ jobs:
         with:
           name: phase4a-cost-correction-evidence
           path: |
+            outputs/management-actions-phase4b
             outputs/management-cost-phase4a
             outputs/management-cost-correction-phase4a
       - name: Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance

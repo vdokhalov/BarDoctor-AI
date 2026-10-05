@@ -3,6 +3,7 @@ import { canReadStore } from "./data-trust";
 import { and, eq, inArray } from "drizzle-orm";
 import { domainData } from "../../db/schema";
 import type { VenueAIContext } from "./venue-ai-context";
+import { rankManagementSignals } from "./business-intelligence";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -44,6 +45,7 @@ export type AIDoctorAttention = {
     moreSignals: number;
   };
   priorities: JsonRecord[];
+  managementQueue: JsonRecord[];
   inProgress: JsonRecord[];
   activeProblems: JsonRecord[];
   timeBuckets: {
@@ -166,7 +168,7 @@ export function aiDoctorIssueKey(value: unknown): string {
   const structured = text(item.issueKey, "", 80);
   if ([
     "profit", "revenue", "traffic", "average-check", "demand-and-average-check",
-    "external-traffic-risk", "operational-blocker", "equipment-recurring",
+    "external-traffic-risk", "operational-blocker", "equipment-recurring", "stock", "unclosed-shifts", "recipes", "ingredient-mapping", "purchase-prices",
   ].includes(structured)) return structured;
   const haystack = searchable(value);
   if (/кондиц|климат|жар[аыеу]|вентиляц|температур/.test(haystack)) return "climate";
@@ -189,6 +191,7 @@ export function aiDoctorIssueKey(value: unknown): string {
 /** Stable identity for a real problem, independent of changing recommendation wording. */
 export function aiDoctorProblemFingerprint(value: unknown, venueId?: string | number | null): string {
   const item = record(value);
+  if (text(item.managementId)) return text(item.managementId);
   const evidence = evidenceOf(item);
   const entity = text(
     item.affectedEntity ?? item.entityId ?? item.equipmentName ?? item.zone ?? item.area,
@@ -249,6 +252,8 @@ function impactAreas(haystack: string, signalClass: AIDoctorSignalClass): string
 }
 
 function hasCriticalOverride(value: unknown): boolean {
+  const item = record(value);
+  if (item.priority === "critical" || item.operationalImpact === "critical" || item.criticalOverride === true) return true;
   const haystack = searchable(value);
   return /пожар|задымлен|коротк.{0,8}замыкан|утечк.{0,8}газ|угроз.{0,10}жизн|риск безопасности|не(возможно| может).{0,22}(открыть|работать)|остановк.{0,12}(работ|завед)|потер[яи].{0,8}данн|массов.{0,10}жалоб|критическ.{0,15}(сбой|аномал|неисправ)/.test(haystack);
 }
@@ -449,11 +454,11 @@ function mergeGroup(values: JsonRecord[], signalClass: AIDoctorSignalClass, task
   base.signalClass = signalClass;
   base.issueKey = issueKey;
   base.problemFingerprint = aiDoctorProblemFingerprint(base);
-  base.recommendationId = recommendationId(signalClass, issueKey);
+  base.recommendationId = text(base.managementId) || recommendationId(signalClass, issueKey);
   const countedQualityTitle = signalClass === "data_quality"
     ? values.map((value) => text(value.title, "", 140)).find((title) => /^\d+\s/.test(title))
     : "";
-  base.title = signalClass === "data_quality"
+  base.title = base.managementId ? text(base.title) : signalClass === "data_quality"
     ? countedQualityTitle || text(base.title, "Улучшить качество данных", 140)
     : canonicalTitle(issueKey, text(base.title, "Проверить управленческий сигнал", 140));
   base.signalCount = Math.max(values.length, evidence.length, 1);
@@ -484,6 +489,7 @@ function mergeGroup(values: JsonRecord[], signalClass: AIDoctorSignalClass, task
   base.financialEffect = "Финансовый эффект пока нельзя надёжно оценить.";
   base.fact = humanizeValue(text(base.fact, text(base.basisSummary, "Сигнал требует проверки"), 600));
   base.factPeriod = humanizeValue(text(base.factPeriod));
+  base.recommendationDeadlineDate = dateOnly(base.deadline);
   base.recommendationDeadline = humanizeValue(text(base.deadline, text(base.estimatedTime)));
   base.deadline = text(base.recommendationDeadline, "Без срока");
   base.estimatedTime = base.recommendationDeadline;
@@ -753,6 +759,8 @@ export function buildAIDoctorAttention(input: {
   areas?: unknown[];
   dataReliabilityPercent?: number;
   now?: Date;
+  canonicalPriorities?: JsonRecord[];
+  canonicalQueue?: JsonRecord[];
 }): AIDoctorAttention {
   const now = input.now ?? new Date();
   const memory = input.memory ?? { tasks: [], actionTasks: [], decisions: [] };
@@ -793,13 +801,13 @@ export function buildAIDoctorAttention(input: {
   for (const candidate of baseCandidates) {
     if (!text(candidate.title) && !text(candidate.action)) continue;
     const signalClass = classifyAIDoctorSignal(candidate);
-    if (signalClass === "data_quality") continue;
+    if (signalClass === "data_quality" && candidate.managementActionable !== true) continue;
     const key = `${signalClass}:${aiDoctorProblemFingerprint(candidate)}`;
     groups.set(key, [...(groups.get(key) ?? []), candidate]);
   }
   const merged = [...groups.entries()].map(([key, values]) => mergeGroup(
     values,
-    key.startsWith("opportunity:") ? "opportunity" : "problem",
+    key.startsWith("opportunity:") ? "opportunity" : key.startsWith("data_quality:") ? "data_quality" : "problem",
     tasks,
     now,
   ));
@@ -851,7 +859,7 @@ export function buildAIDoctorAttention(input: {
     candidate.verificationDeadline = humanizeValue(task?.verificationDate ?? candidate.verificationDate);
     candidate.taskDeadlineDate = dateOnly(task?.deadline);
     candidate.verificationDeadlineDate = dateOnly(task?.verificationDate ?? candidate.verificationDate);
-    candidate.canonicalDeadlineDate = candidate.taskDeadlineDate ?? candidate.verificationDeadlineDate ?? dateOnly(candidate.deadline);
+    candidate.canonicalDeadlineDate = candidate.taskDeadlineDate ?? candidate.verificationDeadlineDate ?? candidate.recommendationDeadlineDate ?? dateOnly(candidate.deadline);
     candidate.deadlineDate = candidate.canonicalDeadlineDate;
     candidate.deadline = text(candidate.taskDeadline, text(candidate.recommendationDeadline, "Без срока"));
     candidate.deadlineSources = [
@@ -926,11 +934,7 @@ export function buildAIDoctorAttention(input: {
     if (actionableIssueKeys.has(aiDoctorIssueKey(opportunities[index]))) opportunities.splice(index, 1);
   }
 
-  actionable.sort((left, right) => {
-    const override = Number(right.criticalOverride === true) - Number(left.criticalOverride === true);
-    if (override) return override;
-    return (number(right.priorityScore) ?? 0) - (number(left.priorityScore) ?? 0);
-  });
+  actionable.splice(0, actionable.length, ...rankManagementSignals(actionable, now));
   opportunities.sort((left, right) => (number(right.priorityScore) ?? 0) - (number(left.priorityScore) ?? 0));
   inProgress.sort((left, right) => text(left.deadlineDate, "9999-12-31").localeCompare(text(right.deadlineDate, "9999-12-31")));
 
@@ -954,14 +958,15 @@ export function buildAIDoctorAttention(input: {
     upcoming: activeProblemCandidates.filter((item) => text(item.timeBucket) === "upcoming"),
     backlog: activeProblemCandidates.filter((item) => text(item.timeBucket) === "backlog"),
   };
-  const priorities = actionable.filter((item) => text(item.timeBucket) === "today").slice(0, 3);
+  const managementQueue = input.canonicalQueue ?? rankManagementSignals([...actionable, ...inProgress.filter(item=>item.criticalOverride===true)], now);
+  const priorities = input.canonicalPriorities ?? managementQueue.slice(0, 3);
   const businessIssueKeys = new Set(["profit", "revenue", "traffic", "average-check", "demand-and-average-check", "external-traffic-risk"]);
   const activeProblems = activeProblemCandidates
     .filter((item) => !businessIssueKeys.has(aiDoctorIssueKey(item)))
     .map(operationalProblemRow)
     .slice(0, 12);
-  const critical = actionable.filter((item) => item.criticalOverride === true).length;
-  const important = actionable.filter((item) => (number(item.priorityScore) ?? 0) >= 45 && item.criticalOverride !== true).length;
+  const critical = managementQueue.filter((item) => item.criticalOverride === true).length;
+  const important = managementQueue.filter((item) => (number(item.priorityScore) ?? 0) >= 45 && item.criticalOverride !== true).length;
   const stable = (input.areas ?? [])
     .map(record)
     .filter((area) => area.status === "stable").length;
@@ -974,13 +979,14 @@ export function buildAIDoctorAttention(input: {
     updatedAt: now.toISOString(),
     diagnosticSentence: diagnosticSentence(priorities, opportunities),
     counts: {
-      requiresAttention: actionable.length,
+      requiresAttention: managementQueue.length,
       critical,
       important,
       stable,
-      moreSignals: Math.max(0, actionable.length - priorities.length),
+      moreSignals: Math.max(0, managementQueue.length - priorities.length),
     },
     priorities,
+    managementQueue,
     inProgress: inProgress.slice(0, 12),
     activeProblems,
     timeBuckets: {

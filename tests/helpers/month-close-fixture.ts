@@ -3,8 +3,8 @@ import { lifecycleRuntime } from './lifecycle-runtime';
 const captured = JSON.parse(readFileSync(new URL('../fixtures/financial-reconciliation-phase7.json', import.meta.url), 'utf8'));
 type QAReply = {eligible:boolean; previewRevision:string; report:Record<string,unknown>; closing:{snapshot:Record<string,unknown>}; evidenceStatus:string};
 const qa = (response:Response) => response as Omit<Response,'json'> & {json():Promise<QAReply>};
-export async function closingFixture() {
- const runtime=await lifecycleRuntime({closing:'./app/api/month-close/route',store:'./app/api/store/[key]/route', bulkStore:'./app/api/store/route', restaurant:'./app/api/restaurants/me/route', users:'./app/api/users/me/route', overview:'./app/api/assortment/overview/route', health:'./app/api/business-health/route'},{now:'2026-10-03T12:00:00Z'});
+export async function closingFixture(extraRoutes:Record<string,string>={}) {
+ const runtime=await lifecycleRuntime({closing:'./app/api/month-close/route',store:'./app/api/store/[key]/route', bulkStore:'./app/api/store/route', restaurant:'./app/api/restaurants/me/route', ...extraRoutes, users:'./app/api/users/me/route', overview:'./app/api/assortment/overview/route', health:'./app/api/business-health/route'},{now:'2026-10-03T12:00:00Z'});
  const user=await runtime.register('month-close@isolated.test');
  const venue=runtime.sqlite.prepare("SELECT * FROM venues WHERE id=?").get(user.activeVenueId)!;const account=Number(venue.data_account_id),venueId=user.activeVenueId;
  const mapVenue=(value: unknown): unknown => Array.isArray(value)?value.map(mapVenue):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([key,value])=>[key,key==='venueId'?venueId:mapVenue(value)])):value;
