@@ -1359,3 +1359,14 @@
   .bd-ai-health-details .bd-ai-health-components { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
   .bd-ai-health-details .bd-ai-health-components article { padding: 9px; }
 }
+
+
+/* Curated Doctor: compact questions and readable evidence, existing page shell. */
+.bd-curated-doctor{margin:12px 0 24px;padding:16px;border:1px solid #dedee5;border-radius:16px;background:var(--background,#fff);overflow-wrap:anywhere}
+.bd-curated-doctor h2{font-size:20px;font-weight:650;margin-bottom:6px}.bd-curated-doctor h3{font-size:16px;font-weight:600;margin:12px 0 6px}
+.bd-curated-doctor p{margin:6px 0}.bd-curated-doctor small{color:#596273;display:block}.bd-curated-questions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.bd-curated-questions button,.bd-curated-actions button,.bd-curated-suggestion button{padding:10px 12px;min-height:44px;border:1px solid #d4d8e2;border-radius:10px;font-size:14px;text-align:left;background:#f6f7fa;color:#172033;max-width:100%}
+.bd-curated-questions button[aria-pressed=true]{border-color:#5359b5;background:#eef0ff;color:#303789}.bd-curated-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.bd-curated-doctor article{margin-top:18px;border-top:1px solid #d4d8e2;padding-top:8px}
+.bd-curated-doctor ol{padding-left:20px}.bd-curated-doctor li{margin:12px 0}.bd-curated-kind{font-size:12px;color:#596273;display:block}.bd-curated-doctor details{margin:12px 0}.bd-curated-doctor summary{cursor:pointer;padding:4px 0}.bd-curated-doctor ul{padding-left:18px}.bd-curated-suggestion{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+@media(max-width:480px){.bd-curated-doctor{padding:12px}.bd-curated-questions{grid-template-columns:1fr}}
+.bd-curated-return[data-curated-dock]{display:block;position:relative;margin:12px 12px 4px;padding:10px 14px;min-height:44px;background:#eef0ff;color:#303789;border:1px solid #5359b5;border-radius:10px}

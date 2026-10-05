@@ -122,5 +122,8 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   const baseSnapshot = buildBusinessHealthSnapshot({ venueId: account.venueId, dataAccountId: account.id, intelligence, context });
   const snapshot = { ...baseSnapshot, snapshotId: `${baseSnapshot.snapshotId}:${inputRevision}`, inputRevision, inputManifest, operationsInputs: operations,
     managementCoverage:{cost:costRows.length>25?"PARTIAL":"CURRENT_EPISODES",tasks:sources.find(source=>source.key==="bd_tasks")?.state ?? "UNAVAILABLE"} };
-  return { restricted: false as const, context, intelligence, snapshot, account: currentAccount, memory, attention };
+  // Internal operands for read-only Doctor projections. Public Health remains
+  // its existing envelope; callers must not serialize raw sources/snapshots.
+  return { restricted: false as const, context, intelligence, snapshot, account: currentAccount, memory, attention,
+    sources, sourceSnapshots: snapshots, profileJson: profileRow.data_json };
 }

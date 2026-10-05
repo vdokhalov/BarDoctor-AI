@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/phase4c-curated-doctor
       - fix/phase4b-management-flow
       - fix/phase4a-cost-resolution
       - fix/phase3a10-provenance
@@ -66,6 +67,8 @@ jobs:
         run: npm run test:management-cost
       - name: Phase 4B canonical management queue and authoritative day/stock checks
         run: node --import tsx --test tests/management-prioritization-phase4b.test.ts tests/management-actions-phase4b.test.ts
+      - name: Phase 4C seven curated contracts, honesty, read-only and venue security
+        run: npm run test:curated-doctor
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -88,6 +91,10 @@ jobs:
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: Phase 4C compiled Worker and curated Doctor 390 820 1280
+        run: |
+          node --test tests/curated-doctor-client-phase4c.test.mjs tests/curated-doctor-worker-phase4c.test.mjs
+          node --import tsx scripts/curated-doctor-phase4c-browser.ts
       - name: Phase 4B management queue and real day editor 390 820 1280
         run: |
           node --test tests/management-actions-worker-phase4b.test.mjs
@@ -101,6 +108,7 @@ jobs:
         with:
           name: phase4a-cost-correction-evidence
           path: |
+            outputs/curated-doctor-phase4c
             outputs/management-actions-phase4b
             outputs/management-cost-phase4a
             outputs/management-cost-correction-phase4a
@@ -230,6 +238,8 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Phase 4C curated Doctor WebKit 390 820 1280
+        run: BD_CURATED_BROWSER=webkit node --import tsx scripts/curated-doctor-phase4c-browser.ts
       - name: Narrow WebKit environment classifier negative controls
         run: node --import tsx --test tests/webkit-environment-gate.test.ts
       - name: Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280
@@ -265,6 +275,7 @@ jobs:
             outputs/finance-inputs-phase3a6/webkit
             outputs/health-inputs-phase3a9/webkit
             outputs/health-inputs-phase3a9/webkit-stable
+            outputs/curated-doctor-phase4c
             outputs/webkit-health-lifecycle
             outputs/provenance-phase3a10
             outputs/webkit-stable-gate
