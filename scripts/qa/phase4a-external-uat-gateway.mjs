@@ -1,4 +1,4 @@
-// QA infrastructure only. Candidate application remains pinned to 3688c6b.
+// QA infrastructure only. The workflow pins and validates the candidate commit.
 import { createServer, request as httpRequest } from 'node:http';
 import { randomBytes, timingSafeEqual, createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
