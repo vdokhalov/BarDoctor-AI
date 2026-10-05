@@ -1,8 +1,8 @@
-import type { CostEpisodeV1, CostVerificationV1 } from '../management-cost-contracts';
+import type { CostEpisodeV1, CostObservationV1, CostVerificationV1 } from '../management-cost-contracts';
 import type { EvidenceReference } from '../evidence-contracts';
 
-type Episode = CostEpisodeV1 & { menuItemName?:string; why: string[]; effect: string; targets: {health:string;techCard:string} };
-type Payload = {ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;itemName?:string;coverage?:string;nextCursor?:string|null;evaluationCursor?:string|null};
+type Episode = CostEpisodeV1 & { menuItemName?:string; why: string[]; effect: string; targets: {health:string;techCard:string;purchase?:string} };
+type Payload = {ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;currentObservation?:CostObservationV1;itemName?:string;coverage?:string;nextCursor?:string|null;evaluationCursor?:string|null};
 type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;enabled:()=>boolean};
 /** React is supplied by the prepared client; keep its existing renderer/hooks. */
 export function createCostManagementClient(React: typeof import('react'), runtime: Runtime) {
@@ -53,6 +53,7 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     const remember=(e:Episode)=>sessionStorage.setItem('bd-cost-origin:'+venue+':'+e.signalId,JSON.stringify({surface,scroll:window.scrollY,returnLocation:e.targets.health}));
     const go=(e:Episode)=>{remember(e);onNavigate(e.targets.health)};
     const correct=(e:Episode)=>{remember(e);onNavigate(e.targets.techCard)};
+    const purchase=(e:Episode)=>{if(e.targets.purchase){if(surface==='home')remember(e);onNavigate(e.targets.purchase)}};
     if(surface==='home'){
       const partial=!!data?.evaluationCursor||!!data?.nextCursor;
       const state=error?'ERROR':busy&&!data?'LOADING':data?.coverage!=='AVAILABLE'||partial&&!active.length?'INSUFFICIENT_STALE':active.length?'ATTENTION':'STABLE';
@@ -66,11 +67,11 @@ export function createCostManagementClient(React: typeof import('react'), runtim
           <button type="button" className="bd-cost-signal bd-cost-home-signal" data-signal-id={top.signalId} onClick={()=>go(top)}>
             <strong>Себестоимость не рассчитана</strong><span className="bd-cost-item-name" title={top.menuItemName||top.menuItemId}>{top.menuItemName||top.menuItemId}</span>
             <span data-cost-why>Почему: {top.why[0]}</span>
-            <span className="bd-cost-home-source" data-cost-source>Источник: меню и техкарта · {new Date(top.latest.asOf).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}. {top.latest.quality.availability==='UNAVAILABLE'?'Данные неполные. ':''}UNKNOWN ≠ 0.</span>
+            <span className="bd-cost-home-source" data-cost-source>Источник: {top.targets.purchase?'техкарта и закупочная стоимость':'меню и техкарта'} · {new Date(top.latest.asOf).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}. {top.latest.quality.availability==='UNAVAILABLE'?'Данные неполные. ':''}UNKNOWN ≠ 0.</span>
           </button>
           <p className="bd-cost-home-limit" data-cost-limitation>Маржу этой позиции пока нельзя подтвердить.</p>
-          <p className="bd-cost-home-next">{top.latest.reasonCodes.includes('RECIPE_MISSING')?'Создайте техкарту для этой позиции.':top.latest.reasonCodes.includes('RECIPE_EMPTY')?'Добавьте ингредиенты в техкарту.':top.latest.reasonCodes.includes('RECIPE_UNAPPROVED')?'Проверьте и подтвердите техкарту.':'Проверьте техкарту и данные расчёта.'}</p>
-          <button type="button" className="bd-cost-home-cta" data-cost-primary-action onClick={()=>correct(top)}>Исправить техкарту <span aria-hidden="true">→</span></button>
+          <p className="bd-cost-home-next">{top.targets.purchase?`${top.latest.blockingIngredients?.find(row=>row.reason==='PRICE_UNKNOWN')?.name}: подтвердите закупочную стоимость.`:top.latest.reasonCodes.includes('RECIPE_MISSING')?'Создайте техкарту для этой позиции.':top.latest.reasonCodes.includes('RECIPE_EMPTY')?'Добавьте ингредиенты в техкарту.':top.latest.reasonCodes.includes('RECIPE_UNAPPROVED')?'Проверьте и подтвердите техкарту.':'Проверьте техкарту и данные расчёта.'}</p>
+          <button type="button" className="bd-cost-home-cta" data-cost-primary-action onClick={()=>top.targets.purchase?purchase(top):correct(top)}>{top.targets.purchase?'Добавить закупку':'Исправить техкарту'} <span aria-hidden="true">→</span></button>
         </article>}
         {!top&&recent.slice(0,1).map(e=><button type="button" className="bd-cost-signal verified" data-signal-id={e.signalId} key={e.signalId} onClick={()=>go(e)}><strong>Проверено: себестоимость рассчитана</strong><span>{e.menuItemName||e.menuItemId} · Было: UNKNOWN · Стало: {format(e.verificationResult!.after)}</span><small>Проверка и история →</small></button>)}
         {error&&<button type="button" disabled={busy} onClick={()=>void refresh()}>Повторить проверку</button>}
@@ -86,7 +87,12 @@ export function createCostManagementClient(React: typeof import('react'), runtim
         {detail.condition==='VERIFIED_RESOLVED'&&detail.verificationResult?<Result result={detail.verificationResult}/>:detail.condition==='NOT_APPLICABLE'?<p>Позиция больше не требует этой проверки. Это не подтверждение рассчитанной себестоимости.</p>:<p>Себестоимость не рассчитана (UNKNOWN).</p>}
         <details open><summary>{detail.condition==='VERIFIED_RESOLVED'?'Почему требовалась проверка':'Почему BarDoctor показывает это'}</summary>{detail.why.map(reason=><p key={reason}>{detail.condition==='VERIFIED_RESOLVED'?'До проверки: ':''}{reason}</p>)}<p>{detail.effect}</p><p>Проверено {new Date(detail.latest.asOf).toLocaleString('ru-RU')}. {detail.latest.quality.availability==='UNAVAILABLE'?'Данные неполные.':'По сохранённым данным BarDoctor.'}</p></details>
         <details><summary>Данные и источники</summary><p>Текущая техкарта: {detail.latest.recipeId||'отсутствует'}, версия {detail.latest.recipeVersion??'—'}.</p>{detail.latest.evidence.map(ref=><Evidence key={ref.id+':'+ref.partId} reference={ref} venue={venue}/>)}{detail.latest.sourceManifest.map(source=><p key={source.sourceKey}>{({'bd_assortment_v1':'Меню и техкарты','bd_purchase_documents':'Подтверждённые закупки','bd_stock_movements':'Складские движения'} as Record<string,string>)[source.sourceKey]}: {source.present?'источник доступен':'источник отсутствует'}. {source.updatedAt&&'Сохранён '+new Date(source.updatedAt).toLocaleString('ru-RU')}</p>)}</details>
-        {detail.condition==='ACTIVE'&&<><button type="button" className="primary" onClick={()=>onNavigate(detail.targets.techCard)}>Открыть техкарту</button><button type="button" disabled={busy} onClick={()=>void verify(detail)}>{busy?'Проверяем…':'Проверить результат'}</button>{detail.verificationStatus==='CANNOT_VERIFY'&&<p role="status">Себестоимость пока не удалось подтвердить. Сигнал остаётся открытым.</p>}</>}
+        {detail.condition==='ACTIVE'&&<>
+          {!!detail.latest.blockingIngredients?.length&&<section className="bd-cost-ingredients" aria-label="Что мешает расчёту">{detail.latest.blockingIngredients.map((row,index)=><p data-cost-ingredient={row.nomenclatureItemId||row.ingredientId} key={row.ingredientId||index}><strong>{row.name} — {row.reason==='PRICE_UNKNOWN'?'стоимость неизвестна':row.reason==='NOMENCLATURE_MISSING'?'номенклатура не найдена':row.reason==='LINK_MISSING'?'ингредиент не связан с номенклатурой':'требует проверки единицы или количества'}.</strong><br/>{row.reason==='PRICE_UNKNOWN'?'Для расчёта себестоимости нужна подтверждённая закупочная стоимость. Справочная цена и оценка начальных остатков её не заменяют.':row.reason==='NOMENCLATURE_MISSING'||row.reason==='LINK_MISSING'?'Найдите позицию в техкарте или используйте «Создать и добавить».':'Проверьте связь, единицы и количество в техкарте.'}</p>)}{(detail.latest.blockingIngredientsTotal||0)>detail.latest.blockingIngredients.length&&<p>Показаны первые {detail.latest.blockingIngredients.length} из {detail.latest.blockingIngredientsTotal} ингредиентов. Полный состав — в техкарте.</p>}</section>}
+          {detail.targets.purchase&&<button type="button" className="primary" data-cost-purchase-action onClick={()=>purchase(detail)}>Добавить закупку</button>}
+          <button type="button" className={detail.targets.purchase?'':'primary'} onClick={()=>onNavigate(detail.targets.techCard)}>Открыть техкарту</button><button type="button" disabled={busy} onClick={()=>void verify(detail)}>{busy?'Проверяем…':'Проверить результат'}</button>{detail.verificationStatus==='CANNOT_VERIFY'&&<p role="status">Себестоимость пока не удалось подтвердить. Сигнал остаётся открытым.</p>}
+          {sessionStorage.getItem('bd-cost-verification-notice:'+venue+':'+detail.signalId)&&<p role="status">Закупка сохранена. Предыдущая проверка результата была недоступна; повторите проверку.</p>}
+        </>}
         <button type="button" onClick={async()=>{const stamp=epoch.current;try{const value=await request('/api/management/cost-signals?state=all&menuItemId='+encodeURIComponent(detail.menuItemId),venue);if(stamp===epoch.current){setHistory(value.items||[]);setHistoryCursor(value.nextCursor||null)}}catch(value){if(stamp===epoch.current)setError((value as Error).message)}}}>История проверки</button>
         {history.map(e=><div key={e.signalId} data-history-signal={e.signalId}><p>Эпизод {e.generation} · {e.condition==='VERIFIED_RESOLVED'?'Проверено':e.condition==='ACTIVE'?'Нужна проверка':'Больше не применимо'}</p>{e.verificationResult&&<Result result={e.verificationResult}/>}</div>)}
         {historyCursor&&<button type="button" onClick={async()=>{const stamp=epoch.current;try{const value=await request('/api/management/cost-signals?state=all&menuItemId='+encodeURIComponent(detail.menuItemId)+'&cursor='+encodeURIComponent(historyCursor),venue);if(stamp===epoch.current){setHistory(old=>[...old,...value.items||[]]);setHistoryCursor(value.nextCursor||null)}}catch(value){if(stamp===epoch.current)setError((value as Error).message)}}}>Предыдущие проверки</button>}
@@ -95,6 +101,41 @@ export function createCostManagementClient(React: typeof import('react'), runtim
       {data?.evaluationCursor&&<button type="button" disabled={busy} onClick={()=>void refresh(data.evaluationCursor!)}>Проверить следующие позиции</button>}
       {data?.nextCursor&&<button type="button" disabled={busy} onClick={async()=>{try{const more=await request('/api/management/cost-signals?state=all&cursor='+encodeURIComponent(data.nextCursor!),venue);setState({venue,data:{...data,items:[...data.items||[],...more.items||[]],nextCursor:more.nextCursor}})}catch(value){setError((value as Error).message)}}}>Показать ещё сигналы</button>}
     </section>
+  }
+  /** Context adapter around the existing purchase editor/handlers; no parallel transaction flow. */
+  function usePurchaseContext({venue,ready,canManage,onOpen,onClear}:{venue:number;ready:boolean;canManage:boolean;onOpen:()=>void;onClear:()=>void}) {
+    const params=new URLSearchParams(window.location.search),active=params.get('costCorrection')==='1',signal=params.get('signalId'),menuId=params.get('menuItemId'),productKey=params.get('productKey'),requestedVenue=Number(params.get('venueId'));
+    type Context = {venue:number;signal:string;episode:Episode;ingredient:NonNullable<CostObservationV1['blockingIngredients']>[number]};
+    const [state,setState]=React.useState<Context|null>(null),[error,setError]=React.useState(''),[checking,setChecking]=React.useState(false);
+    const callbacks=React.useRef({onOpen,onClear});callbacks.current={onOpen,onClear};
+    React.useEffect(()=>{let live=true;setState(null);setError('');if(!active)return;callbacks.current.onClear();
+      if(!ready)return;
+      if(!canManage||requestedVenue!==venue||!signal||!/^cost-v1:[a-f0-9]{64}:[1-9]\d{0,11}$/.test(signal)||!menuId||!productKey){setError('Не удалось подтвердить контекст закупки. Откройте сигнал в исходном заведении.');return;}
+      request('/api/management/cost-signals/'+encodeURIComponent(signal),venue).then(data=>{
+        if(!live)return;
+        const observation=data.currentObservation,ingredient=observation?.blockingIngredients?.find(row=>row.productKey===productKey&&row.reason==='PRICE_UNKNOWN'&&row.nomenclatureItemId&&row.unit);
+        if(data.episode?.scope.venueId!==venue||data.episode.menuItemId!==menuId||data.episode.condition!=='ACTIVE'||!ingredient||observation?.quality.freshness!=='CURRENT_READ'||observation.quality.availability==='UNAVAILABLE'){setError('Причина изменилась или стоимость уже доступна. Вернитесь к сигналу и проверьте результат.');return;}
+        setState({venue,signal,episode:data.episode,ingredient});callbacks.current.onOpen();
+        window.dispatchEvent(new CustomEvent('bd-cost-purchase-context-ready'));
+      }).catch(value=>{if(live)setError(value.message)});
+      return()=>{live=false};
+    },[active,signal,menuId,productKey,requestedVenue,venue,ready,canManage]);
+    const assertScope=()=>{checkScope(venue);if(active&&(!state||state.venue!==venue||requestedVenue!==venue))throw new Error('Контекст закупки недоступен. Вернитесь к сигналу.');};
+    const target=signal&&requestedVenue===venue?'/health?venueId='+venue+'&signalId='+encodeURIComponent(signal)+'&section=management':'/health?venueId='+venue;
+    function returnToSignal(){checkScope(venue);runtime.navigate(target)}
+    function prefillDraft(draft:Record<string,unknown>){if(!active)return draft;assertScope();const row=state!.ingredient,items=draft.items as Record<string,unknown>[];return {...draft,venueId:venue,items:[{...items[0],name:row.name,nomenclatureId:row.nomenclatureItemId,nomenclatureItemId:row.nomenclatureItemId,nomenclatureName:row.name,purchaseProductKey:row.productKey,matchedBaseUnit:row.unit,unit:row.unit==='pcs'?'шт.':row.unit,packageSize:row.unit==='pcs'?'1 шт.':row.unit==='kg'?'1 кг':'1 л',unitPrice:'',lineTotal:'',costStatus:'UNKNOWN',requiresReview:false,mappingSource:'manual'}]};}
+    function assertSave(draft:Record<string,unknown>){if(active){assertScope();if(Number(draft.venueId)!==venue)throw new Error('Закупка относится к другому заведению.');}}
+    function acceptsResponse(savedVenue:number){return !active||runtime.venue()===savedVenue&&savedVenue===venue;}
+    async function afterSave(savedVenue:number,document:Record<string,unknown>){if(!active)return false;if(!acceptsResponse(savedVenue))return true;assertScope();setChecking(true);
+      try{if(document.status==='confirmed')await request('/api/management/cost-signals/'+encodeURIComponent(state!.signal)+'/verify',venue,{trigger:'OWNER_CHECK'});sessionStorage.removeItem('bd-cost-verification-notice:'+venue+':'+state!.signal)}
+      catch{if(runtime.venue()===venue)sessionStorage.setItem('bd-cost-verification-notice:'+venue+':'+state!.signal,'cannot-verify')}
+      finally{if(runtime.venue()===venue){setChecking(false);notify();returnToSignal()}}
+      return true;
+    }
+    const scoped=state?.venue===venue&&state.signal===signal?state:null;
+    const message=checking?'Закупка сохранена. Проверяем себестоимость на сервере…':error|| (scoped?`${scoped.ingredient.name}: внесите фактическую закупку. Цена остаётся неизвестной до подтверждения и серверной проверки.`:'Проверяем ингредиент и контекст сигнала…');
+    const banner=active?<aside className="bd-cost-return" data-cost-purchase-context={signal} role="status"><p>{message}</p><button type="button" onClick={returnToSignal}>Вернуться к сигналу</button></aside>:null;
+    return {active,banner,prefillDraft,assertSave,acceptsResponse,afterSave,returnToSignal};
   }
   function useCatalogContext({venue,item,onTarget,canOpen}:{venue:number;item:Record<string,unknown>|undefined;onTarget:(item:Record<string,unknown>)=>void;canOpen:boolean}) {
     const params=new URLSearchParams(window.location.search),signal=params.get('signalId'),menuId=params.get('menuItemId'),requestedVenue=Number(params.get('venueId'));
@@ -110,5 +151,5 @@ export function createCostManagementClient(React: typeof import('react'), runtim
   }
   async function afterSave(venue:number,itemId:string,status:string){const params=new URLSearchParams(window.location.search),id=params.get('signalId');if(status!=='confirmed'||!id||params.get('menuItemId')!==itemId||Number(params.get('venueId'))!==venue||!runtime.enabled())return;
     try{const result=await request('/api/management/cost-signals/'+encodeURIComponent(id)+'/verify',venue,{trigger:'ACCEPTED_SAVE'});window.dispatchEvent(new CustomEvent('bd-cost-save-verification',{detail:{venue,signal:id,message:result.episode?.condition==='VERIFIED_RESOLVED'?'Проверено: себестоимость рассчитана. Результат сохранён.':'Техкарта сохранена; себестоимость пока не удалось подтвердить. Вернитесь к сигналу для проверки.'}}));notify()}catch{if(runtime.venue()===venue)window.dispatchEvent(new CustomEvent('bd-cost-save-verification',{detail:{venue,signal:id,message:'Техкарта сохранена. Проверка результата недоступна; сигнал остаётся открытым. Вернитесь к сигналу и повторите проверку.'}}));notify()}}
-  return {Center,Result,useCatalogContext,afterSave,covered:(venue:number)=>runtime.enabled()&&!disabled.has(venue)?covered.get(venue)||new Set<string>():new Set<string>()};
+  return {Center,Result,useCatalogContext,usePurchaseContext,afterSave,covered:(venue:number)=>runtime.enabled()&&!disabled.has(venue)?covered.get(venue)||new Set<string>():new Set<string>()};
 }

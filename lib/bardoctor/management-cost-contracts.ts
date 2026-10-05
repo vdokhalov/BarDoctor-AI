@@ -1,6 +1,12 @@
 import type { EvidenceReference } from "./evidence-contracts";
 
 export type CostScope = { workspaceId: number; venueId: number; dataAccountId: number };
+/** Current correction operands, not another price source or signal family. */
+export type CostIngredientBlockerV1 = {
+  ingredientId: string | null; name: string;
+  nomenclatureItemId: string | null; productKey: string | null; unit: string | null;
+  reason: "NOMENCLATURE_MISSING" | "LINK_MISSING" | "PRICE_UNKNOWN" | "UNIT_UNKNOWN";
+};
 export type CostReason = "RECIPE_MISSING" | "RECIPE_EMPTY" | "RECIPE_UNAPPROVED" | "SOURCE_MISSING" | "SOURCE_INVALID" | "SOURCE_CHANGED" | "SCOPE_CONFLICT" | "PRICE_UNKNOWN" | "UNIT_UNKNOWN" | "CURRENCY_UNKNOWN" | "RECIPE_AMBIGUOUS" | "ACCESS_UNAVAILABLE";
 export type CostObservationV1 = {
   metric: "current_recipe_unit_cost";
@@ -10,6 +16,8 @@ export type CostObservationV1 = {
   quality: { availability: "AVAILABLE" | "PARTIAL" | "UNAVAILABLE"; scopeValid: boolean; freshness: "CURRENT_READ" | "STALE" | "UNAVAILABLE" };
   sourceManifest: { sourceKey: string; present: boolean; updatedAt: string | null; contentRevision: string }[];
   profileRevision: string; observationRevision: string; evidence: EvidenceReference[];
+  blockingIngredients?: CostIngredientBlockerV1[];
+  blockingIngredientsTotal?: number;
 };
 export type CostVerificationV1 = {
   kind: "CURRENT_RECIPE_COST_VERIFICATION"; version: 1; verificationId: string;

@@ -49,8 +49,8 @@
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/assets --ignore-pattern public/runtime-assets --ignore-pattern outputs --ignore-pattern .sites-runtime",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate",
-    "test:management-cost": "node --import tsx --test tests/management-cost-phase4a.test.ts",
-    "test:management-cost-browser": "node --import tsx scripts/management-cost-phase4a-browser.ts"
+    "test:management-cost": "node --import tsx --test tests/management-cost-phase4a.test.ts tests/management-cost-correction-phase4a.test.ts",
+    "test:management-cost-browser": "node --import tsx scripts/management-cost-phase4a-browser.ts && node --import tsx scripts/management-cost-correction-phase4a-browser.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

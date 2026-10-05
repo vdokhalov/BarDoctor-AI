@@ -2,12 +2,29 @@ import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { boundSource } from "./canonical-input-evidence";
 import { derivedInputBelongs } from "./derived-input-scope";
 import type { StoreSnapshot } from "./store-cas";
-import type { CostObservationV1, CostReason, CostScope } from "./management-cost-contracts";
+import type { CostIngredientBlockerV1, CostObservationV1, CostReason, CostScope } from "./management-cost-contracts";
 
 export const COST_SOURCE_KEYS = ["bd_assortment_v1", "bd_purchase_documents", "bd_stock_movements"];
 export const COST_CALCULATION_VERSION = "current-recipe-cost-phase4a-v1";
 export const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const canonicalItemId = (id: unknown): id is string => typeof id === "string" && id.length > 0 && id.length <= 120 && id.trim() === id && !/[\u0000-\u001f]/.test(id);
+const identity = (value: unknown) => typeof value === "string" && value.trim() && value.length <= 300 ? value : null;
+/** Use the existing calculator's ingredient rows; never infer price from catalogue metadata. */
+function ingredientBlockers(card: Record<string, unknown>, rows: Record<string, unknown>[], assortment: Record<string, unknown>, scope: CostScope) {
+  const products = (Array.isArray(assortment.nomenclature) ? assortment.nomenclature : []).map(record).filter(p => derivedInputBelongs(p, scope) && p.active !== false && p.archived !== true);
+  const ingredients = (Array.isArray(card.ingredients) ? card.ingredients : []).map(record);
+  const blockers: CostIngredientBlockerV1[] = [];
+  for (const [index, ingredient] of ingredients.entries()) {
+    const row = rows[index];
+    if (!derivedInputBelongs(ingredient, scope) || row?.complete) continue;
+    const itemId = identity(ingredient.nomenclatureItemId), key = identity(ingredient.purchaseProductKey ?? ingredient.productKey ?? ingredient.canonicalProductKey);
+    const matches = products.filter(p => itemId ? [p.id, p.nomenclatureItemId].includes(itemId) : key && [p.key, p.productKey, p.id].includes(key));
+    const product = matches.length === 1 ? matches[0] : null;
+    const reason = !itemId && !key || product && key && ![product.key, product.productKey, product.id].includes(key) ? "LINK_MISSING" : !matches.length ? "NOMENCLATURE_MISSING" : !product ? "UNIT_UNKNOWN" : row?.reason === "price" ? "PRICE_UNKNOWN" : "UNIT_UNKNOWN";
+    blockers.push({ ingredientId: identity(ingredient.id), name: String(product?.name ?? ingredient.name ?? "Ингредиент").slice(0, 180), nomenclatureItemId: product ? identity(product.id ?? product.nomenclatureItemId) : null, productKey: product ? identity(product.productKey ?? product.key ?? product.id) : null, unit: product && ["pcs", "kg", "l"].includes(String(product.unit)) ? String(product.unit) : null, reason });
+  }
+  return blockers;
+}
 const bytes = (value: string) => new TextEncoder().encode(value).byteLength;
 export async function costRevision(value: unknown): Promise<string> {
   const normalize = (v: unknown): unknown => Array.isArray(v) ? v.map(normalize) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)).map(([k, val]) => [k, normalize(val)])) : v;
@@ -80,6 +97,14 @@ export async function observeCurrentCost(input: { scope: CostScope; snapshots: S
           observation.value = metric.recipeCost;
         } else {
           observation.reasonCodes.push(metric?.costCurrency && metric.costCurrency !== currency ? "CURRENCY_UNKNOWN" : metric?.missingPriceCount ? "PRICE_UNKNOWN" : "UNIT_UNKNOWN");
+          const blockers = ingredientBlockers(card, (metric?.ingredientRows ?? []).map(record), parsed.assortment, scope);
+          observation.blockingIngredients = blockers.slice(0, 20);
+          observation.blockingIngredientsTotal = blockers.length;
+          for (const blocker of observation.blockingIngredients) {
+            const product = (parsed.assortment.nomenclature as unknown[]).map(record).find(p => p.id === blocker.nomenclatureItemId && derivedInputBelongs(p, scope));
+            if (product && blocker.nomenclatureItemId && !observation.evidence.some(ref => ref.id === "bd_assortment_v1.nomenclature" && ref.partId === blocker.nomenclatureItemId)) observation.evidence.push(await boundSource(scope, "bd_assortment_v1.nomenclature", product, blocker.nomenclatureItemId));
+          }
+          for (const key of ["bd_purchase_documents", "bd_stock_movements"]) observation.evidence.push(await boundSource(scope, key, parsed.sources[key]));
         }
       } else if (applicable) observation.reasonCodes.push("SOURCE_INVALID");
     }

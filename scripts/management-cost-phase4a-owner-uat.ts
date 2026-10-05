@@ -4,32 +4,15 @@ import { resolve, extname } from 'node:path';
 import { createHash } from 'node:crypto';
 import { costFixture } from '../tests/helpers/management-cost-fixture';
 import { barDoctorResponse } from '../app/bar-doctor-response';
+import { seedCorrectionFixture } from './qa/phase4a-correction-fixture.mjs';
 
 // Local-only human UAT. Every process has its own isolated SQLite database;
 // all writes use the actual application route handlers, never production.
 const fixture = await costFixture({}, {realClock:true});
-// Fresh owner studies use distinct synthetic entities and qualifying reasons;
-// the original fixture remains the default for existing automation.
+// Two independent corrections in an operating venue; no prepriced affected ingredient.
 const scenario = process.env.BD_COST_UAT_SCENARIO;
-if (scenario) {
-  if (!['citrus-empty', 'mint-missing'].includes(scenario)) throw new Error('Invalid isolated QA scenario');
-  const citrus = scenario === 'citrus-empty';
-  const itemId = citrus ? 'qa-citrus' : 'qa-mint';
-  const ingredientId = itemId + '-base', productKey = 'product:' + ingredientId;
-  const itemName = citrus ? 'QA лимонад «Цитрус»' : 'QA чай «Мята»';
-  const ingredientName = citrus ? 'QA основа лимонада' : 'QA порция чая';
-  const assortment = fixture.read('bd_assortment_v1');
-  Object.assign(assortment.menuItems[0], { id: itemId, name: itemName });
-  Object.assign(assortment.nomenclature[0], { id: ingredientId, key: productKey, productKey, name: ingredientName });
-  Object.assign(assortment.recipes[0], { id: itemId + '-recipe', menuItemId: itemId, ownerId: itemId });
-  if (!citrus) assortment.recipes = [];
-  assortment.menuItems.push({...assortment.menuItems[0],id:itemId+'-secondary',name:'QA дополнительная позиция'});
-  fixture.seed('bd_assortment_v1', assortment);
-  const purchases = fixture.read('bd_purchase_documents');
-  purchases[0].id = itemId + '-price';
-  Object.assign(purchases[0].items[0], { id: itemId + '-source', name: ingredientName, purchaseProductKey: productKey, nomenclatureItemId: ingredientId });
-  fixture.seed('bd_purchase_documents', purchases);
-}
+if (!scenario) throw new Error('Isolated working-venue scenario required');
+const readiness=seedCorrectionFixture(fixture,scenario);
 const port = Number(process.env.BD_COST_UAT_PORT || 4390);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('Invalid QA port');
 const routes: Record<string, string> = {
@@ -38,6 +21,9 @@ const routes: Record<string, string> = {
   '/api/store': 'bulkStore', '/api/business-health': 'health',
   '/api/assortment/overview': 'overview', '/api/evidence/resolve': 'evidence',
   '/api/nomenclature/taxonomy': 'taxonomy', '/api/management/cost-signals': 'costs',
+  '/api/nomenclature/quick-create':'quickCreate', '/api/inventory/products':'products',
+  '/api/purchases/confirm':'confirm', '/api/purchases/update':'updatePurchase',
+  '/api/purchases/mappings':'mappings', '/api/procurement/overview':'procurement',
   '/api/management/cost-signals/evaluate': 'evaluate',
 };
 const clientHash = createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex');
@@ -75,6 +61,6 @@ const server = createServer(async (incoming, outgoing) => {
     outgoing.writeHead(500); outgoing.end('Local QA request failed');
   }
 });
-server.listen(port, '127.0.0.1', () => console.log(JSON.stringify({ url: `http://127.0.0.1:${port}/home`, venue: 'Isolated Phase 4A QA', width: 390, height: 844, clientHash, persistence: 'isolated SQLite, retained for this process' })));
+server.listen(port, '127.0.0.1', () => console.log(JSON.stringify({ url: `http://127.0.0.1:${port}/home`, venue: 'Isolated Phase 4A working venue', width: 390, height: 844, clientHash, ...readiness, persistence: 'isolated SQLite, retained for this process' })));
 const stop = () => server.close(() => { fixture.close(); process.exit(0); });
 process.once('SIGTERM', stop); process.once('SIGINT', stop);

@@ -89,6 +89,13 @@ jobs:
         run: |
           node --test tests/management-cost-worker-phase4a.test.mjs
           npm run test:management-cost-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phase4a-cost-correction-evidence
+          path: |
+            outputs/management-cost-phase4a
+            outputs/management-cost-correction-phase4a
       - name: Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance
         run: |
           BD_QA_MODE=regression BD_QA_LABEL=ci node scripts/restricted-manager-403-browser.mjs

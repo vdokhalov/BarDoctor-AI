@@ -13,7 +13,12 @@ const [bundle, scanRoute, patchSource, appHtml, responseShell, bootstrap] = awai
 
 test("global add purchase opens the source chooser on first render", () => {
   assert.match(bundle, /bdPurchaseReceivingStabilityV371="v371"/);
-  assert.match(bundle, /S\.useState\(\(\)=>\{const w=new URLSearchParams\(window\.location\.search\);return w\.get\("create"\)==="1"\|\|w\.get\("scan"\)==="1"\}\)/);
+  const init=bundle.match(/S\.useState\(\(\)=>\{const w=new URLSearchParams\(window\.location\.search\);return ([^}]+)\}\)/);
+  assert.ok(init, "source chooser initializer retained");
+  const firstRender = new Function("window", "URLSearchParams", "const w=new URLSearchParams(window.location.search);return "+init[1]);
+  for(const search of ["?create=1","?scan=1","?create=1&scan=1"]){assert.equal(firstRender({location:{search}},URLSearchParams),true);}
+  for(const search of ["","?create=0","?create=1&costCorrection=1","?scan=1&costCorrection=1"]){assert.equal(firstRender({location:{search}},URLSearchParams),false);}
+
 });
 
 test("receiving keeps source order while matching and advances intentionally", () => {

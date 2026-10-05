@@ -17,3 +17,19 @@ test('Phase4A compiled Worker + native D1: canonical correction, CAS persistence
  assert.equal((await r.call('/api/management/cost-signals?venueId=999')).status,404);await r.db.prepare('UPDATE venue_memberships SET permissions_json=? WHERE account_id=2').bind('{"deny":["inventory.view"]}').run();assert.equal((await r.call('/api/management/cost-signals','GET',undefined,'manager')).status,403);
  assert.equal(r.outbound(),0);
 });
+test('Phase4A native Worker correction: new nomenclature is UNKNOWN until actual purchase confirmation',{timeout:120000},async t=>{
+ const r=await nativeWorkerRuntime();t.after(r.close);
+ const item={id:'correction',venueId:1,active:true,name:'QA correction',consumptionMode:'RECIPE',salePrice:150,currency:'MDL',type:'composite'};
+ const assortment={menuItems:[item],recipes:[{id:'correction-recipe',venueId:1,menuItemId:item.id,ownerId:item.id,ownerType:'menu_item',status:'draft',reviewStatus:'requires_review',version:1,current:true,ingredients:[]}],nomenclature:[],stockBalances:[]};
+ await r.put('bd_assortment_v1',assortment);await r.put('bd_purchase_documents',[]);await r.put('bd_stock_movements',[]);await r.put('bd_suppliers',[{id:'qa-supplier',name:'QA supplier',venueId:1,status:'active'}]);
+ const call=async(path,method='GET',data)=>{const response=await r.call(path,method,data);assert.ok(response.ok,await response.clone().text());return response.json()};
+ const initial=await call('/api/management/cost-signals/evaluate','POST',{menuItemId:item.id}),id=initial.episode.signalId;
+ const lookup=await call('/api/nomenclature/quick-create?q=Correction%20ingredient'),section=lookup.taxonomy.sections.find(v=>v.active),category=lookup.taxonomy.categories.find(v=>v.active&&v.parentId===section.id);
+ const {product}=await call('/api/inventory/products','POST',{action:'create',name:'Correction ingredient',kind:'stock',unit:'pcs',itemType:'ingredient',purchasePrice:777,sectionId:section.id,taxonomyCategoryId:category.id});assert.equal(product.costStatus,'UNKNOWN');
+ const current=(await call('/api/store/bd_assortment_v1')).data;Object.assign(current.recipes[0],{status:'confirmed',reviewStatus:'approved',ingredients:[{id:'correction-ingredient',venueId:1,name:product.name,nomenclatureItemId:product.id,purchaseProductKey:product.key,quantity:1,unit:'pcs'}]});
+ await call('/api/store/bd_assortment_v1','PUT',{data:current});
+ const unknown=await call('/api/management/cost-signals/'+encodeURIComponent(id)+'/verify','POST',{trigger:'OWNER_CHECK'});assert.equal(unknown.episode.condition,'ACTIVE');assert.equal(unknown.episode.latest.value,null);assert.equal(unknown.episode.latest.blockingIngredients[0].name,product.name);assert.ok(unknown.episode.targets.purchase.startsWith('/suppliers?create=1'));
+ await call('/api/purchases/confirm','POST',{document:{id:'qa-correction-purchase',venueId:1,supplierId:'qa-supplier',supplierName:'QA supplier',documentType:'invoice',date:'2026-10-04',currency:'MDL',total:370,costStatus:'KNOWN',items:[{id:'qa-correction-line',name:product.name,nomenclatureItemId:product.id,purchaseProductKey:product.key,quantity:10,unit:'pcs',unitPrice:37,lineTotal:370,costStatus:'KNOWN'}]}});
+ const result=await call('/api/management/cost-signals/'+encodeURIComponent(id)+'/verify','POST',{trigger:'OWNER_CHECK'});assert.equal(result.episode.condition,'VERIFIED_RESOLVED');assert.equal(result.episode.verificationResult.after.value,37);assert.equal(result.episode.verificationResult.before.value,null);
+ assert.deepEqual((await call('/api/management/cost-signals/'+encodeURIComponent(id))).episode.verificationResult,result.episode.verificationResult);assert.equal(r.outbound(),0);
+});
