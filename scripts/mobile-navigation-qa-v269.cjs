@@ -1290,7 +1290,10 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.equal(new URL(page.url()).pathname, "/finance", `${profile.name}: Finance deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });
   await detail.waitFor({ timeout: 10_000 });
-  await detail.getByRole("button", { name: /Спрос/ }).click();
+  const demandZone = detail.locator("button.bd-health-zone-row-v332").filter({ hasText: "Спрос" });
+  assert.equal(await demandZone.count(), 1, `${profile.name}: Demand zone must be uniquely identified independently of Doctor questions`);
+  await demandZone.click();
+  assert.equal(await demandZone.getAttribute("aria-expanded"), "true", `${profile.name}: Demand zone did not expand`);
   await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Спрос" }).getByRole("button", { name: /Посмотреть динамику/ }).click();
   assert.equal(new URL(page.url()).pathname, "/reports", `${profile.name}: Demand deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });
