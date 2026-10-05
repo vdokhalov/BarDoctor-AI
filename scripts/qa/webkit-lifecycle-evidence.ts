@@ -7,7 +7,7 @@ export function webkitLifecycleEvidence(suite: string, width: number) {
   const events: Record<string, unknown>[] = [], pageErrors: { at: number; message: string }[] = [];
   const consoleErrors: { at: number; message: string }[] = [], failedRequests: { at: number; path: string; error: string | null }[] = [];
   let completion: Record<string, unknown> | undefined, failure: Record<string, unknown> | undefined, after: Record<string, unknown> | undefined;
-  function flush() { if (enabled) writeFileSync(process.env.BD_WEBKIT_EVIDENCE!, JSON.stringify({ suite, width, browser, events, pageErrors, consoleErrors, failedRequests, completion, after, failure }, null, 2)); }
+  function flush() { if (enabled) writeFileSync(process.env.BD_WEBKIT_EVIDENCE!, JSON.stringify({ schemaVersion: 2, suite, width, browser, events, pageErrors, consoleErrors, failedRequests, completion, after, failure }, null, 2)); }
   let deniedVenue: string | undefined;
   let guard: string | null = null;
   let browser: string | undefined;
@@ -34,14 +34,29 @@ export function webkitLifecycleEvidence(suite: string, width: number) {
         page.on("pageerror", error => { pageErrors.push({ at: Date.now(), message: error.message }); flush(); });
         page.on("console", message => { if (message.type() === "error") { consoleErrors.push({ at: Date.now(), message: message.text() }); flush(); } });
         page.on("requestfailed", request => { failedRequests.push({ at: Date.now(), path: new URL(request.url()).pathname, error: request.failure()?.errorText ?? null }); flush(); });
-        page.on("response", response => events.push({ type: "http-response", at: Date.now(), path: new URL(response.url()).pathname, status: response.status() }));
+        page.on("response", response => events.push({ type: "http-response", at: Date.now(), path: new URL(response.url()).pathname, status: response.status(), expectedScopeDenial: response.status() === 401 && deniedVenue !== undefined && response.request().headers()["x-venue-id"] === deniedVenue }));
       });
     },
     async health(request: Request, response: Response) {
       if (!enabled) return;
-      events.push({ type: new URL(request.url).pathname === "/api/business-health" ? "health-response" : "store-response", path: new URL(request.url).pathname, at: Date.now(), status: response.status, expectedScopeDenial: response.status === 401 && request.headers.get("X-Venue-Id") === deniedVenue,
+      events.push({ type: new URL(request.url).pathname === "/api/business-health" ? "health-response" : new URL(request.url).pathname === "/api/month-close" ? "month-close-server-response" : "store-response", path: new URL(request.url).pathname, at: Date.now(), status: response.status, expectedScopeDenial: response.status === 401 && request.headers.get("X-Venue-Id") === deniedVenue,
         headers: { email: Boolean(request.headers.get("X-Session-Email")), token: Boolean(request.headers.get("X-Session-Token")), cookie: (request.headers.get("Cookie") ?? "").includes("bd_server_session=") },
         ...(response.status === 401 ? { body: await response.clone().json() } : {}) });
+    },
+    async beginStep(id: string, page: Page, context: BrowserContext) {
+      if (!enabled) return;
+      guard = id;
+      const snapshot = await state(page, context);
+      events.push({ type: "step-start", id, at: Date.now(), state: snapshot }); flush();
+    },
+    endStep() { guard = null; },
+    monthCloseResponse(status: number, code: unknown) {
+      if (!enabled) return;
+      events.push({ type: "month-close-response", at: Date.now(), status, code }); flush();
+    },
+    assertedResponse(path: string, status: number, code: string) {
+      if (!enabled) return;
+      events.push({ type: "expected-response-asserted", at: Date.now(), path, status, code }); flush();
     },
     async completed(page: Page, context: BrowserContext) {
       if (!enabled) return;

@@ -1,0 +1,1954 @@
+{
+  "suite": "derived-metrics-phase3a8",
+  "width": 820,
+  "browser": "webkit",
+  "events": [
+    {
+      "type": "cookie-initialized",
+      "at": 1791205402803,
+      "present": true
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403406,
+      "path": "/reports",
+      "status": 200
+    },
+    {
+      "at": 1791205403420,
+      "type": "storage-write",
+      "key": "qa_webkit_session_marker",
+      "present": true
+    },
+    {
+      "at": 1791205403423,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": false,
+        "token": false,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205403423,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791205403425,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": false,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205403425,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791205403427,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403585,
+      "path": "/venue-timezone.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403587,
+      "path": "/brand-identity-v159.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403587,
+      "path": "/venue-schedule.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403594,
+      "path": "/modern-polish.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403596,
+      "path": "/bardoctor-preview-v397.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403599,
+      "path": "/home-visual-v151.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403634,
+      "path": "/assets/index-D0AhgpbR.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403635,
+      "path": "/navigation.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403635,
+      "path": "/venue-switcher.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403639,
+      "path": "/home-reviews-v409.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403639,
+      "path": "/health-score-experience-v152.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403639,
+      "path": "/accounting-currency.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403640,
+      "path": "/app-shell-v185.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403642,
+      "path": "/navigation-contract-v247.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403642,
+      "path": "/app-shell-v185.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403645,
+      "path": "/navigation-transient-v247.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403651,
+      "path": "/catalog-accounting-v207.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403655,
+      "path": "/monthly-report-qa-v165.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403658,
+      "path": "/more-hub-qa-v166.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403661,
+      "path": "/equipment-qa-v167.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403663,
+      "path": "/procurement-qa-v168.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403666,
+      "path": "/assortment-qa-v170.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403671,
+      "path": "/nomenclature-qa-v238.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403686,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403696,
+      "path": "/health-score-experience.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403698,
+      "path": "/opportunity-calendar-qa-v327.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403717,
+      "path": "/opportunity-calendar-client-v327.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403719,
+      "path": "/competitor-market-qa-v329.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403721,
+      "path": "/competitor-market-client-v329.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403724,
+      "path": "/server-migration-discovery-v262.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403727,
+      "path": "/venue-switcher.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403731,
+      "path": "/modern-polish.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403734,
+      "path": "/manifest.json",
+      "status": 404
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403737,
+      "path": "/icons/bardoctor-mark-v159.svg",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403740,
+      "path": "/venue-schedule.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403748,
+      "path": "/access-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403751,
+      "path": "/market-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403754,
+      "path": "/opportunities-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403759,
+      "path": "/suppliers.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403761,
+      "path": "/purchase-units-v421.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403771,
+      "path": "/warehouse.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403776,
+      "path": "/sales-consumption-v275.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403778,
+      "path": "/nomenclature-v208.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403787,
+      "path": "/canonical-taxonomy-v336.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403792,
+      "path": "/catalog.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403795,
+      "path": "/ai-action-plan.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403802,
+      "path": "/employee-detail.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403803,
+      "path": "/employee-list.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403808,
+      "path": "/team-dashboard-v163.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403809,
+      "path": "/payroll-dashboard-v164.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403813,
+      "path": "/management-cost-phase4a.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403817,
+      "path": "/shifts-visual-v156.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403819,
+      "path": "/finance-dashboard-v160.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403823,
+      "path": "/monthly-report-v165.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403831,
+      "path": "/more-hub-v166.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403832,
+      "path": "/equipment-command-v167.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403835,
+      "path": "/procurement-command-v168.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403839,
+      "path": "/menu-ingestion-phase2.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403841,
+      "path": "/assortment-command-v170.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403846,
+      "path": "/settings-v182.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403850,
+      "path": "/profile-v280.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403856,
+      "path": "/profile-v281.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205403857,
+      "path": "/ai-doctor-attention-v196.css",
+      "status": 200
+    },
+    {
+      "at": 1791205403970,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404031,
+      "path": "/api/auth/bootstrap",
+      "status": 200
+    },
+    {
+      "at": 1791205404031,
+      "type": "storage-write",
+      "key": "bd_active_venue_id",
+      "present": false
+    },
+    {
+      "at": 1791205404032,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791205404032,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205404033,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791205404033,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404081,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404171,
+      "path": "/api/store/bd_assortment_v1",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404328,
+      "path": "/api/store/bd_finance_revenue",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404328,
+      "path": "/api/store/bd_finance_expenses",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404331,
+      "path": "/api/store/bd_finance_gap_reasons",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404356,
+      "path": "/api/restaurants/me",
+      "status": 200
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205404381,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404383,
+      "path": "/api/users/me",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404437,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404527,
+      "path": "/api/store",
+      "status": 200
+    },
+    {
+      "at": 1791205404572,
+      "type": "storage-write",
+      "key": "bd_employees_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404572,
+      "type": "storage-write",
+      "key": "bd_finance_settings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404573,
+      "type": "storage-write",
+      "key": "bd_equipment_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404575,
+      "type": "storage-write",
+      "key": "bd_equipment_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404576,
+      "type": "storage-write",
+      "key": "bd_equipment_work_orders_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404577,
+      "type": "storage-write",
+      "key": "bd_payroll_rules_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404578,
+      "type": "storage-write",
+      "key": "bd_cases_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404579,
+      "type": "storage-write",
+      "key": "bd_events_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404579,
+      "type": "storage-write",
+      "key": "bd_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404580,
+      "type": "storage-write",
+      "key": "bd_action_plans_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404581,
+      "type": "storage-write",
+      "key": "bd_action_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404581,
+      "type": "storage-write",
+      "key": "bd_decisions_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404583,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v3_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404584,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v4_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404584,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v5_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404584,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v6_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404586,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v7_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404587,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v8_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404587,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v9_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404587,
+      "type": "storage-write",
+      "key": "bd_guest_reviews_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404587,
+      "type": "storage-write",
+      "key": "bd_month_closings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404587,
+      "type": "storage-write",
+      "key": "bd_opportunity_calendar_v1_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404588,
+      "type": "storage-write",
+      "key": "bd_access_roles_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404588,
+      "type": "storage-write",
+      "key": "bd_import_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404588,
+      "type": "storage-write",
+      "key": "bd_sales_documents_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404588,
+      "type": "storage-write",
+      "key": "bd_sales_batches_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404594,
+      "type": "storage-write",
+      "key": "bd_sales_mappings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404594,
+      "type": "storage-write",
+      "key": "bd_sales_warehouse_routes_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205404594,
+      "type": "storage-write",
+      "key": "bd_warehouses_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404671,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404732,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205404806,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205404813,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205405446,
+      "path": "/api/month-close",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205407020,
+      "path": "/api/month-close",
+      "status": 409
+    },
+    {
+      "type": "http-response",
+      "at": 1791205407342,
+      "path": "/api/month-close",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205408720,
+      "path": "/api/month-close",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205408777,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205408991,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205408997,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205409248,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409254,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "at": 1791205409276,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409295,
+      "path": "/reports",
+      "status": 200
+    },
+    {
+      "at": 1791205409299,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "75051065-0037-4c54-8236-2a2c28db1e11",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205409311,
+      "type": "storage-write",
+      "key": "qa_webkit_session_marker",
+      "present": true
+    },
+    {
+      "at": 1791205409312,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205409313,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791205409314,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205409314,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791205409316,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409321,
+      "path": "/icons/bardoctor-mark-v159.svg",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409325,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409366,
+      "path": "/manifest.json",
+      "status": 404
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409377,
+      "path": "/venue-timezone.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409378,
+      "path": "/venue-schedule.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409386,
+      "path": "/bardoctor-preview-v397.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409388,
+      "path": "/assets/index-D0AhgpbR.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409390,
+      "path": "/venue-schedule.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409393,
+      "path": "/navigation.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409412,
+      "path": "/venue-switcher.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409422,
+      "path": "/brand-identity-v159.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409427,
+      "path": "/modern-polish.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409433,
+      "path": "/home-visual-v151.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409441,
+      "path": "/home-reviews-v409.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409445,
+      "path": "/health-score-experience-v152.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409449,
+      "path": "/accounting-currency.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409457,
+      "path": "/app-shell-v185.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409460,
+      "path": "/navigation-contract-v247.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409463,
+      "path": "/app-shell-v185.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409467,
+      "path": "/navigation-transient-v247.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409473,
+      "path": "/catalog-accounting-v207.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409474,
+      "path": "/monthly-report-qa-v165.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409478,
+      "path": "/more-hub-qa-v166.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409481,
+      "path": "/equipment-qa-v167.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409484,
+      "path": "/procurement-qa-v168.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409486,
+      "path": "/assortment-qa-v170.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409504,
+      "path": "/nomenclature-qa-v238.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409506,
+      "path": "/health-score-experience.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409509,
+      "path": "/opportunity-calendar-qa-v327.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409511,
+      "path": "/opportunity-calendar-client-v327.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409515,
+      "path": "/competitor-market-qa-v329.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409517,
+      "path": "/competitor-market-client-v329.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409521,
+      "path": "/server-migration-discovery-v262.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409523,
+      "path": "/venue-switcher.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409527,
+      "path": "/modern-polish.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409532,
+      "path": "/access-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409534,
+      "path": "/market-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409537,
+      "path": "/opportunities-entry.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409544,
+      "path": "/suppliers.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409547,
+      "path": "/purchase-units-v421.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409553,
+      "path": "/warehouse.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409556,
+      "path": "/sales-consumption-v275.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409558,
+      "path": "/nomenclature-v208.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409571,
+      "path": "/canonical-taxonomy-v336.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409575,
+      "path": "/catalog.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409579,
+      "path": "/ai-action-plan.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409581,
+      "path": "/employee-detail.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409586,
+      "path": "/employee-list.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409589,
+      "path": "/team-dashboard-v163.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409592,
+      "path": "/payroll-dashboard-v164.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409596,
+      "path": "/management-cost-phase4a.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409601,
+      "path": "/shifts-visual-v156.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409602,
+      "path": "/finance-dashboard-v160.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409606,
+      "path": "/monthly-report-v165.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409611,
+      "path": "/more-hub-v166.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409616,
+      "path": "/equipment-command-v167.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409618,
+      "path": "/procurement-command-v168.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409622,
+      "path": "/menu-ingestion-phase2.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409629,
+      "path": "/assortment-command-v170.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409631,
+      "path": "/settings-v182.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409634,
+      "path": "/profile-v280.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409641,
+      "path": "/profile-v281.css",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409642,
+      "path": "/ai-doctor-attention-v196.css",
+      "status": 200
+    },
+    {
+      "at": 1791205409667,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409795,
+      "path": "/api/auth/bootstrap",
+      "status": 200
+    },
+    {
+      "at": 1791205409796,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791205409797,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791205409798,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791205409798,
+      "type": "state",
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409820,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409899,
+      "path": "/api/store/bd_assortment_v1",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409945,
+      "path": "/api/store/bd_finance_revenue",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409956,
+      "path": "/api/store/bd_finance_expenses",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205409959,
+      "path": "/api/store/bd_finance_gap_reasons",
+      "status": 200
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205409970,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410037,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410077,
+      "path": "/api/store",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410084,
+      "path": "/api/restaurants/me",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410089,
+      "path": "/api/users/me",
+      "status": 200
+    },
+    {
+      "at": 1791205410097,
+      "type": "storage-write",
+      "key": "bd_employees_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410098,
+      "type": "storage-write",
+      "key": "bd_finance_settings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410099,
+      "type": "storage-write",
+      "key": "bd_equipment_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410101,
+      "type": "storage-write",
+      "key": "bd_equipment_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410102,
+      "type": "storage-write",
+      "key": "bd_equipment_work_orders_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410106,
+      "type": "storage-write",
+      "key": "bd_payroll_rules_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410107,
+      "type": "storage-write",
+      "key": "bd_cases_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410107,
+      "type": "storage-write",
+      "key": "bd_events_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410107,
+      "type": "storage-write",
+      "key": "bd_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410107,
+      "type": "storage-write",
+      "key": "bd_action_plans_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410107,
+      "type": "storage-write",
+      "key": "bd_action_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410117,
+      "type": "storage-write",
+      "key": "bd_decisions_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410118,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v3_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410118,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v4_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410122,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v5_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410122,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v6_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410123,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v7_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410123,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v8_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410125,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v9_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410125,
+      "type": "storage-write",
+      "key": "bd_guest_reviews_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410126,
+      "type": "storage-write",
+      "key": "bd_opportunity_calendar_v1_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410126,
+      "type": "storage-write",
+      "key": "bd_access_roles_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410126,
+      "type": "storage-write",
+      "key": "bd_import_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410126,
+      "type": "storage-write",
+      "key": "bd_sales_documents_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410136,
+      "type": "storage-write",
+      "key": "bd_sales_batches_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410136,
+      "type": "storage-write",
+      "key": "bd_sales_mappings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410136,
+      "type": "storage-write",
+      "key": "bd_sales_warehouse_routes_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410137,
+      "type": "storage-write",
+      "key": "bd_warehouses_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410144,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410232,
+      "path": "/api/store",
+      "status": 200
+    },
+    {
+      "at": 1791205410239,
+      "type": "storage-write",
+      "key": "bd_employees_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410239,
+      "type": "storage-write",
+      "key": "bd_finance_settings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410240,
+      "type": "storage-write",
+      "key": "bd_equipment_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410241,
+      "type": "storage-write",
+      "key": "bd_equipment_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410241,
+      "type": "storage-write",
+      "key": "bd_equipment_work_orders_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410242,
+      "type": "storage-write",
+      "key": "bd_payroll_rules_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410242,
+      "type": "storage-write",
+      "key": "bd_cases_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410243,
+      "type": "storage-write",
+      "key": "bd_events_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410244,
+      "type": "storage-write",
+      "key": "bd_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410244,
+      "type": "storage-write",
+      "key": "bd_action_plans_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410244,
+      "type": "storage-write",
+      "key": "bd_action_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410245,
+      "type": "storage-write",
+      "key": "bd_decisions_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410246,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v3_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410247,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v4_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410247,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v5_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410247,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v6_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410247,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v7_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410247,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v8_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410249,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v9_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410250,
+      "type": "storage-write",
+      "key": "bd_guest_reviews_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410250,
+      "type": "storage-write",
+      "key": "bd_opportunity_calendar_v1_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410250,
+      "type": "storage-write",
+      "key": "bd_access_roles_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410251,
+      "type": "storage-write",
+      "key": "bd_import_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410251,
+      "type": "storage-write",
+      "key": "bd_sales_documents_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410252,
+      "type": "storage-write",
+      "key": "bd_sales_batches_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410253,
+      "type": "storage-write",
+      "key": "bd_sales_mappings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410253,
+      "type": "storage-write",
+      "key": "bd_sales_warehouse_routes_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791205410253,
+      "type": "storage-write",
+      "key": "bd_warehouses_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410255,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410342,
+      "path": "/api/operational-days",
+      "status": 404
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205410433,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205410439,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205411377,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205411388,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205411422,
+      "path": "/api/month-close",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205411470,
+      "path": "/api/store/bd_month_closings",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205411511,
+      "path": "/api/store/bd_month_closings",
+      "status": 200
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791205411970,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791205411982,
+      "path": "/api/business-health",
+      "status": 200
+    },
+    {
+      "type": "http-response",
+      "at": 1791205412057,
+      "path": "/api/month-close",
+      "status": 401
+    },
+    {
+      "type": "context-close-start",
+      "at": 1791205412070
+    },
+    {
+      "type": "context-close-end",
+      "at": 1791205412078
+    },
+    {
+      "type": "browser-close-start",
+      "at": 1791205412080
+    },
+    {
+      "type": "browser-close-end",
+      "at": 1791205428162
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [
+    {
+      "at": 1791205403735,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205404671,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205404732,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205407020,
+      "message": "Failed to load resource: the server responded with a status of 409 (Conflict)"
+    },
+    {
+      "at": 1791205408778,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205409366,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205410144,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205410256,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205410342,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791205412059,
+      "message": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "failedRequests": [
+    {
+      "at": 1791205403736,
+      "path": "/manifest.json",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791205404713,
+      "path": "/api/operational-days",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791205409367,
+      "path": "/manifest.json",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791205410198,
+      "path": "/api/operational-days",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791205410316,
+      "path": "/api/operational-days",
+      "error": "Load request cancelled"
+    }
+  ],
+  "completion": {
+    "at": 1791205412062,
+    "assertions": "PASS",
+    "state": {
+      "type": "state",
+      "at": 1791205412067,
+      "origin": "http://127.0.0.1:43159",
+      "documentId": "73f3d325-5eda-4f31-9e12-46d0783b2a83",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      },
+      "cookie": true
+    }
+  }
+}

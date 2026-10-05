@@ -1,0 +1,22 @@
+# WebKit lifecycle gate: native failures and application regressions
+
+The Health lifecycle gate keeps its existing PASS / FAIL / ENVIRONMENT_BLOCKED contract. `classification` explicitly identifies APPLICATION_FAIL when the gate fails. The two existing suites and 390 / 820 / 1280 viewports remain mandatory. Application code, assertions, 30000ms timeout and the independent stable WebKit gates are unchanged.
+
+## Process identity and event ordering
+
+Only a successful WebKit WPE executable `execve` and successful CLONE_THREAD calls establish process/thread identity. Unfinished/resumed execve, clone and clone3 are joined by PID and syscall; interleaved calls are never joined by proximity. Identity is resolved at thread creation, so a later exec/PID reuse cannot relabel an earlier thread. Both SIGABRT and SIGSEGV must belong to these proven executable identities. Forks, failed exec/clone, incomplete calls, missing identity and unrelated process crashes fail closed.
+
+A failure before the first confirmed native fatal event remains APPLICATION_FAIL. So do independent assertion mismatches, selector errors, application JavaScript/page exceptions, HTTP500, unexpected auth responses and unexplained network/console errors, even if a browser subsequently crashes.
+
+## Two narrowly evidenced environment cases
+
+1. Active Health read or the first month-close dialog mount: a NetworkProcess fatal event must precede the failure; previously authenticated state and the initialized QA cookie must disappear within the same document/origin without explicit auth removal. A guarded empty-auth401 requires the observed server response and absent auth headers. A network read error / exact first-mount timeout additionally requires a post-crash WebKit internal request error on the known paths. Live first-mount evidence records authenticated document/cookie state before the crash. The original first-dialog timeout cannot qualify after month-close reads have started. A readiness timeout on the first dialog navigation buttons requires its own step checkpoint and a server-side month-close401 with the exact UNAVAILABLE body and demonstrably absent email/token/cookie headers after native session loss. Its checkpoint may show the already lost session after the crash, but only within the same document/origin. A remount, arbitrary selector timeout or absent checkpoint does not qualify. A later WPEWebProcess crash is accepted in this chain only after the recorded failed guard and context-close start; it cannot supply the original NetworkProcess proof. An internal error on an isolated fixture path also requires a previously observed fixture404 on that exact path before the native crash.
+2. Teardown: all unchanged application assertions must have completed PASS with intact auth/cookie, followed by observed context close, followed by an attributed native fatal event. Exit1 is allowed only for the exact observed browser/context close session-loss error; other exceptions remain failures. Expected stale-input409 is linked to the recorded response code and the existing conflict assertions. Expected foreign-venue401 is linked to the actual request's venue header. They are not blanket HTTP409/401 exceptions.
+
+Known isolated fixture404 paths and their cancelled loads are explicitly enumerated per suite. Console resource errors must correlate to the corresponding HTTP/network evidence; generic console errors are never waived.
+
+## Baseline controls and release semantics
+
+`tests/fixtures/webkit-native-rca/manifest.json` preserves unmodified v485/v486 raw evidence and checksums. Schema-v1 compatibility is confined to the original first-mount callsite and the completed month-close suite's single expected409/401 responses; live schema-v2 runs require explicit context annotations. Tests include negative mutations of the raw evidence as well as process identity controls.
+
+ENVIRONMENT_BLOCKED is distinct from application PASS. The gate records the source SHA, raw child exit, native fatal identity/timestamp, causal proof and diagnostic reason in `outputs/webkit-health-lifecycle/results.json`; process logs, test logs and lifecycle evidence are retained by the existing always-upload CI artifact step. CI can continue past a proven native runtime failure; any APPLICATION_FAIL stops the gate and fails the required job. No retries, skipped suites or unconditional WebKit success are introduced.

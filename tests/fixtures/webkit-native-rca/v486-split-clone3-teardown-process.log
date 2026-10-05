@@ -1,0 +1,205 @@
+7738  1791205402.113394 execve("/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", ["/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffca02ce008 /* 120 vars */) = 0
+7738  1791205402.119261 execve("/opt/hostedtoolcache/node/24.19.0/x64/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119347 execve("/snap/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119414 execve("/home/runner/.local/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119496 execve("/opt/pipx_bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119564 execve("/home/runner/.cargo/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119629 execve("/home/runner/.config/composer/vendor/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119693 execve("/usr/local/.ghcup/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119759 execve("/home/runner/.dotnet/tools/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119825 execve("/usr/local/sbin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119892 execve("/usr/local/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.119957 execve("/usr/sbin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = -1 ENOENT (No such file or directory)
+7738  1791205402.120021 execve("/usr/bin/bash", ["bash", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh", "--inspector-pipe", "--headless", "--no-startup-window"], 0x7ffdef630d80 /* 120 vars */) = 0
+7738  1791205402.130138 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7739
+7739  1791205402.131478 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7740
+7740  1791205402.133665 execve("/usr/bin/dirname", ["dirname", "/home/runner/.cache/ms-playwright/webkit-2248/pw_run.sh"], 0x557d2f0b8fa0 /* 121 vars */) = 0
+7740  1791205402.139813 exit_group(0)   = ?
+7739  1791205402.139994 wait4(-1,  <unfinished ...>
+7740  1791205402.140013 +++ exited with 0 +++
+7739  1791205402.140027 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7740
+7739  1791205402.140187 wait4(-1, 0x7ffdfb7d3150, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7739  1791205402.141055 exit_group(0)   = ?
+7739  1791205402.141263 +++ exited with 0 +++
+7738  1791205402.141308 wait4(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], WNOHANG, NULL) = 7739
+7738  1791205402.141372 wait4(-1, 0x7ffdfb7d2dd0, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7738  1791205402.142173 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7741
+7741  1791205402.144573 execve("/usr/bin/uname", ["uname"], 0x557d2f0b8bf0 /* 121 vars */) = 0
+7741  1791205402.150675 exit_group(0)   = ?
+7738  1791205402.150806 wait4(-1,  <unfinished ...>
+7741  1791205402.150890 +++ exited with 0 +++
+7738  1791205402.150903 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7741
+7738  1791205402.151072 wait4(-1, 0x7ffdfb7d3dd0, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7738  1791205402.151539 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7742
+7742  1791205402.153941 execve("/usr/bin/uname", ["uname"], 0x557d2f0b8dd0 /* 121 vars */) = 0
+7742  1791205402.160031 exit_group(0)   = ?
+7738  1791205402.160175 wait4(-1,  <unfinished ...>
+7742  1791205402.160239 +++ exited with 0 +++
+7738  1791205402.160253 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7742
+7738  1791205402.160400 wait4(-1, 0x7ffdfb7d3c90, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7738  1791205402.160882 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7743
+7743  1791205402.162092 exit_group(0)   = ?
+7743  1791205402.162309 +++ exited with 0 +++
+7738  1791205402.162354 wait4(-1, [{WIFEXITED(s) && WEXITSTATUS(s) == 0}], WNOHANG, NULL) = 7743
+7738  1791205402.162422 wait4(-1, 0x7ffdfb7d1fd0, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7738  1791205402.163135 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f90672a6a10) = 7744
+7738  1791205402.163763 wait4(-1,  <unfinished ...>
+7744  1791205402.163901 execve("/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/MiniBrowser", ["/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/MiniBrowser", "--inspector-pipe", "--headless", "--no-startup-window"], 0x557d2f0bc1e0 /* 122 vars */) = 0
+7744  1791205402.167169 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fe1ba351a10) = 7745
+7745  1791205402.167709 clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7fe1ba351a10) = 7746
+7746  1791205402.168771 execve("/usr/bin/readlink", ["readlink", "-f", "/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/MiniBrowser"], 0x55b56ba52da8 /* 122 vars */) = 0
+7746  1791205402.175099 exit_group(0)   = ?
+7745  1791205402.175148 wait4(-1,  <unfinished ...>
+7746  1791205402.175277 +++ exited with 0 +++
+7745  1791205402.175290 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7746
+7745  1791205402.175399 wait4(-1, 0x7ffe90960fac, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7745  1791205402.176019 execve("/usr/bin/dirname", ["dirname", "/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/MiniBrowser"], 0x55b56ba52da8 /* 122 vars */) = 0
+7745  1791205402.183231 exit_group(0 <unfinished ...>
+7744  1791205402.183258 wait4(-1,  <unfinished ...>
+7745  1791205402.183276 <... exit_group resumed>) = ?
+7745  1791205402.183418 +++ exited with 0 +++
+7744  1791205402.183434 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7745
+7744  1791205402.183572 wait4(-1, 0x7ffe9096127c, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7744  1791205402.183662 execve("/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/MiniBrowser", ["/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/MiniBrowser", "--inspector-pipe", "--headless", "--no-startup-window"], 0x55b56ba530d8 /* 126 vars */) = 0
+7744  1791205402.307022 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc639dff990, parent_tid=0x7fc639dff990, exit_signal=0, stack=0x7fc638dff000, stack_size=0xfffc00, tls=0x7fc639dff6c0} => {parent_tid=[7747]}, 88) = 7747
+7744  1791205402.355031 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5f47fd990, parent_tid=0x7fc5f47fd990, exit_signal=0, stack=0x7fc5f37fd000, stack_size=0xfffc00, tls=0x7fc5f47fd6c0} => {parent_tid=[7748]}, 88) = 7748
+7744  1791205402.356842 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5f37fc990, parent_tid=0x7fc5f37fc990, exit_signal=0, stack=0x7fc5f27fc000, stack_size=0xfffc00, tls=0x7fc5f37fc6c0} => {parent_tid=[7749]}, 88) = 7749
+7744  1791205402.357638 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5f27fb990, parent_tid=0x7fc5f27fb990, exit_signal=0, stack=0x7fc5f17fb000, stack_size=0xfffc00, tls=0x7fc5f27fb6c0} => {parent_tid=[7750]}, 88) = 7750
+7744  1791205402.358175 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5f17fa990, parent_tid=0x7fc5f17fa990, exit_signal=0, stack=0x7fc5f07fa000, stack_size=0xfffc00, tls=0x7fc5f17fa6c0} => {parent_tid=[7751]}, 88) = 7751
+7744  1791205402.363410 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5e3fff990, parent_tid=0x7fc5e3fff990, exit_signal=0, stack=0x7fc5e2fff000, stack_size=0xfffc00, tls=0x7fc5e3fff6c0} => {parent_tid=[7752]}, 88) = 7752
+7744  1791205402.589661 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5e2ffe990, parent_tid=0x7fc5e2ffe990, exit_signal=0, stack=0x7fc5e1ffe000, stack_size=0xfffc00, tls=0x7fc5e2ffe6c0} => {parent_tid=[7762]}, 88) = 7762
+7744  1791205402.590833 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5e1ffd990, parent_tid=0x7fc5e1ffd990, exit_signal=0, stack=0x7fc5e0ffd000, stack_size=0xfffc00, tls=0x7fc5e1ffd6c0} => {parent_tid=[7763]}, 88) = 7763
+7744  1791205402.591947 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5dbfff990, parent_tid=0x7fc5dbfff990, exit_signal=0, stack=0x7fc5dafff000, stack_size=0xfffc00, tls=0x7fc5dbfff6c0} => {parent_tid=[7764]}, 88) = 7764
+7744  1791205402.594066 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7fc641ea8000, stack_size=0x9000}, 88 <unfinished ...>
+7764  1791205402.594378 exit(0)         = ?
+7764  1791205402.594439 +++ exited with 0 +++
+7765  1791205402.596662 execve("/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/WPENetworkProcess", ["/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/WPENetworkProcess", "2", "16"], 0x558207300890 /* 126 vars */) = 0
+7744  1791205402.597047 <... clone3 resumed>) = 7765
+7744  1791205402.618194 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5dbfff990, parent_tid=0x7fc5dbfff990, exit_signal=0, stack=0x7fc5dafff000, stack_size=0xfffc00, tls=0x7fc5dbfff6c0} => {parent_tid=[7766]}, 88) = 7766
+7765  1791205402.718279 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96fc5ff990, parent_tid=0x7f96fc5ff990, exit_signal=0, stack=0x7f96fb5ff000, stack_size=0xfffc40, tls=0x7f96fc5ff6c0} => {parent_tid=[7767]}, 88) = 7767
+7765  1791205402.734361 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96b73fd990, parent_tid=0x7f96b73fd990, exit_signal=0, stack=0x7f96b63fd000, stack_size=0xfffc40, tls=0x7f96b73fd6c0} => {parent_tid=[7768]}, 88) = 7768
+7765  1791205402.734978 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96affff990, parent_tid=0x7f96affff990, exit_signal=0, stack=0x7f96aefff000, stack_size=0xfffc40, tls=0x7f96affff6c0} => {parent_tid=[7769]}, 88) = 7769
+7765  1791205402.740964 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96b63fc990, parent_tid=0x7f96b63fc990, exit_signal=0, stack=0x7f96b53fc000, stack_size=0xfffc40, tls=0x7f96b63fc6c0} => {parent_tid=[7770]}, 88) = 7770
+7765  1791205402.747761 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96b53fb990, parent_tid=0x7f96b53fb990, exit_signal=0, stack=0x7f96b43fb000, stack_size=0xfffc40, tls=0x7f96b53fb6c0} => {parent_tid=[7771]}, 88) = 7771
+7765  1791205402.751636 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96aeffe990, parent_tid=0x7f96aeffe990, exit_signal=0, stack=0x7f96adffe000, stack_size=0xfffc40, tls=0x7f96aeffe6c0} => {parent_tid=[7772]}, 88) = 7772
+7765  1791205402.779567 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f96ad85b990, parent_tid=0x7f96ad85b990, exit_signal=0, stack=0x7f96ac85b000, stack_size=0xfffc40, tls=0x7f96ad85b6c0} => {parent_tid=[7773]}, 88) = 7773
+7744  1791205402.824497 clone3({flags=CLONE_VM|CLONE_VFORK|CLONE_CLEAR_SIGHAND, exit_signal=SIGCHLD, stack=0x7fc641ea8000, stack_size=0x9000}, 88 <unfinished ...>
+7774  1791205402.825111 execve("/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/WPEWebProcess", ["/home/runner/.cache/ms-playwright/webkit-2248/minibrowser-wpe/bin/WPEWebProcess", "4", "21"], 0x558207300890 /* 126 vars */ <unfinished ...>
+7744  1791205402.825336 <... clone3 resumed>) = 7774
+7774  1791205402.825462 <... execve resumed>) = 0
+7744  1791205402.889169 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5c75ff990, parent_tid=0x7fc5c75ff990, exit_signal=0, stack=0x7fc5c65ff000, stack_size=0xfffc00, tls=0x7fc5c75ff6c0} => {parent_tid=[7775]}, 88) = 7775
+7774  1791205402.952346 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbf317ff990, parent_tid=0x7fbf317ff990, exit_signal=0, stack=0x7fbf307ff000, stack_size=0xfffc40, tls=0x7fbf317ff6c0} => {parent_tid=[7776]}, 88) = 7776
+7774  1791205402.963395 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbeec5fd990, parent_tid=0x7fbeec5fd990, exit_signal=0, stack=0x7fbeeb5fd000, stack_size=0xfffc40, tls=0x7fbeec5fd6c0} => {parent_tid=[7777]}, 88) = 7777
+7774  1791205402.965048 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbeeb5fc990, parent_tid=0x7fbeeb5fc990, exit_signal=0, stack=0x7fbeea5fc000, stack_size=0xfffc40, tls=0x7fbeeb5fc6c0} => {parent_tid=[7778]}, 88) = 7778
+7774  1791205402.966500 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbeea5fb990, parent_tid=0x7fbeea5fb990, exit_signal=0, stack=0x7fbee95fb000, stack_size=0xfffc40, tls=0x7fbeea5fb6c0} => {parent_tid=[7779]}, 88) = 7779
+7774  1791205402.968036 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbee95fa990, parent_tid=0x7fbee95fa990, exit_signal=0, stack=0x7fbee85fa000, stack_size=0xfffc40, tls=0x7fbee95fa6c0} => {parent_tid=[7780]}, 88) = 7780
+7765  1791205402.974202 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f9697fff990, parent_tid=0x7f9697fff990, exit_signal=0, stack=0x7f9696fff000, stack_size=0xfffc40, tls=0x7f9697fff6c0} => {parent_tid=[7781]}, 88) = 7781
+7768  1791205402.976105 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f9696ffe990, parent_tid=0x7f9696ffe990, exit_signal=0, stack=0x7f9695ffe000, stack_size=0xfffc40, tls=0x7f9696ffe6c0} => {parent_tid=[7782]}, 88) = 7782
+7774  1791205402.978656 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbedbfff990, parent_tid=0x7fbedbfff990, exit_signal=0, stack=0x7fbedafff000, stack_size=0xfffc40, tls=0x7fbedbfff6c0} => {parent_tid=[7783]}, 88) = 7783
+7774  1791205403.078801 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbec75ff990, parent_tid=0x7fbec75ff990, exit_signal=0, stack=0x7fbec65ff000, stack_size=0xfffc40, tls=0x7fbec75ff6c0} => {parent_tid=[7784]}, 88) = 7784
+7774  1791205403.079368 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbebe3ff990, parent_tid=0x7fbebe3ff990, exit_signal=0, stack=0x7fbebd3ff000, stack_size=0xfffc40, tls=0x7fbebe3ff6c0} => {parent_tid=[7785]}, 88) = 7785
+7784  1791205403.081067 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbec65fe990, parent_tid=0x7fbec65fe990, exit_signal=0, stack=0x7fbec55fe000, stack_size=0xfffc40, tls=0x7fbec65fe6c0} => {parent_tid=[7786]}, 88) = 7786
+7774  1791205403.082672 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbec55fd990, parent_tid=0x7fbec55fd990, exit_signal=0, stack=0x7fbec45fd000, stack_size=0xfffc40, tls=0x7fbec55fd6c0} => {parent_tid=[7787]}, 88) = 7787
+7774  1791205403.083121 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbebffff990, parent_tid=0x7fbebffff990, exit_signal=0, stack=0x7fbebefff000, stack_size=0xfffc40, tls=0x7fbebffff6c0} => {parent_tid=[7788]}, 88) = 7788
+7774  1791205403.084687 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbebd3fe990, parent_tid=0x7fbebd3fe990, exit_signal=0, stack=0x7fbebc3fe000, stack_size=0xfffc40, tls=0x7fbebd3fe6c0} => {parent_tid=[7789]}, 88) = 7789
+7774  1791205403.085218 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbea7fff990, parent_tid=0x7fbea7fff990, exit_signal=0, stack=0x7fbea6fff000, stack_size=0xfffc40, tls=0x7fbea7fff6c0} => {parent_tid=[7790]}, 88) = 7790
+7774  1791205403.085645 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe9edff990, parent_tid=0x7fbe9edff990, exit_signal=0, stack=0x7fbe9ddff000, stack_size=0xfffc40, tls=0x7fbe9edff6c0} => {parent_tid=[7791]}, 88) = 7791
+7774  1791205403.086103 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbea6ffe990, parent_tid=0x7fbea6ffe990, exit_signal=0, stack=0x7fbea5ffe000, stack_size=0xfffc40, tls=0x7fbea6ffe6c0} => {parent_tid=[7792]}, 88) = 7792
+7774  1791205403.086662 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbea5ffd990, parent_tid=0x7fbea5ffd990, exit_signal=0, stack=0x7fbea4ffd000, stack_size=0xfffc40, tls=0x7fbea5ffd6c0} <unfinished ...>
+7786  1791205403.086751 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe9ffff990, parent_tid=0x7fbe9ffff990, exit_signal=0, stack=0x7fbe9efff000, stack_size=0xfffc40, tls=0x7fbe9ffff6c0} <unfinished ...>
+7774  1791205403.086774 <... clone3 resumed> => {parent_tid=[7793]}, 88) = 7793
+7786  1791205403.086841 <... clone3 resumed> => {parent_tid=[7794]}, 88) = 7794
+7774  1791205403.087298 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe9ddfe990, parent_tid=0x7fbe9ddfe990, exit_signal=0, stack=0x7fbe9cdfe000, stack_size=0xfffc40, tls=0x7fbe9ddfe6c0} => {parent_tid=[7795]}, 88) = 7795
+7774  1791205403.092323 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe87fff990, parent_tid=0x7fbe87fff990, exit_signal=0, stack=0x7fbe86fff000, stack_size=0xfffc40, tls=0x7fbe87fff6c0} => {parent_tid=[7796]}, 88) = 7796
+7774  1791205403.156232 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe86ffe990, parent_tid=0x7fbe86ffe990, exit_signal=0, stack=0x7fbe85ffe000, stack_size=0xfffc40, tls=0x7fbe86ffe6c0} => {parent_tid=[7797]}, 88) = 7797
+7744  1791205403.250022 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5c65fe990, parent_tid=0x7fc5c65fe990, exit_signal=0, stack=0x7fc5c55fe000, stack_size=0xfffc00, tls=0x7fc5c65fe6c0} => {parent_tid=[7798]}, 88) = 7798
+7774  1791205403.309993 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe85ffd990, parent_tid=0x7fbe85ffd990, exit_signal=0, stack=0x7fbe84ffd000, stack_size=0xfffc40, tls=0x7fbe85ffd6c0} => {parent_tid=[7799]}, 88) = 7799
+7774  1791205403.317600 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe77fff990, parent_tid=0x7fbe77fff990, exit_signal=0, stack=0x7fbe76fff000, stack_size=0xfffc40, tls=0x7fbe77fff6c0} => {parent_tid=[7800]}, 88) = 7800
+7774  1791205403.319106 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe76ffe990, parent_tid=0x7fbe76ffe990, exit_signal=0, stack=0x7fbe75ffe000, stack_size=0xfffc40, tls=0x7fbe76ffe6c0} => {parent_tid=[7801]}, 88) = 7801
+7774  1791205403.409282 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe75ffd990, parent_tid=0x7fbe75ffd990, exit_signal=0, stack=0x7fbe74ffd000, stack_size=0xfffc40, tls=0x7fbe75ffd6c0} => {parent_tid=[7802]}, 88) = 7802
+7774  1791205403.413281 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe6ffff990, parent_tid=0x7fbe6ffff990, exit_signal=0, stack=0x7fbe6efff000, stack_size=0xfffc40, tls=0x7fbe6ffff6c0} => {parent_tid=[7803]}, 88) = 7803
+7774  1791205403.422558 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe6effe990, parent_tid=0x7fbe6effe990, exit_signal=0, stack=0x7fbe6dffe000, stack_size=0xfffc40, tls=0x7fbe6effe6c0} => {parent_tid=[7804]}, 88) = 7804
+7774  1791205403.424166 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe6dffd990, parent_tid=0x7fbe6dffd990, exit_signal=0, stack=0x7fbe6cffd000, stack_size=0xfffc40, tls=0x7fbe6dffd6c0} => {parent_tid=[7805]}, 88) = 7805
+7774  1791205404.353774 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe5dfff990, parent_tid=0x7fbe5dfff990, exit_signal=0, stack=0x7fbe5cfff000, stack_size=0xfffc40, tls=0x7fbe5dfff6c0} => {parent_tid=[7806]}, 88) = 7806
+7774  1791205404.354499 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe5cffe990, parent_tid=0x7fbe5cffe990, exit_signal=0, stack=0x7fbe5bffe000, stack_size=0xfffc40, tls=0x7fbe5cffe6c0} => {parent_tid=[7807]}, 88) = 7807
+7774  1791205404.355839 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe5bffd990, parent_tid=0x7fbe5bffd990, exit_signal=0, stack=0x7fbe5affd000, stack_size=0xfffc40, tls=0x7fbe5bffd6c0} => {parent_tid=[7808]}, 88) = 7808
+7774  1791205404.530235 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe5affc990, parent_tid=0x7fbe5affc990, exit_signal=0, stack=0x7fbe59ffc000, stack_size=0xfffc40, tls=0x7fbe5affc6c0} => {parent_tid=[7809]}, 88) = 7809
+7774  1791205409.308113 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe59ffb990, parent_tid=0x7fbe59ffb990, exit_signal=0, stack=0x7fbe58ffb000, stack_size=0xfffc40, tls=0x7fbe59ffb6c0} => {parent_tid=[7812]}, 88) = 7812
+7780  1791205412.076178 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fbe51fff990, parent_tid=0x7fbe51fff990, exit_signal=0, stack=0x7fbe50fff000, stack_size=0xfffc40, tls=0x7fbe51fff6c0} => {parent_tid=[7813]}, 88) = 7813
+7763  1791205412.078418 exit(0)         = ?
+7771  1791205412.078537 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7f9695ffd990, parent_tid=0x7f9695ffd990, exit_signal=0, stack=0x7f9694ffd000, stack_size=0xfffc40, tls=0x7f9695ffd6c0} <unfinished ...>
+7763  1791205412.078573 +++ exited with 0 +++
+7771  1791205412.078691 <... clone3 resumed> => {parent_tid=[7814]}, 88) = 7814
+7798  1791205412.080732 exit(0)         = ?
+7798  1791205412.080836 +++ exited with 0 +++
+7766  1791205412.082471 exit(0)         = ?
+7766  1791205412.082585 +++ exited with 0 +++
+7775  1791205412.083062 exit(0)         = ?
+7775  1791205412.083178 +++ exited with 0 +++
+7772  1791205412.083792 exit(0)         = ?
+7772  1791205412.083905 +++ exited with 0 +++
+7765  1791205412.083961 exit_group(0)   = ?
+7782  1791205412.084148 +++ exited with 0 +++
+7814  1791205412.084156 +++ exited with 0 +++
+7781  1791205412.084164 +++ exited with 0 +++
+7771  1791205412.084183 +++ exited with 0 +++
+7770  1791205412.084193 +++ exited with 0 +++
+7769  1791205412.084201 +++ exited with 0 +++
+7768  1791205412.084209 +++ exited with 0 +++
+7767  1791205412.084216 +++ exited with 0 +++
+7750  1791205412.085599 clone3({flags=CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|CLONE_SYSVSEM|CLONE_SETTLS|CLONE_PARENT_SETTID|CLONE_CHILD_CLEARTID, child_tid=0x7fc5c75ff990, parent_tid=0x7fc5c75ff990, exit_signal=0, stack=0x7fc5c65ff000, stack_size=0xfffc00, tls=0x7fc5c75ff6c0} => {parent_tid=[7815]}, 88) = 7815
+7744  1791205412.087957 exit_group(0)   = ?
+7751  1791205412.088136 +++ exited with 0 +++
+7747  1791205412.088162 +++ exited with 0 +++
+7815  1791205412.088194 +++ exited with 0 +++
+7762  1791205412.088214 +++ exited with 0 +++
+7752  1791205412.088223 +++ exited with 0 +++
+7750  1791205412.088232 +++ exited with 0 +++
+7749  1791205412.088241 +++ exited with 0 +++
+7773  1791205412.088646 +++ exited with 0 +++
+7765  1791205412.088665 +++ exited with 0 +++
+7748  1791205412.097105 +++ exited with 0 +++
+7744  1791205412.097127 +++ exited with 0 +++
+7738  1791205412.097144 <... wait4 resumed>[{WIFEXITED(s) && WEXITSTATUS(s) == 0}], 0, NULL) = 7744
+7738  1791205412.097357 wait4(-1, 0x7ffdfb7d3ad0, WNOHANG, NULL) = -1 ECHILD (No child processes)
+7738  1791205412.097702 exit_group(0)   = ?
+7738  1791205412.098009 +++ exited with 0 +++
+7797  1791205412.101307 exit(0)         = ?
+7797  1791205412.101395 +++ exited with 0 +++
+7796  1791205412.107357 exit(0)         = ?
+7796  1791205412.107441 +++ exited with 0 +++
+7801  1791205412.108746 exit(0)         = ?
+7801  1791205412.108821 +++ exited with 0 +++
+7800  1791205412.110461 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x7fbed8ba04bd} ---
+7800  1791205412.110608 --- SIGSEGV {si_signo=SIGSEGV, si_code=SEGV_MAPERR, si_addr=0x7fbed8ba04bd} ---
+7809  1791205428.131501 +++ killed by SIGSEGV (core dumped) +++
+7799  1791205428.131580 +++ killed by SIGSEGV (core dumped) +++
+7792  1791205428.131601 +++ killed by SIGSEGV (core dumped) +++
+7808  1791205428.131655 +++ killed by SIGSEGV (core dumped) +++
+7785  1791205428.131672 +++ killed by SIGSEGV (core dumped) +++
+7793  1791205428.131699 +++ killed by SIGSEGV (core dumped) +++
+7803  1791205428.131737 +++ killed by SIGSEGV (core dumped) +++
+7813  1791205428.131800 +++ killed by SIGSEGV (core dumped) +++
+7812  1791205428.131812 +++ killed by SIGSEGV (core dumped) +++
+7807  1791205428.131823 +++ killed by SIGSEGV (core dumped) +++
+7806  1791205428.131833 +++ killed by SIGSEGV (core dumped) +++
+7805  1791205428.131843 +++ killed by SIGSEGV (core dumped) +++
+7804  1791205428.131854 +++ killed by SIGSEGV (core dumped) +++
+7802  1791205428.131864 +++ killed by SIGSEGV (core dumped) +++
+7800  1791205428.131874 +++ killed by SIGSEGV (core dumped) +++
+7795  1791205428.131884 +++ killed by SIGSEGV (core dumped) +++
+7794  1791205428.131895 +++ killed by SIGSEGV (core dumped) +++
+7791  1791205428.131905 +++ killed by SIGSEGV (core dumped) +++
+7790  1791205428.131915 +++ killed by SIGSEGV (core dumped) +++
+7789  1791205428.131925 +++ killed by SIGSEGV (core dumped) +++
+7788  1791205428.131935 +++ killed by SIGSEGV (core dumped) +++
+7787  1791205428.131945 +++ killed by SIGSEGV (core dumped) +++
+7786  1791205428.131955 +++ killed by SIGSEGV (core dumped) +++
+7784  1791205428.131965 +++ killed by SIGSEGV (core dumped) +++
+7783  1791205428.131981 +++ killed by SIGSEGV (core dumped) +++
+7780  1791205428.131991 +++ killed by SIGSEGV (core dumped) +++
+7779  1791205428.132002 +++ killed by SIGSEGV (core dumped) +++
+7778  1791205428.132012 +++ killed by SIGSEGV (core dumped) +++
+7777  1791205428.132023 +++ killed by SIGSEGV (core dumped) +++
+7776  1791205428.132033 +++ killed by SIGSEGV (core dumped) +++
+7774  1791205428.159556 +++ killed by SIGSEGV (core dumped) +++

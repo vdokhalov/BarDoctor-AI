@@ -1,0 +1,194 @@
+[
+  {
+    "id": "v485-month-timeout",
+    "suite": "derived-metrics-phase3a8",
+    "width": 1280,
+    "exitCode": 1,
+    "sourceSHA": "dcc0541780db52d8c02b0c3a74f3ea0d31cbce24",
+    "run": "37285717777",
+    "attempt": 1,
+    "sourceArtifact": "ci-v485-attempt1/webkit-health-lifecycle/derived-metrics-phase3a8-1280",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v485-month-timeout-evidence.json",
+        "sha256": "633a7bc2c509acce21a70527d6d2051b8621e6e3a2c8fa319e46888aa4f4b5bc"
+      },
+      "process": {
+        "name": "v485-month-timeout-process.log",
+        "sha256": "2cd067f83a2ffcc2d333b4a2e6b78e99a81c38b1a8d0135841038404cd3e1820"
+      }
+    }
+  },
+  {
+    "id": "v486-month-timeout",
+    "suite": "derived-metrics-phase3a8",
+    "width": 1280,
+    "exitCode": 1,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "run": "37305992759",
+    "attempt": 1,
+    "sourceArtifact": "ci-original/webkit-health-lifecycle/derived-metrics-phase3a8-1280",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v486-month-timeout-evidence.json",
+        "sha256": "53047ea181a91797d79017e93798b9848189978d85be087b32a3058ace78c0e8"
+      },
+      "process": {
+        "name": "v486-month-timeout-process.log",
+        "sha256": "61a56301b9a8ab46555b1a07a248dab73c754d8b97add6e0bb457785238111ec"
+      }
+    }
+  },
+  {
+    "id": "v486-split-clone3-teardown",
+    "suite": "derived-metrics-phase3a8",
+    "width": 820,
+    "exitCode": 0,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "run": "37305992759",
+    "attempt": 2,
+    "sourceArtifact": "ci-v486-attempt2/webkit-health-lifecycle/derived-metrics-phase3a8-820",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v486-split-clone3-teardown-evidence.json",
+        "sha256": "eedbcfaca368d5702ac0277cd647e4327052606c5219f843a21d35a136e255b2"
+      },
+      "process": {
+        "name": "v486-split-clone3-teardown-process.log",
+        "sha256": "1abe57d8518e69084c16b281ff6b18d19b9693defd5cfc6ab2b926f71763fd36"
+      }
+    }
+  },
+  {
+    "id": "v485-health-session",
+    "suite": "health-inputs-phase3a9",
+    "width": 820,
+    "exitCode": 1,
+    "sourceSHA": "dcc0541780db52d8c02b0c3a74f3ea0d31cbce24",
+    "run": "37285717777",
+    "attempt": 1,
+    "sourceArtifact": "ci-v485-attempt1/webkit-health-lifecycle/health-inputs-phase3a9-820",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v485-health-session-evidence.json",
+        "sha256": "03a938506d8844489b9d4454df99e177918090cc0cfb5922760ac74640388a82"
+      },
+      "process": {
+        "name": "v485-health-session-process.log",
+        "sha256": "2f888cea3da32a71158b65a3c9673be4848f9288b1a0748e9ad080b9e3e18a13"
+      }
+    }
+  },
+  {
+    "id": "v486-health-session",
+    "suite": "health-inputs-phase3a9",
+    "width": 390,
+    "exitCode": 1,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "run": "37305992759",
+    "attempt": 1,
+    "sourceArtifact": "ci-original/webkit-health-lifecycle/health-inputs-phase3a9-390",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v486-health-session-evidence.json",
+        "sha256": "76b6f34862dc4806928596b0cb8c4ae71119ef628aa3e772a53cba6e7091da17"
+      },
+      "process": {
+        "name": "v486-health-session-process.log",
+        "sha256": "28c6b7220084e508556eebaff7f355e9f198c2f1255650bab863e3c0e9d30abb"
+      }
+    }
+  },
+  {
+    "id": "v485-month-teardown",
+    "suite": "derived-metrics-phase3a8",
+    "width": 390,
+    "exitCode": 0,
+    "sourceSHA": "dcc0541780db52d8c02b0c3a74f3ea0d31cbce24",
+    "run": null,
+    "attempt": null,
+    "sourceArtifact": "gates/v485-r1/webkit-health-lifecycle/derived-metrics-phase3a8-390",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "v485-month-teardown-evidence.json",
+        "sha256": "dcbf7ef61b9fd80367957dbdf9686fe891165d032cd80c73c0fd0590a4e8b7f1"
+      },
+      "process": {
+        "name": "v485-month-teardown-process.log",
+        "sha256": "ae94d0078a89fc56f4253426add57c476fa4b23e66b6b0bb6b9e7fb1042d81a3"
+      }
+    }
+  },
+  {
+    "id": "live-store-session-fixture-network",
+    "suite": "health-inputs-phase3a9",
+    "width": 390,
+    "exitCode": 1,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "diagnosticWorktree": true,
+    "run": null,
+    "attempt": null,
+    "sourceArtifact": "webkit-lifecycle-r1/webkit-health-lifecycle/health-inputs-phase3a9-390",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "live-store-session-fixture-network-evidence.json",
+        "sha256": "d71113d194c54b290683978fb1f265d4473dc59d925fd01917dae5a00f04c646"
+      },
+      "process": {
+        "name": "live-store-session-fixture-network-process.log",
+        "sha256": "9c2d1f0c76b41c598acc466047e67f2ef6c55a35ba9fde1d198233ccc043d788"
+      }
+    }
+  },
+  {
+    "id": "live-network-then-wpe-teardown",
+    "suite": "health-inputs-phase3a9",
+    "width": 820,
+    "exitCode": 1,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "diagnosticWorktree": true,
+    "run": null,
+    "attempt": null,
+    "sourceArtifact": "webkit-lifecycle-r2/webkit-health-lifecycle/health-inputs-phase3a9-820",
+    "expectedClassification": "ENVIRONMENT_BLOCKED",
+    "files": {
+      "evidence": {
+        "name": "live-network-then-wpe-teardown-evidence.json",
+        "sha256": "28e62a16f68153e65056a384c871edee9531de6f0d23be7b516d55c2b68a39a3"
+      },
+      "process": {
+        "name": "live-network-then-wpe-teardown-process.log",
+        "sha256": "7c2c1d3dc7c686bd16960ed57fc436bfa945742b58c113df206270cf8c45dc86"
+      }
+    }
+  },
+  {
+    "id": "live-readiness-insufficient-evidence",
+    "suite": "derived-metrics-phase3a8",
+    "width": 820,
+    "exitCode": 1,
+    "sourceSHA": "a3a08dac3717429e9591e5ed7e88182397e48884",
+    "diagnosticWorktree": true,
+    "run": null,
+    "attempt": null,
+    "sourceArtifact": "final-webkit-lifecycle-r1/webkit-health-lifecycle/derived-metrics-phase3a8-820",
+    "expectedClassification": "APPLICATION_FAIL",
+    "files": {
+      "evidence": {
+        "name": "live-readiness-insufficient-evidence-evidence.json",
+        "sha256": "5ef674a512fd37db8ac79e4c2d6bbe7cd7452c4e917571680eb2c7d1b8cee1cd"
+      },
+      "process": {
+        "name": "live-readiness-insufficient-evidence-process.log",
+        "sha256": "083d571b4b451cdebbd12c14c8e7b3504c934d3c21eeb355443da0851950ce51"
+      }
+    }
+  }
+]

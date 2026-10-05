@@ -19,10 +19,10 @@ suites: for (const suite of WEBKIT_LIFECYCLE_SUITES) for (const width of [390, 8
   child.stderr.on("data", data => { process.stderr.write(data); log.write(data); });
   const exitCode = await new Promise((resolve, reject) => { child.on("error", reject); child.on("close", resolve); });
   await new Promise(resolve => log.end(resolve));
-  const result = classifyWebKitLifecycle({ suite, width, exitCode, trace: existsSync(trace) ? readFileSync(trace, "utf8") : "", evidence: existsSync(evidence) ? JSON.parse(readFileSync(evidence, "utf8")) : null });
+  const result = classifyWebKitLifecycle({ suite, width, exitCode, testLog: readFileSync(`${stem}.log`, "utf8"), trace: existsSync(trace) ? readFileSync(trace, "utf8") : "", evidence: existsSync(evidence) ? JSON.parse(readFileSync(evidence, "utf8")) : null });
   results.push({ suite, width, sourceSHA: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(), exitCode, ...result });
   writeFileSync(resolve(out, "results.json"), JSON.stringify(results, null, 2));
-  console.log(JSON.stringify({ suite, width, status: result.status, reason: result.reason }));
+  console.log(JSON.stringify({ suite, width, status: result.status, classification: result.classification, reason: result.reason }));
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n| ${suite} | WebKit ${width}px | **${result.status}** | ${result.reason ?? "unchanged assertions passed; no native fatal signal"} |\n`);
   if (result.status === "FAIL") { process.exitCode = 1; break suites; }
 }

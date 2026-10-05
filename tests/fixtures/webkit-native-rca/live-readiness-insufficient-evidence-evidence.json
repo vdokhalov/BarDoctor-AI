@@ -1,0 +1,923 @@
+{
+  "schemaVersion": 2,
+  "suite": "derived-metrics-phase3a8",
+  "width": 820,
+  "browser": "webkit",
+  "events": [
+    {
+      "type": "cookie-initialized",
+      "at": 1791208363962,
+      "present": true
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364479,
+      "path": "/reports",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "at": 1791208364500,
+      "type": "storage-write",
+      "key": "qa_webkit_session_marker",
+      "present": true
+    },
+    {
+      "at": 1791208364504,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": false,
+        "token": false,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791208364504,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791208364505,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": true,
+        "token": false,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791208364506,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791208364506,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364593,
+      "path": "/venue-timezone.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364593,
+      "path": "/venue-schedule.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364593,
+      "path": "/bardoctor-preview-v397.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364593,
+      "path": "/assets/index-D0AhgpbR.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364593,
+      "path": "/manifest.json",
+      "status": 404,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364596,
+      "path": "/icons/bardoctor-mark-v159.svg",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/navigation.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/venue-switcher.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/brand-identity-v159.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/modern-polish.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/home-visual-v151.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364724,
+      "path": "/home-reviews-v409.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/health-score-experience-v152.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/accounting-currency.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/app-shell-v185.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/navigation-contract-v247.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/app-shell-v185.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/navigation-transient-v247.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/catalog-accounting-v207.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364725,
+      "path": "/monthly-report-qa-v165.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364733,
+      "path": "/more-hub-qa-v166.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364733,
+      "path": "/equipment-qa-v167.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364734,
+      "path": "/procurement-qa-v168.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364734,
+      "path": "/assortment-qa-v170.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364735,
+      "path": "/nomenclature-qa-v238.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364735,
+      "path": "/health-score-experience.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364757,
+      "path": "/venue-schedule.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364757,
+      "path": "/access-entry.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364757,
+      "path": "/opportunity-calendar-qa-v327.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364759,
+      "path": "/opportunity-calendar-client-v327.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364760,
+      "path": "/competitor-market-qa-v329.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364760,
+      "path": "/competitor-market-client-v329.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364776,
+      "path": "/server-migration-discovery-v262.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364777,
+      "path": "/venue-switcher.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364778,
+      "path": "/modern-polish.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364808,
+      "path": "/market-entry.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364809,
+      "path": "/opportunities-entry.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364809,
+      "path": "/suppliers.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364809,
+      "path": "/purchase-units-v421.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364810,
+      "path": "/warehouse.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364812,
+      "path": "/sales-consumption-v275.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364815,
+      "path": "/nomenclature-v208.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364817,
+      "path": "/canonical-taxonomy-v336.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364826,
+      "path": "/catalog.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364828,
+      "path": "/ai-action-plan.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364831,
+      "path": "/employee-detail.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364835,
+      "path": "/employee-list.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364837,
+      "path": "/team-dashboard-v163.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364843,
+      "path": "/payroll-dashboard-v164.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364847,
+      "path": "/management-cost-phase4a.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364852,
+      "path": "/shifts-visual-v156.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364854,
+      "path": "/finance-dashboard-v160.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364862,
+      "path": "/monthly-report-v165.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364864,
+      "path": "/more-hub-v166.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364872,
+      "path": "/equipment-command-v167.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364874,
+      "path": "/procurement-command-v168.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364884,
+      "path": "/menu-ingestion-phase2.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364893,
+      "path": "/assortment-command-v170.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364899,
+      "path": "/settings-v182.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364903,
+      "path": "/profile-v280.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364907,
+      "path": "/profile-v281.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364916,
+      "path": "/ai-doctor-attention-v196.css",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208364942,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "at": 1791208365023,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365171,
+      "path": "/api/auth/bootstrap",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "at": 1791208365173,
+      "type": "storage-write",
+      "key": "bd_active_venue_id",
+      "present": false
+    },
+    {
+      "at": 1791208365176,
+      "type": "storage-write",
+      "key": "bd_session",
+      "present": true
+    },
+    {
+      "at": 1791208365176,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "at": 1791208365176,
+      "type": "storage-write",
+      "key": "bd_session_token",
+      "present": true
+    },
+    {
+      "at": 1791208365176,
+      "type": "state",
+      "origin": "http://127.0.0.1:40775",
+      "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365264,
+      "path": "/assets/index-BQGspy0I.js",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365373,
+      "path": "/api/store/bd_assortment_v1",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365624,
+      "path": "/api/store/bd_finance_revenue",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365624,
+      "path": "/api/store/bd_finance_expenses",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365624,
+      "path": "/api/store/bd_finance_gap_reasons",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "health-response",
+      "path": "/api/business-health",
+      "at": 1791208365682,
+      "status": 200,
+      "expectedScopeDenial": false,
+      "headers": {
+        "email": true,
+        "token": true,
+        "cookie": true
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365704,
+      "path": "/api/business-health",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365706,
+      "path": "/api/restaurants/me",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365716,
+      "path": "/api/users/me",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208365875,
+      "path": "/api/store",
+      "status": 200,
+      "expectedScopeDenial": false
+    },
+    {
+      "at": 1791208365904,
+      "type": "storage-write",
+      "key": "bd_employees_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365906,
+      "type": "storage-write",
+      "key": "bd_finance_settings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365906,
+      "type": "storage-write",
+      "key": "bd_equipment_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365909,
+      "type": "storage-write",
+      "key": "bd_equipment_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365911,
+      "type": "storage-write",
+      "key": "bd_equipment_work_orders_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365911,
+      "type": "storage-write",
+      "key": "bd_payroll_rules_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365911,
+      "type": "storage-write",
+      "key": "bd_cases_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365911,
+      "type": "storage-write",
+      "key": "bd_events_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365912,
+      "type": "storage-write",
+      "key": "bd_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365912,
+      "type": "storage-write",
+      "key": "bd_action_plans_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365918,
+      "type": "storage-write",
+      "key": "bd_action_tasks_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365918,
+      "type": "storage-write",
+      "key": "bd_decisions_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365918,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v3_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365919,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v4_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365923,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v5_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365924,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v6_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365924,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v7_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365925,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v8_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365925,
+      "type": "storage-write",
+      "key": "bd_ai_diagnosis_v9_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365925,
+      "type": "storage-write",
+      "key": "bd_guest_reviews_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365925,
+      "type": "storage-write",
+      "key": "bd_month_closings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_opportunity_calendar_v1_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_access_roles_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_import_history_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_sales_documents_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_sales_batches_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_sales_mappings_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_sales_warehouse_routes_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "at": 1791208365926,
+      "type": "storage-write",
+      "key": "bd_warehouses_cache__month-close@isolated.test__venue_1",
+      "present": false
+    },
+    {
+      "type": "http-response",
+      "at": 1791208366327,
+      "path": "/api/operational-days",
+      "status": 404,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "step-start",
+      "id": "month-close:first-mount",
+      "at": 1791208366921,
+      "state": {
+        "type": "state",
+        "at": 1791208366919,
+        "origin": "http://127.0.0.1:40775",
+        "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+        "auth": {
+          "email": false,
+          "token": false,
+          "marker": false
+        },
+        "cookie": false
+      }
+    },
+    {
+      "type": "http-response",
+      "at": 1791208367011,
+      "path": "/api/month-close",
+      "status": 401,
+      "expectedScopeDenial": false
+    },
+    {
+      "type": "month-close-response",
+      "at": 1791208367063,
+      "status": 401,
+      "code": "UNAVAILABLE"
+    },
+    {
+      "type": "context-close-start",
+      "at": 1791208397194
+    },
+    {
+      "type": "context-close-end",
+      "at": 1791208397200
+    },
+    {
+      "type": "browser-close-start",
+      "at": 1791208397202
+    },
+    {
+      "type": "browser-close-end",
+      "at": 1791208397274
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [
+    {
+      "at": 1791208364593,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791208366328,
+      "message": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    },
+    {
+      "at": 1791208367012,
+      "message": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+    }
+  ],
+  "failedRequests": [
+    {
+      "at": 1791208364594,
+      "path": "/manifest.json",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791208365969,
+      "path": "/api/operational-days",
+      "error": "Load request cancelled"
+    },
+    {
+      "at": 1791208366011,
+      "path": "/api/operational-days",
+      "error": "Load request cancelled"
+    }
+  ],
+  "after": {
+    "type": "state",
+    "at": 1791208397103,
+    "origin": "http://127.0.0.1:40775",
+    "documentId": "407a6849-6a89-4ff2-8ccc-ab3bc49afcbe",
+    "auth": {
+      "email": false,
+      "token": false,
+      "marker": false
+    },
+    "cookie": false
+  },
+  "failure": {
+    "at": 1791208397098,
+    "guard": "month-close:first-mount",
+    "name": "TimeoutError",
+    "message": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('dialog', { name: 'Мастер закрытия месяца' }).locator('nav button').first() to be visible\n",
+    "stack": "locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n  - waiting for getByRole('dialog', { name: 'Мастер закрытия месяца' }).locator('nav button').first() to be visible\n\n    at mount (/workspace/bardoctor-phase4b-source/scripts/derived-metrics-phase3a8-browser.ts:44:679)\n    at async <anonymous> (/workspace/bardoctor-phase4b-source/scripts/derived-metrics-phase3a8-browser.ts:46:2)"
+  }
+}
