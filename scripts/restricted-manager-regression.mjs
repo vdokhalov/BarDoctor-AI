@@ -7,11 +7,12 @@ import {restrictedManagerRuntime} from './qa/restricted-manager-runtime.mjs';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const r=await restrictedManagerRuntime(),browser=await chromium.launch({executablePath:await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs});
 const results=[],out='outputs/restricted-manager-403/'+(process.env.BD_QA_NEGATIVE_ONLY?'negative-controls':'regression');mkdirSync(out,{recursive:true});
-const expectedRestricted=new Set(['/api/store/bd_finance_expenses','/api/business-health','/api/ai/diagnosis','/api/recommendations/check']);
+const expectedRestricted=new Set(['/api/store/bd_finance_expenses','/api/business-health','/api/ai/diagnosis','/api/recommendations/check','/api/ai/curated']);
 function acceptance(role,requests,errors){
  assert.deepEqual(errors,[],role+' browser errors');
  for(const req of requests.filter(req=>req.status>=400)){
   assert.ok(role==='manager'&&req.status===403&&req.body?.code==='ACCESS_DENIED'&&expectedRestricted.has(req.path),`${role}: unexpected ${req.status} ${req.path}`);
+  if(req.path==='/api/ai/curated')assert.equal(req.body.availability,'RESTRICTED','Curated denial must retain the authoritative source restriction contract');
   assert.ok(!req.body.data);assert.ok(!JSON.stringify(req.body).includes('FINANCE PRIVATE SENTINEL'));
  }
 }
@@ -21,6 +22,9 @@ for(const bad of [{status:403,body:{code:'ACCESS_DENIED'}},{status:401,body:{cod
  if(bad.status!==403)assert.throws(()=>acceptance('manager',[{path:'/api/store/bd_finance_expenses',...bad}],[]));
 }
 assert.throws(()=>acceptance('manager',[],['uncaught error']));
+// The new read endpoint adds one exact expected denial, never a blanket AI exception.
+for(const role of ['owner','permitted'])assert.throws(()=>acceptance(role,[{path:'/api/ai/curated',status:403,body:{code:'ACCESS_DENIED',availability:'RESTRICTED'}}],[]));
+for(const [status,body] of [[401,{code:'UNAUTHORIZED'}],[500,{code:'ACCESS_DENIED',availability:'RESTRICTED'}],[403,{code:'OTHER_DENIAL',availability:'RESTRICTED'}],[403,{code:'ACCESS_DENIED'}],[403,{code:'ACCESS_DENIED',availability:'RESTRICTED',data:{private:true}}]])assert.throws(()=>acceptance('manager',[{path:'/api/ai/curated',status,body}],[]));
 async function settled(page){
  await page.waitForFunction(()=>!document.documentElement.hasAttribute('data-bd-startup-pending'));
  await page.waitForFunction(()=>!window.__qaPending&&Date.now()-window.__qaLastRequest>800);
@@ -61,17 +65,20 @@ try{
    if(path==='/sales-import')await page.frameLocator('iframe[title="Продажи и склад"]').locator('#journal-count').filter({hasText:'документов'}).waitFor();
    if(role==='manager'){
     const body=await page.locator('body').innerText();assert.ok(!body.includes('FINANCE PRIVATE SENTINEL'));assert.ok(!body.replace(/\s/g,'').includes('98765'));
+    if(path==='/analysis'){assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);}
    }
    assert.deepEqual(errors,[],role+' '+path);paths.push(path);
   }
   const finance=await call(page,'/api/store/bd_finance_expenses','GET',undefined,r.venueId);
   assert.equal(finance.status,role==='manager'?403:200);
   if(role==='manager')assert.ok(!finance.body.data);else assert.equal(finance.body.data[0].amount,98765);
-  for(const [path,method,body] of [['/api/business-health','GET'],['/api/ai/diagnosis','POST',{}],['/api/recommendations/check','POST',{recommendations:[{}]}]]){
+  const curatedPath='/api/ai/curated?question=attention&venueId='+r.venueId;
+  for(const [path,method,body] of [['/api/business-health','GET'],[curatedPath,'GET'],['/api/ai/diagnosis','POST',{}],['/api/recommendations/check','POST',{recommendations:[{}]}]]){
    // Permitted roles exercise the source boundary through Health; avoid a real AI/provider call.
-   if(role!=='manager'&&path!=='/api/business-health')continue;
+   if(role!=='manager'&&path!=='/api/business-health'&&path!==curatedPath)continue;
    const response=await call(page,path,method,body,r.venueId);assert.equal(response.status,role==='manager'?403:200);
    if(role==='manager')assert.equal(response.body.availability,'RESTRICTED');
+   else if(path===curatedPath){assert.equal(response.body.data.authority,'DETERMINISTIC_CANONICAL_SERVER');assert.equal(response.body.data.scope.venueId,r.venueId);assert.equal(response.body.data.question.id,'attention');}
   }
   acceptance(role,r.network.slice(start),errors);
   if(role==='owner'){
