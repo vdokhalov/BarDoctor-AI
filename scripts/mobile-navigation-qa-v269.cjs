@@ -1253,19 +1253,21 @@ async function businessHealthColdStartFlow(browser, profile) {
   const homeLayout = await page.evaluate(() => {
     const card = document.querySelector('[data-bd-home-health-index="business-health-snapshot-v334"]');
     const money = document.querySelector(".bd-home-money");
-    const attention = document.querySelector('[data-bd-home-attention="universal-v198"]');
+    const attention = document.querySelector('.bd-management-queue[data-management-venue="901"]');
     const cardRect = card?.getBoundingClientRect();
     const moneyRect = money?.getBoundingClientRect();
     return {
       cardHeight: cardRect?.height ?? null,
       moneyTop: moneyRect?.top ?? null,
       attentionTop: attention?.getBoundingClientRect().top ?? null,
+      legacyAttention: !!document.querySelector('[data-bd-home-attention="universal-v198"]'),
       viewportHeight: innerHeight,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
   assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
-  // Phase 4A approved hierarchy: attention comes before the existing money card.
+  // G2 retains attention before money, using the shared canonical queue.
+  assert.equal(homeLayout.legacyAttention, false, `${profile.name}: Home must not render competing legacy attention`);
   assert.ok((homeLayout.attentionTop ?? Infinity) < (homeLayout.moneyTop ?? -Infinity), `${profile.name}: attention must precede financial details`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
