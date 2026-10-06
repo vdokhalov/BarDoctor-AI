@@ -105,7 +105,8 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   const previousActions=intelligence.briefing.todayActions;
   const queue=rankManagementSignals(attention.managementQueue,new Date(asOf)).map<Row>(item=>{
     const issueKey=String(item.issueKey ?? "");
-    const target=provenTargets.get(String(item.managementId)) ?? (item.linkedTaskId ? {path:"/tasks",label:"Открыть поручения"} : businessHealthActionTarget(issueKey,{caseId:item.caseId}));
+    const taskTab=String(item.taskDeadlineDate??'')&&String(item.taskDeadlineDate)<asOf.slice(0,10)?'overdue':String(item.taskDeadlineDate??'')===asOf.slice(0,10)?'today':'week';
+    const target=provenTargets.get(String(item.managementId)) ?? (item.linkedTaskId ? {path:`/tasks?venueId=${scope.venueId}&taskId=${encodeURIComponent(String(item.linkedTaskId))}&tab=${taskTab}&returnTo=health`,label:"Открыть поручения"} : businessHealthActionTarget(issueKey,{caseId:item.caseId}));
     return {...item,target,reason:String(item.managementPriorityReason ?? item.consequence ?? item.fact ?? "Проверить сигнал."),ctaLabel:target ? (target as {label:string}).label : "Проверить основание сигнала"};
   });
   intelligence.managementQueue=queue;

@@ -75,7 +75,13 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
   const equipmentCounter = counter(equipmentKeys, affected.length, "EQUIPMENT_ID", `retained repair history and maintenance due before ${today}`, equipmentDiagnostics);
 
   const stockKeys = ["bd_assortment_v1", "bd_inventory_snapshots", "bd_opening_stock_v1", "bd_stock_movements"];
+  const stockSourcesTrusted=stockKeys.every(key=>{
+    const source=sourceMap.get(key),data=record(source?.data);
+    return source?.state==='AVAILABLE'&&!['STALE','PARTIAL','UNAVAILABLE','CONFLICT'].includes(String(data.sourceState))&&data.stale!==true&&data.sourceConflict!==true
+      &&(!Array.isArray(source.data)||source.data.every(value=>record(value).stale!==true&&record(value).sourceConflict!==true));
+  });
   const balances = array(record(sourceMap.get("bd_assortment_v1")?.data).stockBalances), stockDiagnostics = rowDiagnostics(stockKeys.filter(key => key !== "bd_assortment_v1"));
+  if(!stockSourcesTrusted)stockDiagnostics.push('SOURCE_UNTRUSTED');
   const projectedProducts = new Set(balances.map(balance => balance.productKey ?? balance.key));
   const catalogue = array(record(sourceMap.get("bd_assortment_v1")?.data).nomenclature);
   if (catalogue.some(item => item.active !== false && item.kind === "stock" && !projectedProducts.has(item.productKey ?? item.key ?? item.id))
@@ -88,11 +94,13 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
     if (!derivedInputBelongs(balance, scope) || !(balance.productKey ?? balance.key) || seenStock.has(identity)) { stockDiagnostics.push("RECORD_NEEDS_REVIEW"); continue; }
     seenStock.add(identity);
     const proof = stockQuantityEvidence({ ...scope, balance, movements: values("bd_stock_movements"), counts: values("bd_inventory_snapshots"), openings: values("bd_opening_stock_v1") });
+    const factTrusted=stockSourcesTrusted&&balance.stale!==true&&balance.sourceConflict!==true;
     const productKey = String(balance.productKey ?? balance.key), warehouseKey = String(balance.warehouseId ?? balance.warehouseExternalId ?? ""), unit = String(balance.unit ?? "");
     const minimum = finite(balance.safety ?? balance.minimum ?? balance.minStock);
     stockFacts.push({ managementId: `health:${input.venueId}:stock:${encodeURIComponent(JSON.stringify([productKey,warehouseKey,unit]))}`, productKey,warehouseKey,unit,
       name:String(catalogue.find(item => (item.productKey ?? item.key) === productKey)?.name ?? balance.name ?? productKey).slice(0,240),
-      quantity:proof.quantity,minimum,evidenceComplete:proof.evidenceComplete,active:proof.evidenceComplete && (proof.quantity! <= 0 || minimum !== null && proof.quantity! <= minimum) });
+      quantity:factTrusted&&proof.evidenceComplete?proof.quantity:null,minimum,evidenceComplete:factTrusted&&proof.evidenceComplete,active:factTrusted&&proof.evidenceComplete && (proof.quantity! <= 0 || minimum !== null && proof.quantity! <= minimum) });
+    if(!factTrusted)stockDiagnostics.push('SOURCE_UNTRUSTED');
     if (!proof.evidenceComplete) { stockDiagnostics.push(...proof.diagnostics, "PARTIAL_EVIDENCE"); continue; }
     const quantity = proof.quantity!, safety = finite(balance.safety ?? balance.minimum ?? balance.minStock);
     if (quantity <= 0 || safety !== null && quantity <= safety) anomalyCount += 1;
@@ -119,7 +127,9 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
       evidence:evidence("shifts",day.businessDate,"Рабочий день ожидает операционные данные"),
       target:{path:`/shifts?month=${day.businessDate.slice(0,7)}&${context(managementId)}&businessDate=${day.businessDate}${shiftId?"&shift="+encodeURIComponent(String(shiftId)):""}`,label:"Заполнить отчёт дня"}});
   }
-  if (stockCounter.availability === "AVAILABLE") for (const fact of stockFacts.filter(item=>item.active)) issues.push({
+  // Aggregate coverage can be partial because a different grain lacks an
+  // anchor. Keep independently proven items actionable in the same queue.
+  if (stockSourcesTrusted) for (const fact of stockFacts.filter(item=>item.active)) issues.push({
     ...fact,issueKey:"stock",affectedEntity:JSON.stringify([fact.productKey,fact.warehouseKey,fact.unit]),verificationKind:"stock",managementActionable:true,signalClass:"problem",
     title:`Проверить остаток: ${fact.name}`,fact:`${fact.name}: ${fact.quantity} ${fact.unit}${fact.minimum!==null?`, минимум ${fact.minimum} ${fact.unit}`:""}.`,
     consequence:"Остаток требует проверки обеспеченности позиции. Время до исчерпания и денежный эффект пока не установлены.",

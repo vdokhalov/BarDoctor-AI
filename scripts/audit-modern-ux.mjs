@@ -155,12 +155,15 @@ export async function runModernUxAudit() {
   assert.ok(homeStart >= 0 && homeEnd > homeStart, "Home hierarchy component not found");
   const home = bundle.slice(homeStart, homeEnd);
   requireOrder(home, [
-    "bdHomeAttention",
+    "bdHomeHealthIndexV200",
+    "bdManagementHomePhase4",
+    "bdCostHomePhase4a",
     "bdHomeMoneyCard",
     "bdHomeReviewsCardV409",
     "bdHomeTodayCard",
     "bdHomeContextCardsV151",
   ], "home information hierarchy");
+  assert.doesNotMatch(home, /i\.jsx\(bdHomeAttention/, "Home must use the canonical management queue");
   assert.doesNotMatch(home, /i\.jsx\(bdHomeFreshAi/, 'Approved Phase4A Home has no competing AI card');
   assert.ok(!home.includes("bdHomeSections"), "Duplicate Home section grid remains");
   requireText(bundle, 'const bdHomeVisualVersion="home-v151"', "Home visual version");

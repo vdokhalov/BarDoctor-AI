@@ -2,6 +2,21 @@ type Row = Record<string, unknown>;
 type Envelope = {success?:boolean;error?:string;data?:{businessHealthSnapshot?:{venueId:string;managementQueue?:Row[];managementTopActions?:Row[];managementCoverage?:Row}};verification?:{result:string;message:string;context:Row;target?:unknown}};
 type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;commit:(value:Envelope)=>void};
 
+/** Unknown and incomplete results must not become numeric zero in Home. */
+export function homeFinancialResult(report:Row|null|undefined) {
+  const known=(value:unknown)=>(typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value));
+  if(!report||report.financeInputsKnown===false)return {value:null,final:false};
+  if(known(report.operatingResult))return {value:Number(report.operatingResult),final:true};
+  // A registered cash subtotal is not an authoritative operating result.
+  // Keep it in its existing source view; do not substitute it for UNKNOWN.
+  return {value:null,final:false};
+}
+
+export function managementTaskContext(search:string,venue:number) {
+  const params=new URLSearchParams(search),id=params.get('taskId');
+  return id&&id.length<=240&&params.getAll('taskId').length===1&&params.getAll('venueId').length===1&&params.get('venueId')===String(venue)?id:null;
+}
+
 export function managementActionContext(rawSearch:string,venue:number) {
   const params=new URLSearchParams(rawSearch),id=params.get('healthAction');
   return {id,active:!!id&&params.getAll('healthAction').length===1&&params.getAll('venueId').length===1&&id.startsWith('health:'+venue+':')&&Number(params.get('venueId'))===venue};
@@ -48,25 +63,32 @@ export function createManagementActionsClient(React:typeof import('react'),runti
       {value?.data?.businessHealthSnapshot?.managementCoverage?.cost==="PARTIAL"&&<small>Проверка себестоимости охватывает часть позиций.</small>}
     </section>;
   }
-  function useContext({venue,ready,onOpen}:{venue:number;query:string;ready:boolean;onOpen:(context:Row)=>void}) {
+  function useContext({venue,query,ready,onOpen,onClear}:{venue:number;query:string;ready:boolean;onOpen:(context:Row)=>void;onClear?:()=>void}) {
     // The legacy router query is already decoded. Parse the raw URL once.
     const {id,active}=managementActionContext(window.location.search,venue);
-    const [message,setMessage]=React.useState(''),[busy,setBusy]=React.useState(false),[retry,setRetry]=React.useState(0),epoch=React.useRef(0),open=React.useRef(onOpen);open.current=onOpen;
+    const params=new URLSearchParams(window.location.search),stock=id?.startsWith('health:'+venue+':stock:'),requestedProduct=params.get('product');
+    const [message,setMessage]=React.useState(''),[busy,setBusy]=React.useState(false),[retry,setRetry]=React.useState(0),epoch=React.useRef(0),open=React.useRef(onOpen),clear=React.useRef(onClear),opened=React.useRef<string|null>(null);open.current=onOpen;clear.current=onClear;
     const returnQueue=React.useCallback(()=>runtime.navigate('/health?venueId='+venue+'&checkedAction='+encodeURIComponent(id||'')),[venue,id]);
     React.useEffect(()=>{
-      setMessage('');if(!active||!ready)return;
-      const epochHandle=epoch;const controller=new AbortController();let opened=false;
+      setMessage('');if(stock&&!requestedProduct)opened.current=null;if(id&&!active)clear.current?.();if(!active||!ready)return;
+      const epochHandle=epoch;const controller=new AbortController();
       const check=async(afterSave=false)=>{const stamp=++epoch.current;setBusy(true);try{
         const value=await verify(venue,id!,controller.signal);if(stamp!==epoch.current||controller.signal.aborted)return;
         setMessage(value.verification?.message||'Проверка недоступна.');
-        if(value.verification?.result==='ACTIVE'&&value.verification.target&&!opened){opened=true;open.current(value.verification.context);}
+        // A stock deep-link requests opening through product. Explicit close
+        // removes product, while retaining the useful action/return context.
+        // Readiness/focus/store refresh must never recreate that user intent.
+        const key=venue+':'+id,context=value.verification?.context;
+        if(value.verification?.result==='ACTIVE'&&value.verification.target&&context&&(!stock||requestedProduct===context.productKey)&&opened.current!==key){opened.current=key;open.current(context);}
+        if(stock&&value.verification?.result!=='ACTIVE'){opened.current=key;clear.current?.();}
         if(afterSave&&value.verification?.result==='CONDITION_CLEARED')returnQueue();
       }catch(e){if(stamp===epoch.current&&!controller.signal.aborted)setMessage(e instanceof Error?e.message:'Проверка недоступна. Исправление не подтверждено.');}finally{if(stamp===epoch.current)setBusy(false)}};
-      void check();const listener=()=>void check(true);
+      void check();const listener=()=>void check(true),focus=()=>void check(false);
       for(const event of ['bd:store-updated','bd:shift-closed'])window.addEventListener(event,listener);
-      return()=>{epochHandle.current++;controller.abort();for(const event of ['bd:store-updated','bd:shift-closed'])window.removeEventListener(event,listener)};
+      window.addEventListener('focus',focus);
+      return()=>{epochHandle.current++;controller.abort();for(const event of ['bd:store-updated','bd:shift-closed'])window.removeEventListener(event,listener);window.removeEventListener('focus',focus)};
     // The editor callback is a ref: store refresh must not reopen the editor.
-    },[venue,id,active,ready,retry,returnQueue]);
+    },[venue,id,active,ready,retry,returnQueue,stock,requestedProduct,query]);
     const banner=id?<section className="bd-cost-management" data-management-context={id} aria-label="Возврат к приоритетам"><strong>Business Health → исправление</strong><p role="status">{active?message||'Проверяем текущую проблему…':'Контекст другого заведения. Откройте действие из его Business Health.'}</p><button type="button" disabled={busy||!active} onClick={returnQueue}>Вернуться и проверить</button><button type="button" disabled={busy||!active} onClick={()=>setRetry(v=>v+1)}>Повторить проверку</button></section>:null;
     return {active,banner};
   }

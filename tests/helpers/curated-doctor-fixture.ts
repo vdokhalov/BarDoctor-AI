@@ -1,7 +1,7 @@
 import { managementActionsFixture } from './management-actions-fixture';
 import type { CuratedAnswer, CuratedQuestionId } from '../../lib/bardoctor/curated-doctor-contracts';
-export async function curatedDoctorFixture(){
- const r=await managementActionsFixture({curated:'./app/api/ai/[action]/route',evaluateCost:'./app/api/management/cost-signals/evaluate/route',costs:'./app/api/management/cost-signals/route',detail:'./app/api/management/cost-signals/[id]/route',verifyCost:'./app/api/management/cost-signals/[id]/verify/route'});
+export async function curatedDoctorFixture(extraRoutes:Record<string,string>={}){
+ const r=await managementActionsFixture({curated:'./app/api/ai/[action]/route',evaluateCost:'./app/api/management/cost-signals/evaluate/route',costs:'./app/api/management/cost-signals/route',detail:'./app/api/management/cost-signals/[id]/route',verifyCost:'./app/api/management/cost-signals/[id]/verify/route',...extraRoutes});
  const profile=JSON.parse(String(r.sqlite.prepare('SELECT restaurant_json FROM accounts WHERE id=?').get(r.account)?.restaurant_json??'{}'));
  r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({...profile,name:'QA Phase 4C — работающая кофейня',businessType:'cafe',country:'Test',city:'Isolated'}),r.account);
  const read=(key:string)=>JSON.parse(String(r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(r.account,key)?.data_json??'null'));

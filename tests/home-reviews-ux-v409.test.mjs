@@ -19,7 +19,9 @@ test("Home keeps canonical Health and Finance ahead of the saved Reviews card", 
   assert.ok(daily.indexOf("bdHomeHealthIndexV200") < daily.indexOf("bdCostHomePhase4a"));
   assert.ok(daily.indexOf("bdHomeHealthIndexV200") < daily.indexOf("bdHomeMoneyCard"));
   assert.ok(daily.indexOf("bdHomeMoneyCard") < daily.indexOf("bdHomeReviewsCardV409"));
-  assert.ok(daily.indexOf("bdHomeAttention") < daily.indexOf("bdHomeMoneyCard"));
+  assert.ok(daily.indexOf("bdHomeHealthIndexV200") < daily.indexOf("bdManagementHomePhase4"));
+  assert.ok(daily.indexOf("bdManagementHomePhase4") < daily.indexOf("bdCostHomePhase4a"));
+  assert.doesNotMatch(daily, /i\.jsx\(bdHomeAttention/);
   assert.match(bundle, /bdCanonicalSnapshot=g/);
   assert.match(bundle, /data-bd-home-health-index":"business-health-snapshot-v334/);
   assert.match(bundle, /data-bd-home-money":"result-v151/);

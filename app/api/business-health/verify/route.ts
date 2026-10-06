@@ -21,7 +21,9 @@ export async function GET(request: Request): Promise<Response> {
   const current=operations.issues?.find(item=>item.managementId===id);
   const fact=kind==='day'?operations.days.find(day=>day.managementId===id):operations.stockFacts?.find(stock=>stock.managementId===id);
   let result:'ACTIVE'|'CONDITION_CLEARED'|'CANNOT_VERIFY'|'NOT_APPLICABLE'='CANNOT_VERIFY';
-  if (counter.availability==='AVAILABLE') {
+  if (kind==='stock'&&fact&&'evidenceComplete' in fact) {
+    if(fact.evidenceComplete)result=fact.active?'ACTIVE':'CONDITION_CLEARED';
+  } else if (counter.availability==='AVAILABLE') {
     if (!fact) result='NOT_APPLICABLE';
     else if (kind==='day') result='status' in fact && fact.status==='COMPLETE'?'CONDITION_CLEARED': 'status' in fact && fact.status==='AWAITING_OPERATIONAL_DATA'?'ACTIVE':'CANNOT_VERIFY';
     else if ('evidenceComplete' in fact && fact.evidenceComplete) result=fact.active?'ACTIVE':'CONDITION_CLEARED';
