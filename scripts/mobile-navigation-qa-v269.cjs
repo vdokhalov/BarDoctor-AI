@@ -143,6 +143,10 @@ function businessHealthEnvelope(venueId) {
     dataQuality: { percent: 91, level: "high", label: "Качество данных: высокое", status: "healthy", statusLabel: "Хорошо", gaps: ["Отзывы ещё не подключены"] },
     explanation: "Операции требуют внимания", source: "server_business_intelligence",
   };
+  const top = { ...snapshot.priorityAction, managementId: "stock-review-mobile-qa", priority: "important", fact: primaryFactor.evidence, consequence: "Аномалии остатков останутся непроверенными.", whyNow: "Текущий подтверждённый stock signal." };
+  snapshot.managementTopActions = [top];
+  snapshot.managementQueue = [top];
+  snapshot.managementCoverage = { tasks: "AVAILABLE", cost: "AVAILABLE" };
   return {
     data: {
       businessHealthSnapshot: snapshot,
@@ -174,6 +178,8 @@ function freshBusinessHealthEnvelope(venueId, healthy = false) {
     snapshot.score = 90;
     snapshot.status = "healthy";
     snapshot.priorityAction = null;
+    snapshot.managementTopActions = [];
+    snapshot.managementQueue = [];
     snapshot.zones.find((zone) => zone.id === "operations").score = 90;
     snapshot.zones.find((zone) => zone.id === "operations").status = "healthy";
     snapshot.zones.find((zone) => zone.id === "operations").statusLabel = "Хорошо";
@@ -1116,15 +1122,16 @@ async function homeReviewsFlow(browser, profile) {
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
-  const attention = page.locator('[data-bd-home-attention="universal-v198"]');
+  const attention = page.locator('.bd-management-queue[data-management-venue="901"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
+  await attention.locator('li').first().waitFor({ timeout: 10_000 });
   assert.deepEqual(state.homeReviewResponses, [200], `${profile.name}: Home Reviews requested protected data before auth bootstrap was ready`);
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',
       '[data-bd-home-money="result-v151"]',
       '[data-bd-home-reviews="ready-v409"]',
-      '[data-bd-home-attention="universal-v198"]',
+      '.bd-management-queue[data-management-venue="901"]',
     ];
     const rects = selectors.map((selector) => document.querySelector(selector)?.getBoundingClientRect()).map((rect) => rect ? ({ top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width }) : null);
     const nav = document.querySelector("[data-bd-primary-navigation]");
@@ -1151,7 +1158,9 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await health.textContent(), /83/);
   assert.match(await finance.textContent(), /Финансовый результат/);
   assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
-  assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
+  assert.match(await attention.textContent(), /Что сделать первым.*Проверить 6 аномалий остатков/s);
+  assert.equal(await attention.locator('li').first().getAttribute('data-management-id'), 'stock-review-mobile-qa', `${profile.name}: Home must use the canonical fixture priority`);
+  assert.equal(await page.locator('[data-bd-home-attention="universal-v198"]').count(), 0, `${profile.name}: Home must not rank review data independently`);
   await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
