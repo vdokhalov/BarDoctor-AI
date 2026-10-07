@@ -58,7 +58,14 @@ try{for(const width of [390,820,1280]){
  try{
   const authoritative={health:(await r.readHealth()).data.businessHealthSnapshot,answers:Object.fromEntries(await Promise.all(CURATED_QUESTIONS.map(async q=>[q.id,await r.ask(q.id)])))};
   writeFileSync(out+'/'+width+'-authoritative.json',JSON.stringify(authoritative,null,2));
-  for(const route of ['home','health']){await visit(base+'/'+route);await page.locator('.bd-management-queue [data-management-id]').first().waitFor({timeout:30000});await capture(route);}
+  for(const route of ['home','health']){await visit(base+'/'+route);await page.locator('.bd-management-queue [data-management-id]').first().waitFor({timeout:30000});await capture(route);
+   if(route==='home'&&process.env.BD_REFERENCE_BASELINE!=='1')assert.deepEqual(await page.locator('.bd-score-ring').evaluate(async ring=>{
+    const fill=ring.querySelector('.bd-score-fill')!,style=(ring as HTMLElement).style,offset=style.getPropertyValue('--bd-score-offset');
+    style.setProperty('--bd-score-offset','42');await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    const result={animations:fill.getAnimations().length,offset:parseFloat(getComputedStyle(fill).strokeDashoffset)};
+    style.setProperty('--bd-score-offset',offset);return result;
+   }),{animations:0,offset:42},'Score changes after first appearance must render immediately without replay');
+  }
   await visit(base+'/analysis?venueId='+r.venueId);
   await page.locator('[data-curated-question=stock]').waitFor({timeout:30000});assert.equal(await page.locator('[data-curated-question]').count(),7);await capture('doctor-before');
   await page.locator('[data-curated-question=stock]').click();await page.locator('[data-curated-answer=stock]').waitFor();await capture('doctor-after');
@@ -68,7 +75,7 @@ try{for(const width of [390,820,1280]){
    assert.ok((await page.locator('.bd-doctor-heading').boundingBox())!.y<150);
    await page.getByRole('button',{name:'Другой вопрос',exact:true}).click();assert.equal(await page.locator('[data-curated-question]').count(),7);
    await page.locator('[data-curated-question=attention]').focus();await page.keyboard.press('Tab');assert.ok(await page.locator('[data-curated-question]:focus').evaluate(e=>getComputedStyle(e).outlineStyle!=='none'));
-   await page.emulateMedia({reducedMotion:'reduce'});await visit(base+'/home');await page.locator('.bd-score-ring[data-score-shown=true]').waitFor();await page.locator('.bd-score-fill').waitFor();assert.equal(await page.locator('.bd-score-fill').evaluate(e=>getComputedStyle(e).transitionDuration),'0s');await visit(base+'/analysis?venueId='+r.venueId);await page.locator('[data-curated-question=stock]').waitFor();
+   await page.emulateMedia({reducedMotion:'reduce'});await visit(base+'/home');await page.locator('.bd-score-ring[data-score-shown=true]').waitFor();await page.locator('.bd-score-fill').waitFor();assert.equal(await page.locator('.bd-score-fill').evaluate(e=>getComputedStyle(e).transitionDuration),'0s');assert.equal(await page.locator('.bd-score-fill').evaluate(e=>e.getAnimations().length),0);await visit(base+'/analysis?venueId='+r.venueId);await page.locator('[data-curated-question=stock]').waitFor();
    // A separately isolated partial-stock scenario proves honest action absence.
    r.seed('bd_opening_stock_v1',[]);r.seed('bd_inventory_snapshots',[]);await page.evaluate(()=>window.dispatchEvent(new CustomEvent('bd:store-updated')));
    await page.locator('[data-curated-question=stock]').click();await page.locator('[data-curated-answer=stock]').waitFor();
