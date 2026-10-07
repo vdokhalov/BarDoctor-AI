@@ -1337,7 +1337,7 @@ async function businessHealthColdStartFlow(browser, profile) {
   run.state.healthMode = "healthy";
   await page.reload({ waitUntil: "networkidle" });
   await home.waitFor({ timeout: 10_000 });
-  await home.getByRole("button", { name: /Открыть полный Business Health/ }).click();
+  await page.locator(".bd-reference-home").getByRole("button", { name: "Подробнее →", exact: true }).click();
   await detail.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/health", `${profile.name}: Home detail CTA is dead`);
   await page.goBack({ waitUntil: "networkidle" });
