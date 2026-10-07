@@ -48,6 +48,7 @@ p.bd-status-warning{background:transparent;font-weight:500}
 .bd-status-critical{color:var(--bd-critical);background:#fff0f0}
 .bd-status-neutral{color:#354a75;background:#edf2fc}
 .bd-reference-page-heading{margin-bottom:24px}.bd-reference-page-heading p{margin:0 0 8px}
+.bd-reference-home .bd-reference-page-heading h2{font-size:28px;font-weight:600;line-height:1.2}
 .bd-reference-home-grid{display:grid;gap:16px}
 .bd-reference-home .bd-home-management-phase4a{margin:0;padding:0;border:0;background:transparent;box-shadow:none;border-radius:0;font-size:16px;line-height:1.5}
 .bd-reference-queue{margin:0;border-top:1px solid var(--bd-divider);padding-top:16px}

@@ -18,7 +18,9 @@ async function registration(page: Page, email: string) {
     await page.locator('input[type=email]').fill(email);
     await page.getByPlaceholder('Минимум 6 символов').fill(password);
     await page.getByPlaceholder('Повторите пароль').fill(password);
-    await page.getByRole('checkbox').click();
+    // The consent control contains separate Terms/Privacy links; click its checkbox, not the row center.
+    await page.getByRole('checkbox').locator('.bd-auth-checkbox').click();
+    assert.equal(await page.getByRole('checkbox').isChecked(), true);
     await page.getByRole('button', { name: 'Создать аккаунт', exact: true }).click();
     await page.waitForURL('**/setup*', { timeout: 10000 });
     page.off('dialog', dismissRegistrationDialog);
@@ -67,7 +69,8 @@ try {
     for (const width of (process.env.BD_SETUP_WIDTHS ? process.env.BD_SETUP_WIDTHS.split(',').map(Number) : [1280, 390, 412])) {
         const context = await browser.newContext({ viewport: { width, height: 850 }, isMobile: width < 600, hasTouch: width < 600 });
         const page = await context.newPage(), errors: string[] = [];
-        page.on('pageerror', e => errors.push(e.message));
+        page.on('pageerror', e => { errors.push(e.message); console.error('SETUP PAGE ERROR',e.message); });
+        page.on('console',m=>{if(m.type()==='error'&&/TypeError|Cannot read|React|Error boundary/.test(m.text()))console.error('SETUP CONSOLE ERROR',m.text());});
         console.log('Setup viewport', width);
         const email = 'setup-' + width + '@isolated.test', name = 'Мастер ' + width;
         await registration(page, email);
@@ -268,6 +271,7 @@ catch (error) {
     for (const context of browser.contexts())
         for (const page of context.pages()) {
             console.error('FAILURE', page.url(), (await page.locator('body').innerText()).slice(0, 3500));
+            console.error('HOME VISIBILITY',JSON.stringify(await page.locator('[data-bd-home-page]').evaluateAll(es=>es.map(e=>{const ancestors=[];for(let p:Element|null=e;p;p=p.parentElement){const s=getComputedStyle(p);ancestors.push({tag:p.tagName,classes:p.className,visibility:s.visibility,display:s.display,opacity:s.opacity,attributes:Object.fromEntries([...p.attributes].filter(a=>a.name.startsWith('data-bd')).map(a=>[a.name,a.value]))});}return {ancestors,rect:e.getBoundingClientRect().toJSON(),html:e.innerHTML.slice(0,2400),children:[...e.children].map(c=>({tag:c.tagName,classes:c.className,display:getComputedStyle(c).display,rect:c.getBoundingClientRect().toJSON()}))};}))));
             await page.screenshot({ path: out + '/failure.png' });
         }
     console.error('Recent HTTP', server.requests.slice(-25));

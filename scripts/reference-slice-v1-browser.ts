@@ -66,6 +66,17 @@ try{for(const width of [390,820,1280]){
     style.setProperty('--bd-score-offset',offset);return result;
    }),{animations:0,offset:42},'Score changes after first appearance must render immediately without replay');
   }
+  if(process.env.BD_REFERENCE_BASELINE!=='1'){
+   await visit(base+'/home');await page.locator('.bd-management-queue [data-management-id]').first().waitFor();
+   // Exercise the existing shell's real legacy-title heuristic around a close control.
+   // The canonical shell owns h1; a scoped visual heading must not hide the Home composite.
+   await page.locator('.bd-reference-page-heading').evaluate(heading=>{const close=document.createElement('button');close.type='button';close.setAttribute('aria-label','Закрыть тестовую панель');close.setAttribute('data-qa-header-probe','');heading.appendChild(close);});
+   await page.evaluate(()=>window.dispatchEvent(new Event('bd:navigation-change')));
+   await page.locator('.bd-reference-home').waitFor({state:'visible'});
+   assert.equal(await page.locator('.bd-reference-home').getAttribute('data-bd-legacy-header'),null,'Existing shell must not classify the complete Home as a legacy title row');
+   for(const selector of ['.bd-home-financial-details','.bd-reference-home-extras','.bd-reference-home-details'])await page.locator(selector).waitFor({state:'visible'});
+   await page.locator('[data-qa-header-probe]').evaluate(element=>element.remove());
+  }
   await visit(base+'/analysis?venueId='+r.venueId);
   await page.locator('[data-curated-question=stock]').waitFor({timeout:30000});assert.equal(await page.locator('[data-curated-question]').count(),7);await capture('doctor-before');
   await page.locator('[data-curated-question=stock]').click();await page.locator('[data-curated-answer=stock]').waitFor();await capture('doctor-after');
