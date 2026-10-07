@@ -9,6 +9,8 @@ Only Home, Business Health and the existing seven-question Curated Doctor interf
 
 Doctor keeps the `Сейчас` and `Операции` groups and all seven question contracts. Selecting a question replaces the list with its answer and moves scroll/focus to its beginning. Conclusion and confirmed action (or explicit absence) precede facts, the first limitation, expandable complete limitations, sources/freshness and return. Home/Health return origin is retained under the existing actor, venue and expiry guards. There is no free-form input or new answer generator.
 
+The existing source/permission refusal remains visible as an alert in both the question list and answer view. The restricted-manager browser regression checks all seven questions before selection, list replacement afterwards, and the absence of facts/actions in both states.
+
 ## Foundation and semantics
 
 A small React factory supplies the shared activity/dialogue identity, score, action treatment and three presentation adapters. Doctor imports only the identity factory, avoiding a duplicate Home implementation in its bundle. Scoped CSS uses the V1.2 type weights (400/500/600/700), sizes, spacing and restrained purple treatment. Lucide SVG assets include their license. The existing prepared-client migration pipeline remains reversible and repeatable; no architecture rewrite or second design system is introduced.

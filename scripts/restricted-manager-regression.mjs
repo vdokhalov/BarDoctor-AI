@@ -65,7 +65,14 @@ try{
    if(path==='/sales-import')await page.frameLocator('iframe[title="Продажи и склад"]').locator('#journal-count').filter({hasText:'документов'}).waitFor();
    if(role==='manager'){
     const body=await page.locator('body').innerText();assert.ok(!body.includes('FINANCE PRIVATE SENTINEL'));assert.ok(!body.replace(/\s/g,'').includes('98765'));
-    if(path==='/analysis'){assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);}
+    if(path==='/analysis'){
+     assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
+     assert.equal(await page.locator('[data-curated-question]').count(),7);
+     await page.locator('[data-curated-question="stock"]').click();await settled(page);
+     assert.equal(await page.locator('[data-curated-question]').count(),0);
+     assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.equal(await page.locator('[data-curated-action]').count(),0);
+     assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
+    }
    }
    assert.deepEqual(errors,[],role+' '+path);paths.push(path);
   }
