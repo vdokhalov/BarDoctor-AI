@@ -25,7 +25,7 @@ try{for(const width of [390,820,1280]){
   if(url.pathname==="/api/shifts/close")writeFileSync(out+"/"+width+"-day-save.json",JSON.stringify({request:JSON.parse(body.toString()),status:response.status,response:await response.clone().json()},null,2));res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch(error){console.error(error);res.writeHead(500);res.end('isolated QA failure')}});
  await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
- const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1180:800},isMobile:width===390,hasTouch:width===390});
+ const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1024:900},isMobile:width===390,hasTouch:width===390});
  await context.addInitScript(({user,venue})=>{if(!/^https?:$/.test(location.protocol))return;localStorage.setItem('bd_session',user.email);localStorage.setItem('bd_session_token',user.token);localStorage.setItem('bd_active_venue_id',String(venue));(window as unknown as Record<string,unknown>).__bdDisableCostManagementPhase4a=true;},{user:r.user,venue:r.venueId});
  const page=await context.newPage(),errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await page.clock.setFixedTime(new Date('2026-10-03T12:00:00Z'));
  const capture=async(label:string)=>{const dimensions=await page.evaluate(()=>({width:innerWidth,client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));assert.ok(dimensions.scroll<=dimensions.client+1,JSON.stringify(dimensions));await page.screenshot({path:`${out}/${width}-${label}.png`,fullPage:true});};
@@ -47,6 +47,6 @@ try{for(const width of [390,820,1280]){
   const stock=(await r.readHealth()).data.businessHealthSnapshot.managementQueue.find(row=>row.issueKey==='stock')!;const created=await api('/api/inventory/counts',{venueId:r.venueId,action:'create',date:'2026-10-03',scope:{type:'all'}}) as {inventory:{id:string;items:Record<string,unknown>[]}};
   await api('/api/inventory/counts',{venueId:r.venueId,action:'save',id:created.inventory.id,items:created.inventory.items.map(row=>({...row,actual:8}))});assert.equal((await r.verifyAction(String(stock.managementId))).verification.result,'ACTIVE');
   await api('/api/inventory/counts',{venueId:r.venueId,action:'finalize',id:created.inventory.id});await page.waitForURL(url=>url.pathname==='/health');await page.locator('[data-management-verification=CONDITION_CLEARED]').waitFor();await capture('stock-verified');
-  assert.deepEqual(errors,[]);results.push({width,height:width===390?844:width===820?1180:800,status:'PASS',ownerUAT:false});
+  assert.deepEqual(errors,[]);results.push({width,height:width===390?844:width===820?1024:900,status:'PASS',ownerUAT:false});
  }catch(error){await capture("failure");writeFileSync(out+"/"+width+"-failure-verify.json",JSON.stringify(await r.verifyAction("health:"+r.venueId+":day:2026-10-02"),null,2));throw error;}finally{await context.close();await new Promise<void>(done=>server.close(()=>done()));r.close()}
 }}finally{await browser.close();writeFileSync(out+'/results.json',JSON.stringify(results,null,2))}

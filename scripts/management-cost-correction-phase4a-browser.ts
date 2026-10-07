@@ -38,11 +38,11 @@ const server=createServer(async(req,res)=>{
 await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));
 const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
 const browser=await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:['--no-sandbox','--disable-setuid-sandbox']});
-const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1180:720},isMobile:width===390,hasTouch:width!==1280,locale:'ru-RU'});
+const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1024:900},isMobile:width===390,hasTouch:width!==1280,locale:'ru-RU'});
 await context.addInitScript(({owner,venueId}:{owner:{email:string;token:string};venueId:number})=>{if(!/^https?:$/.test(location.protocol))return;localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);if(!localStorage.getItem('bd_active_venue_id'))localStorage.setItem('bd_active_venue_id',String(venueId));},{owner:r.owner,venueId:r.venueId});
 const page=await context.newPage();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));const capture=async(label:string)=>{const dimensions=await page.evaluate(()=>({innerWidth,innerHeight,clientWidth:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth}));assert.equal(dimensions.innerWidth,width);assert.ok(dimensions.scrollWidth<=dimensions.clientWidth+1,JSON.stringify({label,...dimensions}));await page.screenshot({path:out+'/'+width+'-'+label+'.png',fullPage:true});writeFileSync(out+'/'+width+'-'+label+'.json',JSON.stringify(dimensions));};
 try{
- await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));await page.goto(base+'/home');const home=page.locator('[data-cost-surface]');await home.locator('[data-cost-primary-action]').waitFor({timeout:30000});
+ await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));await page.goto(base+'/home');await page.locator('.bd-reference-home-details').waitFor({state:'visible'});const home=page.locator('[data-cost-surface]');await home.locator('[data-cost-primary-action]').waitFor({timeout:30000});
  const id=await home.locator('[data-signal-id]').first().getAttribute('data-signal-id');assert.ok(id);const readEpisode=async()=>((await(await r.detail(id)).json()) as {episode:CostEpisodeV1}).episode;
  await home.locator('[data-cost-primary-action]').click();
  const dialog=page.locator('[role="dialog"]').last();await dialog.waitFor();
@@ -101,12 +101,12 @@ try{
  if(width===1280){
   for(let attempt=0;attempt<100&&!releasePurchaseResponse;attempt++)await new Promise(done=>setTimeout(done,20));assert.ok(releasePurchaseResponse);
   await page.goBack();await page.waitForURL(url=>url.pathname==='/health');await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'Correction QA B'}).click();await page.waitForFunction(id=>Number(localStorage.getItem('bd_active_venue_id'))===id,secondVenue);
-  holdPurchaseResponse=false;(releasePurchaseResponse as (()=>void)|null)?.();await page.goto(base+'/home');await page.locator('[data-cost-surface][data-cost-venue="'+secondVenue+'"] .bd-cost-signal').first().waitFor();assert.equal(await page.locator('.bd-cost-result').count(),0);assert.equal(await page.getByText(fixture.ingredientName,{exact:true}).count(),0);await capture('purchase-response-venue-race');
-  await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'Isolated QA — работающее заведение'}).click();await page.waitForFunction(id=>Number(localStorage.getItem('bd_active_venue_id'))===id,r.venueId);await page.goto(base+'/health?venueId='+r.venueId+'&signalId='+encodeURIComponent(id)+'&section=management');
+  holdPurchaseResponse=false;(releasePurchaseResponse as (()=>void)|null)?.();await page.waitForLoadState('networkidle');await page.goto(base+'/home');await page.locator('.bd-reference-home-details').waitFor({state:'visible'});await page.locator('[data-cost-surface][data-cost-venue="'+secondVenue+'"] .bd-cost-signal').first().waitFor();assert.equal(await page.locator('.bd-cost-result').count(),0);assert.equal(await page.getByText(fixture.ingredientName,{exact:true}).count(),0);await capture('purchase-response-venue-race');
+  await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'Isolated QA — работающее заведение'}).click();await page.waitForFunction(id=>Number(localStorage.getItem('bd_active_venue_id'))===id,r.venueId);await page.waitForURL(url=>url.pathname==='/home');await page.waitForLoadState('networkidle');await page.goto(base+'/health?venueId='+r.venueId+'&signalId='+encodeURIComponent(id)+'&section=management');
  }
  if(width===820){
   await page.waitForURL(url=>url.pathname==='/health');await page.getByRole('alert').filter({hasText:'QA: серверная проверка временно недоступна'}).waitFor();assert.equal((await readEpisode()).condition,'ACTIVE');assert.equal((await readEpisode()).verificationResult,null);assert.equal(await page.locator('.bd-cost-result').count(),0);
-  await capture('verification-unavailable');await page.unroute('**/api/management/cost-signals/**');await page.getByRole('button',{name:'Обновить',exact:true}).first().click();
+  await capture('verification-unavailable');await page.unroute('**/api/management/cost-signals/**');await page.locator('[data-cost-surface=health]').getByRole('button',{name:'Обновить',exact:true}).click();
  }
  await page.waitForURL(url=>url.pathname==='/health');await page.getByRole('heading',{name:'Проверено: себестоимость рассчитана',exact:true}).first().waitFor({timeout:30000});
  const verified=await readEpisode();assert.ok(verified.verificationResult);assert.equal(verified.verificationResult.after.value,fixture.expectedCost);assert.equal(verified.verificationResult.before.value,null);

@@ -35,9 +35,9 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   if(url.pathname==="/api/shifts/close")writeFileSync(out+"/"+width+"-day-save.json",JSON.stringify({request:JSON.parse(body.toString()),status:response.status,response:await response.clone().json()},null,2));res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
  }catch(error){console.error(error);res.writeHead(500);res.end('isolated QA failure')}});
  await new Promise<void>(done=>server.listen(0,'127.0.0.1',done));const base=`http://127.0.0.1:${(server.address() as {port:number}).port}`;
- const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1180:800},isMobile:width===390,hasTouch:width===390});
+ const context=await browser.newContext({viewport:{width,height:width===390?844:width===820?1024:900},isMobile:width===390,hasTouch:width===390});
  await context.addInitScript(({user,venue})=>{if(!/^https?:$/.test(location.protocol))return;localStorage.setItem('bd_session',user.email);localStorage.setItem('bd_session_token',user.token);if(!localStorage.getItem('bd_active_venue_id'))localStorage.setItem('bd_active_venue_id',String(venue));},{user:r.user,venue:r.venueId});
- const page=await context.newPage(),errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('response',response=>{if(response.status()>=500)errors.push('HTTP '+response.status()+' '+new URL(response.url()).pathname)});await page.clock.setFixedTime(new Date('2026-10-03T12:00:00Z'));
+ const page=await context.newPage(),errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));page.on('response',response=>{if(response.status()>=500)errors.push('HTTP '+response.status()+' '+new URL(response.url()).pathname)});await page.clock.install({time:new Date('2026-10-03T12:00:00Z')}); // Let toast exit animations advance while retaining the QA business date.
  const capture=async(label:string)=>{const dimensions=await page.evaluate(()=>({width:innerWidth,client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));assert.ok(dimensions.scroll<=dimensions.client+1,JSON.stringify(dimensions));await page.screenshot({path:`${out}/${width}-${label}.png`,fullPage:true});};
  const stage=async(label:string)=>{const health=await r.readHealth(),attention=await r.ask('attention'),next=await r.ask('next');writeFileSync(out+'/'+width+'-'+label+'-state.json',JSON.stringify({health,attention,next,cost:await r.ask('cost'),stock:await r.ask('stock'),shifts:await r.ask('shifts'),expenses:await r.ask('expenses')},null,2));};
  const api=async(path:string,body:object,method='POST')=>page.evaluate(async({path,body,method})=>{const response=await fetch(path,{method,headers:{'Content-Type':'application/json','X-Session-Email':localStorage.getItem('bd_session')!,'X-Session-Token':localStorage.getItem('bd_session_token')!,'X-Venue-Id':localStorage.getItem('bd_active_venue_id')!},body:JSON.stringify(body)});if(!response.ok)throw Error(await response.text());window.dispatchEvent(new CustomEvent('bd:store-updated'));return response.json()},{path,body,method});
@@ -49,6 +49,7 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
    await page.waitForLoadState('networkidle');await page.goto(base+'/home');await page.locator('.bd-management-queue li').first().waitFor();
    assert.equal(await page.locator('.bd-management-queue li').first().getAttribute('data-management-id'),attention.facts[0].id);
    assert.equal(await page.locator('[data-bd-home-attention]').count(),0);
+   await page.locator('.bd-home-financial-details').waitFor({state:'visible'});assert.equal(await page.locator('.bd-home-financial-details').evaluate(e=>e.tagName==='DETAILS'&&!e.hasAttribute('open')),false,'Legacy Finance must be open by default');
    const compare=await page.locator('.bd-home-money-compare').innerText();assert.ok(!compare.includes('%'),compare);
    if(label==='initial'){assert.equal(await page.locator('.bd-home-money-value').innerText(),'Нет расчёта');assert.equal((await r.ask('expenses')).facts.find(f=>f.id==='registered-payroll')?.kind,'UNKNOWN');}
    await capture('home-'+label);
@@ -57,10 +58,12 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   await assertHome('initial');
   await page.waitForLoadState('networkidle');await page.goto(base+'/analysis?venueId='+r.venueId+'&doctorQuestion=attention');
   const panel=page.locator('.bd-curated-doctor');await panel.locator('[data-curated-answer=attention]').waitFor({timeout:30000});
+  await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();
   assert.equal(await panel.locator('[data-curated-question]').count(),7);assert.equal(await panel.locator('input,textarea').count(),0);
+  const chooseQuestion=async(id:string)=>{if(await panel.locator('[data-curated-answer]').count())await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();await panel.locator(`[data-curated-question=${id}]`).click();};
   const examples:Record<string,CuratedAnswer>={};
   for(const question of CURATED_QUESTIONS){
-   await panel.locator(`[data-curated-question=${question.id}]`).click();await panel.locator(`[data-curated-answer=${question.id}]`).waitFor();
+   await chooseQuestion(question.id);await panel.locator(`[data-curated-answer=${question.id}]`).waitFor();
    const a=await r.ask(question.id);examples[question.id]=a;
    assert.deepEqual(await panel.locator('[data-curated-fact]').evaluateAll(rows=>rows.map(row=>row.getAttribute('data-curated-fact'))),a.facts.map(f=>f.id));
    for(const fact of a.facts)assert.equal(await panel.locator('[data-curated-fact]').filter({has:page.locator('strong',{hasText:fact.label})}).first().getAttribute('data-curated-kind'),fact.kind);
@@ -70,16 +73,16 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   assert.deepEqual(examples.attention.facts.map(f=>f.id),examples.attention.canonicalPriorityIds);assert.equal(examples.next.facts[0].id,examples.attention.facts[0].id);
   // All canonical CTAs preserve the question, including cost details and the critical task.
   for(const question of ['attention','next','tasks','cost'] as const){
-   await panel.locator(`[data-curated-question=${question}]`).click();await panel.locator(`[data-curated-answer=${question}]`).waitFor();const before=await r.ask(question);const action=before.nextActions[0];assert.ok(action);
+   await chooseQuestion(question);await panel.locator(`[data-curated-answer=${question}]`).waitFor();const before=await r.ask(question);const action=before.nextActions[0];assert.ok(action);
    await panel.locator('[data-curated-action]').first().click();await page.waitForURL(url=>url.pathname===new URL(action.path,base).pathname);
    if(question==='cost'){await page.locator('[data-cost-surface=health]').getByRole('button',{name:'Открыть техкарту',exact:true}).waitFor();assert.equal(new URL(page.url()).searchParams.get('signalId'),new URL(action.path,base).searchParams.get('signalId'));}
-   await capture('action-'+question);writeFileSync(out+'/'+width+'-action-'+question+'-dom.txt',await page.locator('body').innerText());await page.goBack();await panel.locator(`[data-curated-answer=${question}]`).waitFor();await panel.locator('[data-curated-action]').first().click();await page.waitForURL(url=>url.pathname===new URL(action.path,base).pathname);
+   await capture('action-'+question);writeFileSync(out+'/'+width+'-action-'+question+'-dom.txt',await page.locator('body').innerText());await page.waitForLoadState('networkidle');await page.goBack();await panel.locator(`[data-curated-answer=${question}]`).waitFor();await panel.locator('[data-curated-action]').first().click();await page.waitForURL(url=>url.pathname===new URL(action.path,base).pathname);
    await page.getByRole('button',{name:'Вернуться к вопросу Doctor →',exact:true}).click();await panel.locator(`[data-curated-answer=${question}]`).waitFor();assert.deepEqual((await r.ask(question)).facts,before.facts);
   }
   // Expenses have an existing destination and a scoped return, without a fabricated verification signal.
-  await panel.locator('[data-curated-question=expenses]').click();await panel.locator('[data-curated-answer=expenses]').waitFor();await panel.getByRole('button',{name:'Открыть зарегистрированные расходы →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/finance');
+  await chooseQuestion('expenses');await panel.locator('[data-curated-answer=expenses]').waitFor();await panel.getByRole('button',{name:'Открыть зарегистрированные расходы →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/finance');
   await page.getByRole('button',{name:'Вернуться к вопросу Doctor →',exact:true}).click();await panel.locator('[data-curated-answer=expenses]').waitFor();
-  await panel.locator('[data-curated-question=next]').click();await panel.locator('[data-curated-answer=next]').waitFor();
+  await chooseQuestion('next');await panel.locator('[data-curated-answer=next]').waitFor();
   const taskTarget=(await r.ask('next')).nextActions[0];const taskId=new URL(taskTarget.path,base).searchParams.get('taskId');assert.ok(taskId);
   await panel.locator('[data-curated-action]').first().click();await page.waitForURL(u=>u.pathname==='/tasks');await page.getByText('Проверить безопасное состояние',{exact:true}).waitFor();
   assert.equal(new URL(page.url()).searchParams.get('taskId'),taskId);await capture('overdue-task-visible');
@@ -97,14 +100,14 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   await assertHome('next-after-task');await page.waitForLoadState('networkidle');await page.goto(base+'/analysis?venueId='+r.venueId+'&doctorQuestion=shifts');await panel.locator('[data-curated-answer=shifts]').waitFor();
   await stage('before-corrections');
   // Day correction uses the Phase 4B editor/writer and authoritative verification, then returns to this question.
-  await panel.locator('[data-curated-question=shifts]').click();await panel.locator('[data-curated-answer=shifts]').waitFor();await panel.getByRole('button',{name:'Заполнить отчёт дня →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/shifts');
+  await chooseQuestion('shifts');await panel.locator('[data-curated-answer=shifts]').waitFor();await panel.getByRole('button',{name:'Заполнить отчёт дня →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/shifts');
   const id='health:'+r.venueId+':day:2026-10-02';assert.equal((await r.verifyAction(id)).verification.result,'ACTIVE');await page.locator('[data-bd-shift-closing]').waitFor();await capture('day-editor');await stage('day-open-only');
   const editor=page.locator('[data-bd-shift-closing]');for(let step=0;step<4;step++){if(step===1)await editor.getByRole('button',{name:/QA Бариста/}).click();await editor.getByRole('button',{name:'Далее',exact:true}).click();}await editor.getByRole('button',{name:/Сохранить|Закрыть смену/}).filter({visible:true}).click();
   await page.waitForURL(url=>url.pathname==='/health'&&url.searchParams.get('checkedAction')===id,{timeout:30000});await page.locator('[data-management-verification=CONDITION_CLEARED]').waitFor();await capture('day-verified');await stage('day-authoritatively-saved');
   await page.getByRole('button',{name:'Вернуться к вопросу Doctor →',exact:true}).click();await panel.locator('[data-curated-answer=shifts]').waitFor();assert.equal((await r.ask('shifts')).facts[0].status,'COMPLETE');await page.waitForLoadState('networkidle');await page.reload();await panel.locator('[data-curated-answer=shifts]').waitFor();await stage('day-reload');
   // A saved inventory draft is not verified; only finalization changes the authoritative stock fact.
-  await panel.locator('[data-curated-question=stock]').click();await panel.locator('[data-curated-answer=stock]').waitFor();const stock=(await r.ask('stock')).facts[0];await panel.getByRole('button',{name:'Проверить эту позицию →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/warehouse');await page.locator('.bd-warehouse-product-sheet').waitFor();await capture('stock-context');writeFileSync(out+'/'+width+'-stock-context-dom.txt',await page.locator('body').innerText());
-  const stockActionUrl=page.url();await page.goBack();await panel.locator('[data-curated-answer=stock]').waitFor();await page.locator('.bd-warehouse-product-sheet').waitFor({state:'hidden'});await page.goForward();await page.waitForURL(u=>u.pathname==='/warehouse'&&u.searchParams.has('product'));await page.locator('.bd-warehouse-product-sheet').waitFor();
+  await chooseQuestion('stock');await panel.locator('[data-curated-answer=stock]').waitFor();const stock=(await r.ask('stock')).facts[0];await panel.getByRole('button',{name:'Проверить эту позицию →',exact:true}).click();await page.waitForURL(url=>url.pathname==='/warehouse');await page.locator('.bd-warehouse-product-sheet').waitFor();await capture('stock-context');writeFileSync(out+'/'+width+'-stock-context-dom.txt',await page.locator('body').innerText());
+  const stockActionUrl=page.url();await page.waitForLoadState('networkidle');await page.goBack();await panel.locator('[data-curated-answer=stock]').waitFor();await page.locator('.bd-warehouse-product-sheet').waitFor({state:'hidden'});await page.waitForLoadState('networkidle');await page.goForward();await page.waitForURL(u=>u.pathname==='/warehouse'&&u.searchParams.has('product'));await page.locator('.bd-warehouse-product-sheet').waitFor();
   await page.waitForLoadState('networkidle');await page.locator('.bd-warehouse-product-sheet').getByRole('button',{name:'Закрыть карточку товара',exact:true}).click();
   await page.locator('.bd-warehouse-product-sheet').waitFor({state:'hidden'});
   assert.equal(new URL(page.url()).searchParams.get('healthAction'),stock.id);assert.equal(new URL(page.url()).searchParams.has('product'),false);
@@ -124,7 +127,7 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   await stage('stock-reload');
 
   // The same working QA venue: correct the tracked UNKNOWN-cost position using the real purchase UI.
-  await panel.locator('[data-curated-question=cost]').click();await panel.locator('[data-curated-answer=cost]').waitFor();
+  await chooseQuestion('cost');await panel.locator('[data-curated-answer=cost]').waitFor();
   const costBefore=await r.ask('cost');assert.equal(costBefore.facts[0].kind,'UNKNOWN');await stage('cost-before-correction');
   await panel.locator('[data-curated-action]').first().click();await page.waitForURL(url=>url.pathname==='/health'&&url.searchParams.has('signalId'));const costId=new URL(page.url()).searchParams.get('signalId')!;
   await page.getByRole('button',{name:'Добавить закупку',exact:true}).first().waitFor();await capture('cost-signal-before-purchase');
@@ -144,13 +147,13 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   await page.waitForLoadState('networkidle');await page.goto(base+'/health');await page.locator('.bd-management-queue li').first().waitFor();await capture('all-three-corrections-health');await page.waitForLoadState('networkidle');await page.goto(base+'/home');await page.locator('[data-bd-home-health-index]').waitFor();await capture('all-three-corrections-home');
   // A second operating venue has independent source identity. Old action URLs
   // must not resurrect a foreign product sheet after an actual venue switch.
-  await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'QA B — отдельная кофейня'}).click();await page.waitForFunction(v=>Number(localStorage.getItem('bd_active_venue_id'))===v,bVenue);
+  await page.waitForLoadState('networkidle');await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'QA B — отдельная кофейня'}).click();await page.waitForFunction(v=>Number(localStorage.getItem('bd_active_venue_id'))===v,bVenue);
   await page.waitForLoadState('networkidle');await page.goto(stockActionUrl);await page.locator('[data-management-context]').waitFor();assert.equal(await page.locator('.bd-warehouse-product-sheet').count(),0);assert.ok((await page.locator('[data-management-context]').innerText()).includes('Контекст другого заведения'));
   const foreign=await r.api.verifyAction.GET(r.requestAction('/api/business-health/verify?actionId='+encodeURIComponent(stock.id),'GET',undefined,r.user,bVenue));assert.equal(foreign.status,404);await capture('stale-stock-context-after-venue-switch');
-  await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'QA Phase 4C — работающая кофейня'}).click();await page.waitForFunction(v=>Number(localStorage.getItem('bd_active_venue_id'))===v,r.venueId);await assertHome('venue-return');
+  await page.waitForLoadState('networkidle');await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'QA Phase 4C — работающая кофейня'}).click();await page.waitForFunction(v=>Number(localStorage.getItem('bd_active_venue_id'))===v,r.venueId);await assertHome('venue-return');
   // Every question uses server scope. A stale deep link after switching to another venue cannot leak the original facts.
   const other=await r.register('other-doctor-'+width+'@isolated.test');const response=await r.api.curated.GET(r.requestAction('/api/ai/curated?question=attention','GET',undefined,other,r.venueId),{params:Promise.resolve({action:'curated'})} as never);assert.equal(response.status,401);
-  assert.deepEqual(errors,[]);results.push({width,height:width===390?844:width===820?1180:800,browser:engine,status:'PASS',questions:7,dayVerified:true,stockVerified:true,expensesReturn:true,canonicalEqual:true,taskVisible:true,taskVerifiedOutcome:true,inventoryUi:true,stockStableAfterUnrelatedPurchase:true,financialUnknownHonest:true,staleStockVenueSwitch:true,ownerUAT:false});
- }catch(error){await capture('failure');writeFileSync(out+'/'+width+'-failure.txt',String(error));writeFileSync(out+'/'+width+'-failure-dom.txt',await page.locator('body').innerText());await stage('failure-authoritative');throw error;}finally{await context.close();await new Promise<void>(done=>server.close(()=>done()));r.close()}
+  assert.deepEqual(errors,[]);results.push({width,height:width===390?844:width===820?1024:900,browser:engine,status:'PASS',questions:7,dayVerified:true,stockVerified:true,expensesReturn:true,canonicalEqual:true,taskVisible:true,taskVerifiedOutcome:true,inventoryUi:true,stockStableAfterUnrelatedPurchase:true,financialUnknownHonest:true,staleStockVenueSwitch:true,ownerUAT:false});
+ }catch(error){if(process.env.CI)console.error(`::error title=Phase 4 integrated loop ${engine} ${width}::${String(error).replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A')}`);await capture('failure');writeFileSync(out+'/'+width+'-failure.txt',String(error));writeFileSync(out+'/'+width+'-failure-dom.txt',await page.locator('body').innerText());await stage('failure-authoritative');throw error;}finally{await context.close();await new Promise<void>(done=>server.close(()=>done()));r.close()}
 }}finally{await browser.close();writeFileSync(out+'/results.json',JSON.stringify(results,null,2))}
 console.log(JSON.stringify(results));

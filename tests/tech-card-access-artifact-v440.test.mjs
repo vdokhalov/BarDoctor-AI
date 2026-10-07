@@ -12,7 +12,7 @@ test('access and taxonomy patches replay without duplicate helpers or losing fin
  fs.copyFileSync(path.join(root,'tsconfig.json'),path.join(temporary,'tsconfig.json'));fs.symlinkSync(path.join(root,'node_modules'),path.join(temporary,'node_modules'),'dir');
  const bundlePath=path.join(temporary,'public/assets/index-BQGspy0I.js');
  const scripts=['patch-menu-consumption-sot-v418.mjs','patch-menu-edit-actions-v435.mjs','patch-legacy-consumption-normalization-v436.mjs','patch-edit-form-actions-v438.mjs','patch-editor-standard-v439.mjs','patch-tech-card-access-v440.mjs','patch-menu-taxonomy-v440.mjs'];
- const apply=()=>{for(const [file,args] of [['patch-management-cost-phase4a.mjs',['--restore']],...scripts.map(file=>[file,[]]),['patch-management-cost-phase4a.mjs',[]]]){const result=spawnSync(process.execPath,[path.join(temporary,'scripts',file),...args],{cwd:temporary,encoding:'utf8'});assert.equal(result.status,0,result.stderr)}};
+ const apply=()=>{for(const [file,args] of [['patch-curated-doctor-phase4c.mjs',['--restore']],['patch-management-actions-phase4b.mjs',['--restore']],['patch-management-cost-phase4a.mjs',['--restore']],...scripts.map(file=>[file,[]]),['patch-management-cost-phase4a.mjs',[]],['patch-management-actions-phase4b.mjs',[]],['patch-curated-doctor-phase4c.mjs',[]]]){const result=spawnSync(process.execPath,[path.join(temporary,'scripts',file),...args],{cwd:temporary,encoding:'utf8'});assert.equal(result.status,0,result.stderr)}};
  apply();const before=fs.readFileSync(bundlePath,'utf8');apply();const after=fs.readFileSync(bundlePath,'utf8');
  assert.equal(after,before);
  assert.ok(after.includes('await bdCostClientPhase4a.afterSave(bdCostSaveVenue'),'accepted server save keeps the Phase4A reread hook');

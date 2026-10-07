@@ -1,0 +1,189 @@
+/* Approved V1.2 foundation, limited to Home, Business Health and curated Doctor. */
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor,.bd-reference-doctor-shell){--bd-action:#5929e8;--bd-text:#17172b;--bd-muted:#595b70;--bd-divider:#dddfe8;--bd-surface:#fff;--bd-warning:#8c4b00;--bd-critical:#b42332;--bd-healthy:#08743c;--bd-space-1:4px;--bd-space-2:8px;--bd-space-3:12px;--bd-space-4:16px;--bd-space-6:24px;--bd-space-8:32px;--bd-space-12:48px;color:var(--bd-text);font-size:16px;font-weight:400;line-height:1.5;overflow-wrap:anywhere;min-width:0}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) *{box-sizing:border-box;min-width:0}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) :is(h1,h2,h3,p,ol,ul,dl){margin:0}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) h1{font-size:28px;font-weight:600;line-height:1.2}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) h2{font-size:22px;font-weight:600;line-height:1.3}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) h3{font-size:18px;font-weight:600;line-height:1.35}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) p{margin:8px 0}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) small,.bd-intelligence-meta{font-size:12px!important;font-weight:400!important;line-height:1.5;color:var(--bd-muted)!important;display:block}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) :is(button,summary){font:inherit;min-height:44px;white-space:normal;overflow-wrap:anywhere;cursor:pointer}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor,.bd-doctor-legacy) :is(button,summary):focus-visible{outline:3px solid var(--bd-action);outline-offset:4px}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) button:disabled{opacity:.6;cursor:wait}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) details{border:0;border-top:1px solid var(--bd-divider);border-radius:0;padding:0;margin:16px 0;background:transparent}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) summary{padding:12px 0;font-size:16px;font-weight:500;list-style:revert}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor,.bd-doctor-legacy) :is(.bd-intelligence-primary,.bd-intelligence-secondary,.bd-intelligence-link){border-radius:10px;padding:12px 16px;min-height:48px;max-width:100%;font-size:16px;line-height:1.4;font-weight:500;text-align:center;border:1px solid transparent;box-shadow:none}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) .bd-intelligence-primary{background:var(--bd-action)!important;color:#fff!important;border-color:var(--bd-action)}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor,.bd-doctor-legacy) .bd-intelligence-secondary{background:#fff!important;color:var(--bd-action)!important;border-color:var(--bd-action)}
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) .bd-intelligence-link{background:transparent!important;color:var(--bd-action)!important;border:0;padding:8px 0;text-align:left;font-size:14px}
+.bd-reference-back{margin-bottom:12px}
+.bd-intelligence-identity{display:flex;align-items:center;gap:12px;margin:0 0 16px}
+.bd-intelligence-identity>div{flex:1}
+.bd-intelligence-identity p{font-size:14px;color:var(--bd-muted);margin:4px 0 0}
+:is(.bd-reference-home,.bd-reference-health) .bd-intelligence-identity :is(h1,h2){color:var(--bd-action);font-weight:700}
+.bd-reference-home .bd-intelligence-identity h2{font-size:22px}
+.bd-intelligence-identity.is-doctor h1{font-size:26px;font-weight:500}
+.bd-intelligence-marker{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;background:#eeebff;border-radius:10px;flex:none}
+.bd-intelligence-marker img{width:26px;height:26px}
+.bd-doctor-entry{display:flex;align-items:center;justify-content:center;gap:12px;width:100%}
+.bd-doctor-entry .bd-intelligence-marker{background:transparent;width:24px;height:24px}
+.bd-intelligence-score{display:flex;align-items:center;gap:24px;padding:8px 0 24px;--bd-ring:var(--bd-action)}
+.bd-intelligence-score[data-score-category=healthy]{--bd-ring:var(--bd-healthy)}
+.bd-intelligence-score[data-score-category=attention]{--bd-ring:var(--bd-warning)}
+.bd-intelligence-score[data-score-category=critical]{--bd-ring:var(--bd-critical)}
+.bd-score-ring{position:relative;width:128px;height:128px;flex:none;color:var(--bd-ring)}
+.bd-score-ring svg{width:100%;height:100%;transform:rotate(-90deg);overflow:visible}
+.bd-score-ring circle{fill:none;stroke-width:6}
+.bd-score-track{stroke:#e8e8ef}
+.bd-score-fill{stroke:var(--bd-ring);stroke-linecap:round;stroke-dashoffset:100}
+.bd-score-ring[data-score-shown=true] .bd-score-fill{stroke-dashoffset:var(--bd-score-offset);animation:bd-reference-score-appear .7s ease-out 1}
+@keyframes bd-reference-score-appear{from{stroke-dashoffset:100}to{stroke-dashoffset:var(--bd-score-offset)}}
+.bd-score-ring>div{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.bd-score-ring strong{font-size:48px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums}
+.bd-score-ring span{font-size:14px;color:var(--bd-muted)}
+.bd-score-copy{flex:1}.bd-score-copy h2{font-size:18px}.bd-score-copy p{font-size:14px;margin:4px 0}
+.bd-status{display:inline-block;width:fit-content;padding:4px 8px;border-radius:6px;font-size:14px;font-weight:500;line-height:1.4}
+.bd-status-warning{color:var(--bd-warning)!important;background:#fff3e2}
+p.bd-status-warning{background:transparent;font-weight:500}
+.bd-status-critical{color:var(--bd-critical);background:#fff0f0}
+.bd-status-neutral{color:#354a75;background:#edf2fc}
+.bd-reference-page-heading{margin-bottom:24px}.bd-reference-page-heading p{margin:0 0 8px}
+.bd-reference-home-grid{display:grid;gap:16px}
+.bd-reference-home .bd-home-management-phase4a{margin:0;padding:0;border:0;background:transparent;box-shadow:none;border-radius:0;font-size:16px;line-height:1.5}
+.bd-reference-queue{margin:0;border-top:1px solid var(--bd-divider);padding-top:16px}
+.bd-reference-queue .bd-queue-label{font-size:14px;color:var(--bd-muted);font-weight:500;margin-bottom:12px}
+.bd-reference-queue ol{list-style:none;padding:0;display:grid;gap:24px}
+.bd-reference-queue li{padding:0;max-width:100%}
+.bd-queue-item-heading{display:grid;gap:12px;border-left:3px solid var(--bd-divider);padding-left:16px}
+[data-management-priority=critical]>.bd-queue-item-heading{border-color:var(--bd-critical)}
+[data-management-priority=high]>.bd-queue-item-heading{border-color:var(--bd-warning)}
+.bd-reference-queue .bd-queue-item-heading strong{font-size:24px;line-height:1.3;font-weight:600}
+.bd-reference-queue li>.bd-intelligence-primary,.bd-reference-queue li>.bd-intelligence-secondary{display:block;width:100%;margin:16px 0}
+.bd-reference-queue details{margin:0;border:0}.bd-reference-queue summary{font-weight:600;font-size:18px}
+.bd-reference-queue .bd-queue-short-why{color:var(--bd-muted);margin:12px 0 0 19px}
+.bd-reference-queue .bd-supporting-title{margin:0 0 16px}
+.bd-reference-today{display:flex;flex-direction:column;gap:16px}
+.bd-reference-today>section{border-top:1px solid var(--bd-divider);padding-top:16px}
+.bd-operational-row{display:flex;align-items:center;gap:12px;width:100%;border:0;border-bottom:1px solid var(--bd-divider);background:transparent;text-align:left;padding:16px 0!important;border-radius:0!important;color:var(--bd-text)}
+.bd-operational-row>span:first-child{font-weight:500;flex:1}.bd-operational-row>span:nth-child(2){font-size:14px;color:var(--bd-muted);text-align:right;max-width:50%}
+.bd-reference-today dl>div{display:flex;gap:16px;justify-content:space-between;padding:8px 0;font-size:14px}.bd-reference-today dd{color:var(--bd-muted);text-align:right}
+.bd-reference-home-details{margin-top:24px!important}.bd-reference-home-extras{display:grid;gap:24px;margin-top:24px}
+.bd-reference-health-summary{margin-bottom:24px}.bd-reference-health-summary .bd-doctor-entry{margin-top:8px}
+.bd-reference-health-support{display:grid;gap:24px;margin-top:24px;border-top:1px solid var(--bd-divider);padding-top:24px}
+.bd-reference-health .bd-cost-management,.bd-reference-home .bd-cost-management{padding:0;border:0;border-radius:0;background:transparent;font-size:16px;box-shadow:none;margin:16px 0}
+.bd-reference-health .bd-cost-management article{max-width:100%}
+.bd-reference-health .bd-cost-management :is(button,summary){font-size:14px;font-weight:500}
+.bd-reference-health .bd-cost-management h2{font-size:18px}
+.bd-reference-health .bd-cost-management strong{font-weight:600}
+.bd-reference-health .bd-health-zone-row-v332{box-shadow:none;border-radius:0}
+.bd-home-shell.bd-home-shell,.bd-reference-health-shell.bd-reference-health-shell,.bd-reference-doctor-shell.bd-reference-doctor-shell{width:100%;max-width:none;padding-left:24px;padding-right:24px}
+.bd-home-page.bd-home-page{width:100%;max-width:1104px;margin:auto}
+.bd-reference-health,.bd-reference-doctor{max-width:1104px;margin:auto}
+.bd-home-shell .bd-home-header{margin:0 0 24px}
+.bd-home-shell .bd-home-header strong{font-weight:600}.bd-home-shell .bd-home-header small{font-size:12px}
+.bd-reference-doctor-shell.bd-reference-doctor-shell{padding-top:24px}
+.bd-curated-doctor.bd-reference-doctor{margin:0 auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;font-size:16px}
+.bd-doctor-heading{scroll-margin-top:80px;outline:none}.bd-doctor-heading:focus-visible{outline:3px solid var(--bd-action);outline-offset:4px;border-radius:6px}
+.bd-reference-doctor .bd-doctor-description{color:var(--bd-muted);margin:0 0 24px}
+.bd-doctor-question-groups{display:grid;gap:24px}
+.bd-reference-doctor .bd-curated-group h2{font-size:22px;font-weight:600;color:var(--bd-text);margin-bottom:8px}
+.bd-reference-doctor .bd-curated-questions{display:flex;flex-direction:column;gap:0}
+.bd-reference-doctor .bd-curated-questions button{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;width:100%;font-size:16px;line-height:1.45;font-weight:400;border:0;border-bottom:1px solid var(--bd-divider);border-radius:0;padding:12px 0;background:transparent;color:var(--bd-text);text-align:left}
+.bd-reference-doctor .bd-curated-questions button>span{font-size:24px;flex:none;color:var(--bd-muted)}
+.bd-reference-doctor .bd-doctor-selected-question{margin:0 0 16px;font-size:16px}
+.bd-reference-doctor article{margin:0;border:0;padding:0}
+.bd-doctor-answer-status{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.bd-doctor-answer-grid{display:grid;gap:16px}
+.bd-reference-doctor .bd-doctor-conclusion{font-size:24px;font-weight:600;line-height:1.35;margin:0 0 16px;max-width:42ch}
+.bd-reference-doctor .bd-curated-actions{gap:12px;margin:0 0 24px;display:flex;flex-direction:column}
+.bd-reference-doctor .bd-curated-actions button{font-weight:500}
+.bd-doctor-no-action{margin:0!important;border-left:4px solid #a55b00;background:#fff5e6;color:#804500;padding:12px 16px;border-radius:6px}
+.bd-reference-doctor .bd-doctor-facts{list-style:none;padding:0;margin:12px 0 24px}
+.bd-reference-doctor .bd-doctor-facts li{border-top:1px solid var(--bd-divider);padding:12px 0;margin:0}
+.bd-doctor-fact-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.bd-doctor-fact-head strong{font-size:16px;font-weight:500;flex:1}
+.bd-reference-doctor .bd-curated-kind{font-size:14px;font-weight:400;color:var(--bd-muted);max-width:45%;text-align:right}
+.bd-reference-doctor .bd-doctor-facts p{font-size:14px;margin:4px 0;color:var(--bd-muted)}
+.bd-reference-doctor .bd-doctor-important-limitation{color:var(--bd-muted);margin:8px 0 16px}
+.bd-reference-doctor .bd-doctor-sources{margin:0 0 24px}
+.bd-doctor-sources summary span{margin-top:4px}
+.bd-reference-doctor .bd-doctor-sources ul{list-style:none;padding:0}
+.bd-reference-doctor .bd-doctor-sources li{border-top:1px solid var(--bd-divider);margin:0;padding:12px 0;font-size:14px}
+.bd-doctor-sources li strong{display:block;font-weight:500;font-size:16px}.bd-doctor-sources li span{display:block;color:var(--bd-muted);margin-top:4px}
+.bd-reference-doctor .bd-doctor-sources>p{font-size:12px;color:var(--bd-muted)}
+@media(min-width:760px){
+ div[class~="max-w-[430px]"]:has([data-reference-slice]){max-width:none!important;box-shadow:none}
+ .bd-doctor-question-groups{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:32px}
+ .bd-reference-home-grid{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:32px}
+ .bd-reference-today{border-left:1px solid var(--bd-divider);padding-left:24px}.bd-reference-today>section{order:-1;border:0;padding:0}
+ .bd-reference-home-extras{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .bd-reference-health-summary{display:flex;align-items:center;gap:32px}.bd-reference-health-summary .bd-intelligence-score{flex:1}.bd-reference-health-summary .bd-doctor-entry{width:auto}
+ .bd-reference-health-support{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}
+ .bd-reference-doctor .bd-doctor-answer-grid{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:32px}
+ .bd-reference-doctor .bd-doctor-sources{border-top:0;border-left:1px solid var(--bd-divider);padding-left:24px}.bd-doctor-sources summary{font-size:22px;font-weight:600}
+ .bd-reference-doctor .bd-doctor-return-actions{flex-direction:row;align-items:center}
+}
+@media(min-width:1100px){.bd-score-ring{width:152px;height:152px}.bd-score-ring strong{font-size:54px}.bd-reference-home-grid{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}}
+@media(max-width:430px){.bd-home-shell.bd-home-shell,.bd-reference-health-shell.bd-reference-health-shell,.bd-reference-doctor-shell.bd-reference-doctor-shell{padding-left:16px;padding-right:16px}.bd-intelligence-identity{gap:8px}.bd-intelligence-identity>button{font-size:14px}.bd-reference-home .bd-intelligence-identity p{font-size:12px}.bd-intelligence-score{gap:16px}.bd-reference-home .bd-intelligence-marker{width:32px;height:32px}.bd-reference-home .bd-intelligence-identity h2{font-size:22px}.bd-reference-home .bd-queue-label{display:none}}
+@media(prefers-reduced-motion:reduce){.bd-score-fill{transition:none;stroke-dashoffset:var(--bd-score-offset)}.bd-reference-home *,.bd-reference-health *,.bd-reference-doctor *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+.bd-health-doctor-secondary{margin-top:24px}
+@media(min-width:760px){.bd-health-doctor-secondary{display:none}}
+@media(max-width:759px){.bd-reference-health-summary .bd-doctor-entry{display:none}.bd-reference-health-summary{margin-bottom:0}}
+.bd-reference-home .bd-cost-home-cta{background:#fff!important;border:1px solid var(--bd-action)!important;color:var(--bd-action)!important;font-weight:500}
+
+.bd-reference-home-extras{display:block!important}
+.bd-reference-home-extras :is(h2,h3,strong){font-weight:600!important}
+.bd-reference-home .bd-home-money{font:inherit;font-weight:400;background:#fff;border:0;border-radius:0;box-shadow:none;width:100%}
+.bd-reference-home .bd-home-money *{font-weight:500}
+
+main:has([data-reference-slice]){background:#fff!important}
+.bd-home-shell:has(.bd-reference-home){background:#fff}
+.bd-reference-doctor .bd-doctor-answer-main>h3{font-size:22px}
+.bd-reference-doctor .bd-doctor-facts li p:last-of-type{font-size:16px}
+
+:is(.bd-reference-home,.bd-reference-health,.bd-reference-doctor) button{min-height:44px!important}
+.bd-reference-home-extras :is(p,span,small){font-size:14px!important;font-weight:400!important}
+.bd-reference-home-extras :is(section,article){background:#fff!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+
+.bd-reference-queue .bd-queue-deadline{font-size:14px;color:var(--bd-muted);margin:8px 0 0 19px}
+
+@media(min-width:1100px){
+ .bd-reference-health .bd-reference-queue ol{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);column-gap:32px}
+ .bd-reference-health .bd-reference-queue li:first-child{grid-column:1;grid-row:1/4;padding-right:24px;border-right:1px solid var(--bd-divider)}
+ .bd-reference-health .bd-reference-queue li:not(:first-child){grid-column:2}.bd-reference-health .bd-reference-queue li:not(:first-child) .bd-queue-item-heading strong{font-size:18px}
+
+}
+.bd-reference-doctor .bd-doctor-before-limitation{margin-top:32px;border-top:1px solid var(--bd-divider);padding-top:24px;font-size:14px;color:var(--bd-muted)}
+@media(min-width:760px){.bd-reference-doctor .bd-curated-group:nth-child(2){border-left:1px solid var(--bd-divider);padding-left:24px}}
+:is(.bd-reference-home,.bd-reference-health) .bd-cost-management button.primary{background:#fff;color:var(--bd-action);border-color:var(--bd-action);font-weight:500}
+
+
+/* Recovery: retain the approved intelligence area and keep legacy Home capabilities open. */
+.bd-today-context{margin-top:16px}.bd-reference-home .bd-today-context h3{font-size:16px}
+.bd-home-supporting-actions{margin-top:24px;padding-top:24px}.bd-home-supporting-actions h2{margin-bottom:16px}
+.bd-home-supporting-actions .bd-queue-item-heading strong{font-size:18px}
+.bd-home-financial-details{margin-top:24px;border-top:1px solid var(--bd-divider);padding-top:24px}
+@media(min-width:760px){.bd-home-supporting-actions ol{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px}}
+.bd-reference-home .bd-cost-home-status{font-weight:500}
+.bd-reference-home .bd-home-money *{color:var(--bd-text)!important;font-size:14px!important}
+.bd-reference-home .bd-home-money>strong{font-size:28px!important;font-weight:600}
+.bd-reference-home .bd-home-money .bd-home-money-label{font-size:12px!important;color:var(--bd-muted)!important}
+.bd-reference-home .bd-cost-management strong{font-weight:600}
+
+.bd-reference-health .bd-curated-suggestion{display:flex;flex-direction:column;gap:8px;padding:0;border:0;margin:0;background:transparent}
+@media(max-width:759px){.bd-reference-health-summary .bd-curated-suggestion{display:none}}
+@media(min-width:760px){.bd-reference-health-summary .bd-curated-suggestion{width:auto;flex:none}}
+.bd-reference-home-extras button{font-size:14px!important;font-weight:500!important}
+.bd-reference-home-extras :is(p,span,small){color:var(--bd-muted)!important}
+.bd-reference-health .bd-health-zone-state-v332{font-size:14px;font-weight:600;color:var(--bd-text)!important}
+.bd-reference-health .bd-health-zone-copy-v332 strong{font-size:16px;font-weight:600}
+.bd-reference-health .bd-health-zone-score-v332 strong{font-size:14px;font-weight:600;color:var(--bd-text)!important}
+.bd-reference-health .bd-health-zone-copy-v332 em{font-size:12px;font-weight:500}
+.bd-reference-health .bd-health-zone-copy-v332 em{color:var(--bd-warning)}
+
+/* Existing Phase 4C diagnosis remains available beside the curated capability. */
+.bd-doctor-legacy{margin:24px 0 0;border-top:1px solid var(--bd-divider);padding-top:24px}
+.bd-doctor-legacy>h2{font-size:18px;font-weight:600;color:var(--bd-text);margin:0 0 16px}
+.bd-doctor-legacy>p{font-size:16px;color:var(--bd-text)}
+.bd-doctor-legacy>button{min-height:44px;margin-bottom:16px}

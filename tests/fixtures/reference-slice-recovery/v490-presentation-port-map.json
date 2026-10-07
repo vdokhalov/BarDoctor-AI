@@ -1,0 +1,62 @@
+{
+  "functionalBaseline": "b7708cadb01ff8e8ee11c1bcfdab448c15068878",
+  "approvedVisualSource": "17de9a7c4934ad92c1b7c7b0a14f173155539ed9",
+  "rejectedBehaviorCommit": "9f70d846",
+  "ported": {
+    "foundation": [
+      "lib/bardoctor/client/intelligence-ui.tsx",
+      "public/intelligence-v1.css",
+      "public/icons/intelligence-activity.svg",
+      "public/icons/intelligence-dialogue.svg",
+      "public/icons/intelligence-icons-LICENSE.txt"
+    ],
+    "home": [
+      "scripts/patch-reference-slice-v1.mjs: bdHomeDaily render adapter",
+      "lib/bardoctor/client/intelligence-ui.tsx: Home, Score, Identity"
+    ],
+    "health": [
+      "scripts/patch-reference-slice-v1.mjs: c_e render adapter",
+      "lib/bardoctor/client/intelligence-ui.tsx: Health",
+      "lib/bardoctor/client/management-actions.tsx: Queue presentation"
+    ],
+    "doctor": [
+      "lib/bardoctor/client/curated-doctor.tsx: identity, answer-first presentation and guarded return context",
+      "scripts/patch-reference-slice-v1.mjs: Uce adapter"
+    ],
+    "pipeline": [
+      "app/bar-doctor-response.ts: stylesheet link",
+      "public/app.html: stylesheet link",
+      "scripts/patch-curated-doctor-phase4c.mjs: reversible reference preparation"
+    ]
+  },
+  "excluded": [
+    "closed details wrappers around existing Home cost, Finance, Reviews, Calendar, Competitors",
+    "tablet global bottom-navigation CSS override",
+    "unrelated modules, business logic, APIs, schema, Worker bindings"
+  ],
+  "compatibilityRecovery": [
+    "all legacy Home sections visible by default",
+    "all existing Home canonical management actions retained in original order from same authoritative read",
+    "Health refresh and pre-existing zone links remain normally available",
+    "original Health Doctor Suggestion uses original supported-question selection",
+    "stylesheet query version recovery-1 prevents rejected v490 CSS cache reuse"
+  ],
+  "ownerApprovedException": {
+    "scope": "only two Payroll month initializers",
+    "before": "bdReadNavigationQuery(\"month\",bdPayrollInitialMonth)",
+    "after": "bdReadNavigationQuery(\"month\",bdPayrollInitialMonth())",
+    "preserves": "existing month algorithm, query override, calculations, handlers, permissions and persistence",
+    "evidence": "outputs/reference-slice-recovery/proposals/payroll-evidence.json"
+  },
+  "legacyDiagnosisRecovery": {
+    "source": "b7708cad / Uce.A / Fce; docs/curated-doctor-phase4c.md",
+    "restored": [
+      "run",
+      "error/retry",
+      "cached result/reload",
+      "refresh",
+      "original report"
+    ],
+    "changedBusinessLogic": false
+  }
+}

@@ -87,12 +87,12 @@ replaceOnce(
 replaceOnce(
   "Salaries month and search from URL",
   '[m,h]=S.useState(bdPayrollInitialMonth),[g,y]=S.useState(""),[j,v]=S.useState(!1),b=',
-  '[m,h]=S.useState(()=>window.bdReadNavigationQuery("month",bdPayrollInitialMonth)),[g,y]=S.useState(()=>window.bdReadNavigationQuery("q","")),[j,v]=S.useState(!1),bdSalariesNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({month:m,q:g||null})},[m,g]),b=',
+  '[m,h]=S.useState(()=>window.bdReadNavigationQuery("month",bdPayrollInitialMonth())),[g,y]=S.useState(()=>window.bdReadNavigationQuery("q","")),[j,v]=S.useState(!1),bdSalariesNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({month:m,q:g||null})},[m,g]),b=',
 );
 replaceOnce(
   "Salary detail month from URL",
   '[g,y]=S.useState(bdPayrollInitialMonth),[j,v]=S.useState(null),b=',
-  '[g,y]=S.useState(()=>window.bdReadNavigationQuery("month",bdPayrollInitialMonth)),[j,v]=S.useState(null),bdSalaryNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({month:g})},[g]),b=',
+  '[g,y]=S.useState(()=>window.bdReadNavigationQuery("month",bdPayrollInitialMonth())),[j,v]=S.useState(null),bdSalaryNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({month:g})},[g]),b=',
 );
 
 replaceOnce(
