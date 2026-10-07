@@ -1140,7 +1140,7 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /Внести суммы остатков/);
   assert.match(mainBundle, /data-bd-health-index":"split-diagnostic-v19/);
   assert.match(mainBundle, /bdHomeVisualVersion="home-v151"/);
-  assert.match(mainBundle, /data-bd-home-daily":"v151/);
+  assert.match(mainBundle, /bdReferenceUIV1.Home/);
   assert.match(mainBundle, /data-bd-opportunity-entry":"home-v151/);
   assert.match(mainBundle, /data-bd-competitors-entry":"home-v151/);
   assert.doesNotMatch(mainBundle, /data-bd-home-sections":"v18/);
@@ -1184,16 +1184,16 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /bdWorkflowCopyVersion="daily-close-v17"/);
   assert.match(mainBundle, /bdTaskPersistenceVersion="cloud-v32"/);
   assert.match(mainBundle, /bdHomeDailyVersion="daily-v18"/);
-  assert.match(mainBundle, /data-bd-home-daily":"v151/);
-  assert.match(mainBundle, /data-bd-home-header":"v151/);
-  assert.match(mainBundle, /data-bd-home-today":"v151/);
-  assert.match(mainBundle, /label:"График работы"/);
-  assert.match(mainBundle, /label:"Статус заведения"/);
-  assert.match(mainBundle, /label:"Смена"/);
-  assert.match(mainBundle, /label:"Отчёт за смену"/);
+  assert.match(mainBundle, /bdReferenceUIV1.Home/);
+  assert.match(mainBundle, /data-bd-home-header/);
+  assert.match(mainBundle, /data-bd-home-today/);
+  assert.match(mainBundle, /График работы/);
+  assert.match(mainBundle, /Статус заведения/);
+  assert.match(mainBundle, /Смена/);
+  assert.match(mainBundle, /Отчёт за смену/);
   assert.match(mainBundle, /Закрыть смену/);
   assert.match(mainBundle, /Проверить смену/);
-  assert.match(mainBundle, /data-bd-home-money":"result-v151/);
+  assert.match(mainBundle, /data-bd-home-money/);
   assert.match(mainBundle, /Финансовый результат/);
   assert.match(mainBundle, /Закупки \+ начисления/);
   assert.match(mainBundle, /Результат до себестоимости/);
@@ -1220,12 +1220,11 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.ok(homeDailyStart >= 0 && homeDailyEnd > homeDailyStart);
   const homeDailySource = mainBundle.slice(homeDailyStart, homeDailyEnd);
   const homeOrder = [
-    "i.jsx(bdHomeHealthIndexV200",
-    "i.jsx(bdManagementHomePhase4",
+    "i.jsx(bdReferenceUIV1.Home",
+    "i.jsx(bdManagementQueuePhase4b",
     "i.jsx(bdCostHomePhase4a",
     "i.jsx(bdHomeMoneyCard",
     "i.jsx(bdHomeReviewsCardV409",
-    "i.jsx(bdHomeTodayCard",
     "i.jsx(bdHomeContextCardsV151",
   ].map((token) => homeDailySource.indexOf(token));
   assert.ok(homeOrder.every((position) => position >= 0));
@@ -1455,8 +1454,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /participantIds:\w+\.participantIds/);
   assert.match(mainBundle, /\.get\("closeShift"\)==="1"/);
   assert.match(mainBundle, /title:[A-Za-z_$][\w$]*\?"Смена обновлена":"Смена закрыта"/);
-  assert.match(mainBundle, /children:"Что происходит сейчас"/);
-  assert.match(mainBundle, /children:"Зоны Business Health"/);
+  assert.match(mainBundle, /bdReferenceUIV1.Health/);
+  assert.match(mainBundle, /zones:i\.jsx\("div"/);
   assert.doesNotMatch(mainBundle.slice(mainBundle.indexOf("function c_e(){"), mainBundle.indexOf("function Ln(")), /Открыть раздел|bd-health-tabs-v332/);
   assert.match(mainBundle, /Настройка периодичности остатков/);
   assert.match(mainBundle, /Не внесены остатки на начало текущего месяца/);

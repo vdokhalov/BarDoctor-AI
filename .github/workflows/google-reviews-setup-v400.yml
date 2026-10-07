@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - feat/design-system-v1-slice1
       - feat/phase4c-curated-doctor
       - fix/phase4-integrated-management-loop
       - fix/phase4b-management-flow
@@ -94,6 +95,10 @@ jobs:
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: Design System V1 reference slice and state presentation
+        run: |
+          node --import tsx --test tests/intelligence-ui-v1.test.ts
+          node --import tsx scripts/reference-slice-v1-browser.ts
       - name: Phase 4C compiled Worker and curated Doctor 390 820 1280
         run: |
           node --test tests/curated-doctor-client-phase4c.test.mjs tests/curated-doctor-worker-phase4c.test.mjs
@@ -113,6 +118,7 @@ jobs:
         with:
           name: phase4a-cost-correction-evidence
           path: |
+            outputs/design-system-v1
             outputs/curated-doctor-phase4c
             outputs/management-loop-targeted
             outputs/management-actions-phase4b
@@ -244,6 +250,8 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Design System V1 reference slice WebKit
+        run: BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-v1-browser.ts
       - name: Phase 4C curated Doctor WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/curated-doctor-phase4c-browser.ts
       - name: Phase 4 integrated management loop WebKit 390 820 1280
@@ -283,6 +291,7 @@ jobs:
             outputs/finance-inputs-phase3a6/webkit
             outputs/health-inputs-phase3a9/webkit
             outputs/health-inputs-phase3a9/webkit-stable
+            outputs/design-system-v1
             outputs/curated-doctor-phase4c
             outputs/webkit-health-lifecycle
             outputs/management-loop-targeted

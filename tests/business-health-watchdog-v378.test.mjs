@@ -17,9 +17,11 @@ test("Business Health skeleton has an independent eight-second watchdog", () => 
   assert.doesNotMatch(detail, /bdHealthLoading=!bdHealthCanLoad/);
 });
 
-test("Business Health still keeps the bounded API request and retry state", () => {
+test("Business Health still keeps the bounded API request and retry state", async () => {
   assert.match(bundle, /function bdFetchBusinessHealthV377/);
   assert.match(bundle, /controller\.abort\(\),8e3/);
-  assert.match(bundle, /className:"bd-health-detail-unavailable-v332"/);
-  assert.match(bundle, /children:"Повторить"/);
+  assert.match(bundle, /bdReferenceUIV1.Health,\{onRefresh:\(\)=>bdRefreshLiveBusinessHealthV335\(\)/);
+  const ui = await readFile(new URL("../lib/bardoctor/client/intelligence-ui.tsx", import.meta.url), "utf8");
+  assert.match(ui, /!snapshot&&!loading/);
+  assert.match(ui, /onRefresh\?onRefresh\(\)/);
 });

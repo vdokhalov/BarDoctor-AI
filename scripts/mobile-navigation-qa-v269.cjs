@@ -1120,9 +1120,10 @@ async function homeReviewsFlow(browser, profile) {
   const { page, state } = run;
   await goto(page, "/home?venue=901");
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
-  const finance = page.locator('[data-bd-home-money="result-v151"]');
+  const finance = page.locator('.bd-reference-today [data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
   const attention = page.locator('.bd-management-queue[data-management-venue="901"]');
+  await page.locator(".bd-reference-home-extras > summary").click();
   await reviewsCard.waitFor({ timeout: 10_000 });
   await attention.locator('li').first().waitFor({ timeout: 10_000 });
   assert.deepEqual(state.homeReviewResponses, [200], `${profile.name}: Home Reviews requested protected data before auth bootstrap was ready`);
@@ -1151,14 +1152,14 @@ async function homeReviewsFlow(browser, profile) {
     assert.equal(homeLayout.navVisible, true, `${profile.name}: bottom navigation is missing`);
     assert.ok(homeLayout.navTop < homeLayout.viewportHeight, `${profile.name}: bottom navigation is outside viewport`);
   } else {
-    assert.ok(homeLayout.rects[0].top < homeLayout.rects[3].top && homeLayout.rects[3].top < homeLayout.rects[1].top && homeLayout.rects[1].top === homeLayout.rects[2].top, `${profile.name}: desktop Health/attention/Finance/Reviews hierarchy is incorrect`);
+    assert.ok(homeLayout.rects[0].top < homeLayout.rects[3].top && homeLayout.rects[3].left < homeLayout.rects[1].left && homeLayout.rects[2].top > homeLayout.rects[3].top, `${profile.name}: desktop Health/attention/Finance/Reviews hierarchy is incorrect`);
     assert.ok(await page.locator('[data-bd-nav-key="reviews"]').isVisible(), `${profile.name}: direct Reviews navigation is hidden`);
   }
   assert.ok(homeLayout.scrollWidth <= homeLayout.clientWidth + 1, `${profile.name}: Home has horizontal overflow`);
   assert.match(await health.textContent(), /83/);
   assert.match(await finance.textContent(), /Финансовый результат/);
   assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
-  assert.match(await attention.textContent(), /Что сделать первым.*Проверить 6 аномалий остатков/s);
+  assert.match(await attention.textContent(), /Проверить 6 аномалий остатков/s);
   assert.equal(await attention.locator('li').first().getAttribute('data-management-id'), 'stock-review-mobile-qa', `${profile.name}: Home must use the canonical fixture priority`);
   assert.equal(await page.locator('[data-bd-home-attention="universal-v198"]').count(), 0, `${profile.name}: Home must not rank review data independently`);
   await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
@@ -1202,6 +1203,7 @@ async function homeReviewsFlow(browser, profile) {
   assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
   await dialog.locator(".dialog-actions").getByRole("button", { name: "Закрыть", exact: true }).click();
   await page.goBack({ waitUntil: "networkidle" });
+  await page.locator(".bd-reference-home-extras > summary").click();
   await reviewsCard.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/home", `${profile.name}: Back did not return to Home`);
   await mobileAudit(page, profile.name, "home-reviews-return", { requireTouch: false });
@@ -1244,8 +1246,8 @@ async function businessHealthColdStartFlow(browser, profile) {
   }
   const readHome = () => home.evaluate((node) => ({
     snapshotId: node.getAttribute("data-bd-health-snapshot-id"),
-    score: node.querySelector(".bd-home-health-score-number-v332 strong")?.textContent?.trim(),
-    status: node.querySelector(".bd-home-health-score-status-v332")?.textContent?.trim(),
+    score: node.querySelector(".bd-score-ring strong")?.textContent?.trim(),
+    status: node.querySelector(".bd-score-copy > p")?.textContent?.trim(),
     zones: [...node.querySelectorAll(".bd-home-health-zone-v332")].map((zone) => zone.textContent.replace(/\s+/g, " ").trim()),
     priority: node.querySelector(".bd-home-health-priority-v332")?.textContent?.replace(/\s+/g, " ").trim(),
     confidence: node.querySelector(".bd-home-health-confidence")?.textContent?.trim(),
@@ -1261,7 +1263,7 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.doesNotMatch(await home.textContent(), /Загрузка|Достоверность диагноза/i, `${profile.name}: Home returned to loading or exposed confidence`);
   const homeLayout = await page.evaluate(() => {
     const card = document.querySelector('[data-bd-home-health-index="business-health-snapshot-v334"]');
-    const money = document.querySelector(".bd-home-money");
+    const money = document.querySelector(".bd-home-financial-details");
     const attention = document.querySelector('.bd-management-queue[data-management-venue="901"]');
     const cardRect = card?.getBoundingClientRect();
     const moneyRect = money?.getBoundingClientRect();
@@ -1280,14 +1282,15 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.ok((homeLayout.attentionTop ?? Infinity) < (homeLayout.moneyTop ?? -Infinity), `${profile.name}: attention must precede financial details`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
+  await page.locator(".bd-home-financial-details > summary").click();
   await page.locator(".bd-home-money").scrollIntoViewIfNeeded();
   assert.ok(await page.locator(".bd-home-money").isVisible(), `${profile.name}: financial details remain available`);
 
-  await page.locator(".bd-home-health-score-v332").click();
+  await page.getByRole("button", { name: "Подробнее →", exact: true }).click();
   const detail = page.locator(".bd-health-detail-v332");
   await detail.waitFor({ timeout: 10_000 });
-  assert.equal(await detail.locator(".bd-health-detail-score-v332 strong").textContent(), firstHome.score, `${profile.name}: Home/detail scores diverged`);
-  assert.match(await detail.textContent(), /Что происходит сейчас.*Зоны Business Health.*Главный приоритет.*Качество данных/s);
+  assert.equal(await detail.locator(".bd-score-ring strong").textContent(), firstHome.score, `${profile.name}: Home/detail scores diverged`);
+  assert.match(await detail.textContent(), /Business Health.*Что сделать первым.*Основания и свежесть.*Зоны Business Health/s);
   assert.doesNotMatch(await detail.textContent(), /Обзор.*Финансы.*Спрос.*Операции|Почему такой score|Открыть раздел/s);
   assert.doesNotMatch(await detail.textContent(), /Достоверность диагноза 77%/);
   assert.equal(await detail.getByRole("button", { name: "Подробнее о состоянии", exact: true }).count(), 0, `${profile.name}: detail contains a self-navigation CTA`);
@@ -1296,11 +1299,13 @@ async function businessHealthColdStartFlow(browser, profile) {
     clipped: node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1,
   })));
   assert.equal(zoneCopies.some((zone) => zone.clipped), false, `${profile.name}: a zone interpretation is clipped: ${JSON.stringify(zoneCopies)}`);
+  await detail.getByText("Зоны Business Health и данные", { exact: true }).click();
   await detail.getByRole("button", { name: /Финансы/ }).click();
   await detail.getByRole("button", { name: /Посмотреть финансы/ }).click();
   assert.equal(new URL(page.url()).pathname, "/finance", `${profile.name}: Finance deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });
   await detail.waitFor({ timeout: 10_000 });
+  if (!(await detail.locator("details").filter({ has: page.getByText("Зоны Business Health и данные", { exact: true }) }).getAttribute("open") === "")) await detail.getByText("Зоны Business Health и данные", { exact: true }).click();
   const demandZone = detail.locator("button.bd-health-zone-row-v332").filter({ hasText: "Спрос" });
   assert.equal(await demandZone.count(), 1, `${profile.name}: Demand zone must be uniquely identified independently of Doctor questions`);
   await demandZone.click();
@@ -1309,11 +1314,13 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.equal(new URL(page.url()).pathname, "/reports", `${profile.name}: Demand deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });
   await detail.waitFor({ timeout: 10_000 });
+  if (!(await detail.locator("details").filter({ has: page.getByText("Зоны Business Health и данные", { exact: true }) }).getAttribute("open") === "")) await detail.getByText("Зоны Business Health и данные", { exact: true }).click();
   await detail.getByRole("button", { name: /Операции/ }).click();
   await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Операции" }).getByRole("button", { name: /Проверить остатки/ }).click();
   assert.equal(new URL(page.url()).pathname, "/warehouse", `${profile.name}: Operations deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });
   await detail.waitFor({ timeout: 10_000 });
+  if (!(await detail.locator("details").filter({ has: page.getByText("Зоны Business Health и данные", { exact: true }) }).getAttribute("open") === "")) await detail.getByText("Зоны Business Health и данные", { exact: true }).click();
   await detail.getByRole("button", { name: /Данные/ }).first().click();
   await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Данные" }).getByRole("button", { name: /Проверить данные/ }).click();
   assert.equal(new URL(page.url()).pathname, "/data-control", `${profile.name}: Data Quality deep link is dead`);
