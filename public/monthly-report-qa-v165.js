@@ -6,8 +6,9 @@
   var state = params.get("qaReport");
   if (!state) return;
 
-  var email = "monthly-report-qa@bardoctor.local";
-  var venueId = "qa-monthly-venue";
+  var qaContext = window.__bdMobileQaContextV496 || null;
+  var email = qaContext ? qaContext.email : "monthly-report-qa@bardoctor.local";
+  var venueId = qaContext ? qaContext.activeVenueId : "qa-monthly-venue";
   var scope = "__" + email + "__venue_" + venueId;
   var profile = {
     id: "primary",
@@ -205,12 +206,13 @@
   };
 
   localStorage.setItem("bd_session", email);
-  localStorage.setItem("bd_session_token", "qa-local-token");
-  localStorage.setItem("bd_session_userid", "qa-local-user");
+  localStorage.setItem("bd_session_token", qaContext ? qaContext.token : "qa-local-token");
+  localStorage.setItem("bd_session_userid", qaContext ? String(qaContext.userId) : "qa-local-user");
   localStorage.setItem("bd_active_venue_id", venueId);
-  localStorage.setItem("bd_active_venue_is_primary", "1");
-  localStorage.setItem("bd_active_role", "owner");
-  localStorage.setItem("bd_active_permissions", JSON.stringify(["reports.view", "finance.view", "finance.manage", "payroll.view"]));
+  localStorage.setItem("bd_active_venue_is_primary", !qaContext || qaContext.activeVenueIsPrimary ? "1" : "0");
+  localStorage.setItem("bd_active_role", qaContext ? qaContext.role : "owner");
+  localStorage.setItem("bd_active_permissions", JSON.stringify(qaContext ? qaContext.permissions : ["reports.view", "finance.view", "finance.manage", "payroll.view"]));
+  if (qaContext) localStorage.setItem("bd_venue_context__" + email, JSON.stringify({ activeVenueId: venueId, activeWorkspaceId: qaContext.activeWorkspaceId, canCreateVenues: qaContext.canCreateVenues, venues: qaContext.venues }));
   localStorage.setItem("bd_restaurant_profile__" + email, JSON.stringify(profile));
   localStorage.setItem("bd_restaurant_cache" + scope, JSON.stringify(profile));
   Object.keys(stores).forEach(function (storeKey) {

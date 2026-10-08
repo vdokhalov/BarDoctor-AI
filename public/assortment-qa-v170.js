@@ -5,19 +5,24 @@
   var state = params.get("qaAssortment");
   if (!state) return;
 
-  var email = "assortment-v170-qa@bardoctor.local";
+  var qaContext = window.__bdMobileQaContextV496 || null;
+  var email = qaContext ? qaContext.email : "assortment-v170-qa@bardoctor.local";
+  var token = qaContext ? qaContext.token : "qa-local-token";
+  var userId = qaContext ? qaContext.userId : "qa-assortment-user";
+  var workspaceId = qaContext ? qaContext.activeWorkspaceId : "qa-assortment-workspace";
   var requestedVenue = Number(params.get("venue"));
   var rememberedVenue = Number(localStorage.getItem("bd_active_venue_id"));
-  var venueId = requestedVenue || rememberedVenue || (state === "venue-b" ? 502 : 501);
+  var venueId = qaContext ? qaContext.activeVenueId : requestedVenue || rememberedVenue || (state === "venue-b" ? 502 : 501);
+  var activeVenueIsPrimary = qaContext ? qaContext.activeVenueIsPrimary : venueId === 501;
   var scope = "__" + email + "__venue_" + venueId;
-  var permissions = [
+  var permissions = qaContext ? qaContext.permissions : [
     "inventory.view", "inventory.manage", "expenses.create", "finance.view",
     "finance.manage", "data.import", "integrations.manage", "settings.manage",
   ];
   if (state === "readonly") permissions = permissions.filter(function (permission) {
     return permission !== "inventory.manage";
   });
-  var activeRole = state === "readonly" ? "manager" : "owner";
+  var activeRole = state === "readonly" ? "manager" : qaContext ? qaContext.role : "owner";
   var venueName = state === "long"
     ? "Кёльн · Центральная площадка с исключительно длинным названием"
     : venueId === 502 ? "Причал" : "Кёльн";
@@ -29,7 +34,7 @@
     currency: venueId === 501 ? "PMR_RUB" : "MDL",
     areas: ["Бар", "Кухня", "Зал", "Администрация"],
   };
-  var venueRows = [
+  var venueRows = qaContext ? qaContext.venues.map(function (venue) { return Object.assign({}, venue, { role: activeRole, permissions: permissions }); }) : [
     { id: 501, workspaceId: "qa-assortment-workspace", name: venueId === 501 ? venueName : "Кёльн", role: activeRole, isPrimary: true, status: "active", permissions: permissions },
     { id: 502, workspaceId: "qa-assortment-workspace", name: venueId === 502 ? venueName : "Причал", role: activeRole, isPrimary: false, status: "active", permissions: permissions },
   ];
@@ -307,10 +312,10 @@
   }
 
   localStorage.setItem("bd_session", email);
-  localStorage.setItem("bd_session_token", "qa-local-token");
-  localStorage.setItem("bd_session_userid", "qa-assortment-user");
+  localStorage.setItem("bd_session_token", token);
+  localStorage.setItem("bd_session_userid", String(userId));
   localStorage.setItem("bd_active_venue_id", String(venueId));
-  localStorage.setItem("bd_active_venue_is_primary", venueId === 501 ? "1" : "0");
+  localStorage.setItem("bd_active_venue_is_primary", activeVenueIsPrimary ? "1" : "0");
   localStorage.setItem("bd_active_role", activeRole);
   localStorage.setItem("bd_active_permissions", JSON.stringify(permissions));
   localStorage.setItem("bd_restaurant_profile__" + email, JSON.stringify(profile));
@@ -319,17 +324,17 @@
   localStorage.setItem("bd_purchase_documents_cache" + scope, JSON.stringify(purchases));
   localStorage.setItem("bd_sales_documents_cache" + scope, JSON.stringify(sales));
   localStorage.setItem("bd_finance_revenue_cache" + scope, JSON.stringify(revenues));
-  localStorage.setItem("bd_venue_context__" + email, JSON.stringify({ activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", canCreateVenues: true, venues: venueRows }));
+  localStorage.setItem("bd_venue_context__" + email, JSON.stringify({ activeVenueId: venueId, activeWorkspaceId: workspaceId, canCreateVenues: qaContext ? qaContext.canCreateVenues : true, venues: venueRows }));
 
   var originalFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = typeof input === "string" ? input : input && input.url || "";
     var jsonHeaders = { "Content-Type": "application/json" };
     if (url.indexOf("/api/auth/bootstrap") >= 0) {
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: "qa-assortment-user", token: "qa-local-token", firstName: "QA", lastName: "Assortment", phone: null, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: jsonHeaders }));
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, email: email, userId: userId, token: token, firstName: "QA", lastName: "Assortment", phone: null, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: workspaceId, activeVenueIsPrimary: activeVenueIsPrimary, canCreateVenues: qaContext ? qaContext.canCreateVenues : true, venues: venueRows, bootstrap: { state: "ready", reason: "active_venue_ready", membershipsLoaded: true, venuesLoaded: true, activeVenueRestored: false, accessibleVenueCount: venueRows.length, confirmedOwnedVenueCount: venueRows.length, inaccessibleOwnedVenueCount: 0 } }), { status: 200, headers: jsonHeaders }));
     }
     if (url.indexOf("/api/restaurants/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, restaurant: profile }), { status: 200, headers: jsonHeaders }));
-    if (url.indexOf("/api/users/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: "QA", lastName: "Assortment", email: email, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: venueId === 501, canCreateVenues: true, venues: venueRows } }), { status: 200, headers: jsonHeaders }));
+    if (url.indexOf("/api/users/me") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, user: { firstName: "QA", lastName: "Assortment", email: email, role: activeRole, permissions: permissions, activeVenueId: venueId, activeWorkspaceId: workspaceId, activeVenueIsPrimary: activeVenueIsPrimary, canCreateVenues: qaContext ? qaContext.canCreateVenues : true, venues: venueRows } }), { status: 200, headers: jsonHeaders }));
     if (url.indexOf("/api/migrate") >= 0) return Promise.resolve(new Response(JSON.stringify({ ok: true, imported: [], skipped: [] }), { status: 200, headers: jsonHeaders }));
     if (url.indexOf("/api/store/bd_purchase_documents") >= 0) {
       return Promise.resolve(new Response(JSON.stringify({ ok: true, data: purchases, updatedAt: "2026-08-12T12:00:00.000Z", source: "server_d1", authoritative: true, legacyImportRequired: false }), { status: 200, headers: jsonHeaders }));
@@ -381,7 +386,7 @@
       try { body = JSON.parse(init.body || "{}"); } catch { body = {}; }
       var next = Number(body.venueId) || venueId;
       localStorage.setItem("bd_active_venue_id", String(next));
-      return Promise.resolve(new Response(JSON.stringify({ ok: true, activeVenueId: next, activeWorkspaceId: "qa-assortment-workspace", activeVenueIsPrimary: next === 501, role: activeRole, permissions: permissions }), { status: 200, headers: jsonHeaders }));
+      return Promise.resolve(new Response(JSON.stringify({ ok: true, activeVenueId: next, activeWorkspaceId: workspaceId, activeVenueIsPrimary: qaContext ? !!venueRows.find(function (venue) { return String(venue.id) === String(next); })?.isPrimary : next === 501, role: activeRole, permissions: permissions }), { status: 200, headers: jsonHeaders }));
     }
     return originalFetch(input, init);
   };

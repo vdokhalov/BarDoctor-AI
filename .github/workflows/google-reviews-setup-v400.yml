@@ -114,7 +114,7 @@ jobs:
         run: node --import tsx scripts/production-rca-v496-browser.mjs
       - name: Stable v485 UI rollback and protected contracts
         run: |
-          node --test tests/api-read-tracker.test.mjs tests/reference-slice-recovery.test.mjs tests/reference-slice-recovery-parity.test.mjs
+          node --test tests/api-read-tracker.test.mjs tests/reference-slice-recovery.test.mjs tests/reference-slice-recovery-parity.test.mjs tests/mobile-qa-context-v496.test.mjs
           node --test tests/stable-ui-rollback.test.mjs
           node --import tsx scripts/stable-ui-rollback-browser.mjs
           node --import tsx scripts/owner-uat-v493-browser.mjs
@@ -273,6 +273,11 @@ jobs:
         run: npm run test:mobile-navigation
       - name: Home reviews viewport QA
         run: npm run test:home-reviews-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-navigation-and-home-review-evidence
+          path: qa-artifacts/mobile-navigation-v269
       - uses: actions/upload-artifact@v4
         if: always()
         with:

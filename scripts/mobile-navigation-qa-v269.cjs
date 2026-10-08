@@ -23,11 +23,36 @@ const homeReviewProfiles = [
 const profiles = process.env.BD_QA_SCENARIO === "home-reviews" ? homeReviewProfiles : standardProfiles;
 const desktopProfile = { name: "desktop-chrome", descriptor: devices["Desktop Chrome"] };
 const timings = [];
+let currentRun = null;
+
+async function captureFailureEvidence(run, error) {
+  if (!run) return;
+  const prefix = `${run.profile.name}-${run.label}-failure`.replace(/[^a-zA-Z0-9_-]/g, "_");
+  fs.writeFileSync(path.join(outputDir, `${prefix}.txt`), `${error?.stack || error}\n`);
+  const evidence = { profile: run.profile.name, scenario: run.label, url: run.page.url(), issues: run.issues, transportResponses: run.transportResponses };
+  let documentDeadline;
+  try {
+    evidence.document = await Promise.race([run.page.evaluate(() => ({
+      body: (document.body?.innerText || "").slice(0, 16000),
+      bootstrap: { state: window.__bdAuthBootstrapV274?.state, reason: window.__bdAuthBootstrapV274?.reason, pending: !!window.__bdBootstrapPending },
+      auth: { email: !!localStorage.getItem("bd_session"), token: !!localStorage.getItem("bd_session_token") },
+      venue: localStorage.getItem("bd_active_venue_id"),
+    })), new Promise((_, reject) => { documentDeadline = setTimeout(() => reject(new Error("Failure document capture exceeded 5 seconds")), 5000); })]);
+  } catch (captureError) { evidence.documentCaptureError = captureError.message; }
+  finally { clearTimeout(documentDeadline); }
+  fs.writeFileSync(path.join(outputDir, `${prefix}.json`), `${JSON.stringify(evidence, null, 2)}\n`);
+  try { await run.page.screenshot({ path: path.join(outputDir, `${prefix}.png`), fullPage: true, timeout: 5000 }); }
+  catch (captureError) { process.stderr.write(`[mobile-qa] screenshot capture: ${captureError.message}\n`); }
+}
 
 async function timedFlow(browser, profile, name, flow) {
   const started = performance.now();
   try {
     return await flow(browser, profile);
+  } catch (error) {
+    try { await captureFailureEvidence(currentRun, error); }
+    catch (captureError) { process.stderr.write(`[mobile-qa] failure capture: ${captureError.message}\n`); }
+    throw error;
   } finally {
     const timing = { browser: "chromium", profile: profile.name, scenario: name, durationMs: Math.round(performance.now() - started) };
     timings.push(timing);
@@ -272,6 +297,12 @@ async function createRun(browser, profile, label, options = {}) {
   });
   await context.addInitScript(({ permissions: allowed, venues: venueList, snapshots, assortments }) => {
     const email = "mobile-qa@bardoctor.local";
+    // Local module fixtures share this owner context before bootstrap captures it.
+    window.__bdMobileQaContextV496 = {
+      email, token: "mobile-qa-token", userId: "mobile-qa-user", role: "owner",
+      activeVenueId: 901, activeWorkspaceId: "mobile-qa", activeVenueIsPrimary: true,
+      canCreateVenues: true, permissions: allowed, venues: venueList,
+    };
     localStorage.setItem("bd_session", email);
     localStorage.setItem("bd_session_token", "mobile-qa-token");
     localStorage.setItem("bd_session_userid", "mobile-qa-user");
@@ -572,6 +603,15 @@ async function createRun(browser, profile, label, options = {}) {
 
   const page = await context.newPage();
   const issues = [];
+  const transportResponses = [];
+  page.on("response", (response) => {
+    const url = new URL(response.url());
+    if (url.pathname.startsWith("/api/")) transportResponses.push({ path: url.pathname, status: response.status() });
+  });
+  page.on("requestfailed", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/")) transportResponses.push({ path: url.pathname, failure: request.failure()?.errorText });
+  });
   page.on("dialog", async (dialog) => {
     issues.push({ type: "native-dialog", message: dialog.message() });
     await dialog.dismiss();
@@ -580,7 +620,7 @@ async function createRun(browser, profile, label, options = {}) {
   page.on("console", (message) => {
     if (message.type() === "error" && !/401 \(Unauthorized\)|Failed to load resource/.test(message.text())) issues.push({ type: "console", url: page.url(), location: message.location(), message: message.text() });
   });
-  return { context, page, state, profile, label, issues };
+  return currentRun = { context, page, state, profile, label, issues, transportResponses };
 }
 
 async function goto(page, pathName) {
@@ -657,6 +697,7 @@ async function mobileAudit(page, profileName, label, options = {}) {
 async function closeRun(run) {
   assert.deepEqual(run.issues, [], `${run.profile.name}/${run.label}: browser errors`);
   await run.context.close();
+  if (currentRun === run) currentRun = null;
 }
 
 async function inventoryFlow(browser, profile) {
@@ -1668,6 +1709,7 @@ async function runProfile(browser, profile) {
     passed: failures.length === 0,
   };
   fs.writeFileSync(path.join(outputDir, "mobile-navigation-qa.json"), `${JSON.stringify(summary, null, 2)}\n`);
+  fs.writeFileSync(path.join(outputDir, `mobile-navigation-qa-${process.env.BD_QA_SCENARIO || "all"}.json`), `${JSON.stringify(summary, null, 2)}\n`);
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.passed) process.exit(1);
 })();

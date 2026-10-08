@@ -4,8 +4,9 @@
   var state = new URLSearchParams(window.location.search).get("qaEquipment");
   if (!state) return;
 
-  var email = "equipment-v167-qa@bardoctor.local";
-  var venueId = state === "venue-b" ? 302 : 301;
+  var qaContext = window.__bdMobileQaContextV496 || null;
+  var email = qaContext ? qaContext.email : "equipment-v167-qa@bardoctor.local";
+  var venueId = qaContext ? qaContext.activeVenueId : state === "venue-b" ? 302 : 301;
   var scope = "__" + email + "__venue_" + venueId;
   var venueName = state === "long"
     ? "Кёльн · Центральная площадка с очень длинным названием"
@@ -87,14 +88,14 @@
     { id: "emp-1", name: "Андрей П.", position: "administrator", status: "active" },
     { id: "emp-2", name: "Мария К.", position: "bartender", status: "active" },
   ];
-  var permissions = ["equipment.view", "equipment.manage", "expenses.create", "finance.view", "finance.manage", "team.view"];
+  var permissions = qaContext ? qaContext.permissions : ["equipment.view", "equipment.manage", "expenses.create", "finance.view", "finance.manage", "team.view"];
 
   localStorage.setItem("bd_session", email);
-  localStorage.setItem("bd_session_token", "qa-local-token");
-  localStorage.setItem("bd_session_userid", "qa-equipment-user");
+  localStorage.setItem("bd_session_token", qaContext ? qaContext.token : "qa-local-token");
+  localStorage.setItem("bd_session_userid", qaContext ? String(qaContext.userId) : "qa-equipment-user");
   localStorage.setItem("bd_active_venue_id", String(venueId));
-  localStorage.setItem("bd_active_venue_is_primary", "1");
-  localStorage.setItem("bd_active_role", "owner");
+  localStorage.setItem("bd_active_venue_is_primary", !qaContext || qaContext.activeVenueIsPrimary ? "1" : "0");
+  localStorage.setItem("bd_active_role", qaContext ? qaContext.role : "owner");
   localStorage.setItem("bd_active_permissions", JSON.stringify(permissions));
   localStorage.setItem("bd_restaurant_profile__" + email, JSON.stringify(profile));
   localStorage.setItem("bd_restaurant_cache" + scope, JSON.stringify(profile));
@@ -105,9 +106,9 @@
   localStorage.setItem("bd_employees_cache" + scope, JSON.stringify(employees));
   localStorage.setItem("bd_venue_context__" + email, JSON.stringify({
     activeVenueId: venueId,
-    activeWorkspaceId: "qa-equipment-workspace",
-    canCreateVenues: true,
-    venues: [
+    activeWorkspaceId: qaContext ? qaContext.activeWorkspaceId : "qa-equipment-workspace",
+    canCreateVenues: qaContext ? qaContext.canCreateVenues : true,
+    venues: qaContext ? qaContext.venues : [
       { id: 301, name: venueName, role: "owner", isPrimary: true, permissions: permissions },
       { id: 302, name: "Причал", role: "owner", isPrimary: false, permissions: permissions },
     ],
