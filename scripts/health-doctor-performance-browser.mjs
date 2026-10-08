@@ -23,7 +23,7 @@ try{for(const width of [390,820,1280]){
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
  try{
-  for(const attempt of ['first','repeat']){const started=Date.now(),from=calls.length;await page.goto(r.base+'/health');await page.locator('.bd-health-detail-score-v332').waitFor();await page.waitForLoadState('networkidle');timings.push({surface:'health',attempt,visibleMs:Date.now()-started,healthReads:calls.slice(from).filter(p=>p==='/api/business-health').length});}
+  for(const attempt of ['first','repeat']){const started=Date.now(),from=calls.length;await page.goto(r.base+'/health');await page.locator('.bd-health-detail-hero-v332 .bd-home-health-ring').waitFor();await page.waitForLoadState('networkidle');timings.push({surface:'health',attempt,visibleMs:Date.now()-started,healthReads:calls.slice(from).filter(p=>p==='/api/business-health').length});}
   await page.goto(r.base+'/analysis');await page.getByRole('button',{name:'Запустить диагностику',exact:true}).waitFor();await page.waitForLoadState('networkidle');assert.equal(calls.filter(p=>p==='/api/ai/curated').length,0);assert.equal(await page.locator('[data-curated-question]').count(),0);
   // Independent correction verification survives the removed priority queue.
   const id='health:'+r.fixture.venueId+':day:2026-10-02';
@@ -42,7 +42,7 @@ try{for(const width of [390,820,1280]){
   mode='normal';const recoveredRead=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/business-health/verify'&&res.status()===200);
   await page.evaluate(()=>window.dispatchEvent(new Event('bd:store-updated')));await recoveredRead;await verification.getByRole('alert').waitFor({state:'detached'});await page.locator('[data-management-verification]').waitFor();
   mode='stalled';const started=Date.now();await page.evaluate(()=>window.dispatchEvent(new Event('bd:store-updated')));await verification.getByRole('alert').filter({hasText:'Сервер не ответил вовремя'}).waitFor({timeout:20000});assert.equal(await verification.getByText('Проверяем результат исправления…',{exact:true}).count(),0);timings.push({surface:'correction-verification',attempt:'timeout',visibleMs:Date.now()-started});
-  mode='normal';await page.goto(r.base+'/health');await page.locator('.bd-health-detail-score-v332').waitFor();
+  mode='normal';await page.goto(r.base+'/health');await page.locator('.bd-health-detail-hero-v332 .bd-home-health-ring').waitFor();
   assert.deepEqual(errors,[]);await page.screenshot({path:`${out}/${width}.png`,fullPage:true});results.push({width,status:'PASS',hiddenCuratedReads:0,legacyDoctor:true,coalescedVerificationReads:2,timings});console.log(JSON.stringify(results.at(-1)));
  }catch(error){await page.screenshot({path:`${out}/${width}-failure.png`,fullPage:true});writeFileSync(`${out}/${width}-failure.json`,JSON.stringify({error:String(error),url:page.url(),calls,errors},null,2));throw error;}finally{await context.close();await r.close();}
 }}finally{await browser.close();writeFileSync(out+'/results.json',JSON.stringify(results,null,2));}

@@ -1246,8 +1246,8 @@ async function businessHealthColdStartFlow(browser, profile) {
   assert.deepEqual(await page.evaluate(() => window.__bdHealthRenderedSnapshotIds), ["business-health-snapshot:901:mobile-qa-fresh"], `${profile.name}: stale Health flashed before the canonical response`);
   assert.equal(firstHome.score, "83");
   assert.equal(firstHome.status, "Хорошее состояние");
-  assert.deepEqual(firstHome.zones, [], "Approved compact Home leaves the zone dashboard in full Health");
-  assert.equal(firstHome.priority, undefined, "Home top cost signal is separate from the full Health priority");
+  assert.equal(firstHome.zones.length, 4, "Owner UAT full Home must expose all four Health zones");
+  assert.ok(firstHome.priority?.includes("Главный приоритет"), "Owner UAT full Home must expose the Health recommendation");
   assert.equal(firstHome.confidence, undefined, `${profile.name}: Home exposes confidence as a score`);
   assert.doesNotMatch(await home.textContent(), /Загрузка|Достоверность диагноза/i, `${profile.name}: Home returned to loading or exposed confidence`);
   const homeLayout = await page.evaluate(() => {
@@ -1264,8 +1264,9 @@ async function businessHealthColdStartFlow(browser, profile) {
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
-  assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
-  // Phase 4A approved hierarchy: attention comes before the existing money card.
+  assert.ok(await page.locator('.bd-home-health-ring').isVisible(), `${profile.name}: full Health ring is missing`);
+  assert.ok(await page.locator('.bd-home-health-zones-v332>*').count()>0, `${profile.name}: full Health zones are missing`);
+  // Owner UAT restores full Health; attention still precedes the money card.
   assert.ok((homeLayout.attentionTop ?? Infinity) < (homeLayout.moneyTop ?? -Infinity), `${profile.name}: attention must precede financial details`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
@@ -1275,7 +1276,7 @@ async function businessHealthColdStartFlow(browser, profile) {
   await page.locator(".bd-home-health-score-v332").click();
   const detail = page.locator(".bd-health-detail-v332");
   await detail.waitFor({ timeout: 10_000 });
-  assert.equal(await detail.locator(".bd-health-detail-score-v332 strong").textContent(), firstHome.score, `${profile.name}: Home/detail scores diverged`);
+  assert.equal(await detail.locator(".bd-health-detail-hero-v332 .bd-home-health-ring strong").textContent(), firstHome.score, `${profile.name}: Home/detail scores diverged`);
   assert.match(await detail.textContent(), /Что происходит сейчас.*Зоны Business Health.*Главный приоритет.*Качество данных/s);
   assert.doesNotMatch(await detail.textContent(), /Обзор.*Финансы.*Спрос.*Операции|Почему такой score|Открыть раздел/s);
   assert.doesNotMatch(await detail.textContent(), /Достоверность диагноза 77%/);
@@ -1319,7 +1320,7 @@ async function businessHealthColdStartFlow(browser, profile) {
   run.state.healthMode = "healthy";
   await page.reload({ waitUntil: "networkidle" });
   await home.waitFor({ timeout: 10_000 });
-  await home.getByRole("button", { name: /Открыть полный Business Health/ }).click();
+  await home.locator('.bd-home-health-score-v332').click();
   await detail.waitFor({ timeout: 10_000 });
   assert.equal(new URL(page.url()).pathname, "/health", `${profile.name}: Home detail CTA is dead`);
   await page.goBack({ waitUntil: "networkidle" });
