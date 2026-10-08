@@ -1,5 +1,6 @@
 import type { CostEpisodeV1, CostObservationV1, CostVerificationV1 } from '../management-cost-contracts';
 import type { EvidenceReference } from '../evidence-contracts';
+import { readCanonicalJson } from './canonical-read';
 
 type Episode = CostEpisodeV1 & { menuItemName?:string; why: string[]; effect: string; targets: {health:string;techCard:string;purchase?:string} };
 type Payload = {ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;currentObservation?:CostObservationV1;itemName?:string;coverage?:string;nextCursor?:string|null;evaluationCursor?:string|null};
@@ -10,8 +11,9 @@ export function createCostManagementClient(React: typeof import('react'), runtim
   const checkScope=(venue:number)=>{if(runtime.venue()!==venue)throw new Error('Заведение изменилось. Откройте сигнал в нужном заведении.');};
   async function request(path:string,venue:number,body?:object,signal?:AbortSignal):Promise<Payload> {
     checkScope(venue);
-    const response=await fetch(path,{method:body?'POST':'GET',headers:{...runtime.headers(),'X-Venue-Id':String(venue),...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,cache:'no-store',signal});
-    const value=await response.json() as Payload;checkScope(venue);if(value.code==='FEATURE_DISABLED'){disabled.add(venue);covered.delete(venue);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
+    const headers=new Headers(runtime.headers());headers.set('X-Venue-Id',String(venue));if(body)headers.set('Content-Type','application/json');
+    const {response,value}=await readCanonicalJson<Payload>(path,headers,signal,{method:body?'POST':'GET',body:body?JSON.stringify(body):undefined});
+    checkScope(venue);if(value.code==='FEATURE_DISABLED'){disabled.add(venue);covered.delete(venue);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
     if(!response.ok||value.ok===false)throw new Error(value.error||'Проверка пока недоступна. Повторите.');
     if(value.episode&&value.episode.scope.venueId!==venue)throw new Error('Не удалось подтвердить заведение сигнала.');
     return value;

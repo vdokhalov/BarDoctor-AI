@@ -1,5 +1,5 @@
 /** Bounded transport only. No caching, source substitution or scope decisions. */
-export async function readCanonicalJson<T>(path: string, headers: HeadersInit, signal?: AbortSignal): Promise<{ response: Response; value: T }> {
+export async function readCanonicalJson<T>(path: string, headers: HeadersInit, signal?: AbortSignal, request?: Pick<RequestInit, 'method' | 'body'>): Promise<{ response: Response; value: T }> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancel: () => void = () => undefined;
@@ -10,7 +10,7 @@ export async function readCanonicalJson<T>(path: string, headers: HeadersInit, s
   });
   try {
     return await Promise.race([deadline, (async () => {
-      const response = await fetch(path, { headers, cache: 'no-store', signal: controller.signal });
+      const response = await fetch(path, { ...request, headers, cache: 'no-store', signal: controller.signal });
       return { response, value: await response.json() as T };
     })()]);
   } finally { clearTimeout(timer); signal?.removeEventListener('abort', cancel); }

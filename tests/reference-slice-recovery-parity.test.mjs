@@ -5,6 +5,13 @@ const item={id:'entry:finance',kind:'entry',from:'/finance'};
 const state=()=>({before:{url:'/finance',venue:'1',contract:{path:'/finance',url:'/finance'},entries:[{label:'Зарплаты',tag:'BUTTON'}],frames:[]},actions:{'entry:finance':{url:'/salaries?month=2026-10',contract:{path:'/salaries',url:'/salaries?month=2026-10'}}},baselineDefects:[]});
 const evaluate=candidate=>compareRecoveryParity({items:[item]},{v485:{'/finance':state()},candidate:{'/finance':candidate}},'chromium',1280)[0];
 test('existing route does not excuse a missing visible Finance capability',()=>{const value=state();value.before.entries=[];assert.equal(evaluate(value).verdict,'FAIL');});
+test('owner-approved More Doctor entry cannot excuse removal of an existing More control',()=>{
+ const item={id:'entry:more',kind:'entry',from:'/more'};
+ const a=state();a.before.url='/more';a.before.contract={path:'/more',url:'/more'};a.actions={};
+ const b=structuredClone(a);b.before.entries.unshift({label:'AI Doctor Диагностика и рекомендации',tag:'BUTTON'});
+ const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/more':a},candidate:{'/more':b}},'chromium',390)[0].verdict;
+ assert.equal(compare(),'PASS');b.before.entries.pop();assert.equal(compare(),'FAIL');
+});
 test('clicking the wrong destination blocks otherwise visible navigation',()=>{const value=state();value.actions[item.id].url='/home';assert.equal(evaluate(value).verdict,'FAIL');});
 test('changed embedded module content blocks route-only parity',()=>{const value=state();value.before.frames=[{title:'Finance',text:'Missing payroll'}];assert.equal(evaluate(value).verdict,'FAIL');});
 test('unchanged route, entry and actual destination pass together',()=>assert.equal(evaluate(state()).verdict,'PASS'));

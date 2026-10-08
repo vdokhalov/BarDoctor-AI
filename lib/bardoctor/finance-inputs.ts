@@ -39,8 +39,18 @@ export function financeAmount(row: Row, field: string, currency: string | null):
 /** Attach a recorded report once per date without changing any session identity. */
 export function revenueRowsWithReports(revenues: unknown[], days: ReturnType<typeof operationalDays>): Row[] {
   const seen = new Set<string>();
+  // Preserve the first matching day (including the untagged legacy case),
+  // without scanning the entire calendar for every revenue session.
+  const firstDay = new Map<unknown, typeof days[number]>();
+  const scopedDay = new Map<unknown, Map<number, typeof days[number]>>();
+  for (const day of days) {
+    if (!firstDay.has(day.businessDate)) firstDay.set(day.businessDate, day);
+    const venues = scopedDay.get(day.businessDate) ?? new Map();
+    if (!venues.has(day.venueId)) venues.set(day.venueId, day);
+    scopedDay.set(day.businessDate, venues);
+  }
   return eligibleRevenueRows(revenues).map(row => {
-    const day = days.find(day => day.businessDate === row.date && (row.venueId == null || Number(row.venueId) === day.venueId));
+    const day = row.venueId == null ? firstDay.get(row.date) : scopedDay.get(row.date)?.get(Number(row.venueId));
     if (!day) return row;
     const first = !seen.has(day.businessDate); seen.add(day.businessDate);
     const result: Row = { ...row, _bdOperationalDay: day, revenueStatus: day.revenue.status, operationalStatus: day.status };
@@ -60,14 +70,23 @@ export function revenueRowsWithReports(revenues: unknown[], days: ReturnType<typ
  * before COGS, recurring estimates and final closed-month reconciliation. */
 export function readFinanceInputs(input: FinanceReadInput) {
   const revenues = eligibleRevenueRows(input.revenues, input.venueId, input).filter(row => String(row.date) >= input.startDate && String(row.date) <= input.endDate);
+  const revenuesByDate = new Map<unknown, Row[]>();
+  for (const row of revenues) {
+    const group = revenuesByDate.get(row.date) ?? [];
+    group.push(row); revenuesByDate.set(row.date, group);
+  }
+  const projectedByDate = new Map<unknown, NonNullable<FinanceReadInput['operationalDayProjection']>[number]>();
+  for (const day of input.operationalDayProjection ?? []) {
+    if (day.venueId === input.venueId && !projectedByDate.has(day.businessDate)) projectedByDate.set(day.businessDate, day);
+  }
   const periodRows = (values: unknown[] = []) => scope(values, input).filter(row => String(row.businessDate ?? row.date) >= input.startDate && String(row.businessDate ?? row.date) <= input.endDate);
   const days = operationalDays({ ...input, revenues, events: periodRows(input.events), documents: periodRows(input.documents), reports: periodRows(input.reports) }).map(day => {
     // Existing client consumers receive authorized Operational Day metadata,
     // while internal event/report stores deliberately stay out of bulk sync.
     // Reuse that read projection only for the exact same source identities and
     // accounting amount. A stale/different scope cannot certify a new total.
-    const projected = input.operationalDayProjection?.find(candidate => candidate.venueId === input.venueId && candidate.businessDate === day.businessDate);
-    const dayRows = revenues.filter(row => row.date === day.businessDate);
+    const projected = projectedByDate.get(day.businessDate);
+    const dayRows = revenuesByDate.get(day.businessDate) ?? [];
     const ids = dayRows.map(row => row.id).sort();
     const amounts = dayRows.map(row => financeAmount(row, "revenue", input.currency));
     const matches = projected && Array.isArray(projected.revenue.sourceIds) && projected.revenue.currency === input.currency && ids.every(id => id != null)
@@ -85,13 +104,19 @@ export function readFinanceInputs(input: FinanceReadInput) {
   // The same authorization boundary applies to every day's recorded payroll.
   // Resolve it once, preserving the first report per date and its original FX.
   const scopedReports = scope(input.reports ?? [], input);
-  const payrollByDay = days.filter(day => day.report != null || revenues.some(row => row.date === day.businessDate)).map(day => {
+  const reportsByDate = new Map<unknown, Row>();
+  for (const row of scopedReports) if (!reportsByDate.has(row.date)) reportsByDate.set(row.date, row);
+  const legacyPayrollByDate = new Map<unknown, Row>();
+  for (const row of joined) {
+    if (!legacyPayrollByDate.has(row.date) && finite(record(row.payrollBreakdown).total ?? record(row.payrollBreakdown).totalPayroll) != null) legacyPayrollByDate.set(row.date, row);
+  }
+  const payrollByDay = days.filter(day => day.report != null || revenuesByDate.has(day.businessDate)).map(day => {
     const saved = day.payroll.amount;
     // Even a recorded zero wins over expenses and future rule edits.
-    const legacy = joined.find(row => row.date === day.businessDate && finite(record(row.payrollBreakdown).total ?? record(row.payrollBreakdown).totalPayroll) != null);
+    const legacy = legacyPayrollByDate.get(day.businessDate);
     const amount = saved ?? finite(record(legacy?.payrollBreakdown).total ?? record(legacy?.payrollBreakdown).totalPayroll);
     const source = day.operations.fot === "RECORDED" && saved != null ? "RECORDED" : amount != null ? "LEGACY_RECORDED" : "MISSING";
-    const original = scopedReports.find(row => row.date === day.businessDate) ?? revenues.find(row => row.date === day.businessDate) ?? {};
+    const original = reportsByDate.get(day.businessDate) ?? revenuesByDate.get(day.businessDate)?.[0] ?? {};
     const converted = amount == null ? null : financeAmount({ ...original, originalAmount: amount, amount, accountingAmount: undefined }, "amount", input.currency);
     return { businessDate: day.businessDate, amount: converted, basis: source };
   });

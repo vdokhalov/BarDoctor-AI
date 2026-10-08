@@ -16,6 +16,7 @@ import { evidenceContentRevision } from "./evidence-contracts";
 import { storeSnapshots } from "./store-cas";
 import { reviewsForCurrentGoogleLocation } from "./review-sources";
 import { buildHealthOperationsInputs, HEALTH_OPERATIONS_KEYS, MAX_HEALTH_ROWS, MAX_HEALTH_SOURCE_BYTES, type HealthSource } from "./health-operations-inputs";
+import { observedAwait } from "./request-observability";
 
 type Row = Record<string, unknown>;
 const object = (v: unknown): v is Row => Boolean(v && typeof v === "object" && !Array.isArray(v));
@@ -71,9 +72,9 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   }
   let profile: Row = {};
   try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
-  const context = buildVenueAIContextFromSources("diagnosis", { access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) });
-  await bindCanonicalContext(context, scope, stores);
-  const operations = buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency });
+  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
+  await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
+  const operations = await observedAwait("health.operations", () => buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency }));
   const inputManifest = { contractVersion: 1 as const, scope, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };
   const inputRevision = await revision("OPERATIONAL_REPORT", "business-health-inputs", { inputManifest, operations, costEpisodes:rows.results.filter(row=>row.store_key.startsWith(costPrefix)), localDate: operations.counters.unclosedShifts.window });
   const intelligence = buildBusinessIntelligenceFromVenueContext({ venueId: account.venueId, context, canonicalOperations: operations });

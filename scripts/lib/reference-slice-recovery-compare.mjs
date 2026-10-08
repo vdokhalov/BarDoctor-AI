@@ -12,7 +12,11 @@ export function compareRecoveryParity(inventory,versions,engine,width){const row
     const approved=['/home','/health','/analysis'].includes(path)||['home','health','doctor'].includes(a.before.surface)&&a.before.surface===b.before.surface;
     if(!approved&&!payrollDefault){
       const entries=v=>v.before.entries.filter(e=>e.label.trim()).map(e=>({...Object.fromEntries(Object.entries(e).filter(([key])=>key!=='index')),label:normalized(e.label)}));
-      assert.deepEqual(entries(b),entries(a),item.id+' all visible/discoverable controls');
+      // Only the two owner-requested More entries are new. Every existing
+      // control still participates in the unchanged module parity check.
+      const addedMore=new Set(['AI Doctor Диагностика и рекомендации','Состояние бизнеса Индекс и зоны Business Health']);
+      const candidateEntries=entries(b).filter(entry=>path!=='/more'||!addedMore.has(entry.label));
+      assert.deepEqual(candidateEntries,entries(a),item.id+' all visible/discoverable controls');
       assert.deepEqual(b.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),a.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),item.id+' embedded module content');
     }
     if(payrollDefault){assert.deepEqual(b.baselineDefects,[],item.id+' repaired Payroll runtime');assert.ok(b.before.text.includes('Зарплат'),item.id+' Payroll visible');assert.equal(new URL(b.before.url,'http://isolated.test').searchParams.get('month'),'2026-10',item.id+' same existing default month');}

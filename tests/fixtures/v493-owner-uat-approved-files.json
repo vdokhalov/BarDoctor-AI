@@ -1,0 +1,7 @@
+{
+  "lib/bardoctor/canonical-health-inputs.ts": "5530991126f862efb544906b6278f7f51eb04a822bfd4bd353f364eddf04584e",
+  "lib/bardoctor/client/canonical-read.ts": "73fc944014d41b68446afc02477c91634a8042cdf60898ac7ccf9fafc9712906",
+  "lib/bardoctor/client/management-cost.tsx": "24ac4716d21f60362cefe40740e8c89b463b3a0621dcd6c3859493798c5bfc0d",
+  "lib/bardoctor/finance-inputs.ts": "89dd4f015c216ed59ef526c76411f7833d048917c6fb0d915ce879be68443862",
+  "lib/bardoctor/request-observability.ts": "c97ed4e99356f1def0a4294198a2aa6e4595ce3bb7eb2069256c01aad6d69e6c"
+}

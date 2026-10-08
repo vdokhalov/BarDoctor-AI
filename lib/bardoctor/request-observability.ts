@@ -5,7 +5,8 @@ import { AsyncLocalStorage } from "node:async_hooks";
 type Stage = "worker.dispatch" | "auth.schema" | "auth.identity" | "auth.result" |
   "auth.memberships" | "auth.legacy_import" | "auth.issue_session" |
   "auth.ensure_owner_venue" | "owner.reconcile" | "owner.membership_batch" |
-  "store.load" | "selector.load" | "d1.all" | "d1.first" | "d1.raw" | "d1.run" | "d1.batch" | "d1.exec";
+  "store.load" | "selector.load" | "health.context" | "health.evidence" | "health.operations" |
+  "d1.all" | "d1.first" | "d1.raw" | "d1.run" | "d1.batch" | "d1.exec";
 type Context = { requestId: string; correlationId: string; route: string; started: number;
   scope: { user: "unresolved" | "authenticated" | "anonymous"; venue: "unresolved" | "authorized" };
   span?: number; nextSpan: { value: number; events: number };
@@ -16,6 +17,7 @@ const originalStatements = new WeakMap<object, D1PreparedStatement>();
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function diagnosticRoute(path: string): string | null {
+  if (path === "/api/business-health") return path;
   if (path === "/api/menu/ingestion" || path === "/api/assortment/overview") return path;
   if (path === "/api/auth/bootstrap") return "/api/auth/bootstrap";
   if (path.startsWith("/api/auth/")) return "/api/auth/:action";

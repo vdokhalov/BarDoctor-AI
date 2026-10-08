@@ -10,17 +10,23 @@ const read=path=>readFileSync(path,'utf8');
 const before=path=>execFileSync('git',['show',production+':'+path],{maxBuffer:64*1024*1024});
 const functions=source=>new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,source.slice(n.start,n.end)]));
 
-test('Home, Health and legacy Doctor render exactly as v485; V1.2 is absent from the executable client',()=>{
+test('legacy Doctor remains v485; owner-UAT repairs restore full Health and reachable Doctor without V1.2',()=>{
  const source=read('public/assets/index-BQGspy0I.js'),actual=functions(source);
  const expected=functions(execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:64*1024*1024}).toString());
- for(const name of ['bdHomeDaily','c_e','Uce'])assert.equal(actual.get(name)?.replace('i.jsx(bdManagementVerificationPhase4b,{venue:Number(bdCostHealthVenue.activeVenueId)}),',''),expected.get(name),name);
+ assert.equal(actual.get('Uce'),expected.get('Uce'));
+ assert.doesNotMatch(actual.get('bdHomeDaily'),/managementCompact:!0|phase4a-home-ai-entry-retained-in-more/);
+ assert.match(actual.get('bdHomeDaily'),/bdLegacyDoctorEntryV493/);
+ assert.match(actual.get('c_e'),/bdLegacyHealthRingV493/);
+ assert.match(actual.get('t_e'),/key:"ai-doctor"/);
  assert.doesNotMatch(source,/bdReferenceUIV1|bd-reference-render|reference-slice-v1:start|bdIntelligenceModuleV1|bdCuratedClientPhase4c|i\.jsx\(bdManagementHomePhase4|i\.jsx\(bdManagementQueuePhase4b/);
  for(const path of ['app/bar-doctor-response.ts','public/app.html'])assert.doesNotMatch(read(path),/intelligence-v1\.css/);
 });
 
-test('all production APIs, schema, domain calculations, credentials contracts and dependencies remain byte-identical',()=>{
+test('production APIs, schema, auth and unrelated modules stay identical outside reviewed UAT repair files',()=>{
  const files=execFileSync('git',['ls-tree','-r','--name-only',production,'app/api','lib/bardoctor','drizzle','migrations','db','package-lock.json','.openai/hosting.json']).toString().trim().split('\n');
- const ui=new Set(['lib/bardoctor/client/curated-doctor.tsx','lib/bardoctor/client/management-actions.tsx','lib/bardoctor/client/intelligence-ui.tsx']);
+ const ui=new Set(['lib/bardoctor/client/curated-doctor.tsx','lib/bardoctor/client/management-actions.tsx','lib/bardoctor/client/intelligence-ui.tsx',
+ 'lib/bardoctor/finance-inputs.ts','lib/bardoctor/client/canonical-read.ts','lib/bardoctor/client/management-cost.tsx',
+ 'lib/bardoctor/request-observability.ts','lib/bardoctor/canonical-health-inputs.ts']);
  assert.ok(files.length>300);
  for(const path of files.filter(p=>!ui.has(p)))assert.deepEqual(readFileSync(path),before(path),path);
 });
