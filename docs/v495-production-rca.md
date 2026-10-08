@@ -10,9 +10,9 @@
 
 | UTC / endpoint | Request ID | Production-результат |
 | --- | --- | --- |
-| 15:56:23.248 `/api/business-health` | `6f53f97095dcc91cecf4ea114ec773d1` | `exceededCpu`, CPU 32500 ms, wall 36322 ms; `Worker exceeded CPU time limit`; авторизованный iPhone |
+| 15:56:23.248 `/api/business-health` | `6f53f97095dcc91cecf4ea114ec773d1` | `exceededCpu`, CPU 32500 ms, wall 36322 ms; `Worker exceeded CPU time limit`; iPhone-запрос с session headers |
 | 15:56:34.309 `/api/business-health` | `e5d3c67f5e6533b8fe2f3b71c5e6b378` | CPU 31252 ms, wall 35224 ms, `Network connection lost`; внутреннее `headers_ready:200` не доказывает доставку snapshot клиенту |
-| 15:56:23.532 `/api/auth/bootstrap` | `8729218c3186b7be805315c09159f165` | `canceled`, CPU 42 ms, wall 29954 ms; авторизованный iPhone; доставленного HTTP-ответа нет |
+| 15:56:23.532 `/api/auth/bootstrap` | `8729218c3186b7be805315c09159f165` | `canceled`, CPU 42 ms, wall 29954 ms; iPhone-запрос с session headers; доставленного HTTP-ответа нет |
 | 15:56:25.188 `/api/users/me` | `eaf290435becc148bd10ac9de43e876f` | HTTP 200, CPU 34 ms, wall 3348 ms; сервер принимал сессию в том же временном окне |
 | 15:56:53.887 `/employees?venue=1` | `08f48237ef1892dd1cad820f265d8a66` | документ `canceled`, wall 11475 ms; это не доказательство HTTP 401 Team API |
 
