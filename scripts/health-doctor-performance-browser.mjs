@@ -34,9 +34,14 @@ try{for(const width of [390,820,1280]){
   const reread=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/business-health/verify'&&res.request()!==initialSlowRequest);
   await page.evaluate(()=>{for(let n=0;n<35;n++)window.dispatchEvent(new Event('bd:store-updated'));window.dispatchEvent(new Event('focus'));});await reread;await page.waitForLoadState('networkidle');
   assert.equal(calls.slice(from).filter(p=>p==='/api/business-health/verify').length,2,'Burst notifications coalesce to initial and one post-write read');
-  delay=0;mode='error';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await verification.getByRole('alert').waitFor();
-  mode='normal';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await verification.getByRole('alert').waitFor({state:'detached'});await page.locator('[data-management-verification]').waitFor();
-  mode='stalled';const started=Date.now();await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await verification.getByRole('alert').filter({hasText:'Сервер не ответил вовремя'}).waitFor({timeout:20000});assert.equal(await verification.getByText('Проверяем результат исправления…',{exact:true}).count(),0);timings.push({surface:'correction-verification',attempt:'timeout',visibleMs:Date.now()-started});
+  // WebKit can report networkidle before the JSON consumer finishes. Focus is
+  // deliberately ignored during an active read; a new data-update intent must
+  // survive it. Observe the injected response rather than infer a scheduler state.
+  delay=0;mode='error';const failedRead=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/business-health/verify'&&res.status()===503);
+  await page.evaluate(()=>window.dispatchEvent(new Event('bd:store-updated')));await failedRead;await verification.getByRole('alert').waitFor();
+  mode='normal';const recoveredRead=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/business-health/verify'&&res.status()===200);
+  await page.evaluate(()=>window.dispatchEvent(new Event('bd:store-updated')));await recoveredRead;await verification.getByRole('alert').waitFor({state:'detached'});await page.locator('[data-management-verification]').waitFor();
+  mode='stalled';const started=Date.now();await page.evaluate(()=>window.dispatchEvent(new Event('bd:store-updated')));await verification.getByRole('alert').filter({hasText:'Сервер не ответил вовремя'}).waitFor({timeout:20000});assert.equal(await verification.getByText('Проверяем результат исправления…',{exact:true}).count(),0);timings.push({surface:'correction-verification',attempt:'timeout',visibleMs:Date.now()-started});
   mode='normal';await page.goto(r.base+'/health');await page.locator('.bd-health-detail-score-v332').waitFor();
   assert.deepEqual(errors,[]);await page.screenshot({path:`${out}/${width}.png`,fullPage:true});results.push({width,status:'PASS',hiddenCuratedReads:0,legacyDoctor:true,coalescedVerificationReads:2,timings});console.log(JSON.stringify(results.at(-1)));
  }catch(error){await page.screenshot({path:`${out}/${width}-failure.png`,fullPage:true});writeFileSync(`${out}/${width}-failure.json`,JSON.stringify({error:String(error),url:page.url(),calls,errors},null,2));throw error;}finally{await context.close();await r.close();}
