@@ -1683,7 +1683,7 @@
     if (
       requestUrl
       && requestUrl.origin === window.location.origin
-      && ["/api/auth/login", "/api/auth/register", "/api/auth/bootstrap"].indexOf(requestUrl.pathname) >= 0
+      && ["/api/auth/login", "/api/auth/register"].indexOf(requestUrl.pathname) >= 0
     ) {
       // bd-auth-single-read-v248: consume the auth body once. Response.clone()
       // could leave both readers waiting indefinitely in embedded browsers.
@@ -2047,6 +2047,14 @@
   installNavigationConsistencyGuards();
   loadApplication();
 
+  var bdBootstrapRetryPromiseV496 = null;
+  async function bdRetryBootstrapV496(initial = false) {
+    if (bdBootstrapRetryPromiseV496) return bdBootstrapRetryPromiseV496;
+    window.__bdBootstrapPending = true;
+    if (!initial) window.__bdAuthBootstrapV274 = { state: "loading", reason: "bootstrap_retry_pending" };
+    window.dispatchEvent(new CustomEvent("bd:bootstrap-start"));
+    var bootstrapStateAtStart = window.__bdAuthBootstrapV274;
+    bdBootstrapRetryPromiseV496 = (async function () {
   try {
     var demoEmail = "demo@bardoctor.app";
     if (localStorage.getItem("bd_session") === demoEmail) {
@@ -2062,20 +2070,25 @@
 
     var email = localStorage.getItem("bd_session");
     var token = localStorage.getItem("bd_session_token");
+    var selectedVenue = localStorage.getItem("bd_active_venue_id");
     var headers = {};
     if (email && token) {
       headers["X-Session-Email"] = email;
       headers["X-Session-Token"] = token;
     }
 
-    var response = await fetch("/api/auth/bootstrap", {
-      method: "POST",
-      headers: headers,
-      signal: AbortSignal.timeout(30000)
-    });
-    var result = await response.json();
+    var controller = new AbortController(), timer;
+    var resultPair = await Promise.race([
+      (async function () { var response = await fetch("/api/auth/bootstrap", { method: "POST", headers: headers, signal: controller.signal }); return { response: response, result: await response.json() }; })(),
+      new Promise(function (_, reject) { timer = setTimeout(function () { controller.abort(); reject(new DOMException("Bootstrap timed out", "TimeoutError")); }, 30000); })
+    ]).finally(function () { clearTimeout(timer); });
+    var response = resultPair.response, result = resultPair.result;
+    if (email !== localStorage.getItem("bd_session") || token !== localStorage.getItem("bd_session_token") || selectedVenue !== localStorage.getItem("bd_active_venue_id")) {
+      if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart) window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_context_changed" };
+      return;
+    }
 
-    if (result.ok) {
+    if (response.ok && result.ok) {
       rememberAccessContext(result);
       currentFirstName = cleanFirstName(result.firstName);
       localStorage.setItem("bd_session", result.email);
@@ -2091,7 +2104,7 @@
         return;
       }
       void refreshServerInventoryCacheV235();
-    } else if (result.needsLogin) {
+    } else if (response.status === 401 && result.needsLogin) {
       window.__bdAuthBootstrapV274 = { state: "unauthenticated", reason: "login_required" };
       localStorage.removeItem("bd_session");
       localStorage.removeItem("bd_session_token");
@@ -2101,14 +2114,19 @@
       localStorage.removeItem("bd_active_venue_id");
       localStorage.removeItem("bd_active_venue_is_primary");
     } else {
-      window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed" };
+      window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed", status: response.status };
     }
-  } catch {
-    window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_request_failed" };
+  } catch (error) {
+    if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart) window.__bdAuthBootstrapV274 = { state: "error", reason: error?.name === "TimeoutError" ? "bootstrap_timeout" : "bootstrap_request_failed" };
+  } finally {
+    window.__bdBootstrapPending = false;
+    window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
   }
-
-  window.__bdBootstrapPending = false;
-  window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+    })().finally(function () { bdBootstrapRetryPromiseV496 = null; });
+    return bdBootstrapRetryPromiseV496;
+  }
+  window.__bdRetryBootstrapV496 = bdRetryBootstrapV496;
+  await bdRetryBootstrapV496(true);
 
   injectSupplierAlternativesEntry();
   removeLegacyFinancePurchasePaymentEntryV195();

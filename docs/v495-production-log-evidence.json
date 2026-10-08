@@ -1,0 +1,2292 @@
+{
+  "projectId": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+  "productionVersion": 495,
+  "commit": "4921f368105e44321a020f406b9f58cb619172c9",
+  "sanitized": true,
+  "failures": [
+    {
+      "time": "2026-10-08T15:57:08.035Z",
+      "id": "01M4E3Q4230000000000000005",
+      "request": "76611ea0f5a972e8f4798f3757c26709",
+      "ray": "a476564b6c4fe429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 3,
+      "wall": 24293,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:53.887Z",
+      "id": "01M4E3PP7Z0000000000000001",
+      "request": "08f48237ef1892dd1cad820f265d8a66",
+      "ray": "a476568e88e0e429",
+      "route": "GET /employees",
+      "outcome": "canceled",
+      "cpu": 0,
+      "wall": 11475,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": false,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/employees?venue=1"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:50.982Z",
+      "id": "01M4E3PKD60000000000000001",
+      "request": "f391e84dfbc5ed2b6b80e0c876f7c87b",
+      "ray": "a47656828a21e429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 0,
+      "wall": 304,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:49.406Z",
+      "id": "01M4E3PHVY0000000000000001",
+      "request": "2325a51fbd1f2108e459f176d79a3c6a",
+      "ray": "a4765672786be429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 0,
+      "wall": 2527,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:47.759Z",
+      "id": "01M4E3PG8F0000000000000001",
+      "request": "7ae142b397bccc302304ba3f068dbd16",
+      "ray": "a476566829d9e429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 0,
+      "wall": 1612,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "id": "01M4E3P345000000000000001S",
+      "request": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "ray": "a476561018f3e429",
+      "route": "GET /api/business-health",
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": false,
+      "iphone": false,
+      "source": {
+        "message": "Network connection lost.",
+        "exception": {
+          "name": "Error",
+          "timestamp": 1791474994309
+        }
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:27.225Z",
+      "id": "01M4E3NW6S0000000000000005",
+      "request": "b9c0fb78ac8e10257e2ab065fcc11f2e",
+      "ray": "a47655ee1c7fe429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 3,
+      "wall": 7,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:27.225Z",
+      "id": "01M4E3NW6S0000000000000001",
+      "request": "2c6926f3900d0e06d72cb7e097f4504e",
+      "ray": "a47655ee1c81e429",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 0,
+      "wall": 0,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:23.532Z",
+      "id": "01M4E3NRKC0000000000000038",
+      "request": "8729218c3186b7be805315c09159f165",
+      "ray": "a47655c91e9be429",
+      "route": "POST /api/auth/bootstrap",
+      "outcome": "canceled",
+      "cpu": 42,
+      "wall": 29954,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "POST https://bardoctor-preview.v-dokhalov.chatgpt.site/api/auth/bootstrap"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:23.248Z",
+      "id": "01M4E3NRAG000000000000001K",
+      "request": "6f53f97095dcc91cecf4ea114ec773d1",
+      "ray": "a47655ca8f53e429",
+      "route": "GET /api/business-health",
+      "outcome": "exceededCpu",
+      "cpu": 32500,
+      "wall": 36322,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "error",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/business-health"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:23.248Z",
+      "id": "01M4E3NRAG000000000000001J",
+      "request": "6f53f97095dcc91cecf4ea114ec773d1",
+      "ray": "a47655ca8f53e429",
+      "route": "GET /api/business-health",
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": false,
+      "iphone": false,
+      "source": {
+        "message": "Worker exceeded CPU time limit.",
+        "exception": {
+          "name": "Error",
+          "timestamp": 1791474983248
+        }
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:08.692Z",
+      "id": "01M4E3NA3M000000000000000B",
+      "request": "b43499ce1364d4776e446af52e93024d",
+      "ray": "a47655740df26ce1",
+      "route": "GET /api/store/bd_assortment_v1",
+      "outcome": "canceled",
+      "cpu": 1,
+      "wall": 1065,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/store/bd_assortment_v1"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:08.459Z",
+      "id": "01M4E3N9WB000000000000000B",
+      "request": "7309ebd1d8221d58863dddadb27fbd68",
+      "ray": "a47655729abe6ce1",
+      "route": "GET /api/operational-days",
+      "outcome": "canceled",
+      "cpu": 2,
+      "wall": 1294,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:08.332Z",
+      "id": "01M4E3N9RC0000000000000010",
+      "request": "962cbf2089f0fc485af6aa2645fe084d",
+      "ray": "a4765571c9336ce1",
+      "route": "GET /api/store",
+      "outcome": "canceled",
+      "cpu": 5,
+      "wall": 1426,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/store"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:07.992Z",
+      "id": "01M4E3N9DR000000000000003S",
+      "request": "ecb89b79e59284b1f67c7453524716f6",
+      "ray": "a47655696eb56ce1",
+      "route": "GET /api/users/me",
+      "outcome": "canceled",
+      "cpu": 12,
+      "wall": 2763,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/users/me"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:07.992Z",
+      "id": "01M4E3N9DR000000000000002F",
+      "request": "b46d6ac946bf97b0dc23199d03661627",
+      "ray": "a47655696eaf6ce1",
+      "route": "GET /api/store",
+      "outcome": "canceled",
+      "cpu": 7,
+      "wall": 2705,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/store"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:07.777Z",
+      "id": "01M4E3N971000000000000001S",
+      "request": "c3bc819e934a21978bb3df5e699c5397",
+      "ray": "a47655692ddd6ce1",
+      "route": "GET /api/business-health",
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": false,
+      "iphone": false,
+      "source": {
+        "message": "Network connection lost.",
+        "exception": {
+          "name": "Error",
+          "timestamp": 1791474967777
+        }
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:05.568Z",
+      "id": "01M4E3N720000000000000002C",
+      "request": "e296098f935be6f83376c945c6624431",
+      "ray": "a47655414d246ce1",
+      "route": "POST /api/ai/diagnosis",
+      "outcome": "canceled",
+      "cpu": 57,
+      "wall": 6038,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": true,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "POST https://bardoctor-preview.v-dokhalov.chatgpt.site/api/ai/diagnosis"
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:04.695Z",
+      "id": "01M4E3N66Q000000000000001F",
+      "request": "669351113dde295432300a3a066aed03",
+      "ray": "a47655570e316ce1",
+      "route": "GET /api/venues/logo/REDACTED",
+      "outcome": "ok",
+      "status": 404,
+      "cpu": 7,
+      "wall": 1646,
+      "version": "dbba131f-f90f-4583-89f2-aadac3068ba0",
+      "authHeaders": false,
+      "iphone": true,
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/venues/logo/REDACTED"
+      }
+    }
+  ],
+  "surrounding": [
+    {
+      "time": "2026-10-08T15:57:48.558Z",
+      "requestId": "cab85f8b29bd032f0774cc43249fe5c9",
+      "rayId": "a47657e0bf6bb8d9",
+      "trigger": "GET /",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 2,
+      "wallTimeMs": 2
+    },
+    {
+      "time": "2026-10-08T15:57:08.035Z",
+      "requestId": "76611ea0f5a972e8f4798f3757c26709",
+      "rayId": "a476564b6c4fe429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 3,
+      "wallTimeMs": 24293
+    },
+    {
+      "time": "2026-10-08T15:56:53.887Z",
+      "requestId": "08f48237ef1892dd1cad820f265d8a66",
+      "rayId": "a476568e88e0e429",
+      "trigger": "GET /employees",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/employees?venue=1"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 0,
+      "wallTimeMs": 11475
+    },
+    {
+      "time": "2026-10-08T15:56:50.982Z",
+      "requestId": "f391e84dfbc5ed2b6b80e0c876f7c87b",
+      "rayId": "a47656828a21e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 0,
+      "wallTimeMs": 304
+    },
+    {
+      "time": "2026-10-08T15:56:49.406Z",
+      "requestId": "2325a51fbd1f2108e459f176d79a3c6a",
+      "rayId": "a4765672786be429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 0,
+      "wallTimeMs": 2527
+    },
+    {
+      "time": "2026-10-08T15:56:47.759Z",
+      "requestId": "7ae142b397bccc302304ba3f068dbd16",
+      "rayId": "a476566829d9e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 0,
+      "wallTimeMs": 1612
+    },
+    {
+      "time": "2026-10-08T15:56:46.423Z",
+      "requestId": "d0e3d766d0dfd291b7e6e88d39e9d9c4",
+      "rayId": "a476565acf10e3f2",
+      "trigger": "GET /",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 9,
+      "wallTimeMs": 18
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/business-health"
+      },
+      "outcome": "ok",
+      "cpuTimeMs": 31252,
+      "wallTimeMs": 35224
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "message": "Network connection lost.",
+        "exception": {
+          "name": "Error",
+          "timestamp": 1791474994309
+        }
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "outcome": "headers_ready",
+        "elapsedMs": 1645,
+        "status": 200
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "worker.dispatch",
+        "outcome": "ok",
+        "elapsedMs": 1645,
+        "span": 1,
+        "durationMs": 1645
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.operations",
+        "outcome": "ok",
+        "elapsedMs": 1645,
+        "span": 11,
+        "durationMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.operations",
+        "elapsedMs": 1645,
+        "span": 11,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.evidence",
+        "outcome": "ok",
+        "elapsedMs": 1645,
+        "span": 10,
+        "durationMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.evidence",
+        "elapsedMs": 1645,
+        "span": 10,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.context",
+        "outcome": "ok",
+        "elapsedMs": 1645,
+        "span": 9,
+        "durationMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "health.context",
+        "elapsedMs": 1645,
+        "span": 9,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.309Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.309Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 1645,
+        "span": 8,
+        "durationMs": 193
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.116Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.116Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "elapsedMs": 1452,
+        "span": 8,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:34.116Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:34.116Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "outcome": "ok",
+        "elapsedMs": 1452,
+        "span": 7,
+        "durationMs": 941
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.175Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.175Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "elapsedMs": 511,
+        "span": 7,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.175Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "scope.resolved",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.175Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "elapsedMs": 511
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.175Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.175Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.memberships",
+        "outcome": "ok",
+        "elapsedMs": 511,
+        "span": 4,
+        "durationMs": 337
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.175Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.175Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 511,
+        "span": 6,
+        "durationMs": 171
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.004Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.004Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 340,
+        "span": 6,
+        "parentSpan": 4
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:33.004Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:33.004Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 340,
+        "span": 5,
+        "durationMs": 166
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.838Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.838Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 174,
+        "span": 5,
+        "parentSpan": 4
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.838Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.838Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.memberships",
+        "elapsedMs": 174,
+        "span": 4,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.838Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "scope.resolved",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.838Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "elapsedMs": 174
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.838Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.838Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.identity",
+        "outcome": "ok",
+        "elapsedMs": 174,
+        "span": 2,
+        "durationMs": 174
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.838Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.838Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 174,
+        "span": 3,
+        "durationMs": 174
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.664Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.664Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 0,
+        "span": 3,
+        "parentSpan": 2
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.664Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.664Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.identity",
+        "elapsedMs": 0,
+        "span": 2,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.664Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.664Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "worker.dispatch",
+        "elapsedMs": 0,
+        "span": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:32.664Z",
+      "requestId": "e5d3c67f5e6533b8fe2f3b71c5e6b378",
+      "rayId": "a476561018f3e429",
+      "trigger": "GET /api/business-health",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.start",
+        "requestId": "ce3b25ba-a7d5-4145-884b-3ed0b32de5d3",
+        "correlationId": "904bf99f-9dc9-4f3d-bf5e-fdd5474027bc",
+        "route": "/api/business-health",
+        "timestamp": "2026-10-08T15:56:32.664Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "elapsedMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:28.180Z",
+      "requestId": "6a89d06fe3407411300ccf5c7590e9ab",
+      "rayId": "a47655ee4c95e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 9,
+      "wallTimeMs": 934
+    },
+    {
+      "time": "2026-10-08T15:56:28.140Z",
+      "requestId": "67dff414dbf65d7ba9a8fc3dc9c72850",
+      "rayId": "a47655ee4c93e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 13,
+      "wallTimeMs": 895
+    },
+    {
+      "time": "2026-10-08T15:56:27.863Z",
+      "requestId": "6384aa8e308a71daaa12c7915f62e0b2",
+      "rayId": "a47655e78851e429",
+      "trigger": "GET /api/management/cost-signals",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/management/cost-signals?state=all"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 35,
+      "wallTimeMs": 1717
+    },
+    {
+      "time": "2026-10-08T15:56:27.225Z",
+      "requestId": "b9c0fb78ac8e10257e2ab065fcc11f2e",
+      "rayId": "a47655ee1c7fe429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 3,
+      "wallTimeMs": 7
+    },
+    {
+      "time": "2026-10-08T15:56:27.225Z",
+      "requestId": "2c6926f3900d0e06d72cb7e097f4504e",
+      "rayId": "a47655ee1c81e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "canceled",
+      "cpuTimeMs": 0,
+      "wallTimeMs": 0
+    },
+    {
+      "time": "2026-10-08T15:56:26.804Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/store"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 52,
+      "wallTimeMs": 2434
+    },
+    {
+      "time": "2026-10-08T15:56:26.804Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:26.804Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "outcome": "headers_ready",
+        "elapsedMs": 2329,
+        "status": 200
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:26.804Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:26.804Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "worker.dispatch",
+        "outcome": "ok",
+        "elapsedMs": 2329,
+        "span": 1,
+        "durationMs": 2329
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:26.804Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:26.804Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "store.load",
+        "outcome": "ok",
+        "elapsedMs": 2329,
+        "span": 15,
+        "durationMs": 1028
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:26.804Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:26.804Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "outcome": "ok",
+        "elapsedMs": 2329,
+        "span": 16,
+        "durationMs": 1028
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:26.102Z",
+      "requestId": "ff129580b5f8ee43588bf51c362f9c32",
+      "rayId": "a47655dcb9f5e429",
+      "trigger": "POST /api/management/cost-signals/evaluate",
+      "source": {
+        "level": "info",
+        "message": "POST https://bardoctor-preview.v-dokhalov.chatgpt.site/api/management/cost-signals/evaluate"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 36,
+      "wallTimeMs": 1680
+    },
+    {
+      "time": "2026-10-08T15:56:25.776Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.776Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "elapsedMs": 1301,
+        "span": 16,
+        "parentSpan": 15
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.776Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.776Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "store.load",
+        "elapsedMs": 1301,
+        "span": 15,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.776Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "scope.resolved",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.776Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "elapsedMs": 1301
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.776Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.776Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.memberships",
+        "outcome": "ok",
+        "elapsedMs": 1301,
+        "span": 5,
+        "durationMs": 1090
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.776Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.776Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 1301,
+        "span": 14,
+        "durationMs": 180
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.596Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.596Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 1121,
+        "span": 14,
+        "parentSpan": 5
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.596Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.596Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 1121,
+        "span": 13,
+        "durationMs": 169
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.549Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/store"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 75,
+      "wallTimeMs": 3806
+    },
+    {
+      "time": "2026-10-08T15:56:25.541Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.end",
+        "requestId": "b1ed1778-ae6f-4f81-bff2-f5595a911000",
+        "correlationId": "dc8b0be5-86ba-49d2-ac63-22b773d09498",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.541Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "outcome": "headers_ready",
+        "elapsedMs": 3638,
+        "status": 200
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.541Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "b1ed1778-ae6f-4f81-bff2-f5595a911000",
+        "correlationId": "dc8b0be5-86ba-49d2-ac63-22b773d09498",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.541Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "worker.dispatch",
+        "outcome": "ok",
+        "elapsedMs": 3638,
+        "span": 1,
+        "durationMs": 3638
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.541Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "b1ed1778-ae6f-4f81-bff2-f5595a911000",
+        "correlationId": "dc8b0be5-86ba-49d2-ac63-22b773d09498",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.541Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "store.load",
+        "outcome": "ok",
+        "elapsedMs": 3638,
+        "span": 15,
+        "durationMs": 1089
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.541Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "b1ed1778-ae6f-4f81-bff2-f5595a911000",
+        "correlationId": "dc8b0be5-86ba-49d2-ac63-22b773d09498",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.541Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "outcome": "ok",
+        "elapsedMs": 3638,
+        "span": 16,
+        "durationMs": 1089
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.427Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.427Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 952,
+        "span": 13,
+        "parentSpan": 5
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.427Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.427Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.all",
+        "outcome": "ok",
+        "elapsedMs": 952,
+        "span": 12,
+        "durationMs": 177
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.422Z",
+      "requestId": "db654e1a5fc4da82c3033b360e3125ff",
+      "rayId": "a47655dd3a36e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 12,
+      "wallTimeMs": 910
+    },
+    {
+      "time": "2026-10-08T15:56:25.406Z",
+      "requestId": "32330fa4ea63f3c08b861c19deb42645",
+      "rayId": "a47655dd3a34e429",
+      "trigger": "GET /api/operational-days",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/operational-days"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 19,
+      "wallTimeMs": 905
+    },
+    {
+      "time": "2026-10-08T15:56:25.250Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.250Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.all",
+        "elapsedMs": 775,
+        "span": 12,
+        "parentSpan": 5
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.250Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.250Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.ensure_owner_venue",
+        "outcome": "ok",
+        "elapsedMs": 775,
+        "span": 6,
+        "durationMs": 564
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.250Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.250Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "owner.reconcile",
+        "outcome": "ok",
+        "elapsedMs": 775,
+        "span": 8,
+        "durationMs": 392
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.250Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.250Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "owner.membership_batch",
+        "outcome": "ok",
+        "elapsedMs": 775,
+        "span": 10,
+        "durationMs": 213
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.250Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.250Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.batch",
+        "outcome": "ok",
+        "elapsedMs": 775,
+        "span": 11,
+        "durationMs": 213
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.188Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/users/me"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 34,
+      "wallTimeMs": 3348
+    },
+    {
+      "time": "2026-10-08T15:56:25.188Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:25.188Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "outcome": "headers_ready",
+        "elapsedMs": 3285,
+        "status": 200
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.188Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:25.188Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "worker.dispatch",
+        "outcome": "ok",
+        "elapsedMs": 3285,
+        "span": 1,
+        "durationMs": 3285
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.188Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:25.188Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 3285,
+        "span": 26,
+        "durationMs": 167
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.037Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.037Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.batch",
+        "elapsedMs": 562,
+        "span": 11,
+        "parentSpan": 10
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.037Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.037Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "owner.membership_batch",
+        "elapsedMs": 562,
+        "span": 10,
+        "parentSpan": 8
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.037Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:25.037Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 562,
+        "span": 9,
+        "durationMs": 179
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.021Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:25.021Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "elapsedMs": 3118,
+        "span": 26,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:25.021Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:25.021Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 3118,
+        "span": 25,
+        "durationMs": 170
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.858Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.858Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 383,
+        "span": 9,
+        "parentSpan": 8
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.858Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.858Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "owner.reconcile",
+        "elapsedMs": 383,
+        "span": 8,
+        "parentSpan": 6
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.858Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.858Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 383,
+        "span": 7,
+        "durationMs": 172
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.851Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.851Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.raw",
+        "elapsedMs": 2948,
+        "span": 25,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.851Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.851Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "outcome": "ok",
+        "elapsedMs": 2948,
+        "span": 24,
+        "durationMs": 177
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 211,
+        "span": 7,
+        "parentSpan": 6
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.ensure_owner_venue",
+        "elapsedMs": 211,
+        "span": 6,
+        "parentSpan": 5
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "stage": "auth.memberships",
+        "elapsedMs": 211,
+        "span": 5,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "scope.resolved",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "authenticated",
+        "venueScope": "unresolved",
+        "elapsedMs": 211
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.identity",
+        "outcome": "ok",
+        "elapsedMs": 211,
+        "span": 2,
+        "durationMs": 211
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.686Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.686Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "outcome": "ok",
+        "elapsedMs": 211,
+        "span": 4,
+        "durationMs": 211
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.674Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.674Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "elapsedMs": 2771,
+        "span": 24,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.674Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.674Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "auth.ensure_owner_venue",
+        "outcome": "ok",
+        "elapsedMs": 2771,
+        "span": 18,
+        "durationMs": 572
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.674Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.674Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "owner.reconcile",
+        "outcome": "ok",
+        "elapsedMs": 2771,
+        "span": 20,
+        "durationMs": 391
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.674Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.674Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "owner.membership_batch",
+        "outcome": "ok",
+        "elapsedMs": 2771,
+        "span": 22,
+        "durationMs": 232
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.674Z",
+      "requestId": "eaf290435becc148bd10ac9de43e876f",
+      "rayId": "a47655cb3fc1e429",
+      "trigger": "GET /api/users/me",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "72ec2d28-04ca-4160-ba25-447b77113ceb",
+        "correlationId": "3d0cab3b-ba41-43ae-933e-b0b8f06f2e9c",
+        "route": "/api/users/me",
+        "timestamp": "2026-10-08T15:56:24.674Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.batch",
+        "outcome": "ok",
+        "elapsedMs": 2771,
+        "span": 23,
+        "durationMs": 232
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.531Z",
+      "requestId": "fe1044071f84d260af7db0cd75f315d5",
+      "rayId": "a47655cbc80be429",
+      "trigger": "GET /api/opportunities",
+      "source": {
+        "level": "info",
+        "message": "GET https://bardoctor-preview.v-dokhalov.chatgpt.site/api/opportunities"
+      },
+      "outcome": "ok",
+      "status": 200,
+      "cpuTimeMs": 26,
+      "wallTimeMs": 2695
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "d1.raw",
+        "elapsedMs": 0,
+        "span": 4,
+        "parentSpan": 2
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.end",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.schema",
+        "outcome": "ok",
+        "elapsedMs": 0,
+        "span": 3,
+        "durationMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.schema",
+        "elapsedMs": 0,
+        "span": 3,
+        "parentSpan": 2
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "auth.identity",
+        "elapsedMs": 0,
+        "span": 2,
+        "parentSpan": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "stage": "worker.dispatch",
+        "elapsedMs": 0,
+        "span": 1
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.475Z",
+      "requestId": "269e42951dbb6204d4977d7cda18cb4b",
+      "rayId": "a47655dcea0ee429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "request.start",
+        "requestId": "6c6ef6d0-c702-49d5-a91c-0cd4ce93f6ba",
+        "correlationId": "0a8fca23-83cc-4675-bc42-94818bd3d7b9",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.475Z",
+        "userScope": "unresolved",
+        "venueScope": "unresolved",
+        "elapsedMs": 0
+      }
+    },
+    {
+      "time": "2026-10-08T15:56:24.452Z",
+      "requestId": "abd1882bac4c51c16ff13ae880511a4f",
+      "rayId": "a47655cb3fbae429",
+      "trigger": "GET /api/store",
+      "source": {
+        "level": "info",
+        "telemetry": "bd-runtime-observability-v1",
+        "event": "await.start",
+        "requestId": "b1ed1778-ae6f-4f81-bff2-f5595a911000",
+        "correlationId": "dc8b0be5-86ba-49d2-ac63-22b773d09498",
+        "route": "/api/store/:key",
+        "timestamp": "2026-10-08T15:56:24.452Z",
+        "userScope": "authenticated",
+        "venueScope": "authorized",
+        "stage": "d1.all",
+        "elapsedMs": 2549,
+        "span": 16,
+        "parentSpan": 15
+      }
+    }
+  ]
+}

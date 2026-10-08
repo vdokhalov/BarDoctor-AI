@@ -2,6 +2,7 @@ import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/ba
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateReadOnlyRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { loadCanonicalHealthInputs } from "../../../lib/bardoctor/canonical-health-inputs";
+import { withInfrastructureErrorBoundary } from "../../../lib/bardoctor/request-observability";
 
 
 function noStore(response: Response): Response {
@@ -11,6 +12,10 @@ function noStore(response: Response): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  return noStore(await withInfrastructureErrorBoundary(request, () => readHealth(request)));
+}
+
+async function readHealth(request: Request): Promise<Response> {
   const account = await authenticateReadOnlyRequest(request);
   if (!account) return unauthorized();
   if (!hasPermission(account, "analysis.run")) {

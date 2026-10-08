@@ -16,7 +16,9 @@ test('v489 protected files remain unchanged outside reviewed performance and own
   const uat=JSON.parse(readFileSync('tests/fixtures/v493-owner-uat-approved-files.json','utf8'));
   assert.deepEqual(Object.keys(uat).sort(),['lib/bardoctor/canonical-health-inputs.ts','lib/bardoctor/client/canonical-read.ts','lib/bardoctor/client/management-cost.tsx','lib/bardoctor/finance-inputs.ts','lib/bardoctor/request-observability.ts']);
   assert.deepEqual(Object.keys(performance).sort(),['lib/bardoctor/finance-inputs.ts','lib/bardoctor/operational-day.ts']);
-  for(const [path,hash] of Object.entries(expected))assert.equal(digest(readFileSync(path)),uat[path]??performance[path]??hash,path);
+  const rca=JSON.parse(readFileSync('tests/fixtures/v496-production-rca-approved-files.json','utf8'));
+  assert.deepEqual(Object.keys(rca).sort(),['app/api/business-health/route.ts','lib/bardoctor/health-operations-inputs.ts','lib/bardoctor/request-observability.ts','package.json']);
+  for(const [path,hash] of Object.entries(expected))assert.equal(digest(readFileSync(path)),rca[path]??uat[path]??performance[path]??hash,path);
 });
 
 test('all unrelated v489 functions survive the owner-selected v485 presentation rollback',()=>{
@@ -25,7 +27,7 @@ test('all unrelated v489 functions survive the owner-selected v485 presentation 
   source=source.replaceAll('window.bdReadNavigationQuery("month",bdPayrollInitialMonth())','window.bdReadNavigationQuery("month",bdPayrollInitialMonth)');
   const actual=new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,digest(source.slice(n.start,n.end))]));
   const expected=JSON.parse(readFileSync(fixture+'v489-function-hashes.json','utf8'));
-  const returned=new Set(['bdHomeDaily','c_e','Uce','nt','bdHomeHealthIndexV200','t_e']);
+  const returned=new Set(['bdHomeDaily','c_e','Uce','nt','bdHomeHealthIndexV200','t_e','Vse','zse','pt','bdBootstrapRecoveryV274']);
   const removed=new Set(['bdCuratedDoctorPhase4c','bdCuratedHealthSuggestionPhase4c','bdCuratedReturnPhase4c','bdManagementHomePhase4','bdManagementQueuePhase4b']);
   for(const name of removed)assert.ok(!actual.has(name));
   for(const [name,hash] of Object.entries(expected))if(!returned.has(name)&&!removed.has(name))assert.equal(actual.get(name),hash,name);

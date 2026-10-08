@@ -39,9 +39,10 @@ try{for(const width of [390,820,1280]){
   assert.ok(await page.locator('.bd-health-impact-v332 button').count()>0);await page.getByRole('button',{name:'AI Doctor',exact:true}).click();await page.waitForURL(u=>u.pathname==='/analysis');await settle();
   await page.goto(runtime.base+'/more');await page.getByRole('button',{name:/AI Doctor/}).click();await page.waitForURL(u=>u.pathname==='/analysis');await settle();
   const routes=['/health','/shifts','/finance','/warehouse','/catalog','/salaries','/reports','/tasks','/reviews','/integrations','/settings','/more'];
-  for(const path of routes){await page.goto(runtime.base+path);await settle();assert.ok((await page.locator('body').innerText()).length>0);await page.screenshot({path:`${out}/${width}-${path.slice(1)}.png`,fullPage:true});}
+  for(const path of routes){await page.goto(runtime.base+path);await settle();assert.ok((await page.locator('body').innerText()).length>0);if(path==='/shifts'){await page.locator('[data-bd-shifts-page="v158"]').waitFor();const shift=page.locator('[data-bd-shifts-page="v158"] .bd-shift-card').filter({hasText:'2 октября'});assert.equal((await shift.locator('.bd-shift-card-revenue').innerText()).replace(/\s+/g,' '),'200,00 MDL');assert.equal(await shift.locator('.bd-shift-card-metrics b').first().innerText(),'4');}await page.screenshot({path:`${out}/${width}-${path.slice(1)}.png`,fullPage:true});}
   for(const [key,path]of [['home','/home'],['shifts','/shifts'],['finance','/finance'],['team','/employees'],['more','/more']]){
    const link=page.locator(`[data-bd-nav-key="${key}"]:visible`).first();await link.waitFor();await link.click();await page.waitForURL(u=>u.pathname===path);await settle();
+   if(key==='team'){await page.locator('[data-bd-team-module="v163"]').waitFor();assert.equal(await page.getByText('Не удалось восстановить доступ',{exact:true}).count(),0);}
   }
   // Deliberately stall only the isolated transport; production is never called.
   await page.route('**/api/management/cost-signals/evaluate',()=>undefined);

@@ -9,7 +9,7 @@ test("browser bootstrap preserves loading, error and server-authoritative states
   const source = await read("public/bardoctor-preview.js");
   assert.match(source, /__bdAuthBootstrapV274 = \{ state: "loading"/);
   assert.match(source, /result\.bootstrap && typeof result\.bootstrap\.state === "string"/);
-  assert.match(source, /state: "error", reason: "bootstrap_request_failed"/);
+  assert.match(source, /state: "error", reason:.*"bootstrap_request_failed"/);
   assert.match(source, /state: "error", reason: "bootstrap_response_failed"/);
   assert.match(source, /state: "unauthenticated", reason: "login_required"/);
 });
@@ -35,7 +35,7 @@ test("restaurant bootstrap does not auto-save a cached profile after a failed GE
   assert.ok(start >= 0 && end > start);
   assert.doesNotMatch(provider, /qse\(\)/);
   assert.doesNotMatch(provider, /uM\(h\)/);
-  assert.match(provider, /zse\(\)\.then/);
+  assert.match(provider, /zse\(\{signal:controller\.signal,isCurrent:/);
 });
 
 test("successful first profile save promotes bootstrap to ready without creating another venue", async () => {

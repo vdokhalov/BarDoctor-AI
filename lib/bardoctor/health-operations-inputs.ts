@@ -33,7 +33,15 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
   const sourceMap = new Map(input.sources.map(source => [source.key, source]));
   const scope = { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId };
   const today = venueDate(input.asOf, venueTimeFromJson(JSON.stringify(input.profile)).timezone);
-  const values = (key: string) => array(sourceMap.get(key)?.data).filter(value => derivedInputBelongs(value, scope));
+  const scopedValues = new Map<string, Row[]>();
+  const values = (key: string) => {
+    let result = scopedValues.get(key);
+    if (!result) {
+      result = array(sourceMap.get(key)?.data).filter(value => derivedInputBelongs(value, scope));
+      scopedValues.set(key, result);
+    }
+    return result;
+  };
   const counter = (keys: string[], value: number, grain: string, window: string, diagnostics: string[] = []): HealthCounter => {
     const states = keys.map(key => sourceMap.get(key)?.state ?? "UNAVAILABLE");
     const state: HealthSourceState = states.includes("RESTRICTED") ? "RESTRICTED" : states.includes("UNAVAILABLE") ? "UNAVAILABLE" : states.includes("PARTIAL") || diagnostics.length ? "PARTIAL" : "AVAILABLE";
@@ -87,13 +95,29 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
   if (catalogue.some(item => item.active !== false && item.kind === "stock" && !projectedProducts.has(item.productKey ?? item.key ?? item.id))
     || values("bd_stock_movements").some(movement => activeBusinessRow(movement) && !projectedProducts.has(movement.productKey ?? movement.key))) stockDiagnostics.push("RELATED_EVIDENCE_UNAVAILABLE");
   const seenStock = new Set<string>();
+  // Partition once per read. Keep duplicate identities, original order and all
+  // warehouses: the existing proof still decides scope, anchors and validity.
+  const partition = (rows: Row[], key: (row: Row) => unknown) => {
+    const groups = new Map<unknown, Row[]>();
+    for (const row of rows) {
+      const identity = key(row), group = groups.get(identity);
+      if (group) group.push(row); else groups.set(identity, [row]);
+    }
+    return groups;
+  };
+  const movementsByProduct = partition(values("bd_stock_movements"), row => String(row.productKey ?? row.key ?? ""));
+  const countsById = partition(values("bd_inventory_snapshots"), row => row.id);
+  const openingsById = partition(values("bd_opening_stock_v1"), row => row.id);
   let anomalyCount = 0;
   const stockFacts: HealthStockFact[] = [];
   for (const balance of balances) {
     const identity = JSON.stringify([balance.productKey ?? balance.key, balance.warehouseId ?? balance.warehouseExternalId ?? null, balance.unit]);
     if (!derivedInputBelongs(balance, scope) || !(balance.productKey ?? balance.key) || seenStock.has(identity)) { stockDiagnostics.push("RECORD_NEEDS_REVIEW"); continue; }
     seenStock.add(identity);
-    const proof = stockQuantityEvidence({ ...scope, balance, movements: values("bd_stock_movements"), counts: values("bd_inventory_snapshots"), openings: values("bd_opening_stock_v1") });
+    const proof = stockQuantityEvidence({ ...scope, balance,
+      movements: movementsByProduct.get(String(balance.productKey ?? balance.key ?? "")) ?? [],
+      counts: countsById.get(balance.lastInventoryDocumentId) ?? [],
+      openings: openingsById.get(balance.openingDocumentId) ?? [] });
     const factTrusted=stockSourcesTrusted&&balance.stale!==true&&balance.sourceConflict!==true;
     const productKey = String(balance.productKey ?? balance.key), warehouseKey = String(balance.warehouseId ?? balance.warehouseExternalId ?? ""), unit = String(balance.unit ?? "");
     const minimum = finite(balance.safety ?? balance.minimum ?? balance.minStock);

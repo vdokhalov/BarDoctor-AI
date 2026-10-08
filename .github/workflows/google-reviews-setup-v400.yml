@@ -7,6 +7,7 @@ on:
       - main
       - rollback/stable-ui-v492
       - fix/v493-owner-uat
+      - fix/v495-production-rca
       - fix/design-system-v1-recovery
       - fix/health-curated-performance-v491
       - feat/phase4c-curated-doctor
@@ -82,6 +83,10 @@ jobs:
           node --import tsx scripts/health-doctor-performance.mjs
       - name: Phase 4 integrated G1-G5 identities, stock stability and financial UNKNOWN controls
         run: node --import tsx --test tests/management-loop-targeted.test.ts
+      - name: v495 production RCA stock differential, real handlers and bounded recovery
+        run: |
+          node --import tsx --test tests/production-rca-health-v496.test.ts
+          node --test tests/production-recovery-v496.test.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
@@ -98,12 +103,15 @@ jobs:
           node --test tests/acquisition-stock-worker-phase3a7.test.mjs
           node --test tests/derived-metrics-worker-phase3a8.test.mjs
           node --test tests/health-inputs-worker-phase3a9.test.mjs
+          node --import tsx --test tests/production-rca-worker-v496.test.mjs
           node --test tests/provenance-worker-phase3a10.test.mjs
           node scripts/canonical-boundary-browser-phase3a5.mjs
           node --test tests/evidence-worker-phase3a1.test.mjs
           node --import tsx scripts/evidence-foundation-browser.ts
           node --import tsx scripts/cost-warehouse-trace-browser.ts
           node --import tsx scripts/menu-origin-trace-browser.ts
+      - name: v495 production recovery Chromium mobile tablet desktop
+        run: node --import tsx scripts/production-rca-v496-browser.mjs
       - name: Stable v485 UI rollback and protected contracts
         run: |
           node --test tests/reference-slice-recovery.test.mjs tests/reference-slice-recovery-parity.test.mjs
@@ -129,6 +137,7 @@ jobs:
         with:
           name: phase4a-cost-correction-evidence
           path: |
+            outputs/v495-rca
             outputs/owner-uat-v493
             outputs/stable-ui-rollback
             outputs/reference-slice-recovery
@@ -290,6 +299,8 @@ jobs:
           BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-legacy-doctor-browser.mjs
       - name: Stable UI rollback WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/stable-ui-rollback-browser.mjs
+      - name: v495 production recovery WebKit mobile tablet desktop
+        run: BD_CURATED_BROWSER=webkit node --import tsx scripts/production-rca-v496-browser.mjs
       - name: Owner UAT repair WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/owner-uat-v493-browser.mjs
       - name: Health Doctor performance and bounded loading WebKit 390 820 1280
@@ -327,6 +338,7 @@ jobs:
           path: |
             outputs/sales-navigation-performance/ci
             outputs/finance-inputs-phase3a6/webkit
+            outputs/v495-rca
             outputs/owner-uat-v493
             outputs/health-inputs-phase3a9/webkit
             outputs/health-inputs-phase3a9/webkit-stable

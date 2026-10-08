@@ -24,6 +24,7 @@ export function diagnosticRoute(path: string): string | null {
   if (path === "/api/store" || path.startsWith("/api/store/")) return "/api/store/:key";
   if (path === "/api/tech-cards/nomenclature") return path;
   if (path === "/api/users/me") return path;
+  if (path === "/api/restaurants/me" || path === "/api/access") return path;
   return null;
 }
 

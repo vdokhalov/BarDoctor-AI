@@ -77,15 +77,16 @@ function patchBootstrap(path) {
     /script\.src = "(\/assets\/index-BQGspy0I(?:-[a-f0-9]{12})?\.js)\?v=[^"]+";/,
     'script.src = "$1?v=startup-performance-v343-shell-first-v397-auth-handoff-v423-root-handoff-v424";',
   );
-  source = source.replace(
-    /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
-    `  /* Start the application shell before any network-bound auth or business refresh. */
+  const shellFirst = `  /* Start the application shell before any network-bound auth or business refresh. */
   observePurchaseConfirmation();
   installProtectedOriginalLinks();
   installNavigationConsistencyGuards();
-  loadApplication();
-
-  try {
+  loadApplication();\n\n`;
+  if (source.includes('  var bdBootstrapRetryPromiseV496 = null;')) {
+    source = source.replace('  var bdBootstrapRetryPromiseV496 = null;', shellFirst + '  var bdBootstrapRetryPromiseV496 = null;');
+  } else source = source.replace(
+    /  try \{\r?\n    var demoEmail = "demo@bardoctor\.app";/,
+    shellFirst + `  try {
     var demoEmail = "demo@bardoctor.app";`,
   );
   source = source.replace(

@@ -26,7 +26,8 @@ test('production APIs, schema, auth and unrelated modules stay identical outside
  const files=execFileSync('git',['ls-tree','-r','--name-only',production,'app/api','lib/bardoctor','drizzle','migrations','db','package-lock.json','.openai/hosting.json']).toString().trim().split('\n');
  const ui=new Set(['lib/bardoctor/client/curated-doctor.tsx','lib/bardoctor/client/management-actions.tsx','lib/bardoctor/client/intelligence-ui.tsx',
  'lib/bardoctor/finance-inputs.ts','lib/bardoctor/client/canonical-read.ts','lib/bardoctor/client/management-cost.tsx',
- 'lib/bardoctor/request-observability.ts','lib/bardoctor/canonical-health-inputs.ts']);
+ 'lib/bardoctor/request-observability.ts','lib/bardoctor/canonical-health-inputs.ts',
+ 'app/api/business-health/route.ts','lib/bardoctor/health-operations-inputs.ts']);
  assert.ok(files.length>300);
  for(const path of files.filter(p=>!ui.has(p)))assert.deepEqual(readFileSync(path),before(path),path);
 });
