@@ -36,9 +36,8 @@ try{for(const width of [390,820,1280]){
  try{
   await page.goto(base+'/analysis?venueId='+r.venueId+'&doctorQuestion=attention');
   const panel=page.locator('.bd-curated-doctor');await panel.locator('[data-curated-answer=attention]').waitFor({timeout:30000});
-  await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();
   assert.equal(await panel.locator('[data-curated-question]').count(),7);assert.equal(await panel.locator('input,textarea').count(),0);
-  const chooseQuestion=async(id:string)=>{if(await panel.locator('[data-curated-answer]').count())await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();await panel.locator(`[data-curated-question=${id}]`).click();};
+  const chooseQuestion=async(id:string)=>{await panel.locator(`[data-curated-question=${id}]`).click();};
   const examples:Record<string,CuratedAnswer>={};
   for(const question of CURATED_QUESTIONS){
    await chooseQuestion(question.id);await panel.locator(`[data-curated-answer=${question.id}]`).waitFor();

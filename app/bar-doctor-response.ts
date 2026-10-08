@@ -319,7 +319,6 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <link rel="stylesheet" href="/home-visual-v151.css?v=20260811-home-v151" />
     <link rel="stylesheet" href="/home-reviews-v409.css?v=20260903-home-reviews-ux-v409" />
     <link rel="stylesheet" href="/management-cost-phase4a.css?v=1" media="print" onload="this.media='all'" />
-    <link rel="stylesheet" href="/intelligence-v1.css?v=recovery-1" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/health-score-experience-v152.css?v=20260828-business-health-canonical-v335-20260829-authoritative-home-v344" />
     <link rel="stylesheet" href="/shifts-visual-v156.css?v=20260812-shifts-v158" media="print" onload="this.media='all'" />
     <link rel="stylesheet" href="/finance-dashboard-v160.css?v=20260812-finance-v161" media="print" onload="this.media='all'" />

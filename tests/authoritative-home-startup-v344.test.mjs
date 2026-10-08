@@ -25,11 +25,10 @@ test("v344 replaces the oversized Health skeleton with a compact live status", (
   assert.match(css, /is-compact-loading-v344 \{ min-height: 0/);
 });
 
-test("v344 never exposes cached Finance totals before authoritative sync", async () => {
+test("v344 never exposes cached Finance totals before authoritative sync", () => {
   assert.match(bundle, /cloudReady:bdHomeCloudReady/);
-  assert.match(bundle, /ready:bdHomeCloudReady/);
-  const ui = await readFile(new URL("../lib/bardoctor/client/intelligence-ui.tsx", import.meta.url), "utf8");
-  assert.match(ui, /!ready\?'Сверяем данные с сервером'/);
+  assert.match(bundle, /data-bd-home-money":"authoritative-loading-v344/);
+  assert.match(bundle, /Старые локальные суммы не показываются/);
   assert.match(bundle, /bdHomeCloudReady\?i\.jsx\(bdHomeMoneyCard/);
 });
 

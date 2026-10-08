@@ -55,7 +55,7 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
    await settle();await page.goto(base+'/home');await page.locator('.bd-management-queue li').first().waitFor();
    assert.equal(await page.locator('.bd-management-queue li').first().getAttribute('data-management-id'),attention.facts[0].id);
    assert.equal(await page.locator('[data-bd-home-attention]').count(),0);
-   await page.locator('.bd-home-financial-details').waitFor({state:'visible'});assert.equal(await page.locator('.bd-home-financial-details').evaluate(e=>e.tagName==='DETAILS'&&!e.hasAttribute('open')),false,'Legacy Finance must be open by default');
+   await page.locator('.bd-home-money').waitFor({state:'visible'});assert.equal(await page.locator('.bd-home-money').evaluate(e=>e.tagName==='DETAILS'&&!e.hasAttribute('open')),false,'Legacy Finance must be open by default');
    const compare=await page.locator('.bd-home-money-compare').innerText();assert.ok(!compare.includes('%'),compare);
    if(label==='initial'){assert.equal(await page.locator('.bd-home-money-value').innerText(),'Нет расчёта');assert.equal((await r.ask('expenses')).facts.find(f=>f.id==='registered-payroll')?.kind,'UNKNOWN');}
    await capture('home-'+label);
@@ -64,9 +64,8 @@ try{for(const width of process.env.BD_QA_WIDTHS?.split(',').map(Number)??[390,82
   await assertHome('initial');
   await settle();await page.goto(base+'/analysis?venueId='+r.venueId+'&doctorQuestion=attention');
   const panel=page.locator('.bd-curated-doctor');await panel.locator('[data-curated-answer=attention]').waitFor({timeout:30000});
-  await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();
   assert.equal(await panel.locator('[data-curated-question]').count(),7);assert.equal(await panel.locator('input,textarea').count(),0);
-  const chooseQuestion=async(id:string)=>{if(await panel.locator('[data-curated-answer]').count())await panel.getByRole('button',{name:'Другой вопрос',exact:true}).click();await panel.locator(`[data-curated-question=${id}]`).click();};
+  const chooseQuestion=async(id:string)=>{await panel.locator(`[data-curated-question=${id}]`).click();};
   const examples:Record<string,CuratedAnswer>={};
   for(const question of CURATED_QUESTIONS){
    await chooseQuestion(question.id);await panel.locator(`[data-curated-answer=${question.id}]`).waitFor();

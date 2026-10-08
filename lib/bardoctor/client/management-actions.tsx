@@ -35,7 +35,7 @@ export function createManagementActionsClient(React:typeof import('react'),runti
     runtime.commit(value);return value;
   }
   const verify=(venue:number,id:string,signal?:AbortSignal)=>read('/api/business-health/verify?actionId='+encodeURIComponent(id),venue,signal);
-  function Queue({venue,onNavigate,compact=false,onSupportingChange}:{venue:number;onNavigate:(path:string)=>void;compact?:boolean;onSupportingChange?:(items:Row[]|null)=>void}) {
+  function Queue({venue,onNavigate}:{venue:number;onNavigate:(path:string)=>void}) {
     const [state,setState]=React.useState<{venue:number;value:Envelope}|null>(null),[error,setError]=React.useState(''),[busy,setBusy]=React.useState(false);
     const epoch=React.useRef(0);
     React.useEffect(()=>{
@@ -49,24 +49,19 @@ export function createManagementActionsClient(React:typeof import('react'),runti
       for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.addEventListener(event,listener);
       return()=>{epochHandle.current++;scheduler.dispose();controller.abort();for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(event,listener)};
     },[venue]);
-    const value=state?.venue===venue?state.value:null;
-    const items=React.useMemo(()=>value?.data?.businessHealthSnapshot?.managementTopActions||[],[value]);
-    // Presentation relay: Home keeps every existing action below its compact intelligence area.
-    React.useEffect(()=>{onSupportingChange?.(value?items.slice(1):null);},[value,items,onSupportingChange]);
-    return <section className={'bd-management-queue bd-reference-queue'+(compact?' is-compact':'')} aria-label="Приоритеты управления" data-management-venue={venue}>
-      <h2 className="bd-queue-label">{compact?'Главный приоритет':'Что сделать первым'}</h2>{busy&&!value&&<p role="status">Обновляем управленческую очередь…</p>}
+    const value=state?.venue===venue?state.value:null,items=value?.data?.businessHealthSnapshot?.managementTopActions||[];
+    return <section className="bd-cost-management bd-management-queue" aria-label="Приоритеты управления" data-management-venue={venue}>
+      <h2>Что сделать первым</h2>{busy&&!value&&<p role="status">Обновляем управленческую очередь…</p>}
       {error&&<p role="alert">{error} Порядок пока не подтверждён.</p>}
       {value?.verification&&<p role="status" data-management-verification={value.verification.result}>{value.verification.message} Следующий приоритет — ниже.</p>}
-      <ol>{(compact?items.slice(0,1):items).map((item,index)=>{const target=item.target as {path:string;label:string}|null;return <li key={String(item.recommendationId)} data-management-id={String(item.managementId??item.recommendationId)} data-management-priority={String(item.priority)}>
-        {index===1&&<h2 className="bd-supporting-title">Другие сигналы</h2>}
-        <div className="bd-queue-item-heading"><span className={'bd-status '+(item.priority==='critical'?'bd-status-critical':item.priority==='high'?'bd-status-warning':'bd-status-neutral')}>{({critical:'Критично',high:'Требует внимания',medium:'Обычный приоритет',low:'Информационный'} as Record<string,string>)[String(item.priority)]??String(item.priority)}</span><strong>{String(item.title)}</strong></div>
-        {compact&&<><p className="bd-queue-short-why">{String(item.managementPriorityReason??item.reason)}</p>{!!item.whyNow&&<p className="bd-queue-deadline">{String(item.whyNow)}</p>}</>}
-        {target?<button type="button" className={index===0?'bd-intelligence-primary':'bd-intelligence-secondary'} onClick={()=>onNavigate(target.path)}>{target.label} →</button>:<p className="bd-doctor-no-action">Точное место исправления не подтверждено. Уточните основание сигнала.</p>}
-        {!compact&&<details open={index===0}><summary>{index===0?'Почему это первое':'Почему и что делать'}</summary><p>{String(item.managementPriorityReason??item.reason)}</p><p>{String(item.fact||item.consequence||'Основание требует проверки.')}</p><p>Если отложить: {String(item.consequence||'Отклонение останется без подтверждённого результата.')}</p><p>{String(item.action||'Проверьте основание сигнала.')}</p><small>{String(item.whyNow||'Срок не назначен.')}</small></details>}
+      <ol>{items.map((item,index)=>{const target=item.target as {path:string;label:string}|null;return <li key={String(item.recommendationId)} data-management-id={String(item.managementId??item.recommendationId)} data-management-priority={String(item.priority)}>
+        <strong>{index+1}. {String(item.title)}</strong><p>{String(item.managementPriorityReason??item.reason)}</p>
+        <details open={index===0}><summary>Почему и что делать</summary><p>{String(item.fact||item.consequence||'Основание требует проверки.')}</p><p>Если отложить: {String(item.consequence||'Отклонение останется без подтверждённого результата.')}</p><p>{String(item.action||'Проверьте основание сигнала.')}</p><small>{String(item.whyNow||'Срок не назначен.')}</small></details>
+        {target?<button type="button" onClick={()=>onNavigate(target.path)}>{target.label} →</button>:<p>Точное место исправления не подтверждено. Уточните основание сигнала.</p>}
       </li>})}</ol>
       {value&&!items.length&&<p>Подтверждённых действий в очереди нет. Проверьте доступность источников ниже.</p>}
-      {value?.data?.businessHealthSnapshot?.managementCoverage?.tasks!=="AVAILABLE"&&value&&<p className="bd-intelligence-meta">Не все источники поручений доступны. Очередь может быть неполной.</p>}
-      {value?.data?.businessHealthSnapshot?.managementCoverage?.cost==="PARTIAL"&&<p className="bd-intelligence-meta">Проверка себестоимости охватывает часть позиций.</p>}
+      {value?.data?.businessHealthSnapshot?.managementCoverage?.tasks!=="AVAILABLE"&&value&&<small>Не все источники поручений доступны. Очередь может быть неполной.</small>}
+      {value?.data?.businessHealthSnapshot?.managementCoverage?.cost==="PARTIAL"&&<small>Проверка себестоимости охватывает часть позиций.</small>}
     </section>;
   }
   function useContext({venue,query,ready,onOpen,onClear}:{venue:number;query:string;ready:boolean;onOpen:(context:Row)=>void;onClear?:()=>void}) {

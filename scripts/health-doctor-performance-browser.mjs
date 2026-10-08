@@ -49,7 +49,6 @@ try { for (const width of [390, 820, 1280]) {
     const hiddenReads = calls.slice(from).filter(c => c.path === '/api/ai/curated').length;
     if (!baseline) assert.equal(hiddenReads, 0, 'question list must not compute a hidden answer');
     for (const q of ['attention', 'next', 'cost', 'stock', 'shifts', 'expenses', 'tasks']) {
-      if (await panel.locator('[data-curated-answer]').count()) await panel.getByRole('button', { name: 'Другой вопрос', exact: true }).click();
       const started = Date.now(); await panel.locator(`[data-curated-question=${q}]`).click(); await panel.locator(`[data-curated-answer=${q}]`).waitFor();
       timings.push({ surface: 'doctor', question: q, attempt: 'first', visibleMs: Date.now() - started });
     }

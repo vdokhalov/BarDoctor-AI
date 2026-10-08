@@ -154,9 +154,15 @@ export async function runModernUxAudit() {
   const homeEnd = bundle.indexOf("function Dce()", homeStart);
   assert.ok(homeStart >= 0 && homeEnd > homeStart, "Home hierarchy component not found");
   const home = bundle.slice(homeStart, homeEnd);
-  requireOrder(home, ["bdReferenceUIV1.Home", "snapshot:", "queue:", "bdManagementQueuePhase4b", "cost:", "bdCostHomePhase4a", "finance:", "bdHomeMoneyCard", "bdHomeReviewsCardV409", "bdHomeContextCardsV151"], "home canonical adapters");
-  const intelligenceUi = await source("lib/bardoctor/client/intelligence-ui.tsx");
-  requireOrder(intelligenceUi, ["<Identity home", "<Score snapshot={snapshot}", "{primaryQueue}", "<DoctorEntry venue={venue}", "Сегодня", "{cost}", "{finance}", "{extras}"], "approved V1.2 Home hierarchy");
+  requireOrder(home, [
+    "bdHomeHealthIndexV200",
+    "bdManagementHomePhase4",
+    "bdCostHomePhase4a",
+    "bdHomeMoneyCard",
+    "bdHomeReviewsCardV409",
+    "bdHomeTodayCard",
+    "bdHomeContextCardsV151",
+  ], "home information hierarchy");
   assert.doesNotMatch(home, /i\.jsx\(bdHomeAttention/, "Home must use the canonical management queue");
   assert.doesNotMatch(home, /i\.jsx\(bdHomeFreshAi/, 'Approved Phase4A Home has no competing AI card');
   assert.ok(!home.includes("bdHomeSections"), "Duplicate Home section grid remains");
