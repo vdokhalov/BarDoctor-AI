@@ -59,6 +59,7 @@ try{
   const paths=[];await login(page,r[role]);const start=r.network.length;await page.reload();await settled(page);
   const bootstrap=await cloudReady(page);assert.deepEqual(bootstrap,{cloudReady:true,financeReady:true,restaurantReady:true,authReady:'ready'});
   for(const path of ['/home','/finance','/sales-import','/shifts','/catalog','/warehouse','/equipment','/reviews','/health','/analysis']){
+   const pathStart=r.network.length;
    await page.goto(r.base+path+'?venue='+r.venueId);await settled(page);
    assert.equal(await page.evaluate(()=>Number(localStorage.getItem('bd_active_venue_id'))),r.venueId);
    if(path!=='/sales-import')assert.ok((await page.locator('body').innerText()).trim().length>0,path+' blank UI');
@@ -66,9 +67,14 @@ try{
    if(role==='manager'){
     const body=await page.locator('body').innerText();assert.ok(!body.includes('FINANCE PRIVATE SENTINEL'));assert.ok(!body.replace(/\s/g,'').includes('98765'));
     if(path==='/analysis'){
-     assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
+     assert.equal(await page.locator('[data-curated-answer]').count(),0);
+     assert.equal(await page.locator('[data-curated-venue] [role="alert"]').count(),0);
+     assert.equal(r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated').length,0,'Question list must not issue a hidden answer request');
      assert.equal(await page.locator('[data-curated-question]').count(),7);
      await page.locator('[data-curated-question="stock"]').click();await settled(page);
+     const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated');
+     assert.ok(denied.length>0,'Selecting a question must exercise the server permission boundary');
+     for(const req of denied){assert.equal(req.status,403);assert.equal(req.body?.code,'ACCESS_DENIED');assert.equal(req.body?.availability,'RESTRICTED');assert.ok(!req.body?.data);}
      assert.equal(await page.locator('[data-curated-question]').count(),0);
      assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.equal(await page.locator('[data-curated-action]').count(),0);
      assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
