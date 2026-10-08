@@ -8,9 +8,15 @@ test('existing route does not excuse a missing visible Finance capability',()=>{
 test('owner-approved More Doctor entry cannot excuse removal of an existing More control',()=>{
  const item={id:'entry:more',kind:'entry',from:'/more'};
  const a=state();a.before.url='/more';a.before.contract={path:'/more',url:'/more'};a.actions={};
- const b=structuredClone(a);b.before.entries.unshift({label:'AI Doctor Диагностика и рекомендации',tag:'BUTTON'});
+ const b=structuredClone(a);b.before.entries.unshift({label:'AI Doctor',tag:'BUTTON',nav:false,disabled:false,href:null},{label:'Состояние бизнеса',tag:'BUTTON',nav:false,disabled:false,href:null});
  const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/more':a},candidate:{'/more':b}},'chromium',390)[0].verdict;
  assert.equal(compare(),'PASS');b.before.entries.pop();assert.equal(compare(),'FAIL');
+});
+test('More exception does not hide disabled or renamed Doctor controls',()=>{
+ const item={id:'route:/more',path:'/more'},a=state();a.before.url='/more';a.before.contract={path:'/more',url:'/more'};a.actions={};
+ const b=structuredClone(a),entry={label:'AI Doctor',tag:'BUTTON',nav:false,disabled:false,href:null};b.before.entries.unshift(entry);
+ const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/more':a},candidate:{'/more':b}},'webkit',820)[0].verdict;
+ assert.equal(compare(),'PASS');entry.disabled=true;assert.equal(compare(),'FAIL');entry.disabled=false;entry.label='AI Doctor broken';assert.equal(compare(),'FAIL');
 });
 test('clicking the wrong destination blocks otherwise visible navigation',()=>{const value=state();value.actions[item.id].url='/home';assert.equal(evaluate(value).verdict,'FAIL');});
 test('changed embedded module content blocks route-only parity',()=>{const value=state();value.before.frames=[{title:'Finance',text:'Missing payroll'}];assert.equal(evaluate(value).verdict,'FAIL');});

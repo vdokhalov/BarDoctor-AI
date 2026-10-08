@@ -14,8 +14,9 @@ export function compareRecoveryParity(inventory,versions,engine,width){const row
       const entries=v=>v.before.entries.filter(e=>e.label.trim()).map(e=>({...Object.fromEntries(Object.entries(e).filter(([key])=>key!=='index')),label:normalized(e.label)}));
       // Only the two owner-requested More entries are new. Every existing
       // control still participates in the unchanged module parity check.
-      const addedMore=new Set(['AI Doctor Диагностика и рекомендации','Состояние бизнеса Индекс и зоны Business Health']);
-      const candidateEntries=entries(b).filter(entry=>path!=='/more'||!addedMore.has(entry.label));
+      // The existing More renderer sets aria-label to the title only.
+      const addedMore=new Set(['AI Doctor','Состояние бизнеса']);
+      const candidateEntries=entries(b).filter(entry=>path!=='/more'||!(addedMore.has(entry.label)&&entry.tag==='BUTTON'&&!entry.nav&&!entry.disabled&&!entry.href));
       assert.deepEqual(candidateEntries,entries(a),item.id+' all visible/discoverable controls');
       assert.deepEqual(b.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),a.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),item.id+' embedded module content');
     }
