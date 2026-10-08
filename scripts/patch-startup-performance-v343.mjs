@@ -26,7 +26,9 @@ if (!bundle.includes(bundleMarker)) {
   changed = true;
 }
 
-if (!bundle.includes("S.useState(()=>bz()),[r,a]=S.useState(()=>bz()!==null)")) {
+// Scoped recovery v496 retains the cache but waits for server verification.
+const scopedRecoveryV496 = bundle.includes("function Vse({children:e}){const[t,n]=S.useState(()=>bz()),[r,a]=S.useState(!1),[profileError,setProfileError]");
+if (!scopedRecoveryV496 && !bundle.includes("S.useState(()=>bz()),[r,a]=S.useState(()=>bz()!==null)")) {
   replaceBundleOnce(
     "S.useState(null),[r,a]=S.useState(!1)",
     "S.useState(()=>bz()),[r,a]=S.useState(()=>bz()!==null)",

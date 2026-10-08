@@ -2288,5 +2288,33 @@
         "parentSpan": 15
       }
     }
-  ]
+  ],
+  "readOnlyD1": {
+    "binding": "DB",
+    "accountId": 1,
+    "storeKey": "bd_month_closings",
+    "fullyParsedRows": 1,
+    "periods": [
+      {
+        "venueId": 1,
+        "monthKey": "2026-07",
+        "status": "closed",
+        "positiveRevenue": true,
+        "numericFinalProfit": true
+      }
+    ],
+    "financialHistorySizesUnavailable": true,
+    "venueMapping": {
+      "venueId": 1,
+      "dataAccountId": 1,
+      "workspaceId": 1,
+      "status": "active"
+    },
+    "viewerLimit": {
+      "returnedNextOffset": 60,
+      "error": "A single D1 row is too large to display safely",
+      "affectedRowStoreAndAccountUnavailable": true,
+      "isProductionQueryTimeoutEvidence": false
+    }
+  }
 }

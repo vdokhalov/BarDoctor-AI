@@ -309,7 +309,7 @@ test("production artifact keeps one startup surface and opens server-authoritati
   assert.doesNotMatch(bundle, /"data-bd-health-startup-state":"SPLASH_LOADING"/);
   assert.doesNotMatch(bundle, /\?"SPLASH_LOADING":"HOME"/);
   assert.doesNotMatch(bundle.slice(bundle.indexOf("function bdHealthStartupGateV155")), /bdHealthLaunchRenderedV155|HEALTH_ENTRY/);
-  assert.match(bundle, /S\.useState\(\(\)=>bz\(\)\),\[r,a\]=S\.useState\(\(\)=>bz\(\)!==null\)/);
+  assert.match(bundle, /S\.useState\(\(\)=>bz\(\)\),\[r,a\]=S\.useState\(!1\),\[profileError,setProfileError\]/);
   assert.match(bundle, /function Woe\(\{children:e\}\)\{const\{isReady:t,profile:n\}=Un\(\),\[r,a\]=S\.useState\(!1\)/);
   assert.doesNotMatch(runtime, /cached-health-score-ready/);
   assert.match(runtime, /server-bootstrap-timeout/);

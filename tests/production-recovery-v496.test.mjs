@@ -8,14 +8,14 @@ const source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
 const functions=new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,source.slice(n.start,n.end)]));
 const storage=()=>{const data=new Map([['bd_session','qa@isolated.test'],['bd_session_token','qa-only'],['bd_active_venue_id','1']]);return{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k),key:i=>[...data.keys()][i],get length(){return data.size}};};
 const flush=()=>new Promise(done=>setImmediate(done));
-function provider(fetch){
+function provider(fetch,cachedProfile=null){
  const localStorage=storage(),window=new EventTarget(),states=[],refs=[],effects=[];let index=0,ref=0,cacheWrites=0;
  window.__bdBootstrapPending=true;window.__bdAuthBootstrapV274={state:'loading'};
- const context=vm.createContext({window,localStorage,fetch,AbortController,AbortSignal,DOMException,Error,vz:'/api/restaurants',wz:{Provider:'provider'},bz:()=>null,jz:()=>cacheWrites++,Ot:()=>localStorage.getItem('bd_session'),gz:()=>localStorage.getItem('bd_session_token'),ca:()=>({}),uM:async()=>{},i:{jsx:(_type,props)=>props},S:{useState:initial=>{const at=index++;if(!(at in states))states[at]=typeof initial==='function'?initial():initial;return[states[at],value=>states[at]=value]},useRef:initial=>refs[ref++]??(refs[ref-1]={current:initial}),useEffect:fn=>{if(!effects.length)effects.push(fn)},useCallback:fn=>fn}});
+ const context=vm.createContext({window,localStorage,fetch,AbortController,AbortSignal,DOMException,Error,vz:'/api/restaurants',wz:{Provider:'provider'},bz:()=>cachedProfile,jz:()=>cacheWrites++,Ot:()=>localStorage.getItem('bd_session'),gz:()=>localStorage.getItem('bd_session_token'),ca:()=>({}),uM:async()=>{},i:{jsx:(_type,props)=>props},S:{useState:initial=>{const at=index++;if(!(at in states))states[at]=typeof initial==='function'?initial():initial;return[states[at],value=>states[at]=value]},useRef:initial=>refs[ref++]??(refs[ref-1]={current:initial}),useEffect:fn=>{if(!effects.length)effects.push(fn)},useCallback:fn=>fn}});
  vm.runInContext(functions.get('zse')+';'+functions.get('Vse'),context);
- const render=()=>{index=0;ref=0;return context.Vse({children:null}).value;};render();const cleanup=effects[0]();
+ const render=()=>{index=0;ref=0;return context.Vse({children:null}).value;};const initial=render(),cleanup=effects[0]();
  const complete=()=>{window.__bdBootstrapPending=false;window.__bdAuthBootstrapV274={state:'ready'};window.dispatchEvent(new Event('bd:bootstrap-complete'));};
- return{window,localStorage,render,complete,cleanup,writes:()=>cacheWrites};
+ return{window,localStorage,initial,render,complete,cleanup,writes:()=>cacheWrites};
 }
 
 test('profile waits for bootstrap, records failure, and recovers on completion without a reload',async()=>{
@@ -25,6 +25,12 @@ test('profile waits for bootstrap, records failure, and recovers on completion w
  p.window.__bdBootstrapPending=true;p.window.dispatchEvent(new Event('bd:bootstrap-start'));assert.equal(p.render().isReady,false);
  p.complete();await flush();assert.equal(p.render().profile.name,'QA Team');assert.equal(p.render().profileError,null);assert.equal(calls,2);
  p.cleanup();p.complete();assert.equal(calls,2);
+});
+
+test('cached profile is not ready on the first render and revoked verification clears it',async()=>{
+ let calls=0;const p=provider(async()=>{calls++;return Response.json({ok:false,error:'revoked'},{status:403});},{name:'cached QA profile'});
+ assert.equal(p.initial.isReady,false);assert.equal(p.initial.profile.name,'cached QA profile');assert.equal(calls,0);
+ p.complete();await flush();assert.equal(calls,1);assert.equal(p.render().profile,null);assert.equal(p.render().profileError.status,403);assert.equal(p.writes(),0);p.cleanup();
 });
 
 test('venue change during JSON consumption never commits stale cache and ends in retryable recovery',async()=>{

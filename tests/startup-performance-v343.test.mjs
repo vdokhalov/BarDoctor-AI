@@ -9,9 +9,9 @@ const [bundle, bootstrap, html, responseSource] = await Promise.all([
   readFile(new URL("../app/bar-doctor-response.ts", import.meta.url), "utf8"),
 ]);
 
-test("v343 hydrates the cached profile without exposing incomplete cloud stores", () => {
+test("cached profile hydration retains server verification and cloud store readiness", () => {
   assert.match(bundle, /bdStartupPerformanceVersionV343="v343"/);
-  assert.match(bundle, /S\.useState\(\(\)=>bz\(\)\),\[r,a\]=S\.useState\(\(\)=>bz\(\)!==null\)/);
+  assert.match(bundle, /S\.useState\(\(\)=>bz\(\)\),\[r,a\]=S\.useState\(!1\),\[profileError,setProfileError\]/);
   assert.match(bundle, /function Woe\(\{children:e\}\)\{const\{isReady:t,profile:n\}=Un\(\),\[r,a\]=S\.useState\(!1\),\[s,l\]=S\.useState\(!1\)/);
   assert.match(bundle, /const f=await Xse\(\)/);
   const cloudProvider = bundle.slice(bundle.indexOf("function Woe({children:e})"), bundle.indexOf("function Ai()"));
