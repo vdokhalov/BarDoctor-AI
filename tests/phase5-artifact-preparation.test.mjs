@@ -150,7 +150,8 @@ test("full declared test/build artifact preparation twice preserves behavior and
       assert.equal(published.split("/* derived-metrics-phase3a8:start */").length, 2);
       assert.equal(published.split("/* management-cost-phase4a:start */").length, 2, "exactly one cost lifecycle adapter survives preparation");
       assert.equal(published.split("/* management-actions-phase4b:start */").length, 2, "one canonical management adapter survives preparation");
-      assert.equal(published.split("/* curated-doctor-phase4c:start */").length, 2, "one curated Doctor adapter survives repeated preparation");
+      assert.equal(published.split("/* curated-doctor-phase4c:start */").length, 1, "owner-selected legacy Doctor must not regain the curated bundle during preparation");
+      assert.doesNotMatch(published, /i\.jsx\(bdManagementHomePhase4|i\.jsx\(bdManagementQueuePhase4b|bdCuratedClientPhase4c/);
       assert.equal(published.split("i.jsx(bdCuratedDoctorPhase4c,{ready:bdAiCloudReady})").length, 1, "owner-selected legacy Doctor must survive preparation without curated UI");
       assert.ok(published.includes('await bdCostClientPhase4a.afterSave(bdCostSaveVenue'), "accepted save retains authoritative cost verification");
       assert.equal(published.split('bdBusinessHealthCalculationVersionV284="business-health-engine-v5"').length, 2, "canonical Health version survives repeated preparation exactly once");
