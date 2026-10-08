@@ -1,5 +1,7 @@
 # BarDoctor stable UI rollback from production v492
 
+**SUPERSEDED:** This document describes the rejected v489 UI candidate `51132f45f95c53655eb81096f8e285869a5bd9bf`. The owner explicitly selected the interface before Phase 4B/C. Use [stable-ui-history-v485.md](stable-ui-history-v485.md) and the v485 release handoff. This v489 candidate was not saved or deployed by this task; its CI was cancelled after the scope clarification. The statements below are retained as a record of that earlier candidate, not current release instructions.
+
 This is a saved-release preparation, not authorization to publish. Production must remain v492 until the owner separately approves the exact saved candidate. No Visual Wave 2 is included.
 
 ## Baseline and provenance

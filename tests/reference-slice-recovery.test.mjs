@@ -17,13 +17,16 @@ test('v489 protected files remain unchanged except two equivalent performance re
   for(const [path,hash] of Object.entries(expected))assert.equal(digest(readFileSync(path)),performance[path]??hash,path);
 });
 
-test('3032 prepared-client functions match v489 after the two retained Payroll initializer fixes',()=>{
+test('all unrelated v489 functions survive the owner-selected v485 presentation rollback',()=>{
   let source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
   source=source.replace(/\/\* bd-reference-render:([A-Za-z\d+/=]+) \*\/[\s\S]*?\/\* bd-reference-render:end \*\//g,(_,original)=>Buffer.from(original,'base64').toString('utf8'));
   source=source.replaceAll('window.bdReadNavigationQuery("month",bdPayrollInitialMonth())','window.bdReadNavigationQuery("month",bdPayrollInitialMonth)');
   const actual=new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,digest(source.slice(n.start,n.end))]));
   const expected=JSON.parse(readFileSync(fixture+'v489-function-hashes.json','utf8'));
-  for(const [name,hash] of Object.entries(expected))assert.equal(actual.get(name),hash,name);
+  const returned=new Set(['bdHomeDaily','c_e','Uce','nt']);
+  const removed=new Set(['bdCuratedDoctorPhase4c','bdCuratedHealthSuggestionPhase4c','bdCuratedReturnPhase4c','bdManagementHomePhase4','bdManagementQueuePhase4b']);
+  for(const name of removed)assert.ok(!actual.has(name));
+  for(const [name,hash] of Object.entries(expected))if(!returned.has(name)&&!removed.has(name))assert.equal(actual.get(name),hash,name);
 });
 
 test('baseline inventory includes all source-discovered modules, entries and conditional navigation',()=>{

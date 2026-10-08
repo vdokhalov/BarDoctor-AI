@@ -143,10 +143,6 @@ function businessHealthEnvelope(venueId) {
     dataQuality: { percent: 91, level: "high", label: "Качество данных: высокое", status: "healthy", statusLabel: "Хорошо", gaps: ["Отзывы ещё не подключены"] },
     explanation: "Операции требуют внимания", source: "server_business_intelligence",
   };
-  const top = { ...snapshot.priorityAction, managementId: "stock-review-mobile-qa", priority: "important", fact: primaryFactor.evidence, consequence: "Аномалии остатков останутся непроверенными.", whyNow: "Текущий подтверждённый stock signal." };
-  snapshot.managementTopActions = [top];
-  snapshot.managementQueue = [top];
-  snapshot.managementCoverage = { tasks: "AVAILABLE", cost: "AVAILABLE" };
   return {
     data: {
       businessHealthSnapshot: snapshot,
@@ -178,8 +174,6 @@ function freshBusinessHealthEnvelope(venueId, healthy = false) {
     snapshot.score = 90;
     snapshot.status = "healthy";
     snapshot.priorityAction = null;
-    snapshot.managementTopActions = [];
-    snapshot.managementQueue = [];
     snapshot.zones.find((zone) => zone.id === "operations").score = 90;
     snapshot.zones.find((zone) => zone.id === "operations").status = "healthy";
     snapshot.zones.find((zone) => zone.id === "operations").statusLabel = "Хорошо";
@@ -1122,16 +1116,15 @@ async function homeReviewsFlow(browser, profile) {
   const health = page.locator('[data-bd-home-health-index="business-health-snapshot-v334"]');
   const finance = page.locator('[data-bd-home-money="result-v151"]');
   const reviewsCard = page.locator('[data-bd-home-reviews="ready-v409"]');
-  const attention = page.locator('.bd-management-queue[data-management-venue="901"]');
+  const attention = page.locator('[data-bd-home-attention="universal-v198"]');
   await reviewsCard.waitFor({ timeout: 10_000 });
-  await attention.locator('li').first().waitFor({ timeout: 10_000 });
   assert.deepEqual(state.homeReviewResponses, [200], `${profile.name}: Home Reviews requested protected data before auth bootstrap was ready`);
   const homeLayout = await page.evaluate(() => {
     const selectors = [
       '[data-bd-home-health-index="business-health-snapshot-v334"]',
       '[data-bd-home-money="result-v151"]',
       '[data-bd-home-reviews="ready-v409"]',
-      '.bd-management-queue[data-management-venue="901"]',
+      '[data-bd-home-attention="universal-v198"]',
     ];
     const rects = selectors.map((selector) => document.querySelector(selector)?.getBoundingClientRect()).map((rect) => rect ? ({ top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width }) : null);
     const nav = document.querySelector("[data-bd-primary-navigation]");
@@ -1158,9 +1151,7 @@ async function homeReviewsFlow(browser, profile) {
   assert.match(await health.textContent(), /83/);
   assert.match(await finance.textContent(), /Финансовый результат/);
   assert.match(await reviewsCard.textContent(), /3,19 \/ 5.*105 отзывов.*6.*23.*7 без ответа.*Основные жалобы/s);
-  assert.match(await attention.textContent(), /Что сделать первым.*Проверить 6 аномалий остатков/s);
-  assert.equal(await attention.locator('li').first().getAttribute('data-management-id'), 'stock-review-mobile-qa', `${profile.name}: Home must use the canonical fixture priority`);
-  assert.equal(await page.locator('[data-bd-home-attention="universal-v198"]').count(), 0, `${profile.name}: Home must not rank review data independently`);
+  assert.match(await attention.textContent(), /Что важно сегодня.*7 негативных отзывов без ответа/s);
   await mobileAudit(page, profile.name, "home-reviews", { requireTouch: profile.descriptor.isMobile !== false });
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-home-reviews-v409.png`), fullPage: true });
 
@@ -1262,21 +1253,19 @@ async function businessHealthColdStartFlow(browser, profile) {
   const homeLayout = await page.evaluate(() => {
     const card = document.querySelector('[data-bd-home-health-index="business-health-snapshot-v334"]');
     const money = document.querySelector(".bd-home-money");
-    const attention = document.querySelector('.bd-management-queue[data-management-venue="901"]');
+    const attention = document.querySelector('[data-bd-home-attention="universal-v198"]');
     const cardRect = card?.getBoundingClientRect();
     const moneyRect = money?.getBoundingClientRect();
     return {
       cardHeight: cardRect?.height ?? null,
       moneyTop: moneyRect?.top ?? null,
       attentionTop: attention?.getBoundingClientRect().top ?? null,
-      legacyAttention: !!document.querySelector('[data-bd-home-attention="universal-v198"]'),
       viewportHeight: innerHeight,
       overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
   assert.ok((homeLayout.cardHeight ?? Infinity) <= (profile.descriptor.isMobile ? 290 : 310), `${profile.name}: Health card is still too tall: ${homeLayout.cardHeight}px`);
-  // G2 retains attention before money, using the shared canonical queue.
-  assert.equal(homeLayout.legacyAttention, false, `${profile.name}: Home must not render competing legacy attention`);
+  // Phase 4A approved hierarchy: attention comes before the existing money card.
   assert.ok((homeLayout.attentionTop ?? Infinity) < (homeLayout.moneyTop ?? -Infinity), `${profile.name}: attention must precede financial details`);
   assert.ok(homeLayout.overflow <= 1, `${profile.name}: Health introduced horizontal overflow`);
   await page.screenshot({ path: path.join(outputDir, `${profile.name}-business-health-home.png`), fullPage: false });
@@ -1302,9 +1291,9 @@ async function businessHealthColdStartFlow(browser, profile) {
   await page.goBack({ waitUntil: "networkidle" });
   await detail.waitFor({ timeout: 10_000 });
   const demandZone = detail.locator("button.bd-health-zone-row-v332").filter({ hasText: "Спрос" });
-  assert.equal(await demandZone.count(), 1, `${profile.name}: Demand zone must be uniquely identified independently of Doctor questions`);
+  assert.equal(await demandZone.count(), 1);
   await demandZone.click();
-  assert.equal(await demandZone.getAttribute("aria-expanded"), "true", `${profile.name}: Demand zone did not expand`);
+  assert.equal(await demandZone.getAttribute("aria-expanded"), "true");
   await detail.locator(".bd-health-zone-row-v334").filter({ hasText: "Спрос" }).getByRole("button", { name: /Посмотреть динамику/ }).click();
   assert.equal(new URL(page.url()).pathname, "/reports", `${profile.name}: Demand deep link is dead`);
   await page.goBack({ waitUntil: "networkidle" });

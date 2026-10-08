@@ -6,10 +6,10 @@ import {execFileSync} from 'node:child_process';
 import {isolatedForgotPasswordDocument} from './reference-slice-recovery-ssr.mjs';
 import {curatedDoctorFixture} from './curated-doctor-fixture.ts';
 
-export const BASELINE='b7708cadb01ff8e8ee11c1bcfdab448c15068878';
+export const BASELINE='dcc0541780db52d8c02b0c3a74f3ea0d31cbce24';
 
 export function baselinePublicRoot(){
-  const root=mkdtempSync(resolve(tmpdir(),'bardoctor-v489-parity-'));
+  const root=mkdtempSync(resolve(tmpdir(),'bardoctor-v485-parity-'));
   const archive=execFileSync('git',['archive',BASELINE,'public','app/bar-doctor-response.ts','lib/bardoctor/version.ts','lib/bardoctor/app-shell.ts'],{maxBuffer:128*1024*1024});
   execFileSync('tar',['-x','-C',root],{input:archive});
   return {root,close:()=>rmSync(root,{recursive:true,force:true})};

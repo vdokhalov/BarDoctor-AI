@@ -1,0 +1,4316 @@
+{
+  "schemaVersion": 1,
+  "baseline": {
+    "sitesVersion": 485,
+    "sha": "dcc0541780db52d8c02b0c3a74f3ea0d31cbce24"
+  },
+  "notes": [
+    "Inventory precedes presentation port. Source-owned conditional/dynamic entries are additionally covered by byte-identical handler and navigation contracts, with representative runtime fixtures.",
+    "Primary Reviews is desktop-only in v489; established mobile entry is More. Existing disclosure controls inside modules remain unchanged; Home capabilities must be normally open.",
+    "Auth/setup/admin boundaries are listed separately and are not owner module entries.",
+    "Owner explicitly selects the UI before Phase 4B queue and Phase 4C questions. Their entries are excluded because absent from v485 source; backend contracts and independent fixes remain tested."
+  ],
+  "excludedBoundaries": [
+    "/",
+    "/login",
+    "/register",
+    "/forgot-password",
+    "/join",
+    "/setup",
+    "/admin"
+  ],
+  "navigationLiterals": [
+    {
+      "path": "/about",
+      "sourceFunctions": [
+        "module",
+        "t_e",
+        "bdSettingsPageV182",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/add",
+      "sourceFunctions": [
+        "Tle",
+        "module",
+        "hue",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/analysis",
+      "sourceFunctions": [
+        "v",
+        "bdHomeAttentionBeforePhase4a",
+        "bdHomeFreshAi",
+        "w",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/assortment",
+      "sourceFunctions": [
+        "bdNomenclaturePageV238"
+      ]
+    },
+    {
+      "path": "/cases",
+      "sourceFunctions": [
+        "DCe",
+        "zCe",
+        "z",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/cashier",
+      "sourceFunctions": [
+        "module",
+        "bdPrepareEmbeddedPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/catalog",
+      "sourceFunctions": [
+        "module",
+        "bdWarehouseProductSheet",
+        "bdProcOverviewV168",
+        "t_e",
+        "bdSuppliersPage",
+        "bdAssortmentQueryUrlV170",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/catalog?tab=",
+      "sourceFunctions": [
+        "bdNomenclatureRelationUrlV369"
+      ]
+    },
+    {
+      "path": "/catalog?tab=menu&filter=attention",
+      "sourceFunctions": [
+        "bdAssortmentHomeSignalsV170"
+      ]
+    },
+    {
+      "path": "/catalog?tab=menu&returnTo=nomenclature",
+      "sourceFunctions": [
+        "bdNomenclaturePageV238"
+      ]
+    },
+    {
+      "path": "/catalog?tab=recipes&filter=missing",
+      "sourceFunctions": [
+        "bdAssortmentHomeSignalsV170"
+      ]
+    },
+    {
+      "path": "/catalog?tab=recipes&filter=review",
+      "sourceFunctions": [
+        "bdAssortmentHomeSignalsV170"
+      ]
+    },
+    {
+      "path": "/catalog?tab=recipes&returnTo=nomenclature",
+      "sourceFunctions": [
+        "bdNomenclaturePageV238"
+      ]
+    },
+    {
+      "path": "/data-control",
+      "sourceFunctions": [
+        "bdHealthZoneActionV334",
+        "module",
+        "bdAIDoctorDataQualityV198",
+        "t_e",
+        "c_e",
+        "bdPrepareEmbeddedPage",
+        "bdDataControlPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/design-system",
+      "sourceFunctions": [
+        "lEe"
+      ]
+    },
+    {
+      "path": "/employees",
+      "sourceFunctions": [
+        "Tle",
+        "v",
+        "zC",
+        "bdHomeAttentionBeforePhase4a",
+        "Aue",
+        "module",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/employees?view=employees",
+      "sourceFunctions": [
+        "bdSalariesPage",
+        "bdEmployeeEditPageV206",
+        "bdEmployeeDetailPage",
+        "z"
+      ]
+    },
+    {
+      "path": "/employees?view=overview",
+      "sourceFunctions": [
+        "bdSalariesPage"
+      ]
+    },
+    {
+      "path": "/equipment",
+      "sourceFunctions": [
+        "module",
+        "zC",
+        "bdHomeAttentionBeforePhase4a",
+        "g",
+        "y",
+        "ZAe",
+        "bdEquipmentLegacyDetailV166",
+        "T",
+        "eCe",
+        "tCe",
+        "t_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/equipment?tab=catalog",
+      "sourceFunctions": [
+        "JAe"
+      ]
+    },
+    {
+      "path": "/equipment/analytics",
+      "sourceFunctions": [
+        "bdEquipmentLegacyPageV166",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/equipment/catalog",
+      "sourceFunctions": [
+        "bdEquipmentLegacyPageV166",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/events",
+      "sourceFunctions": [
+        "zC",
+        "h",
+        "HCe",
+        "E",
+        "H",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/finance",
+      "sourceFunctions": [
+        "bdHealthZoneActionV334",
+        "Tle",
+        "v",
+        "zC",
+        "bdHomeTodayState",
+        "bdHomeAttentionBeforePhase4a",
+        "sue",
+        "bdMonthClosingStepBody",
+        "bdFinanceSettingsPage",
+        "bdMonthlyReportLegacyPage",
+        "bdMonthlyReportPage",
+        "bdSalariesPage",
+        "QAe",
+        "bdEquipmentLegacyDetailV166",
+        "Ee",
+        "_e",
+        "bdSuppliersPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/finance?month=",
+      "sourceFunctions": [
+        "bdMonthlyExpensesV165",
+        "bdMonthlyShiftAnalysisV165"
+      ]
+    },
+    {
+      "path": "/finance?view=expenses",
+      "sourceFunctions": [
+        "bdProcSavePaymentV186"
+      ]
+    },
+    {
+      "path": "/finance/settings",
+      "sourceFunctions": [
+        "bdMonthClosingStepBody",
+        "bdWarehousePage",
+        "bdMonthlyReportLegacyPage",
+        "bdMonthlyReportPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/finance/settings?section=utilities",
+      "sourceFunctions": [
+        "bdFinanceQuickActionsV160"
+      ]
+    },
+    {
+      "path": "/health",
+      "sourceFunctions": [
+        "bdHealthPriorityV332",
+        "bdHealthScoreIndicatorV153",
+        "bdHomeAttentionBeforePhase4a",
+        "bdHomeHealthIndexV200",
+        "Y",
+        "w",
+        "bdHealthDetailPriorityV332",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/health?",
+      "sourceFunctions": [
+        "X"
+      ]
+    },
+    {
+      "path": "/health?section=management",
+      "sourceFunctions": [
+        "bdHomeAttentionBeforePhase4a"
+      ]
+    },
+    {
+      "path": "/health?venueId=",
+      "sourceFunctions": [
+        "Y",
+        "X",
+        "z",
+        "bdCostHomeScorePhase4a",
+        "Q"
+      ]
+    },
+    {
+      "path": "/home",
+      "sourceFunctions": [
+        "bdAuthHomeTargetV248",
+        "Ale",
+        "bdVenueHomeV249",
+        "Tle",
+        "v",
+        "y",
+        "Uce",
+        "sue",
+        "hue",
+        "Y",
+        "_Ce",
+        "c_e",
+        "nEe",
+        "pt",
+        "lEe",
+        "bdHealthStartupRouteHomeV155",
+        "bdHealthStartupGateV155"
+      ]
+    },
+    {
+      "path": "/home?venue=",
+      "sourceFunctions": [
+        "bdAuthHomeTargetV248",
+        "bdVenueHomeV249"
+      ]
+    },
+    {
+      "path": "/integrations",
+      "sourceFunctions": [
+        "module",
+        "t_e",
+        "bdPrepareEmbeddedPage",
+        "bdIntegrationsPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/integrations?flow=google",
+      "sourceFunctions": [
+        "bdHomeReviewsCardV409"
+      ]
+    },
+    {
+      "path": "/market",
+      "sourceFunctions": [
+        "v",
+        "bdHomeCompetitorCardV151",
+        "_e",
+        "module",
+        "bdMarketPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/month-closing",
+      "sourceFunctions": [
+        "lEe"
+      ]
+    },
+    {
+      "path": "/more",
+      "sourceFunctions": [
+        "module",
+        "Tle",
+        "bdHomeOpenVenueV151",
+        "bdEquipmentLegacyPageV166",
+        "bdAccountingHeader",
+        "bdNomenclaturePage",
+        "bdNomenclaturePageV238",
+        "bdWarehousePage",
+        "bdEquipmentHeaderV167",
+        "bdProcHeaderV168",
+        "bdSuppliersPage",
+        "bdCatalogPage",
+        "bdAssortmentHeaderV170",
+        "bdAboutPage",
+        "bdSettingsPageV182",
+        "Ll",
+        "q_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/nomenclature",
+      "sourceFunctions": [
+        "module",
+        "bdNomenclatureReturnUrlV369",
+        "_e",
+        "t_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/nomenclature?item=",
+      "sourceFunctions": [
+        "bdNomenclatureReturnUrlV369"
+      ]
+    },
+    {
+      "path": "/nomenclature?returnTo=assortment",
+      "sourceFunctions": [
+        "bdAssortmentCommandPageV170"
+      ]
+    },
+    {
+      "path": "/nomenclature?view=attention&returnTo=warehouse",
+      "sourceFunctions": [
+        "bdWarehousePage"
+      ]
+    },
+    {
+      "path": "/nomenclature?view=taxonomy&returnTo=assortment",
+      "sourceFunctions": [
+        "bdAssortmentCommandPageV170"
+      ]
+    },
+    {
+      "path": "/nomenclature?view=taxonomy&returnTo=catalog",
+      "sourceFunctions": [
+        "bdCatalogPage"
+      ]
+    },
+    {
+      "path": "/nomenclature?view=taxonomy&returnTo=warehouse",
+      "sourceFunctions": [
+        "bdWarehousePage"
+      ]
+    },
+    {
+      "path": "/notifications",
+      "sourceFunctions": [
+        "module",
+        "bdHomeHeaderV151",
+        "t_e",
+        "bdPrepareEmbeddedPage",
+        "bdNotificationsPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/opportunities",
+      "sourceFunctions": [
+        "v",
+        "bdHomeOpportunityCardV151",
+        "_e",
+        "module",
+        "bdOpportunitiesPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/payroll",
+      "sourceFunctions": [
+        "v",
+        "bdHomeAttentionBeforePhase4a",
+        "bdSalariesPage",
+        "bdSalaryEmployeePage",
+        "bdShiftsPage",
+        "bdFinanceRevenueRecordsV160",
+        "bdEmployeeDetailPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/privacy",
+      "sourceFunctions": [
+        "kle",
+        "Dle",
+        "bdAboutPage",
+        "bdSettingsPageV182",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/profile",
+      "sourceFunctions": [
+        "bdProfileBackV281",
+        "bdProfileReturnV281",
+        "bdMoreLegacyPageV165",
+        "t_e",
+        "bdSettingsPageV182",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/profile?edit=venue&focus=currency",
+      "sourceFunctions": [
+        "bdWarehousePage"
+      ]
+    },
+    {
+      "path": "/profile/currency",
+      "sourceFunctions": [
+        "e_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/profile/personal",
+      "sourceFunctions": [
+        "e_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/profile/venue",
+      "sourceFunctions": [
+        "e_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/reports",
+      "sourceFunctions": [
+        "bdHealthZoneActionV334",
+        "v",
+        "bdHomeMoneyCard",
+        "bdDiagnosisFinancialCardV48",
+        "bdWarehousePage",
+        "bdFinanceSettingsPage",
+        "bdFinanceQuickActionsV160",
+        "BAe",
+        "module",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/reports?closeMonth=1",
+      "sourceFunctions": [
+        "bdMonthlyReadinessV165",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/reset",
+      "sourceFunctions": [
+        "lEe"
+      ]
+    },
+    {
+      "path": "/reviews",
+      "sourceFunctions": [
+        "module",
+        "Tle",
+        "v",
+        "zC",
+        "bdHomeReviewsCardV409",
+        "t_e",
+        "bdReviewsPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/reviews?filter=negative",
+      "sourceFunctions": [
+        "bdHomeAttentionBeforePhase4a"
+      ]
+    },
+    {
+      "path": "/reviews?filter=unanswered",
+      "sourceFunctions": [
+        "bdHomeReviewsCardV409"
+      ]
+    },
+    {
+      "path": "/salaries",
+      "sourceFunctions": [
+        "v",
+        "bdMonthlyReportLegacyPage",
+        "bdFinanceQuickActionsV160",
+        "jCe",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/salaries?",
+      "sourceFunctions": [
+        "bdSalaryListHrefV164",
+        "bdSalaryEmployeeHrefV164"
+      ]
+    },
+    {
+      "path": "/salaries?month=",
+      "sourceFunctions": [
+        "BAe",
+        "bdTeamSignalsV163",
+        "bdTeamOverviewV163",
+        "vCe"
+      ]
+    },
+    {
+      "path": "/salaries?return=finance&month=",
+      "sourceFunctions": [
+        "bdMonthlyPayrollRecurringV165",
+        "bdMonthlyReportPage"
+      ]
+    },
+    {
+      "path": "/sales-entry",
+      "sourceFunctions": [
+        "module",
+        "bdPrepareEmbeddedPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/sales-import",
+      "sourceFunctions": [
+        "bdWarehousePage",
+        "module",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/sales-import?",
+      "sourceFunctions": [
+        "bdSalesImportPage"
+      ]
+    },
+    {
+      "path": "/sales-import?batch=",
+      "sourceFunctions": [
+        "bdWarehousePage"
+      ]
+    },
+    {
+      "path": "/sales-import?shiftId=",
+      "sourceFunctions": [
+        "PAe"
+      ]
+    },
+    {
+      "path": "/settings",
+      "sourceFunctions": [
+        "module",
+        "t_e",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/shifts",
+      "sourceFunctions": [
+        "Tle",
+        "v",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/shifts?closeShift=1",
+      "sourceFunctions": [
+        "Tle",
+        "module",
+        "bdHomeTodayState",
+        "bdMonthClosingStepBody"
+      ]
+    },
+    {
+      "path": "/shifts?month=",
+      "sourceFunctions": [
+        "BAe",
+        "bdTeamSignalsV163",
+        "bdTeamOverviewV163"
+      ]
+    },
+    {
+      "path": "/shifts?shift=",
+      "sourceFunctions": [
+        "bdWriteoffWorkspaceV271"
+      ]
+    },
+    {
+      "path": "/smart",
+      "sourceFunctions": [
+        "bdHomeHealthIndexV200",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/supplier-alternatives",
+      "sourceFunctions": [
+        "bdProcOverviewV168",
+        "bdProcSuppliersV168",
+        "bdProcCompareV168",
+        "module",
+        "bdSupplierAlternativesPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/suppliers",
+      "sourceFunctions": [
+        "module",
+        "f",
+        "Ee",
+        "_e",
+        "t_e",
+        "bdSuppliersPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/suppliers?create=1",
+      "sourceFunctions": [
+        "Tle",
+        "f"
+      ]
+    },
+    {
+      "path": "/suppliers?create=1&returnTo=finance",
+      "sourceFunctions": [
+        "BAe",
+        "openExpenseAdd"
+      ]
+    },
+    {
+      "path": "/suppliers?create=1&returnTo=nomenclature",
+      "sourceFunctions": [
+        "bdNomenclaturePage",
+        "bdNomenclaturePageV238"
+      ]
+    },
+    {
+      "path": "/suppliers?create=1&returnTo=warehouse",
+      "sourceFunctions": [
+        "bdWarehousePage"
+      ]
+    },
+    {
+      "path": "/suppliers?documentId=",
+      "sourceFunctions": [
+        "BAe"
+      ]
+    },
+    {
+      "path": "/suppliers?q=",
+      "sourceFunctions": [
+        "bdNomenclatureRelationUrlV369"
+      ]
+    },
+    {
+      "path": "/suppliers?tab=compare&q=",
+      "sourceFunctions": [
+        "bdAssortmentCommandPageV170"
+      ]
+    },
+    {
+      "path": "/suppliers?tab=purchases&documentId=",
+      "sourceFunctions": [
+        "bdProcurementHomeSignalsV168"
+      ]
+    },
+    {
+      "path": "/suppliers?tab=purchases&filter=review",
+      "sourceFunctions": [
+        "bdProcurementHomeSignalsV168"
+      ]
+    },
+    {
+      "path": "/suppliers?tab=purchases&filter=unpaid",
+      "sourceFunctions": [
+        "bdProcOverviewV168"
+      ]
+    },
+    {
+      "path": "/suppliers?tab=purchases&payment=1&returnTo=finance",
+      "sourceFunctions": [
+        "BAe"
+      ]
+    },
+    {
+      "path": "/tasks",
+      "sourceFunctions": [
+        "v",
+        "zC",
+        "bdHomeAttentionBeforePhase4a",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/tasks?new=1",
+      "sourceFunctions": [
+        "Tle"
+      ]
+    },
+    {
+      "path": "/tasks?new=1&title=",
+      "sourceFunctions": [
+        "bdProcComparisonDetailV168"
+      ]
+    },
+    {
+      "path": "/tasks?tab=",
+      "sourceFunctions": [
+        "bdAIDoctorOpenTaskV196",
+        "bdRecommendationToTask"
+      ]
+    },
+    {
+      "path": "/tasks?tab=proposed",
+      "sourceFunctions": [
+        "bdAIDoctorPrepareTaskV196"
+      ]
+    },
+    {
+      "path": "/team-access",
+      "sourceFunctions": [
+        "t_e",
+        "module",
+        "bdTeamAccessPage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/terms",
+      "sourceFunctions": [
+        "kle",
+        "Dle",
+        "bdAboutPage",
+        "bdSettingsPageV182",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/venues/new",
+      "sourceFunctions": [
+        "bdLifecycleEmpty",
+        "t_e",
+        "module",
+        "bdVenueCreatePage",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/warehouse",
+      "sourceFunctions": [
+        "v",
+        "bdHomeAttentionBeforePhase4a",
+        "bdNomenclaturePage",
+        "bdNomenclaturePageV238",
+        "bdMonthlyReportLegacyPage",
+        "bdMonthlyReportPage",
+        "_e",
+        "t_e",
+        "module",
+        "lEe"
+      ]
+    },
+    {
+      "path": "/warehouse?add=inventory",
+      "sourceFunctions": [
+        "bdMonthClosingStepBody",
+        "bdFinanceSettingsPage",
+        "bdFinanceQuickActionsV160",
+        "BAe"
+      ]
+    },
+    {
+      "path": "/warehouse?add=writeoff",
+      "sourceFunctions": [
+        "bdMonthClosingStepBody"
+      ]
+    },
+    {
+      "path": "/warehouse?tab=writeoffs&writeoff=new&returnTo=finance",
+      "sourceFunctions": [
+        "bdFinanceQuickActionsV160"
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "route:/terms",
+      "kind": "route",
+      "path": "/terms",
+      "label": "Условия использования",
+      "parent": "/settings",
+      "type": "document",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/privacy",
+      "kind": "route",
+      "path": "/privacy",
+      "label": "Политика конфиденциальности",
+      "parent": "/settings",
+      "type": "document",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/home",
+      "kind": "route",
+      "path": "/home",
+      "label": "Главная",
+      "parent": null,
+      "type": "root",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/analysis",
+      "kind": "route",
+      "path": "/analysis",
+      "label": "AI Доктор",
+      "parent": "/home",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/smart",
+      "kind": "route",
+      "path": "/smart",
+      "label": "Сообщить BarDoctor",
+      "parent": "/home",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/add",
+      "kind": "route",
+      "path": "/add",
+      "label": "Добавить",
+      "parent": "/home",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/events",
+      "kind": "route",
+      "path": "/events",
+      "label": "Журнал происшествий",
+      "parent": "/home",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/tasks",
+      "kind": "route",
+      "path": "/tasks",
+      "label": "Поручения",
+      "parent": "/employees",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/equipment",
+      "kind": "route",
+      "path": "/equipment",
+      "label": "Оборудование",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/equipment/catalog",
+      "kind": "route",
+      "path": "/equipment/catalog",
+      "label": "Каталог оборудования",
+      "parent": "/equipment",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/equipment/analytics",
+      "kind": "route",
+      "path": "/equipment/analytics",
+      "label": "Аналитика оборудования",
+      "parent": "/equipment",
+      "type": "report",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/finance",
+      "kind": "route",
+      "path": "/finance",
+      "label": "Финансы",
+      "parent": null,
+      "type": "root",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/market",
+      "kind": "route",
+      "path": "/market",
+      "label": "Конкуренты",
+      "parent": "/home",
+      "type": "module",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/opportunities",
+      "kind": "route",
+      "path": "/opportunities",
+      "label": "Календарь возможностей",
+      "parent": "/home",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/data-control",
+      "kind": "route",
+      "path": "/data-control",
+      "label": "Контроль данных",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/team-access",
+      "kind": "route",
+      "path": "/team-access",
+      "label": "Роли и доступ",
+      "parent": "/employees",
+      "type": "settings",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/integrations",
+      "kind": "route",
+      "path": "/integrations",
+      "label": "Интеграции",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/profile",
+      "kind": "route",
+      "path": "/profile",
+      "label": "Профиль",
+      "parent": "/settings",
+      "type": "edit",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/profile/personal",
+      "kind": "route",
+      "path": "/profile/personal",
+      "label": "Личные данные",
+      "parent": "/profile",
+      "type": "edit",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/profile/venue",
+      "kind": "route",
+      "path": "/profile/venue",
+      "label": "Данные заведения",
+      "parent": "/profile",
+      "type": "edit",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/profile/currency",
+      "kind": "route",
+      "path": "/profile/currency",
+      "label": "Валюта учёта",
+      "parent": "/profile",
+      "type": "edit",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/more",
+      "kind": "route",
+      "path": "/more",
+      "label": "Ещё",
+      "parent": null,
+      "type": "root",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/employees",
+      "kind": "route",
+      "path": "/employees",
+      "label": "Команда",
+      "parent": null,
+      "type": "root",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/salaries",
+      "kind": "route",
+      "path": "/salaries",
+      "label": "Зарплаты",
+      "parent": "/finance",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/payroll",
+      "kind": "route",
+      "path": "/payroll",
+      "label": "Правила оплаты",
+      "parent": "/salaries",
+      "type": "settings",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/health",
+      "kind": "route",
+      "path": "/health",
+      "label": "Состояние бизнеса",
+      "parent": "/home",
+      "type": "report",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/reviews",
+      "kind": "route",
+      "path": "/reviews",
+      "label": "Отзывы гостей",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/cases",
+      "kind": "route",
+      "path": "/cases",
+      "label": "Дела",
+      "parent": "/home",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/catalog",
+      "kind": "route",
+      "path": "/catalog",
+      "label": "Ассортимент и техкарты",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/suppliers",
+      "kind": "route",
+      "path": "/suppliers",
+      "label": "Поставщики и закупки",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/nomenclature",
+      "kind": "route",
+      "path": "/nomenclature",
+      "label": "Номенклатура",
+      "parent": "/warehouse",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/warehouse",
+      "kind": "route",
+      "path": "/warehouse",
+      "label": "Склад",
+      "parent": "/more",
+      "type": "module",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/reports",
+      "kind": "route",
+      "path": "/reports",
+      "label": "Месячный отчёт",
+      "parent": "/finance",
+      "type": "report",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/month-closing",
+      "kind": "route",
+      "path": "/month-closing",
+      "label": "Закрытие месяца",
+      "parent": "/reports",
+      "type": "redirect",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/finance/settings",
+      "kind": "route",
+      "path": "/finance/settings",
+      "label": "Настройки финансов",
+      "parent": "/finance",
+      "type": "settings",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/notifications",
+      "kind": "route",
+      "path": "/notifications",
+      "label": "Уведомления",
+      "parent": "/more",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/cashier",
+      "kind": "route",
+      "path": "/cashier",
+      "label": "Касса",
+      "parent": "/sales-import",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/sales-entry",
+      "kind": "route",
+      "path": "/sales-entry",
+      "label": "Продажи",
+      "parent": "/sales-import",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/sales-import",
+      "kind": "route",
+      "path": "/sales-import",
+      "label": "Импорт продаж",
+      "parent": "/warehouse",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/supplier-alternatives",
+      "kind": "route",
+      "path": "/supplier-alternatives",
+      "label": "Новые поставщики",
+      "parent": "/suppliers",
+      "type": "list",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/venues/new",
+      "kind": "route",
+      "path": "/venues/new",
+      "label": "Новое заведение",
+      "parent": "/more",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/settings",
+      "kind": "route",
+      "path": "/settings",
+      "label": "Настройки",
+      "parent": "/more",
+      "type": "settings",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/about",
+      "kind": "route",
+      "path": "/about",
+      "label": "О BarDoctor",
+      "parent": "/more",
+      "type": "document",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/reset",
+      "kind": "route",
+      "path": "/reset",
+      "label": "Сброс",
+      "parent": "/home",
+      "type": "redirect",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/design-system",
+      "kind": "route",
+      "path": "/design-system",
+      "label": "Design system",
+      "parent": "/home",
+      "type": "redirect",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/assortment",
+      "kind": "route",
+      "path": "/assortment",
+      "label": "Ассортимент",
+      "parent": "/catalog",
+      "type": "redirect",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/app.html",
+      "kind": "route",
+      "path": "/app.html",
+      "label": "BarDoctor",
+      "parent": "/home",
+      "type": "compatibility",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/decisions",
+      "kind": "route",
+      "path": "/decisions",
+      "label": "AI Доктор",
+      "parent": "/home",
+      "type": "compatibility",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/shifts",
+      "kind": "route",
+      "path": "/shifts",
+      "label": "Смены",
+      "parent": null,
+      "type": "root",
+      "source": "public/navigation-contract-v247.js + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/events/qa-event",
+      "kind": "route",
+      "path": "/events/qa-event",
+      "label": "Происшествие",
+      "parent": "/events",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/cases/add",
+      "kind": "route",
+      "path": "/cases/add",
+      "label": "Новое дело",
+      "parent": "/cases",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/cases/qa-critical",
+      "kind": "route",
+      "path": "/cases/qa-critical",
+      "label": "Дело",
+      "parent": "/cases",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/equipment/qa-equipment",
+      "kind": "route",
+      "path": "/equipment/qa-equipment",
+      "label": "Оборудование",
+      "parent": "/equipment",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/equipment/qa-equipment/history/new",
+      "kind": "route",
+      "path": "/equipment/qa-equipment/history/new",
+      "label": "Обслуживание",
+      "parent": "/equipment/qa-equipment",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/finance/shift/qa-cash/payroll",
+      "kind": "route",
+      "path": "/finance/shift/qa-cash/payroll",
+      "label": "Расчёт смены",
+      "parent": "/finance",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/employees/qa-barista",
+      "kind": "route",
+      "path": "/employees/qa-barista",
+      "label": "Сотрудник",
+      "parent": "/employees",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/employees/qa-barista/edit",
+      "kind": "route",
+      "path": "/employees/qa-barista/edit",
+      "label": "Редактирование сотрудника",
+      "parent": "/employees/qa-barista",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "route:/salaries/qa-barista",
+      "kind": "route",
+      "path": "/salaries/qa-barista",
+      "label": "Зарплата",
+      "parent": "/salaries",
+      "type": "data-dependent",
+      "source": "public/navigation-contract-v247.js PATTERNS + SPA registry",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/warehouse?writeoff=new",
+      "kind": "query",
+      "path": "/warehouse?writeoff=new",
+      "label": "Списание",
+      "parent": "/warehouse",
+      "type": "fullscreen",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/warehouse?inventory=new",
+      "kind": "query",
+      "path": "/warehouse?inventory=new",
+      "label": "Инвентаризация",
+      "parent": "/warehouse",
+      "type": "fullscreen",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/warehouse?product=qa-stock",
+      "kind": "query",
+      "path": "/warehouse?product=qa-stock",
+      "label": "Карточка товара",
+      "parent": "/warehouse",
+      "type": "sheet",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/catalog?itemId=qa-water",
+      "kind": "query",
+      "path": "/catalog?itemId=qa-water",
+      "label": "Позиция меню",
+      "parent": "/catalog",
+      "type": "sheet",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/notifications?view=category&category=calendar",
+      "kind": "query",
+      "path": "/notifications?view=category&category=calendar",
+      "label": "Календарь возможностей",
+      "parent": "/notifications",
+      "type": "detail",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/notifications?view=quiet",
+      "kind": "query",
+      "path": "/notifications?view=quiet",
+      "label": "Тихие часы",
+      "parent": "/notifications",
+      "type": "detail",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/notifications?view=history",
+      "kind": "query",
+      "path": "/notifications?view=history",
+      "label": "История уведомлений",
+      "parent": "/notifications",
+      "type": "detail",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/notifications?view=device",
+      "kind": "query",
+      "path": "/notifications?view=device",
+      "label": "Настройки устройства",
+      "parent": "/notifications",
+      "type": "detail",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/data-control?event=qa-event",
+      "kind": "query",
+      "path": "/data-control?event=qa-event",
+      "label": "Событие журнала",
+      "parent": "/data-control",
+      "type": "detail",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/integrations?flow=catalog",
+      "kind": "query",
+      "path": "/integrations?flow=catalog",
+      "label": "Подключить систему",
+      "parent": "/integrations",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/integrations?flow=onec",
+      "kind": "query",
+      "path": "/integrations?flow=onec",
+      "label": "1С:Предприятие",
+      "parent": "/integrations",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/integrations?flow=api",
+      "kind": "query",
+      "path": "/integrations?flow=api",
+      "label": "Подключение API",
+      "parent": "/integrations",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/integrations?flow=file",
+      "kind": "query",
+      "path": "/integrations?flow=file",
+      "label": "Импорт из файла",
+      "parent": "/integrations",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/suppliers?documentId=qa-document",
+      "kind": "query",
+      "path": "/suppliers?documentId=qa-document",
+      "label": "Закупочный документ",
+      "parent": "/suppliers",
+      "type": "sheet",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/suppliers?supplierId=qa-supplier",
+      "kind": "query",
+      "path": "/suppliers?supplierId=qa-supplier",
+      "label": "Поставщик",
+      "parent": "/suppliers",
+      "type": "sheet",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/suppliers?compareKey=qa-product",
+      "kind": "query",
+      "path": "/suppliers?compareKey=qa-product",
+      "label": "Сравнение предложений",
+      "parent": "/suppliers",
+      "type": "sheet",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/suppliers?create=1",
+      "kind": "query",
+      "path": "/suppliers?create=1",
+      "label": "Новая покупка",
+      "parent": "/suppliers",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/finance?addExpense=1",
+      "kind": "query",
+      "path": "/finance?addExpense=1",
+      "label": "Новый расход",
+      "parent": "/finance",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/finance?repairEquipmentId=qa-equipment",
+      "kind": "query",
+      "path": "/finance?repairEquipmentId=qa-equipment",
+      "label": "Расход на оборудование",
+      "parent": "/finance",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/finance?closeShift=1",
+      "kind": "query",
+      "path": "/finance?closeShift=1",
+      "label": "Закрытие смены",
+      "parent": "/finance",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/shifts?closeShift=1",
+      "kind": "query",
+      "path": "/shifts?closeShift=1",
+      "label": "Закрытие смены",
+      "parent": "/shifts",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/tasks?new=1",
+      "kind": "query",
+      "path": "/tasks?new=1",
+      "label": "Новое поручение",
+      "parent": "/tasks",
+      "type": "create",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "query:/reports?closeMonth=1",
+      "kind": "query",
+      "path": "/reports?closeMonth=1",
+      "label": "Закрытие периода",
+      "parent": "/reports",
+      "type": "wizard",
+      "source": "public/navigation-contract-v247.js queryScreen",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "primary:Главная",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Главная",
+      "target": "/home",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/home\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "primary:Смены",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Смены",
+      "target": "/shifts",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/shifts\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "primary:Финансы",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Финансы",
+      "target": "/finance",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/finance\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "primary:Отзывы",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Отзывы",
+      "target": "/reviews",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/reviews\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": "via /more",
+      "home": true
+    },
+    {
+      "id": "primary:Добавить",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Добавить",
+      "target": null,
+      "selector": "nav[data-bd-bottom-nav] button[data-bd-nav-key=\"add\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "primary:Команда",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Команда",
+      "target": "/employees",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/employees\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "primary:Ещё",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Ещё",
+      "target": "/more",
+      "selector": "nav[data-bd-bottom-nav] a[href=\"/more\"]",
+      "source": "Tle",
+      "entryScope": "primary",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "more:Оборудование",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Оборудование",
+      "target": "/equipment",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Отзывы гостей",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Отзывы гостей",
+      "target": "/reviews",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Поставщики",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Поставщики",
+      "target": "/suppliers",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Номенклатура",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Номенклатура",
+      "target": "/nomenclature",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Склад",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Склад",
+      "target": "/warehouse",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Ассортимент и техкарты",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Ассортимент и техкарты",
+      "target": "/catalog",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Контроль данных",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Контроль данных",
+      "target": "/data-control",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Мои заведения",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Мои заведения",
+      "target": "/team-access",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Интеграции",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Интеграции",
+      "target": "/integrations",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Уведомления",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Уведомления",
+      "target": "/notifications",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Настройки",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Настройки",
+      "target": "/settings",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:О BarDoctor",
+      "kind": "entry",
+      "from": "/more",
+      "label": "О BarDoctor",
+      "target": "/about",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Добавить заведение",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Добавить заведение",
+      "target": "/venues/new",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "more:Открыть профиль заведения",
+      "kind": "entry",
+      "from": "/more",
+      "label": "Открыть профиль заведения",
+      "target": "/profile",
+      "source": "t_e",
+      "entryScope": "more",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "add:Закрыть смену",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Закрыть смену",
+      "target": "/shifts?closeShift=1",
+      "source": "Tle",
+      "entryScope": "add-menu",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "add:Добавить покупку",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Добавить покупку",
+      "target": "/suppliers?create=1",
+      "source": "Tle",
+      "entryScope": "add-menu",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "add:Сообщить о происшествии",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Сообщить о происшествии",
+      "target": "/add",
+      "source": "Tle",
+      "entryScope": "add-menu",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "add:Создать поручение",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Создать поручение",
+      "target": "/tasks?new=1",
+      "source": "Tle",
+      "entryScope": "add-menu",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Business Health",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Business Health",
+      "target": "/health",
+      "selector": "[data-bd-home-health-index]",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Cost correction",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Cost correction",
+      "target": null,
+      "selector": "[data-cost-surface=home]",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Monthly Finance",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Monthly Finance",
+      "target": "/reports",
+      "selector": ".bd-home-money",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Reviews",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Reviews",
+      "target": "/reviews",
+      "selector": "[data-bd-home-reviews]",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Today operational action",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Today operational action",
+      "target": null,
+      "selector": "[data-bd-home-today]",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Calendar",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Calendar",
+      "target": "/opportunities",
+      "selector": "[data-bd-home-context] button:first-child",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Competitors",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Competitors",
+      "target": "/market",
+      "selector": "[data-bd-home-context] button:last-child",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "home:Today context",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Today context",
+      "target": null,
+      "selector": "[data-bd-home-today]",
+      "source": "bdHomeDaily + unchanged legacy helpers",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    },
+    {
+      "id": "context:/smart:Назад",
+      "kind": "entry",
+      "from": "/smart",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/add:Назад",
+      "kind": "entry",
+      "from": "/add",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/events:Все",
+      "kind": "entry",
+      "from": "/events",
+      "label": "Все",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/events:Открытые",
+      "kind": "entry",
+      "from": "/events",
+      "label": "Открытые",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/events:Критические",
+      "kind": "entry",
+      "from": "/events",
+      "label": "Критические",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/events:Решённые",
+      "kind": "entry",
+      "from": "/events",
+      "label": "Решённые",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/events:Записать происшествие",
+      "kind": "entry",
+      "from": "/events",
+      "label": "Записать происшествие",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/tasks:Предложенные",
+      "kind": "entry",
+      "from": "/tasks",
+      "label": "Предложенные",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/tasks:Сегодня",
+      "kind": "entry",
+      "from": "/tasks",
+      "label": "Сегодня",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/tasks:На неделе",
+      "kind": "entry",
+      "from": "/tasks",
+      "label": "На неделе",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/tasks:Просрочено1",
+      "kind": "entry",
+      "from": "/tasks",
+      "label": "Просрочено1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/tasks:История",
+      "kind": "entry",
+      "from": "/tasks",
+      "label": "История",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:Добавить оборудование",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "Добавить оборудование",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:Обзор",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "Обзор",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:Оборудование",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "Оборудование",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:Обслуживание",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "Обслуживание",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:0Просрочено",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "0Просрочено",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:0В течение 7 дней",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "0В течение 7 дней",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:0В течение 30 дней",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "0В течение 30 дней",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment:0ТО не настроено",
+      "kind": "entry",
+      "from": "/equipment",
+      "label": "0ТО не настроено",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/equipment/catalog:Продолжить",
+      "kind": "entry",
+      "from": "/equipment/catalog",
+      "label": "Продолжить",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Открыть быстрые финансовые действия",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Открыть быстрые финансовые действия",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Продолжить закрытие",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Продолжить закрытие",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Выручка200,00 MDL4 чека",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Выручка200,00 MDL4 чека",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Расходы30,00 MDL1 категория",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Расходы30,00 MDL1 категория",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:ФОТНеизвестно0% от выручки",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "ФОТНеизвестно0% от выручки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Средний чек50,00 MDLПо 4 чекам",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Средний чек50,00 MDLПо 4 чекам",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Не внесены начальные и конечные остатки",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Не внесены начальные и конечные остатки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Есть расхождение остатков",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Есть расхождение остатков",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Мастер закрытия месяца",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Мастер закрытия месяца",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Внести остатки",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Внести остатки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Создать списание",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Создать списание",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Коммунальные услуги",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Коммунальные услуги",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Зарплаты",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Зарплаты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Месячный отчёт",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Месячный отчёт",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Открыть расходы",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Открыть расходы",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Открыть зарплаты",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Открыть зарплаты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Открыть смены и выручку",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Открыть смены и выручку",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance:Текущая неделя · 28 сентября – 4 октябряГрафик: срВыручка—Средний чек—Списания0,00 MDLСмены1 из 1",
+      "kind": "entry",
+      "from": "/finance",
+      "label": "Текущая неделя · 28 сентября – 4 октябряГрафик: срВыручка—Средний чек—Списания0,00 MDLСмены1 из 1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/opportunities:Настройки уведомлений",
+      "kind": "entry",
+      "from": "/opportunities",
+      "label": "Настройки уведомлений",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:Назад",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:TETestВладелец · QA Phase 4C — работающая кофейня",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "TETestВладелец · QA Phase 4C — работающая кофейня",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:Личные данные",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "Личные данные",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:БезопасностьПароль и подтверждение личности",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "БезопасностьПароль и подтверждение личности",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:QPQA Phase 4C — работающая кофейняcafe · Isolated",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "QPQA Phase 4C — работающая кофейняcafe · Isolated",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:Валюта учётаMDL",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "Валюта учётаMDL",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile:Устройства и сессии",
+      "kind": "entry",
+      "from": "/profile",
+      "label": "Устройства и сессии",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/personal:Назад",
+      "kind": "entry",
+      "from": "/profile/personal",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/personal:Загрузить фото",
+      "kind": "entry",
+      "from": "/profile/personal",
+      "label": "Загрузить фото",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Назад",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Загрузить логотип",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Загрузить логотип",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Ресторан",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Ресторан",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Кафе",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Кафе",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Бар",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Бар",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Пекарня",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Пекарня",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Кофейня",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Кофейня",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Другое",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Другое",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Показать дополнительные поля",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Показать дополнительные поля",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Понедельник",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Понедельник",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Вторник",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Вторник",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Среда",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Среда",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Четверг",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Четверг",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Пятница",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Пятница",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Суббота",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Суббота",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/venue:Воскресенье",
+      "kind": "entry",
+      "from": "/profile/venue",
+      "label": "Воскресенье",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/profile/currency:Назад",
+      "kind": "entry",
+      "from": "/profile/currency",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Добавить сотрудника",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Добавить сотрудника",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Зарплаты",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Зарплаты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Обзор",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Обзор",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Сотрудники",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Сотрудники",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Роли и доступ",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Роли и доступ",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:ФОТ за месяц—ФОТ неизвестен",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "ФОТ за месяц—ФОТ неизвестен",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Отделы не указаныДобавьте отделы в карточках сотрудников",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Отделы не указаныДобавьте отделы в карточках сотрудников",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Открыть смены",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Открыть смены",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Состав пока не указанBarDoctor покажет сотрудников после сохранения состава смены.",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Состав пока не указанBarDoctor покажет сотрудников после сохранения состава смены.",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:График и смены",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "График и смены",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Авансы и выплаты",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Авансы и выплаты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/employees:Штрафы и удержания",
+      "kind": "entry",
+      "from": "/employees",
+      "label": "Штрафы и удержания",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/payroll:Активные (0)",
+      "kind": "entry",
+      "from": "/payroll",
+      "label": "Активные (0)",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/payroll:Архив (1)",
+      "kind": "entry",
+      "from": "/payroll",
+      "label": "Архив (1)",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:Обновить",
+      "kind": "entry",
+      "from": "/health",
+      "label": "Обновить",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:15ФинансыТекущий денежный результат доступен, но сопоставимой истории для динамики пока недостаточно.15/100",
+      "kind": "entry",
+      "from": "/health",
+      "label": "15ФинансыТекущий денежный результат доступен, но сопоставимой истории для динамики пока недостаточно.15/100",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:—СпросСопоставимых смен пока меньше трёх: отклонение показано как слабый сигнал, а не как доказанная тенденция.—/100",
+      "kind": "entry",
+      "from": "/health",
+      "label": "—СпросСопоставимых смен пока меньше трёх: отклонение показано как слабый сигнал, а не как доказанная тенденция.—/100",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:48ОперацииВниманиеОперационная зона требует внимания: дни, ожидающие операционных данных: 1.48/100",
+      "kind": "entry",
+      "from": "/health",
+      "label": "48ОперацииВниманиеОперационная зона требует внимания: дни, ожидающие операционных данных: 1.48/100",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:83ДанныеЕсть пробелы, которые ограничивают часть выводов.83/100",
+      "kind": "entry",
+      "from": "/health",
+      "label": "83ДанныеЕсть пробелы, которые ограничивают часть выводов.83/100",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:Открыть поручения",
+      "kind": "entry",
+      "from": "/health",
+      "label": "Открыть поручения",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/health:Проверить данные",
+      "kind": "entry",
+      "from": "/health",
+      "label": "Проверить данные",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Обзор",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Обзор",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Номенклатура",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Номенклатура",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Меню",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Меню",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Техкарты",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Техкарты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:К закупке",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "К закупке",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Актуальная цена продажи2/2",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Актуальная цена продажи2/2",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Однозначный способ складского списания2/2",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Однозначный способ складского списания2/2",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Подтверждённая техкарта1/1",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Подтверждённая техкарта1/1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Нормализованные единицы1/1",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Нормализованные единицы1/1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Связь расхода с номенклатурой1/1",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Связь расхода с номенклатурой1/1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Подтверждённая стоимость расхода0/1",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Подтверждённая стоимость расхода0/1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Смотреть все",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Смотреть все",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:1 ингредиентов без подтверждённой ценыСебестоимость зависимых позиций пока неполна",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "1 ингредиентов без подтверждённой ценыСебестоимость зависимых позиций пока неполна",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:Обновить менюИмпорт и обязательный diff",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "Обновить менюИмпорт и обязательный diff",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:ТехкартыРасчёты готовы",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "ТехкартыРасчёты готовы",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/catalog:К закупкеПроверить потребность",
+      "kind": "entry",
+      "from": "/catalog",
+      "label": "К закупкеПроверить потребность",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Обзор",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Обзор",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Закупки",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Закупки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Поставщики",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Поставщики",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Сравнение",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Сравнение",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Задолженность поставщикам0,00 ₽Открытых обязательств нет",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Задолженность поставщикам0,00 ₽Открытых обязательств нет",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Добавить покупкуЧек, файл или вручную",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Добавить покупкуЧек, файл или вручную",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Добавить поставщикаКонтакты и условия",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Добавить поставщикаКонтакты и условия",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Ассортимент и техкартыСвязать закупочный товар со складом, ингредиентом и техкартой",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Ассортимент и техкартыСвязать закупочный товар со складом, ингредиентом и техкартой",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/suppliers:Новые поставщикиПоиск региональных альтернатив по реальному ассортименту",
+      "kind": "entry",
+      "from": "/suppliers",
+      "label": "Новые поставщикиПоиск региональных альтернатив по реальному ассортименту",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Позиция",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Позиция",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Покупка",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Покупка",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Остатки",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Остатки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Меню",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Меню",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Техкарты",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Техкарты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Структура",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Структура",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Категории",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Категории",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Все позиции",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Все позиции",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:На проверке2",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "На проверке2",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:Нужно проверить распределение2 позиций",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "Нужно проверить распределение2 позиций",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:ААдминистрация0",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "ААдминистрация0",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:ББар0",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "ББар0",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:ККальянная0",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "ККальянная0",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:ККухня0",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "ККухня0",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/nomenclature:ХХозчасть0",
+      "kind": "entry",
+      "from": "/nomenclature",
+      "label": "ХХозчасть0",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Начальные остатки / импорт",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Начальные остатки / импорт",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Не рассчитано: 1 из 1 поз.Открыть проблемные позиции",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Не рассчитано: 1 из 1 поз.Открыть проблемные позиции",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Провести инвентаризациюВнести фактические количества",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Провести инвентаризациюВнести фактические количества",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Сканировать ведомостьФото, PDF, Excel или CSV",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Сканировать ведомостьФото, PDF, Excel или CSV",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Импортировать продажиСписать по техкартам",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Импортировать продажиСписать по техкартам",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Добавить покупкуЧек, файл или вручную",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Добавить покупкуЧек, файл или вручную",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Остатки",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Остатки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Движения",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Движения",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Продажи",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Продажи",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Инвентаризации",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Инвентаризации",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Списания",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Списания",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Настроить структуру склада",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Настроить структуру склада",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/warehouse:Требуют распределения: 1",
+      "kind": "entry",
+      "from": "/warehouse",
+      "label": "Требуют распределения: 1",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Октябрь 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Октябрь 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Сентябрь 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Сентябрь 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Август 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Август 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Июль 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Июль 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Июнь 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Июнь 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Май 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Май 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Апрель 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Апрель 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Март 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Март 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Февраль 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Февраль 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Январь 2026",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Январь 2026",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Декабрь 2025",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Декабрь 2025",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Ноябрь 2025",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Ноябрь 2025",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Продолжить закрытие",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Продолжить закрытие",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Все категории",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Все категории",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Зарплаты",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Зарплаты",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Открыть смены",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Открыть смены",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:2 окт.Выручка 200,00 MDL · Себестоимость — · ФОТ Неизвестно · Постоянные 3,00 MDLНеизвестно",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "2 окт.Выручка 200,00 MDL · Себестоимость — · ФОТ Неизвестно · Постоянные 3,00 MDLНеизвестно",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/reports:Остатки",
+      "kind": "entry",
+      "from": "/reports",
+      "label": "Остатки",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance/settings:Внести суммы остатков",
+      "kind": "entry",
+      "from": "/finance/settings",
+      "label": "Внести суммы остатков",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/finance/settings:Перейти к месячному отчёту",
+      "kind": "entry",
+      "from": "/finance/settings",
+      "label": "Перейти к месячному отчёту",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/venues/new:Назад",
+      "kind": "entry",
+      "from": "/venues/new",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Профиль и контактные данныеИмя, телефон и данные аккаунта",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Профиль и контактные данныеИмя, телефон и данные аккаунта",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Управление заведениямиАрхивация, восстановление и удаление",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Управление заведениямиАрхивация, восстановление и удаление",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Архив заведений",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Архив заведений",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Изменить парольЧерез подтверждение связанной учётной записи",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Изменить парольЧерез подтверждение связанной учётной записи",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Активные сессииУстройства пока не фиксируютсяНе определено",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Активные сессииУстройства пока не фиксируютсяНе определено",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Экспорт персональных данныхJSON-файл с профилем и доступамиСкачать",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Экспорт персональных данныхJSON-файл с профилем и доступамиСкачать",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:О приложении",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "О приложении",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Политика конфиденциальности",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Политика конфиденциальности",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/settings:Условия тестирования",
+      "kind": "entry",
+      "from": "/settings",
+      "label": "Условия тестирования",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "context:/about:Назад",
+      "kind": "entry",
+      "from": "/about",
+      "label": "Назад",
+      "source": "v489 runtime owner DOM + source route handler",
+      "entryScope": "module/context",
+      "desktop": true,
+      "mobile": true,
+      "home": false
+    },
+    {
+      "id": "doctor-legacy:run",
+      "kind": "entry",
+      "from": "/analysis",
+      "label": "Запустить диагностику",
+      "entryScope": "legacy-diagnosis",
+      "source": "Exact v489 Uce A handler and zce/qce/Fce + docs/curated-doctor-phase4c.md: legacy diagnosis remains available",
+      "condition": "v === idle",
+      "desktop": true,
+      "mobile": true,
+      "home": false,
+      "target": "POST /api/ai/diagnosis"
+    },
+    {
+      "id": "doctor-legacy:refresh",
+      "kind": "entry",
+      "from": "/analysis",
+      "label": "Обновить анализ",
+      "entryScope": "legacy-diagnosis",
+      "source": "Exact v489 Uce A handler and zce/qce/Fce + docs/curated-doctor-phase4c.md: legacy diagnosis remains available",
+      "condition": "v === ready",
+      "desktop": true,
+      "mobile": true,
+      "home": false,
+      "target": "POST /api/ai/diagnosis"
+    },
+    {
+      "id": "doctor-legacy:retry",
+      "kind": "entry",
+      "from": "/analysis",
+      "label": "Попробовать снова",
+      "entryScope": "legacy-diagnosis",
+      "source": "Exact v489 Uce A handler and zce/qce/Fce + docs/curated-doctor-phase4c.md: legacy diagnosis remains available",
+      "condition": "v === error",
+      "desktop": true,
+      "mobile": true,
+      "home": false,
+      "target": "POST /api/ai/diagnosis"
+    },
+    {
+      "id": "doctor-legacy:report-actions",
+      "kind": "entry",
+      "from": "/analysis",
+      "label": "Действия legacy-отчёта — задачи",
+      "entryScope": "legacy-report",
+      "selector": ".bd-ai-management-cta",
+      "source": "Exact v489 Fce / bdAIDoctorOpenTaskV196 / bdAIDoctorPrepareTaskV196; conditional todayActions rows",
+      "condition": "v === ready && authoritative briefing.todayActions.length > 0",
+      "desktop": true,
+      "mobile": true,
+      "home": false,
+      "target": "/tasks"
+    },
+    {
+      "id": "home:Legacy attention",
+      "kind": "entry",
+      "from": "/home",
+      "label": "Legacy attention",
+      "target": null,
+      "selector": "[data-bd-home-attention=\"universal-v198\"]",
+      "source": "v485 bdHomeDaily and bdHomeAttentionBeforePhase4a",
+      "entryScope": "home",
+      "desktop": true,
+      "mobile": true,
+      "home": true
+    }
+  ],
+  "additionalDiscovery": {
+    "sourceCommit": "b7708cadb01ff8e8ee11c1bcfdab448c15068878",
+    "method": "Full archived runtime route sweep and Phase 4C source contract",
+    "items": [
+      "doctor-legacy:run",
+      "doctor-legacy:refresh",
+      "doctor-legacy:retry"
+    ]
+  },
+  "ownerSelectedUiRemovals": [
+    "home:Canonical management actions",
+    "context:/analysis:Что требует внимания сейчас?",
+    "context:/analysis:Что делать дальше?",
+    "context:/analysis:Где проблемы с себестоимостью?",
+    "context:/analysis:Что происходит со складом?",
+    "context:/analysis:Есть ли проблемы со сменами?",
+    "context:/analysis:Что происходит с зарегистрированными расходами?",
+    "context:/analysis:Какие задачи просрочены или критичны?",
+    "context:/analysis:Открыть поручения →",
+    "context:/analysis:Открыть происшествие →",
+    "context:/analysis:Посмотреть финансы →",
+    "context:/analysis:Обновить ответ",
+    "context:/analysis:К управленческой очереди",
+    "context:/health:Открыть поручения →",
+    "context:/health:Открыть происшествие →",
+    "context:/health:Посмотреть финансы →",
+    "context:/health:Спросить Doctor: Что требует внимания сейчас?"
+  ]
+}

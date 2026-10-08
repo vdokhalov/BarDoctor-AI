@@ -4,17 +4,17 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
 
-const baseline='b7708cadb01ff8e8ee11c1bcfdab448c15068878';
+const baseline='dcc0541780db52d8c02b0c3a74f3ea0d31cbce24';
 const production='7d4eeb44ea9ac0419d55881e846268bc31da57ee';
 const read=path=>readFileSync(path,'utf8');
 const before=path=>execFileSync('git',['show',production+':'+path],{maxBuffer:64*1024*1024});
 const functions=source=>new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,source.slice(n.start,n.end)]));
 
-test('Home, Health and legacy Doctor render exactly as v489; V1.2 is absent from the executable client',()=>{
+test('Home, Health and legacy Doctor render exactly as v485; V1.2 is absent from the executable client',()=>{
  const source=read('public/assets/index-BQGspy0I.js'),actual=functions(source);
  const expected=functions(execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:64*1024*1024}).toString());
- for(const name of ['bdHomeDaily','c_e','Uce'])assert.equal(actual.get(name),expected.get(name),name);
- assert.doesNotMatch(source,/bdReferenceUIV1|bd-reference-render|reference-slice-v1:start|bdIntelligenceModuleV1/);
+ for(const name of ['bdHomeDaily','c_e','Uce'])assert.equal(actual.get(name)?.replace('i.jsx(bdManagementVerificationPhase4b,{venue:Number(bdCostHealthVenue.activeVenueId)}),',''),expected.get(name),name);
+ assert.doesNotMatch(source,/bdReferenceUIV1|bd-reference-render|reference-slice-v1:start|bdIntelligenceModuleV1|bdCuratedClientPhase4c|i\.jsx\(bdManagementHomePhase4|i\.jsx\(bdManagementQueuePhase4b/);
  for(const path of ['app/bar-doctor-response.ts','public/app.html'])assert.doesNotMatch(read(path),/intelligence-v1\.css/);
 });
 

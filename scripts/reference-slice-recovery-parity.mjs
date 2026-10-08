@@ -9,7 +9,7 @@ import {baselinePublicRoot,recoveryRuntime} from '../tests/helpers/reference-sli
 const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require('./browser-runtime.cjs');
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const out='outputs/reference-slice-recovery/'+(process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
-const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v489-functional-inventory.json','utf8'));
+const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v485-functional-inventory.json','utf8'));
 if(process.env.BD_RECOVERY_RECHECK){const paths=process.env.BD_RECOVERY_RECHECK==='compatibility'?['/employees/qa-barista','/warehouse?inventory=new','/data-control?event=qa-event']:['/analysis','/health','/finance?repairEquipmentId=qa-equipment'];inventory.items=inventory.items.filter(i=>paths.includes(i.path??i.from));}
 if(!process.env.BD_RECOVERY_WIDTH){
  const widths=[390,820,1280];
@@ -28,12 +28,12 @@ const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 
 try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECOVERY_WIDTH)]:[390,820,1280]){
   const resume=process.env.BD_RECOVERY_RESUME==='unfinished',versions={};
-  for(const version of ['v489','candidate']){
-    const runtime=await recoveryRuntime(version==='v489'?baseline.root:process.cwd());
+  for(const version of ['v485','candidate']){
+    const runtime=await recoveryRuntime(version==='v485'?baseline.root:process.cwd());
     const r=runtime.fixture;
     // Checkpoint only the exact prepared client, inventory and deterministic business inputs.
     // Session tokens may differ; no authoritative row or snapshot may differ.
-    const inputs={clientHash,baselineCommit:baseline.commit??'b7708cadb01ff8e8ee11c1bcfdab448c15068878',inventoryHash:createHash('sha256').update(JSON.stringify(inventory)).digest('hex'),domainHash:createHash('sha256').update(JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all())).digest('hex'),healthHash:createHash('sha256').update(JSON.stringify((await r.readHealth()).data.businessHealthSnapshot)).digest('hex')};
+    const inputs={clientHash,baselineCommit:baseline.commit??'dcc0541780db52d8c02b0c3a74f3ea0d31cbce24',inventoryHash:createHash('sha256').update(JSON.stringify(inventory)).digest('hex'),domainHash:createHash('sha256').update(JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all())).digest('hex'),healthHash:createHash('sha256').update(JSON.stringify((await r.readHealth()).data.businessHealthSnapshot)).digest('hex')};
     const inputFile=`${out}/${version}-${width}-inputs.json`;
     if(resume&&existsSync(inputFile))assert.deepEqual(JSON.parse(readFileSync(inputFile,'utf8')),inputs,'Checkpoint source/business inputs changed');
     else if(resume&&existsSync(`${out}/${version}-${width}-runtime.json`)){
@@ -77,7 +77,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
         const current=page.frames();if(current.length===frames.length&&current.every(frame=>frames.includes(frame)&&!frame.isDetached())){await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));return;}
       }throw Error('Contextual frames did not settle');
     };
-    const visit=async path=>{if(/^https?:/.test(page.url())){if(new URL(page.url()).pathname==='/home'){await page.locator('.bd-management-queue [data-management-id]').first().waitFor({timeout:60000});}await settle();}const requested=new URL(path,'http://isolated.test');const payrollDefault=requested.pathname.startsWith('/salaries')&&!requested.searchParams.has('month');if(version==='v489'&&payrollDefault){requested.searchParams.set('month','2026-10');path=requested.pathname+'?'+requested.searchParams;}try{await page.goto(runtime.base+path,{timeout:30000});}catch(error){if(!String(error).includes('ERR_ABORTED'))throw error;await settle();await page.goto(runtime.base+path,{timeout:30000});}await settle();await page.waitForFunction(()=>document.documentElement.getAttribute('data-bd-startup-pending')!=='true');};
+    const visit=async path=>{if(/^https?:/.test(page.url())){if(new URL(page.url()).pathname==='/home'){await page.locator('[data-bd-home-attention]').first().waitFor({timeout:60000});}await settle();}const requested=new URL(path,'http://isolated.test');const payrollDefault=requested.pathname.startsWith('/salaries')&&!requested.searchParams.has('month');if(version==='v485'&&payrollDefault){requested.searchParams.set('month','2026-10');path=requested.pathname+'?'+requested.searchParams;}try{await page.goto(runtime.base+path,{timeout:30000});}catch(error){if(!String(error).includes('ERR_ABORTED'))throw error;await settle();await page.goto(runtime.base+path,{timeout:30000});}await settle();await page.waitForFunction(()=>document.documentElement.getAttribute('data-bd-startup-pending')!=='true');};
     const state=async()=>page.evaluate(()=>{
       const visible=e=>{if(!e.getClientRects().length)return false;for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p);if(s.display==='none'||s.visibility==='hidden')return false;if(p.tagName==='DETAILS'&&!p.hasAttribute('open')&&!p.querySelector(':scope>summary')?.contains(e)&&p!==e)return false;}return true;};
       const label=e=>{const copy=e.cloneNode(true);for(const child of copy.querySelectorAll('[aria-hidden=true]'))child.remove();return(e.getAttribute('aria-label')||copy.textContent||'').trim().replace(/\s+/g,' ');};
@@ -87,7 +87,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
     try{
       for(const path of paths){
         const errorsAtRoute=errors.length;await visit(path);let before=await state();
-        // The compatibility redirects retain their v489 resolved destination.
+        // The compatibility redirects retain their v485 resolved destination.
         assert.equal(before.venue,String(r.venueId),path+' venue');
         assert.ok(before.contract,path+' contract');
         const fatal=runtime.requests.filter(q=>q.status>=500);assert.deepEqual(fatal,[],path+' HTTP 500');
@@ -99,9 +99,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
         for(const item of entries){
           if(item.entryScope==='home')continue; // exact legacy Home checks below
           const errorsAtAction=errors.length;await visit(path);
-          if(path==='/analysis'&&version==='candidate'&&!item.label.endsWith('?')){
-            await page.locator('[data-curated-question=attention]').click();await page.locator('[data-curated-answer=attention]').waitFor();await settle();
-          }
+
           if(item.entryScope==='add-menu')await page.locator('nav[data-bd-bottom-nav] button[data-bd-nav-key="add"]').click();
           let locator;
           if(item.entryScope==='add-menu')locator=page.locator('[data-bd-add-menu] button').filter({hasText:item.label});
@@ -111,7 +109,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
             const current=await state(),approvedLabel=item.label,entry=current.entries.find(e=>normalized(e.label)===normalized(approvedLabel))??(version==='candidate'&&path==='/health'&&item.label==='Открыть поручения'?current.entries.find(e=>e.label==='Открыть поручения →'):null);
             if(entry){const scope=entry.frame?page.frames().find(f=>new URL(f.url()).pathname===entry.frame):page;locator=scope?.locator('button,a,summary').nth(entry.index);}
           }
-          if(item.mobile==='via /more'&&width<1024){record.actions[item.id]={conditional:'v489 desktop-only primary; tested More Reviews entry'};continue;}
+          if(item.mobile==='via /more'&&width<1024){record.actions[item.id]={conditional:'v485 desktop-only primary; tested More Reviews entry'};continue;}
           if(!locator||!await locator.count()){
             // The inventory also records source-owned data-dependent entries.
             // A missing control is acceptable only when absent in the identical baseline fixture.
@@ -120,7 +118,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
           locator=locator.first();await locator.waitFor({state:'visible'});if(item.entryScope==='legacy-diagnosis'){await locator.click({trial:true});record.actions[item.id]={activation:'PASS (actual run tested in separate isolated legacy diagnosis fixture)',handler:'Uce.A → POST /api/ai/diagnosis'};continue;}
           if(await locator.isDisabled()){record.actions[item.id]={disabled:true};continue;}
           const actionOrigin=await state();await locator.click({trial:true});await locator.click();try{await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));}catch(error){if(!String(error).includes('Execution context was destroyed'))throw error;await page.waitForLoadState('domcontentloaded');}await settle();
-          let after=await state();const originalPayrollFailure=version==='v489'&&errors.slice(errorsAtAction).some(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname);if(originalPayrollFailure){const original=after.url;await visit(after.url);after=await state();after.approvedPayrollProbe={original,explicitMonth:'2026-10'};}assert.equal(after.venue,String(r.venueId),item.id+' venue');
+          let after=await state();const originalPayrollFailure=version==='v485'&&errors.slice(errorsAtAction).some(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname);if(originalPayrollFailure){const original=after.url;await visit(after.url);after=await state();after.approvedPayrollProbe={original,explicitMonth:'2026-10'};}assert.equal(after.venue,String(r.venueId),item.id+' venue');
           record.actions[item.id]={url:after.url,contract:after.contract,actionOrigin:{url:actionOrigin.url,question:actionOrigin.activeDoctorQuestion},approvedPayrollProbe:after.approvedPayrollProbe??null,baselineDefects:errors.slice(errorsAtAction).filter(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname),opened:after.entries.map(e=>({label:e.label,tag:e.tag,href:e.href}))};
           if(item.target&&item.target!==after.url){
             const a=new URL(after.url,runtime.base),b=new URL(item.target,runtime.base);
@@ -132,10 +130,8 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
         }
         all[path]=record;console.log(JSON.stringify({engine,width,version,path,entriesTested:Object.keys(record.actions).length}));writeFileSync(`${out}/${version}-${width}-runtime.json`,JSON.stringify(all,null,2));writeFileSync(`${out}/${version}-${width}-requests.json`,JSON.stringify(runtime.requests,null,2));writeFileSync(`${out}/${version}-${width}-runtime-errors.json`,JSON.stringify(errors,null,2));
       }
-      await visit('/home');await page.locator('.bd-management-queue [data-management-id]').first().waitFor();
-      const homeItems=await page.locator('[data-bd-home-daily] [data-management-id]').evaluateAll(es=>es.map(e=>e.getAttribute('data-management-id')));
-      const authoritative=(await r.readHealth()).data.businessHealthSnapshot.managementTopActions;
-      assert.deepEqual(homeItems,authoritative.map(i=>String(i.managementId??i.recommendationId)),'all canonical Home actions in order');
+      await visit('/home');await page.locator('[data-bd-home-attention]').first().waitFor();
+      assert.equal(await page.locator('.bd-management-queue,[data-curated-question]').count(),0,'No declined Phase 4B/C UI');
       for(const item of inventory.items.filter(i=>i.entryScope==='home')){const selector=version==='candidate'&&item.label.startsWith('Today')?'[data-bd-home-daily]':item.selector;const element=page.locator(selector).first();await element.waitFor({state:'visible'});assert.equal(await element.evaluate(e=>{for(let p=e;p;p=p.parentElement)if(p.tagName==='DETAILS'&&!p.open)return true;return false;}),false,item.id+' closed disclosure');}
       const legacy=[['[data-bd-home-health-index] button','/health'],['.bd-home-money','/reports'],['[data-bd-home-reviews] button','/reviews'],['[data-bd-home-context] button:first-child','/opportunities'],['[data-bd-home-context] button:last-child','/market']];
       for(const[selector,defaultTarget]of legacy){await visit('/home');const control=page.locator(selector).first();await control.waitFor({state:'visible'});const target=selector.includes('home-reviews')&&(await control.innerText()).includes('Подключить')?'/integrations':defaultTarget;await control.click({trial:true});await control.click();await page.waitForURL(u=>u.pathname===target);await settle();await page.reload();await settle();assert.equal(new URL(page.url()).pathname,target);await page.goBack();await settle();assert.equal((await state()).venue,String(r.venueId));}

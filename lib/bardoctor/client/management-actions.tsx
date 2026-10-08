@@ -35,7 +35,7 @@ export function createManagementActionsClient(React:typeof import('react'),runti
     runtime.commit(value);return value;
   }
   const verify=(venue:number,id:string,signal?:AbortSignal)=>read('/api/business-health/verify?actionId='+encodeURIComponent(id),venue,signal);
-  function Queue({venue,onNavigate}:{venue:number;onNavigate:(path:string)=>void}) {
+  function Queue({venue,onNavigate,verificationOnly=false}:{venue:number;onNavigate:(path:string)=>void;verificationOnly?:boolean}) {
     const [state,setState]=React.useState<{venue:number;value:Envelope}|null>(null),[error,setError]=React.useState(''),[busy,setBusy]=React.useState(false);
     const epoch=React.useRef(0);
     React.useEffect(()=>{
@@ -50,6 +50,11 @@ export function createManagementActionsClient(React:typeof import('react'),runti
       return()=>{epochHandle.current++;scheduler.dispose();controller.abort();for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(event,listener)};
     },[venue]);
     const value=state?.venue===venue?state.value:null,items=value?.data?.businessHealthSnapshot?.managementTopActions||[];
+    if(verificationOnly)return <section className="bd-cost-management" aria-label="Результат проверки исправления">
+      {busy&&!value&&<p role="status">Проверяем результат исправления…</p>}
+      {error&&<p role="alert">{error} Исправление не подтверждено.</p>}
+      {value?.verification&&<p role="status" data-management-verification={value.verification.result}>{value.verification.message}</p>}
+    </section>;
     return <section className="bd-cost-management bd-management-queue" aria-label="Приоритеты управления" data-management-venue={venue}>
       <h2>Что сделать первым</h2>{busy&&!value&&<p role="status">Обновляем управленческую очередь…</p>}
       {error&&<p role="alert">{error} Порядок пока не подтверждён.</p>}
@@ -93,5 +98,9 @@ export function createManagementActionsClient(React:typeof import('react'),runti
     const banner=id?<section className="bd-cost-management" data-management-context={id} aria-label="Возврат к приоритетам"><strong>Business Health → исправление</strong><p role="status">{active?message||'Проверяем текущую проблему…':'Контекст другого заведения. Откройте действие из его Business Health.'}</p><button type="button" disabled={busy||!active} onClick={returnQueue}>Вернуться и проверить</button><button type="button" disabled={busy||!active} onClick={()=>setRetry(v=>v+1)}>Повторить проверку</button></section>:null;
     return {active,banner};
   }
-  return {Queue,useContext};
+  function Verification({venue}:{venue:number}){
+    const params=new URLSearchParams(window.location.search),checked=params.get('checkedAction');
+    return params.getAll('checkedAction').length===1&&params.getAll('venueId').length===1&&params.get('venueId')===String(venue)&&checked?.startsWith('health:'+venue+':')?<Queue venue={venue} onNavigate={runtime.navigate} verificationOnly/>:null;
+  }
+  return {Queue,useContext,Verification};
 }

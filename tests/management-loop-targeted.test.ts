@@ -6,10 +6,10 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 type Row=Record<string,unknown>;
 
-test('G2/G5 prepared Home uses shared queue and real money-card never fabricates percentage trends',()=>{
+test('Legacy Home retains truthful Finance inputs and never fabricates percentage trends',()=>{
  const source=readFileSync(new URL('../public/assets/index-BQGspy0I.js',import.meta.url),'utf8');
- assert.ok(source.includes('i.jsx(bdManagementHomePhase4,{onNavigate:g})'));
- assert.ok(!source.includes('i.jsx(bdHomeAttention,{profile:e,report:E'));
+ assert.ok(!source.includes('i.jsx(bdManagementHomePhase4,{onNavigate:g})'));
+ assert.ok(source.includes('i.jsx(bdHomeAttention,{profile:e,report:E'));
  const functions=['bdHomeResultV151','bdHomeMoneyCard'].map(name=>source.split('\n').find(line=>line.startsWith('function '+name+'('))!).join('\n');
  const ctx=vm.createContext({bdManagementModulePhase4b:{homeFinancialResult},i:{jsx:(_tag:unknown,props:Row)=>props,jsxs:(_tag:unknown,props:Row)=>props},W:{button:'button'},Br:'arrow',GM:(n:number)=>String(n),bdMonthDisplay:()=>'',bdHomeComparisonV151:()=> '100% comparison'});
  vm.runInContext(functions,ctx);

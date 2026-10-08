@@ -70,15 +70,13 @@ try{
      assert.equal(await page.locator('[data-curated-answer]').count(),0);
      assert.equal(await page.locator('[data-curated-venue] [role="alert"]').count(),0);
      assert.equal(r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated').length,0,'Question list must not issue a hidden answer request');
-     assert.equal(await page.locator('[data-curated-question]').count(),7);
-     await page.locator('[data-curated-question="stock"]').click();await settled(page);
-     const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated');
-     assert.ok(denied.length>0,'Selecting a question must exercise the server permission boundary');
+     assert.equal(await page.locator('[data-curated-question]').count(),0,'Legacy Doctor has no curated panel');
+     await page.getByRole('button',{name:'Запустить диагностику',exact:true}).click();await settled(page);
+     const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/diagnosis');
+     assert.ok(denied.length>0,'Legacy diagnosis must exercise the server permission boundary');
      for(const req of denied){assert.equal(req.status,403);assert.equal(req.body?.code,'ACCESS_DENIED');assert.equal(req.body?.availability,'RESTRICTED');assert.ok(!req.body?.data);}
-     assert.equal(await page.locator('[data-curated-question]').count(),7,'Stable Doctor keeps the question list visible on denial');
-     assert.equal(await page.locator('[data-curated-question=stock]').getAttribute('aria-pressed'),'true');
-     assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.equal(await page.locator('[data-curated-action]').count(),0);
-     assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
+     assert.equal(await page.locator('[data-bd-ai-result]').count(),0);
+     await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();
     }
    }
    assert.deepEqual(errors,[],role+' '+path);paths.push(path);
