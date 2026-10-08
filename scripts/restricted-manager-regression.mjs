@@ -75,7 +75,8 @@ try{
      const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated');
      assert.ok(denied.length>0,'Selecting a question must exercise the server permission boundary');
      for(const req of denied){assert.equal(req.status,403);assert.equal(req.body?.code,'ACCESS_DENIED');assert.equal(req.body?.availability,'RESTRICTED');assert.ok(!req.body?.data);}
-     assert.equal(await page.locator('[data-curated-question]').count(),0);
+     assert.equal(await page.locator('[data-curated-question]').count(),7,'Stable Doctor keeps the question list visible on denial');
+     assert.equal(await page.locator('[data-curated-question=stock]').getAttribute('aria-pressed'),'true');
      assert.equal(await page.locator('[data-curated-answer]').count(),0);assert.equal(await page.locator('[data-curated-action]').count(),0);
      assert.match(await page.locator('[data-curated-venue] [role="alert"]').innerText(),/Факты сейчас не подтверждены/);
     }

@@ -287,7 +287,7 @@ jobs:
         run: |
           BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-recovery-parity.mjs
           BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-legacy-doctor-browser.mjs
-      - name: Design System V1 reference slice WebKit
+      - name: Stable UI rollback WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/stable-ui-rollback-browser.mjs
       - name: Phase 4C curated Doctor WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/curated-doctor-phase4c-browser.ts
