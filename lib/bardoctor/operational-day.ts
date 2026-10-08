@@ -83,5 +83,25 @@ export function operationalDay(input: OperationalDayInput) {
 }
 export function operationalDays(input: Omit<OperationalDayInput, "businessDate">) {
   const dates = new Set([...rows(input.revenues), ...rows(input.reports), ...rows(input.events), ...rows(input.documents)].filter(row => scopedBusinessRows([row], { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).length > 0).map(row => String(row.businessDate ?? row.date)).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)));
-  return [...dates].sort().reverse().map(businessDate => operationalDay({ ...input, businessDate }));
+  // Scope/deduplicate history once before partitioning. Global first-identity
+  // selection must precede grouping to preserve duplicates across dates.
+  const partition = (values: Row[], field: (row: Row) => unknown) => {
+    const byDate = new Map<unknown, Row[]>();
+    for (const row of values) {
+      const date = field(row), group = byDate.get(date);
+      if (group) group.push(row); else byDate.set(date, [row]);
+    }
+    return byDate;
+  };
+  const revenues = partition(eligibleRevenueRows(input.revenues, input.venueId, input), row => row.date);
+  const events = partition(uniqueBusinessRows(input.events ?? []), row => row.businessDate);
+  const reports = partition(rows(input.reports), row => row.date);
+  const documents = partition(rows(input.documents), row => row.date);
+  const writeOffs = partition(rows(input.writeOffs), row => row.date);
+  const incidents = partition(rows(input.incidents), row => String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10));
+  return [...dates].sort().reverse().map(businessDate => operationalDay({ ...input, businessDate,
+    revenues: revenues.get(businessDate) ?? [], events: events.get(businessDate) ?? [],
+    reports: reports.get(businessDate) ?? [], documents: documents.get(businessDate) ?? [],
+    writeOffs: writeOffs.get(businessDate) ?? [], incidents: incidents.get(businessDate) ?? [],
+  }));
 }

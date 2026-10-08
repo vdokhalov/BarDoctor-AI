@@ -1,3 +1,4 @@
+import { readCanonicalJson, canonicalReadScheduler } from './canonical-read';
 type Row = Record<string, unknown>;
 type Envelope = {success?:boolean;error?:string;data?:{businessHealthSnapshot?:{venueId:string;managementQueue?:Row[];managementTopActions?:Row[];managementCoverage?:Row}};verification?:{result:string;message:string;context:Row;target?:unknown}};
 type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;commit:(value:Envelope)=>void};
@@ -28,7 +29,7 @@ export function createManagementActionsClient(React:typeof import('react'),runti
   async function read(path:string,venue:number,signal?:AbortSignal):Promise<Envelope> {
     if(runtime.venue()!==venue)throw Error('Заведение изменилось.');
     const headers=new Headers(runtime.headers());headers.set('X-Venue-Id',String(venue));
-    const response=await fetch(path,{headers,cache:'no-store',signal});const value=await response.json() as Envelope;
+    const {response,value}=await readCanonicalJson<Envelope>(path,headers,signal);
     if(runtime.venue()!==venue||Number(value.data?.businessHealthSnapshot?.venueId)!==venue)throw Error('Контекст заведения не подтверждён.');
     if(!response.ok||value.success===false)throw Error(value.error||'Проверка недоступна. Повторите.');
     runtime.commit(value);return value;
@@ -44,9 +45,9 @@ export function createManagementActionsClient(React:typeof import('react'),runti
         const value=checked?.startsWith('health:'+venue+':')?await verify(venue,checked,controller.signal):await read('/api/business-health',venue,controller.signal);
         if(stamp===epoch.current){setState({venue,value});setError('');}
       }catch(e){if(stamp===epoch.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Проверка недоступна.');}finally{if(stamp===epoch.current)setBusy(false)}};
-      void refresh();const listener=()=>void refresh();
+      const scheduler=canonicalReadScheduler(refresh);scheduler.start();const listener=scheduler.notify;
       for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.addEventListener(event,listener);
-      return()=>{epochHandle.current++;controller.abort();for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(event,listener)};
+      return()=>{epochHandle.current++;scheduler.dispose();controller.abort();for(const event of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(event,listener)};
     },[venue]);
     const value=state?.venue===venue?state.value:null;
     const items=React.useMemo(()=>value?.data?.businessHealthSnapshot?.managementTopActions||[],[value]);

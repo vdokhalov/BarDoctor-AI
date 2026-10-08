@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - fix/design-system-v1-recovery
+      - fix/health-curated-performance-v491
       - feat/phase4c-curated-doctor
       - fix/phase4-integrated-management-loop
       - fix/phase4b-management-flow
@@ -73,6 +74,10 @@ jobs:
         run: node --import tsx --test tests/management-prioritization-phase4b.test.ts tests/management-actions-phase4b.test.ts
       - name: Phase 4C seven curated contracts, honesty, read-only and venue security
         run: npm run test:curated-doctor
+      - name: Health Doctor performance contracts and isolated 5000-day budget
+        run: |
+          node --import tsx --test tests/health-doctor-performance.test.ts
+          node --import tsx scripts/health-doctor-performance.mjs
       - name: Phase 4 integrated G1-G5 identities, stock stability and financial UNKNOWN controls
         run: node --import tsx --test tests/management-loop-targeted.test.ts
       - name: Typecheck
@@ -110,6 +115,8 @@ jobs:
         run: |
           node --test tests/management-actions-worker-phase4b.test.mjs
           npm run test:management-actions-browser
+      - name: Health Doctor first repeat slow error and timeout states 390 820 1280
+        run: node --import tsx scripts/health-doctor-performance-browser.mjs
       - name: Phase 4 integrated management loop real Tasks Inventory Day and Purchase UI
         run: node --import tsx scripts/management-loop-targeted-browser.ts
       - name: Phase 4A compiled Worker native D1 and real editor 390 820 1280 lifecycle
@@ -124,6 +131,7 @@ jobs:
             outputs/design-system-v1
             outputs/reference-slice-recovery
             outputs/curated-doctor-phase4c
+            outputs/health-doctor-performance
             outputs/management-loop-targeted
             outputs/management-actions-phase4b
             outputs/management-cost-phase4a
@@ -282,6 +290,8 @@ jobs:
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-v1-browser.ts
       - name: Phase 4C curated Doctor WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/curated-doctor-phase4c-browser.ts
+      - name: Health Doctor performance and bounded loading WebKit 390 820 1280
+        run: BD_CURATED_BROWSER=webkit node --import tsx scripts/health-doctor-performance-browser.mjs
       - name: Phase 4 integrated management loop WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/management-loop-targeted-browser.ts
       - name: Narrow WebKit environment classifier negative controls
@@ -322,6 +332,7 @@ jobs:
             outputs/design-system-v1
             outputs/reference-slice-recovery
             outputs/curated-doctor-phase4c
+            outputs/health-doctor-performance
             outputs/webkit-health-lifecycle
             outputs/management-loop-targeted
             outputs/provenance-phase3a10

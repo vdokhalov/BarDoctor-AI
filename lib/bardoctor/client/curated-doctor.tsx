@@ -1,4 +1,5 @@
 import { createIntelligenceIdentity } from './intelligence-ui';
+import { readCanonicalJson, canonicalReadScheduler } from './canonical-read';
 import { CURATED_QUESTIONS, isCuratedQuestion, type CuratedQuestionId, type CuratedAnswer, type CuratedAction } from '../curated-doctor-contracts';
 type Runtime={headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void};
 export function curatedQuestionContext(search:string,venue:number):CuratedQuestionId|null{
@@ -37,19 +38,18 @@ export function createCuratedDoctorClient(React:typeof import('react'),runtime:R
   const epoch=React.useRef(0),currentActor=actor();
   React.useEffect(()=>{setQ(curatedQuestionContext(location.search,venue)??'attention');setAnswerView(!!curatedQuestionContext(location.search,venue));},[venue,currentActor]);
   React.useEffect(()=>{
-   setSaved(null);setError('');if(!ready||!Number.isSafeInteger(venue)||venue<1)return;
+   setSaved(null);setError('');setBusy(false);if(!ready||!answerView||!Number.isSafeInteger(venue)||venue<1)return;
    const ref=epoch,controller=new AbortController();
    const read=async()=>{const stamp=++epoch.current;setBusy(true);try{
     const headers=new Headers(runtime.headers());headers.set('X-Venue-Id',String(venue));
-    const response=await fetch(`/api/ai/curated?question=${q}&venueId=${venue}`,{headers,cache:'no-store',signal:controller.signal});
-    const envelope=await response.json() as {success:boolean;error?:string;data?:CuratedAnswer};
+    const {response,value:envelope}=await readCanonicalJson<{success:boolean;error?:string;data?:CuratedAnswer}>(`/api/ai/curated?question=${q}&venueId=${venue}`,headers,controller.signal);
     if(!response.ok||!envelope.success)throw Error(envelope.error??'Ответ пока недоступен.');
     const value=envelope.data;if(!value||value.scope.venueId!==venue||value.question.id!==q||value.authority!=='DETERMINISTIC_CANONICAL_SERVER')throw Error('Контекст ответа не подтверждён.');
     if(stamp===epoch.current&&runtime.venue()===venue&&actor()===currentActor){setSaved({venue,actor:currentActor,question:q,value});setError('');}
    }catch(e){if(stamp===epoch.current&&!controller.signal.aborted)setError(e instanceof Error?e.message:'Ответ недоступен.');}finally{if(stamp===epoch.current)setBusy(false)}};
-   void read();const listener=()=>void read();for(const e of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.addEventListener(e,listener);
-   return()=>{ref.current++;controller.abort();for(const e of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(e,listener)};
-  },[venue,currentActor,q,ready,refresh]);
+   const scheduler=canonicalReadScheduler(read);scheduler.start();const listener=scheduler.notify;for(const e of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.addEventListener(e,listener);
+   return()=>{ref.current++;scheduler.dispose();controller.abort();for(const e of ['bd:store-updated','bd:shift-closed','bd-cost-projection-updated','bd-cost-management-refresh','focus'])window.removeEventListener(e,listener)};
+  },[venue,currentActor,q,ready,refresh,answerView]);
   const value=saved?.venue===venue&&saved.actor===currentActor&&saved.question===q&&runtime.venue()===venue?saved.value:null;
   const choose=(id:CuratedQuestionId)=>{const params=new URLSearchParams(location.search);params.set('doctorQuestion',id);params.set('venueId',String(venue));params.set('returnTo',origin());history.replaceState(history.state,'',location.pathname+'?'+params);setQ(id);setAnswerView(true);};
   const another=()=>{const params=new URLSearchParams(location.search);params.delete('doctorQuestion');history.replaceState(history.state,'',location.pathname+'?'+params);setAnswerView(false);};

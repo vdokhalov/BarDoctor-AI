@@ -1,0 +1,723 @@
+{
+  "baseline": {
+    "production": "v491",
+    "commit": "39d27f5fce9714c00cd41881595a980d09dabd64"
+  },
+  "scope": [
+    "Business Health",
+    "Curated AI Doctor"
+  ],
+  "production_changed": false,
+  "owner_uat": {
+    "device": "real iPhone, mobile internet",
+    "scenarios": [
+      "first opening after sign in",
+      "question selection",
+      "repeat opening",
+      "refresh"
+    ],
+    "bottom_navigation_defect": false
+  },
+  "confirmed_causes": [
+    "Bootstrap store notifications each started a canonical Health/Doctor read, without coalescing.",
+    "Operational-day projection scoped and deduplicated complete history per date; Finance additionally rescoped all reports per payroll day. CPU profiling identified these repeated loops.",
+    "Doctor read had no fetch/body deadline; hidden question-list reads and unresolved responses could prolong loading."
+  ],
+  "production_evidence": {
+    "worker_failures": [
+      {
+        "timestamp": 1791438999785,
+        "route": "/api/business-health",
+        "id": "5aa4f6f461b433492bfe513355ef96bc",
+        "outcome": "canceled",
+        "wallTimeMs": 2173,
+        "cpuTimeMs": 188
+      },
+      {
+        "timestamp": 1791438999722,
+        "route": "/api/business-health",
+        "id": "bfb20fbf22acaa7d058a7a1edb693bea",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 39624,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438999722,
+        "route": "GET /api/business-health",
+        "id": "bfb20fbf22acaa7d058a7a1edb693bea"
+      },
+      {
+        "timestamp": 1791438999716,
+        "route": "/api/business-health",
+        "id": "d6c0129ced3e8a4de1eb1062c8e49627",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 39755,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438999716,
+        "route": "GET /api/business-health",
+        "id": "d6c0129ced3e8a4de1eb1062c8e49627"
+      },
+      {
+        "timestamp": 1791438999544,
+        "route": "/api/business-health",
+        "id": "18e7d478c852181e0c8f00d4e036040b",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 38404,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438999544,
+        "route": "/api/business-health",
+        "id": "12292af0440b37442b110917f32631a8",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 38675,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438999544,
+        "route": "GET /api/business-health",
+        "id": "18e7d478c852181e0c8f00d4e036040b"
+      },
+      {
+        "timestamp": 1791438999544,
+        "route": "GET /api/business-health",
+        "id": "12292af0440b37442b110917f32631a8"
+      },
+      {
+        "timestamp": 1791438999132,
+        "route": "/api/business-health",
+        "id": "623fd9ffe7af1dff2d05dc6136b38c6f",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 39630,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438999132,
+        "route": "GET /api/business-health",
+        "id": "623fd9ffe7af1dff2d05dc6136b38c6f"
+      },
+      {
+        "timestamp": 1791438998065,
+        "route": "/api/business-health",
+        "id": "635645df0bbf009c5728caf470475ae6",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 39403,
+        "cpuTimeMs": 30000
+      },
+      {
+        "timestamp": 1791438998065,
+        "route": "GET /api/business-health",
+        "id": "635645df0bbf009c5728caf470475ae6"
+      },
+      {
+        "timestamp": 1791438997812,
+        "route": "/api/business-health",
+        "id": "3d8035b9c6ee629f4d283afc12b4127b",
+        "outcome": "exceededCpu",
+        "wallTimeMs": 39707,
+        "cpuTimeMs": 32500
+      },
+      {
+        "timestamp": 1791438997812,
+        "route": "GET /api/business-health",
+        "id": "3d8035b9c6ee629f4d283afc12b4127b"
+      }
+    ],
+    "qa_api_min_ms": 531.3128309999884,
+    "qa_api_max_ms": 1996.2564279999933,
+    "qa_requests": 103,
+    "qa_direct_health_ms": 1785.485224,
+    "qa_direct_attention_ms": 1474.2509769999997,
+    "qa_cost_click_visible_ms": 1403.6397690000013
+  },
+  "isolated_server_before": [
+    {
+      "mode": "baseline",
+      "rows": 5000,
+      "path": "/api/business-health",
+      "status": 200,
+      "totalMs": 132252.45025700002,
+      "headersMs": 132247.621213,
+      "inputRevision": "sha256:1f70518972ebe37686a6379c95f104a3a81249c445c09d2acccae4bdb1463fa7",
+      "bytes": 688736
+    },
+    {
+      "mode": "baseline",
+      "rows": 5000,
+      "path": "/api/ai/curated?question=attention&venueId=1",
+      "status": 200,
+      "totalMs": 91002.68947000001,
+      "headersMs": 91002.52999899999,
+      "inputRevision": "sha256:1f70518972ebe37686a6379c95f104a3a81249c445c09d2acccae4bdb1463fa7",
+      "bytes": 6308,
+      "answer": "В текущей очереди нет подтверждённых приоритетов."
+    }
+  ],
+  "isolated_server_after": [
+    {
+      "mode": "candidate",
+      "rows": 5000,
+      "path": "/api/business-health",
+      "status": 200,
+      "totalMs": 3504.3494659999997,
+      "headersMs": 3500.433444,
+      "inputRevision": "sha256:1f70518972ebe37686a6379c95f104a3a81249c445c09d2acccae4bdb1463fa7",
+      "bytes": 688736,
+      "spans": [
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.22993600000000924
+        },
+        {
+          "stage": "auth.identity",
+          "durationMs": 4.887493000000006
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.1668809999999894
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.09925900000001775
+        },
+        {
+          "stage": "auth.memberships",
+          "durationMs": 4.1885220000000345
+        },
+        {
+          "stage": "auth.total",
+          "durationMs": 9.516316999999958
+        },
+        {
+          "stage": "d1.all",
+          "durationMs": 9.343221000000028
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.16264400000000023
+        },
+        {
+          "stage": "canonical.total",
+          "durationMs": 3483.617926
+        }
+      ]
+    },
+    {
+      "mode": "candidate",
+      "rows": 5000,
+      "path": "/api/ai/curated?question=attention&venueId=1",
+      "status": 200,
+      "totalMs": 2977.2879249999996,
+      "headersMs": 2977.1341140000004,
+      "inputRevision": "sha256:1f70518972ebe37686a6379c95f104a3a81249c445c09d2acccae4bdb1463fa7",
+      "bytes": 6308,
+      "answer": "В текущей очереди нет подтверждённых приоритетов.",
+      "spans": [
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.3888849999998456
+        },
+        {
+          "stage": "auth.identity",
+          "durationMs": 2.1593979999997828
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.12944500000003245
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.05393099999992046
+        },
+        {
+          "stage": "auth.memberships",
+          "durationMs": 2.2637650000001486
+        },
+        {
+          "stage": "auth.total",
+          "durationMs": 4.5047169999998005
+        },
+        {
+          "stage": "d1.all",
+          "durationMs": 2.8404530000002524
+        },
+        {
+          "stage": "d1.raw",
+          "durationMs": 0.18208400000003166
+        },
+        {
+          "stage": "canonical.total",
+          "durationMs": 2961.9888570000003
+        },
+        {
+          "stage": "answer.total",
+          "durationMs": 9.465181999999913
+        }
+      ]
+    }
+  ],
+  "isolated_client_before": [
+    {
+      "width": 390,
+      "status": "PASS",
+      "hiddenReads": 2,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 3620,
+          "healthReads": 45
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 5509,
+          "healthReads": 86
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 105
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 130
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 206
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 157
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 215
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 194
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 168
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 169
+        }
+      ]
+    },
+    {
+      "width": 820,
+      "status": "PASS",
+      "hiddenReads": 2,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 2279,
+          "healthReads": 44
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 3495,
+          "healthReads": 86
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 106
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 195
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 191
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 176
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 181
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 193
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 166
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 638
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "status": "PASS",
+      "hiddenReads": 2,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 2751,
+          "healthReads": 45
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 5021,
+          "healthReads": 86
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 133
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 165
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 197
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 156
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 228
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 229
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 183
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 160
+        }
+      ]
+    }
+  ],
+  "changes": [
+    "Partition each authorized history once, retaining global duplicate winners and every existing day calculation.",
+    "Resolve the unchanged report authorization boundary once per Finance read.",
+    "One active client read per component and one reread after writes; focus during active reads is coalesced.",
+    "No hidden Doctor answer reads on question list; stop/cancel on question or scope changes.",
+    "15-second deadline includes response JSON; cancel transport and clear loading so user can retry."
+  ],
+  "local_validation": {
+    "targeted_phase4_security_tests": 110,
+    "performance_contract_tests": 4,
+    "build": "PASS",
+    "typecheck": "PASS",
+    "lint": {
+      "errors": 0,
+      "preexisting_warnings": 2
+    },
+    "seven_questions_and_canonical_cta_browsers": "Chromium PASS at 390/820/1280",
+    "slow_error_timeout_empty_partial": "Chromium PASS at 390/820/1280 for Health and Doctor"
+  },
+  "limitations": [
+    "Production v491 has no per-stage Health/curated telemetry: its Worker logs separate wall/CPU only; production D1/auth attribution cannot be measured exactly without a new deployment.",
+    "Stage spans use actual handlers, isolated SQLite as D1 adapter and synthetic data. They are not production D1 latency measurements.",
+    "Before/after browser controls use identical isolated current handlers; they isolate client request amplification, not full production phone loading speed.",
+    "No physical iPhone after-fix UAT or production-after measurement before owner-authorized publication.",
+    "D1 queries, authentication/permission checks, authoritative evidence, business facts and visual design are unchanged."
+  ],
+  "isolated_client_after": [
+    {
+      "width": 390,
+      "status": "PASS",
+      "hiddenReads": 0,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 1321,
+          "healthReads": 4
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 1055,
+          "healthReads": 4
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 219
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 137
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 116
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 153
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 166
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 121
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 116
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 166
+        },
+        {
+          "surface": "doctor",
+          "attempt": "timeout",
+          "visibleMs": 15101
+        },
+        {
+          "surface": "health",
+          "attempt": "timeout",
+          "visibleMs": 15013
+        }
+      ]
+    },
+    {
+      "width": 820,
+      "status": "PASS",
+      "hiddenReads": 0,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 1202,
+          "healthReads": 5
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 1085,
+          "healthReads": 4
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 120
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 118
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 105
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 149
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 98
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 134
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 151
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 997
+        },
+        {
+          "surface": "doctor",
+          "attempt": "timeout",
+          "visibleMs": 15952
+        },
+        {
+          "surface": "health",
+          "attempt": "timeout",
+          "visibleMs": 15042
+        }
+      ]
+    },
+    {
+      "width": 1280,
+      "status": "PASS",
+      "hiddenReads": 0,
+      "timings": [
+        {
+          "surface": "health",
+          "attempt": "first",
+          "visibleMs": 1156,
+          "healthReads": 5
+        },
+        {
+          "surface": "health",
+          "attempt": "repeat",
+          "visibleMs": 1043,
+          "healthReads": 4
+        },
+        {
+          "surface": "doctor",
+          "question": "attention",
+          "attempt": "first",
+          "visibleMs": 187
+        },
+        {
+          "surface": "doctor",
+          "question": "next",
+          "attempt": "first",
+          "visibleMs": 234
+        },
+        {
+          "surface": "doctor",
+          "question": "cost",
+          "attempt": "first",
+          "visibleMs": 113
+        },
+        {
+          "surface": "doctor",
+          "question": "stock",
+          "attempt": "first",
+          "visibleMs": 130
+        },
+        {
+          "surface": "doctor",
+          "question": "shifts",
+          "attempt": "first",
+          "visibleMs": 163
+        },
+        {
+          "surface": "doctor",
+          "question": "expenses",
+          "attempt": "first",
+          "visibleMs": 120
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "first",
+          "visibleMs": 150
+        },
+        {
+          "surface": "doctor",
+          "question": "tasks",
+          "attempt": "refresh",
+          "visibleMs": 189
+        },
+        {
+          "surface": "doctor",
+          "attempt": "timeout",
+          "visibleMs": 15361
+        },
+        {
+          "surface": "health",
+          "attempt": "timeout",
+          "visibleMs": 15163
+        }
+      ]
+    }
+  ]
+}

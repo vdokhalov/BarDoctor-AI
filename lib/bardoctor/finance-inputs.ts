@@ -82,13 +82,16 @@ export function readFinanceInputs(input: FinanceReadInput) {
   const entries = scope((input.payrollEntries ?? []).map(value => { const row = record(value); return row.venueId != null && input.legacyVenueKeys?.includes(String(row.venueId)) ? { ...row, venueId: input.venueId } : row; }), input).filter(row => activeBusinessRow(row) && String(row.date) >= input.startDate && String(row.date) <= input.endDate);
   const total = (rows: Row[], field: string) => { const amounts = rows.map(row => financeAmount(row, field, input.currency)); return amounts.some(value => value == null) ? null : round(amounts.reduce<number>((sum, value) => sum + value!, 0)); };
   const revenue = total(revenues, "revenue");
+  // The same authorization boundary applies to every day's recorded payroll.
+  // Resolve it once, preserving the first report per date and its original FX.
+  const scopedReports = scope(input.reports ?? [], input);
   const payrollByDay = days.filter(day => day.report != null || revenues.some(row => row.date === day.businessDate)).map(day => {
     const saved = day.payroll.amount;
     // Even a recorded zero wins over expenses and future rule edits.
     const legacy = joined.find(row => row.date === day.businessDate && finite(record(row.payrollBreakdown).total ?? record(row.payrollBreakdown).totalPayroll) != null);
     const amount = saved ?? finite(record(legacy?.payrollBreakdown).total ?? record(legacy?.payrollBreakdown).totalPayroll);
     const source = day.operations.fot === "RECORDED" && saved != null ? "RECORDED" : amount != null ? "LEGACY_RECORDED" : "MISSING";
-    const original = scope(input.reports ?? [], input).find(row => row.date === day.businessDate) ?? revenues.find(row => row.date === day.businessDate) ?? {};
+    const original = scopedReports.find(row => row.date === day.businessDate) ?? revenues.find(row => row.date === day.businessDate) ?? {};
     const converted = amount == null ? null : financeAmount({ ...original, originalAmount: amount, amount, accountingAmount: undefined }, "amount", input.currency);
     return { businessDate: day.businessDate, amount: converted, basis: source };
   });
