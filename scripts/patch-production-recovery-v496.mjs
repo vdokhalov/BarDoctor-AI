@@ -1,6 +1,43 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 import {parse} from 'acorn';
 
+function findFunction(node,name){if(!node||typeof node!=='object')return null;if(node.type==='FunctionDeclaration'&&node.id?.name===name)return node;for(const value of Object.values(node)){for(const child of Array.isArray(value)?value:[value]){const found=findFunction(child,name);if(found)return found;}}return null;}
+function finishBootstrap(boot){
+ const assignment='    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"\n      ? result.bootstrap\n      : { state: "recovery_required", reason: "bootstrap_contract_missing" };';
+ if(!boot.includes('bd-bootstrap-storage-commit-v496')){
+  const helper=findFunction(parse(boot,{ecmaVersion:'latest',sourceType:'script'}),'rememberAccessContext');
+  if(!helper)throw Error('Access context helper required');
+  let updated=boot.slice(helper.start,helper.end);
+  if(!updated.includes(assignment))throw Error('Exact bootstrap state commit required');
+  updated=updated.replace(assignment+'\n','');
+  updated=updated.replace('        window.location.replace("/login");',assignment+'\n        window.location.replace("/login");');
+  const end=updated.lastIndexOf('\n  }');
+  updated=updated.slice(0,end)+'\n    // bd-bootstrap-storage-commit-v496: publish readiness after scoped storage commits.\n'+assignment+'\n'+updated.slice(end);
+  boot=boot.slice(0,helper.start)+updated+boot.slice(helper.end);
+ }
+ // V397 inserts this redirect while regenerating an already marked V396 helper.
+ const helper=findFunction(parse(boot,{ecmaVersion:'latest',sourceType:'script'}),'rememberAccessContext');
+ const original=boot.slice(helper.start,helper.end),redirect='      if (window.location.pathname !== "/login") {\n        window.location.replace("/login");\n        return;\n      }';
+ const updated=original.replace(redirect,'      if (window.location.pathname !== "/login") {\n'+assignment+'\n        window.location.replace("/login");\n        return;\n      }');
+ boot=boot.slice(0,helper.start)+updated+boot.slice(helper.end);
+ if(!boot.includes('activeDocumentV496')){
+  boot=boot.replace('    var controller = new AbortController(), timer;',`    var controller = new AbortController(), timer, activeDocumentV496 = true;
+    var cancelDocumentV496 = function () { activeDocumentV496 = false; controller.abort(); };
+    window.addEventListener("pagehide", cancelDocumentV496, { once: true });`);
+  boot=boot.replace('    if (email !== localStorage.getItem("bd_session")','    if (!activeDocumentV496) return;\n    if (email !== localStorage.getItem("bd_session")');
+  boot=boot.replace('if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart) window.__bdAuthBootstrapV274 = { state: "error", reason: error?.name', 'if (activeDocumentV496 !== false && (window.__bdAuthBootstrapV274 === bootstrapStateAtStart || result && window.__bdAuthBootstrapV274 === result.bootstrap)) window.__bdAuthBootstrapV274 = { state: "error", reason: error?.name');
+  boot=boot.replace('  } finally {\n    window.__bdBootstrapPending = false;', '  } finally {\n    if (cancelDocumentV496) window.removeEventListener("pagehide", cancelDocumentV496);\n    window.__bdBootstrapPending = false;');
+ }
+ boot=boot.replace('    var cancelDocumentV496 = function () { activeDocumentV496 = false; controller.abort(); };',`    var cancelDocumentV496 = function () {
+      activeDocumentV496 = false; controller.abort();
+      window.__bdBootstrapPending = false;
+      if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart || result && window.__bdAuthBootstrapV274 === result.bootstrap) window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_document_closed" };
+      window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+    };`);
+ boot=boot.replace('    if (cancelDocumentV496) window.removeEventListener("pagehide", cancelDocumentV496);\n    window.__bdBootstrapPending = false;\n    window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));','    if (cancelDocumentV496) window.removeEventListener("pagehide", cancelDocumentV496);\n    if (activeDocumentV496 !== false) {\n      window.__bdBootstrapPending = false;\n      window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));\n    }');
+ parse(boot,{ecmaVersion:'latest',sourceType:'script'});return boot;
+}
+
 const file='public/assets/index-BQGspy0I.js';
 let source=readFileSync(file,'utf8');
 const replacements={
@@ -32,7 +69,7 @@ for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.
  // Login/register retain their existing single-read navigation contract.
  boot=boot.replace('["/api/auth/login", "/api/auth/register", "/api/auth/bootstrap"].indexOf', '["/api/auth/login", "/api/auth/register"].indexOf');
  writeFileSync(file,boot);
- if(boot.includes('async function bdRetryBootstrapV496'))continue;
+ if(boot.includes('async function bdRetryBootstrapV496')){writeFileSync(file,finishBootstrap(boot));continue;}
  const start=boot.lastIndexOf('  try {\n    var demoEmail'),endMarker='  window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));',end=boot.indexOf(endMarker,start);
  if(start<0||end<0)throw Error('Exact bootstrap recovery boundary required: '+file);
  let block=boot.slice(start,end+endMarker.length);
@@ -73,6 +110,6 @@ ${block}
   window.__bdRetryBootstrapV496 = bdRetryBootstrapV496;
   await bdRetryBootstrapV496(true);`;
  boot=boot.slice(0,start)+replacement+boot.slice(end+endMarker.length);
- parse(boot,{ecmaVersion:'latest',sourceType:'script'});writeFileSync(file,boot);
+ writeFileSync(file,finishBootstrap(boot));
 }
 console.log('production-recovery-v496: scoped profile retry and bounded bootstrap');

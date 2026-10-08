@@ -32,6 +32,6 @@ try{for(const width of [390,820,1280]){
   const headers=Object.fromEntries(r.requestAction('/api/business-health','GET').headers),healthResponse=await context.request.get(runtime.base+'/api/business-health',{headers});
   assert.equal(healthResponse.status(),200);const snapshot=(await healthResponse.json()).data.businessHealthSnapshot;assert.notEqual(snapshot.score,null);
   assert.equal(await page.evaluate(()=>window.__qaTeamBeforeBootstrap),0);assert.deepEqual(errors,[]);const result={engine,width,status:'PASS',production:false,isolatedVenue:r.venueId,actualHandlers:true,teamReady:true,profile503Retry:true,profileAfterBootstrap:true,sameDocumentRetry:true,reload:true,cachedProfile:true,noPrematureTeamCommit:true,healthSnapshotScore:snapshot.score,errors};results.push(result);console.log(JSON.stringify(result));
- }catch(error){await page.screenshot({path:`${out}/${width}-failure.png`,fullPage:true});writeFileSync(`${out}/${width}-failure.json`,JSON.stringify({error:String(error),errors,requests:runtime.requests},null,2));throw error;}
+ }catch(error){writeFileSync(`${out}/${width}-failure.json`,JSON.stringify({error:String(error),errors,requests:runtime.requests},null,2));try{await page.screenshot({path:`${out}/${width}-failure.png`,fullPage:true});}catch(captureError){writeFileSync(`${out}/${width}-capture-error.json`,JSON.stringify({error:String(captureError)},null,2));}throw error;}
  finally{await context.close();await runtime.close();}
 }}finally{await browser.close();writeFileSync(out+'/results.json',JSON.stringify(results,null,2));}

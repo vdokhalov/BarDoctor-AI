@@ -56,3 +56,36 @@ for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.
  mode='normal';await window.__bdRetryBootstrapV496();assert.equal(window.__bdAuthBootstrapV274.state,'ready');assert.equal(calls,2);
  mode='denied';await window.__bdRetryBootstrapV496();assert.equal(window.__bdAuthBootstrapV274.state,'unauthenticated');assert.equal(localStorage.getItem('bd_session_token'),null);
 });
+
+for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.js'])for(const failKey of ['bd_active_permissions','bd_session_userid'])test(file+' '+failKey+' commit failure cannot leave authenticated bootstrap ready',async()=>{
+ const script=readFileSync(file,'utf8'),start=script.indexOf('  var bdBootstrapRetryPromiseV496'),end=script.indexOf('  await bdRetryBootstrapV496(true);',start);
+ const find=(node,name)=>{if(!node||typeof node!=='object')return null;if(node.type==='FunctionDeclaration'&&node.id?.name===name)return node;for(const value of Object.values(node)){for(const child of Array.isArray(value)?value:[value]){const found=find(child,name);if(found)return found;}}return null;};
+ const helper=find(parse(script,{ecmaVersion:'latest',sourceType:'script'}),'rememberAccessContext');assert.ok(helper);
+ const localStorage=storage(),sessionStorage=storage(),window=new EventTarget();window.__bdAuthBootstrapV274={state:'ready',reason:'cached_shell_ready_v397'};window.location={pathname:'/employees',href:'https://qa.isolated.test/employees'};window.history={replaceState:()=>{}};
+ const nativeSet=localStorage.setItem;let fail=true;localStorage.setItem=(key,value)=>{if(fail&&key===failKey)throw new DOMException('QA local storage unavailable','QuotaExceededError');return nativeSet(key,value);};
+ const context=vm.createContext({window,localStorage,sessionStorage,URL,CustomEvent:class extends Event{},DOMException,AbortController,Promise,JSON,currentRole:'',currentPermissions:[],currentFirstName:'',cleanFirstName:v=>v||'',refreshServerInventoryCacheV235:async()=>{},setTimeout:()=>1,clearTimeout:()=>{},fetch:async()=>Response.json({ok:true,email:'qa@isolated.test',token:'qa-only',userId:1,role:'owner',permissions:['employees.view'],activeVenueId:1,activeVenueIsPrimary:true,venues:[{id:1,isPrimary:true}],bootstrap:{state:'ready',reason:'active_venue_ready'}})});
+ vm.runInContext(script.slice(helper.start,helper.end)+'\n'+script.slice(start,end),context);
+ await window.__bdRetryBootstrapV496();
+ assert.equal(window.__bdAuthBootstrapV274.state,'error','Partial storage commit must not expose ready');assert.equal(window.__bdBootstrapPending,false);assert.equal(localStorage.getItem('bd_session_token'),'qa-only');
+ fail=false;await window.__bdRetryBootstrapV496();assert.equal(window.__bdAuthBootstrapV274.state,'ready');assert.equal(localStorage.getItem('bd_active_venue_id'),'1');
+});
+
+for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.js'])test(file+' pagehide prevents a late bootstrap body from changing the next document context',async()=>{
+ const script=readFileSync(file,'utf8'),start=script.indexOf('  var bdBootstrapRetryPromiseV496'),end=script.indexOf('  await bdRetryBootstrapV496(true);',start);
+ const localStorage=storage(),window=new EventTarget();window.__bdAuthBootstrapV274={state:'ready',reason:'cached_shell_ready_v397'};window.location={pathname:'/employees'};
+ let finish,signal,writes=0;const body=new Promise(done=>finish=done);
+ const context=vm.createContext({window,localStorage,sessionStorage:storage(),CustomEvent:class extends Event{},DOMException,AbortController,Promise,JSON,currentFirstName:'',cleanFirstName:v=>v||'',refreshServerInventoryCacheV235:async()=>{},setTimeout:()=>1,clearTimeout:()=>{},rememberAccessContext:()=>writes++,fetch:async(_url,init)=>{signal=init.signal;return{ok:true,status:200,json:()=>body};}});
+ vm.runInContext(script.slice(start,end),context);const pending=window.__bdRetryBootstrapV496(true);await flush();window.dispatchEvent(new Event('pagehide'));assert.equal(signal.aborted,true);
+ assert.equal(window.__bdBootstrapPending,false);assert.equal(window.__bdAuthBootstrapV274.reason,'bootstrap_document_closed');
+ const next={state:'loading',reason:'next_document'};window.__bdAuthBootstrapV274=next;window.__bdBootstrapPending=true;finish({ok:true,email:'qa@isolated.test',token:'stale-replacement',userId:9,bootstrap:{state:'ready'}});await pending;
+ assert.equal(writes,0);assert.equal(window.__bdAuthBootstrapV274,next);assert.equal(window.__bdBootstrapPending,true);assert.equal(localStorage.getItem('bd_session_token'),'qa-only');assert.equal(localStorage.getItem('bd_active_venue_id'),'1');
+});
+
+for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.js'])test(file+' an empty server venue invalidates cached readiness before a delayed redirect',()=>{
+ const script=readFileSync(file,'utf8'),find=(node)=>{if(!node||typeof node!=='object')return null;if(node.type==='FunctionDeclaration'&&node.id?.name==='rememberAccessContext')return node;for(const value of Object.values(node)){for(const child of Array.isArray(value)?value:[value]){const found=find(child);if(found)return found;}}return null;};
+ const helper=find(parse(script,{ecmaVersion:'latest',sourceType:'script'}));assert.ok(helper);
+ const localStorage=storage(),window=new EventTarget(),serverState={state:'recovery_required',reason:'no_active_venue'};window.__bdAuthBootstrapV274={state:'ready',reason:'cached_shell_ready_v397'};window.location={pathname:'/employees',replace:()=>assert.equal(window.__bdAuthBootstrapV274,serverState)};
+ const context=vm.createContext({window,localStorage,sessionStorage:storage(),currentRole:'',currentPermissions:[],CustomEvent:class extends Event{}});
+ vm.runInContext(script.slice(helper.start,helper.end),context);context.rememberAccessContext({ok:true,userId:1,email:'qa@isolated.test',activeVenueId:null,bootstrap:serverState});
+ assert.equal(window.__bdAuthBootstrapV274,serverState);assert.equal(localStorage.getItem('bd_active_venue_id'),null);assert.equal(localStorage.getItem('bd_session_token'),'qa-only');
+});

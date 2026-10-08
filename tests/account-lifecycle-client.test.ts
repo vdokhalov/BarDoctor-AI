@@ -12,14 +12,14 @@ class Storage {
 }
 test('new identity incarnation clears old email caches and pending writes, existing account preserves them', () => {
   const source = fs.readFileSync(new URL('../public/bardoctor-preview.js', import.meta.url), 'utf8');
-  const start = source.indexOf('    // Account incarnation, not email:');
-  const end = source.indexOf('    window.__bdAuthBootstrapV274 = result.bootstrap', start);
+  const start = source.indexOf('  function rememberAccessContext(result)');
+  const end = source.indexOf('  function hasClientPermission(', start);
   assert.ok(start > 0 && end > start);
   const localStorage = new Storage(), sessionStorage = new Storage();
   localStorage.setItem('bd_session', 'same@isolated.test'); localStorage.setItem('bd_session_userid', '10'); localStorage.setItem('bd_store_cache__same@isolated.test', 'old venue'); localStorage.setItem('bd_sync_queue', 'old write'); localStorage.setItem('unrelated', 'keep'); sessionStorage.setItem('bd_restaurant', 'old venue');
   localStorage.setItem('bd_sync_queue__other@isolated.test__venue_77', 'other pending write'); localStorage.setItem('bd_store_cache__other@isolated.test', 'other account data');
-  const script = new vm.Script(source.slice(start, end));
-  const apply = (id: number) => script.runInNewContext({ result: { userId: id, email: 'same@isolated.test' }, localStorage, sessionStorage });
+  const script = new vm.Script(source.slice(start, end) + '\nrememberAccessContext(result);');
+  const apply = (id: number) => script.runInNewContext({ result: { ok: true, userId: id, email: 'same@isolated.test' }, localStorage, sessionStorage, window: {}, currentRole: '', currentPermissions: [] });
   apply(10); assert.equal(localStorage.getItem('bd_sync_queue'), 'old write', 'existing account upgrade must preserve cache');
   apply(11); assert.equal(localStorage.getItem('bd_sync_queue'), null); assert.equal(localStorage.getItem('bd_store_cache__same@isolated.test'), null); assert.equal(sessionStorage.getItem('bd_restaurant'), null); assert.equal(localStorage.getItem('unrelated'), 'keep');
   assert.equal(localStorage.getItem('bd_identity_incarnation__same@isolated.test'), '11');

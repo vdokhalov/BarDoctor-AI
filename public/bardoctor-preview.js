@@ -938,9 +938,6 @@
       localStorage.setItem(incarnationKey, String(result.userId));
     }
 
-    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"
-      ? result.bootstrap
-      : { state: "recovery_required", reason: "bootstrap_contract_missing" };
     if (Object.prototype.hasOwnProperty.call(result, "role")) {
       currentRole = typeof result.role === "string" ? result.role : "";
     }
@@ -982,6 +979,11 @@
       localStorage.setItem(venueContextKey, JSON.stringify(venueContext));
       window.dispatchEvent(new CustomEvent("bd:venue-context", { detail: venueContext }));
     }
+    // bd-bootstrap-storage-commit-v496: publish readiness after scoped storage commits.
+    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"
+      ? result.bootstrap
+      : { state: "recovery_required", reason: "bootstrap_contract_missing" };
+
   }
 
   function hasClientPermission(permission) {
@@ -1969,12 +1971,20 @@
       headers["X-Session-Token"] = token;
     }
 
-    var controller = new AbortController(), timer;
+    var controller = new AbortController(), timer, activeDocumentV496 = true;
+    var cancelDocumentV496 = function () {
+      activeDocumentV496 = false; controller.abort();
+      window.__bdBootstrapPending = false;
+      if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart || result && window.__bdAuthBootstrapV274 === result.bootstrap) window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_document_closed" };
+      window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+    };
+    window.addEventListener("pagehide", cancelDocumentV496, { once: true });
     var resultPair = await Promise.race([
       (async function () { var response = await fetch("/api/auth/bootstrap", { method: "POST", headers: headers, signal: controller.signal }); return { response: response, result: await response.json() }; })(),
       new Promise(function (_, reject) { timer = setTimeout(function () { controller.abort(); reject(new DOMException("Bootstrap timed out", "TimeoutError")); }, 30000); })
     ]).finally(function () { clearTimeout(timer); });
     var response = resultPair.response, result = resultPair.result;
+    if (!activeDocumentV496) return;
     if (email !== localStorage.getItem("bd_session") || token !== localStorage.getItem("bd_session_token") || selectedVenue !== localStorage.getItem("bd_active_venue_id")) {
       if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart) window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_context_changed" };
       return;
@@ -2009,10 +2019,13 @@
       window.__bdAuthBootstrapV274 = { state: "error", reason: "bootstrap_response_failed", status: response.status };
     }
   } catch (error) {
-    if (window.__bdAuthBootstrapV274 === bootstrapStateAtStart) window.__bdAuthBootstrapV274 = { state: "error", reason: error?.name === "TimeoutError" ? "bootstrap_timeout" : "bootstrap_request_failed" };
+    if (activeDocumentV496 !== false && (window.__bdAuthBootstrapV274 === bootstrapStateAtStart || result && window.__bdAuthBootstrapV274 === result.bootstrap)) window.__bdAuthBootstrapV274 = { state: "error", reason: error?.name === "TimeoutError" ? "bootstrap_timeout" : "bootstrap_request_failed" };
   } finally {
-    window.__bdBootstrapPending = false;
-    window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+    if (cancelDocumentV496) window.removeEventListener("pagehide", cancelDocumentV496);
+    if (activeDocumentV496 !== false) {
+      window.__bdBootstrapPending = false;
+      window.dispatchEvent(new CustomEvent("bd:bootstrap-complete"));
+    }
   }
     })().finally(function () { bdBootstrapRetryPromiseV496 = null; });
     return bdBootstrapRetryPromiseV496;
