@@ -41,8 +41,10 @@ test('answer-first refresh preserves the question and does not navigate',()=>{
 });
 test('QA fetch tracking survives repeated WebKit bootstrap without losing an in-flight request',async()=>{
  const {readFileSync}=await import('node:fs'),{createContext,runInContext}=await import('node:vm');
+ const {installApiReadTracker}=await import('../scripts/qa/api-read-tracker.mjs');
  const source=readFileSync('scripts/reference-slice-recovery-parity.mjs','utf8');
- const code=[...source.matchAll(/addInitScript\(\{content:`([^`]+)`\}\)/g)].map(m=>m[1]).find(code=>code.includes('__qaFetchTrackingInstalled'));assert.ok(code);
+ assert.match(source,/await context\.addInitScript\(installApiReadTracker\)/);
+ const code='('+installApiReadTracker.toString()+')()';
  let resolve;const response=Response.json({success:true,data:[]}),pending=new Promise(done=>resolve=done);
  const context=createContext({URL,location:{href:'http://isolated.test/home'},fetch:()=>pending});
  runInContext(code,context);const wrapper=context.fetch,request=wrapper('/api/store/bd_finance_expenses');assert.equal(context.__qaPendingApi,1);

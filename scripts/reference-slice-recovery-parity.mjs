@@ -5,6 +5,7 @@ import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {chromium,webkit} from 'playwright-core';
 import {baselinePublicRoot,recoveryRuntime} from '../tests/helpers/reference-slice-recovery-runtime.mjs';
+import {installApiReadTracker} from './qa/api-read-tracker.mjs';
 
 const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require('./browser-runtime.cjs');
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
@@ -60,7 +61,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
     // Freeze Date only. Playwright's clock timer shim can fire a departed document's
     // refresh callback in WebKit; real navigation must retain native timer teardown.
     await context.addInitScript({content:`(()=>{const NativeDate=Date,time=Date.parse('2026-10-03T12:00:00Z');function FixtureDate(...args){if(new.target)return Reflect.construct(NativeDate,args.length?args:[time],new.target);return new NativeDate(time).toString();}FixtureDate.prototype=NativeDate.prototype;Object.setPrototypeOf(FixtureDate,NativeDate);FixtureDate.now=()=>time;globalThis.Date=FixtureDate;})();`});
-    await context.addInitScript({content:`(()=>{if(globalThis.__qaFetchTrackingInstalled)return;Object.defineProperty(globalThis,'__qaFetchTrackingInstalled',{value:true});let pending=0;Object.defineProperty(globalThis,'__qaPendingApi',{get:()=>pending});const nativeFetch=globalThis.fetch;globalThis.fetch=function(...args){const path=String(args[0]?.url??args[0]),tracked=new URL(path,location.href).pathname.startsWith('/api/');if(!tracked)return nativeFetch.apply(this,args);pending++;return nativeFetch.apply(this,args).then(async response=>{await response.clone().arrayBuffer();return response;}).finally(()=>pending--);};})();`});
+    await context.addInitScript(installApiReadTracker);
     const page=await context.newPage();
     page.on('dialog',dialog=>dialog.accept());
     const lifecycle=[],errors=[];page.on('console',event=>{const raw=event.text();for(const marker of ['[qa-document-lifecycle]','[qa-document-error]'])if(raw.startsWith(marker)){try{lifecycle.push({kind:marker,...JSON.parse(raw.slice(marker.length).trim())});}catch{}}});page.on('pageerror',error=>errors.push({message:error.message,path:new URL(page.url()).pathname,stack:error.stack,lifecycle:lifecycle.slice(-3),knownPayroll:error.message.startsWith('e.split is not a function')&&new URL(page.url()).pathname.startsWith('/salaries')&&(error.stack?.includes('bdMonthMeta')||(engine==='webkit'&&error.stack?.includes('/assets/index-BQGspy0I.js:978:43')))}));
@@ -139,7 +140,14 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
       const finance=await r.api.store.GET(r.requestAction('/api/store/bd_finance_expenses'),{params:Promise.resolve({key:'bd_finance_expenses'})});assert.equal(finance.status,200);assert.deepEqual((await finance.json()).data,r.read('bd_finance_expenses'));
       versions[version]=all;
       console.log(JSON.stringify({engine,width,version,pages:Object.keys(all).length,executedPages:paths.length,legacyHome:'PASS',finance:200}));
-    }catch(error){await page.screenshot({path:`${out}/${version}-${width}-failure.png`,fullPage:true});writeFileSync(`${out}/${version}-${width}-failure.txt`,String(error));writeFileSync(`${out}/${version}-${width}-failure-state.json`,JSON.stringify(await state(),null,2));throw error;}
+    }catch(error){
+      writeFileSync(`${out}/${version}-${width}-failure.txt`,error?.stack??String(error));
+      const captureErrors=[];
+      try{writeFileSync(`${out}/${version}-${width}-failure-state.json`,JSON.stringify(await state(),null,2));}catch(captureError){captureErrors.push({stage:'state',error:String(captureError)});}
+      try{await page.screenshot({path:`${out}/${version}-${width}-failure.png`,fullPage:true});}catch(captureError){captureErrors.push({stage:'screenshot',error:String(captureError)});}
+      if(captureErrors.length)writeFileSync(`${out}/${version}-${width}-capture-errors.json`,JSON.stringify(captureErrors,null,2));
+      throw error;
+    }
     finally{writeFileSync(`${out}/${version}-${width}-requests.json`,JSON.stringify(runtime.requests,null,2));writeFileSync(`${out}/${version}-${width}-runtime-errors.json`,JSON.stringify(errors,null,2));await context.close();await runtime.close();}
   }
   const {compareRecoveryParity}=await import('./lib/reference-slice-recovery-compare.mjs');
