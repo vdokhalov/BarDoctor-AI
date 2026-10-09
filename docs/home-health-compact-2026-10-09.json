@@ -1,0 +1,42 @@
+{
+  "baseline": "772ceee943028b9982b53c957b6472d09cd180e4",
+  "production": "v502 unchanged",
+  "scope": [
+    "Remove only bdCostHomePhase4a mount from bdHomeDaily, including its automatic evaluate/read effect",
+    "Compact Home Health spacing; 84px ring with centered stacked score and /100; same score color variable",
+    "Version CSS URL to invalidate cached presentation"
+  ],
+  "origin": "Phase 4A cost signal module, retained by scripts/lib/owner-uat-v493.mjs",
+  "preserved": [
+    "All backend/API/auth/provider/calculation/schema/bindings",
+    "Full Health cost module, recipe correction and purchase workflows",
+    "Other Home priorities, wording, navigation, full Health layout"
+  ],
+  "checks": {
+    "cost_unit_and_exact_client_delta": "29 PASS",
+    "rendered_artifact_and_home_order": "44 PASS",
+    "historical_protection_and_preparation_idempotency": "7 PASS; manifests unchanged",
+    "backend_boundary_and_exact_client_delta": "2 PASS",
+    "build": "PASS",
+    "typecheck": "PASS",
+    "lint": "0 errors; 2 existing warnings",
+    "visual_chromium": "PASS 375/390/430/820/1280",
+    "visual_webkit": "PASS 375/390/430/820/1280",
+    "cost_management_browser": "PASS 390: Home/reload has no cost request; full Health correction/reload/history/venue isolation",
+    "cost_purchase_correction_browser": "PASS 390/820/1280: real isolated handlers, editor, purchase, verification/retry/venue race",
+    "full_ci": "NOT RUN",
+    "live_provider": "NOT RUN"
+  },
+  "visual_evidence": {
+    "before": "outputs/home-health-compact/before-390.png",
+    "after": "outputs/home-health-compact/after-390.png",
+    "chromium": "outputs/home-health-compact/results.json",
+    "webkit": "outputs/home-health-compact-webkit/results.json",
+    "card_height_chromium_px": {
+      "before": 329.546875,
+      "after": 320.546875
+    },
+    "note": "Isolated QA data, not Koln screenshots. Geometry probe uses83; screenshots restore actual fixture score and matching color/status."
+  },
+  "publication": "Not authorized for this candidate; previous CI-risk waiver applied only to v502. No push/deploy. Before publication require owner authorization and applicable new-candidate release gate or explicit new exception."
+}

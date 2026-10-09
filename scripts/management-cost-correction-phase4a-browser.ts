@@ -9,7 +9,7 @@ import type {CostEpisodeV1} from '../lib/bardoctor/management-cost-contracts';
 import {barDoctorResponse} from '../app/bar-doctor-response';
 const require=createRequire(import.meta.url);
 const {resolveBrowserExecutable}=require('./browser-runtime.cjs');
-const out='outputs/management-cost-correction-phase4a';mkdirSync(out,{recursive:true});const results:unknown[]=[];for(const width of [390,820,1280]){
+const out='outputs/management-cost-correction-phase4a';mkdirSync(out,{recursive:true});const results:unknown[]=[];for(const width of process.env.BD_COST_WIDTH?[Number(process.env.BD_COST_WIDTH)]:[390,820,1280]){
 const r=await costFixture();
 const {seedCorrectionFixture}=await import('./qa/phase4a-correction-fixture.mjs');const fixture=seedCorrectionFixture(r,width===820?'mint-missing':'citrus-empty');const historical=r.read('bd_sales_documents');
 let secondVenue=0;
@@ -42,9 +42,9 @@ const context=await browser.newContext({viewport:{width,height:width===390?844:w
 await context.addInitScript(({owner,venueId}:{owner:{email:string;token:string};venueId:number})=>{if(!/^https?:$/.test(location.protocol))return;localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);if(!localStorage.getItem('bd_active_venue_id'))localStorage.setItem('bd_active_venue_id',String(venueId));},{owner:r.owner,venueId:r.venueId});
 const page=await context.newPage();const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));const capture=async(label:string)=>{const dimensions=await page.evaluate(()=>({innerWidth,innerHeight,clientWidth:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth}));assert.equal(dimensions.innerWidth,width);assert.ok(dimensions.scrollWidth<=dimensions.clientWidth+1,JSON.stringify({label,...dimensions}));await page.screenshot({path:out+'/'+width+'-'+label+'.png',fullPage:true});writeFileSync(out+'/'+width+'-'+label+'.json',JSON.stringify(dimensions));};
 try{
- await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));await page.goto(base+'/home');const home=page.locator('[data-cost-surface]');await home.locator('[data-cost-primary-action]').waitFor({timeout:30000});
+ await page.clock.setFixedTime(new Date('2026-10-04T12:00:00Z'));await page.goto(base+'/health');const home=page.locator('[data-cost-surface]');await home.locator('.bd-cost-signal').first().waitFor({timeout:30000});
  const id=await home.locator('[data-signal-id]').first().getAttribute('data-signal-id');assert.ok(id);const readEpisode=async()=>((await(await r.detail(id)).json()) as {episode:CostEpisodeV1}).episode;
- await home.locator('[data-cost-primary-action]').click();
+ await home.locator('.bd-cost-signal').first().click();await page.getByRole('button',{name:'Открыть техкарту',exact:true}).click();
  const dialog=page.locator('[role="dialog"]').last();await dialog.waitFor();
  await dialog.getByRole('button',{name:/Добавить ингредиент/}).click();
  await dialog.getByPlaceholder('Ингредиент или готовый товар').fill(fixture.ingredientName);
@@ -101,7 +101,7 @@ try{
  if(width===1280){
   for(let attempt=0;attempt<100&&!releasePurchaseResponse;attempt++)await new Promise(done=>setTimeout(done,20));assert.ok(releasePurchaseResponse);
   await page.goBack();await page.waitForURL(url=>url.pathname==='/health');await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'Correction QA B'}).click();await page.waitForFunction(id=>Number(localStorage.getItem('bd_active_venue_id'))===id,secondVenue);
-  holdPurchaseResponse=false;(releasePurchaseResponse as (()=>void)|null)?.();await page.waitForLoadState('networkidle');await page.goto(base+'/home');await page.locator('[data-cost-surface][data-cost-venue="'+secondVenue+'"] .bd-cost-signal').first().waitFor();assert.equal(await page.locator('.bd-cost-result').count(),0);assert.equal(await page.getByText(fixture.ingredientName,{exact:true}).count(),0);await capture('purchase-response-venue-race');
+  holdPurchaseResponse=false;(releasePurchaseResponse as (()=>void)|null)?.();await page.waitForLoadState('networkidle');await page.goto(base+'/health');await page.locator('[data-cost-surface][data-cost-venue="'+secondVenue+'"] .bd-cost-signal').first().waitFor();assert.equal(await page.locator('.bd-cost-result').count(),0);assert.equal(await page.getByText(fixture.ingredientName,{exact:true}).count(),0);await capture('purchase-response-venue-race');
   await page.locator('[data-bd-venue-trigger]').click();await page.locator('.bd-venue-row').filter({hasText:'Isolated QA — работающее заведение'}).click();await page.waitForFunction(id=>Number(localStorage.getItem('bd_active_venue_id'))===id,r.venueId);await page.waitForURL(url=>url.pathname==='/home');await page.waitForLoadState('networkidle');await page.goto(base+'/health?venueId='+r.venueId+'&signalId='+encodeURIComponent(id)+'&section=management');
  }
  if(width===820){

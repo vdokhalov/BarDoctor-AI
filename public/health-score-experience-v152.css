@@ -1421,3 +1421,13 @@ button.bd-home-health-priority-action-v332 {
 .bd-home-money-loading-v344 strong { font-size: 17px; line-height: 1.25; }
 .bd-home-money-loading-v344 small { color: rgba(255,255,255,.62); font-size: 11px; }
 @keyframes bd-health-v344-pulse { 50% { opacity: .42; transform: scale(.82); } }
+
+/* Owner-requested compact Home card; full Health keeps its existing layout. */
+.bd-home-daily > .bd-home-health-card-v332 { padding: 10px 14px; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-score-v332 { padding: 2px 0; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-score-number-v332 { align-items: center; gap: 10px; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-ring { width: 84px; height: 84px; flex: 0 0 84px; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-value { flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-value strong { font-size: 34px; line-height: 1; letter-spacing: -.04em; color: var(--bd-health-score-color, #171a2b); }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-value small { font-size: 10px; line-height: 1; }
+.bd-home-daily > .bd-home-health-card-v332 .bd-home-health-live-v334 { padding-bottom: 6px; }

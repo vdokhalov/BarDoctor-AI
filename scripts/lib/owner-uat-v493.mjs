@@ -17,7 +17,7 @@ function bdLegacyDoctorEntryV493({onNavigate:e}){if(!bdMoreHasPermissionV166("an
    const start=text.indexOf('i.jsxs("section",{className:"bd-home-management-phase4a');
    const end=text.indexOf('i.jsx(bdHomeAttention,',start);
    if(start<0||end<start)throw Error('Legacy Home management boundary required');
-   text=text.slice(0,start)+'i.jsx(bdHomeHealthIndexV200,{snapshot:bdHealthSnapshot,diagnosis:f,loading:bdHealthLoading,onNavigate:g}),i.jsx(bdCostHomePhase4a,{onNavigate:g}),'+text.slice(end);
+   text=text.slice(0,start)+'i.jsx(bdHomeHealthIndexV200,{snapshot:bdHealthSnapshot,diagnosis:f,loading:bdHealthLoading,onNavigate:g}),'+text.slice(end);
    text=text.replace('/* phase4a-home-ai-entry-retained-in-more */','i.jsx(bdLegacyDoctorEntryV493,{onNavigate:g}),');
   }
   if(node.id.name==='bdHomeHealthIndexV200'){
