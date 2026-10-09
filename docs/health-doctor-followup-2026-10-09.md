@@ -36,3 +36,13 @@ The skill's destination question, to ask only when the helper prerequisite is re
 > Save the new key to /workspace/BarDoctor-AI/.env.local? Reply yes to continue, another workspace-relative env-file path to change it, or decline.
 
 The parent should present the purpose, connector-default target and one-call billing scope alongside that destination confirmation. No plaintext secret needs to pass through chat. In this follow-up no key was created, no secret was written, and no AI request was made. Push/merge/publication remain unperformed and unauthorized.
+
+## Final credential attempt — connector rejection
+
+This update supersedes the pending helper/confirmation sections above. The user explicitly approved a new key in the connected account's default project, the ignored local `.env.local` destination, and exactly one isolated live diagnosis with an overall USD 0.50 limit. The parent verified the connected account, Personal organization, sole active Default project, and USD 6.67 balance through authenticated browser UI; those browser IDs were not treated as picker-confirmed IDs.
+
+Official bundle and Library downloads both returned HTTP 403. The parent then supplied the unchanged, non-secret official OpenAI Developers 1.3.6 helper as task input. Its local bytes verified exactly: 13,600 bytes; SHA256 `7dd08001d0712226b443bdd00f45f99a90a58bdf10e25595da29850849a2fa23`. No substitute helper was used.
+
+The official helper's `prepare` succeeded after destination safety checks. Exactly one `create_encrypted_openai_api_key` call was made with the requested QA name and public JWK, omitting organization/project IDs as required by the documented text fallback. The connector returned `isError: true` and **“OpenAI Platform rejected the API key request.”** It returned no encrypted key. No retry or alternate-target attempt was made. The temporary setup keypair and public request file were removed; `.env.local` remains absent. No paid inference request was made, and no plaintext API secret was emitted.
+
+Live provider QA remains **BLOCKED by OpenAI Platform connector rejection**, not by missing user permission, missing helper, an invisible picker, or a demonstrated lack of balance. All previously recorded application/test/browser/CPU results remain unchanged. No push, merge, deployment, or publication was performed.
