@@ -3,7 +3,7 @@ import { canReadSavedDiagnosis, restrictedVenueContext } from './venue-context-a
 import { hasPermission } from './access-control';
 import { loadCanonicalHealthInputs } from './canonical-health-inputs';
 import { boundSource, SOURCE_SELECTORS } from './canonical-input-evidence';
-import { observeCurrentCost, COST_SOURCE_KEYS, canonicalItemId, record } from './management-cost-observation';
+import { COST_SOURCE_KEYS, canonicalItemId, record } from './management-cost-observation';
 import { COST_WHY } from './management-cost-contracts';
 import { readFinanceInputs } from './finance-inputs';
 import { venueDate, venueTimeFromJson } from './venue-time';
@@ -52,10 +52,10 @@ export async function buildCuratedAnswer(c: Canonical, question: CuratedQuestion
  } else if(question==='cost'){
   const items=Array.isArray(record(source('bd_assortment_v1')?.data).menuItems)?(record(source('bd_assortment_v1')?.data).menuItems as unknown[]).map(record).filter(item=>item.active!==false&&item.consumptionMode==='RECIPE'):[];
   total=usable('bd_assortment_v1')?items.length:null;
-  // Observe bounded items sequentially: each calculator parses retained stores.
+  // Observe bounded items sequentially with a request-owned ingredient memo.
   // Concurrent copies of large venue sources would exceed the Worker memory budget.
   for(const item of items.slice(0,25)){
-   const result=await observeCurrentCost({scope,snapshots:c.sourceSnapshots,profileJson:c.profileJson,menuItemId:String(item.id),now:asOf});const o=result.observation;
+   const result=await c.readCurrentCost(String(item.id));const o=result.observation;
    const signal=queue.find(q=>q.issueKey==='recipes'&&q.affectedEntity===item.id);
    const blockText=(o.blockingIngredients??[]).map(b=>`${b.name}: ${b.reason==='NOMENCLATURE_MISSING'?'нет номенклатуры':b.reason==='LINK_MISSING'?'связь ингредиента не подтверждена':b.reason==='PRICE_UNKNOWN'?'закупочная стоимость UNKNOWN':'единицы или количество требуют проверки'}.`).join(' ');
    const action=signal?target(signal):usable('bd_assortment_v1')&&canonicalItemId(item.id)&&!o.reasonCodes.includes('SOURCE_INVALID')?{id:String(item.id),label:'Найти позицию в техкартах',path:`/catalog?venueId=${scope.venueId}&tab=recipes&q=${encodeURIComponent(result.itemName)}`,verification:'EXISTING_DOMAIN_READ' as const}:null;

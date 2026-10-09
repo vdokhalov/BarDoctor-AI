@@ -1,4 +1,4 @@
-import { ingredientReferencesConflict } from "./ingredient-reference";
+import { createIngredientReferenceResolver } from "./ingredient-reference";
 import {
   inventoryPackageAmount,
   inventoryProductKey,
@@ -8,8 +8,7 @@ import {
 } from "./inventory";
 import { classifyNomenclatureItem } from "./nomenclature";
 import {
-  canonicalSupplierMappings,
-  supplierEvidenceForCanonical,
+  supplierEvidenceIndex,
 } from "./nomenclature-identity";
 
 type JsonRecord = Record<string, unknown>;
@@ -275,10 +274,11 @@ export function collectIngredientMatchCandidates(input: {
   for (const value of array(assortment.nomenclature).map(record)) add(value, 3);
   for (const value of array(assortment.stockBalances).map(record)) add(value, 2);
 
+  const supplierEvidence = supplierEvidenceIndex(assortment);
   // Supplier/source rows enrich their canonical product with aliases and
   // purchasing evidence. They are deliberately never emitted as candidates.
   for (const [key, candidate] of byKey) {
-    const evidence = supplierEvidenceForCanonical(assortment, key);
+    const evidence = supplierEvidence.forProduct(key);
     byKey.set(key, {
       ...candidate,
       supplierNames: evidence.supplierNames,
@@ -289,7 +289,7 @@ export function collectIngredientMatchCandidates(input: {
     });
   }
   const mappingByLine = new Map<string, string>();
-  for (const mapping of canonicalSupplierMappings(assortment)) {
+  for (const mapping of supplierEvidence.mappings) {
     for (const lineId of mapping.purchaseLineIds) mappingByLine.set(lineId, mapping.canonicalProductKey);
   }
   for (const document of (input.purchaseDocuments ?? []).map(record)) {
@@ -700,12 +700,13 @@ export function rememberConfirmedIngredientAliases(input: {
 }): JsonRecord[] {
   const assortment = record(input.assortment);
   const aliases = array(assortment.techCardIngredientAliases).map(record);
+  const references = createIngredientReferenceResolver(assortment);
   const byId = new Map(aliases.map((alias) => [text(alias.id), alias]));
   const now = (input.now ?? new Date()).toISOString();
   for (const recipe of array(assortment.recipes).map(record)) {
     for (const ingredient of array(recipe.ingredients).map(record)) {
       if (ingredient.linkConfirmedByUser !== true && text(ingredient.linkSource) !== "manual") continue;
-      if (ingredientReferencesConflict(ingredient, assortment)) continue;
+      if (references.conflicts(ingredient)) continue;
       const key = productKey(ingredient);
       const normalizedIngredientName = aliasKey(ingredient.name);
       if (!key || !normalizedIngredientName) continue;

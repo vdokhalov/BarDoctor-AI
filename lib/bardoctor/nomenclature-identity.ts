@@ -355,18 +355,25 @@ export function upsertSupplierProductMapping(
   return [mapping, ...mappings].slice(0, 10_000);
 }
 
-export function supplierEvidenceForCanonical(assortment: unknown, productKey: string): {
-  supplierNames: string[];
-  aliases: string[];
-  sourceCount: number;
-} {
-  const mappings = canonicalSupplierMappings(assortment)
-    .filter((mapping) => mapping.canonicalProductKey === productKey && mapping.status !== "orphan");
-  return {
-    supplierNames: [...new Set(mappings.map((mapping) => mapping.supplierName).filter(Boolean))],
-    aliases: [...new Set(mappings.map((mapping) => mapping.sourceName).filter(Boolean))],
-    sourceCount: mappings.length,
-  };
+export function supplierEvidenceIndex(assortment: unknown) {
+  const mappings = canonicalSupplierMappings(assortment);
+  const grouped = new Map<string, typeof mappings>();
+  for (const mapping of mappings) {
+    if (mapping.status === "orphan") continue;
+    const rows = grouped.get(mapping.canonicalProductKey) ?? [];
+    rows.push(mapping); grouped.set(mapping.canonicalProductKey, rows);
+  }
+  return { mappings, forProduct(productKey: string) {
+    const rows = grouped.get(productKey) ?? [];
+    return {
+      supplierNames: [...new Set(rows.map(mapping => mapping.supplierName).filter(Boolean))],
+      aliases: [...new Set(rows.map(mapping => mapping.sourceName).filter(Boolean))],
+      sourceCount: rows.length,
+    };
+  } };
+}
+export function supplierEvidenceForCanonical(assortment: unknown, productKey: string) {
+  return supplierEvidenceIndex(assortment).forProduct(productKey);
 }
 
 export function enrichCanonicalSupplierSummary(assortmentValue: unknown): JsonRecord {

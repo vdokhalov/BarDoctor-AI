@@ -10,7 +10,7 @@ import {
   procurementPricePoints,
   type ProcurementPricePoint,
 } from "./procurement-analytics";
-import { reconcileTechCards } from "./tech-card-reconciliation";
+import { reconcileTechCards, type IngredientReconciliationMemo } from "./tech-card-reconciliation";
 import {
   formatMenuSaleSize,
   menuSaleSizeUnitOptions,
@@ -345,6 +345,7 @@ function ingredientCost(
   stockMovements: unknown[] = [],
   venueId = 0,
   asOf = new Date().toISOString(),
+  movementByKey?: Map<string, unknown[]>,
 ) {
   const resolvedAmount = resolvedIngredientAmount(ingredient);
   const fallbackAmount = toInventoryBaseAmount(ingredient.quantity, ingredient.unit);
@@ -371,6 +372,7 @@ function ingredientCost(
   if (!productKey) {
     return { complete: false, reason: "mapping", amount: amount.amount, unit: amount.unit, productKey };
   }
+  stockMovements = movementByKey?.get(productKey) ?? (movementByKey ? [] : stockMovements);
   const canonicalBasis = stockMovements.length
     ? resolveCostBasis({
         venueId,
@@ -632,11 +634,16 @@ export function buildAssortmentAnalytics(input: {
   workspaceId?: number;
   dataAccountId?: number;
   now?: Date;
-}) {
+}, ingredientMemo?: IngredientReconciliationMemo) {
   if (input.venueId) {
     const boundary = { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId };
     const scoped = (values: unknown[] = []) => values.filter(value => derivedInputBelongs(value, boundary));
     input = { ...input, salesEvents: scoped(input.salesEvents), salesDocuments: scoped(input.salesDocuments), salesBatches: scoped(input.salesBatches), financeRevenue: scoped(input.financeRevenue), purchaseDocuments: scoped(input.purchaseDocuments), stockMovements: scoped(input.stockMovements) };
+  }
+  const movementByKey = new Map<string, unknown[]>();
+  for (const value of input.stockMovements ?? []) {
+    const key = text(record(value).productKey);
+    const group = movementByKey.get(key) ?? []; group.push(value); movementByKey.set(key, group);
   }
   const now = input.now ?? new Date();
   const period = periodWindow(input.period, now);
@@ -646,7 +653,7 @@ export function buildAssortmentAnalytics(input: {
     purchaseDocuments: input.purchaseDocuments,
     venueId: input.venueId,
     now,
-  });
+  }, ingredientMemo);
   const assortment = record(reconciliation.assortment);
   const menuTaxonomy = canonicalTaxonomyForAssortment(assortment);
   const groups = array(assortment.groups).map(record);
@@ -707,6 +714,7 @@ export function buildAssortmentAnalytics(input: {
       input.stockMovements ?? [],
       input.venueId ?? 0,
       now.toISOString(),
+      movementByKey,
     );
     return {
       ...cost,
@@ -884,6 +892,7 @@ export function buildAssortmentAnalytics(input: {
         input.stockMovements ?? [],
         input.venueId ?? 0,
         now.toISOString(),
+        movementByKey,
       ),
     }));
     const reviewStatus = consumption.ok

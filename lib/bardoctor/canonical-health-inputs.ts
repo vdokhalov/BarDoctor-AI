@@ -9,7 +9,8 @@ import { buildBusinessHealthSnapshot, businessHealthActionTarget } from "./busin
 import { buildAIDoctorAttention } from "./ai-doctor-attention";
 import { rankManagementSignals } from "./business-intelligence";
 import { COST_EPISODE_PREFIX, projectManagementCostEpisode } from "./management-cost-signals";
-import { observeCurrentCost } from "./management-cost-observation";
+import { createIngredientReconciliationMemo } from "./tech-card-reconciliation";
+import { createCurrentCostReader } from "./management-cost-observation";
 import type { CostEpisodeV1 } from "./management-cost-contracts";
 import { derivedInputBelongs } from "./derived-input-scope";
 import { evidenceContentRevision } from "./evidence-contracts";
@@ -72,7 +73,8 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   }
   let profile: Row = {};
   try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
-  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
+  const ingredientMemo = createIngredientReconciliationMemo();
+  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
   await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
   const operations = await observedAwait("health.operations", () => buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency }));
   const inputManifest = { contractVersion: 1 as const, scope, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };
@@ -85,11 +87,12 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   const memory = {tasks:memoryRows("bd_tasks"),actionTasks:memoryRows("bd_action_tasks"),decisions:memoryRows("bd_decisions")};
   const costRows = rows.results.filter(row=>row.store_key.startsWith(costPrefix));
   const costCandidates: Row[] = [];
+  const readCurrentCost = createCurrentCostReader({scope,snapshots,profileJson:profileRow.data_json,now:asOf}, ingredientMemo);
   if (runtimeEnv("BD_DISABLE_COST_MANAGEMENT_PHASE4A")!=="1" && hasPermission(currentAccount,"inventory.view") && ["bd_assortment_v1","bd_purchase_documents","bd_stock_movements"].every(key=>canReadVenueSource(currentAccount,key))) for (const row of costRows.slice(0,25)) {
     try {
       const episode=JSON.parse(row.data_json ?? "null") as CostEpisodeV1;
       if (episode?.scope.venueId!==scope.venueId || episode.scope.workspaceId!==scope.workspaceId || episode.scope.dataAccountId!==scope.dataAccountId || episode.condition!=="ACTIVE") continue;
-      const observed=await observeCurrentCost({scope,snapshots,profileJson:profileRow.data_json,menuItemId:episode.menuItemId,now:asOf});
+      const observed=await readCurrentCost(episode.menuItemId);
       const projected=await projectManagementCostEpisode({...episode,latest:observed.observation},observed.itemName);
       costCandidates.push({managementId:episode.signalId,issueKey:"recipes",affectedEntity:episode.menuItemId,signalClass:"data_quality",managementActionable:true,
         title:observed.observation.status==="UNKNOWN"?`Проверить себестоимость: ${observed.itemName ?? episode.menuItemId}`:`Проверить результат себестоимости: ${observed.itemName ?? episode.menuItemId}`,
@@ -127,5 +130,5 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   // Internal operands for read-only Doctor projections. Public Health remains
   // its existing envelope; callers must not serialize raw sources/snapshots.
   return { restricted: false as const, context, intelligence, snapshot, account: currentAccount, memory, attention,
-    sources, sourceSnapshots: snapshots, profileJson: profileRow.data_json };
+    sources, sourceSnapshots: snapshots, profileJson: profileRow.data_json, readCurrentCost };
 }

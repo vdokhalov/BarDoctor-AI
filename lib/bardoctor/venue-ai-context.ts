@@ -13,7 +13,7 @@ import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { buildProcurementAnalytics } from "./procurement-analytics";
 import { accountingCurrencyFromProfile } from "./currency";
 import { resolveAccountingMoney } from "./accounting-money";
-import { reconcileTechCards } from "./tech-card-reconciliation";
+import { reconcileTechCards, createIngredientReconciliationMemo, type IngredientReconciliationMemo } from "./tech-card-reconciliation";
 import { resolveMenuConsumption } from "./consumption-mode";
 
 type JsonRecord = Record<string, unknown>;
@@ -60,6 +60,7 @@ export type StoredVenueValue = {
 };
 
 export type VenueAIContextSources = {
+  ingredientMemo?: IngredientReconciliationMemo;
   access?: AuthenticatedAccount;
   workspaceId?: number;
   accountProfile: JsonRecord;
@@ -582,6 +583,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
 }
 
 function summariseMenu(sources: VenueAIContextSources, now: Date) {
+  const ingredientMemo = sources.ingredientMemo ?? createIngredientReconciliationMemo();
   const stored = store(sources, "bd_assortment_v1");
   const venueId = number(sources.accountProfile.venueId) ?? number(record(stored?.data).venueId) ?? undefined;
   const purchaseDocuments = array(store(sources, "bd_purchase_documents")?.data);
@@ -590,7 +592,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     purchaseDocuments,
     venueId,
     now,
-  });
+  }, ingredientMemo);
   const root = record(reconciliation.assortment);
   const menuItems = array(root.menuItems).map(record);
   const recipes = array(root.recipes).map(record);
@@ -651,7 +653,7 @@ function summariseMenu(sources: VenueAIContextSources, now: Date) {
     workspaceId: sources.workspaceId, dataAccountId: sources.access?.id,
     venueId,
     now,
-  });
+  }, ingredientMemo);
 
   return {
     available: menuItems.length > 0,

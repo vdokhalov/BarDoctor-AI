@@ -1,4 +1,4 @@
-import { canonicalIngredientReference as canonicalProductKey, ingredientReferencesConflict } from "./ingredient-reference";
+import { createIngredientReferenceResolver } from "./ingredient-reference";
 import {
   collectIngredientMatchCandidates,
   rankIngredientCandidates,
@@ -319,6 +319,7 @@ function reconcileIngredient(
   venueId?: number,
   protectAutoLink = false,
   crossVenueProductKeys = new Set<string>(),
+  references = createIngredientReferenceResolver(assortment),
 ): {
   ingredient: JsonRecord;
   state: IngredientLinkState;
@@ -333,7 +334,7 @@ function reconcileIngredient(
 } {
   const before = JSON.stringify(ingredient);
 
-  if (ingredientReferencesConflict(ingredient, assortment)) {
+  if (references.conflicts(ingredient)) {
     // Preserve all submitted references: selecting a key here would erase the conflict.
     const after = { ...ingredient, linkStatus: "ambiguous", resolutionStatus: "reference_conflict",
       matchReason: "ID и складской ключ указывают на разные товары. Выберите номенклатуру явно.",
@@ -343,14 +344,14 @@ function reconcileIngredient(
       resolutionStatus: "reference_conflict", highIdentityPreviouslyUnmatched: false, costRecovered: false };
   }
 
-  const requestedKey = canonicalProductKey(assortment, productKey(ingredient));
+  const requestedKey = references.canonical(productKey(ingredient));
   if (requestedKey) {
     if (crossVenueProductKeys.has(requestedKey) || !sameVenue(ingredient, venueId)) {
       const after = { ...ingredient, linkStatus: "wrong_venue" };
       return { ingredient: after, state: "wrong_venue", changed: JSON.stringify(after) !== before, tier: "low", manualProtected: true, unitMismatch: false, duplicateCandidateCase: false, resolutionStatus: "wrong_venue", highIdentityPreviouslyUnmatched: false, costRecovered: false };
     }
     const matched = candidates.find((candidate) =>
-      canonicalProductKey(assortment, productKey(candidate)) === requestedKey,
+      references.canonical(productKey(candidate)) === requestedKey,
     );
     if (!matched) {
       const after = { ...ingredient, linkStatus: "missing" };
@@ -558,12 +559,27 @@ function annotateVersions(
   };
 }
 
+/** Request-owned memo. Exact operand signatures invalidate it; no tenant data survives a read. */
+export function createIngredientReconciliationMemo() {
+  let context = "";
+  const entries = new Map<string, ReturnType<typeof reconcileIngredient>>();
+  return {
+    read(signature: string, key: string, calculate: () => ReturnType<typeof reconcileIngredient>) {
+      if (signature !== context) { entries.clear(); context = signature; }
+      let result = entries.get(key);
+      if (!result) { result = calculate(); entries.set(key, structuredClone(result)); }
+      return structuredClone(result);
+    },
+  };
+}
+export type IngredientReconciliationMemo = ReturnType<typeof createIngredientReconciliationMemo>;
+
 export function reconcileTechCards(input: {
   assortment: unknown;
   purchaseDocuments?: unknown[];
   venueId?: number;
   now?: Date;
-}): TechCardReconciliationResult {
+}, ingredientMemo?: IngredientReconciliationMemo): TechCardReconciliationResult {
   const source = record(input.assortment);
   const aliases = rememberConfirmedIngredientAliases({
     assortment: source,
@@ -571,6 +587,7 @@ export function reconcileTechCards(input: {
     now: input.now,
   });
   const workingSource = { ...source, techCardIngredientAliases: aliases };
+  const references = createIngredientReferenceResolver(workingSource);
   const menuItems = array(source.menuItems).map(record);
   const candidateCollection = collectIngredientMatchCandidates({
     assortment: workingSource,
@@ -579,6 +596,11 @@ export function reconcileTechCards(input: {
   });
   const candidates = candidateCollection.candidates;
   const crossVenueProductKeys = new Set(candidateCollection.crossVenueProductKeys);
+  // These are every non-ingredient operand read by reconcileIngredient and its
+  // matching helpers. Menu owner/version selection still runs independently.
+  const ingredientSignature = ingredientMemo ? JSON.stringify([input.venueId, candidates,
+    candidateCollection.crossVenueProductKeys, workingSource.techCardIngredientAliases,
+    source.nomenclature, source.stockBalances, source.canonicalProductAliases, source.inventoryProductAliases]) : "";
   const counters = {
     correctlyLinked: 0,
     autoLinked: 0,
@@ -634,14 +656,18 @@ export function reconcileTechCards(input: {
       };
       const protectAutoLink = canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
         && text(recipe.source, "manual") !== "ai";
-      const result = reconcileIngredient(
+      const calculate = () => reconcileIngredient(
         identified,
         candidates,
         workingSource,
         input.venueId,
         protectAutoLink,
         crossVenueProductKeys,
+        references,
       );
+      const result = ingredientMemo
+        ? ingredientMemo.read(ingredientSignature, JSON.stringify([identified, protectAutoLink]), calculate)
+        : calculate();
       if (["linked", "linked_unit_review", "linked_packaging_review", "archived_source"].includes(result.state)) counters.linkedIngredientLines += 1;
       if (["auto_linked", "linked_unit_review", "linked_packaging_review"].includes(result.state)) counters.autoLinkedIngredientLines += 1;
       if (result.state === "ambiguous") counters.ambiguousIngredientLines += 1;
@@ -862,12 +888,13 @@ export function canonicalTechCardForOwner(
 /** Drafts retain conflicting identities; confirmation requires explicit resolution. */
 export function changedConfirmedReferenceConflicts(beforeValue: unknown, afterValue: unknown, venueId: number) {
   const before = record(beforeValue), after = record(afterValue);
+  const references = createIngredientReferenceResolver(after);
   const owners = changedOwnerIds(before, after, venueId);
   const previous = new Map(array(before.recipes).map(record).map(recipe => [text(recipe.id), recipe]));
   return array(after.recipes).map(record).filter(recipe => sameVenue(recipe, venueId)
     && canonicalTechCardLifecycleStatus(recipe.status) === "confirmed"
     && (owners.has(ownerId(recipe)) || JSON.stringify(previous.get(text(recipe.id))) !== JSON.stringify(recipe)))
     .flatMap(recipe => array(recipe.ingredients).map(record)
-      .filter(ingredient => ingredientReferencesConflict(ingredient, after))
+      .filter(ingredient => references.conflicts(ingredient))
       .map(ingredient => ({ recipeId: text(recipe.id), ingredientId: text(ingredient.id), code: "INGREDIENT_REFERENCE_CONFLICT" })));
 }

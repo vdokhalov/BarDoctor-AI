@@ -1,3 +1,4 @@
+import { createIngredientReconciliationMemo, type IngredientReconciliationMemo } from "./tech-card-reconciliation";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { boundSource } from "./canonical-input-evidence";
 import { derivedInputBelongs } from "./derived-input-scope";
@@ -49,10 +50,8 @@ export function parseCostSources(snapshots: StoreSnapshot[], scope: CostScope) {
   return { sources, reasons: [...new Set(reasons)], assortment: record(sources.bd_assortment_v1) };
 }
 
-/** Strict certification boundary around the existing current recipe calculator.
- * No historical sale input or fallback source is supplied to this projection. */
-export async function observeCurrentCost(input: { scope: CostScope; snapshots: StoreSnapshot[]; profileJson: string | null; menuItemId: string; now: string }) {
-  const { scope, snapshots, profileJson, menuItemId, now } = input;
+type CostReadInput = { scope: CostScope; snapshots: StoreSnapshot[]; profileJson: string | null; menuItemId: string; now: string };
+async function prepareCurrentCostRead({scope, snapshots, profileJson}: Omit<CostReadInput, "menuItemId">) {
   const parsed = parseCostSources(snapshots, scope), reasons = [...parsed.reasons];
   let profile: Record<string, unknown> = {};
   try { profile = record(JSON.parse(profileJson ?? "null")); } catch { reasons.push("SOURCE_INVALID"); }
@@ -60,6 +59,22 @@ export async function observeCurrentCost(input: { scope: CostScope; snapshots: S
   if (!currency) reasons.push("CURRENCY_UNKNOWN");
   const manifest = await Promise.all(snapshots.filter(s => COST_SOURCE_KEYS.includes(s.key)).map(async s => ({ sourceKey: s.key, present: s.dataJson !== null, updatedAt: s.updatedAt, contentRevision: await costRevision([scope, s.key, s.dataJson]) })));
   const profileRevision = await costRevision(profileJson);
+  const evidence = new Map<string, ReturnType<typeof boundSource>>();
+  return { parsed, reasons, currency, manifest, profileRevision, sourceEvidence(key: string) {
+    let result = evidence.get(key);
+    if (!result) { result = boundSource(scope, key, parsed.sources[key]); evidence.set(key, result); }
+    return result;
+  } };
+}
+/** Strict certification boundary around the existing current recipe calculator.
+ * No historical sale input or fallback source is supplied to this projection. */
+export async function observeCurrentCost(input: CostReadInput) {
+  return observePreparedCurrentCost(input, prepareCurrentCostRead(input));
+}
+async function observePreparedCurrentCost(input: CostReadInput, prepared: ReturnType<typeof prepareCurrentCostRead>, ingredientMemo?: IngredientReconciliationMemo) {
+  const { scope, menuItemId, now } = input;
+  const { parsed, reasons: sourceReasons, currency, manifest, profileRevision, sourceEvidence } = await prepared;
+  const reasons = [...sourceReasons];
   const observation: CostObservationV1 = { metric: "current_recipe_unit_cost", status: "UNKNOWN", value: null, currency, asOf: now, calculationVersion: COST_CALCULATION_VERSION, recipeId: null, recipeVersion: null, reasonCodes: reasons, quality: { availability: reasons.length ? "UNAVAILABLE" : "AVAILABLE", scopeValid: !reasons.includes("SCOPE_CONFLICT"), freshness: reasons.length ? "UNAVAILABLE" : "CURRENT_READ" }, sourceManifest: manifest, profileRevision, observationRevision: "", evidence: [] };
   const items = Array.isArray(parsed.assortment.menuItems) ? parsed.assortment.menuItems.map(record) : [];
   const matches = items.filter(item => item.id === menuItemId);
@@ -89,10 +104,10 @@ export async function observeCurrentCost(input: { scope: CostScope; snapshots: S
       const primary: CostReason | null = !card ? "RECIPE_MISSING" : !Array.isArray(card.ingredients) || !card.ingredients.length ? "RECIPE_EMPTY" : card.status !== "confirmed" || card.reviewStatus !== "approved" ? "RECIPE_UNAPPROVED" : null;
       if (primary) { observation.reasonCodes.push(primary); eligible = applicable; }
       else if (applicable && card && canonicalItemId(card.id)) {
-        const analytics = buildAssortmentAnalytics({ assortment: { ...parsed.assortment, menuItems: [item] }, purchaseDocuments: parsed.sources.bd_purchase_documents as unknown[], stockMovements: parsed.sources.bd_stock_movements as unknown[], ...scope, now: new Date(now) });
+        const analytics = buildAssortmentAnalytics({ assortment: { ...parsed.assortment, menuItems: [item] }, purchaseDocuments: parsed.sources.bd_purchase_documents as unknown[], stockMovements: parsed.sources.bd_stock_movements as unknown[], ...scope, now: new Date(now) }, ingredientMemo);
         const metric = analytics.menuItems.find(metric => metric.id === menuItemId);
         if (metric && metric.recipeId === card.id && metric.consumptionStatus === "CONFIGURED" && metric.recipeCostStatus !== "UNKNOWN" && typeof metric.recipeCost === "number" && Number.isFinite(metric.recipeCost) && metric.recipeCost >= 0 && metric.costCurrency === currency && currency) {
-          for (const key of ["bd_purchase_documents", "bd_stock_movements"]) observation.evidence.push(await boundSource(scope, key, parsed.sources[key]));
+          for (const key of ["bd_purchase_documents", "bd_stock_movements"]) observation.evidence.push(await sourceEvidence(key));
           observation.status = metric.recipeCost === 0 ? "KNOWN_ZERO" : "KNOWN_VALUE";
           observation.value = metric.recipeCost;
         } else {
@@ -104,7 +119,7 @@ export async function observeCurrentCost(input: { scope: CostScope; snapshots: S
             const product = (parsed.assortment.nomenclature as unknown[]).map(record).find(p => p.id === blocker.nomenclatureItemId && derivedInputBelongs(p, scope));
             if (product && blocker.nomenclatureItemId && !observation.evidence.some(ref => ref.id === "bd_assortment_v1.nomenclature" && ref.partId === blocker.nomenclatureItemId)) observation.evidence.push(await boundSource(scope, "bd_assortment_v1.nomenclature", product, blocker.nomenclatureItemId));
           }
-          for (const key of ["bd_purchase_documents", "bd_stock_movements"]) observation.evidence.push(await boundSource(scope, key, parsed.sources[key]));
+          for (const key of ["bd_purchase_documents", "bd_stock_movements"]) observation.evidence.push(await sourceEvidence(key));
         }
       } else if (applicable) observation.reasonCodes.push("SOURCE_INVALID");
     }
@@ -117,4 +132,15 @@ export async function observeCurrentCost(input: { scope: CostScope; snapshots: S
   } else if (observation.status === "UNKNOWN") observation.quality.availability = "PARTIAL";
   observation.observationRevision = await costRevision({ scope, menuItemId, manifest, profileRevision, status: observation.status, value: observation.value, reasons: observation.reasonCodes, applicable });
   return { observation, eligible, applicable, itemName: typeof item?.name === "string" ? item.name.slice(0, 240) : menuItemId };
+}
+
+/** Share only within one immutable server snapshot; each fresh request gets a new reader. */
+export function createCurrentCostReader(input: Omit<Parameters<typeof observeCurrentCost>[0], "menuItemId">, memo = createIngredientReconciliationMemo()) {
+  const observations = new Map<string, ReturnType<typeof observeCurrentCost>>();
+  let prepared: ReturnType<typeof prepareCurrentCostRead> | undefined;
+  return (menuItemId: string) => {
+    let result = observations.get(menuItemId);
+    if (!result) { result = observePreparedCurrentCost({ ...input, menuItemId }, prepared ??= prepareCurrentCostRead(input), memo); observations.set(menuItemId, result); }
+    return result.then(value => structuredClone(value));
+  };
 }

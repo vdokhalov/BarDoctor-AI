@@ -1,0 +1,337 @@
+{
+  "baseCommit": "ad0378431dfea73ded6e67c176dbfcae7ddf4f42",
+  "branch": "fix/health-doctor-recovery",
+  "sourceSha256": {
+    "lib/bardoctor/assortment-analytics.ts": "a9d325a1fba87e0f000429dc8202ce732eba1975b27f93c2f65dce584b028ad6",
+    "lib/bardoctor/canonical-health-inputs.ts": "676314b7bc3cd9ba6d1a64f3aa04b61e0cbe7eacbd16d212f9c9173a277c77ac",
+    "lib/bardoctor/curated-doctor.ts": "cc28ed8e1723dcc9314dcfd91ce9b74e28e0b37182f111bb8da13f1268569bf4",
+    "lib/bardoctor/ingredient-reference.ts": "768eb6990475570e37be66ffd4745de2dd821b13a5cca07eaef73e623615beb1",
+    "lib/bardoctor/management-cost-observation.ts": "1fb16bffbf5800306285e24dd608da62050d45fd55318984f61b13070b4180a2",
+    "lib/bardoctor/nomenclature-identity.ts": "e07807162386593769f0dbd039ff5e9cdc917f2b6aa0b7a916a60882e37fe373",
+    "lib/bardoctor/tech-card-ingredient-matching.ts": "a813d8c7e5f5145c33aea4178ec743a359a36e8c858d092290c8bdd8492f781b",
+    "lib/bardoctor/tech-card-reconciliation.ts": "bda82e5aa4a7900381cca7c77df96a994937f5dfb55c8788f35a5aa2d8b32c56",
+    "lib/bardoctor/venue-ai-context.ts": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a",
+    "scripts/health-doctor-recovery-browser.mjs": "1783de981c045999e83170baea2c2f4fe34b0ad8517d212c5d26bda76ca190a6",
+    "scripts/health-doctor-recovery-cpu.mjs": "c5802115e924d6e9a7aad4e72a2ca369494180e671f1a69108bbb1adb74269be",
+    "tests/health-doctor-recovery.test.ts": "a370724a9fa0f43415bb1a3ac7c0c6d43e2ef2e35d6c36f7382d8228194c6e31"
+  },
+  "verification": {
+    "npmTest": {
+      "status": "PASS",
+      "tests": 2354,
+      "batches": [
+        4,
+        468,
+        100,
+        7,
+        4,
+        1748,
+        10,
+        13
+      ],
+      "failures": 0
+    },
+    "typecheck": "PASS",
+    "build": "PASS (npm test build-verified)",
+    "lint": {
+      "status": "PASS",
+      "errors": 0,
+      "existingWarnings": 2
+    },
+    "baselineFinancialEquivalence": {
+      "status": "PASS",
+      "analyticsDatasets": 16,
+      "certifiedObservations": 48,
+      "completeResponseComparisons": [
+        "linked/health",
+        "linked/attention",
+        "linked/cost",
+        "unlinked/health",
+        "unlinked/attention",
+        "unlinked/cost"
+      ]
+    },
+    "chromium": [
+      {
+        "engine": "chromium",
+        "width": 390,
+        "status": "PASS",
+        "actualHandlers": true,
+        "isolated": true,
+        "healthScore": true,
+        "healthReload": true,
+        "diagnosisFallback": true,
+        "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+        "doctorReload": true
+      },
+      {
+        "engine": "chromium",
+        "width": 820,
+        "status": "PASS",
+        "actualHandlers": true,
+        "isolated": true,
+        "healthScore": true,
+        "healthReload": true,
+        "diagnosisFallback": true,
+        "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+        "doctorReload": true
+      },
+      {
+        "engine": "chromium",
+        "width": 1280,
+        "status": "PASS",
+        "actualHandlers": true,
+        "isolated": true,
+        "healthScore": true,
+        "healthReload": true,
+        "diagnosisFallback": true,
+        "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+        "doctorReload": true
+      }
+    ],
+    "webkit": {
+      "status": "BLOCKED",
+      "reason": "Workspace browser installed; host libraries missing; install-deps su authentication failed"
+    },
+    "liveOpenAI": {
+      "status": "BLOCKED",
+      "reason": "New QA key not created; supported Codex confirmation/local-write flow unavailable"
+    },
+    "productionOwnerIPhone": "NOT_RUN",
+    "publication": "NOT_AUTHORIZED_NOT_ATTEMPTED"
+  },
+  "cpu": {
+    "method": "process.cpuUsage; actual authenticated routes; isolated SQLite; all stores below 2MB",
+    "production": false,
+    "targetMs": 5000,
+    "hardLimitMs": 10000,
+    "representative": [
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "health",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 491.649,
+        "wallMs": 606.1505370000001,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "attention",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 347.914,
+        "wallMs": 490.8965119999998,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "cost",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 908.081,
+        "wallMs": 1155.7040889999998,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "diagnosis",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 242.978,
+        "wallMs": 334.71009000000004,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "health",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 770.085,
+        "wallMs": 1030.4589850000002,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "attention",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 638.725,
+        "wallMs": 1017.3160950000001,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "cost",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 1435.471,
+        "wallMs": 2084.842289,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "diagnosis",
+        "products": 500,
+        "menus": 30,
+        "movements": 4000,
+        "financialDays": 1000,
+        "cpuMs": 705.505,
+        "wallMs": 1051.3433560000003,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      }
+    ],
+    "stress": [
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "health",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 787.335,
+        "wallMs": 1054.063819,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "attention",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 540.319,
+        "wallMs": 833.2243440000002,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "cost",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 1599.531,
+        "wallMs": 2750.098361,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "linked",
+        "question": "diagnosis",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 457.17,
+        "wallMs": 799.2981749999999,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "health",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 2431.05,
+        "wallMs": 3323.642119,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "attention",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 2488.785,
+        "wallMs": 4070.181877000001,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "cost",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 4550.667,
+        "wallMs": 5109.869336000002,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      },
+      {
+        "mode": "candidate",
+        "scenario": "unlinked",
+        "question": "diagnosis",
+        "products": 1000,
+        "menus": 60,
+        "movements": 8000,
+        "financialDays": 1000,
+        "cpuMs": 2044.261,
+        "wallMs": 2053.8751410000004,
+        "status": "PASS",
+        "actualHandlers": true,
+        "production": false
+      }
+    ]
+  }
+}
