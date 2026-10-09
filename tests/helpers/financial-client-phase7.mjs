@@ -80,17 +80,17 @@ export function compileFinancialClient(bundle, getStore, options = {}) {
       for (const ref of references(unit)) include(ref);
     }
   }
-  for (const name of ['bdBuildMonthlyReport', 'bdMonthClosingSnapshot', 'wn']) {
+  for (const name of ['bdBuildMonthlyReport', 'bdMonthClosingSnapshot', 'wn', ...(options.payroll ? ['bdPayrollMonthModel'] : [])]) {
     required(`client function exists ${name}`, definitions.has(name), name);
     include(name);
   }
   const ordered = [...selected].sort((a, b) => a.start - b.start);
   const source = ordered.map(u => u.code).join('\n');
-  const context = vm.createContext({ Date: FixtureDate, Intl, Math, JSON, Map, Set, structuredClone, localStorage: options.localStorage,
+  const context = vm.createContext({ Date: FixtureDate, Intl, Math, JSON, Map, Set, structuredClone, localStorage: options.localStorage, window: { bdFormatAccountingMoney: (value, currency) => new Intl.NumberFormat("ru", {style:"currency", currency}).format(value) },
     xr: key => clone(getStore(key) ?? null), bdCurrentAccountingCurrencyV243: () => 'MDL',
     console: { warn: (...v) => log.push({ clientWarning: v.map(String) }) },
   });
-  const script = new vm.Script(`${source}\nglobalThis.financialClient={report:bdBuildMonthlyReport,closeSnapshot:bdMonthClosingSnapshot,finance:wn};`, { filename: 'actual-final-client-financial-extract.js' });
+  const script = new vm.Script(`${source}\nglobalThis.financialClient={report:bdBuildMonthlyReport,closeSnapshot:bdMonthClosingSnapshot,finance:wn${options.payroll ? ",payroll:bdPayrollMonthModel" : ""}};`, { filename: 'actual-final-client-financial-extract.js' });
   script.runInContext(context, { timeout: 15000 });
   const extraction = { source, bundleSha256: sha(bundle), extractedSha256: sha(source),
     units: ordered.map(u => ({ name: u.name, offset: u.start, sha256: sha(u.code) })),

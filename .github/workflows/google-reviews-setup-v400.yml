@@ -212,6 +212,8 @@ jobs:
         run: npm run validate:artifact
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Owner QA writeoff payroll repair persisted mobile Chromium
+        run: node --import tsx scripts/owner-qa-regressions-browser.mjs
       - name: Complete v485 navigation and functionality parity Chromium
         run: |
           node --import tsx scripts/reference-slice-recovery-parity.mjs
@@ -298,6 +300,8 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Owner QA writeoff payroll repair persisted mobile WebKit
+        run: BD_CURATED_BROWSER=webkit node --import tsx scripts/owner-qa-regressions-browser.mjs
       - name: Complete v485 navigation and functionality parity WebKit
         run: |
           BD_CURATED_BROWSER=webkit node --import tsx scripts/reference-slice-recovery-parity.mjs
