@@ -333,5 +333,19 @@
         "production": false
       }
     ]
+  },
+  "stagingInvestigation": {
+    "status": "NO_AUTHORIZED_CONFIGURED_PATH_FOUND",
+    "accessibleSites": 1,
+    "separateQaSite": false,
+    "currentPreviewUrl": null,
+    "sitesPreviewCommandAvailable": false,
+    "localProviderCredentialPresent": false,
+    "localEnvFilesPresent": false,
+    "productionSecretRead": false,
+    "productionSecretInheritance": "NOT_SUPPORTED_BY_DISCOVERED_LOCAL_CONFIG",
+    "liveRequestMade": false,
+    "secureCodexSetupRoute": "UNAVAILABLE",
+    "encryptedCreationPrimitive": "AVAILABLE_BUT_NOT_CALLED_WITHOUT_COMPLETE_TRUSTED_SETUP"
   }
 }

@@ -53,3 +53,24 @@ Credential setup is a platform-tool blocker in this environment. The applicable 
 The parent must restore a supported Codex secure setup/local-write flow, obtain its confirmation for the new QA key and destination, and rerun the live test. There is no verified mobile setup URL from these tool results; do not ask Vitaliy to paste a secret, retry an invisible widget indefinitely, or open a computer. A functioning supported secure form is the required platform capability, not a missing business decision from Vitaliy.
 
 Vitaliy will see these code changes in the existing BarDoctor URL only after the approved commit is published. Before then, production is unchanged. Use `/health`, then `/analysis`, launch diagnosis and reload both pages for the post-release owner check.
+
+## Follow-up: live AI route / existing staging investigation
+
+Read-only check after the repair commit:
+
+- `sites_list_sites(limit=50, include_editable=true)` returned exactly one accessible Site, `BarDoctor Preview`, latest version 501, with the existing production URL and `current_preview_url=null`; pagination ended. No separate accessible QA/staging Site was found.
+- `sites-preview` is not installed on this execution environment. The Sites managed-preview reference describes an internal checkout server, not a published staging deployment or a user-facing preview.
+- `vite.config.ts:20` takes local OpenAI bindings only from `process.env`. Its D1 configuration uses a local placeholder database. `build/sites-vite-plugin.ts` packages metadata/migrations; it does not fetch or inherit production secrets.
+- There are no `.env*` or `.dev.vars*` files in the checkout, and the relevant provider-variable presence checks are false. Actual-handler QA uses disposable SQLite; native Worker QA uses isolated Miniflare D1 and explicitly blocks outbound services.
+- No production environment-variable read was made: the available Sites tool returns production values and is not a staging/secret-inheritance mechanism. No live AI request, key creation, credential copying, or deployment was performed during this investigation.
+
+Therefore an already-configured, authorized staging path with a usable new QA credential is **not available in the discovered workspace/account**. It is not safe to infer one from the Site's title “Preview”. A Sites deployment would publish production code, and reusing an existing production credential would contradict Vitaliy's choice of a new key even without extracting its bytes.
+
+The current choice remains **new QA key**. The actually callable secure primitive is `create_encrypted_openai_api_key`; the complete supported Codex confirmation-and-local-write route is unavailable, so that primitive was not called. A functioning `open_codex_api_key_setup` / destination-confirmation flow and bundled helper must be made available by the platform before the new-key route can finish. No verified alternative iPhone form/link was returned by the tools. Repeating the broken widget or supplying an unverified link would not remove this blocker.
+
+If a different release/testing path is proposed later, its approval scope must be explicit:
+
+- Separate private QA Site: authorize a new private project with isolated D1/R2, deployment of the reviewed repair SHA, and secure configuration of the **new** QA key. This is new infrastructure/publication and is not authorized by the current research request.
+- Test through the existing production Site: authorize publishing the repair SHA, a dedicated QA account/venue and its QA writes, and explicitly revise the rejected-existing-key decision if an existing credential would be used. This path was not selected or attempted.
+
+Neither option is silently substituted for the existing new-key decision. The current browser PASS is the no-provider fallback only; live OpenAI remains BLOCKED.
