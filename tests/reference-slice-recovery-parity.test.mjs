@@ -51,3 +51,12 @@ test('QA fetch tracking survives repeated WebKit bootstrap without losing an in-
  runInContext(code,context);assert.equal(context.fetch,wrapper);assert.equal(context.__qaPendingApi,1);
  resolve(response);assert.equal(await request,response);assert.equal(context.__qaPendingApi,0);assert.deepEqual(await response.json(),{success:true,data:[]});
 });
+
+test('v503 cost relocation requires actual browser evidence and does not claim Home parity',()=>{
+ const item={id:'home:Cost correction',from:'/home',home:true},a=state();a.before.url='/home';a.before.contract={path:'/home',url:'/home'};a.actions={};
+ const b=structuredClone(a),check=()=>compareRecoveryParity({items:[item]},{v485:{'/home':a},candidate:{'/home':b}},'webkit',390)[0];
+ assert.equal(check().verdict,'FAIL');
+ b.approvedCostPlacement={approval:'v503',homeAbsent:true,healthVisible:true,healthOutsideClosedDisclosure:true};
+ assert.equal(check().verdict,'PASS');assert.equal(check().home,'REMOVED (owner-approved v503)');assert.equal(check().discoverability,'PASS (Health)');
+ for(const key of ['homeAbsent','healthVisible','healthOutsideClosedDisclosure']){b.approvedCostPlacement[key]=false;assert.equal(check().verdict,'FAIL');b.approvedCostPlacement[key]=true;}
+});

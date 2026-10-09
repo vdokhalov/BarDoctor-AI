@@ -133,7 +133,17 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
       }
       await visit('/home');await page.locator('[data-bd-home-attention]').first().waitFor();
       assert.equal(await page.locator('.bd-management-queue,[data-curated-question]').count(),0,'No declined Phase 4B/C UI');
-      for(const item of inventory.items.filter(i=>i.entryScope==='home')){const selector=version==='candidate'&&item.label.startsWith('Today')?'[data-bd-home-daily]':item.selector;const element=page.locator(selector).first();await element.waitFor({state:'visible'});assert.equal(await element.evaluate(e=>{for(let p=e;p;p=p.parentElement)if(p.tagName==='DETAILS'&&!p.open)return true;return false;}),false,item.id+' closed disclosure');}
+      for(const item of inventory.items.filter(i=>i.entryScope==='home')){
+        // v503 intentionally removed only the Home cost mount; retain its Health visibility check.
+        if(version==='candidate'&&item.id==='home:Cost correction'){
+          assert.equal(await page.locator(item.selector).count(),0,'v503 Home cost mount remains absent');
+          await visit('/health');const cost=page.locator('[data-cost-surface=health]');await cost.waitFor({state:'visible'});
+          assert.equal(await cost.evaluate(e=>{for(let p=e;p;p=p.parentElement)if(p.tagName==='DETAILS'&&!p.open)return true;return false;}),false,'retained Health cost is not hidden in disclosure');
+          all['/home'].approvedCostPlacement={approval:'v503',homeAbsent:true,healthVisible:true,healthOutsideClosedDisclosure:true};
+          writeFileSync(file,JSON.stringify(all,null,2));
+          await visit('/home');continue;
+        }
+        const selector=version==='candidate'&&item.label.startsWith('Today')?'[data-bd-home-daily]':item.selector;const element=page.locator(selector).first();await element.waitFor({state:'visible'});assert.equal(await element.evaluate(e=>{for(let p=e;p;p=p.parentElement)if(p.tagName==='DETAILS'&&!p.open)return true;return false;}),false,item.id+' closed disclosure');}
       const legacy=[['[data-bd-home-health-index] button','/health'],['.bd-home-money','/reports'],['[data-bd-home-reviews] button','/reviews'],['[data-bd-home-context] button:first-child','/opportunities'],['[data-bd-home-context] button:last-child','/market']];
       for(const[selector,defaultTarget]of legacy){await visit('/home');const control=page.locator(selector).first();await control.waitFor({state:'visible'});const target=selector.includes('home-reviews')&&(await control.innerText()).includes('Подключить')?'/integrations':defaultTarget;await control.click({trial:true});await control.click();await page.waitForURL(u=>u.pathname===target);await settle();await page.reload();await settle();assert.equal(new URL(page.url()).pathname,target);await page.goBack();await settle();assert.equal((await state()).venue,String(r.venueId));}
       await visit('/home');await page.getByRole('button',{name:'Переключить заведение',exact:true}).click();await page.getByText('QA Phase 4C — работающая кофейня',{exact:true}).last().waitFor();
