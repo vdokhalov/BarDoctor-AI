@@ -40,6 +40,10 @@ try{for(const width of [390,820,1280]){const facts={};for(const version of ['v48
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);assert.deepEqual(errors,[]);assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[]);
   const finance=await r.api.store.GET(r.requestAction('/api/store/bd_finance_expenses','GET'),{params:Promise.resolve({key:'bd_finance_expenses'})});assert.equal(finance.status,200);
   await page.screenshot({path:`${out}/${version}-${width}.png`,fullPage:true});results.push({engine,width,version,run:'PASS',errorRetry:'PASS (isolated injected 503)',actualHandler:'PASS (HTTP 200)',cachedReload:'PASS',refresh:'PASS',finance:'PASS',reportActions,footerRefresh:'PASS',errors});console.log(JSON.stringify(results.at(-1)));
- }catch(error){await page.screenshot({path:`${out}/${version}-${width}-failure.png`,fullPage:true});throw error;}finally{await context.close();await runtime.close();}
+ }catch(error){
+  const state=await page.evaluate(()=>({path:location.pathname,venue:localStorage.getItem('bd_active_venue_id'),sessionPresent:!!localStorage.getItem('bd_session_token'),pendingApi:globalThis.__qaPendingApi,reportVisible:!!document.querySelector('[data-bd-ai-result]'),scrollWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth})).catch(()=>null);
+  try{writeFileSync(`${out}/${version}-${width}-failure.json`,JSON.stringify({engine,width,version,error:String(error),stack:error?.stack??null,errors,state,requests:runtime.requests},null,2));}catch{console.error("Could not persist failure diagnostics; rethrowing original test failure.");}
+  await page.screenshot({path:`${out}/${version}-${width}-failure.png`,fullPage:true}).catch(()=>{});throw error;
+ }finally{await context.close();await runtime.close();}
 }assert.deepEqual(facts.candidate,facts.v485,'legacy diagnosis authoritative facts unchanged');writeFileSync(`${out}/facts-${width}.json`,JSON.stringify(facts,null,2));}}
 finally{await browser.close();baseline.close();writeFileSync(`${out}/results.json`,JSON.stringify(results,null,2));assert.equal(createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex'),hash);}
