@@ -35,10 +35,10 @@ test("Finance dashboard exposes the three existing financial levels as one resul
   assert.match(page, /"data-bd-finance-dashboard":"v160"/);
   assert.match(page, /"data-bd-finance-density":"v161"/);
   assert.match(finance, /Финансовый результат месяца/);
-  assert.match(finance, /Денежный результат после оплат/);
+  assert.match(finance, /Расчёт после оплат поставщикам/);
   assert.match(finance, /Операционный результат до себестоимости/);
   assert.match(finance, /Финальный финансовый результат/);
-  assert.match(finance, /Денежный итог/);
+  assert.match(finance, /После оплат поставщикам/);
   assert.match(finance, /До себестоимости/);
   assert.match(finance, /Чистая прибыль/);
   assert.match(finance, /чистая прибыль/);
@@ -58,7 +58,7 @@ test("Finance dashboard is compact, actionable, and keeps detailed records behin
     "Расходы",
     "ФОТ",
     "Средний чек",
-    "Готовность данных",
+    "Полнота данных смен",
     "Что сделать",
     "Из чего сложился результат",
     "Текущая неделя",

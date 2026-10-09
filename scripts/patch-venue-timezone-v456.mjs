@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 const asset='public/assets/index-BQGspy0I.js';let code=fs.readFileSync(asset,'utf8');
 function replace(before,after){if(!code.includes(before)&&!code.includes(after))throw Error('Timezone patch anchor missing: '+before.slice(0,100));let start=0;while(true){const at=code.indexOf(before,start);if(at<0)break;if(code.slice(at,at+after.length)!==after)code=code.slice(0,at)+after+code.slice(at+before.length);start=at+after.length;}}
+// A business date is a calendar label, not midnight UTC in the browser's zone.
+// Actual timestamps still resolve to the active venue's calendar date.
+replace('function sg(e){return new Date(e).toLocaleDateString("ru-RU",{day:"numeric",month:"short"})}', 'function sg(e){const n=typeof e==="string"&&/^\\d{4}-\\d{2}-\\d{2}$/.test(e),r=new Date(n?e+"T12:00:00Z":e);let t="UTC";if(!n){try{t=new Intl.DateTimeFormat("en",{timeZone:bz()?.timezone||"UTC"}).resolvedOptions().timeZone}catch{}}return r.toLocaleDateString("ru-RU",{day:"numeric",month:"short",timeZone:t})}');
 const helper='function bdVenueTimezoneReact({value:e,onChange:t,suggest:n}){const r=S.useRef(null),a=S.useRef(t);a.current=t;S.useEffect(()=>{const l=r.current;if(!l)return;const u=d=>a.current(d.detail);l.addEventListener("timezonechange",u);return()=>l.removeEventListener("timezonechange",u)},[]);S.useEffect(()=>{if(n&&!e){a.current(Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC");return}if(r.current)r.current.value=e||""},[e,n]);return i.jsx("bd-venue-timezone",{ref:r})}';
 if(!code.includes('function bdVenueTimezoneReact('))replace('function bdVenueScheduleReact(',helper+'function bdVenueScheduleReact(');
 replace('r=S.useRef(t),p=S.useRef(null);r.current=t;', 'r=S.useRef(t),p=S.useRef(null),v=S.useRef(e);r.current=t;v.current=e;');

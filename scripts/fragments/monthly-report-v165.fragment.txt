@@ -120,7 +120,7 @@ function bdMonthlyComparisonV165({ report, previous }) {
 
 function bdMonthlyChainV165({ report }) {
   const steps = [
-    { key: "cash", label: "После оплат", value: report.cashResult },
+    { key: "cash", label: "После оплат поставщикам", value: report.cashResult },
     { key: "before", label: "До себестоимости", value: report.resultBeforeCost },
     { key: "final", label: "Чистая прибыль", value: report.operatingResult, final: true },
   ];
@@ -134,7 +134,7 @@ function bdMonthlyChainV165({ report }) {
     i.jsxs("details", { className: "bd-monthly-details-v165", children: [
       i.jsx("summary", { children: "Как считаются результаты" }),
       i.jsxs("div", { children: [
-        i.jsx("p", { children: "Денежный итог: выручка минус фактические оплаты поставщикам, ФОТ, списания, прочие расходы, налоги и коммунальные услуги." }),
+        i.jsx("p", { children: "Расчёт после оплат поставщикам: выручка минус оплаты поставщикам, начисленный ФОТ, списания, прочие расходы, налоги и коммунальные услуги. Это не остаток денег: выплаты зарплаты погашают долг и не уменьшают этот результат повторно." }),
         i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "До себестоимости: закупки запасов не вычитаются целиком; стоимость проданного берётся из сохранённых продаж." : "До себестоимости: закупки запасов не вычитаются целиком; их проданная часть определяется после остатков." }),
         i.jsx("p", { children: report.costBasis === "historical_sales_snapshots" ? "Чистая прибыль: выручка минус сохранённая себестоимость продаж, ФОТ, списания, прочие расходы, налоги и коммунальные услуги; недостачи уменьшают результат, излишки увеличивают." : "Чистая прибыль: результат после себестоимости проданного, ФОТ, списаний, остальных расходов, налогов и коммунальных услуг." }),
       ] }),
@@ -294,7 +294,7 @@ function bdMonthlyReadinessV165({ report, navigate }) {
   if (report.coveragePercent < 100) issues.push("не объяснены " + Math.max(0, report.expectedShifts - report.accountedShifts) + " смен");
   if (!report.periodPast) issues.push("месяц ещё не завершён");
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-readiness-v165", children: [
-    i.jsx(bdMonthlySectionHeaderV165, { title: "Готовность отчёта", caption: "Что мешает финальному закрытию" }),
+    i.jsx(bdMonthlySectionHeaderV165, { title: "Полнота данных смен", caption: "Процент относится только к сменам. Условия закрытия месяца — ниже." }),
     i.jsxs("div", { className: "bd-monthly-readiness-score-v165", children: [
       i.jsx("strong", { children: report.coveragePercent + "%" }),
       i.jsx("div", { children: i.jsx("i", { style: { width: Math.max(0, Math.min(100, report.coveragePercent)) + "%" } }) }),
