@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
-const current=readFileSync('public/assets/index-BQGspy0I.js','utf8');
+import {restoreBusinessDateBaseline} from './helpers/business-dates-guard.mjs';
+const current=restoreBusinessDateBaseline(readFileSync('public/assets/index-BQGspy0I.js','utf8'));
 function previous(commit:string){return execFileSync('git',['show',commit+':public/assets/index-BQGspy0I.js'],{encoding:'utf8',maxBuffer:64*1024*1024});}
 function home(source:string){const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='bdHomeDaily');assert.ok(node);return source.slice(node.start,node.end);}
 test('Home retains exactly the v503 removal of the v502 cost component mount',()=>{

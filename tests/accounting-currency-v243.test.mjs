@@ -141,7 +141,7 @@ test("empty venues do not claim completed setup or 100 percent readiness", async
   assert.match(bundle, /" шаг остался"/);
   assert.match(bundle, /" шага осталось"/);
   assert.match(bundle, /Пока нет прошедших смен для оценки готовности/);
-  assert.match(bundle, /Готовность данных пока не рассчитывается/);
+  assert.match(bundle, /Полнота данных смен пока не рассчитывается/);
 });
 
 test("assortment detail also translates canonical base units", async () => {

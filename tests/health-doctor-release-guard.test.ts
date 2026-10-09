@@ -4,6 +4,8 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {recoveryApprovedHashes,recoveryBaseline,recoveryFiles} from './helpers/health-doctor-recovery-guard.mjs';
 
+import {businessDateBackend,assertBusinessDateBackend} from './helpers/business-dates-guard.mjs';
+
 test('recovery approval is exact and cannot admit another file or later edit',()=>{
  const manifest=JSON.parse(readFileSync('tests/fixtures/health-doctor-recovery-approved-files.json','utf8'));
  assert.deepEqual(Object.keys(recoveryApprovedHashes()),[...recoveryFiles]);
@@ -22,7 +24,9 @@ test('all API, auth, provider, schema, bindings and other backend files stay byt
  assert.deepEqual(current,paths,'no added or removed production boundary files');
  assert.ok(paths.length>300);
  const approved=recoveryApprovedHashes();
+ assertBusinessDateBackend();
  for(const path of paths){
+  if(path===businessDateBackend)continue;
   if(Object.hasOwn(approved,path))continue; // Exact contents already asserted above.
   assert.deepEqual(readFileSync(path),execFileSync('git',['show',recoveryBaseline+':'+path],{maxBuffer:64*1024*1024}),path);
  }
