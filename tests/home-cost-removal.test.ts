@@ -19,3 +19,8 @@ test('owner QA fixes change only five writeoff/equipment functions and the recor
  }assert.equal(count,6);return source;}
  assert.equal(outside(current),outside(previous('fa836b711941c39984c40a40e3b9b45e88265014')));
 });
+
+test('recorded payroll adapter stays byte-identical to the verified owner-QA implementation',()=>{
+ function adapter(source:string){const nodes=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(node=>node.type==='ExpressionStatement'&&node.expression.type==='AssignmentExpression'&&node.expression.left.type==='Identifier'&&node.expression.left.name==='bdPayrollMonthAudits');assert.equal(nodes.length,1);return source.slice(nodes[0].start,nodes[0].end);}
+ assert.equal(adapter(current),adapter(previous('27a223e7db9988d6cee394b73ac07bb9442067c7')));
+});

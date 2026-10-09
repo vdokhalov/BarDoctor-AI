@@ -1,0 +1,26 @@
+{
+  "baseline": "fa836b711941c39984c40a40e3b9b45e88265014",
+  "implementation": "27a223e7db9988d6cee394b73ac07bb9442067c7",
+  "functions": {
+    "bdWriteoffDefaultUnitV271": {
+      "before": "eb753313287a22198f9edc91391a58b1336a9bc2dab77822ab85437b0bc3c4b6",
+      "after": "4180666e072c8eaf460ad63bb304fb3c780d88fb640f1ef56c656a87efbb1979"
+    },
+    "bdWriteoffDisplayQuantityV271": {
+      "before": "4407dc66870e2d42664bd381a242924d7f2f025db033b3c3d9e3085155d3c111",
+      "after": "9948505aaa5cb3d54397fc85135ecb5018fab1d1995244e532706b6abc587d40"
+    },
+    "bdWriteoffBaseV271": {
+      "before": "1dfa7de5200092a533b015d8b20039e40b14d25b4c212864099a5415ad5539b4",
+      "after": "29ca7a4d10650cf12f8e5a47a668464af1184c3e17d044c648cf0fe85713171c"
+    },
+    "bdWriteoffLineV271": {
+      "before": "625549ca49f5301466e6a00bfcb0eb0293863df2e6e21b0bb32f5fe750f44b85",
+      "after": "2c1f65f66d3b4321c5b6adbc15e3f6a7fe17ada1c98307cf6d938fafff2f722a"
+    },
+    "bdEquipmentWorkOrderEditorV167": {
+      "before": "460885b90f71b49684325edde23a06f9d71d0803f73a24cdcd6494f9d53405cd",
+      "after": "77dbbfc66136d0c44e19278832110ade1df8d364ffc6e14d60f789380e017352"
+    }
+  }
+}

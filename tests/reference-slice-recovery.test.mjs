@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {parse} from 'acorn';
 import {repairPayrollMonthInitializers} from '../scripts/lib/payroll-month-initializers.mjs';
 import {recoveryApprovedHashes} from './helpers/health-doctor-recovery-guard.mjs';
+import {ownerQaApprovedHashes} from './helpers/owner-qa-guard.mjs';
 
 const fixture='tests/fixtures/reference-slice-recovery/';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -31,8 +32,9 @@ test('all unrelated v489 functions survive the owner-selected v485 presentation 
   const expected=JSON.parse(readFileSync(fixture+'v489-function-hashes.json','utf8'));
   const returned=new Set(['bdHomeDaily','c_e','Uce','nt','bdHomeHealthIndexV200','t_e','Vse','zse','pt','bdBootstrapRecoveryV274']);
   const removed=new Set(['bdCuratedDoctorPhase4c','bdCuratedHealthSuggestionPhase4c','bdCuratedReturnPhase4c','bdManagementHomePhase4','bdManagementQueuePhase4b']);
+  const approved=ownerQaApprovedHashes();
   for(const name of removed)assert.ok(!actual.has(name));
-  for(const [name,hash] of Object.entries(expected))if(!returned.has(name)&&!removed.has(name))assert.equal(actual.get(name),hash,name);
+  for(const [name,hash] of Object.entries(expected))if(!returned.has(name)&&!removed.has(name))assert.equal(actual.get(name),approved[name]??hash,name);
 });
 
 test('baseline inventory includes all source-discovered modules, entries and conditional navigation',()=>{
