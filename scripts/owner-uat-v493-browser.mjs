@@ -45,11 +45,18 @@ try{for(const width of [390,820,1280]){
    if(key==='team'){await page.locator('[data-bd-team-module="v163"]').waitFor();assert.equal(await page.getByText('Не удалось восстановить доступ',{exact:true}).count(),0);}
   }
   // Deliberately stall only the isolated transport; production is never called.
+  // v503 retains cost management on Health; its error and retry controls differ from Home.
   await page.route('**/api/management/cost-signals/evaluate',()=>undefined);
-  await page.goto(runtime.base+'/home');await page.locator('[data-cost-surface="home"][data-cost-state="ERROR"]').waitFor({timeout:20000});
-  assert.match(await page.locator('[data-cost-surface="home"]').innerText(),/недоступна|не ответил вовремя/);
-  await page.unroute('**/api/management/cost-signals/evaluate');await page.getByRole('button',{name:'Повторить проверку',exact:true}).click();
-  await page.waitForFunction(()=>{const el=document.querySelector('[data-cost-surface="home"]');return el&&!['LOADING','ERROR'].includes(el.getAttribute('data-cost-state'));});
+  await page.goto(runtime.base+'/health');
+  const cost=page.locator('[data-cost-surface="health"]');
+  await cost.getByRole('alert').waitFor({timeout:20000});
+  assert.match(await cost.getByRole('alert').innerText(),/недоступна|не ответил вовремя/);
+  await page.unroute('**/api/management/cost-signals/evaluate');
+  const costRecovered=page.waitForResponse(response=>response.url().includes('/api/management/cost-signals/evaluate')&&response.request().method()==='POST');
+  await cost.getByRole('button',{name:'Обновить',exact:true}).click();
+  const costResponse=await costRecovered;assert.equal(costResponse.status(),200);assert.equal((await costResponse.json()).ok,true);
+  await cost.getByRole('status').waitFor({state:'hidden'});
+  assert.equal(await cost.getByRole('alert').count(),0);
   await settle();assert.deepEqual(errors,[]);assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[]);
   assert.equal(await page.locator('[data-curated-question]').count(),0);
   const result={engine,width,status:'PASS',environment:'isolated SQLite / actual handlers',production:false,health:{score:snapshot.score,currentSnapshot:true,readOnly:true,ring:true,zones:true},doctor:{homeEntry:true,healthEntry:true,moreEntry:true,actualDiagnosis200:true,controlled503Retry:true,cachedReload:true},cost:{stalledRequestError:true,retryRecovery:true},coreRoutes:routes.length,jsErrors:0,serverErrors:0};results.push(result);console.log(JSON.stringify(result));
