@@ -8,7 +8,7 @@ const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const out='outputs/health-doctor-recovery/browser-'+engine;mkdirSync(out,{recursive:true});
 // Explicit missing-provider QA, never substitute a successful provider response.
 for(const key of ['OPENAI_API_KEY','ANTHROPIC_API_KEY','AI_INTEGRATIONS_ANTHROPIC_API_KEY'])assert.equal(Boolean(process.env[key]),false,'Missing-provider test requires no ambient AI credential');
-const browser=engine==='webkit'?await webkit.launch({headless:true}):await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});
+const browser=engine==='webkit'?await webkit.launch({headless:true,...(process.env.BD_WEBKIT_EXECUTABLE?{executablePath:process.env.BD_WEBKIT_EXECUTABLE}:{})}):await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});
 const results=[];
 try{for(const width of [390,820,1280]){
  const r=await recoveryRuntime(),context=await browser.newContext({viewport:{width,height:900},isMobile:width===390,hasTouch:width===390});

@@ -11,7 +11,7 @@
     "lib/bardoctor/tech-card-ingredient-matching.ts": "a813d8c7e5f5145c33aea4178ec743a359a36e8c858d092290c8bdd8492f781b",
     "lib/bardoctor/tech-card-reconciliation.ts": "bda82e5aa4a7900381cca7c77df96a994937f5dfb55c8788f35a5aa2d8b32c56",
     "lib/bardoctor/venue-ai-context.ts": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a",
-    "scripts/health-doctor-recovery-browser.mjs": "1783de981c045999e83170baea2c2f4fe34b0ad8517d212c5d26bda76ca190a6",
+    "scripts/health-doctor-recovery-browser.mjs": "095d60e66229cfbc23408960e0b0162b792571d200f2e13a4db855e372fd1747",
     "scripts/health-doctor-recovery-cpu.mjs": "c5802115e924d6e9a7aad4e72a2ca369494180e671f1a69108bbb1adb74269be",
     "tests/health-doctor-recovery.test.ts": "a370724a9fa0f43415bb1a3ac7c0c6d43e2ef2e35d6c36f7382d8228194c6e31"
   },
@@ -90,12 +90,53 @@
       }
     ],
     "webkit": {
-      "status": "BLOCKED",
-      "reason": "Workspace browser installed; host libraries missing; install-deps su authentication failed"
+      "status": "PASS",
+      "method": "Official Playwright WebKit 2248 native binary, ordinary executablePath/env launch; Debian packages verified against authenticated Release and extracted to workspace",
+      "results": [
+        {
+          "engine": "webkit",
+          "width": 390,
+          "status": "PASS",
+          "actualHandlers": true,
+          "isolated": true,
+          "healthScore": true,
+          "healthReload": true,
+          "diagnosisFallback": true,
+          "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+          "doctorReload": true
+        },
+        {
+          "engine": "webkit",
+          "width": 820,
+          "status": "PASS",
+          "actualHandlers": true,
+          "isolated": true,
+          "healthScore": true,
+          "healthReload": true,
+          "diagnosisFallback": true,
+          "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+          "doctorReload": true
+        },
+        {
+          "engine": "webkit",
+          "width": 1280,
+          "status": "PASS",
+          "actualHandlers": true,
+          "isolated": true,
+          "healthScore": true,
+          "healthReload": true,
+          "diagnosisFallback": true,
+          "providerLive": "BLOCKED_NO_NEW_QA_KEY",
+          "doctorReload": true
+        }
+      ],
+      "osModified": false,
+      "rootUsed": false,
+      "securitySettingsChanged": false
     },
     "liveOpenAI": {
       "status": "BLOCKED",
-      "reason": "New QA key not created; supported Codex confirmation/local-write flow unavailable"
+      "reason": "Text-only fallback is permitted; official prepare/decrypt helper is absent, destination/default target/API spend confirmations still pending"
     },
     "productionOwnerIPhone": "NOT_RUN",
     "publication": "NOT_AUTHORIZED_NOT_ATTEMPTED"
@@ -345,7 +386,21 @@
     "productionSecretRead": false,
     "productionSecretInheritance": "NOT_SUPPORTED_BY_DISCOVERED_LOCAL_CONFIG",
     "liveRequestMade": false,
-    "secureCodexSetupRoute": "UNAVAILABLE",
+    "secureCodexSetupRoute": "DOCUMENTED_TEXT_FALLBACK_PERMITTED_BUT_OFFICIAL_HELPER_ABSENT",
     "encryptedCreationPrimitive": "AVAILABLE_BUT_NOT_CALLED_WITHOUT_COMPLETE_TRUSTED_SETUP"
+  },
+  "followupCredentialSetup": {
+    "decision": "new QA key already selected",
+    "suggestedName": "BarDoctor QA Health-Doctor 2026-10-09",
+    "target": "/workspace/BarDoctor-AI/.env.local",
+    "envVar": "OPENAI_API_KEY",
+    "ignored": true,
+    "exists": false,
+    "symlink": false,
+    "project": "connector default; explicit organization/project names and IDs not confirmed",
+    "helperFound": false,
+    "keyCreated": false,
+    "secretWritten": false,
+    "liveAIRequestMade": false
   }
 }
