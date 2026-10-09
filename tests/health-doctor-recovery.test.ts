@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {lifecycleRuntime} from './helpers/lifecycle-runtime';
-import {createIngredientReconciliationMemo} from '../lib/bardoctor/tech-card-reconciliation';
+import {createIngredientReconciliationMemo,reconcileTechCards} from '../lib/bardoctor/tech-card-reconciliation';
 import {buildAssortmentAnalytics} from '../lib/bardoctor/assortment-analytics';
 import {createCurrentCostReader} from '../lib/bardoctor/management-cost-observation';
 import {createIngredientReferenceResolver,canonicalIngredientReference} from '../lib/bardoctor/ingredient-reference';
@@ -34,7 +34,28 @@ test('request indexes preserve exact baseline analytics and certified costs acro
    assert.deepEqual(await read(item.id),expected,'memo results cannot be mutated by callers');
   }
   assert.equal(JSON.stringify(input),untouched,'projection never mutates sources');
+  const changedSnapshots=snapshots.map(snapshot=>snapshot.key==='bd_stock_movements'
+   ? {...snapshot,updatedAt:'2026-10-08T12:01:00Z',dataJson:JSON.stringify(movements.map(movement=>({...movement,costAmount:movement.costAmount*2})))}
+   : snapshot);
+  const freshInput={...costInput,snapshots:changedSnapshots};
+  const fresh=createCurrentCostReader(freshInput);
+  assert.deepEqual(await fresh('m0'),await oldCost.observeCurrentCost({...freshInput,menuItemId:'m0'}),'fresh reader sees changed sources '+sample);
  }}finally{r.close();}
+});
+test('shared reconciliation memo invalidates for venue, candidates and aliases',()=>{
+ const memo=createIngredientReconciliationMemo();
+ const source={menuItems:[{id:'m',name:'Menu',venueId:1}],recipes:[{id:'r',ownerId:'m',menuItemId:'m',ownerType:'menu_item',venueId:1,status:'draft',ingredients:[{id:'i',name:'Tea',quantity:1,unit:'pcs',purchaseProductKey:'legacy'}]}],nomenclature:[{id:'n',name:'Tea',productKey:'p',unit:'pcs',active:true,venueId:1}],canonicalProductAliases:[{from:'legacy',to:'p'}]};
+ const variants=[
+  {assortment:source,venueId:1},
+  {assortment:source,venueId:2},
+  {assortment:{...source,nomenclature:[{...source.nomenclature[0],productKey:'other',unit:'kg'}]},venueId:1},
+  {assortment:{...source,canonicalProductAliases:[{from:'legacy',to:'other'}]},venueId:1},
+  {assortment:source,venueId:1},
+ ];
+ for(const variant of variants){
+  const input={...variant,now:new Date('2026-10-08T12:00:00Z')};
+  assert.deepEqual(reconcileTechCards(input,memo),reconcileTechCards(input),'memo must equal a fresh computation after scope/source changes');
+ }
 });
 test('alias cycles preserve starting identity and fresh readers see mutations',()=>{
  const source={nomenclature:[{id:'n',productKey:'p'}],canonicalProductAliases:[{from:'a',to:'b'},{from:'b',to:'a'}]};

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
+import {recoveryApprovedHashes,recoveryDigest} from './helpers/health-doctor-recovery-guard.mjs';
 
 const baseline='dcc0541780db52d8c02b0c3a74f3ea0d31cbce24';
 const production='7d4eeb44ea9ac0419d55881e846268bc31da57ee';
@@ -29,7 +30,11 @@ test('production APIs, schema, auth and unrelated modules stay identical outside
  'lib/bardoctor/request-observability.ts','lib/bardoctor/canonical-health-inputs.ts',
  'app/api/business-health/route.ts','lib/bardoctor/health-operations-inputs.ts']);
  assert.ok(files.length>300);
- for(const path of files.filter(p=>!ui.has(p)))assert.deepEqual(readFileSync(path),before(path),path);
+ const recovery=recoveryApprovedHashes();
+ for(const path of files.filter(p=>!ui.has(p))){
+  if(Object.hasOwn(recovery,path))assert.equal(recoveryDigest(readFileSync(path)),recovery[path],path);
+  else assert.deepEqual(readFileSync(path),before(path),path);
+ }
 });
 
 test('release preparation cannot reinstall the rejected design or lose Payroll and performance fixes',()=>{

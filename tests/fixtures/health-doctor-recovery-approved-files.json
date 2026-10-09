@@ -1,0 +1,41 @@
+{
+  "baseline": "ad0378431dfea73ded6e67c176dbfcae7ddf4f42",
+  "files": {
+    "lib/bardoctor/assortment-analytics.ts": {
+      "before": "68a72ed2cd1c35836f129f2ec0a81e37aa68d5eea3ed0397dc190e9d8b34937b",
+      "after": "a9d325a1fba87e0f000429dc8202ce732eba1975b27f93c2f65dce584b028ad6"
+    },
+    "lib/bardoctor/canonical-health-inputs.ts": {
+      "before": "5530991126f862efb544906b6278f7f51eb04a822bfd4bd353f364eddf04584e",
+      "after": "676314b7bc3cd9ba6d1a64f3aa04b61e0cbe7eacbd16d212f9c9173a277c77ac"
+    },
+    "lib/bardoctor/curated-doctor.ts": {
+      "before": "8a585fc8d3ce337406dd842ab0c13cbd8c5c5c27c18381d9af48e02b91eeb139",
+      "after": "cc28ed8e1723dcc9314dcfd91ce9b74e28e0b37182f111bb8da13f1268569bf4"
+    },
+    "lib/bardoctor/ingredient-reference.ts": {
+      "before": "5c98179eaf09716d6591f4a81cec7e0d9f2fd5af3eaf5dd96aad1fbbfd67f405",
+      "after": "768eb6990475570e37be66ffd4745de2dd821b13a5cca07eaef73e623615beb1"
+    },
+    "lib/bardoctor/management-cost-observation.ts": {
+      "before": "e944e342955f7e5f2ef162546161d2d596720bd82bd9c9b84cdce97b3d9c850d",
+      "after": "1fb16bffbf5800306285e24dd608da62050d45fd55318984f61b13070b4180a2"
+    },
+    "lib/bardoctor/nomenclature-identity.ts": {
+      "before": "3309b13ef8bf76d08069114a420c774956b2718357c5e4f637f19b00da95522e",
+      "after": "e07807162386593769f0dbd039ff5e9cdc917f2b6aa0b7a916a60882e37fe373"
+    },
+    "lib/bardoctor/tech-card-ingredient-matching.ts": {
+      "before": "14b78a0215201cc12acccfa37301851afe1b3309a85ca27edfd14fd4d7427a1b",
+      "after": "a813d8c7e5f5145c33aea4178ec743a359a36e8c858d092290c8bdd8492f781b"
+    },
+    "lib/bardoctor/tech-card-reconciliation.ts": {
+      "before": "a797a768c2ba81a0cb5493a8c763f74dedd194e7439b449974a5249c809f4a7c",
+      "after": "bda82e5aa4a7900381cca7c77df96a994937f5dfb55c8788f35a5aa2d8b32c56"
+    },
+    "lib/bardoctor/venue-ai-context.ts": {
+      "before": "2f7fe6dbbbc39621039f2cbf8b65a630debe706a8215b10bdc39053eedf30588",
+      "after": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a"
+    }
+  }
+}

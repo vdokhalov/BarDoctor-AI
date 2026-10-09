@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {parse} from 'acorn';
 import {repairPayrollMonthInitializers} from '../scripts/lib/payroll-month-initializers.mjs';
+import {recoveryApprovedHashes} from './helpers/health-doctor-recovery-guard.mjs';
 
 const fixture='tests/fixtures/reference-slice-recovery/';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -18,7 +19,8 @@ test('v489 protected files remain unchanged outside reviewed performance and own
   assert.deepEqual(Object.keys(performance).sort(),['lib/bardoctor/finance-inputs.ts','lib/bardoctor/operational-day.ts']);
   const rca=JSON.parse(readFileSync('tests/fixtures/v496-production-rca-approved-files.json','utf8'));
   assert.deepEqual(Object.keys(rca).sort(),['app/api/business-health/route.ts','lib/bardoctor/health-operations-inputs.ts','lib/bardoctor/request-observability.ts','package.json']);
-  for(const [path,hash] of Object.entries(expected))assert.equal(digest(readFileSync(path)),rca[path]??uat[path]??performance[path]??hash,path);
+  const recovery=recoveryApprovedHashes();
+  for(const [path,hash] of Object.entries(expected))assert.equal(digest(readFileSync(path)),recovery[path]??rca[path]??uat[path]??performance[path]??hash,path);
 });
 
 test('all unrelated v489 functions survive the owner-selected v485 presentation rollback',()=>{
