@@ -7,7 +7,7 @@ import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time"
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission, canManagePosPrivilegedAction, type PermissionKey } from "../../../lib/bardoctor/access-control";
-import { canReadManagementWorkday } from "../../../lib/bardoctor/management-workday";
+import { canReadManagementWorkday, workdayPersonnelView } from "../../../lib/bardoctor/management-workday";
 import { OPERATIONAL_REPORT_STORE_KEY } from "../../../lib/bardoctor/operational-day";
 import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
 import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
@@ -67,7 +67,7 @@ export async function GET(request:Request) {
     return navigation(reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
-      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : shift),
+      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : workdayPersonnelView(shift,canReadManagementWorkday(account))),
       events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(event => account.role === "cashier" ? posSalesEventView(event) : event),
       permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage"),managementDay:canReadManagementWorkday(account)} }));
   } catch(error) { return navigation(controlled(error)); }
@@ -122,6 +122,8 @@ async function command(request:Request):Promise<Response> {
         return reply({ok:true,shiftId:body.shiftId,duplicate:true,...(body.action==="close_shift" ? {report:readPosShiftReport(c,body.shiftId)} : {})});
       }
       if (body.action==="open_shift") {
+        const date=revenues.find(row=>row.id===body.shiftId&&row.venueId===c.venueId)?.date;
+        if(workdays.some(row=>row?.venueId===c.venueId&&row.date===date&&row.workdayStatus==="CLOSED"))return reply({ok:false,code:"WORKDAY_CLOSED",error:"Рабочий день за эту дату уже закрыт. Новую кассовую смену открыть нельзя."},409);
         if (body.openingFloat!==undefined) posDiscountCents(body.openingFloat);
         revenues=revenues.map(row=>row.id===body.shiftId ? {...row,openingFloat:body.openingFloat??null}:row);
       } else {

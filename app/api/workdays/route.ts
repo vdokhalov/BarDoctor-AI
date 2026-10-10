@@ -37,7 +37,7 @@ export async function GET(request:Request){
  const open=c.rows(keys[0]).find(r=>r.workdayStatus==="OPEN"),query=new URL(request.url).searchParams.get("date"),date=query||String(open?.date||defaultDate);
  if(!validDate(date))return reply({ok:false,code:"DATE_INVALID"},400);
  const report=c.rows(keys[0]).find(r=>r.date===date),rules=c.rows(keys[5]);
- return reply({ok:true,venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(report&&!report.workdayStatus),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
+ return reply({ok:true,venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
 }
 export async function POST(request:Request){return withStoreCasRetries(request,command);}
 async function command(request:Request):Promise<Response>{
@@ -54,7 +54,7 @@ async function command(request:Request):Promise<Response>{
  if(Number(previous?.workdayRevision||0)!==body.expectedRevision)return reply({ok:false,code:"WORKDAY_REVISION_CONFLICT",error:"Рабочая смена изменена. Обновите её перед сохранением."},409);
  if(body.action==="open"){
   if(body.startTime!==undefined&&(typeof body.startTime!=="string"||!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.startTime)))return reply({ok:false,code:"WORKDAY_START_TIME_INVALID"},422);
-  if(previous)return reply({ok:false,code:"WORKDAY_ALREADY_EXISTS",error:"Отчёт дня уже существует. Откройте его для просмотра."},409);
+  if(previous||projection(c,date).report)return reply({ok:false,code:"WORKDAY_ALREADY_EXISTS",error:"Отчёт дня уже существует. Откройте его для просмотра."},409);
   if(reports.some(r=>r.workdayStatus==="OPEN")||c.rows(keys[1]).some(r=>r.closingStatus==="open"&&r.date!==date))return reply({ok:false,code:"WORKDAY_ALREADY_OPEN",error:"Сначала завершите ранее открытую рабочую или кассовую смену."},409);
  }else if(previous?.workdayStatus!=="OPEN")return reply({ok:false,code:"WORKDAY_NOT_OPEN"},409);
  const staffing=body.action==="close"?previous?.staffing:body.staffing;
@@ -68,6 +68,7 @@ async function command(request:Request):Promise<Response>{
  const payroll=calculateWorkdayPayroll({date,staffing:normalized,employees,rules:c.rows(keys[5]),profile:c.profile,revenues:c.rows(keys[1]),gaps:c.rows(keys[6]),venueId:c.account.venueId,shiftVenueSales,shiftDepartmentSales,previous});
  if(body.action==="preview")return reply({ok:true,payroll});
  if(body.action==="close"){
+  if(day.revenue.consistency==="MISMATCH")return reply({ok:false,code:"WORKDAY_REVENUE_NEEDS_REVIEW",error:"Продажи и финансовая выручка расходятся. Проверьте данные перед закрытием рабочего дня."},409);
   if(day.cashShifts.some(s=>s.status==="OPEN"))return reply({ok:false,code:"WORKDAY_CASH_OPEN",error:"Сначала закройте все кассовые смены дня."},409);
   if(stableSalesValue(record(previous?.workdayPayrollDraft).payrollBreakdown)!==stableSalesValue(payroll.payrollBreakdown))return reply({ok:false,code:"WORKDAY_PAYROLL_CHANGED",error:"Расчёт ФОТ изменился. Вернитесь к команде, сохраните часы и проверьте новую сумму перед закрытием."},409);
   if(payroll.status!=="COMPLETE")return reply({ok:false,code:"WORKDAY_PAYROLL_INCOMPLETE",error:"Заполните недостающие данные ФОТ.",payroll},422);

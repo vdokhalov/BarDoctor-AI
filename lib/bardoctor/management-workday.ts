@@ -37,3 +37,20 @@ export function managementWorkday(day: ReturnType<typeof operationalDay>, employ
     missing: [...(!staffing.length ? ["Не указан состав команды"] : []), ...(day.payroll.amount == null ? ["ФОТ не сохранён"] : [])],
   };
 }
+
+
+/** Public projections must not disclose personnel through raw reports, legacy
+ * revenue rows or nested snapshots when the same management boundary is denied.
+ * Internal accounting planners continue to receive the original records. */
+const personnelFields=new Set(["staffing","payrollBreakdown","workdayPayrollDraft","workdaySummary","shiftDepartmentSales","shiftVenueSales","management","workdayOpenedBy","workdayClosedBy"]);
+export function workdayPersonnelView<T>(value:T,allowed:boolean):T {
+  if(allowed||value===null||typeof value!=="object")return value;
+  if(Array.isArray(value))return value.map(row=>workdayPersonnelView(row,false)) as T;
+  return Object.fromEntries(Object.entries(value).filter(([key])=>!personnelFields.has(key)).map(([key,item])=>[key,key==="payroll"&&item&&typeof item==="object"&&"amount" in item?{amount:null,basis:"RESTRICTED"}:workdayPersonnelView(item,false)])) as T;
+}
+
+/** A redacted read must never turn a subsequent write into personnel deletion. */
+export function workdayPersonnelChanged(before:unknown,after:unknown) {
+ const a=record(before),b=record(after);
+ return [...personnelFields].some(key=>JSON.stringify(a[key])!==JSON.stringify(b[key]));
+}

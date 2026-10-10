@@ -1,3 +1,4 @@
+import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -145,19 +146,20 @@ async function postOnce(request: Request): Promise<Response> {
       : 422;
     return Response.json(result, { status });
   }
+  if(!canReadManagementWorkday(account)&&[...compareStoreData(stores.revenues,result.revenues),...compareStoreData(stores.reports,result.reports)].some(m=>workdayPersonnelChanged(m.before,m.after)))return Response.json({ok:false,code:"WORKDAY_PERSONNEL_PROTECTED",error:"Нет доступа к изменению команды или ФОТ. Кадровые данные сохранены без изменений."},{status:403});
   if (result.idempotent) {
     return Response.json({
       ok: true,
       idempotent: true,
       shiftId: result.shiftId,
-      revenueRecord: result.revenueRecord,
+      revenueRecord: workdayPersonnelView(result.revenueRecord, canReadManagementWorkday(account)),
       writeOffDocuments: result.writeOffDocuments,
       writeOffs: result.writeOffs,
       assortment: result.assortment,
       stockMovements: result.stockMovements,
       expenses: result.expenses,
       stockChanged: false,
-      sections: result.sections, operationalReport: result.operationalReport, reports: result.reports, incidents: result.incidents, revenues: result.revenues,
+      sections: result.sections, operationalReport: workdayPersonnelView(result.operationalReport, canReadManagementWorkday(account)), reports: workdayPersonnelView(result.reports, canReadManagementWorkday(account)), incidents: result.incidents, revenues: workdayPersonnelView(result.revenues, canReadManagementWorkday(account)),
     });
   }
   const lockedMutation = firstClosedMutation([
@@ -211,7 +213,7 @@ async function postOnce(request: Request): Promise<Response> {
     ok: true,
     idempotent: false,
     shiftId: result.shiftId,
-    revenueRecord: result.revenueRecord,
+    revenueRecord: workdayPersonnelView(result.revenueRecord, canReadManagementWorkday(account)),
     writeOffDocuments: result.writeOffDocuments,
     writeOffs: result.writeOffs,
     assortment: result.assortment,
@@ -219,7 +221,7 @@ async function postOnce(request: Request): Promise<Response> {
     expenses: result.expenses,
     warnings: result.warnings,
     stockChanged: result.writeOffDocuments.length > 0,
-    sections: result.sections, operationalReport: result.operationalReport, reports: result.reports, incidents: result.incidents, revenues: result.revenues,
+    sections: result.sections, operationalReport: workdayPersonnelView(result.operationalReport, canReadManagementWorkday(account)), reports: workdayPersonnelView(result.reports, canReadManagementWorkday(account)), incidents: result.incidents, revenues: workdayPersonnelView(result.revenues, canReadManagementWorkday(account)),
   }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
 }
 

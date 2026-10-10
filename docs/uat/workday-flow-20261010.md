@@ -22,3 +22,14 @@ Validation on isolated local data:
 No new whole-application CI was requested or dispatched. Browser checks use desktop Chromium mobile emulation, not hardware iPhone. No real venue data, paid AI, or monetary operations were used.
 
 Known product boundaries remain: no paid refunds, mixed tender, fiscal integration, kitchen/printer integration, or physical-device assurance. UI labels distinguish provisional daily payroll from recorded payroll and never replace missing inputs with zero. Cash-session snapshots remain separate from the current daily report.
+
+## Independent review corrections
+
+Four findings on efd7762b are fixed in the follow-up commit:
+
+- `team.view` denial now removes staffing, hours, payroll breakdown/draft and nested personnel snapshots from operational-day reports and legacy revenue rows. The same boundary applies to raw/bulk revenue reads, cashier shift-row reads, and both new/replayed operations-save responses. A subsequent redacted write cannot delete the hidden personnel fields; it is rejected without mutation.
+- A guided-v17 legacy report stored in `bd_finance_revenue` is recognized by GET and prevents opening an overlapping working day. Its recorded payroll remains 70 in the regression fixture.
+- A new cash shift cannot be opened on the date of an explicitly CLOSED workday. Existing cash operation replay remains idempotent.
+- Workday close rejects revenue/fact MISMATCH before recording CLOSED, with no report or audit write.
+
+Validation: 40 related handler/domain tests passed, including four new real HTTP/isolated D1 regressions; 11 access-control/data-trust tests passed; typecheck and changed-file lint passed. No full CI or publication was run. The previously built UI is unchanged; the follow-up server changes must be included in the final release artifact after review.

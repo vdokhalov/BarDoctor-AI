@@ -1,3 +1,4 @@
+import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
 import { canReadSavedDiagnosis, restrictedVenueContext } from "../../../../lib/bardoctor/venue-context-access";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
@@ -106,7 +107,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   const data = row ? JSON.parse(row.dataJson) : null;
   return Response.json({
     ok: true,
-    data,
+    data: key === "bd_finance_revenue" ? workdayPersonnelView(data,canReadManagementWorkday(account)) : data,
     updatedAt: row?.updatedAt ?? null,
     source: row ? "server_d1" : "missing",
     authoritative: Boolean(row),
@@ -404,6 +405,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     { status: monthKey ? 423 : 409 });
   }
   const mutations = compareStoreData(auditBefore, auditAfter);
+  if(key==="bd_finance_revenue"&&!canReadManagementWorkday(account)&&mutations.some(m=>workdayPersonnelChanged(m.before,m.after)))return Response.json({ok:false,code:"WORKDAY_PERSONNEL_PROTECTED",error:"Нет доступа к изменению команды или ФОТ. Кадровые данные сохранены без изменений."},{status:403});
   if (/^bd_ai_diagnosis_v[3-9]$/.test(key) && !canReadSavedDiagnosis(account)) return restrictedVenueContext();
   if ((key === EXPENSE_STORE_KEY || key === "bd_equipment_work_orders") && mutations.some(mutation =>
     [mutation.before, mutation.after].some(value => {
@@ -612,7 +614,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     updatedAt,
     auditedChanges: mutations.length,
     mergedConflicts: merge.conflicts,
-    data: after,
+    data: key === "bd_finance_revenue" ? workdayPersonnelView(after,canReadManagementWorkday(account)) : after,
     techCardReconciliation,
     consumptionReview: key === ASSORTMENT_STORE_KEY
       ? legacyConsumptionConflicts(after, account.venueId)
