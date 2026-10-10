@@ -130,7 +130,7 @@ export type SalesBatch = {
   sourceReference?: string;
   externalBatchId?: string;
   status: SalesBatchStatus;
-  createdBy: { accountId: number; name: string; role: string };
+  createdBy: { accountId: number; name: string; role: string; jobTitle?: string };
   createdAt: string;
   updatedAt: string;
   postedAt?: string;

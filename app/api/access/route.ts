@@ -27,6 +27,7 @@ import {
   unauthorized,
 } from "../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
+import { STAFF_JOB_LABELS, STAFF_JOB_TITLES, staffJobTitle, validStaffJobTitle } from "../../../lib/bardoctor/staff-job-title";
 
 function restaurantName(value: string | null): string {
   if (!value) return "Новое заведение";
@@ -74,6 +75,7 @@ export async function GET(request: Request): Promise<Response> {
       .select({
         id: venueInvites.id,
         role: venueInvites.role,
+        jobTitle: venueInvites.jobTitle,
         permissionsJson: venueInvites.permissionsJson,
         expiresAt: venueInvites.expiresAt,
         createdAt: venueInvites.createdAt,
@@ -102,12 +104,13 @@ export async function GET(request: Request): Promise<Response> {
     current: {
       membershipId: actor.membershipId,
       role: actor.role,
+      jobTitle: actor.jobTitle ?? null,
       permissions: actor.permissions,
     },
     canManageAccess,
     canEditPermissions: actor.role === "owner",
     members: members.map(({ membership, account }) => {
-      const role = isAccessRole(membership.role) ? membership.role : "shift_manager";
+      const role = isAccessRole(membership.role) ? membership.role : null;
       return {
         id: membership.id,
         accountId: account.id,
@@ -115,22 +118,24 @@ export async function GET(request: Request): Promise<Response> {
         email: account.appEmail,
         phone: account.phone,
         role,
+        jobTitle: staffJobTitle(role, membership.jobTitle),
         status: membership.status,
         employeeId: membership.employeeId,
         joinedAt: membership.joinedAt,
-        permissions: permissionsFor(role, membership.permissionsJson),
+        permissions: role ? permissionsFor(role, membership.permissionsJson) : [],
         overrides: parsePermissionOverrides(membership.permissionsJson),
         isCurrent: membership.id === actor.membershipId,
       };
     }),
     invites: activeInvites.map((invite) => {
-      const role = isAccessRole(invite.role) ? invite.role : "shift_manager";
+      const role = isAccessRole(invite.role) ? invite.role : null;
       return {
         id: invite.id,
         role,
+        jobTitle: staffJobTitle(role, invite.jobTitle),
         expiresAt: invite.expiresAt,
         createdAt: invite.createdAt,
-        permissions: permissionsFor(role, invite.permissionsJson),
+        permissions: role ? permissionsFor(role, invite.permissionsJson) : [],
       };
     }),
     myVenues: myVenues.map((item) => ({
@@ -138,6 +143,7 @@ export async function GET(request: Request): Promise<Response> {
       workspaceId: item.venue.workspaceId,
       name: restaurantName(item.dataAccount.restaurantJson),
       role: item.role,
+      jobTitle: item.jobTitle,
       permissions: item.permissions,
       status: item.venue.status,
       isPrimary: item.venue.dataAccountId === identity.id,
@@ -149,6 +155,7 @@ export async function GET(request: Request): Promise<Response> {
       permissions: defaultPermissionsFor(role),
     })),
     permissionDefinitions: PERMISSION_DEFINITIONS,
+    staffJobTitles: STAFF_JOB_TITLES.map(jobTitle => ({ jobTitle, label: STAFF_JOB_LABELS[jobTitle], role: "cashier" })),
     inviteLifetimeHours: INVITE_LIFETIME_HOURS,
   });
 }
@@ -162,7 +169,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 403 },
     );
   }
-  const parsed = await readJsonRequest<{ role?: unknown; permissions?: unknown }>(request, {
+  const parsed = await readJsonRequest<{ role?: unknown; jobTitle?: unknown; permissions?: unknown }>(request, {
     maxBytes: 128 * 1024,
   });
   if (!parsed.ok) return parsed.response;
@@ -170,9 +177,12 @@ export async function POST(request: Request): Promise<Response> {
   const role = body.role;
   if (!isAccessRole(role) || role === "owner") {
     return Response.json(
-      { ok: false, error: "Выберите роль «Управляющий» или «Менеджер»" },
+      { ok: false, error: "Выберите роль управляющего, администратора или сотрудника кассы" },
       { status: 400 },
     );
+  }
+  if (!validStaffJobTitle(role, body.jobTitle)) {
+    return Response.json({ ok: false, code: "STAFF_JOB_TITLE_INVALID", error: "Выберите должность сотрудника кассы" }, { status: 400 });
   }
   if (actor.role !== "owner" && role !== "shift_manager") {
     return Response.json(
@@ -184,14 +194,15 @@ export async function POST(request: Request): Promise<Response> {
   const created = await createVenueInvite({
     actor,
     role: role as AccessRole,
+    jobTitle: staffJobTitle(role, body.jobTitle),
     permissions: actor.role === "owner" ? body.permissions : undefined,
   });
   await logAccessChange({
     actor,
     action: "create",
     entityId: String(created.invite.id),
-    entityLabel: role === "manager" ? "Приглашение управляющего" : "Приглашение менеджера",
-    after: { role, expiresAt: created.invite.expiresAt },
+    entityLabel: role === "cashier" ? `Приглашение: ${STAFF_JOB_LABELS[staffJobTitle(role, body.jobTitle)!]}` : role === "manager" ? "Приглашение управляющего" : "Приглашение администратора",
+    after: { role, jobTitle: created.invite.jobTitle, expiresAt: created.invite.expiresAt },
     reason: "Создан одноразовый код приглашения",
   });
   const origin = new URL(request.url).origin;
@@ -201,6 +212,7 @@ export async function POST(request: Request): Promise<Response> {
       id: created.invite.id,
       code: created.code,
       role,
+      jobTitle: created.invite.jobTitle,
       expiresAt: created.invite.expiresAt,
       joinUrl: `${origin}/join?code=${encodeURIComponent(created.code)}`,
     },

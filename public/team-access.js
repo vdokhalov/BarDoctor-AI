@@ -1,11 +1,13 @@
 (function () {
   "use strict";
-  var ROLE_LABELS = { owner: "Владелец", manager: "Управляющий", shift_manager: "Администратор заведения", cashier: "Кассир" };
+  var ROLE_LABELS = { owner: "Владелец", manager: "Управляющий", shift_manager: "Администратор заведения", cashier: "Сотрудник кассы" };
+  var JOB_LABELS = { cashier: "Кассир", waiter: "Официант", barista: "Бариста", bartender: "Бармен" };
+  var ACCESS_CHOICES = ["manager", "shift_manager", "cashier", "waiter", "barista", "bartender"];
   var ROLE_DESCRIPTIONS = {
     owner: "Все данные, права, интеграции и критические настройки заведения.",
     manager: "Операционное управление. Владелец может точечно изменить доступ.",
     shift_manager: "Смены, склад, поручения, происшествия и оборудование.",
-    cashier: "Просмотр смен и проведение продаж в кассе без отмены проведённых операций."
+    cashier: "Работа только в кассе: заказы и свои чеки. Управление сменой и отмены доступны старшим."
   };
   var state = { access: null, selectedMember: null, lastInvite: null };
 
@@ -13,6 +15,9 @@
   function node(tag, className, text) { var item = document.createElement(tag); if (className) item.className = className; if (text != null) item.textContent = text; return item; }
   function clear(item) { while (item && item.firstChild) item.removeChild(item.firstChild); }
   function roleLabel(role) { return ROLE_LABELS[role] || role || "Без роли"; }
+  function choiceLabel(value) { return JOB_LABELS[value] || roleLabel(value); }
+  function memberLabel(member) { return member.role === "cashier" ? JOB_LABELS[member.jobTitle] || JOB_LABELS.cashier : roleLabel(member.role); }
+  function choicePayload(value) { return JOB_LABELS[value] ? { role: "cashier", jobTitle: value } : { role: value, jobTitle: null }; }
   function sessionHeaders(extra) {
     var headers = new Headers(extra || {});
     var email = localStorage.getItem("bd_session");
@@ -60,7 +65,7 @@
       card.appendChild(node("span", "", ROLE_DESCRIPTIONS[role]));
       root.appendChild(card);
     });
-    byId("current-role").textContent = roleLabel(state.access.current.role);
+    byId("current-role").textContent = memberLabel(state.access.current);
   }
 
   function renderInvites() {
@@ -71,7 +76,7 @@
     invites.forEach(function (invite) {
       var row = node("div", "compact-item");
       var copy = node("div");
-      copy.appendChild(node("strong", "", roleLabel(invite.role)));
+      copy.appendChild(node("strong", "", memberLabel(invite)));
       copy.appendChild(node("span", "", "Действует до " + dateTime(invite.expiresAt)));
       row.appendChild(copy);
       var revoke = node("button", "", "Отозвать");
@@ -104,22 +109,26 @@
       copy.appendChild(node("strong", "", member.name || member.email));
       copy.appendChild(node("span", "", (member.email || "") + (member.isCurrent ? " · это вы" : "")));
       head.appendChild(copy);
-      head.appendChild(node("span", "role-pill", member.status === "disabled" ? "Отключён" : roleLabel(member.role)));
+      head.appendChild(node("span", "role-pill", member.status === "disabled" ? "Отключён · " + memberLabel(member) : memberLabel(member)));
       row.appendChild(head);
       row.appendChild(node("p", "member-summary", member.role === "owner" ? "Полный доступ." : "Разрешено действий: " + String((member.permissions || []).length)));
       if (canManage(member)) {
         var actions = node("div", "member-actions");
         if (state.access.current.role === "owner") {
           var role = node("select");
-          ["manager", "shift_manager", "cashier"].forEach(function (value) {
-            var option = node("option", "", roleLabel(value));
+          role.setAttribute("aria-label", "Роль или должность: " + (member.name || member.email));
+          ACCESS_CHOICES.forEach(function (value) {
+            var option = node("option", "", choiceLabel(value));
             option.value = value;
             role.appendChild(option);
           });
-          role.value = member.role;
+          role.value = member.role === "cashier" ? member.jobTitle || "cashier" : member.role;
           role.disabled = member.status === "disabled";
           role.addEventListener("change", function () {
-            updateMember(member.id, { role: role.value, permissions: { allow: [], deny: [] } }, "Роль обновлена");
+            var changes = choicePayload(role.value);
+            // Changing a cashier job title never resets its existing permission restrictions.
+            if (changes.role !== member.role) changes.permissions = { allow: [], deny: [] };
+            updateMember(member.id, changes, "Роль и должность обновлены");
           });
           actions.appendChild(role);
           var permissions = node("button", "", "Настроить права");
@@ -146,8 +155,9 @@
     renderInvites();
     renderMembers();
     byId("invite-section").classList.toggle("hidden", !state.access.canManageAccess);
-    var manager = byId("invite-role").querySelector('option[value="manager"]');
-    if (manager) manager.disabled = state.access.current.role !== "owner";
+    Array.from(byId("invite-role").options).forEach(function (option) {
+      option.disabled = state.access.current.role !== "owner" && option.value !== "shift_manager";
+    });
     if (state.access.current.role !== "owner") byId("invite-role").value = "shift_manager";
   }
 
@@ -171,11 +181,11 @@
       var result = await api("/api/access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: byId("invite-role").value })
+        body: JSON.stringify(choicePayload(byId("invite-role").value))
       });
       state.lastInvite = result.invite;
       byId("invite-code").textContent = result.invite.code;
-      byId("invite-expiry").textContent = "Действует до " + dateTime(result.invite.expiresAt) + " и только для одного входа.";
+      byId("invite-expiry").textContent = memberLabel(result.invite) + ". Действует до " + dateTime(result.invite.expiresAt) + " и только для одного входа.";
       byId("invite-result").classList.remove("hidden");
       notice("Одноразовый код создан");
       await load();
@@ -210,7 +220,7 @@
       localStorage.setItem("bd_active_venue_id", String(result.activeVenueId));
       if (result.role) localStorage.setItem("bd_active_role", result.role);
       if (Array.isArray(result.permissions)) localStorage.setItem("bd_active_permissions", JSON.stringify(result.permissions));
-      window.location.assign("/employees?venue=" + encodeURIComponent(result.activeVenueId));
+      window.location.assign((result.role === "cashier" ? "/cashier" : "/employees") + "?venue=" + encodeURIComponent(result.activeVenueId));
     } catch (error) { notice(error.message, "error"); }
   }
 
@@ -261,7 +271,7 @@
   function openPermissions(member) {
     state.selectedMember = member;
     byId("permission-title").textContent = "Права: " + member.name;
-    byId("permission-subtitle").textContent = "Роль — " + roleLabel(member.role) + ". Изменения относятся только к текущему заведению.";
+    byId("permission-subtitle").textContent = memberLabel(member) + ". Изменения относятся только к текущему заведению.";
     renderPermissionChecks(member, false);
     byId("permission-sheet").classList.remove("hidden");
     document.body.classList.add("sheet-open");

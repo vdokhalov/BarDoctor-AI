@@ -1,3 +1,4 @@
+import { validatePosDiscountSnapshot, allocatePosDiscount, posDiscountCents, type PosDiscountSnapshot } from "./pos-discounts";
 import { canonicalVenueTimezone, venueDate, venueClock } from "./venue-time";
 import { createOrUpdateSalesBatch, postSalesBatch, reverseSalesBatch, SALES_SOURCES, type SalesBatch, type SalesSource } from "./sales-consumption";
 import type { StockMovement } from "./inventory";
@@ -13,7 +14,9 @@ export type SalesEvent = {
   status: "POSTED" | "REVERSED"; acceptedAt: string; reversedAt?: string; businessDate: string;
   shiftId?: string; revenueRowId: string; currency: string; revenue: number;
   actor?: SalesBatch["createdBy"]; comment?: string; payments?: PosPayment[];
-  prices: { lineId: string; menuItemId: string; name: string; quantity: number; unitPrice: number; total: number }[];
+  orderId?: string; orderActor?: SalesBatch["createdBy"]; tableNumber?: string;
+  grossAmount?: number; discountAmount?: number; netAmount?: number; discount?: PosDiscountSnapshot;
+  prices: { lineId: string; menuItemId: string; name: string; quantity: number; unitPrice: number; total: number; grossTotal?: number; discountAmount?: number }[];
   batch: SalesBatch; originalMovements: StockMovement[];
 };
 export type SalesEventContext = {
@@ -64,10 +67,13 @@ function project(c: SalesEventContext, events: SalesEvent[], rowId: string, date
     createdAt: matching[0]?.createdAt ?? c.now, updatedAt: c.now };
   return [...c.revenues.filter(r => !(r.id === rowId && r.venueId === c.venueId)), row];
 }
-export async function planSalesEvent(c: SalesEventContext, command: SalesEventCommand) {
+export async function planSalesEvent(c: SalesEventContext, command: SalesEventCommand, pricing?: { discount?: PosDiscountSnapshot }) {
   if (!command || !id(command.id) || !SALES_SOURCES.includes(command.source) || command.occurredAt != null
     || command.shiftId !== undefined && !id(command.shiftId)) fail("LIVE_COMMAND_REQUIRED");
   const isPos = command.source === "POS_API";
+  // Discounts enter only through a server-authorized, persisted order snapshot, never command JSON.
+  if (["discount", "discountAmount", "grossAmount", "netAmount", "grossRevenue"].some(key => Object.hasOwn(command, key))) fail("DISCOUNT_FIELDS_FORBIDDEN");
+  if (pricing?.discount && !isPos) fail("DISCOUNT_FIELDS_FORBIDDEN");
   if (!isPos && (command.payments !== undefined || command.comment !== undefined)) fail("POS_FIELDS_FORBIDDEN");
   if (isPos && (!id(command.shiftId) || !Array.isArray(command.payments) || command.payments.length !== 1
     || command.payments.some(p => !p || !id(p.id) || !["CASH","CARD_EXTERNAL"].includes(p.method)
@@ -79,6 +85,7 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   if (isPos && command.lines.some(l => !Number.isSafeInteger(l.quantity) || l.quantity > 999)) fail("POS_QUANTITY_INVALID");
   const normalized = { id: command.id, source: command.source, shiftId: command.shiftId,
     ...(isPos ? { payments:command.payments,comment:command.comment ?? "" } : {}),
+    ...(pricing?.discount ? { discount: pricing.discount } : {}),
     lines: command.lines.map(l => ({ id:l.id, menuItemId:l.menuItemId, quantity:l.quantity })) };
   const fingerprint = await digest(normalized);
   const eventId = "sales-event:" + await digest([c.venueId,command.source,command.id]);
@@ -98,16 +105,28 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   revenueCheck(c,date);
   const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems as Row[] : [];
   if (menu.some(m => !m || typeof m !== "object" || Array.isArray(m))) fail("MENU_NEEDS_REVIEW");
-  const prices = command.lines.map(line => {
+  const grossPrices = command.lines.map(line => {
     const found = menu.filter(m => m.id === line.menuItemId && scoped(m,c.venueId) && m.active !== false && m.archived !== true);
     if (found.length !== 1) fail("MENU_NEEDS_REVIEW");
     const item = found[0], price = item.salePrice;
-    if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || (item.currency != null && item.currency !== c.currency)) fail("PRICE_NEEDS_REVIEW");
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 0 || Math.abs(price * 100 - Math.round(price * 100)) > 0.000001 || (item.currency != null && item.currency !== c.currency)) fail("PRICE_NEEDS_REVIEW");
     const total = Math.round(price*line.quantity*100)/100;
     if (!Number.isSafeInteger(Math.round(total*100))) fail("PRICE_NEEDS_REVIEW");
     return { lineId:line.id, menuItemId:line.menuItemId, name:String(item.name ?? ""), quantity:line.quantity, unitPrice:price, total };
   });
-  const revenue = Math.round(prices.reduce((sum,p) => sum+p.total,0)*100)/100;
+  const grossCents = grossPrices.reduce((sum, price) => {
+    const next = sum + Math.round(price.total * 100);
+    if (!Number.isSafeInteger(next)) fail("PRICE_NEEDS_REVIEW");
+    return next;
+  }, 0);
+  const discount = pricing?.discount ? validatePosDiscountSnapshot(pricing.discount) : undefined;
+  const allocation = discount ? allocatePosDiscount(grossPrices.map(price => ({ lineId: price.lineId, grossAmount: price.total })), discount.kind, discount.value, c.currency) : undefined;
+  if (discount && (discount.venueId !== c.venueId || discount.currency !== c.currency
+    || posDiscountCents(discount.grossAmount) !== grossCents || stableSalesValue(discount.lines) !== stableSalesValue(allocation!.lines))) fail("DISCOUNT_SNAPSHOT_CHANGED");
+  const discountAmount = allocation?.discountAmount ?? 0, revenue = allocation?.netAmount ?? grossCents / 100;
+  // Keep existing item/document consumers on net sales without changing quantity or captured cost.
+  const prices = grossPrices.map((price, index) => ({ ...price, grossTotal: price.total,
+    discountAmount: allocation?.lines[index].discountAmount ?? 0, total: allocation?.lines[index].netAmount ?? price.total }));
   if (isPos && Math.round(command.payments![0].amount*100) !== Math.round(revenue*100)) fail("POS_PAYMENT_MISMATCH");
   const common = { assortment:c.assortment, mappings:c.mappings, warehouseRoutes:c.warehouseRoutes, warehouses:c.warehouses,
     stockMovements:c.movements, venueId:c.venueId, actor:c.actor, now:c.now, costAsOf:c.now };
@@ -119,10 +138,10 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
   const event: SalesEvent = { id:eventId, externalId:command.id, source:command.source, venueId:c.venueId, fingerprint,
     status:"POSTED", acceptedAt:c.now, timezone, businessDate:date, shiftId:command.shiftId,
     revenueRowId:command.shiftId ?? `sales-events:${c.venueId}:${date}`, currency:c.currency,
-    revenue, prices, actor:c.actor, ...(isPos ? {payments:command.payments,comment:command.comment?.trim() ?? ""} : {}), batch:posted.batch,
+    revenue, grossAmount: grossCents / 100, discountAmount, netAmount: revenue, ...(discount ? { discount: structuredClone(discount) } : {}), prices, actor:c.actor, ...(isPos ? {payments:command.payments,comment:command.comment?.trim() ?? ""} : {}), batch:posted.batch,
     originalMovements:posted.stockMovements.filter(m => m.salesBatchId === eventId && m.venueId === c.venueId) };
   const events = [...c.events,event]; capacity(events);
-  const previewHash = await digest({ date, timezone, currency:c.currency, prices, shiftId:command.shiftId,
+  const previewHash = await digest({ date, timezone, currency:c.currency, prices, grossAmount: grossCents / 100, discountAmount, netAmount: revenue, ...(discount ? { discount } : {}), shiftId:command.shiftId,
     ...(isPos ? {payments:command.payments,comment:command.comment ?? ""} : {}),
     recipes:posted.batch.lines.map(l => { const snapshot = l.recipeSnapshot!; return { ...snapshot, capturedAt:undefined }; }) });
   return { duplicate:false, event, events, assortment:posted.assortment, movements:posted.stockMovements,
@@ -159,7 +178,7 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
     if (c.closedMonths.has(String(existing.date).slice(0,7))) fail("MONTH_LOCKED");
     if (existing.closingStatus === "closed") return c.revenues;
     if (existing.closingStatus !== "open") fail("SHIFT_NEEDS_REVIEW");
-    return c.revenues.map(r => r === existing ? { ...r,closingStatus:"closed",endTime:venueClock(c.now, canonicalVenueTimezone(existing.timezone) || "UTC"),closedAt:c.now,updatedAt:c.now } : r);
+    return c.revenues.map(r => r === existing ? { ...r,closingStatus:"closed",endTime:venueClock(c.now, canonicalVenueTimezone(existing.timezone) || "UTC"),closedAt:c.now,closedBy:{...c.actor},updatedAt:c.now } : r);
   }
   if (!id(name)) fail("SHIFT_NAME_INVALID");
   if (existing) {
@@ -170,7 +189,7 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
   const timezone = canonicalVenueTimezone(c.timezone) || "UTC";
   const date = venueDate(c.now, timezone); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
   return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,timezone,accountingMonth:date.slice(0,7),shiftName:name,
-    revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",startTime:venueClock(c.now, timezone),createdAt:c.now,updatedAt:c.now }];
+    revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",openedAt:c.now,openedBy:{...c.actor},startTime:venueClock(c.now, timezone),createdAt:c.now,updatedAt:c.now }];
 }
 /** Legacy writers may neither replace event totals nor add another daily total. */
 export function eventRevenueMutation(before: unknown[], after: unknown[]): boolean {
@@ -183,5 +202,5 @@ export function eventRevenueMutation(before: unknown[], after: unknown[]): boole
 
 export function salesEventDocuments(events: unknown[], venueId: number) {
   return events.filter((value): value is SalesEvent => Boolean(value && typeof value === "object" && (value as SalesEvent).venueId === venueId && (value as SalesEvent).batch && ["POSTED","REVERSED"].includes((value as SalesEvent).status)))
-    .map(event => ({ ...event.batch, status:event.status, readOnly:true, salesEventId:event.id, currency:event.currency, revenue:event.revenue, prices:event.prices, payments:event.payments, comment:event.comment, actor:event.actor, acceptedAt:event.acceptedAt }));
+    .map(event => ({ ...event.batch, status:event.status, readOnly:true, salesEventId:event.id, currency:event.currency, revenue:event.revenue, grossAmount:event.grossAmount, discountAmount:event.discountAmount, netAmount:event.netAmount, discount:event.discount, prices:event.prices, payments:event.payments, comment:event.comment, actor:event.actor, acceptedAt:event.acceptedAt }));
 }

@@ -122,6 +122,7 @@ async function postOnce(request: Request): Promise<Response> {
   if (date && stores.closedMonths.has(date.slice(0, 7))) {
     return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   }
+  if (stores.revenues.some(value => record(value).id === body.shiftId && record(value).revenueSource === "sales_events_v1")) return Response.json({ok:false,code:"POS_SHIFT_CLOSE_REQUIRED",error:"Закройте кассовую смену в кассе."},{status:409});
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
   const result = await saveOperationalReport({

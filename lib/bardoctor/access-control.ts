@@ -1,4 +1,5 @@
 import type { Account, VenueMembership } from "../../db/schema";
+import type { StaffJobTitle } from "./staff-job-title";
 
 export const ACCESS_ROLES = ["owner", "manager", "shift_manager", "cashier"] as const;
 export type AccessRole = (typeof ACCESS_ROLES)[number];
@@ -108,6 +109,11 @@ const ALL_PERMISSIONS = new Set<PermissionKey>(PERMISSION_KEYS);
 const OWNER_ONLY_PERMISSIONS = new Set<PermissionKey>(
   PERMISSION_DEFINITIONS.filter((item) => item.ownerOnly).map((item) => item.key),
 );
+// These operations are a role boundary, not a delegable cashier override.
+const POS_PRIVILEGED_PERMISSIONS = new Set<PermissionKey>([
+  "sales.reverse", "shifts.manage", "shifts.delete",
+]);
+const CASHIER_PERMISSIONS = new Set<PermissionKey>(["sales.view", "sales.create", "sales.post"]);
 
 const PERMISSION_DEPENDENCIES: Partial<Record<PermissionKey, PermissionKey>> = {
   "shifts.manage": "shifts.view",
@@ -170,7 +176,7 @@ const ROLE_DEFAULTS: Record<Exclude<AccessRole, "owner">, PermissionKey[]> = {
     "data.import",
     "settings.manage",
   ],
-  cashier: ["home.view", "shifts.view", "sales.view", "sales.create", "sales.post"],
+  cashier: ["sales.view", "sales.create", "sales.post"],
   shift_manager: [
     "home.view",
     "shifts.view",
@@ -195,6 +201,7 @@ const ROLE_DEFAULTS: Record<Exclude<AccessRole, "owner">, PermissionKey[]> = {
 };
 
 export type AuthenticatedAccount = Account & {
+  jobTitle?: StaffJobTitle | null;
   actorAccountId: number;
   venueId: number;
   membershipId: number;
@@ -235,7 +242,8 @@ export function sanitizePermissionOverrides(
     ? value as { allow?: unknown; deny?: unknown }
     : {};
   const allow = uniquePermissions(parsed.allow).filter((key) => !OWNER_ONLY_PERMISSIONS.has(key)
-    && (key !== "sales.reverse" || canManagePosPrivilegedAction({ role })));
+    && (role !== "cashier" || CASHIER_PERMISSIONS.has(key))
+    && (!POS_PRIVILEGED_PERMISSIONS.has(key) || canManagePosPrivilegedAction({ role })));
   const deny = uniquePermissions(parsed.deny);
   const allowSet = new Set(allow);
   return {
@@ -263,7 +271,8 @@ export function permissionsFor(
   const permissions = new Set<PermissionKey>(ROLE_DEFAULTS[role]);
   const overrides = parsePermissionOverrides(permissionsJson);
   for (const key of overrides.allow) {
-    if (!OWNER_ONLY_PERMISSIONS.has(key) && (key !== "sales.reverse" || canManagePosPrivilegedAction({ role }))) permissions.add(key);
+    if (!OWNER_ONLY_PERMISSIONS.has(key) && (role !== "cashier" || CASHIER_PERMISSIONS.has(key))
+      && (!POS_PRIVILEGED_PERMISSIONS.has(key) || canManagePosPrivilegedAction({ role }))) permissions.add(key);
   }
   for (const key of overrides.deny) permissions.delete(key);
   for (const [permission, dependency] of Object.entries(PERMISSION_DEPENDENCIES) as [
@@ -285,7 +294,8 @@ export function hasPermission(
   account: Pick<AuthenticatedAccount, "role" | "permissions">,
   permission: PermissionKey,
 ): boolean {
-  if (permission === "sales.reverse" && !canManagePosPrivilegedAction(account)) return false;
+  if (account.role === "cashier" && !CASHIER_PERMISSIONS.has(permission)) return false;
+  if (POS_PRIVILEGED_PERMISSIONS.has(permission) && !canManagePosPrivilegedAction(account)) return false;
   return account.role === "owner" || account.permissions.includes(permission);
 }
 
@@ -312,7 +322,7 @@ export function permissionPayload(role: AccessRole, permissionsJson?: string | n
   };
 }
 
-/** POS-2 privileged actions cannot be granted to a cashier through overrides. */
-export function canManagePosPrivilegedAction(account: Pick<AuthenticatedAccount, "role">): boolean {
+/** Cashier/waiter/barista access can never acquire shift administration or reversal via overrides. */
+export function canManagePosPrivilegedAction(account: { role: string }): boolean {
   return account.role === "owner" || account.role === "manager" || account.role === "shift_manager";
 }

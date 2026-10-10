@@ -16,7 +16,7 @@ const TEAM_ACCESS_HTML = `<!doctype html>
     ${canonicalUserShellAssets()}
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
-    <script src="/team-access.js?v=20260813-access-v171" defer></script>
+    <script src="/team-access.js?v=20261010-staff-titles" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/employees">
@@ -43,8 +43,9 @@ const TEAM_ACCESS_HTML = `<!doctype html>
         <section id="invite-section" class="access-card hidden">
           <div class="card-title"><div><p>ПРИГЛАШЕНИЕ</p><h2>Добавить участника</h2></div></div>
           <p class="help">Создайте одноразовый код. Пароль сотрудника вам не показывается и не передаётся.</p>
+          <p class="help">Кассир, официант, бариста и бармен работают только в кассе. Должность не даёт доступа к управлению сменой, отменам, складу или финансам.</p>
           <div class="invite-controls">
-            <label>Роль<select id="invite-role"><option value="manager">Управляющий</option><option value="shift_manager">Администратор заведения</option><option value="cashier">Кассир</option></select></label>
+            <label>Роль или должность<select id="invite-role"><option value="manager">Управляющий</option><option value="shift_manager">Администратор заведения</option><option value="cashier">Кассир</option><option value="waiter">Официант</option><option value="barista">Бариста</option><option value="bartender">Бармен</option></select></label>
             <button id="create-invite" type="button">Создать код</button>
           </div>
           <div id="invite-result" class="invite-result hidden">

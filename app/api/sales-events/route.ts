@@ -1,3 +1,7 @@
+import { posDiscountCents } from "../../../lib/bardoctor/pos-discounts";
+import { POS_ORDER_STORE_KEY, parsePosOrders, assertPosShiftClosable, canReadPosSaleHistory } from "../../../lib/bardoctor/pos-orders";
+import { posSalesEventView, posShiftView, buildPosShiftReport, readPosShiftReport } from "../../../lib/bardoctor/pos-shift-report";
+import { planPosCash, type PosCashEntry } from "../../../lib/bardoctor/pos-shift-cash";
 import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -11,7 +15,7 @@ import { SALES_EVENT_STORE_KEY, EVENT_REVENUE_SOURCE, planSalesEvent, planRevers
 
 import { menuTaxonomyPresentation, canonicalTaxonomyForAssortment } from "../../../lib/bardoctor/nomenclature-taxonomy";
 
-const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings"];
+const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY];
 const reply = (data: unknown,status=200) => Response.json(data,{ status,headers:{ "Cache-Control":"private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
   const db = getD1(), snapshots = await readStoreSnapshots(db,account.id,keys);
@@ -22,14 +26,14 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const events = rows(SALES_EVENT_STORE_KEY);
   if (events.some(e => !e.id || !e.fingerprint || !e.batch || !Array.isArray(e.originalMovements) || !Array.isArray(e.prices) || !["POSTED","REVERSED"].includes(e.status))) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
   const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now:new Date().toISOString(),
-    actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role },
+    actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role, ...(account.jobTitle ? { jobTitle:account.jobTitle } : {}) },
     assortment:assortment as Record<string,unknown>,movements:rows(keys[1]),events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
-  return { db,snapshots,context };
+  return { db,snapshots,context, orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error:unknown) {
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
-  if (error instanceof Error && error.message.startsWith("SALES_EVENT_")) {
+  if (error instanceof Error && /^(SALES_EVENT_|POS_ORDER_|POS_CASH_|POS_SHIFT_|POS_DISCOUNT_)/.test(error.message)) {
     const messages: Record<string,string> = {
       SALES_EVENT_SHIFT_ALREADY_OPEN: "В заведении уже есть открытая кассовая смена. Перейдите в неё или сначала закройте её.",
       SALES_EVENT_SHIFT_NOT_FOUND: "Открытая смена не найдена. Выберите другую смену.",
@@ -49,46 +53,76 @@ export async function GET(request:Request) {
   if (!hasPermission(account,"sales.view")) return reply({ok:false,code:"ACCESS_DENIED"},403);
   try {
     const {context:c} = await load(account);
+    const reportShift = new URL(request.url).searchParams.get("reportShiftId");
+    if (reportShift) {
+      if (!canManagePosPrivilegedAction(account)) return reply({ok:false,code:"ACCESS_DENIED"},403);
+      return reply({ok:true,report:readPosShiftReport(c,reportShift)});
+    }
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
     const taxonomy = canonicalTaxonomyForAssortment(c.assortment);
     return reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
-      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null),
-      events:c.events.filter(e => e.venueId === c.venueId && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse(),
-      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:hasPermission(account,"shifts.manage")} });
+      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(posShiftView),
+      events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(posSalesEventView),
+      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage")} });
   } catch(error) { return controlled(error); }
 }
 export async function POST(request:Request):Promise<Response> { return withStoreCasRetries(request,command); }
 async function command(request:Request):Promise<Response> {
   const account = await authenticateRequest(request); if (!account) return unauthorized();
-  const parsed = await readJsonRequest<{action:string;venueId:number;command:SalesEventCommand;previewHash:string;eventId:string;shiftId:string;name:string}>(request,{maxBytes:100_000});
+  const parsed = await readJsonRequest<{action:string;venueId:number;command:SalesEventCommand;previewHash:string;eventId:string;shiftId:string;name:string;openingFloat?:number;actualCash?:number;cash?:Pick<PosCashEntry,"operationId"|"kind"|"amount"|"reason">}>(request,{maxBytes:100_000});
   if (!parsed.ok) return parsed.response;
   const body = parsed.data;
-  const permissions:Record<string,PermissionKey> = {preview:"sales.create",post:"sales.post",reverse:"sales.reverse",open_shift:"shifts.manage",close_shift:"shifts.manage"};
+  const permissions:Record<string,PermissionKey> = {preview:"sales.create",post:"sales.post",reverse:"sales.reverse",open_shift:"shifts.manage",close_shift:"shifts.manage",cash:"shifts.manage"};
   if (!permissions[body.action]) return reply({ok:false,code:"ACTION_INVALID"},422);
-  if (!hasPermission(account,permissions[body.action]) || body.action === "post" && !hasPermission(account,"sales.create") || body.action === "reverse" && !canManagePosPrivilegedAction(account)) return reply({ok:false,code:"ACCESS_DENIED"},403);
+  if (!hasPermission(account,permissions[body.action]) || body.action === "post" && !hasPermission(account,"sales.create") || ["reverse","open_shift","close_shift","cash"].includes(body.action) && !canManagePosPrivilegedAction(account)) return reply({ok:false,code:"ACCESS_DENIED"},403);
   if (body.venueId !== account.venueId) return reply({ok:false,code:"VENUE_CHANGED"},409);
+  const pricingKeys = ["discount","discountId","discountRuleId","discountSnapshot","discountAmount","grossAmount","netAmount","grossRevenue","netRevenue","posDiscount","prices","unitPrice","total"];
+  if (pricingKeys.some(key => Object.hasOwn(body,key) || body.command && Object.hasOwn(body.command,key))
+    || body.command?.lines?.some(line=>pricingKeys.some(key=>Object.hasOwn(line,key)))) return reply({ok:false,code:"SALES_EVENT_DISCOUNT_REQUIRES_ORDER"},422);
   try {
-    const {db,snapshots,context:c} = await load(account);
+    const {db,snapshots,context:c,orders} = await load(account);
     let updates: [string,unknown][], result:unknown;
     let accountingMonth = venueDate(c.now, c.timezone).slice(0,7);
     if (body.action === "preview" || body.action === "post") {
+      if (account.role === "cashier" && body.command?.source !== "POS_API") return reply({ok:false,code:"ACCESS_DENIED"},403);
       const plan = await planSalesEvent(c,body.command);
+      if (plan.duplicate && !canReadPosSaleHistory(c.actor,plan.event)) return reply({ok:false,code:"ACCESS_DENIED"},403);
       accountingMonth = plan.event.businessDate.slice(0,7);
-      result = {ok:true,duplicate:plan.duplicate,event:plan.event,previewHash:plan.previewHash};
+      result = {ok:true,duplicate:plan.duplicate,event:posSalesEventView(plan.event),previewHash:plan.previewHash};
       if (body.action === "preview" || plan.duplicate) return reply(result);
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
     } else if (body.action === "reverse") {
       const target=c.events.find(event => event.id === body.eventId && event.venueId === c.venueId);
       if (target?.source === "POS_API") return reply({ok:false,code:"POS_REVERSAL_NOT_AVAILABLE",error:"Отмена кассовой продажи пока недоступна."},409);
-      const plan=planReverseSalesEvent(c,body.eventId); accountingMonth=plan.event.businessDate.slice(0,7); result={ok:true,duplicate:plan.duplicate,event:plan.event};
+      const plan=planReverseSalesEvent(c,body.eventId); accountingMonth=plan.event.businessDate.slice(0,7); result={ok:true,duplicate:plan.duplicate,event:posSalesEventView(plan.event)};
       if (plan.duplicate) return reply(result);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
+    } else if (body.action === "cash") {
+      const revenues=planPosCash(c,body.shiftId,body.cash!);
+      result={ok:true,shiftId:body.shiftId,report:readPosShiftReport({...c,revenues},body.shiftId)};
+      if (revenues===c.revenues) return reply({...result as object,duplicate:true});
+      accountingMonth=String(revenues.find(row=>row.id===body.shiftId)?.date).slice(0,7); updates=[[keys[3],revenues]];
     } else {
-      const revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name);
-      result={ok:true,shiftId:body.shiftId}; if (revenues===c.revenues) return reply({...result as object,duplicate:true});
+      const original=c.revenues.find(row=>row.id===body.shiftId && row.venueId===c.venueId);
+      if (body.action==="close_shift") assertPosShiftClosable(orders,c.venueId,body.shiftId);
+      let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name);
+      if (revenues===c.revenues) {
+        if (body.action==="open_shift" && body.openingFloat!==undefined && body.openingFloat!==original?.openingFloat) return reply({ok:false,code:"SALES_EVENT_IDEMPOTENCY_CONFLICT"},409);
+        return reply({ok:true,shiftId:body.shiftId,duplicate:true,...(body.action==="close_shift" ? {report:readPosShiftReport(c,body.shiftId)} : {})});
+      }
+      if (body.action==="open_shift") {
+        if (body.openingFloat!==undefined) posDiscountCents(body.openingFloat);
+        revenues=revenues.map(row=>row.id===body.shiftId ? {...row,openingFloat:body.openingFloat??null}:row);
+      } else {
+        if (body.actualCash!==undefined) posDiscountCents(body.actualCash);
+        revenues=revenues.map(row=>row.id===body.shiftId ? {...row,actualCash:body.actualCash??null}:row);
+        const report=buildPosShiftReport({...c,revenues},body.shiftId);
+        revenues=revenues.map(row=>row.id===body.shiftId ? {...row,closingReport:report}:row);
+      }
+      result={ok:true,shiftId:body.shiftId,...(body.action==="close_shift" ? {report:readPosShiftReport({...c,revenues},body.shiftId)} : {})};
       accountingMonth=String(revenues.find(row=>row.id===body.shiftId)?.date).slice(0,7);
       updates=[[keys[3],revenues]];
     }

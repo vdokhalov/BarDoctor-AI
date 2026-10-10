@@ -64,6 +64,7 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
     return { ...base, outcome, code: "READ_MODEL_CHANGED", diagnostics };
   };
   if (reference.venueId !== context.venueId || reference.workspaceId !== context.workspaceId) return fail("unavailable");
+  if (context.account.role === "cashier") return fail("restricted");
   const inventory = hasPermission(context.account, "inventory.view"), sales = hasPermission(context.account, "sales.view");
   const warehouseKind = reference.kind === "WAREHOUSE_MOVEMENT", nomenclatureKind = reference.kind === "NOMENCLATURE";
   if (warehouseKind || nomenclatureKind ? !inventory : !sales) return fail("restricted");

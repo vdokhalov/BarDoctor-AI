@@ -35,6 +35,7 @@ export async function POST(request: Request): Promise<Response> {
     ok: true,
     activeVenueId: membership.venueId,
     role: membership.role,
+    jobTitle: membership.jobTitle,
     permissions: context.permissions,
     activeWorkspaceId: context.venue.workspaceId,
     activeVenueIsPrimary: context.venue.dataAccountId === account.id,

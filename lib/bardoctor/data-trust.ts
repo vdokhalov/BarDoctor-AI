@@ -129,6 +129,7 @@ function subjectHas(subject: AccessSubject, permission: PermissionKey): boolean 
 }
 
 export function canReadStore(subject: AccessSubject, storeKey: string): boolean {
+  if (["bd_pos_orders_v1","bd_pos_discounts_v1","bd_sales_events_v1"].includes(storeKey)) return false;
   // A closing contains the combined financial result and input manifest. Its
   // raw/bulk read must not bypass the permissions of those nested sources.
   if (storeKey === "bd_month_closings" && !["finance.view", "payroll.view", "inventory.view", "shifts.view", "sales.view"].every(permission => subjectHas(subject, permission as PermissionKey))) return false;
@@ -198,6 +199,7 @@ export function canWriteStore(
   storeKey: string,
   mutations: DataMutation[] = [],
 ): boolean {
+  if (["bd_pos_orders_v1","bd_pos_discounts_v1","bd_sales_events_v1"].includes(storeKey)) return false;
   if (typeof subject === "string" && !isAccessRole(subject)) {
     const legacy = ROLE_WRITE_KEYS[subject] ?? ROLE_WRITE_KEYS.viewer;
     return legacy === "all" || legacy.has(storeKey);

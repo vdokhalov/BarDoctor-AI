@@ -7,6 +7,7 @@ import {
   revokeInvite,
 } from "../../../../../lib/bardoctor/access-service";
 import { authenticateRequest, unauthorized } from "../../../../../lib/bardoctor/auth";
+import { STAFF_JOB_LABELS, staffJobTitle } from "../../../../../lib/bardoctor/staff-job-title";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -51,8 +52,8 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
     actor,
     action: "delete",
     entityId: String(inviteId),
-    entityLabel: invite.role === "manager" ? "Приглашение управляющего" : "Приглашение менеджера",
-    before: { role: invite.role, expiresAt: invite.expiresAt },
+    entityLabel: invite.role === "cashier" ? `Приглашение: ${STAFF_JOB_LABELS[staffJobTitle(invite.role, invite.jobTitle)!]}` : invite.role === "manager" ? "Приглашение управляющего" : "Приглашение администратора",
+    before: { role: invite.role, jobTitle: invite.jobTitle, expiresAt: invite.expiresAt },
     reason: "Код приглашения отозван",
   });
   return Response.json({ ok: true });

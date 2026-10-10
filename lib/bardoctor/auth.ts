@@ -10,6 +10,7 @@ import {
   type Account,
 } from "../../db/schema";
 import { normalizeAccountEmail } from "./account-identity";
+import { staffJobTitle, validStaffJobTitle } from "./staff-job-title";
 import {
   isAccessRole,
   permissionPayload,
@@ -397,12 +398,13 @@ export async function membershipsForAccount(account: Account, readOnly = false) 
   return rows
     .map((row) => {
       const dataAccount = accountById.get(row.venue.dataAccountId);
-      if (!dataAccount || !isAccessRole(row.membership.role)) return null;
+      if (!dataAccount || !isAccessRole(row.membership.role) || !validStaffJobTitle(row.membership.role, row.membership.jobTitle)) return null;
       return {
         membership: row.membership,
         venue: row.venue,
         dataAccount,
         ...permissionPayload(row.membership.role, row.membership.permissionsJson),
+        jobTitle: staffJobTitle(row.membership.role, row.membership.jobTitle),
       };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row))
@@ -476,6 +478,7 @@ async function authenticateScopedRequest(
     actorAccountId: identitySession.account.id,
     venueId: context.venue.id,
     membershipId: context.membership.id,
+    jobTitle: context.jobTitle,
     permissions: context.permissions,
   };
 }
@@ -535,6 +538,7 @@ export async function authResult(account: Account, token: string, request?: Requ
     phone: account.phone,
     avatarId: account.avatarId,
     role: activeRole,
+    jobTitle: active?.jobTitle ?? null,
     permissions: active?.permissions ?? [],
     activeVenueId: active?.venue.id ?? null,
     activeWorkspaceId: active?.venue.workspaceId ?? null,
@@ -556,6 +560,7 @@ export async function authResult(account: Account, token: string, request?: Requ
       logoId: venueIdentityFromJson(item.dataAccount.restaurantJson).logoId,
       hasProfile: Boolean(item.dataAccount.restaurantJson),
       role: item.role,
+      jobTitle: item.jobTitle,
       permissions: item.permissions,
       status: item.venue.status,
       isPrimary: item.venue.dataAccountId === account.id,

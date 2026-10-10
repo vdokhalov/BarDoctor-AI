@@ -9,6 +9,7 @@ import {
 import { logAccessChange } from "../../../../../lib/bardoctor/access-service";
 import { authenticateRequest, unauthorized } from "../../../../../lib/bardoctor/auth";
 import { readJsonRequest } from "../../../../../lib/bardoctor/http";
+import { staffJobTitle, validStaffJobTitle } from "../../../../../lib/bardoctor/staff-job-title";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -45,6 +46,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
 
   const parsed = await readJsonRequest<{
     role?: unknown;
+    jobTitle?: unknown;
     permissions?: unknown;
     status?: unknown;
     employeeId?: unknown;
@@ -61,6 +63,13 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
       { status: 403 },
     );
   }
+  const requestedJobTitle = body.jobTitle === undefined
+    ? nextRole === target.membership.role ? target.membership.jobTitle : null
+    : body.jobTitle;
+  if (!validStaffJobTitle(nextRole, requestedJobTitle)) {
+    return Response.json({ ok: false, code: "STAFF_JOB_TITLE_INVALID", error: "Выберите должность сотрудника кассы" }, { status: 400 });
+  }
+  const jobTitle = staffJobTitle(nextRole, requestedJobTitle);
   const nextStatus = body.status === undefined ? target.membership.status : body.status;
   if (nextStatus !== "active" && nextStatus !== "disabled") {
     return Response.json({ ok: false, error: "Некорректный статус доступа" }, { status: 400 });
@@ -78,6 +87,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
     .update(venueMemberships)
     .set({
       role: nextRole,
+      jobTitle,
       permissionsJson,
       status: nextStatus,
       employeeId,
@@ -93,10 +103,11 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
     entityLabel: label,
     before: {
       role: target.membership.role,
+      jobTitle: target.membership.jobTitle,
       permissionsJson: target.membership.permissionsJson,
       status: target.membership.status,
     },
-    after: { role: nextRole, permissionsJson, status: nextStatus },
+    after: { role: nextRole, jobTitle, permissionsJson, status: nextStatus },
     reason: nextStatus === "disabled"
       ? "Доступ сотрудника отключён"
       : "Обновлены роль и права сотрудника",

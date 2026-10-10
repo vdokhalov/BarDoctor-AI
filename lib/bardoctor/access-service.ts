@@ -13,6 +13,7 @@ import {
   type AccessRole,
   type AuthenticatedAccount,
 } from "./access-control";
+import { staffJobTitle, validStaffJobTitle, type StaffJobTitle } from "./staff-job-title";
 
 const INVITE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const INVITE_LIFETIME_HOURS = 72;
@@ -58,7 +59,7 @@ export async function findActiveInvite(code: string) {
       ),
     )
     .limit(1);
-  return invite && isAccessRole(invite.role) && invite.role !== "owner"
+  return invite && isAccessRole(invite.role) && invite.role !== "owner" && validStaffJobTitle(invite.role, invite.jobTitle)
     ? invite
     : null;
 }
@@ -66,8 +67,10 @@ export async function findActiveInvite(code: string) {
 export async function createVenueInvite(input: {
   actor: AuthenticatedAccount;
   role: AccessRole;
+  jobTitle?: StaffJobTitle | null;
   permissions?: unknown;
 }) {
+  if (!validStaffJobTitle(input.role, input.jobTitle)) throw new Error("STAFF_JOB_TITLE_INVALID");
   const expiresAt = new Date(
     Date.now() + INVITE_LIFETIME_HOURS * 60 * 60 * 1_000,
   ).toISOString();
@@ -82,6 +85,7 @@ export async function createVenueInvite(input: {
           venueId: input.actor.venueId,
           codeHash,
           role: input.role,
+          jobTitle: staffJobTitle(input.role, input.jobTitle),
           permissionsJson,
           createdByAccountId: input.actor.actorAccountId,
           expiresAt,
@@ -98,7 +102,7 @@ export async function createVenueInvite(input: {
 export async function claimVenueInvite(
   account: Account,
   code: string,
-): Promise<{ venueId: number; role: AccessRole } | null> {
+): Promise<{ venueId: number; role: AccessRole; jobTitle: StaffJobTitle | null } | null> {
   const invite = await findActiveInvite(code);
   if (!invite || !isAccessRole(invite.role) || invite.role === "owner") return null;
   const [venue] = await getDb()
@@ -134,10 +138,10 @@ export async function claimVenueInvite(
     d1
       .prepare(
         `INSERT INTO venue_memberships (
-           venue_id, account_id, role, permissions_json, status,
+           venue_id, account_id, role, job_title, permissions_json, status,
            invited_by_account_id, joined_at, created_at, updated_at
          )
-         SELECT venue_id, ?, role, permissions_json, 'active',
+         SELECT venue_id, ?, role, job_title, permissions_json, 'active',
                 created_by_account_id, ?, ?, ?
          FROM venue_invites
          WHERE id = ? AND used_by_account_id = ? AND used_at = ?
@@ -170,7 +174,7 @@ export async function claimVenueInvite(
   if ((claim.meta.changes ?? 0) !== 1 || (membership.meta.changes ?? 0) !== 1) {
     return null;
   }
-  return { venueId: invite.venueId, role: invite.role };
+  return { venueId: invite.venueId, role: invite.role, jobTitle: staffJobTitle(invite.role, invite.jobTitle) };
 }
 
 function actorName(actor: AuthenticatedAccount): string {
@@ -195,7 +199,7 @@ export async function logAccessChange(input: {
     monthKey: null,
     beforeJson: input.before == null ? null : JSON.stringify(input.before),
     afterJson: input.after == null ? null : JSON.stringify(input.after),
-    changedFieldsJson: JSON.stringify(["role", "permissions", "status"]),
+    changedFieldsJson: JSON.stringify(["role", "jobTitle", "permissions", "status"]),
     actorName: actorName(input.actor),
     actorRole: input.actor.role,
     reason: input.reason,

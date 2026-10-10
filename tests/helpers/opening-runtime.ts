@@ -1,3 +1,7 @@
+import * as posShiftCash from "../../lib/bardoctor/pos-shift-cash";
+import * as posShiftReport from "../../lib/bardoctor/pos-shift-report";
+import * as posDiscounts from "../../lib/bardoctor/pos-discounts";
+import * as posOrders from "../../lib/bardoctor/pos-orders";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
@@ -43,7 +47,7 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
       if (i === failAt) throw new Error("SIMULATED_D1_WRITE_FAILURE"); out.push(await statements[i].run());
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
-  const dependencies = { ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport,
+  const dependencies = { ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport,
     getD1: () => db as unknown as D1Database,
     authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), actorAccountId: 7, role: "owner", firstName: "QA", lastName: "", restaurantJson: JSON.stringify({ currency: accountingCurrency }) } : null,
     unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };

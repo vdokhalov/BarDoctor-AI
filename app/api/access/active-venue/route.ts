@@ -34,6 +34,7 @@ export async function POST(request: Request): Promise<Response> {
     venueName: identity.name,
     logoId: identity.logoId,
     role: context.role,
+    jobTitle: context.jobTitle,
     permissions: context.permissions,
   });
 }

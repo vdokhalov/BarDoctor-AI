@@ -1,3 +1,4 @@
+import { canReadPosSaleHistory } from "./pos-orders";
 import { resolveProvenanceEvidence } from "./provenance-evidence";
 import { isStockEvidenceKind, resolveStockEvidence } from "./stock-evidence";
 import { isMenuEvidenceKind, resolveMenuEvidence, readMenuOrigin, menuTraceRelations } from "./menu-evidence";
@@ -147,6 +148,7 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
   }
   const parent = uniqueRecord(stores, kind, reference.id, context);
   if (!parent) return result("unavailable", asOf);
+  if (kind === "SALE_EVENT" && !canReadPosSaleHistory({ accountId:context.account.actorAccountId, name:"", role:context.account.role }, parent)) return result("unavailable", asOf);
   const child = reference.partId === undefined ? null : kind === "SALE_EVENT"
     ? saleChild(parent, reference.partId, context) : kind === "MENU_INGESTION_DRAFT" ? draftChild(parent, reference.partId, context) : null;
   if (reference.partId !== undefined && !child) return result("unavailable", asOf);

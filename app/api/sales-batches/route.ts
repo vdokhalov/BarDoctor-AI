@@ -241,6 +241,7 @@ function responsePayload(stores: Awaited<ReturnType<typeof readStores>>, venueId
 export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
+  if (account.role === "cashier") return Response.json({ok:false,code:"ACCESS_DENIED",error:"Используйте кассу для продаж и своих чеков."},{status:403});
   if (!hasPermission(account, "sales.view")) {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать продажи" }, { status: 403 });
   }
@@ -257,6 +258,7 @@ export async function GET(request: Request): Promise<Response> {
 async function postOnce(request: Request): Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
+  if (account.role === "cashier") return Response.json({ok:false,code:"ACCESS_DENIED",error:"Используйте кассу для продаж и своих чеков."},{status:403});
   const raw = await request.text();
   if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) return Response.json({ ok: false, error: "В документе слишком много данных" }, { status: 413 });
   let body: JsonRecord;
