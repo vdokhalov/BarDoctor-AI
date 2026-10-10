@@ -90,3 +90,32 @@ test("an invitation claimed by exact v505 retains its job after upgrade, with st
   const patch = await r.api.members.PATCH(r.request(owner, "/api/access/members/" + membership.id, "PATCH", { jobTitle: "waiter" }), { params: Promise.resolve({ id: String(membership.id) }) });
   assert.equal(patch.status, 200); assert.equal((await r.api.auth.authenticateRequest(request()))?.jobTitle, "waiter", "explicit edit overrides historical invitation");
 });
+
+for (const secondHasMetadata of [true, false]) test(`ambiguous v505 claims never guess a title (second metadata=${secondHasMetadata})`, async t => {
+  const r = await lifecycleRuntime({ ...routes, legacy: "legacy-v505-invite-service" }, { now: "2026-10-10T12:00:00.000Z", plugins: [{ name: "exact-v505-race", setup(build) {
+    build.onResolve({ filter: /^legacy-v505-invite-service$/ }, () => ({ path: "lib/bardoctor/access-service.ts", namespace: "v505" }));
+    build.onLoad({ filter: /.*/, namespace: "v505" }, () => ({ contents: execFileSync("git", ["show", `${baseline}:lib/bardoctor/access-service.ts`], { encoding: "utf8" }), loader: "ts", resolveDir: resolve("lib/bardoctor") }));
+  } }] }); t.after(r.close);
+  const owner = await r.register("ambiguous-owner@isolated.test"), user = await r.register("ambiguous-staff@isolated.test");
+  const legacy = r.api.legacy as unknown as typeof import("../lib/bardoctor/access-service");
+  const issue = async (jobTitle: string) => (await (await r.api.access.POST(r.request(owner, "/api/access", "POST", { role: "cashier", jobTitle }))).json() as { invite: { id: number; code: string } }).invite;
+  const a = await issue("waiter");
+  const ownerActor = await r.api.auth.authenticateRequest(r.request(owner, "/api/access")); assert.ok(ownerActor);
+  const oldInvite = secondHasMetadata ? null : await legacy.createVenueInvite({ actor: ownerActor, role: "cashier" });
+  const b = secondHasMetadata ? await issue("barista") : { id: oldInvite!.invite.id, code: oldInvite!.code };
+  const account = await r.api.auth.authenticateIdentityRequest(r.request(user, "/api/access/join")); assert.ok(account);
+  // Both preflights pass in v505. Lower-ID A wins, higher-ID B is burned by
+  // the old losing batch, and both claim timestamps equal membership.joined_at.
+  r.beforeNextBatch(async () => { assert.ok(await legacy.claimVenueInvite(account, a.code)); });
+  assert.equal(await legacy.claimVenueInvite(account, b.code), null);
+  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM venue_invites WHERE used_by_account_id=?").get(user.userId)?.n, 2);
+  const membership = r.sqlite.prepare("SELECT * FROM venue_memberships WHERE account_id=? AND venue_id=?").get(user.userId, owner.activeVenueId)!;
+  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM venue_invites WHERE used_at=?").get(membership.joined_at!)?.n, 2);
+  assert.equal(readMemberJob(r.sqlite, user.userId, owner.activeVenueId), null);
+  const request = () => { const req = r.request(user, "/api/access"); req.headers.set("X-Venue-Id", String(owner.activeVenueId)); return req; };
+  const resolved = await r.api.auth.authenticateReadOnlyRequest(request());
+  assert.equal(resolved?.membershipJobTitle, null, "ambiguous invite provenance supplies no job metadata");
+  assert.equal(resolved?.role, "cashier"); assert.equal(resolved?.jobTitle, "cashier", "retain the legacy base-role fallback, never pick waiter/barista by ID");
+  assert.equal((await r.api.members.PATCH(r.request(owner, "/api/access/members/" + membership.id, "PATCH", { jobTitle: "waiter" }), { params: Promise.resolve({ id: String(membership.id) }) })).status, 200);
+  assert.equal((await r.api.auth.authenticateReadOnlyRequest(request()))?.jobTitle, "waiter", "an explicit authorized title resolves ambiguity");
+});

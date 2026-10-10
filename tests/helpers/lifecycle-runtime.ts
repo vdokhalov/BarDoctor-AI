@@ -14,6 +14,7 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   let failRead = false;
   const checkReadFailure = () => { if (failRead) { failRead = false; throw new Error('injected database read failure'); } };
   let beforeDomainWrite: (() => void | Promise<void>) | null = null;
+  let beforeBatch: (() => void | Promise<void>) | null = null;
   let inBatch = false;
   const isDomainWrite = (sql: string) => /(?:INSERT\s+INTO|UPDATE)\s+["`]?domain_data\b/i.test(sql);
   const interleave = async () => { const callback = beforeDomainWrite; beforeDomainWrite = null; await callback?.(); };
@@ -31,6 +32,7 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   };
   let batchQueue: Promise<unknown> = Promise.resolve();
   const db = { prepare, async batch(statements: ReturnType<typeof prepare>[]) {
+    const batchCallback = beforeBatch; beforeBatch = null; if (batchCallback) await batchCallback();
     // Commit B before A enters the transaction queue; B may itself use a real route/batch.
     if (statements.some(statement => isDomainWrite(statement.sql))) await interleave();
     const transaction = batchQueue.then(async () => {
@@ -74,5 +76,5 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   function request(user: { email: string; token: string }, path: string, method = 'GET', data?: unknown) {
     return new Request(`https://isolated.test${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Session-Email': user.email, 'X-Session-Token': user.token }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   }
-  return { api, sqlite, objects, register, request, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failDatabaseRead: () => { failRead = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
+  return { api, sqlite, objects, register, request, beforeNextBatch: (callback: () => void | Promise<void>) => { beforeBatch = callback; }, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failDatabaseRead: () => { failRead = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
 }
