@@ -1,6 +1,6 @@
 {
   "baseline": "4644a85c2843f0f51935555c4122facc3e1030ad",
-  "scope": "POS orders, discounts, cash/report, cashier privacy and nullable staff titles. No changes to previous release manifests.",
+  "scope": "POS orders, discounts, cash/report, cashier privacy and staff titles in existing server-owned domain metadata (no DDL). No changes to previous release manifests.",
   "files": {
     "app/api/access/active-venue/route.ts": {
       "before": "20f11d193f32765bd426ddd031ffaaa0197d7fc10ff413b0ca23e549365a1029",
@@ -8,7 +8,7 @@
     },
     "app/api/access/invites/[id]/route.ts": {
       "before": "fb6ebbceb5aeae3d0ce7dd2c67309dcd63759e2fcca4fc60c3cf364af4d600d8",
-      "after": "e9bc18c6552ad1f2a21ce9310eca255b272a2926fc56c42f228d42b67a063c31"
+      "after": "97a7e67687d9336498672a14e6cceb8b5270abbd6c4141b7fb1650ea334144b7"
     },
     "app/api/access/join/route.ts": {
       "before": "b866b70ef0754b6705cf025381894b9cd3a61482c7bba9d4de7ca0787bfcf8e5",
@@ -16,11 +16,11 @@
     },
     "app/api/access/members/[id]/route.ts": {
       "before": "e6c4821aa4dd1cf24e76a982459e5be15be6a6f2ad46b7c92ff0145b1196a453",
-      "after": "f2fccf148572aa3b133cd9b304ce1255899cd6dafa5975041628b99be54606fe"
+      "after": "7587a094d7e62c497291c257555c543feddf5ead3449247a530fb3ba2b6beeb0"
     },
     "app/api/access/route.ts": {
       "before": "207be20de3a77dfcc39689998cb83dc0e8d905ed3a974e7fa6b6887c1709c791",
-      "after": "8ac2da68ad9fc3d6cded676ef95db8d0fa78aa1b7dc4dec5f64eb1700c5978eb"
+      "after": "fe25f25e1db92360aef3f0e26008bae6b4ff5647a3d8e5ba895c823d761a9da1"
     },
     "app/api/pos-discounts/route.ts": {
       "before": null,
@@ -32,7 +32,7 @@
     },
     "app/api/pos-overview/route.ts": {
       "before": null,
-      "after": "6f11a04f0b537620e5d3c15c7a9b056a83c309817b0c71fd762c8eda15b87f98"
+      "after": "c807b63aefc8670e7c5786a06de8f4ef88eca7260dbca39e0a68806c20ced3db"
     },
     "app/api/sales-batches/route.ts": {
       "before": "006ea50b3c49513d654840686eac0326aa37cc01e79c026afe2f962a1c90d173",
@@ -40,15 +40,7 @@
     },
     "app/api/sales-events/route.ts": {
       "before": "f61f61d9363a455bc4b98efa2f0ba01d3fb937699c31412cbd4fc7e356d3193b",
-      "after": "01437e7b689bd96a3df6a59f5d0fc1737441dc800140465696fd39a320cb06ce"
-    },
-    "db/schema.ts": {
-      "before": "d2fde5703e3d02d1bb83e8b375f93b2e1db124ad88785197fdf5111f96887085",
-      "after": "a3d8649ed2d1e69826624c0436a751009ed22dbc0d6e2d9d7d60093f1a4a0ba3"
-    },
-    "drizzle/0026_cashier_staff_job_titles.sql": {
-      "before": null,
-      "after": "0ec47e4e1350b633183f1924c3c40c677af8d8c4c285e843c028a320ca6aea6c"
+      "after": "6b34dac4cf217364d055aaa3bfcfe622e9470613d15c6883bd69f6995050cafd"
     },
     "lib/bardoctor/access-control.ts": {
       "before": "83a2a8b859bbd2b4746b4831d9decddccb7deac326b10056c9c4ae03ef7f5fed",
@@ -56,11 +48,11 @@
     },
     "lib/bardoctor/access-service.ts": {
       "before": "05dcf400ddfc75da830b3af7b42a05b698156343100f3e235672d48244d018f3",
-      "after": "66be57f9684f004afcb177b34f4b4481d93dedb476cfd609e7d4e51974108b4d"
+      "after": "5bdd437672b14fd6438e446c35dc78940d44f9b336b40f646df9f9a9dfbd1eb4"
     },
     "lib/bardoctor/auth.ts": {
       "before": "9228d51110f57191790a7531313349ff21d0641714b4b72db8f33255d01d0be4",
-      "after": "7c3bd497c6cecdad5784935af0cca740eb4017f20a8bdff2894268c5301e4400"
+      "after": "15cbf6e1d0288bc65888a5a029656d57b57f0ebb597120b1de3855a08aa8ef3e"
     },
     "lib/bardoctor/cost-evidence.ts": {
       "before": "4171e39d5237010937f4ef4a50aca7aa2626c033a33994612b8db6539bec5960",
@@ -76,7 +68,7 @@
     },
     "lib/bardoctor/pos-auth-guard.ts": {
       "before": null,
-      "after": "8582ddb162a439a8bc142710dab234740365b7488f85ee798f427cd52e4100f1"
+      "after": "21c13c05eba4476b4288c9e4855adf528165458264c7213391afd39467d77fa6"
     },
     "lib/bardoctor/pos-discounts.ts": {
       "before": null,
@@ -109,6 +101,10 @@
     "lib/bardoctor/staff-job-title.ts": {
       "before": null,
       "after": "40c3bfb64ef5e826c98b1718fab946d4170ee54ba14dca6397f61b126d10d881"
+    },
+    "lib/bardoctor/staff-job-storage.ts": {
+      "before": null,
+      "after": "86a4f4696ab7908bc590d66a0b6ffcc5d154dd3a3a70242776027fd9f6b5d342"
     }
   }
 }

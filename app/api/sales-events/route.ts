@@ -52,6 +52,7 @@ function controlled(error:unknown) {
 export async function GET(request:Request) {
   const account = await authenticateRequest(request); if (!account) return unauthorized();
   if (!hasPermission(account,"sales.view")) return reply({ok:false,code:"ACCESS_DENIED"},403);
+  const navigation = (response: Response) => { response.headers.set("X-BD-Sales-Journal", canManagePosPrivilegedAction(account) ? "1" : "0"); return response; };
   try {
     const {context:c} = await load(account);
     const reportShift = new URL(request.url).searchParams.get("reportShiftId");
@@ -61,13 +62,13 @@ export async function GET(request:Request) {
     }
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
     const taxonomy = canonicalTaxonomyForAssortment(c.assortment);
-    return reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
+    return navigation(reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : shift),
       events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(event => account.role === "cashier" ? posSalesEventView(event) : event),
-      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage")} });
-  } catch(error) { return controlled(error); }
+      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage")} }));
+  } catch(error) { return navigation(controlled(error)); }
 }
 export async function POST(request:Request):Promise<Response> { return withStoreCasRetries(request,command); }
 async function command(request:Request):Promise<Response> {

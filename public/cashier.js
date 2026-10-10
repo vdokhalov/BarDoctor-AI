@@ -25,7 +25,7 @@
     }
     if(!configure()){state.rules=[];clearView("discounts");if(state.view==="discounts")state.view="cashier";}
   }
-  function clearSensitive(message) { state.frozen=true;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
+  function clearSensitive(message) { state.frozen=true;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
   async function request(path,body) {
     if(state.frozen)throw Error("Обновите кассу перед продолжением.");
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
@@ -40,6 +40,7 @@
       clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
       if(response.status===401)location.replace("/login");
     }
+    if(path==="/api/sales-events"&&!body)$("sales-journal").hidden=response.headers.get("X-BD-Sales-Journal")!=="1";
     if(!response.ok||!data.ok){const error=Error(data.error||({POS_ORDER_SHIFT_HAS_OPEN_ORDERS:"Перед закрытием завершите или отмените все открытые заказы.",POS_CASH_NEEDS_REVIEW:"Проверьте кассовые суммы и причину операции."})[data.code]||"Операция не выполнена. Обновите данные и проверьте запрос.");error.status=response.status;error.code=data.code;error.uncertain=response.status>=500;throw error;}
     return data;
   }

@@ -1,3 +1,4 @@
+import { seedMemberJob, readMemberJob } from "../tests/helpers/staff-job-fixture";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync, mkdirSync, existsSync } from "node:fs";
@@ -13,8 +14,9 @@ const r = await lifecycleRuntime({ access: "./app/api/access/route", members: ".
 const owner = await r.register("staff-browser-owner@isolated.test");
 const staff = await r.register("staff-browser-member@isolated.test");
 // Only the in-memory fixture is changed. No remote server, real code or account is used.
-r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,job_title,status,permissions_json) VALUES (?,?,'cashier','waiter','active',?)")
+r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status,permissions_json) VALUES (?,?,'cashier','active',?)")
   .run(owner.activeVenueId, staff.userId, JSON.stringify({ deny: ["sales.post"], allow: [] }));
+seedMemberJob(r.sqlite,staff.userId,owner.activeVenueId,"waiter");
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", "http://127.0.0.1");
@@ -60,18 +62,18 @@ try {
     await page.locator("#invite-role").selectOption("barista"); await page.locator("#create-invite").click();
     await page.locator("#invite-result").waitFor({ state: "visible" });
     assert.match(await page.locator("#invite-expiry").innerText(), /^Бариста\./);
-    const persisted = r.sqlite.prepare("SELECT role,job_title FROM venue_invites ORDER BY id DESC LIMIT 1").get();
+    const persisted = r.sqlite.prepare("SELECT i.role,json_extract(j.data_json,'$') AS job_title FROM venue_invites i JOIN domain_data j ON j.account_id=i.created_by_account_id AND j.store_key='__bd_invite_job_v1__:' || i.code_hash ORDER BY i.id DESC LIMIT 1").get();
     assert.equal(persisted?.role, "cashier"); assert.equal(persisted?.job_title, "barista");
     const member = page.locator(".member-row").filter({ hasText: staff.email });
     await member.locator("select").selectOption(profile.name === "desktop" ? "bartender" : "waiter");
     await member.locator(".role-pill").filter({ hasText: profile.name === "desktop" ? "Бармен" : "Официант" }).waitFor();
-    const saved = r.sqlite.prepare("SELECT role,job_title,permissions_json FROM venue_memberships WHERE venue_id=? AND account_id=?").get(owner.activeVenueId, staff.userId)!;
+    const saved = r.sqlite.prepare("SELECT role,permissions_json FROM venue_memberships WHERE venue_id=? AND account_id=?").get(owner.activeVenueId, staff.userId)!;
     assert.equal(saved.role, "cashier"); assert.deepEqual(JSON.parse(String(saved.permissions_json)).deny, ["sales.post"]);
     await member.getByRole("button", { name: "Настроить права" }).click();
     assert.equal(await page.locator("#permission-list input").count(), 3);
     await page.keyboard.press("Escape"); assert.equal(await page.locator("#permission-sheet").isVisible(), false);
     await page.reload(); await page.locator("#access-content").waitFor({ state: "visible" });
-    assert.equal(await member.locator("select").inputValue(), saved.job_title);
+    assert.equal(await member.locator("select").inputValue(), readMemberJob(r.sqlite,staff.userId,owner.activeVenueId));
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "no horizontal overflow");
     await page.screenshot({ path: `outputs/pos-workspace/${profile.name}-staff-access.png`, fullPage: true });
     assert.deepEqual(errors, []); await context.close(); console.log(profile.name + " staff access PASS");

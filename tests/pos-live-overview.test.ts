@@ -1,3 +1,4 @@
+import { seedMemberJob } from "./helpers/staff-job-fixture";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildPosLiveOverview, type PosLiveOverview, type PosOverviewMember } from "../lib/bardoctor/pos-live-overview";
@@ -156,7 +157,8 @@ function seedShift(r: Runtime, owner: User) {
 function join(r: Runtime, owner: User, accountId: number, role: string, title: string | null = null, permissions: unknown = null) {
   const workspace = r.sqlite.prepare("SELECT workspace_id FROM venues WHERE id=?").get(owner.activeVenueId)!.workspace_id;
   r.sqlite.prepare("INSERT OR IGNORE INTO workspace_memberships (workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace!, accountId);
-  r.sqlite.prepare("INSERT INTO venue_memberships (venue_id,account_id,role,job_title,status,permissions_json) VALUES (?,?,?,?,'active',?)").run(owner.activeVenueId, accountId, role, title, permissions == null ? null : JSON.stringify(permissions));
+  r.sqlite.prepare("INSERT INTO venue_memberships (venue_id,account_id,role,status,permissions_json) VALUES (?,?,?,'active',?)").run(owner.activeVenueId, accountId, role, permissions == null ? null : JSON.stringify(permissions));
+  seedMemberJob(r.sqlite,accountId,owner.activeVenueId,title);
 }
 function identity(r: Runtime, label: string, kind = "user") {
   return Number(r.sqlite.prepare("INSERT INTO accounts (chatgpt_email,app_email,first_name,last_name,account_kind,owns_venue) VALUES (?,?,?,'Staff',?,0)").run(`${label}@isolated.test`, `${label}@isolated.test`, label, kind).lastInsertRowid);
@@ -175,7 +177,7 @@ test("real-auth overview includes active role/job zeros only, excludes disabled/
   r.sqlite.prepare("UPDATE workspace_memberships SET status='disabled' WHERE workspace_id=? AND account_id=?").run(workspace!, disabledWorkspace);
   r.sqlite.prepare("INSERT INTO workspace_memberships (workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace!, foreignSameWorkspace);
   join(r, foreign, foreignSameWorkspace, "cashier", "waiter");
-  r.sqlite.prepare("INSERT INTO venue_invites (venue_id,code_hash,role,job_title,created_by_account_id,expires_at) VALUES (?,'unclaimed','cashier','waiter',?,'2099-01-01')").run(owner.activeVenueId, owner.userId);
+  r.sqlite.prepare("INSERT INTO venue_invites (venue_id,code_hash,role,created_by_account_id,expires_at) VALUES (?,'unclaimed','cashier',?,'2099-01-01')").run(owner.activeVenueId, owner.userId);
   const state = () => JSON.stringify(r.sqlite.prepare("SELECT name,sql FROM sqlite_master ORDER BY name").all()) + JSON.stringify(["domain_data", "venue_memberships", "workspace_memberships", "audit_log", "sessions"].map(table => r.sqlite.prepare(`SELECT * FROM ${table} ORDER BY 1`).all()));
   const before = state();
   const response = await r.api.overview.GET(selected(r, owner, owner.activeVenueId)); assert.equal(response.status, 200); assert.equal(response.headers.get("Cache-Control"), "private, no-store");
@@ -191,10 +193,10 @@ test("real-auth overview needs management plus sales.view, ignores shift-manage 
   join(r, owner, staff.userId, "cashier", "waiter", { allow: ["shifts.manage", "finance.view", "sales.view"] });
   const get = (user = staff, path = "/api/pos-overview?shiftId=night", venueId = owner.activeVenueId) => r.api.overview.GET(selected(r, user, venueId, path));
   for (const title of ["cashier", "waiter", "barista", "bartender"]) {
-    r.sqlite.prepare("UPDATE venue_memberships SET job_title=? WHERE venue_id=? AND account_id=?").run(title, owner.activeVenueId, staff.userId); assert.equal((await get()).status, 403);
+    seedMemberJob(r.sqlite,staff.userId,owner.activeVenueId,title); assert.equal((await get()).status, 403);
   }
   for (const role of ["manager", "shift_manager"]) {
-    r.sqlite.prepare("UPDATE venue_memberships SET role=?,job_title=NULL,permissions_json=? WHERE venue_id=? AND account_id=?").run(role, JSON.stringify({ deny: ["shifts.manage"] }), owner.activeVenueId, staff.userId);
+    r.sqlite.prepare("UPDATE venue_memberships SET role=?,permissions_json=? WHERE venue_id=? AND account_id=?").run(role, JSON.stringify({ deny: ["shifts.manage"] }), owner.activeVenueId, staff.userId);
     assert.equal((await get()).status, 200, role + " only needs sales.view");
   }
   r.sqlite.prepare("UPDATE venue_memberships SET permissions_json=? WHERE venue_id=? AND account_id=?").run(JSON.stringify({ deny: ["sales.view"], allow: ["shifts.manage"] }), owner.activeVenueId, staff.userId);

@@ -20,6 +20,17 @@ test('More exception does not hide disabled or renamed Doctor controls',()=>{
 });
 test('clicking the wrong destination blocks otherwise visible navigation',()=>{const value=state();value.actions[item.id].url='/home';assert.equal(evaluate(value).verdict,'FAIL');});
 test('changed embedded module content blocks route-only parity',()=>{const value=state();value.before.frames=[{title:'Finance',text:'Missing payroll'}];assert.equal(evaluate(value).verdict,'FAIL');});
+test('recovered cashier presentation requires the same measured read-only rejection and route contract',()=>{
+ const item={id:'route:/cashier',path:'/cashier'},a=state();a.before.url='/cashier';a.before.contract={path:'/cashier',url:'/cashier',parent:'/sales-import'};a.actions={};
+ a.cashierRejection={status:409,code:'SALES_EVENT_STORE_NEEDS_REVIEW',visible:true,ledgerUnchanged:true};
+ const b=structuredClone(a);b.before.entries=[];b.before.frames=[{title:'Касса',text:'New POS presentation'}];b.cashierReturn={visible:true,href:'/sales-import',destination:'/sales-import'};
+ const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/cashier':a},candidate:{'/cashier':b}},'webkit',390)[0].verdict;
+ assert.equal(compare(),'PASS');
+ for(const change of [{status:401},{code:'UNKNOWN'},{visible:false},{ledgerUnchanged:false}]){b.cashierRejection={...a.cashierRejection,...change};assert.equal(compare(),'FAIL');}
+ delete b.cashierRejection;assert.equal(compare(),'FAIL');b.cashierRejection={...a.cashierRejection};
+ for(const change of [{visible:false},{href:'/home'},{destination:'/home'}]){const saved=b.cashierReturn;b.cashierReturn={...saved,...change};assert.equal(compare(),'FAIL');b.cashierReturn=saved;}
+ b.before.contract.parent='/home';assert.equal(compare(),'FAIL');
+});
 test('unchanged route, entry and actual destination pass together',()=>assert.equal(evaluate(state()).verdict,'PASS'));
 test('approved Doctor presentation does not excuse a removed legacy diagnosis entry',()=>{
  const legacy={id:'doctor-legacy:run',kind:'entry',from:'/analysis'};
@@ -59,4 +70,13 @@ test('v503 cost relocation requires actual browser evidence and does not claim H
  b.approvedCostPlacement={approval:'v503',homeAbsent:true,healthVisible:true,healthOutsideClosedDisclosure:true};
  assert.equal(check().verdict,'PASS');assert.equal(check().home,'REMOVED (owner-approved v503)');assert.equal(check().discoverability,'PASS (Health)');
  for(const key of ['homeAbsent','healthVisible','healthOutsideClosedDisclosure']){b.approvedCostPlacement[key]=false;assert.equal(check().verdict,'FAIL');b.approvedCostPlacement[key]=true;}
+});
+
+test('approved team cashier description changes no controls, route or other copy',()=>{
+ const item={id:'route:/team-access',path:'/team-access'},a=state();a.before.url='/team-access';a.before.contract={path:'/team-access',url:'/team-access'};a.actions={};
+ a.before.frames=[{title:'Access',text:'Manager unchanged Кассир Просмотр смен и проведение продаж в кассе без отмены проведённых операций.'}];
+ const b=structuredClone(a);b.before.frames[0].text='Manager unchanged Сотрудник кассы Работа только в кассе: заказы и свои чеки. Управление сменой и отмены доступны старшим.';
+ const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/team-access':a},candidate:{'/team-access':b}},'webkit',390)[0].verdict;
+ assert.equal(compare(),'PASS');b.before.entries=[];assert.equal(compare(),'FAIL');b.before.entries=a.before.entries;
+ b.before.frames[0].text=b.before.frames[0].text.replace('Manager unchanged','Manager removed');assert.equal(compare(),'FAIL');
 });

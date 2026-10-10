@@ -1,5 +1,6 @@
+import { membershipWithJobTitle, setMemberJob } from "../../../../../lib/bardoctor/staff-job-storage";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../../../../db";
+import { getD1, getDb } from "../../../../../db";
 import { accounts, venueMemberships } from "../../../../../db/schema";
 import {
   canManageTarget,
@@ -23,7 +24,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
   }
   const [target] = await getDb()
     .select({
-      membership: venueMemberships,
+      membership: membershipWithJobTitle,
       firstName: accounts.firstName,
       lastName: accounts.lastName,
       email: accounts.appEmail,
@@ -83,17 +84,12 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
       ? body.employeeId.trim().slice(0, 120)
       : null;
   const updatedAt = new Date().toISOString();
-  await getDb()
-    .update(venueMemberships)
-    .set({
-      role: nextRole,
-      jobTitle,
-      permissionsJson,
-      status: nextStatus,
-      employeeId,
-      updatedAt,
-    })
-    .where(eq(venueMemberships.id, membershipId));
+  const db = getD1();
+  await db.batch([
+    db.prepare(`UPDATE venue_memberships SET role=?,permissions_json=?,status=?,employee_id=?,updated_at=? WHERE id=? AND venue_id=?`)
+      .bind(nextRole,permissionsJson,nextStatus,employeeId,updatedAt,membershipId,actor.venueId),
+    setMemberJob(db,target.membership.accountId,actor.venueId,jobTitle,updatedAt),
+  ]);
 
   const label = [target.firstName, target.lastName].filter(Boolean).join(" ") || target.email;
   await logAccessChange({

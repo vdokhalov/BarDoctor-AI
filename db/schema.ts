@@ -126,7 +126,6 @@ export const venueMemberships = sqliteTable(
       .notNull()
       .references(() => accounts.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("shift_manager"),
-    jobTitle: text("job_title"),
     permissionsJson: text("permissions_json"),
     status: text("status").notNull().default("active"),
     employeeId: text("employee_id"),
@@ -153,7 +152,6 @@ export const venueInvites = sqliteTable(
       .references(() => venues.id, { onDelete: "cascade" }),
     codeHash: text("code_hash").notNull(),
     role: text("role").notNull(),
-    jobTitle: text("job_title"),
     permissionsJson: text("permissions_json"),
     createdByAccountId: integer("created_by_account_id")
       .notNull()

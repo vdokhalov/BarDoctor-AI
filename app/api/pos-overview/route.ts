@@ -25,7 +25,7 @@ export async function GET(request: Request): Promise<Response> {
     const results = await database.batch<Record<string, unknown>>([
       database.prepare("SELECT store_key,data_json FROM domain_data WHERE account_id=? AND store_key IN (?,?,?,?)").bind(account.id, ...STORE_KEYS),
       database.prepare(`SELECT vm.id AS membershipId, vm.account_id AS accountId, a.first_name AS firstName, a.last_name AS lastName,
-        vm.role, vm.job_title AS jobTitle, vm.permissions_json AS permissionsJson
+        vm.role, CASE WHEN vm.role='cashier' THEN (SELECT json_extract(j.data_json, '$') FROM domain_data j WHERE j.account_id=vm.account_id AND j.store_key='__bd_staff_job_v1__:' || vm.venue_id) ELSE NULL END AS jobTitle, vm.permissions_json AS permissionsJson
         FROM venue_memberships vm JOIN accounts a ON a.id=vm.account_id
         JOIN venues v ON v.id=vm.venue_id
         JOIN workspace_memberships wm ON wm.workspace_id=v.workspace_id AND wm.account_id=vm.account_id

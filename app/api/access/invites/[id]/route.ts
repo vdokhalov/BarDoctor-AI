@@ -1,3 +1,4 @@
+import { inviteWithJobTitle } from "../../../../../lib/bardoctor/staff-job-storage";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../../db";
 import { venueInvites } from "../../../../../db/schema";
@@ -23,7 +24,7 @@ export async function DELETE(request: Request, context: RouteContext): Promise<R
   const { id } = await context.params;
   const inviteId = Number(id);
   const [invite] = await getDb()
-    .select()
+    .select(inviteWithJobTitle)
     .from(venueInvites)
     .where(
       and(

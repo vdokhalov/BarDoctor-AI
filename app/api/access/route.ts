@@ -1,3 +1,4 @@
+import { membershipWithJobTitle, inviteJobTitle } from "../../../lib/bardoctor/staff-job-storage";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { getDb } from "../../../db";
 import {
@@ -57,7 +58,7 @@ export async function GET(request: Request): Promise<Response> {
     );
   const members = await getDb()
     .select({
-      membership: venueMemberships,
+      membership: membershipWithJobTitle,
       account: {
         id: accounts.id,
         firstName: accounts.firstName,
@@ -75,7 +76,7 @@ export async function GET(request: Request): Promise<Response> {
       .select({
         id: venueInvites.id,
         role: venueInvites.role,
-        jobTitle: venueInvites.jobTitle,
+        jobTitle: inviteJobTitle,
         permissionsJson: venueInvites.permissionsJson,
         expiresAt: venueInvites.expiresAt,
         createdAt: venueInvites.createdAt,

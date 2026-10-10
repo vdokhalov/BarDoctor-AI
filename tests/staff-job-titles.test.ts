@@ -1,3 +1,4 @@
+import { readMemberJob } from "./helpers/staff-job-fixture";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
@@ -43,7 +44,7 @@ test("each job survives one-use invite, fresh registration/login, auth and team 
     assert.equal(invitation.status, 201);
     const { invite } = await invitation.json() as InvitePayload;
     assert.equal(invite.role, "cashier"); assert.equal(invite.jobTitle, jobTitle);
-    assert.equal(r.sqlite.prepare("SELECT job_title FROM venue_invites WHERE id=?").get(invite.id)?.job_title, jobTitle);
+    assert.equal(JSON.parse(String(r.sqlite.prepare("SELECT j.data_json FROM domain_data j JOIN venue_invites i ON j.account_id=i.created_by_account_id AND j.store_key='__bd_invite_job_v1__:' || i.code_hash WHERE i.id=?").get(invite.id)?.data_json)), jobTitle);
     const email = `jobs-${jobTitle}@isolated.test`;
     const registration = await r.api.register.POST(new Request("https://isolated.test/api/auth/register", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -56,7 +57,7 @@ test("each job survives one-use invite, fresh registration/login, auth and team 
     assert.equal(r.sqlite.prepare("SELECT owns_venue FROM accounts WHERE id=?").get(user.userId)?.owns_venue, 0);
     assert.equal(r.sqlite.prepare("SELECT count(*) n FROM venues WHERE created_by_account_id=?").get(user.userId)?.n, 0);
     const membership = r.sqlite.prepare("SELECT * FROM venue_memberships WHERE account_id=?").get(user.userId)!;
-    assert.equal(membership.role, "cashier"); assert.equal(membership.job_title, jobTitle);
+    assert.equal(membership.role, "cashier"); assert.equal(readMemberJob(r.sqlite,user.userId,owner.activeVenueId), jobTitle);
     const freshLogin = await r.api.login.POST(new Request("https://isolated.test/api/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "Isolated-Test-Password-123!" }) }));
     assert.equal(freshLogin.status, 200);
     const login = await freshLogin.json() as User;
@@ -97,7 +98,7 @@ test("existing-account join preserves venue-scoped job and title editing preserv
   assert.equal((await patch({ jobTitle: "administrator" })).status, 400);
   assert.equal((await patch({ role: "manager", jobTitle: "waiter" })).status, 400);
   assert.equal((await patch({ role: "manager" })).status, 200);
-  assert.equal(r.sqlite.prepare("SELECT job_title FROM venue_memberships WHERE id=?").get(membership.id)?.job_title, null);
+  assert.equal(readMemberJob(r.sqlite,user.userId,owner.activeVenueId), null);
   assert.equal((await patch({ role: "cashier", jobTitle: "waiter", permissions: { allow: [], deny: [] } })).status, 200);
   assert.equal((await patch({ status: "disabled" })).status, 200);
   const disabledHeaders = new Headers(r.request(user, "/api/access").headers); disabledHeaders.set("X-Venue-Id", String(owner.activeVenueId));
@@ -116,7 +117,7 @@ test("invalid titles and cross-role metadata fail before issuing an invitation",
   assert.equal(r.sqlite.prepare("SELECT count(*) n FROM venue_invites").get()?.n, 0);
   const legacy = await (await r.api.access.POST(r.request(owner, "/api/access", "POST", { role: "cashier" }))).json() as InvitePayload;
   assert.equal(legacy.invite.jobTitle, "cashier");
-  assert.throws(() => r.sqlite.prepare("UPDATE venue_invites SET role='manager' WHERE id=?").run(legacy.invite.id), /CHECK constraint/);
+  for (const table of ["venue_memberships", "venue_invites"]) assert.equal(r.sqlite.prepare(`PRAGMA table_info(${table})`).all().some(column => column.name === "job_title"), false, "unchanged production schema");
 });
 
 test("team controls send canonical cashier plus job metadata and joined staff land in cashier", () => {

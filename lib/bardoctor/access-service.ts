@@ -1,3 +1,4 @@
+import { inviteWithJobTitle, inviteJobKey, MEMBER_JOB_PREFIX, INVITE_JOB_PREFIX } from "./staff-job-storage";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
 import {
@@ -48,7 +49,7 @@ export async function findActiveInvite(code: string) {
   const codeHash = await inviteCodeHash(normalized);
   const now = new Date().toISOString();
   const [invite] = await getDb()
-    .select()
+    .select(inviteWithJobTitle)
     .from(venueInvites)
     .where(
       and(
@@ -79,18 +80,14 @@ export async function createVenueInvite(input: {
     const code = randomInviteCode();
     const codeHash = await inviteCodeHash(code);
     try {
-      const [invite] = await getDb()
-        .insert(venueInvites)
-        .values({
-          venueId: input.actor.venueId,
-          codeHash,
-          role: input.role,
-          jobTitle: staffJobTitle(input.role, input.jobTitle),
-          permissionsJson,
-          createdByAccountId: input.actor.actorAccountId,
-          expiresAt,
-        })
-        .returning();
+      const db = getD1();
+      await db.batch([
+        db.prepare(`INSERT INTO venue_invites(venue_id,code_hash,role,permissions_json,created_by_account_id,expires_at)
+          VALUES (?,?,?,?,?,?)`).bind(input.actor.venueId,codeHash,input.role,permissionsJson,input.actor.actorAccountId,expiresAt),
+        db.prepare(`INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?)`)
+          .bind(input.actor.actorAccountId,inviteJobKey(codeHash),JSON.stringify(staffJobTitle(input.role,input.jobTitle))),
+      ]);
+      const [invite] = await getDb().select(inviteWithJobTitle).from(venueInvites).where(eq(venueInvites.codeHash,codeHash)).limit(1);
       return { invite, code };
     } catch (error) {
       if (!(error instanceof Error) || !/unique/i.test(error.message)) throw error;
@@ -138,16 +135,22 @@ export async function claimVenueInvite(
     d1
       .prepare(
         `INSERT INTO venue_memberships (
-           venue_id, account_id, role, job_title, permissions_json, status,
+           venue_id, account_id, role, permissions_json, status,
            invited_by_account_id, joined_at, created_at, updated_at
          )
-         SELECT venue_id, ?, role, job_title, permissions_json, 'active',
+         SELECT venue_id, ?, role, permissions_json, 'active',
                 created_by_account_id, ?, ?, ?
          FROM venue_invites
          WHERE id = ? AND used_by_account_id = ? AND used_at = ?
          ON CONFLICT(venue_id, account_id) DO NOTHING`,
       )
       .bind(account.id, now, now, now, invite.id, account.id, now),
+    d1.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at)
+      SELECT ?, ? || i.venue_id, j.data_json, ? FROM venue_invites i
+      JOIN domain_data j ON j.account_id=i.created_by_account_id AND j.store_key=? || i.code_hash
+      WHERE i.id=? AND i.used_by_account_id=? AND i.used_at=?
+      ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`)
+      .bind(account.id,MEMBER_JOB_PREFIX,now,INVITE_JOB_PREFIX,invite.id,account.id,now),
     d1
       .prepare(
         `INSERT INTO workspace_memberships (

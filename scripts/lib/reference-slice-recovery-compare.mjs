@@ -10,15 +10,23 @@ export function compareRecoveryParity(inventory,versions,engine,width){const row
     const contractMeaning=c=>({...c,url:canonical(c.url,b.before.venue),...(c.parent?{parent:canonical(c.parent,b.before.venue)}:{})});
     assert.deepEqual(contractMeaning(b.before.contract),contractMeaning(a.before.contract),item.id+' return/reload contract');
     const approved=['/home','/health','/analysis'].includes(path)||['home','health','doctor'].includes(a.before.surface)&&a.before.surface===b.before.surface;
-    if(!approved&&!payrollDefault){
-      const entries=v=>v.before.entries.filter(e=>e.label.trim()).map(e=>({...Object.fromEntries(Object.entries(e).filter(([key])=>key!=='index')),label:normalized(e.label)}));
+    const recoveredCashier=item.id==='route:/cashier'&&path==='/cashier';
+    if(recoveredCashier){
+      const rejection={status:409,code:'SALES_EVENT_STORE_NEEDS_REVIEW',visible:true,ledgerUnchanged:true};
+      assert.deepEqual(a.cashierRejection,rejection,'historical cashier rejects incomplete fixture sale');
+      assert.deepEqual(b.cashierRejection,rejection,'recovered cashier retains visible, read-only rejection');
+      assert.deepEqual(b.cashierReturn,{visible:true,href:'/sales-import',destination:'/sales-import'},'recovered cashier journal return is functional');
+    }
+    const teamCopy=text=>path==='/team-access'?text.replace(normalized('Сотрудник кассы Работа только в кассе: заказы и свои чеки. Управление сменой и отмены доступны старшим.'),normalized('Кассир Просмотр смен и проведение продаж в кассе без отмены проведённых операций.')):text;
+    if(!approved&&!payrollDefault&&!recoveredCashier){
+      const entries=v=>v.before.entries.filter(e=>e.label.trim()).map(e=>({...Object.fromEntries(Object.entries(e).filter(([key])=>key!=='index')),label:teamCopy(normalized(e.label))}));
       // Only the two owner-requested More entries are new. Every existing
       // control still participates in the unchanged module parity check.
       // The existing More renderer sets aria-label to the title only.
       const addedMore=new Set(['AI Doctor','Состояние бизнеса']);
       const candidateEntries=entries(b).filter(entry=>path!=='/more'||!(addedMore.has(entry.label)&&entry.tag==='BUTTON'&&!entry.nav&&!entry.disabled&&!entry.href));
       assert.deepEqual(candidateEntries,entries(a),item.id+' all visible/discoverable controls');
-      assert.deepEqual(b.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),a.before.frames.map(f=>({title:f.title,text:normalized(f.text)})),item.id+' embedded module content');
+      assert.deepEqual(b.before.frames.map(f=>({title:f.title,text:teamCopy(normalized(f.text))})),a.before.frames.map(f=>({title:f.title,text:teamCopy(normalized(f.text))})),item.id+' embedded module content');
     }
     if(payrollDefault){assert.deepEqual(b.baselineDefects,[],item.id+' repaired Payroll runtime');assert.ok(b.before.text.includes('Зарплат'),item.id+' Payroll visible');assert.equal(new URL(b.before.url,'http://isolated.test').searchParams.get('month'),'2026-10',item.id+' same existing default month');}
     const x=a.actions[item.id],y=b.actions[item.id];
@@ -32,6 +40,6 @@ export function compareRecoveryParity(inventory,versions,engine,width){const row
     if(x?.reloaded||y?.reloaded){assert.ok(x.reloaded&&y.reloaded,item.id+' reload evaluated');assert.equal(canonical(y.reloaded.url),canonical(x.reloaded.url),item.id+' reload state parity');}
     const movedCost=item.id==='home:Cost correction';
     if(movedCost)assert.deepEqual(b.approvedCostPlacement,{approval:'v503',homeAbsent:true,healthVisible:true,healthOutsideClosedDisclosure:true},'v503 cost placement must be verified in browser');
-    rows.push({id:item.id,engine,width,route:'PASS',desktop:width===1280?'PASS':'N/A',mobile:width<1024?'PASS':'N/A',home:movedCost?'REMOVED (owner-approved v503)':item.home?'PASS':'N/A',discoverability:movedCost?'PASS (Health)':x?.absent?'CONDITIONAL (same baseline inputs)':'PASS',clickability:x?.absent||x?.disabled?'N/A (same baseline precondition)':'PASS',destination:x?.absent||x?.disabled?'N/A (same baseline precondition)':'PASS',venue:'PASS',reload:'PASS',return:'PASS (v485 canonical contract)',permissions:'PASS (protected handlers + RBAC regression)',condition:x?.absent?'Data-dependent: absent in identical v485 inputs; unchanged source handler':x?.conditional??(x?.disabled?'Same v485 precondition/disabled state':null),functional:b.baselineDefects?.length?'FAIL':'PASS',approvedException:movedCost?'Home mount removed in v503; cost verified visible on Health':payrollDefault?'Owner-approved two initializer calls; original cold failure captured separately; baseline functional comparison supplies its existing supported month query, candidate opens without month':null,verdict:b.baselineDefects?.length?'BLOCKED':'PASS'});
+    rows.push({id:item.id,engine,width,route:'PASS',desktop:width===1280?'PASS':'N/A',mobile:width<1024?'PASS':'N/A',home:movedCost?'REMOVED (owner-approved v503)':item.home?'PASS':'N/A',discoverability:movedCost?'PASS (Health)':x?.absent?'CONDITIONAL (same baseline inputs)':'PASS',clickability:x?.absent||x?.disabled?'N/A (same baseline precondition)':'PASS',destination:x?.absent||x?.disabled?'N/A (same baseline precondition)':'PASS',venue:'PASS',reload:'PASS',return:'PASS (v485 canonical contract)',permissions:'PASS (protected handlers + RBAC regression)',condition:x?.absent?'Data-dependent: absent in identical v485 inputs; unchanged source handler':x?.conditional??(x?.disabled?'Same v485 precondition/disabled state':null),functional:b.baselineDefects?.length?'FAIL':'PASS',approvedException:recoveredCashier?'Recovered POS presentation; measured same visible409 rejection without ledger changes; successful POS workflow has a separate mandatory browser gate':movedCost?'Home mount removed in v503; cost verified visible on Health':payrollDefault?'Owner-approved two initializer calls; original cold failure captured separately; baseline functional comparison supplies its existing supported month query, candidate opens without month':null,verdict:b.baselineDefects?.length?'BLOCKED':'PASS'});
   }catch(error){rows.push({id:item.id,engine,width,verdict:'FAIL',error:String(error)});}}
 return rows;}

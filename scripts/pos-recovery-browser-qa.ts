@@ -1,3 +1,4 @@
+import { seedMemberJob } from "../tests/helpers/staff-job-fixture";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { readFileSync,mkdirSync,existsSync,mkdtempSync,writeFileSync } from "node:fs";
@@ -18,7 +19,8 @@ r.sqlite.prepare("UPDATE accounts SET first_name='Анна',last_name='' WHERE i
 const workspace=r.sqlite.prepare("SELECT workspace_id FROM venues WHERE id=?").get(owner.activeVenueId)!.workspace_id!;
 for(const user of [anna,zero]){
  r.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace,user.userId);
- r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,job_title,status) VALUES (?,?,'cashier','waiter','active')").run(owner.activeVenueId,user.userId);
+ r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status) VALUES (?,?,'cashier','active')").run(owner.activeVenueId,user.userId);
+ seedMemberJob(r.sqlite,user.userId,owner.activeVenueId,"waiter");
 }
 const fixture=salesEventFixture();const menu=fixture.assortment.menuItems as {id:string;name:string;venueId:number;sectionId?:string;category?:string}[];
 for(const item of menu){item.venueId=owner.activeVenueId;item.category="Напитки";}
@@ -51,7 +53,7 @@ try{
  for(const profile of [{name:"desktop",width:1440,height:1000},{name:"tablet",width:820,height:1180},{name:"iphone",width:390,height:844}]){
   const context=await browser.newContext({viewport:profile});await context.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});
   const page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));await page.clock.install();
-  await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});await page.locator('[data-order="table-1"]').first().click();
+  await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});assert.equal(await page.locator("#sales-journal").isVisible(),true);assert.equal(await page.locator("#sales-journal").getAttribute("href"),"/sales-import");await page.locator('[data-order="table-1"]').first().click();
   await page.screenshot({path:join(output,profile.name+"-cashier.png"),fullPage:true});
   await page.getByRole("button",{name:"Текущая смена",exact:true}).click();await page.locator(".staff-table").waitFor();
   assert.match(await page.locator(".staff-table").innerText(),/Олег/);assert.match(await page.locator(".staff-table").innerText(),/Нет открытых счетов и продаж/);
@@ -113,6 +115,7 @@ try{
   await context.close();
  }
  const staffContext=await browser.newContext({viewport:{width:390,height:844}});await staffContext.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:anna,venue:owner.activeVenueId});const page=await staffContext.newPage();page.on("pageerror",error=>errors.push(error.message));await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});
+ assert.equal(await page.locator("#sales-journal").isVisible(),false);
  assert.equal(await page.locator('[data-view="overview"]').count(),0);assert.equal(await page.locator('[data-action="close-shift"]').count(),0);await page.getByRole("button",{name:"Чеки",exact:true}).click();assert.equal(await page.locator("#receipts-view .receipt-row").count(),1);
  await staffContext.close();
  // Finish the synthetic shift through real order cancellation API, then verify the report in the browser.

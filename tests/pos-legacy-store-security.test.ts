@@ -1,3 +1,4 @@
+import { seedMemberJob } from "./helpers/staff-job-fixture";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {lifecycleRuntime} from './helpers/lifecycle-runtime';
@@ -21,13 +22,15 @@ test('cashier legacy batch raw and bulk stores deny persisted private costs desp
  const context={params:Promise.resolve({id:undefined,key})};
  const request=(user:typeof owner,path:string,method='GET',body?:object)=>{const req=r.request(user,path,method,body);req.headers.set('X-Venue-Id',String(venue));return req;};
  const snapshot=()=>({domain:r.sqlite.prepare('SELECT * FROM domain_data ORDER BY account_id,store_key').all(),audit:r.sqlite.prepare('SELECT * FROM audit_log ORDER BY id').all()});
- const before=snapshot();
+
  for(const title of ['cashier','waiter','barista','bartender'])for(const permissions of [null,JSON.stringify({allow:PERMISSION_KEYS,deny:[]})]){
-  r.sqlite.prepare('UPDATE venue_memberships SET job_title=?,permissions_json=? WHERE venue_id=? AND account_id=?').run(title,permissions,venue,staff.userId);
+  r.sqlite.prepare('UPDATE venue_memberships SET permissions_json=? WHERE venue_id=? AND account_id=?').run(permissions,venue,staff.userId);
+  seedMemberJob(r.sqlite,staff.userId,venue,title);const before=snapshot();
   const raw=await r.api.raw.GET(request(staff,'/api/store/'+key),context);assert.equal(raw.status,403);assert.doesNotMatch(await raw.text(),/private-legacy-batch|recipeSnapshot|totalTheoreticalCost/);
   const bulk=await r.api.bulk.GET(request(staff,'/api/store'));assert.equal(bulk.status,200);const data=await bulk.json() as {entries:Record<string,unknown>};assert.equal(data.entries[key],undefined);assert.doesNotMatch(JSON.stringify(data),/private-legacy-batch|recipeSnapshot|totalTheoreticalCost/);
   const put=await r.api.raw.PUT(request(staff,'/api/store/'+key,'PUT',{data:legacy}),context);assert.equal(put.status,403);assert.deepEqual(snapshot(),before);
  }
+ const before=snapshot();
  const allowed=await r.api.raw.GET(request(owner,'/api/store/'+key),context);assert.equal(allowed.status,200);assert.deepEqual((await allowed.json() as {data:unknown}).data,legacy);
  assert.deepEqual(snapshot(),before);
 });

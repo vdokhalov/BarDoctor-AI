@@ -11,7 +11,7 @@ const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require(
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const out='outputs/reference-slice-recovery/'+(process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
 const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v485-functional-inventory.json','utf8'));
-if(process.env.BD_RECOVERY_RECHECK){const paths=process.env.BD_RECOVERY_RECHECK==='compatibility'?['/employees/qa-barista','/warehouse?inventory=new','/data-control?event=qa-event']:['/analysis','/health','/finance?repairEquipmentId=qa-equipment'];inventory.items=inventory.items.filter(i=>paths.includes(i.path??i.from));}
+if(process.env.BD_RECOVERY_RECHECK){const paths=process.env.BD_RECOVERY_RECHECK==='pos'?['/cashier','/team-access']:process.env.BD_RECOVERY_RECHECK==='compatibility'?['/employees/qa-barista','/warehouse?inventory=new','/data-control?event=qa-event']:['/analysis','/health','/finance?repairEquipmentId=qa-equipment'];inventory.items=inventory.items.filter(i=>paths.includes(i.path??i.from));}
 if(!process.env.BD_RECOVERY_WIDTH){
  const widths=[390,820,1280];
  const codes=await Promise.all(widths.map(width=>new Promise(done=>{const child=spawn(process.execPath,['--import','tsx',import.meta.filename],{env:{...process.env,BD_RECOVERY_WIDTH:String(width)},stdio:'inherit'});child.on('error',()=>done(1));child.on('exit',code=>done(code??1));})));
@@ -95,6 +95,26 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
         assert.deepEqual(fatalErrors(),[],path+' runtime errors');
         assert.equal(before.overflow,false,path+' overflow');
         const record={before,actions:{},baselineDefects:errors.slice(errorsAtRoute).filter(error=>error.knownPayroll&&error.path===new URL(before.url,runtime.base).pathname)};
+        if(path==='/cashier'){
+          // This Health fixture deliberately contains a thin historical sale,
+          // not a postable POS event (no immutable batch/prices/fingerprint).
+          // Both cashiers must visibly reject it without touching the ledger.
+          const ledger=JSON.stringify(r.read('bd_sales_events_v1'));
+          const response=await fetch(runtime.base+'/api/sales-events',{headers:r.requestAction('/api/sales-events').headers});
+          const payload=await response.json(),frame=page.frames().find(f=>new URL(f.url(),runtime.base).pathname==='/cashier'&&f.parentFrame());
+          assert.ok(frame,'cashier document rendered');assert.equal(response.status,409);assert.equal(payload.code,'SALES_EVENT_STORE_NEEDS_REVIEW');
+          assert.equal(await frame.locator('#notice').isVisible(),true);assert.equal(await frame.locator('#notice').innerText(),payload.error);
+          assert.equal(JSON.stringify(r.read('bd_sales_events_v1')),ledger);
+          record.cashierRejection={status:response.status,code:payload.code,visible:true,ledgerUnchanged:true};
+          if(version==='candidate'){
+            const link=frame.getByRole('link',{name:'Вернуться в журнал продаж',exact:true});
+            assert.equal(await link.isVisible(),true);assert.equal(await link.getAttribute('href'),'/sales-import');
+            await link.click();await page.waitForURL(url=>url.pathname==='/sales-import');await settle();
+            assert.equal((await state()).venue,String(r.venueId));
+            record.cashierReturn={visible:true,href:'/sales-import',destination:new URL(page.url()).pathname};
+            await visit(path);
+          }
+        }
         // Test the actual originating controls, not just direct-open destinations.
         const entries=inventory.items.filter(i=>i.from===path&&i.kind==='entry');
         for(const item of entries){

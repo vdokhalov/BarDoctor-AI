@@ -1,3 +1,4 @@
+import { membershipWithJobTitle } from "./staff-job-storage";
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
 import {
@@ -368,7 +369,7 @@ export async function membershipsForAccount(account: Account, readOnly = false) 
   }
   const rows = await getDb()
     .select({
-      membership: venueMemberships,
+      membership: membershipWithJobTitle,
       venue: venues,
     })
     .from(venueMemberships)

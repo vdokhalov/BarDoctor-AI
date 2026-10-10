@@ -99,6 +99,10 @@ jobs:
         run: node --test tests/phase5-artifact-preparation.test.mjs
       - name: Install Chromium for browser QA
         run: npm run browser:install
+      - name: Staff invitation title persistence and responsive access controls
+        run: node --import tsx scripts/staff-job-titles-browser-qa.ts
+      - name: Recovered POS real orders cash reports RBAC retries and responsive workflow
+        run: node --import tsx scripts/pos-recovery-browser-qa.ts
       - name: Phase 3A.1–3A.4 compiled Worker native D1 and evidence API mobile desktop
         run: |
           node --test tests/canonical-boundary-worker-phase3a5.test.mjs

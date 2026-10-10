@@ -1,3 +1,4 @@
+import { seedMemberJob } from "./helpers/staff-job-fixture";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { lifecycleRuntime } from "./helpers/lifecycle-runtime";
@@ -24,9 +25,11 @@ test("real-auth POS retries recheck membership denial and private cashier histor
  r.beforeNextDomainWrite(()=>{r.sqlite.prepare("UPDATE venue_memberships SET permissions_json=? WHERE venue_id=? AND account_id=?").run(JSON.stringify({deny:["sales.post"],allow:["finance.view"]}),venue,staff.userId);});
  assert.equal((await r.api.sales.POST(request(staff,"POST",{action:"post",command:mine,previewHash:preview.previewHash}))).status,403);
  const persisted=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(persisted.length,1);
- // Nullable legacy title must not prevent a valid cashier sale after rights are restored.
+ // A title changed after authentication must be captured by a fresh CAS attempt, never the stale actor.
  r.sqlite.prepare("UPDATE venue_memberships SET permissions_json=NULL WHERE venue_id=? AND account_id=?").run(venue,staff.userId);
+ r.beforeNextDomainWrite(()=>seedMemberJob(r.sqlite,staff.userId,venue,"waiter"));
  assert.equal((await r.api.sales.POST(request(staff,"POST",{action:"post",command:mine,previewHash:preview.previewHash}))).status,201);
+ const written=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(written.find((event:{externalId:string})=>event.externalId===mine.id).actor.jobTitle,"waiter");
  const safe=await (await r.api.sales.GET(request(staff))).json() as {events:{id:string;externalId:string}[]};assert.deepEqual(safe.events.map(e=>e.externalId),["staff-sale"]);
  assert.doesNotMatch(JSON.stringify(safe),/totalTheoreticalCost|originalMovements|recipeSnapshot/);
  const ownId=safe.events[0].id;
