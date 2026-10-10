@@ -64,7 +64,8 @@ try { for (const width of widths) {
     await page.waitForFunction(()=>Boolean((window as unknown as {__phase9:{current:()=>{snapshot:unknown}}}).__phase9?.current().snapshot));await page.screenshot({path:`${out}/${width}-known-zero.png`,fullPage:true});
     r.sqlite.prepare("DELETE FROM domain_data WHERE account_id=? AND store_key='bd_operational_reports_v1'").run(r.accountId);const partial=await call('/api/business-health');assert.equal(partial.body.data.businessHealth.components.find((c:{id:string})=>c.id==='operations')!.score,null);assert.notEqual(partial.body.data.businessHealthSnapshot.inputRevision,a.body.data.businessHealthSnapshot.inputRevision);await page.evaluate(body=>(window as unknown as {__phase9:{accept:(body:unknown)=>unknown}}).__phase9.accept(body),partial.body);
     await page.waitForFunction(()=>(window as unknown as {__phase9:{current:()=>{snapshot:{zones:{id:string;score:number|null}[]}}}}).__phase9.current().snapshot.zones.find(zone=>zone.id==='operations')?.score===null);
-    await page.screenshot({path:`${out}/${width}-missing-source.png`,fullPage:true});await waitForHealthHostReads(page, evidence);await page.reload();await page.waitForLoadState('networkidle');
+    // Finish host network work before test-forced reload; retain all pageerror assertions.
+    await page.screenshot({path:`${out}/${width}-missing-source.png`,fullPage:true});await waitForHealthHostReads(page, evidence);await page.waitForLoadState('networkidle');await page.reload();await page.waitForLoadState('networkidle');
     // Reproduce a Store read finishing after bootstrap Health without altering its data.
     evidence.guard(true,'store');assert.equal((await call('/api/store/bd_assortment_v1')).status,200);evidence.guard(false);
     await waitForHealthHostReads(page, evidence);assert.equal((await call('/api/business-health')).body.data.businessHealth.components.find((c:{id:string})=>c.id==='operations')!.score,null);
