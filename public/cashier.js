@@ -39,7 +39,11 @@
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
     if([401,403].includes(response.status)) {
       clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
-      if(response.status===401)location.replace("/login");
+      if(response.status===401){
+        // Match the shared expired-session contract; retain venue-scoped drafts.
+        for(const key of ["bd_session","bd_session_token","bd_session_userid"])localStorage.removeItem(key);
+        location.replace("/login");
+      }
     }
     let data,malformed=false;try{data=await response.json();if(!data||typeof data!=="object"||Array.isArray(data)){data={};malformed=true;}}catch{data={};malformed=true;}
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
