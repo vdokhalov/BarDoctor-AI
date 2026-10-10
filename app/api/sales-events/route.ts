@@ -7,6 +7,8 @@ import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time"
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission, canManagePosPrivilegedAction, type PermissionKey } from "../../../lib/bardoctor/access-control";
+import { canReadManagementWorkday } from "../../../lib/bardoctor/management-workday";
+import { OPERATIONAL_REPORT_STORE_KEY } from "../../../lib/bardoctor/operational-day";
 import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
 import { venueIdentityFromJson } from "../../../lib/bardoctor/venue-identity";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
@@ -16,7 +18,7 @@ import { SALES_EVENT_STORE_KEY, EVENT_REVENUE_SOURCE, planSalesEvent, planRevers
 
 import { menuTaxonomyPresentation, canonicalTaxonomyForAssortment } from "../../../lib/bardoctor/nomenclature-taxonomy";
 
-const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY];
+const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY,OPERATIONAL_REPORT_STORE_KEY];
 const reply = (data: unknown,status=200) => Response.json(data,{ status,headers:{ "Cache-Control":"private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
   const db = getD1(), snapshots = await readStoreSnapshots(db,account.id,keys);
@@ -67,7 +69,7 @@ export async function GET(request:Request) {
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : shift),
       events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(event => account.role === "cashier" ? posSalesEventView(event) : event),
-      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage")} }));
+      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage"),managementDay:canReadManagementWorkday(account)} }));
   } catch(error) { return navigation(controlled(error)); }
 }
 export async function POST(request:Request):Promise<Response> { return withStoreCasRetries(request,command); }
@@ -110,7 +112,11 @@ async function command(request:Request):Promise<Response> {
     } else {
       const original=c.revenues.find(row=>row.id===body.shiftId && row.venueId===c.venueId);
       if (body.action==="close_shift") assertPosShiftClosable(orders,c.venueId,body.shiftId);
-      let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name);
+      const workdays=JSON.parse(snapshots.find(row=>row.key===OPERATIONAL_REPORT_STORE_KEY)?.dataJson??"[]");
+      if(!Array.isArray(workdays))throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
+      const active=workdays.filter(row=>row?.venueId===c.venueId&&row.workdayStatus==="OPEN");
+      if(body.action==="open_shift"&&active.length>1)return reply({ok:false,code:"WORKDAY_NEEDS_REVIEW",error:"Найдены несколько открытых рабочих смен."},409);
+      let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name,body.action==="open_shift"?active[0]?.date:undefined);
       if (revenues===c.revenues) {
         if (body.action==="open_shift" && body.openingFloat!==undefined && body.openingFloat!==original?.openingFloat) return reply({ok:false,code:"SALES_EVENT_IDEMPOTENCY_CONFLICT"},409);
         return reply({ok:true,shiftId:body.shiftId,duplicate:true,...(body.action==="close_shift" ? {report:readPosShiftReport(c,body.shiftId)} : {})});

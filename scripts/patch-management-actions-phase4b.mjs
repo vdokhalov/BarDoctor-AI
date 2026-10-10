@@ -23,6 +23,14 @@ const patches=[
  ['S.useEffect(()=>{const params=new URLSearchParams(window.location.search),linkedShift=params.get("shift");','const bdManagementDayContextPhase4b=bdManagementClientPhase4b.useContext({venue:Number(bdUseProcVenueContextV168().activeVenueId),query:location,ready:!!profile&&canManage,onOpen:context=>{setViewing(null);setEditing(revenue.find(row=>String(row.date).slice(0,10)===context.businessDate)||{date:context.businessDate});setSheet("revenue")}});S.useEffect(()=>{const params=new URLSearchParams(window.location.search);if(params.has("healthAction"))return;const linkedShift=params.get("shift");'],
  ['className:"bd-shifts-page-v156",children:[','className:"bd-shifts-page-v156",children:[bdManagementDayContextPhase4b.banner,'],
 ];
+// Workday deep links are consumed once, so editing cannot reopen the view.
+// Preserve that owned declaration through restore/apply with the same unique-anchor gate.
+if(source.includes('linkKey=params.get("venue")+":"+linkedShift')){
+ const patch=patches.find(([before])=>before.startsWith('S.useEffect(()=>{const params=new URLSearchParams(window.location.search),linkedShift='));
+ const declaration='const linkedShift=params.get("shift"),linkKey=params.get("venue")+":"+linkedShift;if(!linkedShift)bdConsumedShiftLink.current=null;';
+ patch[0]='S.useEffect(()=>{const params=new URLSearchParams(window.location.search);'+declaration;
+ patch[1]=patch[1].replace('const linkedShift=params.get("shift");',declaration);
+}
 const at=source.indexOf(start);if(at>=0){const to=source.indexOf(end,at);if(to<0)throw Error('Incomplete Phase 4B client');source=source.slice(0,at)+source.slice(to+end.length).replace(/^\n/,'');}
 for(const[before,after]of patches)source=source.replace(after,before);
 if(process.argv.includes('--restore')){fs.writeFileSync(file,source);process.exit(0);}

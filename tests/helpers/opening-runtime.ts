@@ -19,6 +19,7 @@ import * as access from "../../lib/bardoctor/access-control";
 import * as salesEvents from "../../lib/bardoctor/sales-events";
 import * as venueIdentity from "../../lib/bardoctor/venue-identity";
 import * as operationalDay from "../../lib/bardoctor/operational-day";
+import * as managementWorkday from "../../lib/bardoctor/management-workday";
 import * as operationalReport from "../../lib/bardoctor/operational-report";
 import * as venueTime from "../../lib/bardoctor/venue-time";
 
@@ -47,7 +48,7 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
       if (i === failAt) throw new Error("SIMULATED_D1_WRITE_FAILURE"); out.push(await statements[i].run());
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
-  const dependencies = { ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport,
+  const dependencies = { ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport, ...managementWorkday,
     // This fixture explicitly substitutes auth; real membership/CAS coverage lives in lifecycleRuntime.
     posMembershipGuard: () => db.prepare("SELECT 1"),
     getD1: () => db as unknown as D1Database,

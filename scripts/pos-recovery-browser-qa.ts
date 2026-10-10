@@ -1,3 +1,4 @@
+import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { seedMemberJob } from "../tests/helpers/staff-job-fixture";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -12,7 +13,7 @@ import { GET as cashierPage } from "../app/cashier/route";
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require("./browser-runtime.cjs");
 const output=resolve("outputs/pos-recovery");mkdirSync(output,{recursive:true});
 const isolated=mkdtempSync(join(tmpdir(),"bardoctor-pos-qa-"));
-const r=await lifecycleRuntime({sales:"./app/api/sales-events/route",orders:"./app/api/pos-orders/route",discounts:"./app/api/pos-discounts/route",overview:"./app/api/pos-overview/route",members:"./app/api/access/members/[id]/route"},{sqlitePath:join(isolated,"synthetic.sqlite")});
+const r=await lifecycleRuntime({days:"./app/api/operational-days/route",sales:"./app/api/sales-events/route",orders:"./app/api/pos-orders/route",discounts:"./app/api/pos-discounts/route",overview:"./app/api/pos-overview/route",members:"./app/api/access/members/[id]/route"},{sqlitePath:join(isolated,"synthetic.sqlite")});
 const owner=await r.register("pos-recovery-owner@isolated.test"),anna=await r.register("pos-recovery-anna@isolated.test"),zero=await r.register("pos-recovery-zero@isolated.test");
 r.sqlite.prepare("UPDATE accounts SET first_name='Владелец QA',restaurant_json=? WHERE id=?").run(JSON.stringify({currency:"MDL",name:"BarDoctor QA",timezone:"Europe/Chisinau"}),owner.userId);
 r.sqlite.prepare("UPDATE accounts SET first_name='Анна',last_name='' WHERE id=?").run(anna.userId);r.sqlite.prepare("UPDATE accounts SET first_name='Олег',last_name='' WHERE id=?").run(zero.userId);
@@ -41,7 +42,7 @@ const server=createServer(async(req,res)=>{
  try{
   const url=new URL(req.url||"/","http://127.0.0.1");
   if(url.pathname==="/cashier"){const response=cashierPage();res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text());return;}
-  const route=url.pathname.startsWith("/api/access/members/")?"members":({"/api/sales-events":"sales","/api/pos-orders":"orders","/api/pos-discounts":"discounts","/api/pos-overview":"overview"} as Record<string,string>)[url.pathname];
+  const route=url.pathname.startsWith("/api/access/members/")?"members":({"/api/operational-days":"days","/api/sales-events":"sales","/api/pos-orders":"orders","/api/pos-discounts":"discounts","/api/pos-overview":"overview"} as Record<string,string>)[url.pathname];
   if(route){apiCalls++;const chunks:Buffer[]=[];for await(const part of req)chunks.push(part);const response=await r.api[route][req.method||"GET"](new Request(url,{method:req.method,headers:req.headers as Record<string,string>,...(req.method==="GET"?{}:{body:Buffer.concat(chunks)})}),{params:Promise.resolve({id:url.pathname.split("/").at(-1)})});res.writeHead(response.status,Object.fromEntries(response.headers));res.end(await response.text());return;}
   const path=resolve("public","."+url.pathname);if(!path.startsWith(resolve("public")+"/")||!existsSync(path)){res.writeHead(404);res.end();return;}
   res.writeHead(200,{"Content-Type":({".js":"text/javascript",".css":"text/css",".svg":"image/svg+xml",".png":"image/png"} as Record<string,string>)[extname(path)]||"application/octet-stream"});res.end(readFileSync(path));
@@ -71,7 +72,7 @@ try{
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),profile.name+" overflow");
   await page.getByRole("button",{name:"Касса",exact:true}).click();await page.getByRole("button",{name:"Быстрая продажа",exact:false}).click();
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="menu"]').first().click();
-  await page.locator('[data-add="beer"]').click();
+  await posAddItem(page,'[data-add="beer"]',"click");
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="order"]').first().click();
   if(profile.name==="desktop")await page.route("**/api/sales-events",async route=>{
     if(route.request().method()==="POST"&&route.request().postDataJSON().action==="post"){
@@ -90,7 +91,7 @@ try{
   await page.getByRole("button",{name:"Касса",exact:true}).click();await page.locator('[data-action="create-order"]').click();
   await page.locator('dialog [name="table"]').fill("20");await page.getByRole("button",{name:"Создать заказ",exact:true}).click();await page.locator("dialog").waitFor({state:"hidden"});
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="menu"]').first().click();
-  await page.locator('[data-add="beer"]').click();await page.locator('[data-add="beer"]').click();
+  await posAddItem(page,'[data-add="beer"]',"click");await posAddItem(page,'[data-add="beer"]',"click");
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="order"]').first().click();
   await page.waitForFunction(()=>document.querySelector("#work")?.getAttribute("aria-busy")==="false"&&document.querySelectorAll(".cart .line").length===2);
   const geometry=await page.evaluate(()=>{
@@ -99,16 +100,16 @@ try{
   });
   assert.equal(geometry.position,"static");assert(geometry.top>=geometry.lastBottom,"checkout does not overlap order lines");
   await page.locator('[data-action="payment"]').scrollIntoViewIfNeeded();assert(await page.locator('[data-action="payment"]').isVisible());
-  await page.locator('[data-action="precheck"]').click();await page.locator(".admin-actions summary").click();
+  await page.locator('[data-action="precheck"]').click();if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();
   await page.locator('[data-action="cancel-precheck"]').click();await page.locator('dialog [name="reason"]').fill("Synthetic correction");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
-  await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Synthetic discount");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Synthetic discount");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
   assert.match(await page.locator(".cart .readonly").innerText(),/QA 10%/);
-  await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Before split");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
-  await page.locator(".admin-actions summary").click();await page.locator('[data-action="split"]').click();await page.locator('dialog input[type="number"]').first().fill("1");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Before split");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();await page.locator('[data-action="split"]').click();await page.locator('dialog input[type="number"]').first().fill("1");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
   const currentOrders=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_pos_orders_v1'").get(owner.userId)!.data_json));
   const split=currentOrders.filter((order:{status:string;tableNumber:string})=>order.status==="OPEN"&&order.tableNumber==="20");assert.equal(split.length,2);
   for(const order of split){
-    await page.locator(`[data-order="${order.id}"]`).first().click();await page.locator(".admin-actions summary").click();await page.locator('[data-action="cancel-order"]').click();await page.locator('dialog [name="reason"]').fill("End synthetic flow");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+    await page.locator(`[data-order="${order.id}"]`).first().click();if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();await page.locator('[data-action="cancel-order"]').click();await page.locator('dialog [name="reason"]').fill("End synthetic flow");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
   }
 
   await page.reload();await page.locator("#work").waitFor({state:"visible"});assert.equal(await page.locator("#recovery").isVisible(),false);
@@ -117,10 +118,10 @@ try{
  const staffContext=await browser.newContext({viewport:{width:390,height:844}});await staffContext.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:anna,venue:owner.activeVenueId});const page=await staffContext.newPage();page.on("pageerror",error=>errors.push(error.message));await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});
  assert.equal(await page.locator("#sales-journal").isVisible(),false);
  assert.equal(await page.locator("#cashier-venue-host").isVisible(),false);
- await page.locator('[data-action="quick"]').click();await page.locator('[data-pane="menu"]').first().click();await page.locator('[data-add="beer"]').click();await page.locator('[data-pane="order"]').click();
- assert.equal(await page.locator('[data-increase-line]').count(),1);assert.equal(await page.locator('[data-decrease-line],[data-cancel-line],[data-action="split"],[data-action="cancel-precheck"]').count(),0);
+ await page.locator('[data-action="quick"]').click();await page.locator('[data-pane="menu"]').first().click();await posAddItem(page,'[data-add="beer"]',"click");await page.locator('[data-pane="order"]').click();
+ assert.equal(await page.locator('[data-increase-line]').count(),1);assert.equal(await page.locator('[data-decrease-line]').count(),1);assert.equal(await page.locator('[data-cancel-line],[data-action="split"],[data-action="cancel-precheck"]').count(),0);
  await page.locator('[data-increase-line]').click();assert.equal(await page.locator('.cart .line output').innerText(),'2');
- await page.reload();await page.locator('.cart .line output').waitFor();assert.equal(await page.locator('.cart .line output').innerText(),'2');assert.equal(await page.locator('[data-decrease-line],[data-cancel-line]').count(),0);
+ await page.reload();await page.locator('.cart .line output').waitFor();assert.equal(await page.locator('.cart .line output').innerText(),'2');assert.equal(await page.locator('[data-decrease-line]').count(),1);assert.equal(await page.locator('[data-cancel-line]').count(),0);await page.locator('[data-decrease-line]').click();assert.equal(await page.locator('.cart .line output').innerText(),'1');await page.locator('[data-increase-line]').click();
 
  assert.equal(await page.locator('[data-view="overview"]').count(),0);assert.equal(await page.locator('[data-action="close-shift"]').count(),0);await page.getByRole("button",{name:"Чеки",exact:true}).click();assert.equal(await page.locator("#receipts-view .receipt-row").count(),1);
  await staffContext.close();
@@ -128,7 +129,7 @@ try{
  const stored=r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_pos_orders_v1'").get(owner.userId)!;
  for(const order of JSON.parse(String(stored.data_json)))if(order.status==="OPEN")await call(owner,"orders",{action:"cancel_order",orderId:order.id,operationId:"cancel-"+order.id,expectedRevision:order.revision,reason:"End of synthetic browser scenario"});
  await call(owner,"sales",{action:"cash",shiftId:"night",cash:{operationId:"cash-in",kind:"IN",amount:20,reason:"Synthetic float adjustment"}});
- const final=await browser.newContext({viewport:{width:1440,height:1000}});await final.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});const report=await final.newPage();report.on("pageerror",error=>errors.push(error.message));await report.goto(base+"/cashier");await report.locator("#work").waitFor({state:"visible"});await report.locator('[data-action="close-shift"]').click();await report.locator('dialog [name="actual"]').fill("198");await report.locator("#dialog-submit").click();await report.locator("dialog").waitFor({state:"hidden"});await report.locator("#report-view:not([hidden]) .report .metrics").waitFor();await report.screenshot({path:join(output,"desktop-report.png"),fullPage:true});await report.setViewportSize({width:390,height:844});assert(await report.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await report.screenshot({path:join(output,"iphone-report.png"),fullPage:true});await final.close();
+ const final=await browser.newContext({viewport:{width:1440,height:1000}});await final.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});const report=await final.newPage();report.on("pageerror",error=>errors.push(error.message));await report.goto(base+"/cashier");await report.locator("#work").waitFor({state:"visible"});await report.locator('[data-action="close-shift"]').click();await report.locator('dialog [name="actual"]').fill("198");await report.locator("#dialog-submit").click();await report.locator("dialog").waitFor({state:"hidden"});await report.locator("#report-view:not([hidden]) .report > .metrics").waitFor();await report.screenshot({path:join(output,"desktop-report.png"),fullPage:true});await report.setViewportSize({width:390,height:844});assert(await report.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await report.screenshot({path:join(output,"iphone-report.png"),fullPage:true});await final.close();
  // Independent-review regressions: two real browser sessions over one synthetic database.
  const manager=await r.register("pos-review-manager@isolated.test");
  r.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace,manager.userId);
@@ -143,18 +144,18 @@ try{
  await Promise.all([managerPage.goto(base+"/cashier"),operatorPage.goto(base+"/cashier")]);
  await managerPage.locator("#work").waitFor({state:"visible"});await operatorPage.locator("#work").waitFor({state:"visible"});
  await managerPage.locator('[data-view="report"]').click();await managerPage.locator(".report-fresh").waitFor();
- const revenue=()=>managerPage.locator(".report .metric").first().locator("strong");
+ const revenue=()=>managerPage.locator(".report > .metrics .metric").first().locator("strong");
  assert.match(await revenue().innerText(),/^0,00/);
  async function operatorSale(){
-  await operatorPage.locator('[data-view="cashier"]').click();await operatorPage.locator('[data-action="quick"]').click();await operatorPage.locator('[data-add="beer"]').click();
+  await operatorPage.locator('[data-view="cashier"]').click();await operatorPage.locator('[data-action="quick"]').click();await posAddItem(operatorPage,'[data-add="beer"]',"click");
   await operatorPage.locator('[data-action="payment"]').click();await operatorPage.locator("#dialog-submit").click();await operatorPage.locator("dialog").waitFor({state:"hidden"});await operatorPage.locator("#receipts-view:not([hidden])").waitFor();
  }
  await operatorSale();assert.match(await revenue().innerText(),/^0,00/);
- await managerPage.clock.runFor(15000);await managerPage.waitForFunction(()=>document.querySelector(".report .metric strong")?.textContent?.startsWith("20,00"));
+ await managerPage.clock.runFor(15000);await managerPage.waitForFunction(()=>document.querySelector(".report > .metrics .metric strong")?.textContent?.startsWith("20,00"));
  const lastSuccess=await managerPage.locator(".report-fresh").getAttribute("data-last-success");
  await operatorSale();await managerPage.route("**/api/sales-events?reportShiftId=*",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({ok:false,error:"Synthetic report unavailable"})}));
  await managerPage.clock.runFor(15000);await managerPage.getByText("Данные устарели",{exact:true}).waitFor();assert.match(await revenue().innerText(),/^20,00/);assert.equal(await managerPage.locator(".report-fresh").getAttribute("data-last-success"),lastSuccess);
- await managerPage.unroute("**/api/sales-events?reportShiftId=*");await managerPage.clock.runFor(15000);await managerPage.waitForFunction(()=>document.querySelector(".report .metric strong")?.textContent?.startsWith("40,00"));
+ await managerPage.unroute("**/api/sales-events?reportShiftId=*");await managerPage.clock.runFor(15000);await managerPage.waitForFunction(()=>document.querySelector(".report > .metrics .metric strong")?.textContent?.startsWith("40,00"));
  assert.notEqual(await managerPage.locator(".report-fresh").getAttribute("data-last-success"),lastSuccess);
  await operatorPage.locator('[data-view="cashier"]').click();await operatorPage.locator('[data-action="close-shift"]').click();await operatorPage.locator('dialog [name="actual"]').fill("40");await operatorPage.locator("#dialog-submit").click();await operatorPage.locator("dialog").waitFor({state:"hidden"});
  await managerPage.clock.runFor(15000);await managerPage.locator(".report .badge").filter({hasText:"Закрыта"}).waitFor();const closedRequests=reportRequests,closedSuccess=await managerPage.locator(".report-fresh").getAttribute("data-last-success");
@@ -184,7 +185,7 @@ try{
  for(const [index,scenario] of ["lost-response","confirmed-reload-failure","changed-draft","ordinary-create"].entries()){
   const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});
   const page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});
-  await page.locator('.mobile-tabs [data-pane="menu"]').first().click();await page.locator('[data-add="beer"]').click();await page.locator('[data-add="coffee"]').click();await page.locator('.mobile-tabs [data-pane="order"]').first().click();
+  await page.locator('.mobile-tabs [data-pane="menu"]').first().click();await posAddItem(page,'[data-add="beer"]',"click");await posAddItem(page,'[data-add="coffee"]',"click");await page.locator('.mobile-tabs [data-pane="order"]').first().click();
   const key=`bd_pos_workspace_v2:${owner.userId}:${owner.activeVenueId}`;
   const initial=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),key);assert.equal(initial.quick.lines.length,2);
   let createPosts=0,failReload=false;
@@ -196,7 +197,7 @@ try{
     }else await route.continue();
   });
   await page.route("**/api/sales-events",route=>failReload&&route.request().method()==="GET"?route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({ok:false,error:"Synthetic read failure after confirmed create"})}):route.continue());
-  if(scenario==="ordinary-create")await page.locator('[data-action="create-order"]').click();else{await page.locator(".admin-actions summary").click();await page.locator('[data-action="save-quick"]').click();}
+  if(scenario==="ordinary-create")await page.locator('[data-action="create-order"]').click();else{if(!await page.locator("details.admin-actions").evaluate(node=>node.hasAttribute("open")))await page.locator(".admin-actions summary").click();await page.locator('[data-action="save-quick"]').click();}
   await page.locator('dialog [name="table"]').fill(String(800+index));await page.locator("#dialog-submit").click();
   if(scenario==="confirmed-reload-failure"){
     await page.getByText("Synthetic read failure after confirmed create",{exact:true}).first().waitFor();

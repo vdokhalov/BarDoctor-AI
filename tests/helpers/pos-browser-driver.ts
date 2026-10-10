@@ -1,5 +1,12 @@
 import type { Page } from "playwright-core";
 
+export async function posAddItem(page: Page, selector: string, method: "click" | "tap" = "click", quantity = 1) {
+  await page.locator(selector)[method]();
+  await page.locator('dialog [name="quantity"]').fill(String(quantity));
+  await page.locator("#dialog-submit").click();
+  await page.locator("dialog").waitFor({ state: "hidden" });
+}
+
 /** Real recovered POS controls; no response stubs or synthetic success states. */
 export async function posPane(page: Page, order = true) {
   if ((page.viewportSize()?.width ?? 1280) <= 600) {

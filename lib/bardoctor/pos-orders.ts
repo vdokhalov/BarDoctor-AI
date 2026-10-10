@@ -16,7 +16,7 @@ export type PosOrder = {
   operations: PosOrderOperation[];
 };
 export type PosOrderCommand = {
-  action: "create" | "add_items" | "cancel_item" | "cancel_order" | "precheck" | "cancel_precheck" | "split" | "preview_payment" | "pay" | "apply_discount" | "remove_discount";
+  action: "create" | "add_items" | "set_quantity" | "cancel_item" | "cancel_order" | "precheck" | "cancel_precheck" | "split" | "preview_payment" | "pay" | "apply_discount" | "remove_discount";
   operationId: string; orderId: string; expectedRevision: number;
   shiftId?: string; tableNumber?: string; comment?: string;
   lines?: { id?: string; menuItemId?: string; lineId?: string; quantity: number }[];
@@ -27,7 +27,7 @@ export type PosOrderCommand = {
 type SalesPlan = Awaited<ReturnType<typeof planSalesEvent>>;
 export type PosOrderPlan = { orders: PosOrder[]; order: PosOrder; duplicate: boolean; event?: SalesEvent; previewHash?: string; salesPlan?: SalesPlan };
 export type PosOrderContext = SalesEventContext & { discountRules?: PosDiscountRule[] };
-const actions = new Set(["create", "add_items", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
+const actions = new Set(["create", "add_items", "set_quantity", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
 const privileged = new Set(["cancel_item", "cancel_order", "cancel_precheck", "split", "apply_discount", "remove_discount"]);
 function fail(code: string): never { throw new Error("POS_ORDER_" + code); }
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -149,6 +149,10 @@ function normalize(c: PosOrderCommand): Record<string, unknown> {
   if (!record(c) || !actions.has(c.action) || !identifier(c.operationId) || !identifier(c.orderId)
     || !Number.isSafeInteger(c.expectedRevision) || c.expectedRevision < 0) fail("COMMAND_INVALID");
   const base: Record<string, unknown> = { action: c.action, operationId: c.operationId, orderId: c.orderId, expectedRevision: c.expectedRevision };
+  if (c.action === "set_quantity") {
+    if (!identifier(c.lineId) || typeof c.quantity !== "number" || !Number.isSafeInteger(c.quantity) || c.quantity < 0 || c.quantity > 999) fail("LINES_INVALID");
+    Object.assign(base, { lineId: c.lineId, quantity: c.quantity });
+  }
   if (c.action === "create" || c.action === "add_items") {
     if (c.action === "create") {
       if (!identifier(c.shiftId) || c.expectedRevision !== 0 || c.comment != null && (typeof c.comment !== "string" || c.comment.length > 500)) fail("COMMAND_INVALID");
@@ -223,13 +227,16 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
     if (order.revision !== command.expectedRevision) fail("REVISION_CONFLICT");
     if (order.status !== "OPEN") fail("NOT_OPEN");
     assertShiftOpen(c, order.shiftId);
-    if (order.precheck && ["add_items", "cancel_item", "split", "precheck", "apply_discount", "remove_discount"].includes(command.action)) fail("PRECHECK_LOCKED");
-    if (order.discount && ["add_items", "cancel_item", "split"].includes(command.action)) fail(command.action === "split" ? "SPLIT_DISCOUNTED" : "DISCOUNT_LOCKED");
+    if (order.precheck && ["add_items", "set_quantity", "cancel_item", "split", "precheck", "apply_discount", "remove_discount"].includes(command.action)) fail("PRECHECK_LOCKED");
+    if (order.discount && ["add_items", "set_quantity", "cancel_item", "split"].includes(command.action)) fail(command.action === "split" ? "SPLIT_DISCOUNTED" : "DISCOUNT_LOCKED");
     order = { ...order, revision: order.revision + 1 };
     if (command.action === "add_items") {
       const incoming = details.lines as { id: string; menuItemId: string; quantity: number }[];
       if (incoming.some(line => order!.lines.some(current => current.id === line.id)) || order.lines.length + incoming.length > 100) fail("LINES_INVALID");
       order.lines = [...order.lines, ...incoming].map(line => priceLine(c, line));
+    } else if (command.action === "set_quantity") {
+      if (!order.lines.some(line => line.id === command.lineId)) fail("LINES_INVALID");
+      order.lines = order.lines.flatMap(line => line.id !== command.lineId ? [line] : command.quantity === 0 ? [] : [priceLine(c, { ...line, quantity: command.quantity! })]);
     } else if (command.action === "cancel_item") {
       const target = order.lines.find(line => line.id === command.lineId);
       if (!target || command.quantity !== undefined && command.quantity > target.quantity) fail("LINES_INVALID");

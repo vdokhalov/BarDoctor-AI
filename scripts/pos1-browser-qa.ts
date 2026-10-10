@@ -1,3 +1,4 @@
+import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posOpenShift, posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from "node:assert/strict";
@@ -80,14 +81,14 @@ try{
     if(profile.name==="mobile-390"){
       await page.locator("#menu-search").fill("TEST VODKA");assert.equal(await page.locator(".menu-item").count(),1);await page.locator("#menu-search").fill("");
       await page.locator("#menu-department").selectOption("bar");assert.equal(await page.locator(".menu-item").count(),1);await page.locator("#menu-department").selectOption("all");
-      await page.locator('[data-add="vodka40"]').click();
-      await orderPane(page,false);await page.locator('[data-add="vodka40"]').click();await orderPane(page);
+      await posAddItem(page,'[data-add="vodka40"]',"click");
+      await orderPane(page,false);await posAddItem(page,'[data-add="vodka40"]',"click");await orderPane(page);
       assert.match(await page.locator(".cart .lines").innerText(),/2 ×/);
       await orderPane(page);await page.getByRole("button",{name:"Уменьшить TEST VODKA 40"}).click();
       assert.match(await page.locator(".cart .lines").innerText(),/1 ×/);
       await page.getByRole("button",{name:"Отменить позицию TEST VODKA 40"}).click();
       assert.match(await page.locator(".cart .lines").innerText(),/Добавьте позиции/);
-      await orderPane(page,false);await page.locator('[data-add="vodka40"]').click();await orderPane(page);
+      await orderPane(page,false);await posAddItem(page,'[data-add="vodka40"]',"click");await orderPane(page);
       assert.match(await page.locator(".cart .total").innerText(),/30.*руб\. ПМР/);
       await page.screenshot({path:"outputs/pos1/mobile-390-order.png",fullPage:true});
       await posPay(page);
@@ -100,7 +101,7 @@ try{
       assert.equal((fixture.get("bd_finance_revenue") as {revenue:number}[])[0].revenue,30);
     }
     if(profile.name==="tablet"){
-      await page.locator('[data-add="ticket"]').click();
+      await posAddItem(page,'[data-add="ticket"]',"click");
       await posPane(page);await page.locator('[data-action="payment"]').click();
       await page.locator('dialog input[name="method"][value="CARD_EXTERNAL"]').check();
       await page.screenshot({path:"outputs/pos1/tablet-card-order.png",fullPage:true});
@@ -110,7 +111,7 @@ try{
       assert.equal(reread.events.length,2);assert.equal(reread.events[0].payments?.[0].method,"CARD_EXTERNAL");
       assert.equal((fixture.get("bd_assortment_v1") as {stockBalances:{current:number}[]}).stockBalances[0].current,0.96);
       await posNewQuick(page);await page.locator('[data-add="ticket"]').waitFor();
-      await page.locator('[data-add="ticket"]').click();
+      await posAddItem(page,'[data-add="ticket"]',"click");
       await page.route("**/api/sales-events",async route=>{
         if(route.request().method()==="POST"&&route.request().postDataJSON().action==="post"){
           const response=await route.fetch();assert.equal(response.status(),201);await route.abort("failed");

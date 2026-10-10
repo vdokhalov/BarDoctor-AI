@@ -6,7 +6,7 @@ export const REVENUE_SOURCES = ["BARDOC_POS", "MANUAL_SUMMARY", "IMPORT", "INTEG
 export type RevenueSource = typeof REVENUE_SOURCES[number] | "LEGACY_UNKNOWN";
 export type RevenueStatus = "PROVISIONAL" | "FINAL" | "UNKNOWN";
 type Row = Record<string, unknown>;
-export const operationalFields = ["staffing", "payrollBreakdown", "shiftDepartmentSales", "shiftVenueSales", "note", "guests", "writeOffDocumentIds", "writeOffItemCount", "writeOffTotalCost", "incidentIds"] as const;
+export const operationalFields = ["staffing", "payrollBreakdown", "shiftDepartmentSales", "shiftVenueSales", "note", "guests", "writeOffDocumentIds", "writeOffItemCount", "writeOffTotalCost", "incidentIds", "workdayStatus", "workdayRevision", "workdayPayrollDraft", "workdayConfirmations"] as const;
 export function operationalData(value: unknown): Row {
   const row = object(value);
   return Object.fromEntries(operationalFields.filter(key => row[key] !== undefined).map(key => [key, row[key]]));
@@ -62,17 +62,17 @@ export function operationalDay(input: OperationalDayInput) {
   const status: RevenueStatus = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
   const report = rows(input.reports).find(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate)
     ?? revenues.find(row => row.revenueSource !== "sales_events_v1" && ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)));
-  const recorded = report?.closingStatus === "closed" || report?.closedVia === "guided-v17";
+  const recorded = report?.workdayStatus !== "OPEN" && (report?.closingStatus === "closed" || report?.closedVia === "guided-v17");
   const operationStatus = recorded ? "RECORDED" : "MISSING";
   const writeOffs = rows(input.writeOffs).filter(row => belongs(row) && row.date === input.businessDate && row.status !== "cancelled");
   const incidents = rows(input.incidents).filter(row => belongs(row) && String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10) === input.businessDate);
   const payroll = object(report?.payrollBreakdown), rawPayroll = payroll.total ?? payroll.totalPayroll;
-  const payrollAmount = finiteBusinessNumber(rawPayroll);
-  const dayStatus = open ? "OPERATING" : recorded && payrollAmount != null && revenues.length && status === "FINAL" && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
+  const payrollAmount = report?.workdayStatus === "OPEN" ? null : finiteBusinessNumber(rawPayroll);
+  const dayStatus = open || report?.workdayStatus === "OPEN" ? "OPERATING" : recorded && payrollAmount != null && (revenues.length && status === "FINAL" || report?.workdayStatus === "CLOSED" && !revenues.length) && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
   return {
     venueId: input.venueId, businessDate: input.businessDate,
     payroll: { amount: payrollAmount, basis: payrollAmount == null ? "MISSING" : recorded ? "RECORDED" : "LEGACY_RECORDED" },
-    revenue: { amount, sourceIds: revenues.map(row => row.id).filter(id => id != null), grain: "BUSINESS_DAY", currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null), currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN", source, status, receipts, payments, asOf: input.asOf,
+    revenue: { amount, sourceIds: revenues.map(row => row.id).filter(id => id != null), grain: "BUSINESS_DAY", currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null), currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN", source, status: report?.workdayStatus === "CLOSED" && !revenues.length ? "FINAL" : status, receipts, payments, asOf: input.asOf,
       updatedAt: [...revenues.map(row => String(row.updatedAt ?? row.createdAt ?? "")), ...events.map(row => String(row.acceptedAt ?? ""))].sort().at(-1) || null,
       readOnly: events.length > 0 || documents.length > 0 || revenues.some(row => ["sales_events_v1", "sales_documents"].includes(String(row.revenueSource))), consistency },
     cashShift: cashShifts.length === 1 ? { id: cashShifts[0].id, status: cashShifts[0].closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: cashShifts[0].openedAt ?? cashShifts[0].createdAt ?? null, closedAt: cashShifts[0].closedAt ?? null } : null,

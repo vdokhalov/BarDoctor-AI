@@ -12,10 +12,15 @@ export async function saveOperationalReport(input: {
   const revenueInput = row(input.request.revenueRecord), date = String(revenueInput.date ?? "");
   const day = operationalDay({ ...input.current, venueId: input.venueId, businessDate: date, asOf: input.now });
   if (day.revenue.consistency === "MISMATCH") return { ok: false as const, code: "OPERATIONAL_DAY_REVENUE_NEEDS_REVIEW", error: "Продажи и финансовая выручка расходятся. Ничего не изменено; требуется проверка данных." };
-  const protectedRevenue = day.revenue.readOnly;
+  const protectedRevenue = day.revenue.readOnly || input.current.reports.map(row).some(report => report.venueId === input.venueId && report.date === date && Boolean(report.workdayStatus));
   if (protectedRevenue && input.request.sectionsVersion !== 1) return { ok: false as const, code: "SALES_EVENT_REVENUE_PROTECTED", error: "Выручка поступает из продаж. Откройте обновлённый отчёт для отдельного сохранения операционных данных." };
   const reportId = `operational-report:${input.venueId}:${date}`;
   const previous = input.current.reports.map(row).find(report => report.id === reportId);
+  // Workday lifecycle and payroll are owned by the scoped workday command. The
+  // existing editor remains the owner of write-offs/incidents, not a bypass.
+  if (["workdayStatus", "workdayRevision", "workdayPayrollDraft", "workdayReceipts", "workdayConfirmations"].some(key => revenueInput[key] !== undefined)) return { ok: false as const, code: "WORKDAY_FIELDS_PROTECTED", error: "Состояние рабочей смены изменяется в её общем экране." };
+  if (previous?.workdayStatus && revenueInput.staffing !== undefined && stableSalesValue(revenueInput.staffing) !== stableSalesValue(previous.staffing)) return { ok: false as const, code: "WORKDAY_TEAM_PROTECTED", error: "Измените команду и часы в общем экране рабочей смены." };
+  const trustedOperations = previous?.workdayStatus ? { ...operationalData(revenueInput), staffing: previous.staffing, payrollBreakdown: previous.payrollBreakdown, shiftVenueSales: previous.shiftVenueSales, shiftDepartmentSales: previous.shiftDepartmentSales } : operationalData(revenueInput);
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(stableSalesValue(input.request)));
   const fingerprint = Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
   const receipt = (Array.isArray(previous?.saveReceipts) ? previous.saveReceipts : []).map(row).find(saved => saved.id === input.request.shiftCloseId);
@@ -30,7 +35,7 @@ export async function saveOperationalReport(input: {
   const plan = closeShiftWithCanonicalWriteOffs({ ...input,
     current: { ...input.current, revenues: protectedRevenue ? input.current.reports : input.current.revenues },
     request: { ...input.request, shiftId: protectedRevenue ? reportId : input.request.shiftId,
-      revenueRecord: protectedRevenue ? { ...operationalData(revenueInput), date, createdAt: previous?.createdAt } : revenueInput },
+      revenueRecord: protectedRevenue ? { ...trustedOperations, date, createdAt: previous?.createdAt } : revenueInput },
   });
   if (!plan.ok) return plan;
   if (!protectedRevenue && eventRevenueMutation(input.current.revenues, plan.revenues)) return { ok: false as const, code: "SALES_EVENT_REVENUE_PROTECTED", error: "Нельзя заменить строку выручки продаж ручным отчётом" };
@@ -53,6 +58,9 @@ export async function saveOperationalReport(input: {
     createdAt: previous?.createdAt ?? input.now, updatedAt: input.now,
     saveReceipts: [...(Array.isArray(previous?.saveReceipts) ? previous.saveReceipts : []), { id: input.request.shiftCloseId, fingerprint }],
   };
+  if (previous?.workdayStatus) {
+    Object.assign(operationalReport, { ...previous, ...operationalReport, workdayStatus: previous.workdayStatus, closingStatus: previous.workdayStatus === "OPEN" ? "open" : "closed", workdayRevision: Number(previous.workdayRevision || 0) + 1, staffing: previous.staffing, payrollBreakdown: previous.payrollBreakdown, shiftVenueSales: previous.shiftVenueSales, shiftDepartmentSales: previous.shiftDepartmentSales });
+  }
   return { ...plan, revenues: protectedRevenue ? input.current.revenues : plan.revenues,
     revenueRecord: { ...plan.revenueRecord, ...(protectedRevenue ? { revenue: day.revenue.amount, receipts: day.revenue.receipts } : {}), operationalSaved: true },
     reports: [...input.current.reports.filter(value => row(value).id !== reportId), operationalReport], incidents,

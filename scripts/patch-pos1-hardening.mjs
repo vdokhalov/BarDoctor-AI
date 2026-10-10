@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { parse } from 'acorn';
 const path='public/assets/index-BQGspy0I.js';
 let source=fs.readFileSync(path,'utf8');
 source=source.replace('if(h.pathname==="/sales-entry"){','if(["/sales-entry","/cashier"].includes(h.pathname)){');
@@ -14,5 +15,23 @@ source=source.replaceAll('bdWarehouseMoney(B.costAmount,B.currency||"MDL")','bdW
 source=source.replaceAll('bdWarehouseMoney(e.inventoryValue,e.currency||bdCurrentAccountingCurrencyV243())','bdWarehouseMoney(e.inventoryValue,e.currency)');
 source=source.replaceAll('bdWarehouseMoney(B.costAmount,B.currency||bdCurrentAccountingCurrencyV243())','bdWarehouseMoney(B.costAmount,B.currency)');
 if(!source.includes('["/sales-entry","/cashier"].includes(h.pathname)'))throw Error('Cashier navigation bridge missing');
+// Discoverability is separate from the existing POS route and its server RBAC.
+const entryHelpers = `function bdCashierEntryHref(){const venue=localStorage.getItem("bd_active_venue_id");return "/cashier"+(venue?"?venue="+encodeURIComponent(venue):"")}
+function bdCashierEntry({onNavigate}){return typeof window.bdHasClientPermission==="function"&&window.bdHasClientPermission("sales.view")?i.jsx("button",{type:"button",className:"bd-more-quick-v166","data-bd-cashier-entry":true,onClick:()=>onNavigate(bdCashierEntryHref()),children:"Касса · столы, заказы и оплата"}):null}
+`;
+for(const name of ['bdCashierEntryHref','bdCashierEntry']) {
+ const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name===name);
+ if(node)source=source.slice(0,node.start)+source.slice(node.end);
+}
+source=entryHelpers+source;
+function addEntry(name,anchor,entry){
+ const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(node=>node.type==='FunctionDeclaration'&&node.id?.name===name);
+ if(!node)throw Error('Cashier entry target missing: '+name);
+ let code=source.slice(node.start,node.end);
+ if(!code.includes(entry)){if(!code.includes(anchor))throw Error('Cashier entry anchor missing: '+name);code=code.replace(anchor,entry+anchor);}
+ source=source.slice(0,node.start)+code+source.slice(node.end);
+}
+addEntry('Dce','i.jsx(bdHomeDaily,','i.jsx(bdCashierEntry,{onNavigate:a}),');
+addEntry('bdShiftsPage','i.jsxs("div",{className:"bd-shifts-layout"','i.jsx(bdCashierEntry,{onNavigate:navigate}),');
 fs.writeFileSync(path,source);
 console.log('POS-1 navigation and shared money presentation applied');

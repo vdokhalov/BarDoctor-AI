@@ -1,3 +1,4 @@
+import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { waitForSalesHostReads } from '../tests/helpers/sales-navigation-settled';
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
@@ -105,12 +106,12 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  await documentButton.tap();await frame().locator('.pos-event-summary').waitFor();
  await measure('O Document → Warehouse',()=>frame().locator('.journal-link').tap(),()=>page.getByText('Документ продаж',{exact:true}).first().waitFor());
  await measure('P Warehouse → Document',()=>page.getByText('Документ продаж',{exact:true}).first().tap(),()=>frame().locator('.pos-event-summary').waitFor());
- await waitForSalesHostReads(hostPage);await page.goto(base+'/cashier?venue='+venue);await cashReady();await posPane(page,false);await page.locator('[data-add="menu-0"]').tap();await waitForSalesHostReads(hostPage);await page.reload();await posPane(page);await page.locator('.cart .line').waitFor();
+ await waitForSalesHostReads(hostPage);await page.goto(base+'/cashier?venue='+venue);await cashReady();await posPane(page,false);await posAddItem(page,'[data-add="menu-0"]',"tap");await waitForSalesHostReads(hostPage);await page.reload();await posPane(page);await page.locator('.cart .line').waitFor();
  await page.locator('#sales-journal').tap();await frame().locator('[data-resume-shift="ux2-open"]').waitFor();
  await measure('Q Resume → Cashier',()=>frame().locator('[data-resume-shift="ux2-open"]').tap(),()=>page.locator('.cart .line').waitFor());
  await posPay(page);await posReceiptList(page);
  await measure('R Success → New order',()=>posNewQuick(page),async()=>{await cashReady();assert.equal(await page.locator('.cart .line').count(),0);if(width===390)await page.locator('.mobile-tabs [data-pane=menu][aria-pressed=true]').waitFor();else{await page.locator('.menu-panel').waitFor();await page.locator('.cart').waitFor();}});
- await page.locator('[data-add="menu-0"]').tap();if(width===390)await page.locator('.mobile-tabs [data-pane=order]').tap();await posPay(page);await posReceiptList(page);
+ await posAddItem(page,'[data-add="menu-0"]',"tap");if(width===390)await page.locator('.mobile-tabs [data-pane=order]').tap();await posPay(page);await posReceiptList(page);
  await page.locator('#receipts-view .receipt-row').first().tap();
  await measure('S Success → Document',()=>page.locator('#receipt-sale').tap(),()=>frame().locator('.pos-event-summary').waitFor());
 

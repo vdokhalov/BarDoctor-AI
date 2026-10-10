@@ -167,7 +167,7 @@ export function planReverseSalesEvent(c: SalesEventContext, eventId: string) {
   return { duplicate:false,event:next,events,assortment:reversed.assortment,movements:reversed.stockMovements,
     revenues:project(c,events,event.revenueRowId,event.businessDate) };
 }
-export function planSalesShift(c: SalesEventContext, action: "open_shift" | "close_shift", shiftId: string, name?: string) {
+export function planSalesShift(c: SalesEventContext, action: "open_shift" | "close_shift", shiftId: string, name?: string, workdayDate?: string) {
   if (!id(shiftId)) fail("SHIFT_ID_INVALID");
   contextCheck(c);
   const rows = c.revenues.filter(r => r.id === shiftId && r.venueId === c.venueId);
@@ -187,7 +187,9 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
   }
   if (c.revenues.some(row => row.venueId === c.venueId && row.revenueSource === EVENT_REVENUE_SOURCE && row.closingStatus === "open")) fail("SHIFT_ALREADY_OPEN");
   const timezone = canonicalVenueTimezone(c.timezone) || "UTC";
-  const date = venueDate(c.now, timezone); if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
+  const date = workdayDate ?? venueDate(c.now, timezone);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0,10)!==date) fail("SHIFT_DATE_INVALID");
+  if (c.closedMonths.has(date.slice(0,7))) fail("MONTH_LOCKED"); revenueCheck(c,date);
   return [...c.revenues,{ id:shiftId,venueId:c.venueId,date,timezone,accountingMonth:date.slice(0,7),shiftName:name,
     revenueSource:EVENT_REVENUE_SOURCE,currency:c.currency,revenue:0,receipts:0,closingStatus:"open",openedAt:c.now,openedBy:{...c.actor},startTime:venueClock(c.now, timezone),createdAt:c.now,updatedAt:c.now }];
 }

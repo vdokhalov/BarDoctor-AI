@@ -43,9 +43,9 @@ function bdLegacyDoctorEntryV493({onNavigate:e}){if(!bdMoreHasPermissionV166("an
    text=text.slice(0,elements.end-1)+','+cost+text.slice(elements.end-1);
   }
   if(node.id.name==='t_e'&&!text.includes('key:"ai-doctor"')){
-   const anchor='A=[m&&';
-   if(!text.includes(anchor))throw Error('Native More management anchor required');
-   text=text.replace(anchor,'A=[bdMoreHasPermissionV166("analysis.view")&&!bdAnalysisContextRestrictedPhase3a5()&&{key:"ai-doctor",icon:Of,title:"AI Doctor",description:"Диагностика и рекомендации",onClick:()=>e("/analysis")},bdMoreHasPermissionV166("analysis.view")&&{key:"business-health",icon:Of,title:"Состояние бизнеса",description:"Индекс и зоны Business Health",onClick:()=>e("/health")},m&&');
+   const anchor='A=[';
+   if(text.split(anchor).length!==2)throw Error('Unique native More management array required');
+   text=text.replace(anchor,'A=[bdMoreHasPermissionV166("analysis.view")&&!bdAnalysisContextRestrictedPhase3a5()&&{key:"ai-doctor",icon:Of,title:"AI Doctor",description:"Диагностика и рекомендации",onClick:()=>e("/analysis")},bdMoreHasPermissionV166("analysis.view")&&{key:"business-health",icon:Of,title:"Состояние бизнеса",description:"Индекс и зоны Business Health",onClick:()=>e("/health")},');
   }
   if(text!==source.slice(node.start,node.end))edits.push({start:node.start,end:node.end,text});
  }

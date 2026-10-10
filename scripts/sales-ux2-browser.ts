@@ -1,3 +1,4 @@
+import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
@@ -78,9 +79,9 @@ else {
    await p.goto(base+'/sales-entry');await p.locator('#sale').waitFor();await fits('manual');assert.equal(await p.locator('bd-app-header').count(),0,'manual owns its correct header');await snap('manual',true);
    await p.goto(base+'/cashier');await p.locator('#cashier-view:not([hidden])').waitFor();assert.equal(await p.locator('bd-app-header').count(),0,'cashier owns one header');await posPane(p,false);
    await p.locator('#menu-search').fill('Тартар');assert.equal(await p.locator('.menu-item').count(),1);await p.locator('#menu-search').fill('');
-   for(let i=0;i<2;i++)await p.locator('[data-add="menu-'+i+'"]').click();await snap('cashier');await pane(true);await snap('small-cart');
+   for(let i=0;i<2;i++)await posAddItem(p,'[data-add="menu-'+i+'"]',"click");await snap('cashier');await pane(true);await snap('small-cart');
    await p.locator('[data-increase="menu-0"]').click();await p.locator('[data-decrease="menu-0"]').click();
-   await pane(false);for(let i=2;i<12;i++)await p.locator('[data-add="menu-'+i+'"]').click();await pane(true);assert.equal(await p.locator('.cart .line').count(),12);await fits('large cart');await p.evaluate(()=>window.scrollTo(0,0));await snap('large-cart');
+   await pane(false);for(let i=2;i<12;i++)await posAddItem(p,'[data-add="menu-'+i+'"]',"click");await pane(true);assert.equal(await p.locator('.cart .line').count(),12);await fits('large cart');await p.evaluate(()=>window.scrollTo(0,0));await snap('large-cart');
    await p.locator('#pay').scrollIntoViewIfNeeded();const button=await p.locator('#pay').boundingBox();assert.ok(button&&button.y>=0&&button.y+button.height<=height+1,'payment remains reachable after the complete order');
    await p.locator('.cart .line').last().scrollIntoViewIfNeeded();
    const last=await p.locator('.cart .line').last().boundingBox(),foot=await p.locator('.cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last line not covered by checkout');await snap('checkout');
