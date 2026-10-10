@@ -62,3 +62,31 @@ test("metadata failure rolls back invite issue, one-use claim and combined role/
   assert.deepEqual(r.sqlite.prepare("SELECT * FROM venue_memberships WHERE id=?").get(before.id!), before);
   assert.equal(readMemberJob(r.sqlite, user.userId, owner.activeVenueId), "barista");
 });
+
+test("an invitation claimed by exact v505 retains its job after upgrade, with strict claim provenance", async t => {
+  const r = await lifecycleRuntime({ ...routes, legacy: "legacy-v505-invite-service" }, { plugins: [{ name: "exact-v505-claim", setup(build) {
+    build.onResolve({ filter: /^legacy-v505-invite-service$/ }, () => ({ path: "lib/bardoctor/access-service.ts", namespace: "v505" }));
+    build.onLoad({ filter: /.*/, namespace: "v505" }, () => ({ contents: execFileSync("git", ["show", `${baseline}:lib/bardoctor/access-service.ts`], { encoding: "utf8" }), loader: "ts", resolveDir: resolve("lib/bardoctor") }));
+  } }] }); t.after(r.close);
+  const owner = await r.register("legacy-claim-owner@isolated.test"), user = await r.register("legacy-claim-staff@isolated.test");
+  const { invite } = await (await r.api.access.POST(r.request(owner, "/api/access", "POST", { role: "cashier", jobTitle: "bartender" }))).json() as { invite: { id: number; code: string } };
+  const identity = await r.api.auth.authenticateIdentityRequest(r.request(user, "/api/access/join")); assert.ok(identity);
+  const legacy = r.api.legacy as unknown as { claimVenueInvite: (account: typeof identity, code: string) => Promise<unknown> };
+  assert.ok(await legacy.claimVenueInvite(identity, invite.code));
+  assert.equal(readMemberJob(r.sqlite, user.userId, owner.activeVenueId), null, "v505 did not know the metadata store");
+  const request = () => { const req = r.request(user, "/api/access"); req.headers.set("X-Venue-Id", String(owner.activeVenueId)); return req; };
+  assert.equal((await r.api.auth.authenticateRequest(request()))?.jobTitle, "bartender");
+  const membership = r.sqlite.prepare("SELECT * FROM venue_memberships WHERE account_id=? AND venue_id=?").get(user.userId, owner.activeVenueId)!;
+  for (const field of ["venue_id", "used_by_account_id", "created_by_account_id"]) {
+    const before = r.sqlite.prepare(`SELECT ${field} value FROM venue_invites WHERE id=?`).get(invite.id)!.value;
+    const other = field === "venue_id" ? user.activeVenueId : field === "used_by_account_id" ? owner.userId : user.userId;
+    r.sqlite.prepare(`UPDATE venue_invites SET ${field}=? WHERE id=?`).run(other, invite.id);
+    assert.equal((await r.api.auth.authenticateRequest(request()))?.jobTitle, "cashier", field + " cannot borrow title metadata");
+    r.sqlite.prepare(`UPDATE venue_invites SET ${field}=? WHERE id=?`).run(before!, invite.id);
+  }
+  r.sqlite.prepare("UPDATE venue_invites SET used_at='2000-01-01' WHERE id=?").run(invite.id);
+  assert.equal((await r.api.auth.authenticateRequest(request()))?.jobTitle, "cashier", "claim timestamp must match");
+  r.sqlite.prepare("UPDATE venue_invites SET used_at=? WHERE id=?").run(membership.joined_at!, invite.id);
+  const patch = await r.api.members.PATCH(r.request(owner, "/api/access/members/" + membership.id, "PATCH", { jobTitle: "waiter" }), { params: Promise.resolve({ id: String(membership.id) }) });
+  assert.equal(patch.status, 200); assert.equal((await r.api.auth.authenticateRequest(request()))?.jobTitle, "waiter", "explicit edit overrides historical invitation");
+});

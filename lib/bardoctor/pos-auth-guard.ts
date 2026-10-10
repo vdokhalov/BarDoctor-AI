@@ -1,3 +1,4 @@
+import { MEMBER_JOB_TITLE_SQL } from "./staff-job-storage";
 import type { AuthenticatedAccount } from "./access-control";
 /** Same transaction as the domain CAS: a revoked membership cannot finish an in-flight POS write. */
 export function posMembershipGuard(db: D1Database, account: AuthenticatedAccount, now: string): D1PreparedStatement {
@@ -7,7 +8,7 @@ export function posMembershipGuard(db: D1Database, account: AuthenticatedAccount
       JOIN workspace_memberships wm ON wm.workspace_id=v.workspace_id AND wm.account_id=vm.account_id
       JOIN workspaces w ON w.id=v.workspace_id
       WHERE vm.id=? AND vm.account_id=? AND vm.venue_id=? AND v.data_account_id=?
-      AND vm.role=? AND vm.permissions_json IS ? AND CASE WHEN vm.role='cashier' THEN (SELECT json_extract(j.data_json, '$') FROM domain_data j WHERE j.account_id=vm.account_id AND j.store_key='__bd_staff_job_v1__:' || vm.venue_id) ELSE NULL END IS ?
+      AND vm.role=? AND vm.permissions_json IS ? AND ${MEMBER_JOB_TITLE_SQL} IS ?
       AND vm.status='active' AND v.status='active' AND wm.status='active' AND w.status='active'
     )`).bind(account.id,now,account.membershipId,account.actorAccountId,account.venueId,account.id,
       account.role,account.membershipPermissionsJson??null,account.membershipJobTitle??null);
