@@ -505,6 +505,10 @@
       var open=context.shifts.filter(function(s){return s.closingStatus==='open';});
       document.getElementById('pos-shift-status').textContent=open.length?'Открытые кассовые смены: '+open.map(function(s){return s.shiftName;}).join(' · '):'Кассовая смена закрыта · откройте её в кассе';
       var drafts=[];
+      // The current cashier keeps one quick basket per actor and venue, rather
+      // than a separate legacy draft per shift. Keep its real resume entry.
+      var workspace=JSON.parse(localStorage.getItem('bd_pos_workspace_v2:'+context.actor.accountId+':'+context.venueId)||'null');
+      if(open.length && workspace && workspace.quick && Array.isArray(workspace.quick.lines) && (workspace.quick.lines.length || workspace.pending))drafts.push({shift:open[0],draft:workspace.quick});
       for(var shift of open){
         var draft=window.bdPosDraft.read(localStorage,window.bdPosDraft.key(context.actor.accountId,context.venueId,shift.id));
         if(draft && (draft.lines.length || draft.pending))drafts.push({shift:shift,draft:draft});

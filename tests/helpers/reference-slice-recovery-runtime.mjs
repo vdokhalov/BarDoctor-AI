@@ -10,7 +10,7 @@ export const BASELINE='dcc0541780db52d8c02b0c3a74f3ea0d31cbce24';
 
 export function baselinePublicRoot(){
   const root=mkdtempSync(resolve(tmpdir(),'bardoctor-v485-parity-'));
-  const archive=execFileSync('git',['archive',BASELINE,'public','app/bar-doctor-response.ts','lib/bardoctor/version.ts','lib/bardoctor/app-shell.ts'],{maxBuffer:128*1024*1024});
+  const archive=execFileSync('git',['archive',BASELINE,'public','app/bar-doctor-response.ts','app/cashier/route.ts','lib/bardoctor/version.ts','lib/bardoctor/app-shell.ts'],{maxBuffer:128*1024*1024});
   execFileSync('tar',['-x','-C',root],{input:archive});
   return {root,close:()=>rmSync(root,{recursive:true,force:true})};
 }
@@ -25,6 +25,9 @@ export async function recoveryRuntime(root=process.cwd()){
   r.seed('bd_equipment',[{id:'qa-equipment',venueId:r.venueId,name:'QA оборудование',category:'coffee',status:'active',photos:[],history:[],maintenance:[],purchaseDate:'2026-09-01',purchasePrice:100,currency:'MDL'}]);
   r.seed('bd_equipment_history',[]);r.seed('bd_equipment_work_orders',[]);
   const html=await import(root+'/app/bar-doctor-response.ts');
+  // A historical cashier script must receive its own historical document.
+  // Candidate documents and all API handlers continue to use current source.
+  const cashierDocument=root===process.cwd()?null:await import(root+'/app/cashier/route.ts');
   const requests=[];
   const server=createServer(async(req,res)=>{
     try{
@@ -45,7 +48,7 @@ export async function recoveryRuntime(root=process.cwd()){
       }else if(url.pathname==='/forgot-password'){response=await isolatedForgotPasswordDocument();
       }else if(!extname(url.pathname)){
         const doc=definitions.find(d=>d.path===url.pathname&&!d.path.startsWith('/api/'));
-        response=doc&&url.searchParams.get('embedded')==='1'?await r.api[doc.name].GET(request):html.barDoctorResponse();
+        response=doc&&url.searchParams.get('embedded')==='1'?await (url.pathname==='/cashier'&&cashierDocument?cashierDocument:r.api[doc.name]).GET(request):html.barDoctorResponse();
       }else{
         let file=resolve(root,'public','.'+url.pathname);
         if(!existsSync(file)&&/\/assets\/index-BQGspy0I-[a-f0-9]+\.js$/.test(file))file=resolve(root,'public/assets/index-BQGspy0I.js');

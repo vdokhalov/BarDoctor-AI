@@ -24,6 +24,11 @@ export function posAmendment(manifest=JSON.parse(readFileSync('tests/fixtures/po
   assert.equal(posDigest(read(path)),item.after,path+' exact POS implementation');
   old.set(path,before);
  }
+ // Preserve the historical package bytes only after proving the sole allowed
+ // change: remove duplicate preparation from the aggregate test command.
+ const packageBefore=revision('package.json');
+ assert.equal(read('package.json').toString(),packageBefore.toString().replace('"test": "npm run pretest:artifact && ','"test": "'),'exact aggregate preparation change');
+ old.set('package.json',packageBefore);
  return {
   paths(paths){return paths.filter(path=>!old.has(path)||old.get(path)!==null);},
   read(path){return old.has(path)?old.get(path):read(path);},

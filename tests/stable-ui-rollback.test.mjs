@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
 import {recoveryApprovedHashes,recoveryDigest} from './helpers/health-doctor-recovery-guard.mjs';
+import {posAmendment} from './helpers/pos-release-amendment.mjs';
 
 import {businessDateBackend,assertBusinessDateBackend} from './helpers/business-dates-guard.mjs';
 
@@ -32,11 +33,11 @@ test('production APIs, schema, auth and unrelated modules stay identical outside
  'lib/bardoctor/request-observability.ts','lib/bardoctor/canonical-health-inputs.ts',
  'app/api/business-health/route.ts','lib/bardoctor/health-operations-inputs.ts']);
  assert.ok(files.length>300);
- const recovery=recoveryApprovedHashes();assertBusinessDateBackend();
+ const recovery=recoveryApprovedHashes();assertBusinessDateBackend();const pos=posAmendment();
  for(const path of files.filter(p=>!ui.has(p))){
   if(path===businessDateBackend)continue; // Exact pinned date/count repair asserted above.
   if(Object.hasOwn(recovery,path))assert.equal(recoveryDigest(readFileSync(path)),recovery[path],path);
-  else assert.deepEqual(readFileSync(path),before(path),path);
+  else assert.deepEqual(pos.read(path),before(path),path);
  }
 });
 

@@ -16,6 +16,7 @@ test('POS amendment pins exact files and bytes while preserving untouched releas
  const changedView=posAmendment(manifest,(path:string)=>path===unchanged?altered(path):readFileSync(path));
  assert.throws(()=>assert.deepEqual(changedView.read(unchanged),execFileSync('git',['show',posBaseline+':'+unchanged])));
  assert.ok(view.paths(['unexpected/new.ts']).includes('unexpected/new.ts'));
+ assert.throws(()=>posAmendment(manifest,(path:string)=>path==='package.json'?Buffer.from(JSON.stringify({...JSON.parse(readFileSync(path,'utf8')),unapproved:true})):readFileSync(path)));
 });
 test('npm aggregate removes only the duplicate artifact preparation; artifact lifecycle preserves every gate',()=>{
  const before=JSON.parse(execFileSync('git',['show',posBaseline+':package.json'],{encoding:'utf8'})).scripts;

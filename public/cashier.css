@@ -5,3 +5,4 @@
 @media print{.sidebar,.top,.notice,.warning,.toolbar,button,dialog{display:none!important}.workspace{margin:0;padding:0;background:white}#work>section:not(#report-view){display:none!important}#report-view{display:block!important}.report .panel,.report .metrics{break-inside:avoid}.report-columns{display:block}.report{max-width:none}.report select{display:none}.metrics{background:#eee!important}}
 
 nav button[aria-pressed=true]:hover{background:var(--soft);color:var(--accent)}#waiter-filter{width:auto;max-width:270px}.detail-list .order-card:hover{background:#f8f6ff}
+@media(max-width:600px){input,select,textarea{font-size:16px}}
