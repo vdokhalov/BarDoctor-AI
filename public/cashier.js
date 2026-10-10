@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
-  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,refreshController;
   const notice=message=>{$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
@@ -13,7 +13,9 @@
   const date=value=>value?new Intl.DateTimeFormat("ru-RU",{dateStyle:"short",timeStyle:"short",timeZone:state.data?.timezone||"UTC"}).format(new Date(value)):"Неизвестно";
   const time=value=>value?new Intl.DateTimeFormat("ru-RU",{hour:"2-digit",minute:"2-digit",timeZone:state.data?.timezone||"UTC"}).format(new Date(value)):"—";
   const senior=()=>["owner","manager","shift_manager"].includes(state.data?.actor.role), configure=()=>["owner","manager"].includes(state.data?.actor.role);
-  const shift=()=>state.data?.shifts.find(s=>s.closingStatus==="open"), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
+  const shiftSelectionKey=()=>`bd_pos_shift_v1:${state.data.actor.accountId}:${state.data.venueId}`;
+  const selectedShift=data=>{if(!data)return;const open=data.shifts.filter(s=>s.closingStatus==="open"),saved=localStorage.getItem(`bd_pos_shift_v1:${data.actor.accountId}:${data.venueId}`);return open.find(s=>s.id===saved)||(open.length===1?open[0]:undefined);};
+  const shift=()=>selectedShift(state.data), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
   const storageKey=()=>`bd_pos_workspace_v2:${state.data.actor.accountId}:${state.data.venueId}`;
   function clearView(name){const view=$(name+"-view");view.replaceChildren();view.hidden=true;}
   function setReport(report){state.report=report;state.reportLastSuccess=report?Date.now():null;}
@@ -25,7 +27,7 @@
     }
     if(!configure()){state.rules=[];clearView("discounts");if(state.view==="discounts")state.view="cashier";}
   }
-  function clearSensitive(message) { state.frozen=true;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
+  function clearSensitive(message) { state.frozen=true;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("cashier-venue-host").hidden=true;$("venue-timezone-label").replaceChildren();$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
   async function request(path,body) {
     if(state.frozen)throw Error("Обновите кассу перед продолжением.");
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
@@ -33,8 +35,8 @@
     if(email&&token){headers["X-Session-Email"]=email;headers["X-Session-Token"]=token;}if(initialVenue)headers["X-Venue-Id"]=initialVenue;
     let response;
     try { response=await fetch(path,{method:body?"POST":"GET",headers,cache:"no-store",...(body?{body:JSON.stringify({...body,venueId:state.data.venueId})}:{}),signal:AbortSignal.timeout(20000)}); }
-    catch { const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;throw error; }
-    const data=await response.json().catch(()=>({}));
+    catch { const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;error.network=true;throw error; }
+    let data;try{data=await response.json();}catch{const error=Error("Ответ сервера получен не полностью. Сохранённый запрос можно проверить и повторить.");error.uncertain=true;throw error;}
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
     if([401,403].includes(response.status)||data.code==="VENUE_CHANGED") {
       clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
@@ -44,14 +46,23 @@
     if(!response.ok||!data.ok){const error=Error(data.error||({POS_ORDER_SHIFT_HAS_OPEN_ORDERS:"Перед закрытием завершите или отмените все открытые заказы.",POS_CASH_NEEDS_REVIEW:"Проверьте кассовые суммы и причину операции."})[data.code]||"Операция не выполнена. Обновите данные и проверьте запрос.");error.status=response.status;error.code=data.code;error.uncertain=response.status>=500;throw error;}
     return data;
   }
-  function saveLocal() { try {localStorage.setItem(storageKey(),JSON.stringify({quick:state.quick,pending:state.pending}));}catch{throw Error("Не удалось сохранить запрос в браузере. Оплата заблокирована до восстановления хранилища.");} }
+  function saveLocal() { try {if(state.quick.shiftId)state.drafts[state.quick.shiftId]=state.quick;localStorage.setItem(storageKey(),JSON.stringify({quick:state.quick,pending:state.pending,byShift:state.drafts}));}catch{throw Error("Не удалось сохранить запрос в браузере. Оплата заблокирована до восстановления хранилища.");} }
   function restoreLocal() {
     const raw=localStorage.getItem(storageKey());
-    if(raw){const saved=JSON.parse(raw);if(!saved.quick||!Array.isArray(saved.quick.lines))throw Error("Локальный черновик повреждён. Сохранённые данные не удалены.");state.quick=saved.quick;state.pending=saved.pending||null;}
+    if(raw){const saved=JSON.parse(raw);if(!saved.quick||!Array.isArray(saved.quick.lines))throw Error("Локальный черновик повреждён. Сохранённые данные не удалены.");state.quick=saved.quick;state.pending=saved.pending||null;state.drafts=saved.byShift||{};}
     const prefix=`bd_pos_draft_v1:${encodeURIComponent(state.data.actor.accountId)}:${encodeURIComponent(state.data.venueId)}:`;
     for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith(prefix)){const draft=window.bdPosDraft.read(localStorage,key);if(draft?.pending||draft?.lines?.length){state.legacy={key,draft,storage:"local"};break;}}}
     const legacyKey=`bd_pos_pending:${localStorage.getItem("bd_session")}:${state.data.venueId}`,old=sessionStorage.getItem(legacyKey);
     if(old&&!state.legacy)state.legacy={key:legacyKey,draft:JSON.parse(old),storage:"session"};
+  }
+  function syncQuickShift(){
+    const current=shift();if(!current)return;
+    if(!state.quick.shiftId){state.quick.shiftId=current.id;return;}
+    if(state.quick.shiftId!==current.id){
+      state.drafts[state.quick.shiftId]=state.quick;
+      state.quick=state.drafts[current.id]||{id:uuid(),lines:[],comment:"",shiftId:current.id};
+      state.orderId=null;
+    }
   }
   async function load() {
     const data=await request("/api/sales-events");
@@ -62,7 +73,7 @@
     const orders=await request("/api/pos-orders");
     if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
     let overview=null;
-    const current=data.shifts.find(s=>s.closingStatus==="open");
+    const current=selectedShift(data);
     if(state.view==="overview"&&["owner","manager","shift_manager"].includes(data.actor.role)&&current)overview=await request("/api/pos-overview?shiftId="+encodeURIComponent(current.id));
     let report;
     if(state.view==="report"&&["owner","manager","shift_manager"].includes(data.actor.role)&&state.report?.status==="open"){
@@ -70,9 +81,9 @@
     }
     return {data,orders:orders.orders,overview,report};
   }
-  function accept(value) { if(state.frozen)return;state.data=value.data;state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";render(); }
+  function accept(value) { if(state.frozen)return;state.data=value.data;syncQuickShift();state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";render(); }
   async function reload(){accept(await load());}
-  function errorView(error){state.stale=true;$("connection").textContent="Данные устарели";notice(error.message);if(state.data)render();}
+  function errorView(error){state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message);if(state.data)render();}
   async function working(task) {
     if(state.busy||state.frozen||refreshController?.state().running)return;
     state.busy=true;setBusy();
@@ -95,10 +106,11 @@
       let quick=durable.quick;
       if(saved.origin?.kind==="quick_to_table"&&saved.body.action==="create"){
         // A different draft (including a concurrent localStorage edit) is never consumed.
-        if(matchesQuick(durable.quick,saved.origin))quick=matchesQuick(state.quick,saved.origin)?{id:uuid(),lines:[],comment:""}:state.quick;
-      }else if(saved.body.action==="post")quick={id:uuid(),lines:[],comment:""};
+        if(matchesQuick(durable.quick,saved.origin))quick=matchesQuick(state.quick,saved.origin)?{id:uuid(),lines:[],comment:"",shiftId:state.quick.shiftId}:state.quick;
+      }else if(saved.body.action==="post")quick={id:uuid(),lines:[],comment:"",shiftId:saved.body.command?.shiftId||state.quick.shiftId};
       // Persist acknowledgement and consumption together, before any network reload.
-      localStorage.setItem(key,JSON.stringify({quick,pending:null}));state.quick=quick;state.pending=null;
+      const byShift={...(durable.byShift||{}),...(quick.shiftId?{[quick.shiftId]:quick}:{})};
+      localStorage.setItem(key,JSON.stringify({...durable,quick,pending:null,byShift}));state.quick=quick;state.drafts=byShift;state.pending=null;
     }catch{
       const error=Error("Операция подтверждена сервером, но локальное подтверждение не сохранено. Обновите кассу и проверьте сохранённый запрос.");error.uncertain=true;throw error;
     }
@@ -122,11 +134,11 @@
   const field=(name,label,type="text",value="",attrs="")=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
   function renderRecovery(){
     $("recovery").hidden=!state.pending&&!state.legacy;
-    $("recovery").innerHTML=state.legacy?'<strong>Есть незавершённый заказ из прежней кассы.</strong><p>Он сохранён. Новая оплата заблокирована до проверки результата.</p><button data-action="legacy">Проверить и восстановить</button>':state.pending?'<strong>Результат операции ещё не подтверждён.</strong><p>Повтор использует тот же номер операции.</p><button data-action="retry">Проверить результат и повторить</button>':"";
+    $("recovery").innerHTML=state.legacy?'<strong>Есть незавершённый заказ из прежней кассы.</strong><p>Он сохранён. Новая оплата заблокирована до проверки результата.</p><button data-action="legacy">Проверить и восстановить</button>':state.pending?'<strong>Результат операции ещё не подтверждён.</strong><p>Повтор использует тот же номер операции.</p><button id="retry" data-action="retry">Проверить результат и повторить</button>':"";
   }
   function nav(){
     const items=[["cashier","Касса","grid-2x2"],["orders","Заказы","clipboard-list"],["receipts","Чеки","circle-check"],...(senior()?[["overview","Текущая смена","clock-3"],["report","Отчёт смены","activity"]]:[]),...(configure()?[["discounts","Настройка скидок","settings-2"]]:[])];
-    $("navigation").innerHTML=items.map(([key,label,image])=>`<button data-view="${key}" aria-pressed="${state.view===key}">${icon(image)}${label}</button>`).join("");$("management-link").hidden=!senior();
+    $("navigation").innerHTML=items.map(([key,label,image])=>`<button data-view="${key}" aria-pressed="${state.view===key}">${icon(image)}${label}</button>`).join("");$("management-link").hidden=!senior();$("cashier-venue-host").hidden=!senior();
   }
   function pricing(order){return order.lines.some(l=>l.pricingUnavailable)?null:order.totals?.netAmount??order.lines.reduce((n,l)=>n+Math.round(l.total*100),0)/100;}
   function quickLines(){return state.quick.lines.map(l=>{const item=state.data.menu.find(m=>m.id===l.menuItemId);const valid=item&&typeof item.salePrice==="number"&&Number.isFinite(item.salePrice)&&Math.abs(item.salePrice*100-Math.round(item.salePrice*100))<0.000001;return {...l,name:item?.name||l.name||"Недоступная позиция",unitPrice:valid?item.salePrice:null,total:valid?Math.round(item.salePrice*100)*l.quantity/100:null};});}
@@ -149,22 +161,26 @@
         && (state.subcategory==="all"||m.subcategoryId===state.subcategory));
   }
   function renderCashier(){
-    const current=shift(),order=selectedOrder();
+    const timezoneLabel=$("venue-timezone-label");timezoneLabel.dataset.configured=String(state.data.timezoneConfigured===true);
+    timezoneLabel.innerHTML=state.data.timezoneConfigured?`Часовой пояс: ${esc(state.data.timezone)}`:`Часовой пояс не настроен. Учётная дата около полуночи может отличаться.${senior()?` <a href="/profile/venue?venue=${encodeURIComponent(state.data.venueId)}">Настроить часовой пояс</a>`:""}`;
+    const current=shift(),order=selectedOrder(),open=state.data.shifts.filter(s=>s.closingStatus==="open");
+    const picker=open.length>1?`<label id="shift-picker-label">Кассовая смена<select id="shift-picker" ${state.pending||state.legacy?"disabled":""}><option value="">Выберите смену</option>${open.map(s=>`<option value="${esc(s.id)}" ${current?.id===s.id?"selected":""}>${esc(s.shiftName)} · ${esc(s.date)}</option>`).join("")}</select></label>`:"";
+    if(!current&&open.length>1){$("cashier-view").innerHTML=`<section class="panel"><h2>Выберите открытую смену</h2><p>Обнаружены ранее открытые параллельные смены. Черновики и оплаты учитываются раздельно.</p>${picker}</section>`;return;}
     if(!current){$("cashier-view").innerHTML=`<section class="panel"><h2>Кассовая смена закрыта</h2><p>${state.data.permissions.shifts?"Откройте смену и укажите размен для сверки наличных.":"Попросите администратора, управляющего или владельца открыть смену."}</p>${state.data.permissions.shifts?'<button class="primary" data-action="open-shift">Открыть смену</button>':""}</section>`;return;}
     const orders=activeOrders(),lines=order?order.lines:quickLines(),total=order?pricing(order):quickTotal();
-    const departments=[...new Map(state.data.menu.filter(m=>m.sectionId).map(m=>[m.sectionId,m.section||m.sectionName||m.sectionId])).entries()];
+    const departments=[...new Map(state.data.menu.filter(m=>m.sectionId).map(m=>[m.sectionId,m.department||m.section||m.sectionName||m.sectionId])).entries()];
     const categoryItems=state.data.menu.filter(m=>state.department==="all"||m.sectionId===state.department);
     const categories=[...new Map(categoryItems.filter(m=>m.categoryId).map(m=>[m.categoryId,m.category])).entries()];
     const subcategories=[...new Map(categoryItems.filter(m=>m.subcategoryId&&(state.category==="all"||m.categoryId===state.category)).map(m=>[m.subcategoryId,m.subcategory])).entries()];
     const menu=visibleMenu();
     const locked=!!order?.precheck||!!order?.discount,blocked=state.pending||state.legacy||total==null||!lines.length||!state.data.permissions.post;
-    $("cashier-view").innerHTML=`<div class="toolbar"><small>${esc(current.shiftName)} · ${esc(current.date)} · ${esc(state.data.timezone||"UTC")}</small>${state.data.permissions.shifts?'<div class="actions"><button data-action="cash">Кассовая операция</button><button data-action="close-shift">Закрыть смену</button></div>':""}</div>
+    $("cashier-view").innerHTML=`<div class="toolbar">${picker}<small>${esc(current.shiftName)} · ${esc(current.date)} · ${esc(state.data.timezone||"UTC")}</small>${state.data.permissions.shifts?'<div class="actions"><button data-action="cash">Кассовая операция</button><button data-action="close-shift">Закрыть смену</button></div>':""}</div>
       <div class="order-tabs"><button data-action="quick" aria-pressed="${!order}">Быстрая продажа<small>${esc(money(quickTotal()))}</small></button>${orders.map(o=>`<button data-order="${esc(o.id)}" aria-pressed="${order?.id===o.id}">Стол ${esc(o.tableNumber)}<small>${esc(money(pricing(o)))}</small></button>`).join("")}<button data-action="create-order">${icon("plus")} Заказ</button></div>
       <div class="mobile-tabs"><button data-pane="order" aria-pressed="${document.body.dataset.pane!=="menu"}">Заказ · ${lines.reduce((n,l)=>n+l.quantity,0)}</button><button data-pane="menu" aria-pressed="${document.body.dataset.pane==="menu"}">Меню</button></div>
-      <div class="layout"><section class="menu-panel panel"><label><span class="muted">Цены в ${esc(currency())}</span><input id="menu-search" type="search" placeholder="Поиск по меню" value="${esc(state.search)}"></label>${departments.length?`<label>Раздел<select id="menu-department"><option value="all">Все разделы</option>${departments.map(([id,name])=>`<option value="${esc(id)}" ${state.department===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="categories"><button data-category="all" aria-pressed="${state.category==="all"}">Все</button>${categories.map(([id,name])=>`<button data-category="${esc(id)}" aria-pressed="${state.category===id}">${esc(name)}</button>`).join("")}</div>${subcategories.length?`<label>Подкатегория<select id="menu-subcategory"><option value="all">Все подкатегории</option>${subcategories.map(([id,name])=>`<option value="${esc(id)}" ${state.subcategory===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="menu-grid">${menu.length?menu.map(m=>`<button class="menu-item" data-add="${esc(m.id)}" ${locked||m.salePrice==null?'disabled data-ineligible':''}>${m.imageUrl?`<img src="${esc(m.imageUrl)}" alt="" loading="lazy">`:""}<strong>${esc(m.name)}</strong><span>${esc(money(m.salePrice))}</span></button>`).join(""):'<p class="empty">Позиций по этому запросу нет.</p>'}</div></section>
-      <section class="cart panel"><div class="section-head"><div><h2>${order?"Стол "+esc(order.tableNumber):"Быстрая продажа"}</h2><small>${order?esc(order.createdBy.name)+" · "+esc(time(order.createdAt)):"Выберите позиции из меню"}</small></div>${order?badge(order):""}</div><div class="lines">${lines.length?lines.map(l=>`<div class="line"><div class="copy"><strong>${esc(l.name)}</strong><small>${l.quantity} × ${esc(money(l.unitPrice))}</small></div><strong class="line-sum">${esc(money(l.pricingUnavailable?null:l.total))}</strong>${senior()&&!locked?`<button data-cancel-line="${esc(l.id)}" aria-label="Отменить позицию ${esc(l.name)}">${icon("circle-off")}</button>`:""}</div>`).join(""):'<p class="empty">Добавьте позиции из меню.</p>'}</div>
+      <div class="layout"><section class="menu-panel panel"><label><span class="muted">Цены в ${esc(currency())}</span><input id="menu-search" type="search" placeholder="Поиск по меню" value="${esc(state.search)}"></label>${departments.length?`<label>Раздел<select id="menu-department"><option value="all">Все разделы</option>${departments.map(([id,name])=>`<option value="${esc(id)}" ${state.department===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="categories"><button data-category="all" aria-pressed="${state.category==="all"}">Все</button>${categories.map(([id,name])=>`<button data-category="${esc(id)}" aria-pressed="${state.category===id}">${esc(name)}</button>`).join("")}</div>${subcategories.length?`<label>Подкатегория<select id="menu-subcategory"><option value="all">Все подкатегории</option>${subcategories.map(([id,name])=>`<option value="${esc(id)}" ${state.subcategory===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="menu-grid">${menu.length?menu.map(m=>`<button class="menu-item" data-add="${esc(m.id)}" ${locked||m.salePrice==null?'disabled data-ineligible':''}>${m.imageUrl?`<img src="${esc(m.imageUrl)}" alt="" loading="lazy">`:""}<strong>${esc(m.name)}</strong><small>${esc(m.subcategory||m.category||"")}</small><span>${esc(money(m.salePrice))}</span></button>`).join(""):'<p class="empty">Позиций по этому запросу нет.</p>'}</div></section>
+      <section class="cart panel"><div class="section-head"><div><h2>${order?"Стол "+esc(order.tableNumber):"Быстрая продажа"}</h2><small>${order?esc(order.createdBy.name)+" · "+esc(time(order.createdAt)):"Выберите позиции из меню"}</small></div>${order?badge(order):""}</div><div class="lines">${lines.length?lines.map(l=>`<div class="line" data-menu-item="${esc(l.menuItemId)}"><div class="copy"><strong>${esc(l.name)}</strong><small><output>${l.quantity}</output> × ${esc(money(l.unitPrice))}</small></div><strong class="line-sum">${esc(money(l.pricingUnavailable?null:l.total))}</strong>${!order?`<div class="quantity-controls"><button data-increase-line="${esc(l.id)}" data-increase="${esc(l.menuItemId)}" aria-label="Увеличить ${esc(l.name)}" ${l.quantity>=999?"disabled data-ineligible":""}>+</button>${senior()?`<button data-decrease-line="${esc(l.id)}" data-decrease="${esc(l.menuItemId)}" aria-label="Уменьшить ${esc(l.name)}">−</button>`:""}</div>`:""}${senior()&&!locked?`<button data-cancel-line="${esc(l.id)}" data-remove="${esc(l.menuItemId)}" aria-label="Отменить позицию ${esc(l.name)}">${icon("circle-off")}</button>`:""}</div>`).join(""):'<p class="empty">Добавьте позиции из меню.</p>'}</div>
       <button data-pane="menu" class="mobile-tabs">Добавить позиции</button>${order?.comment?`<p class="muted">${esc(order.comment)}</p>`:!order?`<label>Комментарий<textarea id="quick-comment" rows="2" maxlength="500">${esc(state.quick.comment)}</textarea></label>`:""}
-      <div class="cart-foot">${order?.discount?`<p class="readonly">${esc(order.discount.name)} · Скидка ${esc(money(order.discount.discountAmount))}<br><small>До скидки ${esc(money(order.discount.grossAmount))}</small></p>`:""}<div class="total"><span>Итого</span><strong>${esc(money(total))}</strong></div><div class="actions">${order&&!order.precheck?`<button data-action="precheck" ${!lines.length||total==null?'disabled data-ineligible':''}>Предчек</button>`:""}<button class="primary" data-action="payment" ${blocked?'disabled data-ineligible':''}>К оплате · ${esc(amount(total))}</button></div>
+      <div class="cart-foot">${order?.discount?`<p class="readonly">${esc(order.discount.name)} · Скидка ${esc(money(order.discount.discountAmount))}<br><small>До скидки ${esc(money(order.discount.grossAmount))}</small></p>`:""}<div class="total"><span>Итого</span><strong>${esc(money(total))}</strong></div><div class="actions">${order&&!order.precheck?`<button data-action="precheck" ${!lines.length||total==null?'disabled data-ineligible':''}>Предчек</button>`:""}<button id="pay" class="primary" data-action="payment" ${blocked?'disabled data-ineligible':''}>К оплате · ${esc(amount(total))}</button></div>
       ${senior()?`<details class="admin-actions"><summary>Действия администратора</summary><div class="actions">${order?`${order.precheck?'<button data-action="cancel-precheck">Отмена предчека</button>':`<button data-action="split" ${order.discount?'disabled data-ineligible':''}>Разделить счёт</button><button data-action="discount">${order.discount?"Снять скидку":"Применить скидку"}</button>`}<button class="danger" data-action="cancel-order">Отменить заказ</button>`:'<button data-action="save-quick">Сохранить за столом</button>'}</div></details>`:'<div class="admin-actions"><p>Разделение счёта, отмены и скидки выполняет администратор, управляющий или владелец.</p></div>'}<p class="footnote">Предчек и печать в браузере — нефискальные. Принтер и эквайринг не подключены.</p></div></section></div>`;
   }
   function renderOrders(){ $("orders-view").innerHTML=`<div class="section-head"><div><h2>Открытые заказы</h2><p class="muted">${activeOrders().length} счетов · ${new Set(activeOrders().map(o=>o.tableNumber)).size} столов</p></div><button class="primary" data-action="create-order" ${!shift()?'disabled data-ineligible':''}>Новый заказ</button></div><div class="cards">${activeOrders().map(o=>orderCard(o)).join("")}</div>${!activeOrders().length?'<p class="empty">Нет открытых заказов.</p>':""}`; }
@@ -213,7 +229,8 @@
   async function showPayment(){
     const order=selectedOrder(),sum=order?pricing(order):quickTotal();
     if(sum==null)throw Error("Цена недоступна. Проверьте позиции.");
-    dialog("Оплата",`<p class="total">К оплате <strong>${esc(money(sum))}</strong></p><div class="payment-choices"><label><input type="radio" name="method" value="CASH" checked>Наличные</label><label><input type="radio" name="method" value="CARD_EXTERNAL">Внешний терминал</label></div><p class="footnote">Подтвердите фактически полученную оплату. Интеграция эквайринга и фискализация отсутствуют.</p>`,async form=>{
+    dialog("Оплата",`<p class="total">К оплате <strong>${esc(money(sum))}</strong></p><div class="payment-choices"><label><input type="radio" name="method" value="CASH" ${order||state.quick.method!=="CARD_EXTERNAL"?"checked":""}>Наличные</label><label><input type="radio" name="method" value="CARD_EXTERNAL" ${!order&&state.quick.method==="CARD_EXTERNAL"?"checked":""}>Внешний терминал</label></div><p class="footnote">Подтвердите фактически полученную оплату. Интеграция эквайринга и фискализация отсутствуют.</p>`,async form=>{
+      notice("Выполняем оплату…");
       const method=String(form.get("method")),payment={id:uuid(),method,amount:sum};let result;
       if(order){
         const body={orderId:order.id,expectedRevision:order.revision,payment};
@@ -229,7 +246,7 @@
   }
   function showReceipt(id){
     const event=state.data.events.find(e=>e.id===id)||state.overview?.staff.flatMap(s=>s.paidReceipts).find(e=>e.id===id);if(!event)return;
-    dialog("Оплаченный чек",`<p class="success-title">Оплачено · ${esc(date(event.acceptedAt))}</p><p>${esc(event.tableNumber?"Стол "+event.tableNumber:"Быстрая продажа")} · ${esc(paymentLabel(event))}</p>${event.prices.map(l=>`<div class="cash-row"><span>${esc(l.name)} × ${l.quantity}</span><strong>${esc(money(l.total))}</strong></div>`).join("")}<div class="cash-row"><span>До скидки</span><strong>${esc(money(event.grossAmount))}</strong></div><div class="cash-row"><span>Скидка</span><strong>${esc(money(event.discountAmount))}</strong></div><p class="total">Оплачено <strong>${esc(money(event.revenue))}</strong></p><p class="muted">Официант: ${esc(event.orderActor?.name||event.waiter?.name||event.actor?.name||"Неизвестно")}<br>Оплату принял: ${esc(event.actor?.name||"Неизвестно")}</p><p class="footnote long-id">Номер: ${esc(event.id)}<br>Нефискальное подтверждение. Оплаченные возвраты пока недоступны.</p>`,null);
+    dialog("Оплаченный чек",`<p class="success-title">Оплачено · ${esc(date(event.acceptedAt))}</p><p>${esc(event.tableNumber?"Стол "+event.tableNumber:"Быстрая продажа")} · ${esc(paymentLabel(event))}</p>${event.prices.map(l=>`<div class="cash-row"><span>${esc(l.name)} × ${l.quantity}</span><strong>${esc(money(l.total))}</strong></div>`).join("")}<div class="cash-row"><span>До скидки</span><strong>${esc(money(event.grossAmount))}</strong></div><div class="cash-row"><span>Скидка</span><strong>${esc(money(event.discountAmount))}</strong></div><p class="total">Оплачено <strong>${esc(money(event.revenue))}</strong></p><p class="muted">Официант: ${esc(event.orderActor?.name||event.waiter?.name||event.actor?.name||"Неизвестно")}<br>Оплату принял: ${esc(event.actor?.name||"Неизвестно")}</p>${senior()&&!$("sales-journal").hidden?`<a id="receipt-sale" href="/sales-import?venue=${encodeURIComponent(state.data.venueId)}&batch=${encodeURIComponent(event.id)}">Документ продажи</a>`:""}<p class="footnote long-id">Номер: ${esc(event.id)}<br>Нефискальное подтверждение. Оплаченные возвраты пока недоступны.</p>`,null);
   }
   function showRule(id){const rule=state.rules.find(r=>r.id===id);dialog(rule?"Изменить скидку":"Новая скидка",field("name","Название","text",rule?.name||"","required maxlength=120")+`<label>Тип<select name="kind"><option value="PERCENT" ${rule?.kind!=="FIXED"?"selected":""}>Процент</option><option value="FIXED" ${rule?.kind==="FIXED"?"selected":""}>Фиксированная сумма</option></select></label>`+field("value","Значение","number",rule?.value??"","required min=0 step=0.01 inputmode=decimal")+`<label>Состояние<select name="active"><option value="true" ${rule?.active!==false?"selected":""}>Активна</option><option value="false" ${rule?.active===false?"selected":""}>Выключена</option></select></label>`,async form=>{
     await mutate("/api/pos-discounts",{action:"save",ruleId:rule?.id||uuid(),expectedRevision:rule?.revision||0,operationId:uuid(),rule:{name:String(form.get("name")),kind:String(form.get("kind")),value:Number(form.get("value")),active:form.get("active")==="true"}});state.rules=(await request("/api/pos-discounts")).rules;render();notice("Правило сохранено. Оплаченные чеки не изменены.");
@@ -284,6 +301,7 @@
   }
   document.addEventListener("click",event=>{
     const button=event.target.closest("button");if(!button||button.disabled)return;
+    if(button.id==="dialog-submit")return; // The form submit handler owns this transaction.
     if(button.dataset.action==="dismiss"){$("dialog").close();return;}
     if(button.dataset.pane){document.body.dataset.pane=button.dataset.pane;render();window.scrollTo({top:0,behavior:"instant"});return;}
     void working(async()=>{
@@ -296,6 +314,12 @@
         const order=selectedOrder();
         if(order){await orderAction("add_items",{lines:[{id:uuid(),menuItemId:item.id,quantity:1}]});render();}
         else{const existing=state.quick.lines.find(l=>l.menuItemId===item.id);if(existing){if(existing.quantity>=999)return;existing.quantity++;}else{if(state.quick.lines.length>=100)throw Error("В одном чеке до 100 позиций.");state.quick.lines.push({id:uuid(),menuItemId:item.id,quantity:1,name:item.name});}saveLocal();render();notice("Позиция добавлена.");}
+      }else if(button.dataset.increaseLine||button.dataset.decreaseLine){
+        if(selectedOrder()||state.pending||state.legacy)return;
+        const line=state.quick.lines.find(l=>l.id===(button.dataset.increaseLine||button.dataset.decreaseLine));if(!line)return;
+        if(button.dataset.decreaseLine){if(!senior())return;if(line.quantity===1)state.quick.lines=state.quick.lines.filter(l=>l!==line);else line.quantity--;}
+        else{if(line.quantity>=999)return;line.quantity++;}
+        saveLocal();render();
       }else if(button.dataset.cancelLine){if(!senior())return;if(selectedOrder())reasonAction("Отменить позицию","cancel_item",{lineId:button.dataset.cancelLine});else{state.quick.lines=state.quick.lines.filter(l=>l.id!==button.dataset.cancelLine);saveLocal();render();}}
       else if(button.dataset.waiter!==undefined){state.waiter=button.dataset.waiter;state.detailTab="tables";render();window.scrollTo({top:0,behavior:"instant"});}
       else if(button.dataset.detail){state.detailTab=button.dataset.detail;render();}
@@ -309,6 +333,8 @@
     if(event.target.id==="quick-comment"){state.quick.comment=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
   });
   document.addEventListener("change",event=>{
+    if(event.target.id==="shift-picker")void working(async()=>{if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");saveLocal();localStorage.setItem(shiftSelectionKey(),event.target.value);syncQuickShift();saveLocal();render();});
+    if(event.target.name==="method"&&!selectedOrder()){state.quick.method=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
     if(event.target.id==="menu-department"){state.department=event.target.value;state.category="all";state.subcategory="all";renderCashier();}
     if(event.target.id==="menu-subcategory"){state.subcategory=event.target.value;renderCashier();}
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}

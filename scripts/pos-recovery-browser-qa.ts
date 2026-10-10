@@ -116,6 +116,12 @@ try{
  }
  const staffContext=await browser.newContext({viewport:{width:390,height:844}});await staffContext.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:anna,venue:owner.activeVenueId});const page=await staffContext.newPage();page.on("pageerror",error=>errors.push(error.message));await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});
  assert.equal(await page.locator("#sales-journal").isVisible(),false);
+ assert.equal(await page.locator("#cashier-venue-host").isVisible(),false);
+ await page.locator('[data-action="quick"]').click();await page.locator('[data-pane="menu"]').first().click();await page.locator('[data-add="beer"]').click();await page.locator('[data-pane="order"]').click();
+ assert.equal(await page.locator('[data-increase-line]').count(),1);assert.equal(await page.locator('[data-decrease-line],[data-cancel-line],[data-action="split"],[data-action="cancel-precheck"]').count(),0);
+ await page.locator('[data-increase-line]').click();assert.equal(await page.locator('.cart .line output').innerText(),'2');
+ await page.reload();await page.locator('.cart .line output').waitFor();assert.equal(await page.locator('.cart .line output').innerText(),'2');assert.equal(await page.locator('[data-decrease-line],[data-cancel-line]').count(),0);
+
  assert.equal(await page.locator('[data-view="overview"]').count(),0);assert.equal(await page.locator('[data-action="close-shift"]').count(),0);await page.getByRole("button",{name:"Чеки",exact:true}).click();assert.equal(await page.locator("#receipts-view .receipt-row").count(),1);
  await staffContext.close();
  // Finish the synthetic shift through real order cancellation API, then verify the report in the browser.
@@ -169,7 +175,8 @@ try{
  await managerPage.reload();await managerPage.locator("#work").waitFor({state:"visible"});await managerPage.locator('[data-view="report"]').click();await managerPage.locator(".report").waitFor();
  const sibling=await reviewer.newPage();await sibling.goto(base+"/cashier");await sibling.evaluate(venue=>localStorage.setItem("bd_active_venue_id",String(venue)),manager.activeVenueId);
  await managerPage.locator("#work").waitFor({state:"hidden"});assert.equal(await managerPage.locator("#report-view").innerHTML(),"");assert.equal(await managerPage.locator("#dialog-content").innerHTML(),"");
- await managerPage.reload();await managerPage.locator("#work").waitFor({state:"visible"});await managerPage.locator('[data-view="report"]').click();await managerPage.locator(".report").waitFor();
+ // Re-enter the original venue explicitly: the canonical switcher now also updates the URL in sibling tabs.
+ await managerPage.goto(base+"/cashier?venue="+owner.activeVenueId);await managerPage.locator("#work").waitFor({state:"visible"});await managerPage.locator('[data-view="report"]').click();await managerPage.locator(".report").waitFor();
  await sibling.evaluate(()=>localStorage.removeItem("bd_session_token"));await managerPage.locator("#work").waitFor({state:"hidden"});assert.equal(await managerPage.locator("#report-view").innerHTML(),"");assert.equal(await managerPage.locator("#dialog-content").innerHTML(),"");
  await reviewer.close();await operator.close();
  // Late recovery review: quick-to-table acknowledgement must consume only its source draft.

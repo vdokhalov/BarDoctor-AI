@@ -1,3 +1,4 @@
+import { posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -13,14 +14,14 @@ import { GET as journal } from '../app/sales-import/route';
 import { barDoctorResponse } from '../app/bar-doctor-response';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const out='outputs/sales-ux2';mkdirSync(out,{recursive:true});
-const runtime=await lifecycleRuntime({events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
+const runtime=await lifecycleRuntime({orders:"./app/api/pos-orders/route",events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
 const requests:{path:string;status:number;method:string}[]=[];let failure=false;
 let demo: {email:string;token:string;activeVenueId:number}|null=null;
 const server=createServer(async(req,res)=>{try{
  const url=new URL(req.url||'/','http://localhost');let response:Response;
  if(url.pathname==='/__qa/start' && demo){ const target=url.searchParams.get('to')||'/sales-import?embedded=1'; response=new Response('<!doctype html><script>localStorage.setItem("bd_session",'+JSON.stringify(demo.email)+');localStorage.setItem("bd_session_token",'+JSON.stringify(demo.token)+');localStorage.setItem("bd_active_venue_id",'+JSON.stringify(String(demo.activeVenueId))+');location.replace('+JSON.stringify(target)+');</script>',{headers:{'Content-Type':'text/html'}}); }
  else if(url.pathname.startsWith('/api/')){
-  const routes:Record<string,string>={'/api/sales-events':'events','/api/sales-batches':'batches','/api/auth/bootstrap':'bootstrap','/api/auth/login':'login','/api/users/me':'usersMe','/api/restaurants/me':'restaurantMe','/api/venues':'venues','/api/store':'store','/api/assortment/overview':'overview'};
+  const routes:Record<string,string>={"/api/pos-orders":"orders",'/api/sales-events':'events','/api/sales-batches':'batches','/api/auth/bootstrap':'bootstrap','/api/auth/login':'login','/api/users/me':'usersMe','/api/restaurants/me':'restaurantMe','/api/venues':'venues','/api/store':'store','/api/assortment/overview':'overview'};
   const key=url.pathname.match(/^\/api\/store\/([^/]+)$/)?.[1],name=key?'storeKey':routes[url.pathname];
   const chunks=[];for await(const c of req)chunks.push(Buffer.from(c));const body=Buffer.concat(chunks);
   response=failure&&name==='events'?Response.json({ok:false,error:'QA server unavailable'},{status:503}):name?await runtime.api[name][req.method||'GET'](new Request(url,{method:req.method,headers:req.headers as HeadersInit,...(body.length?{body}:{})}),{params:Promise.resolve({key})} as never):Response.json({ok:false},{status:404});
@@ -63,7 +64,7 @@ else {
   p.on('pageerror',e=>errors.push(e.message));
   const snap=async(name:string,fullPage=false)=>{await p.screenshot({path:out+'/'+width+'-'+name+'.png',fullPage});};
   const fits=async(name:string)=>assert.equal(await p.evaluate(()=>document.body.scrollWidth<=innerWidth+1 && [...document.querySelectorAll<HTMLElement>('.editor-body,.editor-header,.pos-cart-foot')].filter(e=>e.getBoundingClientRect().width).every(e=>e.getBoundingClientRect().right<=innerWidth+1&&e.scrollWidth<=e.clientWidth+1)),true,name+' fits '+width);
-  const pane=async(order:boolean)=>{if(width<768)await p.locator(order?'#show-cart':'#show-menu').click();};
+  const pane=async(order:boolean)=>{await posPane(p,order);};
   const before={events:get('bd_sales_events_v1').length,stock:get('bd_assortment_v1').stockBalances[0].current,revenue:get('bd_finance_revenue').find((v:{id:string})=>v.id==='ux2-open').revenue};
   try {
    await p.goto(base+'/__qa/start');await p.locator('.batch-row').first().waitFor();await fits('journal');await snap('journal',true);
@@ -75,20 +76,20 @@ else {
    await p.locator('[data-sales-view=import]').click();await p.locator('#import-quality').waitFor();await fits('import workspace');await snap('import-workspace',true);
    await p.goto(base+'/sales-entry?view=shifts');await p.locator('.cash-shift[data-state=open]').waitFor();await fits('shifts');await snap('shifts',true);
    await p.goto(base+'/sales-entry');await p.locator('#sale').waitFor();await fits('manual');assert.equal(await p.locator('bd-app-header').count(),0,'manual owns its correct header');await snap('manual',true);
-   await p.goto(base+'/cashier');await p.locator('#cashier:not([hidden])').waitFor();assert.equal(await p.locator('bd-app-header').count(),0,'cashier owns one header');
-   await p.locator('#search').fill('Тартар');assert.equal(await p.locator('.pos-item').count(),1);await p.locator('#search').fill('');
+   await p.goto(base+'/cashier');await p.locator('#cashier-view:not([hidden])').waitFor();assert.equal(await p.locator('bd-app-header').count(),0,'cashier owns one header');await posPane(p,false);
+   await p.locator('#menu-search').fill('Тартар');assert.equal(await p.locator('.menu-item').count(),1);await p.locator('#menu-search').fill('');
    for(let i=0;i<2;i++)await p.locator('[data-add="menu-'+i+'"]').click();await snap('cashier');await pane(true);await snap('small-cart');
    await p.locator('[data-increase="menu-0"]').click();await p.locator('[data-decrease="menu-0"]').click();
-   await pane(false);for(let i=2;i<12;i++)await p.locator('[data-add="menu-'+i+'"]').click();await pane(true);assert.equal(await p.locator('.pos-line').count(),12);await fits('large cart');await p.evaluate(()=>window.scrollTo(0,0));await snap('large-cart');
-   const button=await p.locator('#pay').boundingBox();assert.ok(button&&button.y>=0&&button.y+button.height<=height+1,'payment visible without scrolling');
-   await p.locator('.pos-line').last().scrollIntoViewIfNeeded();
-   const last=await p.locator('.pos-line').last().boundingBox(),foot=await p.locator('.pos-cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last line not covered by checkout');await snap('checkout');
+   await pane(false);for(let i=2;i<12;i++)await p.locator('[data-add="menu-'+i+'"]').click();await pane(true);assert.equal(await p.locator('.cart .line').count(),12);await fits('large cart');await p.evaluate(()=>window.scrollTo(0,0));await snap('large-cart');
+   await p.locator('#pay').scrollIntoViewIfNeeded();const button=await p.locator('#pay').boundingBox();assert.ok(button&&button.y>=0&&button.y+button.height<=height+1,'payment remains reachable after the complete order');
+   await p.locator('.cart .line').last().scrollIntoViewIfNeeded();
+   const last=await p.locator('.cart .line').last().boundingBox(),foot=await p.locator('.cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last line not covered by checkout');await snap('checkout');
    if(width===390){for(const selector of ['[data-increase="menu-11"]','[data-decrease="menu-11"]','[data-remove="menu-11"]']){const b=await p.locator(selector).boundingBox();assert.ok(b&&b.height>=44&&b.width>=44,'44 px quantity targets');}}
-   if(width===1280){await p.setViewportSize({width:640,height:400});await p.locator('#show-cart').click();await p.locator('.pos-line').last().scrollIntoViewIfNeeded();await snap('zoom-reflow');const lastZoom=await p.locator('.pos-line').last().boundingBox(),footZoom=await p.locator('.pos-cart-foot').boundingBox();assert.ok(lastZoom&&footZoom&&lastZoom.y+lastZoom.height<=footZoom.y+1,'zoomed automatic scroll clears checkout');await p.setViewportSize({width,height});}
-   await p.reload();await p.locator('.pos-line').last().waitFor();assert.equal(await p.locator('.pos-line').count(),12,'draft preserved after reload');await p.locator('#pay').click();await p.locator('#receipt:not([hidden])').waitFor();await snap('success');await fits('success');
-   const next=await p.locator('#new-order').boundingBox();assert.ok(next&&next.y+next.height<=height,'new order visible on success');assert.ok((await p.locator('#receipt-sale').getAttribute('href'))?.includes('batch='));
+   if(width===1280){await p.setViewportSize({width:640,height:400});await posPane(p);await p.locator('.cart .line').last().scrollIntoViewIfNeeded();await snap('zoom-reflow');const lastZoom=await p.locator('.cart .line').last().boundingBox(),footZoom=await p.locator('.cart-foot').boundingBox();assert.ok(lastZoom&&footZoom&&lastZoom.y+lastZoom.height<=footZoom.y+1,'zoomed automatic scroll clears checkout');await p.setViewportSize({width,height});}
+   await p.reload();await p.locator('.cart .line').last().waitFor();assert.equal(await p.locator('.cart .line').count(),12,'draft preserved after reload');await posPay(p);await posReceiptList(p);await snap('success');await fits('success');
+   await p.locator('#navigation [data-view="cashier"]').scrollIntoViewIfNeeded();const next=await p.locator('#navigation [data-view="cashier"]').boundingBox();assert.ok(next&&next.y>=0&&next.y+next.height<=height,'new order entry reachable on success');await p.locator('#receipts-view .receipt-row').first().click();assert.ok((await p.locator('#receipt-sale').getAttribute('href'))?.includes('batch='));await p.locator('dialog [data-action="dismiss"]').first().click();
    assert.equal(get('bd_sales_events_v1').length,before.events+1);assert.equal(get('bd_assortment_v1').stockBalances[0].current,before.stock-12);assert.equal(get('bd_finance_revenue').find((v:{id:string})=>v.id==='ux2-open').revenue,before.revenue+1530);assert.equal(get('bd_sales_events_v1').at(-1).shiftId,'ux2-open');
-   await p.locator('#new-order').click();await p.locator('#cashier:not([hidden])').waitFor();assert.equal(await p.locator('.pos-line').count(),0);
+   await posNewQuick(p);await p.locator('#cashier-view:not([hidden])').waitFor();assert.equal(await p.locator('.cart .line').count(),0);
    failure=true;await p.reload();await p.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(p.url()).pathname,'/cashier');await snap('server-error');failure=false;
    await p.route('**/api/sales-events*',r=>r.abort('internetdisconnected'));await p.reload();await p.locator('#connection').filter({hasText:'Нет соединения'}).waitFor();await snap('network-error');await p.unroute('**/api/sales-events*');
    await p.route('**/api/sales-batches*',async route=>{const response=await route.fetch(),body=await response.json();body.batches=[];await route.fulfill({response,json:body});});await p.goto(base+'/sales-import?embedded=1');await p.getByText('Продаж пока нет',{exact:true}).waitFor();await snap('empty-journal');await p.unroute('**/api/sales-batches*');
@@ -97,7 +98,7 @@ else {
    await p.goto(base+'/sales-import?embedded=1');await p.locator('.batch-row').nth(79).waitFor();await fits('80 documents and long values');await snap('long-values');
    await p.locator('.journal-filters summary').focus();await p.keyboard.press('Enter');assert.equal(await p.locator('.journal-filters details').getAttribute('open'),'');assert.notEqual(await p.locator('.journal-filters summary').evaluate(e=>getComputedStyle(e).outlineStyle),'none');
    await p.unroute('**/api/sales-batches*');
-   await p.route('**/api/sales-events*',async route=>{const response=await route.fetch(),body=await response.json();body.shifts=[];await route.fulfill({response,json:body});});await p.goto(base+'/cashier');await p.locator('#open-shift').waitFor();await fits('no open shift');await snap('no-open-shift');await p.unroute('**/api/sales-events*');
+   await p.route('**/api/sales-events*',async route=>{const response=await route.fetch(),body=await response.json();body.shifts=[];await route.fulfill({response,json:body});});await p.goto(base+'/cashier');await p.locator('[data-action="open-shift"]').waitFor();await fits('no open shift');await snap('no-open-shift');await p.unroute('**/api/sales-events*');
    assert.deepEqual(errors,[]);results.push({width,height,passed:true,lines:12,postedRevenue:1530,stockDelta:-12,journal:true,filters:true,document:true,importPriority:true,shifts:true,manual:true,checkoutVisible:true,noOverlap:true,touchTargets:true,draftReload:true,success:true,serverError:true,networkError:true,empty:true,longNames:true,largeAmounts:true,manyDocuments:80,keyboardFocus:true,noOpenShift:true});
   }catch(error){await snap('failure').catch(()=>{});throw error;}finally{await c.close();}
  }}finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));runtime.close();writeFileSync(out+'/results.json',JSON.stringify(results,null,2));}

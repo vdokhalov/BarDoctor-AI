@@ -1,3 +1,4 @@
+import { posPane, posPay, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -13,12 +14,12 @@ import { GET as journal } from '../app/sales-import/route';
 import { barDoctorResponse } from '../app/bar-doctor-response';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const diagnostic=process.env.BD_OBS_DIAGNOSTIC==='1',out='outputs/sales-observations-v454';mkdirSync(out,{recursive:true});
-const runtime=await lifecycleRuntime({events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
+const runtime=await lifecycleRuntime({orders:"./app/api/pos-orders/route",events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
 const requests:{path:string;status:number;method:string}[]=[];let failure=false;
 const server=createServer(async(req,res)=>{try{
  const url=new URL(req.url||'/','http://localhost');let response:Response;
  if(url.pathname.startsWith('/api/')){
-  const routes:Record<string,string>={'/api/sales-events':'events','/api/sales-batches':'batches','/api/auth/bootstrap':'bootstrap','/api/auth/login':'login','/api/users/me':'usersMe','/api/restaurants/me':'restaurantMe','/api/venues':'venues','/api/store':'store','/api/assortment/overview':'overview'};
+  const routes:Record<string,string>={"/api/pos-orders":"orders",'/api/sales-events':'events','/api/sales-batches':'batches','/api/auth/bootstrap':'bootstrap','/api/auth/login':'login','/api/users/me':'usersMe','/api/restaurants/me':'restaurantMe','/api/venues':'venues','/api/store':'store','/api/assortment/overview':'overview'};
   const key=url.pathname.match(/^\/api\/store\/([^/]+)$/)?.[1],name=key?'storeKey':routes[url.pathname];
   const chunks=[];for await(const c of req)chunks.push(Buffer.from(c));const body=Buffer.concat(chunks);
   response=failure&&name==='events'?Response.json({ok:false,error:'QA server unavailable'},{status:503}):name?await runtime.api[name][req.method||'GET'](new Request(url,{method:req.method,headers:req.headers as HeadersInit,...(body.length?{body}:{})}),{params:Promise.resolve({key})} as never):Response.json({ok:false},{status:404});
@@ -56,13 +57,13 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
  }
  const context=await setup('authenticated'),page=salesSurfacePage(await context.newPage()),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto(base+'/cashier?venue='+venue);await page.locator('#work:not([hidden])').waitFor();assert.equal(await page.locator('#shift-picker option').count(),3);await page.locator('#shift-picker').selectOption('C');await page.locator('#cashier:not([hidden])').waitFor();
+  await page.goto(base+'/cashier?venue='+venue);await page.locator('#work:not([hidden])').waitFor();assert.equal(await page.locator('#shift-picker option').count(),3);await page.locator('#shift-picker').selectOption('C');await page.locator('#cashier-view:not([hidden])').waitFor();
   await page.goto(base+'/sales-entry?view=shifts&venue='+venue);await page.locator('.cash-shift h3').filter({hasText:'C overnight · Открыта'}).waitFor();
   await page.goto(base+'/sales-entry?venue='+venue);await page.locator('#sale').waitFor();await page.locator('#shift').selectOption('C');await page.locator('[data-menu]').selectOption('beer');await page.locator('#sale').getByRole('button',{name:'Проверить продажу',exact:true}).click();
   if(diagnostic){await page.locator('#notice').filter({hasText:'Эта смена уже закрыта'}).waitFor();report.push({case:'manual-C',notice:await page.locator('#notice').innerText(),shiftId:await page.locator('#shift').inputValue(),openShifts:get('bd_finance_revenue').filter((s:{closingStatus:string})=>s.closingStatus==='open').map((s:{id:string;date:string})=>({id:s.id,date:s.date}))});continue;}
   await page.locator('#preview:not([hidden])').waitFor();await page.screenshot({path:out+'/'+profile.name+'-manual.png',fullPage:true});await page.locator('#post').click();await page.locator('#notice').filter({hasText:'Продажа сохранена'}).waitFor();
   assert.equal(get('bd_sales_events_v1')[0].shiftId,'C');assert.equal(get('bd_sales_events_v1')[0].businessDate,shifts[0].date);
-  await page.goto(base+'/cashier?venue='+venue);await page.locator('#cashier:not([hidden])').waitFor();await page.locator('[data-add=beer]').click();await page.reload();await page.locator('.pos-line').waitFor();await page.screenshot({path:out+'/'+profile.name+'-cashier.png',fullPage:true});await orderPane(page);await page.locator('#pay').click();await page.locator('#receipt:not([hidden])').waitFor();
+  await page.goto(base+'/cashier?venue='+venue);await page.locator('#cashier-view:not([hidden])').waitFor();await posPane(page,false);await page.locator('[data-add=beer]').click();await page.reload();await orderPane(page);await page.locator('.cart .line').waitFor();await page.screenshot({path:out+'/'+profile.name+'-cashier.png',fullPage:true});await posPay(page);await posReceiptList(page);
   assert.equal(get('bd_sales_events_v1').length,2);assert.equal(get('bd_stock_movements').length,2);assert.equal(get('bd_assortment_v1').stockBalances[0].current,18);assert.equal(get('bd_finance_revenue').find((s:{id:string})=>s.id==='C').revenue,40);
   await page.goto(base+'/sales-import?embedded=1&venue='+venue);await page.locator('#journal-receipts').filter({hasText:'2'}).waitFor();assert.equal(await page.locator('.batch-row').count(),2);assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-journal.png',fullPage:true});
   await page.goto(base+'/finance?venue='+venue);await page.getByRole('heading',{name:/Финанс/}).first().waitFor();assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-finance.png',fullPage:true});
@@ -71,21 +72,22 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
   failure=true;await page.goto(base+'/cashier?venue='+venue);await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
   await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await page.reload();await page.locator('#connection').filter({hasText:'Нет соединения'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');await page.screenshot({path:out+'/'+profile.name+'-network.png'});await page.unroute('**/api/sales-events*');await page.reload();await page.locator('#work:not([hidden])').waitFor();assert.match(await page.locator('#connection').innerText(),/На связи/);
   // Expiration during payment must preserve the pending idempotency key and local order.
-  await page.locator('#cashier:not([hidden])').waitFor();await page.locator('[data-add=beer]').click();
-  const draftKey='bd_pos_draft_v1:'+user.userId+':'+venue+':D';
-  const beforeAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(beforeAuth.lines.length,1);
-  runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);
-  await orderPane(page);await page.locator('#pay').click();await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();
-  const afterAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(afterAuth.id,beforeAuth.id);assert.equal(afterAuth.pending.command.id,beforeAuth.id);assert.equal(get('bd_sales_events_v1').length,2);
+  await page.locator('#cashier-view:not([hidden])').waitFor();await posPane(page,false);await page.locator('[data-add=beer]').click();
+  const draftKey='bd_pos_workspace_v2:'+user.userId+':'+venue;
+  const beforeAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(beforeAuth.quick.lines.length,1);
+  await page.route('**/api/sales-events',async route=>{if(route.request().method()==='POST'&&route.request().postDataJSON()?.action==='post')runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);await route.continue();});
+  await posPay(page);await page.waitForURL('**/login');await page.locator('input[type=email]').waitFor();
+  const afterAuth=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),draftKey);assert.equal(afterAuth.quick.id,beforeAuth.quick.id);assert.equal(afterAuth.pending.body.command.id,beforeAuth.quick.id);assert.equal(get('bd_sales_events_v1').length,2);
   runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
+  await page.unroute('**/api/sales-events');
   // Re-establish the authenticated browser fixture at document start, after the login handoff.
   await page.evaluate(()=>sessionStorage.removeItem('qa_initialized'));
-  await page.goto(base+'/cashier?venue='+venue);await page.locator('#retry:not([hidden])').waitFor();await page.locator('#retry').click();await page.locator('#receipt:not([hidden])').waitFor();
-  assert.equal(get('bd_sales_events_v1').length,3);assert.equal(get('bd_sales_events_v1').find((e:{externalId:string})=>e.externalId===beforeAuth.id).shiftId,'D');assert.equal(get('bd_stock_movements').length,3);
+  await page.goto(base+'/cashier?venue='+venue);await page.locator('#retry:not([hidden])').waitFor();await page.locator('#retry').click();await page.locator('#receipts-view:not([hidden])').waitFor();
+  assert.equal(get('bd_sales_events_v1').length,3);assert.equal(get('bd_sales_events_v1').find((e:{externalId:string})=>e.externalId===beforeAuth.quick.id).shiftId,'D');assert.equal(get('bd_stock_movements').length,3);
   assert.deepEqual(errors,[]);report.push({profile:profile.name,manualOvernight:true,posOvernight:true,closedShiftGuard:true,multipleShifts:true,draftRecovery:true,authExpiryPendingRecovery:true,journal:true,financeScreen:true,overnightShiftRevenue:40,finalStock:17,server503NotLogin:true,networkFailure:true,networkRecovery:true});
  }catch(error){console.error({profile:profile.name,url:new URL(page.url()).pathname,notice:await page.evaluate(()=>document.querySelector('#notice')?.textContent),errors,requests:requests.slice(-12)});await page.screenshot({path:out+'/'+profile.name+'-failure.png'}).catch(()=>{});throw error;}finally{await context.close();}
 }}
 finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));runtime.close();writeFileSync(out+'/'+(diagnostic?'baseline':'results')+'.json',JSON.stringify(report,null,2));}
 console.log(JSON.stringify(report,null,2));
 
-async function orderPane(page: import("playwright-core").Page, order=true){if((page.viewportSize()?.width||1280)<768)await page.locator(order?"#show-cart":"#show-menu").click();}
+async function orderPane(page: import("playwright-core").Page, order=true){await posPane(page,order);}

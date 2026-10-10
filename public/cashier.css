@@ -6,3 +6,11 @@
 
 nav button[aria-pressed=true]:hover{background:var(--soft);color:var(--accent)}#waiter-filter{width:auto;max-width:270px}.detail-list .order-card:hover{background:#f8f6ff}
 @media(max-width:600px){input,select,textarea{font-size:16px}}
+
+.line{flex-wrap:wrap}.quantity-controls{display:flex;gap:6px;flex-basis:100%;justify-content:flex-end}.quantity-controls button{min-width:44px;min-height:44px;padding:9px}
+
+.back-link{display:inline-flex;align-items:center;min-height:44px;min-width:44px;padding:8px 0}.menu-item small{padding:6px 14px 0}.toolbar{flex-wrap:wrap}.toolbar label{max-width:100%}@media(max-width:600px){body{padding-top:var(--bd-safe-top,env(safe-area-inset-top,0px))}.workspace{padding-bottom:calc(24px + var(--bd-safe-bottom,env(safe-area-inset-bottom,0px)))}}
+
+.line button{min-width:44px;min-height:44px}
+
+.line .copy strong{overflow-wrap:anywhere}
