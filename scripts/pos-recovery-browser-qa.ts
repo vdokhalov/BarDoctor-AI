@@ -169,5 +169,50 @@ try{
  await managerPage.reload();await managerPage.locator("#work").waitFor({state:"visible"});await managerPage.locator('[data-view="report"]').click();await managerPage.locator(".report").waitFor();
  await sibling.evaluate(()=>localStorage.removeItem("bd_session_token"));await managerPage.locator("#work").waitFor({state:"hidden"});assert.equal(await managerPage.locator("#report-view").innerHTML(),"");assert.equal(await managerPage.locator("#dialog-content").innerHTML(),"");
  await reviewer.close();await operator.close();
- assert.deepEqual(errors,[]);writeFileSync(join(output,"result.json"),JSON.stringify({status:"PASS",viewports:[1440,820,390],realApi:true,persistentSyntheticSqlite:true,apiCalls,consoleErrors:errors,scenarios:["Anna ten tables","paid receipts","management only","return to list","stale and refresh","lost payment response and reload replay","create and add","precheck and cancellation","apply and remove discount","split and cancel","cash reconciliation","close via UI opens report immediately","checkout scroll and no overlap","two-session report refresh and transient failure","closed report remains immutable across polling","role downgrade clears cached report and print","cross-tab venue switch and logout clear sensitive DOM"],physicalIPhone:false,hardware:false},null,2));console.log(JSON.stringify({status:"PASS",apiCalls,viewports:[1440,820,390],consoleErrors:errors}));
+ // Late recovery review: quick-to-table acknowledgement must consume only its source draft.
+ const stockBeforeTransfer=r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_stock_movements'").get(owner.userId)!.data_json;
+ for(const [index,scenario] of ["lost-response","confirmed-reload-failure","changed-draft","ordinary-create"].entries()){
+  const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});
+  const page=await context.newPage();page.on("pageerror",error=>errors.push(error.message));await page.goto(base+"/cashier");await page.locator("#work").waitFor({state:"visible"});
+  await page.locator('.mobile-tabs [data-pane="menu"]').first().click();await page.locator('[data-add="beer"]').click();await page.locator('[data-add="coffee"]').click();await page.locator('.mobile-tabs [data-pane="order"]').first().click();
+  const key=`bd_pos_workspace_v2:${owner.userId}:${owner.activeVenueId}`;
+  const initial=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),key);assert.equal(initial.quick.lines.length,2);
+  let createPosts=0,failReload=false;
+  await page.route("**/api/pos-orders",async route=>{
+    if(route.request().method()==="POST"&&route.request().postDataJSON().action==="create"){
+      createPosts++;const response=await route.fetch();
+      if(createPosts===1){assert.equal(response.status(),201);if(scenario!=="confirmed-reload-failure"){await route.abort("failed");return;}failReload=true;}
+      await route.fulfill({response});
+    }else await route.continue();
+  });
+  await page.route("**/api/sales-events",route=>failReload&&route.request().method()==="GET"?route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({ok:false,error:"Synthetic read failure after confirmed create"})}):route.continue());
+  if(scenario==="ordinary-create")await page.locator('[data-action="create-order"]').click();else{await page.locator(".admin-actions summary").click();await page.locator('[data-action="save-quick"]').click();}
+  await page.locator('dialog [name="table"]').fill(String(800+index));await page.locator("#dialog-submit").click();
+  if(scenario==="confirmed-reload-failure"){
+    await page.getByText("Synthetic read failure after confirmed create",{exact:true}).first().waitFor();
+    const saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),key);assert.equal(saved.pending,null);assert.equal(saved.quick.lines.length,0);
+    failReload=false;await page.reload();await page.locator("#work").waitFor({state:"visible"});assert.equal(createPosts,1);
+  }else{
+    await page.getByText("Результат операции ещё не подтверждён.",{exact:true}).waitFor();
+    const pending=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),key);
+    assert.equal(pending.pending.origin?.draftId,scenario==="ordinary-create"?undefined:initial.quick.id);
+    if(scenario==="changed-draft"){
+      await page.evaluate(key=>{const saved=JSON.parse(localStorage.getItem(key)!);saved.quick.id="unrelated-quick";saved.quick.lines[0].quantity=3;localStorage.setItem(key,JSON.stringify(saved));},key);
+      await page.getByRole("button",{name:"Закрыть",exact:true}).click();
+    }else{await page.reload();await page.locator("#work").waitFor({state:"visible"});}
+    await page.locator('[data-action="retry"]').click();await page.getByText("Результат подтверждён. Операция учтена один раз.",{exact:true}).waitFor();assert.equal(createPosts,2);
+  }
+  const after=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!),key);assert.equal(after.pending,null);
+  if(scenario==="changed-draft"){assert.equal(after.quick.id,"unrelated-quick");assert.equal(after.quick.lines[0].quantity,3);}
+  else if(scenario==="ordinary-create")assert.deepEqual(after.quick,initial.quick);
+  else assert.equal(after.quick.lines.length,0);
+  await page.reload();await page.locator("#work").waitFor({state:"visible"});await page.locator('[data-action="quick"]').click();
+  assert.equal(await page.locator(".cart .line").count(),["ordinary-create","changed-draft"].includes(scenario)?2:0);
+  if(!["ordinary-create","changed-draft"].includes(scenario))assert(await page.locator('[data-action="payment"]').isDisabled());
+  const orders=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_pos_orders_v1'").get(owner.userId)!.data_json));
+  const created=orders.filter((order:{tableNumber:string})=>order.tableNumber===String(800+index));assert.equal(created.length,1);assert.equal(created[0].lines.length,scenario==="ordinary-create"?0:2);
+  await context.close();
+ }
+ assert.equal(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_stock_movements'").get(owner.userId)!.data_json,stockBeforeTransfer);
+ assert.deepEqual(errors,[]);writeFileSync(join(output,"result.json"),JSON.stringify({status:"PASS",viewports:[1440,820,390],realApi:true,persistentSyntheticSqlite:true,apiCalls,consoleErrors:errors,scenarios:["Anna ten tables","paid receipts","management only","return to list","stale and refresh","lost payment response and reload replay","create and add","precheck and cancellation","apply and remove discount","split and cancel","cash reconciliation","close via UI opens report immediately","checkout scroll and no overlap","two-session report refresh and transient failure","closed report remains immutable across polling","role downgrade clears cached report and print","cross-tab venue switch and logout clear sensitive DOM","quick to table lost response and browser reload retry","quick to table acknowledgement before reload failure","changed quick draft race preserved","ordinary table creation preserves unrelated quick draft"],physicalIPhone:false,hardware:false},null,2));console.log(JSON.stringify({status:"PASS",apiCalls,viewports:[1440,820,390],consoleErrors:errors}));
 }finally{await browser.close();await new Promise<void>(resolve=>server.close(()=>resolve()));r.close();}

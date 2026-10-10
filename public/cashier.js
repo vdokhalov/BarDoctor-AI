@@ -79,16 +79,35 @@
     finally{state.busy=false;setBusy();renderRecovery();}
   }
   function setBusy(){document.querySelectorAll("button").forEach(b=>{if(!b.hasAttribute("data-ineligible"))b.disabled=state.busy;});$("work").setAttribute("aria-busy",String(state.busy));}
-  async function mutate(path,body) {
+  // Exact canonical draft fingerprint; provenance stays client-side, outside the server command.
+  function quickOrigin(draft){return {kind:"quick_to_table",draftId:draft.id,fingerprint:JSON.stringify({id:draft.id,comment:draft.comment||"",lines:draft.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))})};}
+  function matchesQuick(draft,origin){return !!draft&&Array.isArray(draft.lines)&&draft.id===origin.draftId&&quickOrigin(draft).fingerprint===origin.fingerprint;}
+  async function mutate(path,body,origin) {
     if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");
-    state.pending={path,body};saveLocal();
+    state.pending={path,body,...(origin?{origin}:{})};saveLocal();
     return sendPending();
+  }
+  function confirmPending(saved,key){
+    try{
+      const durable=JSON.parse(localStorage.getItem(key)||"null");
+      if(!durable?.quick||!Array.isArray(durable.quick.lines)||durable.pending&&JSON.stringify(durable.pending)!==JSON.stringify(saved))throw Error("Локальный запрос изменился");
+      let quick=durable.quick;
+      if(saved.origin?.kind==="quick_to_table"&&saved.body.action==="create"){
+        // A different draft (including a concurrent localStorage edit) is never consumed.
+        if(matchesQuick(durable.quick,saved.origin))quick=matchesQuick(state.quick,saved.origin)?{id:uuid(),lines:[],comment:""}:state.quick;
+      }else if(saved.body.action==="post")quick={id:uuid(),lines:[],comment:""};
+      // Persist acknowledgement and consumption together, before any network reload.
+      localStorage.setItem(key,JSON.stringify({quick,pending:null}));state.quick=quick;state.pending=null;
+    }catch{
+      const error=Error("Операция подтверждена сервером, но локальное подтверждение не сохранено. Обновите кассу и проверьте сохранённый запрос.");error.uncertain=true;throw error;
+    }
   }
   async function sendPending(){
     if(!state.pending)return;
-    const saved=state.pending;
-    try{const result=await request(saved.path,saved.body);state.pending=null;if(saved.body.action==="post")state.quick={id:uuid(),lines:[],comment:""};saveLocal();await reload();return result;}
+    const saved=state.pending,key=storageKey();let result;
+    try{result=await request(saved.path,saved.body);}
     catch(error){if(!error.uncertain&&!state.frozen){state.pending=null;saveLocal();await reload().catch(()=>{});}throw error;}
+    confirmPending(saved,key);await reload();return result;
   }
   async function orderAction(action,extra={}) {
     const order=selectedOrder();if(!order)throw Error("Выберите заказ.");
@@ -185,8 +204,7 @@
   async function createOrder(fromQuick=false){
     if(!shift())throw Error("Сначала откройте смену.");
     dialog("Новый заказ",field("table","Номер стола","number","","required min=1 max=9999 step=1 inputmode=numeric")+field("comment","Комментарий","text",fromQuick?state.quick.comment:"","maxlength=500"),async form=>{
-      const id=uuid(),result=await mutate("/api/pos-orders",{action:"create",operationId:uuid(),orderId:id,expectedRevision:0,shiftId:shift().id,tableNumber:String(form.get("table")),comment:String(form.get("comment")),lines:fromQuick?state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity})):[]});
-      if(fromQuick){state.quick={id:uuid(),lines:[],comment:""};saveLocal();}
+      const id=uuid(),result=await mutate("/api/pos-orders",{action:"create",operationId:uuid(),orderId:id,expectedRevision:0,shiftId:shift().id,tableNumber:String(form.get("table")),comment:String(form.get("comment")),lines:fromQuick?state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity})):[]},fromQuick?quickOrigin(state.quick):undefined);
       openOrder(result.order.id);notice("Заказ сохранён. Добавьте позиции из меню.");
     },"Создать заказ");
   }
