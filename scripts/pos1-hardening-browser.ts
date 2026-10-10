@@ -87,8 +87,14 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
     // Select a different open shift: its cart is empty. Return to the first draft.
     assert.equal((await request({action:"open_shift",venueId:venue,shiftId:"second",name:"Second"})).status,409);
     const legacyRows=get("bd_finance_revenue");put("bd_finance_revenue",[...legacyRows,{...legacyRows.find((s:{id:string})=>s.id===shiftId),id:"second",shiftName:"Second",revenue:0,receipts:0}]); // Legacy data remains selectable.
-    await page.evaluate(({account,venue})=>localStorage.removeItem("bd_pos_shift_v1:"+account+":"+venue),{account:user.userId,venue});await page.reload();await page.locator("#shift-picker").selectOption("second");assert.equal(await page.locator(".cart .line").count(),0);
+    await page.evaluate(({account,venue})=>localStorage.removeItem("bd_pos_shift_v1:"+account+":"+venue),{account:user.userId,venue});await page.reload();await page.locator("#shift-picker").selectOption("second");assert.equal(await page.locator(".cart .line").count(),0);await orderPane(page,false);await page.locator('[data-add="service"]').click();
     await page.evaluate(({account,venue})=>localStorage.removeItem("bd_pos_shift_v1:"+account+":"+venue),{account:user.userId,venue});await page.reload();await page.locator("#shift-picker").selectOption(shiftId);await page.locator('[data-remove="water"]').waitFor();
+    // The journal's real Continue action writes only the shift-selection key.
+    const quickBeforeSwitch=await page.evaluate(({account,venue})=>JSON.parse(localStorage.getItem("bd_pos_workspace_v2:"+account+":"+venue)!).quick,{account:user.userId,venue});
+    const resumeTab=salesSurfacePage(await context.newPage());await resumeTab.goto(base+"/sales-import?embedded=1&venue="+venue);await resumeTab.locator('[data-resume-shift="second"]').click();
+    await page.locator("#work").waitFor({state:"hidden"});assert.equal(await page.locator("#pay").count(),0);assert.equal(postCalls,0);assert.equal((get("bd_sales_events_v1")||[]).length,0);
+    const savedAfterSwitch=await page.evaluate(({account,venue})=>JSON.parse(localStorage.getItem("bd_pos_workspace_v2:"+account+":"+venue)!).quick,{account:user.userId,venue});assert.deepEqual(savedAfterSwitch,quickBeforeSwitch);
+    await resumeTab.close();await page.reload();await page.locator('[data-remove="service"]').waitFor();await page.locator("#shift-picker").selectOption(shiftId);await page.locator('[data-remove="water"]').waitFor();
     await orderPane(page,false);for(let i=0;i<14;i++)await page.locator('[data-add="long-'+i+'"]').click();
     const overflow=await page.evaluate(()=>Array.from(document.querySelectorAll("body *")).filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.right>innerWidth+2}).map(e=>({tag:e.tagName,cls:e.className,id:e.id,right:e.getBoundingClientRect().right,text:e.textContent?.slice(0,80)})));
     assert.equal(await page.locator("body").evaluate(node=>node.scrollWidth<=innerWidth+2),true,profile.name+" horizontal overflow "+JSON.stringify(overflow.slice(0,20)));

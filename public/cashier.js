@@ -36,13 +36,16 @@
     let response;
     try { response=await fetch(path,{method:body?"POST":"GET",headers,cache:"no-store",...(body?{body:JSON.stringify({...body,venueId:state.data.venueId})}:{}),signal:AbortSignal.timeout(20000)}); }
     catch { const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;error.network=true;throw error; }
-    let data;try{data=await response.json();}catch{const error=Error("Ответ сервера получен не полностью. Сохранённый запрос можно проверить и повторить.");error.uncertain=true;throw error;}
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
-    if([401,403].includes(response.status)||data.code==="VENUE_CHANGED") {
+    if([401,403].includes(response.status)) {
       clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
       if(response.status===401)location.replace("/login");
     }
-    if(path==="/api/sales-events"&&!body)$("sales-journal").hidden=response.headers.get("X-BD-Sales-Journal")!=="1";
+    let data,malformed=false;try{data=await response.json();if(!data||typeof data!=="object"||Array.isArray(data)){data={};malformed=true;}}catch{data={};malformed=true;}
+    if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
+    if(data.code==="VENUE_CHANGED"&&!state.frozen)clearSensitive("Доступ или заведение изменились. Обновите кассу.");
+    if(malformed){const error=Error("Ответ сервера получен не полностью. Сохранённый запрос можно проверить и повторить.");error.uncertain=true;throw error;}
+    if(path==="/api/sales-events"&&!body&&!state.frozen)$("sales-journal").hidden=response.headers.get("X-BD-Sales-Journal")!=="1";
     if(!response.ok||!data.ok){const error=Error(data.error||({POS_ORDER_SHIFT_HAS_OPEN_ORDERS:"Перед закрытием завершите или отмените все открытые заказы.",POS_CASH_NEEDS_REVIEW:"Проверьте кассовые суммы и причину операции."})[data.code]||"Операция не выполнена. Обновите данные и проверьте запрос.");error.status=response.status;error.code=data.code;error.uncertain=response.status>=500;throw error;}
     return data;
   }
@@ -219,15 +222,24 @@
   }
   function openOrder(id){state.orderId=id;state.view="cashier";document.body.dataset.pane="order";render();window.scrollTo({top:0,behavior:"instant"});}
   async function createOrder(fromQuick=false){
-    if(!shift())throw Error("Сначала откройте смену.");
+    if(!shift())throw Error("Сначала откройте смену.");if(fromQuick)assertQuickShift();
     dialog("Новый заказ",field("table","Номер стола","number","","required min=1 max=9999 step=1 inputmode=numeric")+field("comment","Комментарий","text",fromQuick?state.quick.comment:"","maxlength=500"),async form=>{
+      if(fromQuick)assertQuickShift();
       const id=uuid(),result=await mutate("/api/pos-orders",{action:"create",operationId:uuid(),orderId:id,expectedRevision:0,shiftId:shift().id,tableNumber:String(form.get("table")),comment:String(form.get("comment")),lines:fromQuick?state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity})):[]},fromQuick?quickOrigin(state.quick):undefined);
       openOrder(result.order.id);notice("Заказ сохранён. Добавьте позиции из меню.");
     },"Создать заказ");
   }
   function reasonAction(title,action,extra={}){dialog(title,field("reason","Причина","text","","required maxlength=500"),async f=>{await orderAction(action,{...extra,reason:String(f.get("reason"))});render();});}
+  function assertQuickShift(){
+    const current=shift();
+    if(state.frozen||!current||state.quick.shiftId!==current.id){
+      clearSensitive("Смена черновика изменилась. Обновите кассу перед продолжением.");
+      throw Error("Смена черновика не совпадает с выбранной сменой.");
+    }
+    return current;
+  }
   async function showPayment(){
-    const order=selectedOrder(),sum=order?pricing(order):quickTotal();
+    const order=selectedOrder();if(!order)assertQuickShift();const sum=order?pricing(order):quickTotal();
     if(sum==null)throw Error("Цена недоступна. Проверьте позиции.");
     dialog("Оплата",`<p class="total">К оплате <strong>${esc(money(sum))}</strong></p><div class="payment-choices"><label><input type="radio" name="method" value="CASH" ${order||state.quick.method!=="CARD_EXTERNAL"?"checked":""}>Наличные</label><label><input type="radio" name="method" value="CARD_EXTERNAL" ${!order&&state.quick.method==="CARD_EXTERNAL"?"checked":""}>Внешний терминал</label></div><p class="footnote">Подтвердите фактически полученную оплату. Интеграция эквайринга и фискализация отсутствуют.</p>`,async form=>{
       notice("Выполняем оплату…");
@@ -237,8 +249,9 @@
         const preview=await request("/api/pos-orders",{...body,action:"preview_payment",operationId:uuid()});
         result=await mutate("/api/pos-orders",{...body,action:"pay",operationId:uuid(),previewHash:preview.previewHash});
       } else {
-        const command={id:state.quick.id,source:"POS_API",shiftId:shift().id,comment:state.quick.comment,payments:[payment],lines:state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))};
+        const command={id:state.quick.id,source:"POS_API",shiftId:assertQuickShift().id,comment:state.quick.comment,payments:[payment],lines:state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))};
         const preview=await request("/api/sales-events",{action:"preview",command});
+        assertQuickShift();
         result=await mutate("/api/sales-events",{action:"post",command,previewHash:preview.previewHash});
       }
       state.orderId=null;state.view="receipts";render();notice(result.duplicate?"Оплата уже была сохранена. Повторного списания нет.":"Продажа проведена и сохранена в общем журнале.");
@@ -295,7 +308,11 @@
         },"Повторить исходную оплату");
       } else {
         if(state.quick.lines.length)throw Error("Есть ещё один быстрый черновик. Старый заказ сохранён и требует отдельной проверки.");
-        state.quick={id:draft.id,lines:draft.lines.map((l,i)=>({...l,id:"line-"+(i+1)})),comment:draft.comment||""};saveLocal();localStorage.removeItem(old.key);state.legacy=null;render();notice("Черновик восстановлен. Проверьте актуальные цены.");
+        const originalShiftId=old.storage==="local"?decodeURIComponent(old.key.split(":").at(-1)):draft.shiftId;
+        const originalShift=state.data.shifts.find(s=>s.id===originalShiftId&&s.closingStatus==="open");
+        if(!originalShift)throw Error("Исходная смена сохранённого черновика недоступна. Черновик сохранён; не переносите его в другую смену.");
+        localStorage.setItem(shiftSelectionKey(),originalShift.id);
+        state.quick={id:draft.id,shiftId:originalShift.id,lines:draft.lines.map((l,i)=>({...l,id:"line-"+(i+1)})),comment:draft.comment||""};saveLocal();localStorage.removeItem(old.key);state.legacy=null;render();notice("Черновик восстановлен. Проверьте актуальные цены.");
       }return;
     }
   }
@@ -340,7 +357,7 @@
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
     if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report);render();});
   });
-  window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():""].includes(event.key))clearSensitive("Аккаунт, заведение или черновик изменились в другой вкладке. Обновите кассу.");});
+  window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():"",state.data?shiftSelectionKey():""].includes(event.key))clearSensitive("Аккаунт, заведение, смена или черновик изменились в другой вкладке. Обновите кассу.");});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
   window.addEventListener("pagehide",()=>refreshController?.stop());
   window.addEventListener("pageshow",event=>{if(event.persisted&&!state.frozen){refreshController?.start();void refreshController?.refresh(true);}});
