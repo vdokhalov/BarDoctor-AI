@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
-  const state={data:null,orders:[],rules:[],overview:null,report:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,refreshController;
   const notice=message=>{$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
@@ -15,7 +15,17 @@
   const senior=()=>["owner","manager","shift_manager"].includes(state.data?.actor.role), configure=()=>["owner","manager"].includes(state.data?.actor.role);
   const shift=()=>state.data?.shifts.find(s=>s.closingStatus==="open"), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
   const storageKey=()=>`bd_pos_workspace_v2:${state.data.actor.accountId}:${state.data.venueId}`;
-  function clearSensitive(message) { state.frozen=true;state.overview=null;state.report=null;state.orders=[];state.data=null;$("work").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();refreshController?.stop();notice(message); }
+  function clearView(name){const view=$(name+"-view");view.replaceChildren();view.hidden=true;}
+  function setReport(report){state.report=report;state.reportLastSuccess=report?Date.now():null;}
+  function reconcileAccess(){
+    if(!senior()){
+      state.overview=null;setReport(null);state.waiter=null;state.filterWaiter="";
+      clearView("overview");clearView("report");$("dialog").close();$("dialog-content").replaceChildren();
+      if(["overview","report"].includes(state.view))state.view="cashier";
+    }
+    if(!configure()){state.rules=[];clearView("discounts");if(state.view==="discounts")state.view="cashier";}
+  }
+  function clearSensitive(message) { state.frozen=true;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
   async function request(path,body) {
     if(state.frozen)throw Error("Обновите кассу перед продолжением.");
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
@@ -43,14 +53,23 @@
     if(old&&!state.legacy)state.legacy={key:legacyKey,draft:JSON.parse(old),storage:"session"};
   }
   async function load() {
-    const data=await request("/api/sales-events"), orders=await request("/api/pos-orders");
+    const data=await request("/api/sales-events");
+    // Apply known access changes immediately, even if a later read in this refresh fails.
+    if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){
+      state.data=data;state.orders=[];reconcileAccess();render();
+    }
+    const orders=await request("/api/pos-orders");
     if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
     let overview=null;
     const current=data.shifts.find(s=>s.closingStatus==="open");
     if(state.view==="overview"&&["owner","manager","shift_manager"].includes(data.actor.role)&&current)overview=await request("/api/pos-overview?shiftId="+encodeURIComponent(current.id));
-    return {data,orders:orders.orders,overview};
+    let report;
+    if(state.view==="report"&&["owner","manager","shift_manager"].includes(data.actor.role)&&state.report?.status==="open"){
+      report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(state.report.shiftId))).report;
+    }
+    return {data,orders:orders.orders,overview,report};
   }
-  function accept(value) { if(state.frozen)return;state.data=value.data;state.orders=value.orders;state.overview=value.overview;state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";render(); }
+  function accept(value) { if(state.frozen)return;state.data=value.data;state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";render(); }
   async function reload(){accept(await load());}
   function errorView(error){state.stale=true;$("connection").textContent="Данные устарели";notice(error.message);if(state.data)render();}
   async function working(task) {
@@ -150,7 +169,7 @@
     if(!r){$("report-view").innerHTML=picker+'<p class="empty">Выберите смену для просмотра отчёта.</p>';return;}
     const m=n=>money(n,r.currency),avg=r.totals.paidReceipts?r.totals.paidRevenue/r.totals.paidReceipts:null,cash=r.payments.find(p=>p.method==="CASH"),card=r.payments.find(p=>p.method==="CARD_EXTERNAL"),proportion=r.totals.paidRevenue>0?cash.paidRevenue/r.totals.paidRevenue*100:0;
     const cashRows=[["На начало",r.cash.openingFloat],["Наличные продажи",r.cash.salesRevenue],["Внесения",r.cash.cashIn],["Выдачи",r.cash.cashOut],["Инкассация",r.cash.safeDrop],["Ожидается",r.cash.expected],["Пересчитано",r.cash.actual]];
-    $("report-view").innerHTML=`<div class="report">${picker}<div class="section-head"><div><h2>Отчёт по смене</h2><span class="muted">${esc(r.shiftName)}</span> <span class="badge">${r.status==="closed"?"Закрыта":"Открыта"}</span></div><button class="primary" data-action="print">Распечатать</button></div><div class="report-meta"><span>Открыта ${esc(date(r.openedAt))} · ${esc(r.openedBy?.name||"Ответственный неизвестен")}</span><span>Закрыта ${esc(date(r.closedAt))} · ${esc(r.closedBy?.name||"Ответственный неизвестен")}</span><span>${esc(r.timezone)} · Учётная дата ${esc(r.businessDate)}</span></div><div class="metrics"><div class="metric"><small>Выручка</small><strong>${esc(m(r.totals.paidRevenue))}</strong><p>После применённых скидок</p></div><div class="metric"><small>Оплаченных чеков</small><strong>${r.totals.paidReceipts}</strong></div><div class="metric"><small>Средний чек</small><strong>${esc(m(avg))}</strong></div></div><div class="report-columns"><div><section class="panel"><h3>Продажи по официантам</h3><div class="table-wrap"><table><thead><tr><th>Сотрудник</th><th class="amount">Выручка</th><th class="amount">Чеков</th><th class="amount">Средний чек</th></tr></thead><tbody>${r.employees.map(e=>`<tr><td>${esc(e.name||"Автор неизвестен")}</td><td class="amount"><strong>${esc(m(e.paidRevenue))}</strong></td><td class="amount">${e.paidReceipts}</td><td class="amount">${esc(m(e.paidReceipts?e.paidRevenue/e.paidReceipts:null))}</td></tr>`).join("")}</tbody><tfoot><tr><td>Итого</td><td class="amount">${esc(m(r.totals.paidRevenue))}</td><td class="amount">${r.totals.paidReceipts}</td><td class="amount">${esc(m(avg))}</td></tr></tfoot></table></div></section><section class="panel"><h3>Способы оплаты</h3><div class="paybar"><span id="cash-proportion"></span><span id="card-proportion" class="card"></span></div>${r.payments.map(p=>`<div class="cash-row"><span>${esc({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешний терминал",UNSPECIFIED:"Способ не указан"}[p.method])}</span><strong>${esc(m(p.paidRevenue))}</strong></div>`).join("")}</section></div><section class="panel cash-panel"><h3>Сверка кассы</h3>${cashRows.map(([label,value],i)=>`<div class="cash-row ${i>4?"emphasis":""}"><span>${label}</span><strong>${esc(m(value))}</strong></div>`).join("")}<div class="difference ${r.cash.variance===0?"good":""}"><strong>Расхождение · ${esc(m(r.cash.variance))}</strong><p>${r.cash.status==="NEGATIVE_EXPECTED"?"Ожидаемая сумма отрицательна: проверьте кассовые движения.":r.cash.variance==null?"Для сверки не хватает данных.":r.cash.variance===0?"Касса сошлась.":"Проверьте кассовые движения и пересчёт."}</p></div></section></div><section class="panel"><h3>Контроль операций</h3><div class="audit-grid"><div><small>Скидки</small><strong>${esc(m(r.totals.paidDiscountAmount))}</strong><small>До скидок ${esc(m(r.totals.paidGrossRevenue))}</small></div><div><small>Возвраты оплаты</small><strong>Недоступны</strong><small>Оплаченные возвраты через кассу пока не поддерживаются</small></div><div><small>Аннулированные продажи</small><strong>${esc(m(r.totals.reversedRevenue))}</strong><small>${r.totals.reversedReceipts} чеков исключены из выручки</small></div></div><details><summary>Кассовые движения · ${r.cash.entries?.length||0}</summary>${(r.cash.entries||[]).map(e=>`<p>${esc(date(e.at))} · ${esc(e.actor.name)} · ${esc({IN:"Внесение",OUT:"Выдача",SAFE_DROP:"Инкассация"}[e.kind])}: ${esc(m(e.amount))}<br><small>${esc(e.reason)}</small></p>`).join("")}</details></section><p class="footnote">Нефискальный управленческий отчёт. Себестоимость не включена; выручка не равна прибыли. Закрытый отчёт — исторический снимок.</p></div>`;
+    $("report-view").innerHTML=`<div class="report">${picker}<p class="fresh report-fresh" data-last-success="${state.reportLastSuccess||""}">${r.status==="closed"?"Исторический снимок получен":state.stale?"Данные отчёта устарели · обновлено":"Отчёт обновлён"} ${state.reportLastSuccess?esc(time(new Date(state.reportLastSuccess))):"—"}${r.status==="open"?" · каждые 15 сек.":""}</p><div class="section-head"><div><h2>Отчёт по смене</h2><span class="muted">${esc(r.shiftName)}</span> <span class="badge">${r.status==="closed"?"Закрыта":"Открыта"}</span></div><button class="primary" data-action="print">Распечатать</button></div><div class="report-meta"><span>Открыта ${esc(date(r.openedAt))} · ${esc(r.openedBy?.name||"Ответственный неизвестен")}</span><span>Закрыта ${esc(date(r.closedAt))} · ${esc(r.closedBy?.name||"Ответственный неизвестен")}</span><span>${esc(r.timezone)} · Учётная дата ${esc(r.businessDate)}</span></div><div class="metrics"><div class="metric"><small>Выручка</small><strong>${esc(m(r.totals.paidRevenue))}</strong><p>После применённых скидок</p></div><div class="metric"><small>Оплаченных чеков</small><strong>${r.totals.paidReceipts}</strong></div><div class="metric"><small>Средний чек</small><strong>${esc(m(avg))}</strong></div></div><div class="report-columns"><div><section class="panel"><h3>Продажи по официантам</h3><div class="table-wrap"><table><thead><tr><th>Сотрудник</th><th class="amount">Выручка</th><th class="amount">Чеков</th><th class="amount">Средний чек</th></tr></thead><tbody>${r.employees.map(e=>`<tr><td>${esc(e.name||"Автор неизвестен")}</td><td class="amount"><strong>${esc(m(e.paidRevenue))}</strong></td><td class="amount">${e.paidReceipts}</td><td class="amount">${esc(m(e.paidReceipts?e.paidRevenue/e.paidReceipts:null))}</td></tr>`).join("")}</tbody><tfoot><tr><td>Итого</td><td class="amount">${esc(m(r.totals.paidRevenue))}</td><td class="amount">${r.totals.paidReceipts}</td><td class="amount">${esc(m(avg))}</td></tr></tfoot></table></div></section><section class="panel"><h3>Способы оплаты</h3><div class="paybar"><span id="cash-proportion"></span><span id="card-proportion" class="card"></span></div>${r.payments.map(p=>`<div class="cash-row"><span>${esc({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешний терминал",UNSPECIFIED:"Способ не указан"}[p.method])}</span><strong>${esc(m(p.paidRevenue))}</strong></div>`).join("")}</section></div><section class="panel cash-panel"><h3>Сверка кассы</h3>${cashRows.map(([label,value],i)=>`<div class="cash-row ${i>4?"emphasis":""}"><span>${label}</span><strong>${esc(m(value))}</strong></div>`).join("")}<div class="difference ${r.cash.variance===0?"good":""}"><strong>Расхождение · ${esc(m(r.cash.variance))}</strong><p>${r.cash.status==="NEGATIVE_EXPECTED"?"Ожидаемая сумма отрицательна: проверьте кассовые движения.":r.cash.variance==null?"Для сверки не хватает данных.":r.cash.variance===0?"Касса сошлась.":"Проверьте кассовые движения и пересчёт."}</p></div></section></div><section class="panel"><h3>Контроль операций</h3><div class="audit-grid"><div><small>Скидки</small><strong>${esc(m(r.totals.paidDiscountAmount))}</strong><small>До скидок ${esc(m(r.totals.paidGrossRevenue))}</small></div><div><small>Возвраты оплаты</small><strong>Недоступны</strong><small>Оплаченные возвраты через кассу пока не поддерживаются</small></div><div><small>Аннулированные продажи</small><strong>${esc(m(r.totals.reversedRevenue))}</strong><small>${r.totals.reversedReceipts} чеков исключены из выручки</small></div></div><details><summary>Кассовые движения · ${r.cash.entries?.length||0}</summary>${(r.cash.entries||[]).map(e=>`<p>${esc(date(e.at))} · ${esc(e.actor.name)} · ${esc({IN:"Внесение",OUT:"Выдача",SAFE_DROP:"Инкассация"}[e.kind])}: ${esc(m(e.amount))}<br><small>${esc(e.reason)}</small></p>`).join("")}</details></section><p class="footnote">Нефискальный управленческий отчёт. Себестоимость не включена; выручка не равна прибыли. Закрытый отчёт — исторический снимок.</p></div>`;
     $("cash-proportion").style.width=proportion+"%";$("card-proportion").style.width=(r.totals.paidRevenue>0?card.paidRevenue/r.totals.paidRevenue*100:0)+"%";
   }
   function renderDiscounts(){ $("discounts-view").innerHTML=`<div class="section-head"><div><h2>Настройка скидок</h2><p class="muted">Одна скидка на весь счёт, без накопления. Процент или фиксированная сумма.</p></div><button class="primary" data-action="new-rule">Создать</button></div><div class="rule-list">${state.rules.map(r=>`<div class="rule"><div><strong>${esc(r.name)}</strong><small>${r.kind==="PERCENT"?esc(r.value)+"%":esc(money(r.value))} · ${r.active?"Активна":"Выключена"}</small></div><button data-rule="${esc(r.id)}">Изменить</button></div>`).join("")||'<p class="empty">Правила скидок ещё не созданы.</p>'}</div>`; }
@@ -159,7 +178,7 @@
     state.view=view;state.waiter=null;state.filterWaiter="";
     if(view==="overview")await reload();
     else if(view==="discounts"){state.rules=(await request("/api/pos-discounts")).rules;render();}
-    else if(view==="report"){const id=state.report?.shiftId||state.data.shifts.at(-1)?.id;if(id)state.report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(id))).report;render();}
+    else if(view==="report"){const id=state.report?.shiftId||state.data.shifts.at(-1)?.id;if(id)setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(id))).report);render();}
     else render();window.scrollTo({top:0,behavior:"instant"});
   }
   function openOrder(id){state.orderId=id;state.view="cashier";document.body.dataset.pane="order";render();window.scrollTo({top:0,behavior:"instant"});}
@@ -219,7 +238,7 @@
     }
     if(action==="close-shift"){
       if(activeOrders().length)throw Error("Перед закрытием оплатите или отмените все открытые заказы.");
-      dialog("Закрыть смену",field("actual","Пересчитано наличных","number","","min=0 step=0.01 inputmode=decimal")+'<p class="footnote">Пустое значение останется неизвестным. Отчёт сохранится как исторический снимок.</p>',async form=>{const result=await mutate("/api/sales-events",{action:"close_shift",shiftId:shift().id,...(form.get("actual")!==""?{actualCash:Number(form.get("actual"))}:{})});state.report=result.report;state.view="report";render();notice("Смена закрыта. Итоговый отчёт сохранён.");},"Закрыть смену");return;
+      dialog("Закрыть смену",field("actual","Пересчитано наличных","number","","min=0 step=0.01 inputmode=decimal")+'<p class="footnote">Пустое значение останется неизвестным. Отчёт сохранится как исторический снимок.</p>',async form=>{const result=await mutate("/api/sales-events",{action:"close_shift",shiftId:shift().id,...(form.get("actual")!==""?{actualCash:Number(form.get("actual"))}:{})});setReport(result.report);state.view="report";render();notice("Смена закрыта. Итоговый отчёт сохранён.");},"Закрыть смену");return;
     }
     if(action==="cash"){
       dialog("Кассовая операция",`<label>Операция<select name="kind"><option value="IN">Внесение</option><option value="OUT">Выдача</option><option value="SAFE_DROP">Инкассация</option></select></label>`+field("amount","Сумма","number","","required min=0.01 step=0.01 inputmode=decimal")+field("reason","Причина","text","","required maxlength=500"),async form=>{await mutate("/api/sales-events",{action:"cash",shiftId:shift().id,cash:{operationId:uuid(),kind:String(form.get("kind")),amount:Number(form.get("amount")),reason:String(form.get("reason"))}});notice("Кассовое движение сохранено.");});return;
@@ -227,7 +246,7 @@
     if(action==="all-staff"){state.waiter=null;render();return;}
     if(action==="print"){window.print();return;}
     if(action==="new-rule"){showRule();return;}
-    if(action==="retry"){const saved=state.pending;const result=await sendPending();if(result?.report){state.report=result.report;state.view="report";}else if(result?.event){state.orderId=null;state.view="receipts";}else if(saved?.body.action==="create")state.orderId=result?.order.id;render();notice("Результат подтверждён. Операция учтена один раз.");return;}
+    if(action==="retry"){const saved=state.pending;const result=await sendPending();if(result?.report){setReport(result.report);state.view="report";}else if(result?.event){state.orderId=null;state.view="receipts";}else if(saved?.body.action==="create")state.orderId=result?.order.id;render();notice("Результат подтверждён. Операция учтена один раз.");return;}
     if(action==="legacy"){
       const old=state.legacy,draft=old.draft,pending=draft.pending||draft,command=pending.command;
       if(command){
@@ -274,7 +293,7 @@
     if(event.target.id==="menu-department"){state.department=event.target.value;state.category="all";state.subcategory="all";renderCashier();}
     if(event.target.id==="menu-subcategory"){state.subcategory=event.target.value;renderCashier();}
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
-    if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{state.report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report;render();});
+    if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report);render();});
   });
   window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():""].includes(event.key))clearSensitive("Аккаунт, заведение или черновик изменились в другой вкладке. Обновите кассу.");});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
