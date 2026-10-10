@@ -1,3 +1,4 @@
+import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission, canManagePosPrivilegedAction } from "../../../lib/bardoctor/access-control";
@@ -89,6 +90,7 @@ async function command(request: Request): Promise<Response> {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(account.id, POS_ORDER_STORE_KEY, body.action, plan.order.id, `Стол ${plan.order.tableNumber}`, String(shift?.date ?? "").slice(0, 7),
         JSON.stringify(orders.find(order => order.id === plan.order.id) ?? null), JSON.stringify({ order: plan.order, salesEventId: plan.event?.id }),
         JSON.stringify(["revision", "status", "lines", "precheck", "discount", "totals"]), context.actor.name, context.actor.role, typeof body.reason === "string" && body.reason.trim() || "Подтверждённая операция", context.now));
+    statements.unshift(posMembershipGuard(db,account,context.now));
     await runStoreCasBatch(db, account.id, snapshots, statements, context.now);
     return reply(result, 201);
   } catch (error) { return controlled(error); }

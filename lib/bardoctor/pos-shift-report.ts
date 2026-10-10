@@ -88,7 +88,7 @@ export function buildPosShiftReport(c: Context, shiftId: string) {
   return { version:1,shiftId,venueId:c.venueId,shiftName:String(shift.shiftName??""),businessDate:String(shift.date),timezone:canonicalVenueTimezone(shift.timezone)||"UTC",currency:String(shift.currency),status:shift.closingStatus as "open"|"closed",
     openedAt:instant(shift.openedAt)??instant(shift.createdAt),closedAt:instant(shift.closedAt),startTime:clock(shift.startTime),endTime:clock(shift.endTime),openedBy:actor(shift.openedBy),closedBy:actor(shift.closedBy),
     totals:{...totals,totalReceipts:totals.paidReceipts+totals.reversedReceipts,grossRevenue:moneyAdd(totals.paidRevenue,totals.reversedRevenue)},employees:[...employees.values()].sort((a,b)=>(a.accountId??Number.MAX_SAFE_INTEGER)-(b.accountId??Number.MAX_SAFE_INTEGER)),payments:[...payments.values()],
-    cash:posShiftCashReport(shift,payments.get("CASH")!,payments.get("UNSPECIFIED")!.paidRevenue),costOfGoods:null,costStatus:"NOT_INCLUDED" };
+    cash:posShiftCashReport(shift,payments.get("CASH")!,payments.get("UNSPECIFIED")!.paidRevenue,payments.get("UNSPECIFIED")!.paidReceipts),costOfGoods:null,costStatus:"NOT_INCLUDED" };
 }
 export type PosShiftReport = ReturnType<typeof buildPosShiftReport>;
 /** Closed reports are immutable historical snapshots; legacy missing fields remain unknown. */

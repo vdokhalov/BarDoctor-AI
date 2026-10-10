@@ -1,3 +1,4 @@
+import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
@@ -51,6 +52,7 @@ async function command(request: Request): Promise<Response> {
       db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,NULL,?,?,?,?,?,?,?)`).bind(account.id, POS_DISCOUNT_STORE_KEY, "save_discount_rule", plan.rule.id, plan.rule.name,
         JSON.stringify(rules.find(rule => rule.id === plan.rule.id) ?? null), JSON.stringify(plan.rule), '["name","kind","value","active","revision"]', context.actor.name, context.actor.role, "Настройка правила скидки", context.now)];
+    statements.unshift(posMembershipGuard(db,account,context.now));
     await runStoreCasBatch(db, account.id, snapshots, statements, context.now);
     return reply(result, 201);
   } catch (error) { return controlled(error); }

@@ -1597,6 +1597,11 @@
           try {
             var result = JSON.parse(body);
             rememberAccessContext(result);
+      var confirmedPosRole = result;
+      if (confirmedPosRole.role === "cashier") {
+        window.location.replace("/cashier?venue=" + encodeURIComponent(result.activeVenueId));
+        return;
+      }
             if (result && result.ok && result.joinedVenue) {
               sessionStorage.removeItem("bd_pending_invite_code");
             }
@@ -2032,6 +2037,7 @@
   }
   window.__bdRetryBootstrapV496 = bdRetryBootstrapV496;
   await bdRetryBootstrapV496(true);
+  if (currentRole === "cashier" && window.__bdAuthBootstrapV274.state !== "error") return;
 
   observePurchaseConfirmation();
   installProtectedOriginalLinks();

@@ -35,13 +35,13 @@ export function planPosCash(c: SalesEventContext, shiftId: string, command: Pick
   if (JSON.stringify(next).length > 1_000_000) fail();
   return c.revenues.map(row => row === shift ? { ...row, cashEntries: next, updatedAt: c.now } : row);
 }
-export function posShiftCashReport(shift: Row, cash: { paidRevenue: number; reversedRevenue: number }, unclassifiedRevenue: number) {
+export function posShiftCashReport(shift: Row, cash: { paidRevenue: number; reversedRevenue: number }, unclassifiedRevenue: number, unclassifiedReceipts = 0) {
   const entries = parsePosCashEntries(shift.cashEntries);
   const sum = (kind: PosCashEntry["kind"]) => entries.filter(e => e.kind === kind).reduce((n,e) => n + posDiscountCents(e.amount),0) / 100;
   const openingFloat = shift.openingFloat == null ? null : posDiscountCents(shift.openingFloat) / 100;
   const actual = shift.actualCash == null ? null : posDiscountCents(shift.actualCash) / 100;
   const cashIn = sum("IN"), cashOut = sum("OUT"), safeDrop = sum("SAFE_DROP");
-  const expectedCents = openingFloat === null || unclassifiedRevenue > 0 ? null : posDiscountCents(openingFloat) + posDiscountCents(cash.paidRevenue) + posDiscountCents(cashIn) - posDiscountCents(cashOut) - posDiscountCents(safeDrop);
+  const expectedCents = openingFloat === null || (unclassifiedRevenue > 0 || unclassifiedReceipts > 0) ? null : posDiscountCents(openingFloat) + posDiscountCents(cash.paidRevenue) + posDiscountCents(cashIn) - posDiscountCents(cashOut) - posDiscountCents(safeDrop);
   if (expectedCents !== null && !Number.isSafeInteger(expectedCents)) fail();
   const expected = expectedCents === null ? null : expectedCents / 100;
   return { openingFloat, salesRevenue: cash.paidRevenue, reversedRevenue: cash.reversedRevenue, cashIn, cashOut, safeDrop, expected, actual,

@@ -1,3 +1,4 @@
+import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { posDiscountCents } from "../../../lib/bardoctor/pos-discounts";
 import { POS_ORDER_STORE_KEY, parsePosOrders, assertPosShiftClosable, canReadPosSaleHistory } from "../../../lib/bardoctor/pos-orders";
 import { posSalesEventView, posShiftView, buildPosShiftReport, readPosShiftReport } from "../../../lib/bardoctor/pos-shift-report";
@@ -130,6 +131,7 @@ async function command(request:Request):Promise<Response> {
       ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`).bind(account.id,key,JSON.stringify(value),c.now));
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",accountingMonth,JSON.stringify(result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
+    statements.unshift(posMembershipGuard(db,account,c.now));
     await runStoreCasBatch(db,account.id,snapshots,statements,c.now);
     return reply(result,201);
   } catch(error) { return controlled(error); }

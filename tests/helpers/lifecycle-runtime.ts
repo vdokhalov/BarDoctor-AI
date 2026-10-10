@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import { build, type Plugin } from "esbuild";
 
 /** Actual route/auth/service modules, all migrations, and transactional isolated SQLite. */
-export async function lifecycleRuntime(extraRoutes: Record<string, string> = {}, options: { plugins?: Plugin[]; bindings?: Record<string, unknown>; modules?: Record<string, unknown>; now?: string } = {}) {
-  const sqlite = new DatabaseSync(':memory:');
+export async function lifecycleRuntime(extraRoutes: Record<string, string> = {}, options: { plugins?: Plugin[]; bindings?: Record<string, unknown>; modules?: Record<string, unknown>; now?: string; sqlitePath?: string } = {}) {
+  const sqlite = new DatabaseSync(options.sqlitePath ?? ':memory:');
   sqlite.exec('PRAGMA foreign_keys=ON');
   const dir = new URL('../../drizzle/', import.meta.url);
   for (const file of readdirSync(dir).filter(name => name.endsWith('.sql')).sort()) sqlite.exec(readFileSync(new URL(file, dir), 'utf8').replaceAll('--> statement-breakpoint', ''));

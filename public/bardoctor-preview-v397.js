@@ -1702,6 +1702,11 @@
             if (requestUrl.pathname === "/api/auth/register" && response.ok && result && result.ok) {
               window.bdMarkNavigationClean?.();
             }
+      var confirmedPosRole = result;
+      if (confirmedPosRole.role === "cashier") {
+        window.location.replace("/cashier?venue=" + encodeURIComponent(result.activeVenueId));
+        return;
+      }
             if (result && result.ok && result.joinedVenue) {
               sessionStorage.removeItem("bd_pending_invite_code");
             }
@@ -2143,6 +2148,7 @@
   }
   window.__bdRetryBootstrapV496 = bdRetryBootstrapV496;
   await bdRetryBootstrapV496(true);
+  if (currentRole === "cashier" && window.__bdAuthBootstrapV274.state !== "error") return;
 
   injectSupplierAlternativesEntry();
   removeLegacyFinancePurchasePaymentEntryV195();

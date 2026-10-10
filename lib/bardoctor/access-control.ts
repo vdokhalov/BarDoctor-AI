@@ -205,6 +205,8 @@ export type AuthenticatedAccount = Account & {
   actorAccountId: number;
   venueId: number;
   membershipId: number;
+  membershipPermissionsJson?: string | null;
+  membershipJobTitle?: string | null;
   permissions: PermissionKey[];
 };
 

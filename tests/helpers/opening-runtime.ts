@@ -48,6 +48,8 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
   const dependencies = { ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport,
+    // This fixture explicitly substitutes auth; real membership/CAS coverage lives in lifecycleRuntime.
+    posMembershipGuard: () => db.prepare("SELECT 1"),
     getD1: () => db as unknown as D1Database,
     authenticateRequest: async (request: Request) => signedIn ? { id: 7, venueId: Number(request.headers.get("X-Venue-Id") || 1), actorAccountId: 7, role: "owner", firstName: "QA", lastName: "", restaurantJson: JSON.stringify({ currency: accountingCurrency }) } : null,
     unauthorized: () => new Response(null, { status: 401 }), hasPermission: () => allowed, ...extraDependencies };

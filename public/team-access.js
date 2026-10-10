@@ -244,7 +244,7 @@
     clear(root);
     var selected = defaultsOnly ? roleDefaults(member.role) : new Set(member.permissions || []);
     var groups = new Map();
-    (state.access.permissionDefinitions || []).filter(function (item) { return !item.ownerOnly; }).forEach(function (definition) {
+    (state.access.permissionDefinitions || []).filter(function (item) { return !item.ownerOnly && (member.role !== "cashier" || ["sales.view", "sales.create", "sales.post"].includes(item.key)); }).forEach(function (definition) {
       if (!groups.has(definition.group)) groups.set(definition.group, []);
       groups.get(definition.group).push(definition);
     });
@@ -288,7 +288,7 @@
     if (!member) return;
     var defaults = roleDefaults(member.role);
     var selected = new Set(Array.from(document.querySelectorAll("#permission-list input:checked")).map(function (input) { return input.value; }));
-    var all = (state.access.permissionDefinitions || []).filter(function (item) { return !item.ownerOnly; }).map(function (item) { return item.key; });
+    var all = (state.access.permissionDefinitions || []).filter(function (item) { return !item.ownerOnly && (member.role !== "cashier" || ["sales.view", "sales.create", "sales.post"].includes(item.key)); }).map(function (item) { return item.key; });
     var allow = all.filter(function (key) { return selected.has(key) && !defaults.has(key); });
     var deny = all.filter(function (key) { return defaults.has(key) && !selected.has(key); });
     await updateMember(member.id, { permissions: { allow: allow, deny: deny } }, "Индивидуальные права сохранены");

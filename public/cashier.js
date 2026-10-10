@@ -1,219 +1,278 @@
 (() => {
   "use strict";
-  const $ = id => document.getElementById(id);
-  const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);
-  const text = (id, value) => { $(id).textContent = value; };
-  let data, activeShift, cart = new Map(), department = "all", category = "all", subcategory = "all", busy = false, pending = null, frozen = false;
-  const departmentKey = item => String(item.sectionId);
-  const money = amount => window.bdFormatAccountingMoney(amount,data?.currency);
-  const sessionKey = () => `bd_pos_pending:${localStorage.getItem("bd_session")}:${data.venueId}`;
-  const notice = message => text("notice",message);
-  const currentVenue = () => new URLSearchParams(location.search).get("venue") || localStorage.getItem("bd_active_venue_id");
-  const online = value => { text("connection",value ? "На связи" : "Нет соединения"); $("connection").dataset.online=String(value); };
-  const initialIdentity = [localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":");
-  async function request(body, externalId) {
-    if (frozen) throw Error("Заведение изменилось. Обновите кассу.");
-    const venue = currentVenue(), email = localStorage.getItem("bd_session"), token = localStorage.getItem("bd_session_token");
-    if (data && String(data.venueId) !== venue) throw Error("Заведение изменилось. Обновите кассу.");
-    const headers = new Headers({"Content-Type":"application/json"});
-    if (email && token) { headers.set("X-Session-Email",email); headers.set("X-Session-Token",token); }
-    if (venue) headers.set("X-Venue-Id",venue);
+  const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+  const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
+  const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  let dialogSubmit=null,refreshController;
+  const notice=message=>{$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
+  const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
+  const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
+  const amount=value=>value==null?"—":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(value);
+  const currency=()=>state.data?.currency==="PRB"?"руб. ПМР":state.data?.currency||"";
+  const date=value=>value?new Intl.DateTimeFormat("ru-RU",{dateStyle:"short",timeStyle:"short",timeZone:state.data?.timezone||"UTC"}).format(new Date(value)):"Неизвестно";
+  const time=value=>value?new Intl.DateTimeFormat("ru-RU",{hour:"2-digit",minute:"2-digit",timeZone:state.data?.timezone||"UTC"}).format(new Date(value)):"—";
+  const senior=()=>["owner","manager","shift_manager"].includes(state.data?.actor.role), configure=()=>["owner","manager"].includes(state.data?.actor.role);
+  const shift=()=>state.data?.shifts.find(s=>s.closingStatus==="open"), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
+  const storageKey=()=>`bd_pos_workspace_v2:${state.data.actor.accountId}:${state.data.venueId}`;
+  function clearSensitive(message) { state.frozen=true;state.overview=null;state.report=null;state.orders=[];state.data=null;$("work").hidden=true;$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();refreshController?.stop();notice(message); }
+  async function request(path,body) {
+    if(state.frozen)throw Error("Обновите кассу перед продолжением.");
+    if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
+    const headers={"Content-Type":"application/json"};const email=localStorage.getItem("bd_session"),token=localStorage.getItem("bd_session_token");
+    if(email&&token){headers["X-Session-Email"]=email;headers["X-Session-Token"]=token;}if(initialVenue)headers["X-Venue-Id"]=initialVenue;
     let response;
-    try { response = await fetch("/api/sales-events"+(externalId?"?externalId="+encodeURIComponent(externalId):""), { method:body?"POST":"GET", headers, ...(body?{body:JSON.stringify({...body,venueId:data.venueId})}:{}), signal:AbortSignal.timeout(20000) }); }
-    catch { online(false); throw Error("Соединение недоступно. Проверьте сеть и повторите запрос."); }
-    online(true);
-    const result = await response.json().catch(() => ({}));
-    if (venue !== currentVenue() || initialIdentity !== [localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":")) { frozen=true; throw Error("Заведение изменилось. Обновите кассу."); }
-    if (response.status === 401) {
-      frozen=true;
-      $("work").hidden=true;
-      text("connection","Требуется вход");
-      // Use the shared login entry point; retain venue-scoped POS drafts for recovery.
-      for (const key of ["bd_session","bd_session_token","bd_session_userid"]) localStorage.removeItem(key);
-      const error=Error("Сессия завершена. Войдите снова.");
-      error.status=401; error.authRequired=true;
-      window.location.replace("/login");
-      throw error;
+    try { response=await fetch(path,{method:body?"POST":"GET",headers,cache:"no-store",...(body?{body:JSON.stringify({...body,venueId:state.data.venueId})}:{}),signal:AbortSignal.timeout(20000)}); }
+    catch { const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;throw error; }
+    const data=await response.json().catch(()=>({}));
+    if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
+    if([401,403].includes(response.status)||data.code==="VENUE_CHANGED") {
+      clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
+      if(response.status===401)location.replace("/login");
     }
-    if (!response.ok || !result.ok) { const error = Error(result.error || ({SALES_EVENT_CONSUMPTION_NEEDS_REVIEW:"Для этой позиции не настроено безопасное складское списание. Проверьте режим и техкарту.",SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH:"Смена закрыта. Выберите открытую смену.",SALES_EVENT_POS_PAYMENT_MISMATCH:"Сумма оплаты не совпадает с суммой заказа."})[result.code] || "Операция не выполнена. Ничего не изменено."); error.status=response.status; error.code=result.code; throw error; }
-    return result;
+    if(!response.ok||!data.ok){const error=Error(data.error||({POS_ORDER_SHIFT_HAS_OPEN_ORDERS:"Перед закрытием завершите или отмените все открытые заказы.",POS_CASH_NEEDS_REVIEW:"Проверьте кассовые суммы и причину операции."})[data.code]||"Операция не выполнена. Обновите данные и проверьте запрос.");error.status=response.status;error.code=data.code;error.uncertain=response.status>=500;throw error;}
+    return data;
   }
-  let draftKey=null, draftRevision=null, orderId=null, storageFailed=false;
-  const selectionKey=()=>"bd_pos_shift_v1:"+data.actor.accountId+":"+data.venueId;
-  function draftIdentity(shiftId) {return window.bdPosDraft.key(data.actor.accountId,data.venueId,shiftId);}
-  function persistDraft() {
-    if(!data||!activeShift||frozen||draftKey!==draftIdentity(activeShift.id))return false;
-    try {
-      const current=window.bdPosDraft.read(localStorage,draftKey);
-      if((current?.revision||null)!==draftRevision) {frozen=true;throw Error("Заказ изменён в другой вкладке. Откройте кассу заново.");}
-      orderId ||= crypto.randomUUID();
-      const draft={version:1,id:orderId,revision:crypto.randomUUID(),lines:[...cart.values()].map(row=>({menuItemId:String(row.item.id),quantity:row.quantity,name:row.item.name})),comment:$("comment").value,method:document.querySelector('input[name="payment"]:checked').value,pending};
-      localStorage.setItem(draftKey,JSON.stringify(draft));draftRevision=draft.revision;storageFailed=false;return true;
-    } catch(error) {storageFailed=true;notice(error.message || "Не удалось сохранить заказ в браузере. Проверьте доступ к хранилищу и повторите изменение.");renderButtons();return false;}
+  function saveLocal() { try {localStorage.setItem(storageKey(),JSON.stringify({quick:state.quick,pending:state.pending}));}catch{throw Error("Не удалось сохранить запрос в браузере. Оплата заблокирована до восстановления хранилища.");} }
+  function restoreLocal() {
+    const raw=localStorage.getItem(storageKey());
+    if(raw){const saved=JSON.parse(raw);if(!saved.quick||!Array.isArray(saved.quick.lines))throw Error("Локальный черновик повреждён. Сохранённые данные не удалены.");state.quick=saved.quick;state.pending=saved.pending||null;}
+    const prefix=`bd_pos_draft_v1:${encodeURIComponent(state.data.actor.accountId)}:${encodeURIComponent(state.data.venueId)}:`;
+    for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith(prefix)){const draft=window.bdPosDraft.read(localStorage,key);if(draft?.pending||draft?.lines?.length){state.legacy={key,draft,storage:"local"};break;}}}
+    const legacyKey=`bd_pos_pending:${localStorage.getItem("bd_session")}:${state.data.venueId}`,old=sessionStorage.getItem(legacyKey);
+    if(old&&!state.legacy)state.legacy={key:legacyKey,draft:JSON.parse(old),storage:"session"};
   }
-  function restoreDraft() {
-    cart.clear();pending=null;orderId=null;draftRevision=null;$("comment").value="";document.querySelector('input[name="payment"][value="CASH"]').checked=true;
-    draftKey=activeShift?draftIdentity(activeShift.id):null;
-    if(!draftKey)return;
-    localStorage.setItem(selectionKey(),activeShift.id);
-    const draft=window.bdPosDraft.read(localStorage,draftKey);
-    if(!draft)return;
-    orderId=draft.id;draftRevision=draft.revision;pending=draft.pending||null;
-    for(const line of draft.lines){const item=data.menu.find(item=>String(item.id)===line.menuItemId)||{id:line.menuItemId,name:line.name||"Недоступная позиция",salePrice:null,unavailable:true};cart.set(String(item.id),{item,quantity:line.quantity});}
-    $("comment").value=String(draft.comment||"").slice(0,500);$("comment-panel").open=Boolean($("comment").value);document.querySelector('input[name="payment"][value="'+(draft.method==="CARD_EXTERNAL"?"CARD_EXTERNAL":"CASH")+'"]').checked=true;
-    if(cart.size)notice("Незавершённый заказ восстановлен. Проверьте позиции и текущие цены перед оплатой.");
+  async function load() {
+    const data=await request("/api/sales-events"), orders=await request("/api/pos-orders");
+    if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
+    let overview=null;
+    const current=data.shifts.find(s=>s.closingStatus==="open");
+    if(state.view==="overview"&&["owner","manager","shift_manager"].includes(data.actor.role)&&current)overview=await request("/api/pos-overview?shiftId="+encodeURIComponent(current.id));
+    return {data,orders:orders.orders,overview};
   }
-  function complete(event,duplicate) {
-    // Clear before displaying a receipt; a retained pending key is also safe if storage removal fails.
-    try{if(draftKey)localStorage.removeItem(draftKey);sessionStorage.removeItem(sessionKey());}catch{}
-    pending=null;cart.clear();orderId=null;draftRevision=null;$("comment").value="";showReceipt(event,duplicate);
+  function accept(value) { if(state.frozen)return;state.data=value.data;state.orders=value.orders;state.overview=value.overview;state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";render(); }
+  async function reload(){accept(await load());}
+  function errorView(error){state.stale=true;$("connection").textContent="Данные устарели";notice(error.message);if(state.data)render();}
+  async function working(task) {
+    if(state.busy||state.frozen||refreshController?.state().running)return;
+    state.busy=true;setBusy();
+    try{await task();}catch(error){errorView(error);if($("dialog").open)$("dialog-error").textContent=error.message;}
+    finally{state.busy=false;setBusy();renderRecovery();}
   }
-  function working(task, message = "Выполняем действие…") { if (busy || frozen) return; busy=true; notice(message); renderButtons(); Promise.resolve().then(task).catch(error => notice(error.message || "Операция не выполнена")).finally(() => {busy=false;renderButtons();}); }
-  function openShifts() { return data.shifts.filter(shift => shift.closingStatus === "open"); }
-  let orderView=false;
-  let layoutFrame=0;
-  function measureLayoutMetrics() {
-    const style=document.documentElement.style;
-    const offset=$("cashier").getBoundingClientRect().top+window.scrollY;
-    const height=document.querySelector(".pos-cart-foot").getBoundingClientRect().height;
-    // A hidden pane has no measurable checkout; retain its last visible reservation.
-    for(const [key,value] of [["--pos-cart-offset",offset],...(height>0?[["--pos-checkout-height",height]]:[])]) {
-      const pixels=value+"px";
-      if(style.getPropertyValue(key)!==pixels)style.setProperty(key,pixels);
+  function setBusy(){document.querySelectorAll("button").forEach(b=>{if(!b.hasAttribute("data-ineligible"))b.disabled=state.busy;});$("work").setAttribute("aria-busy",String(state.busy));}
+  async function mutate(path,body) {
+    if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");
+    state.pending={path,body};saveLocal();
+    return sendPending();
+  }
+  async function sendPending(){
+    if(!state.pending)return;
+    const saved=state.pending;
+    try{const result=await request(saved.path,saved.body);state.pending=null;if(saved.body.action==="post")state.quick={id:uuid(),lines:[],comment:""};saveLocal();await reload();return result;}
+    catch(error){if(!error.uncertain&&!state.frozen){state.pending=null;saveLocal();await reload().catch(()=>{});}throw error;}
+  }
+  async function orderAction(action,extra={}) {
+    const order=selectedOrder();if(!order)throw Error("Выберите заказ.");
+    const result=await mutate("/api/pos-orders",{action,orderId:order.id,expectedRevision:order.revision,operationId:uuid(),...extra});
+    notice("Заказ сохранён.");return result;
+  }
+  function dialog(title,content,submit,label="Подтвердить") {
+    $("dialog-title").textContent=title;$("dialog-content").innerHTML=content;$("dialog-error").textContent="";$("dialog-submit").textContent=label;$("dialog-submit").hidden=!submit;dialogSubmit=submit;$("dialog").showModal();
+  }
+  $("dialog-form").onsubmit=event=>{event.preventDefault();void working(async()=>{if(dialogSubmit)await dialogSubmit(new FormData($("dialog-form")));if(!state.frozen)$("dialog").close();});};
+  const field=(name,label,type="text",value="",attrs="")=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
+  function renderRecovery(){
+    $("recovery").hidden=!state.pending&&!state.legacy;
+    $("recovery").innerHTML=state.legacy?'<strong>Есть незавершённый заказ из прежней кассы.</strong><p>Он сохранён. Новая оплата заблокирована до проверки результата.</p><button data-action="legacy">Проверить и восстановить</button>':state.pending?'<strong>Результат операции ещё не подтверждён.</strong><p>Повтор использует тот же номер операции.</p><button data-action="retry">Проверить результат и повторить</button>':"";
+  }
+  function nav(){
+    const items=[["cashier","Касса","grid-2x2"],["orders","Заказы","clipboard-list"],["receipts","Чеки","circle-check"],...(senior()?[["overview","Текущая смена","clock-3"],["report","Отчёт смены","activity"]]:[]),...(configure()?[["discounts","Настройка скидок","settings-2"]]:[])];
+    $("navigation").innerHTML=items.map(([key,label,image])=>`<button data-view="${key}" aria-pressed="${state.view===key}">${icon(image)}${label}</button>`).join("");$("management-link").hidden=!senior();
+  }
+  function pricing(order){return order.lines.some(l=>l.pricingUnavailable)?null:order.totals?.netAmount??order.lines.reduce((n,l)=>n+Math.round(l.total*100),0)/100;}
+  function quickLines(){return state.quick.lines.map(l=>{const item=state.data.menu.find(m=>m.id===l.menuItemId);const valid=item&&typeof item.salePrice==="number"&&Number.isFinite(item.salePrice)&&Math.abs(item.salePrice*100-Math.round(item.salePrice*100))<0.000001;return {...l,name:item?.name||l.name||"Недоступная позиция",unitPrice:valid?item.salePrice:null,total:valid?Math.round(item.salePrice*100)*l.quantity/100:null};});}
+  function quickTotal(){const lines=quickLines();return lines.some(l=>l.total==null)?null:lines.reduce((n,l)=>n+Math.round(l.total*100),0)/100;}
+  const badge=o=>`<span class="badge ${o.precheck||o.status==="PRECHECK"?"precheck":""}">${o.precheck||o.status==="PRECHECK"?"Предчек":"Открыт"}</span>`;
+  function orderCard(o,owner){const total=o.totals?.netAmount===null?null:o.totals?.netAmount??pricing(o);return `<button class="order-card" data-order="${esc(o.id)}"><strong>Стол ${esc(o.tableNumber)}</strong><span class="muted">${esc(owner||o.createdBy?.name||"")}</span><b>${esc(amount(total))} <span class="currency">${esc(currency())}</span></b>${badge(o)}<span class="card-arrow">${icon("chevron-right")}</span></button>`;}
+  function render(){
+    if(!state.data||state.frozen)return;
+    $("work").hidden=false;$("venue-name").textContent=state.data.venueName||"Заведение";$("employee-name").textContent=state.data.actor.name;$("employee-role").textContent=labels[state.data.actor.jobTitle||state.data.actor.role]||"Сотрудник";
+    nav();for(const v of ["cashier","orders","receipts","overview","report","discounts"])$(v+"-view").hidden=state.view!==v;
+    $("shift-gate").hidden=true;
+    if(state.view==="cashier")renderCashier();if(state.view==="orders")renderOrders();if(state.view==="receipts")renderReceipts();if(state.view==="overview")renderOverview();if(state.view==="report")renderReport();if(state.view==="discounts")renderDiscounts();
+    renderRecovery();setBusy();
+  }
+  function renderCashier(){
+    const current=shift(),order=selectedOrder();
+    if(!current){$("cashier-view").innerHTML=`<section class="panel"><h2>Кассовая смена закрыта</h2><p>${state.data.permissions.shifts?"Откройте смену и укажите размен для сверки наличных.":"Попросите администратора, управляющего или владельца открыть смену."}</p>${state.data.permissions.shifts?'<button class="primary" data-action="open-shift">Открыть смену</button>':""}</section>`;return;}
+    const orders=activeOrders(),lines=order?order.lines:quickLines(),total=order?pricing(order):quickTotal();
+    const categories=[...new Set(state.data.menu.map(m=>m.category).filter(Boolean))];
+    const menu=state.data.menu.filter(m=>(state.search?m.name.toLocaleLowerCase("ru").includes(state.search.toLocaleLowerCase("ru")):state.category==="all"||m.category===state.category));
+    const locked=!!order?.precheck||!!order?.discount,blocked=state.pending||state.legacy||total==null||!lines.length||!state.data.permissions.post;
+    $("cashier-view").innerHTML=`<div class="toolbar"><small>${esc(current.shiftName)} · ${esc(current.date)} · ${esc(state.data.timezone||"UTC")}</small>${state.data.permissions.shifts?'<div class="actions"><button data-action="cash">Кассовая операция</button><button data-action="close-shift">Закрыть смену</button></div>':""}</div>
+      <div class="order-tabs"><button data-action="quick" aria-pressed="${!order}">Быстрая продажа<small>${esc(money(quickTotal()))}</small></button>${orders.map(o=>`<button data-order="${esc(o.id)}" aria-pressed="${order?.id===o.id}">Стол ${esc(o.tableNumber)}<small>${esc(money(pricing(o)))}</small></button>`).join("")}<button data-action="create-order">${icon("plus")} Заказ</button></div>
+      <div class="mobile-tabs"><button data-pane="order" aria-pressed="${document.body.dataset.pane!=="menu"}">Заказ · ${lines.reduce((n,l)=>n+l.quantity,0)}</button><button data-pane="menu" aria-pressed="${document.body.dataset.pane==="menu"}">Меню</button></div>
+      <div class="layout"><section class="menu-panel panel"><label><span class="muted">Цены в ${esc(currency())}</span><input id="menu-search" type="search" placeholder="Поиск по меню" value="${esc(state.search)}"></label><div class="categories"><button data-category="all" aria-pressed="${state.category==="all"}">Все</button>${categories.map(c=>`<button data-category="${esc(c)}" aria-pressed="${state.category===c}">${esc(c)}</button>`).join("")}</div><div class="menu-grid">${menu.length?menu.map(m=>`<button class="menu-item" data-add="${esc(m.id)}" ${locked||m.salePrice==null?'disabled data-ineligible':''}>${m.imageUrl?`<img src="${esc(m.imageUrl)}" alt="" loading="lazy">`:""}<strong>${esc(m.name)}</strong><span>${esc(money(m.salePrice))}</span></button>`).join(""):'<p class="empty">Позиций по этому запросу нет.</p>'}</div></section>
+      <section class="cart panel"><div class="section-head"><div><h2>${order?"Стол "+esc(order.tableNumber):"Быстрая продажа"}</h2><small>${order?esc(order.createdBy.name)+" · "+esc(time(order.createdAt)):"Выберите позиции из меню"}</small></div>${order?badge(order):""}</div><div class="lines">${lines.length?lines.map(l=>`<div class="line"><div class="copy"><strong>${esc(l.name)}</strong><small>${l.quantity} × ${esc(money(l.unitPrice))}</small></div><strong class="line-sum">${esc(money(l.pricingUnavailable?null:l.total))}</strong>${senior()&&!locked?`<button data-cancel-line="${esc(l.id)}" aria-label="Отменить позицию ${esc(l.name)}">${icon("circle-off")}</button>`:""}</div>`).join(""):'<p class="empty">Добавьте позиции из меню.</p>'}</div>
+      <button data-pane="menu" class="mobile-tabs">Добавить позиции</button>${order?.comment?`<p class="muted">${esc(order.comment)}</p>`:!order?`<label>Комментарий<textarea id="quick-comment" rows="2" maxlength="500">${esc(state.quick.comment)}</textarea></label>`:""}
+      <div class="cart-foot">${order?.discount?`<p class="readonly">${esc(order.discount.name)} · Скидка ${esc(money(order.discount.discountAmount))}<br><small>До скидки ${esc(money(order.discount.grossAmount))}</small></p>`:""}<div class="total"><span>Итого</span><strong>${esc(money(total))}</strong></div><div class="actions">${order&&!order.precheck?`<button data-action="precheck" ${!lines.length||total==null?'disabled data-ineligible':''}>Предчек</button>`:""}<button class="primary" data-action="payment" ${blocked?'disabled data-ineligible':''}>К оплате · ${esc(amount(total))}</button></div>
+      ${senior()?`<details class="admin-actions"><summary>Действия администратора</summary><div class="actions">${order?`${order.precheck?'<button data-action="cancel-precheck">Отмена предчека</button>':`<button data-action="split" ${order.discount?'disabled data-ineligible':''}>Разделить счёт</button><button data-action="discount">${order.discount?"Снять скидку":"Применить скидку"}</button>`}<button class="danger" data-action="cancel-order">Отменить заказ</button>`:'<button data-action="save-quick">Сохранить за столом</button>'}</div></details>`:'<div class="admin-actions"><p>Разделение счёта, отмены и скидки выполняет администратор, управляющий или владелец.</p></div>'}<p class="footnote">Предчек и печать в браузере — нефискальные. Принтер и эквайринг не подключены.</p></div></section></div>`;
+  }
+  function renderOrders(){ $("orders-view").innerHTML=`<div class="section-head"><div><h2>Открытые заказы</h2><p class="muted">${activeOrders().length} счетов · ${new Set(activeOrders().map(o=>o.tableNumber)).size} столов</p></div><button class="primary" data-action="create-order" ${!shift()?'disabled data-ineligible':''}>Новый заказ</button></div><div class="cards">${activeOrders().map(o=>orderCard(o)).join("")}</div>${!activeOrders().length?'<p class="empty">Нет открытых заказов.</p>':""}`; }
+  const paymentLabel=e=>(e.payments||[]).map(p=>({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешний терминал"})[p.method]||"Не указан").join(", ")||"Не указан";
+  function receiptRows(events){return events.map(e=>`<button class="receipt-row" data-receipt="${esc(e.id)}"><span><strong>${esc(time(e.acceptedAt))} · ${e.tableNumber?"Стол "+esc(e.tableNumber):"Быстрая продажа"}</strong><small>${esc(e.orderActor?.name||e.actor?.name||"Автор неизвестен")} · ${esc(paymentLabel(e))}</small></span><strong>${esc(money(e.revenue))} ${icon("chevron-right")}</strong></button>`).join("");}
+  function renderReceipts(){ $("receipts-view").innerHTML=`<h2>Оплаченные чеки</h2><p class="muted">${senior()?"Последние чеки заведения":"Только созданные или оплаченные вами чеки"} · до 100 последних записей</p><section class="panel">${receiptRows(state.data.events.filter(e=>e.status==="POSTED"))||'<p class="empty">Оплаченных чеков пока нет.</p>'}</section>`; }
+  function metrics(s,detail=false){return `<div class="metrics ${detail?"detail-metrics":""}"><div class="metric"><small>Открытых столов</small><strong>${s.openTableCount}</strong>${detail?`<p>${esc(money(s.openNetAmount))} не оплачено</p>`:""}</div><div class="metric"><small>${detail?"Оплаченных чеков":"Неоплаченные счета"}</small><strong>${detail?s.paidCheckCount:esc(amount(s.openNetAmount))}</strong>${detail?`<p>${esc(money(s.paidNetAmount))}</p>`:`<p>${esc(currency())}</p>`}</div><div class="metric"><small>Оплаченных чеков</small><strong>${s.paidCheckCount}</strong></div><div class="metric"><small>Оплачено</small><strong>${esc(amount(s.paidNetAmount))}</strong><p>${esc(currency())}</p></div></div>`;}
+  function freshness(){return `<p class="fresh ${state.stale?"stale":""}">${state.stale?"Данные устарели · ":""}Обновлено ${state.lastSuccess?esc(time(new Date(state.lastSuccess))):"—"} · каждые 15 сек.</p>`;}
+  function renderOverview(){
+    const o=state.overview;
+    if(!o){$("overview-view").innerHTML=`<h2>Текущая смена</h2><p class="empty">${shift()?"Загружаем обзор…":"Открытой кассовой смены нет."}</p>`;return;}
+    const staff=state.waiter===null?null:o.staff.find(s=>String(s.accountId)===state.waiter);
+    if(staff){
+      $("overview-view").innerHTML=`<button class="back-link" data-action="all-staff">${icon("arrow-left")} Все сотрудники</button><div class="section-head detail-heading"><div><h2>${esc(staff.name||"Автор неизвестен")}</h2><p class="muted">Текущая смена · ${esc(labels[staff.jobTitle||staff.role]||"Сотрудник")}</p></div></div>${freshness()}${metrics(staff,true)}<div class="detail-tabs"><button data-detail="tables" aria-pressed="${state.detailTab==="tables"}">Столы · ${staff.openTableCount}</button><button data-detail="paid" aria-pressed="${state.detailTab==="paid"}">Оплачено · ${staff.paidCheckCount}</button></div>${state.detailTab==="tables"?`<h2>Открытые столы</h2><div class="detail-list">${staff.openOrders.map(order=>orderCard(order,staff.name)).join("")}</div>${!staff.openOrders.length?'<p class="empty">Нет открытых счетов.</p>':""}`:`<h2>Оплаченные чеки</h2><section class="panel">${receiptRows(staff.paidReceipts)||'<p class="empty">Оплаченных чеков нет.</p>'}</section>`}<p class="footnote">Активность по заказам и продажам не подтверждает присутствие на работе.</p>`;return;
+    }
+    const filtered=state.filterWaiter?o.staff.filter(s=>String(s.accountId)===state.filterWaiter):o.staff;
+    $("overview-view").innerHTML=`<div class="section-head"><div><h2>Текущая смена <span class="badge">Открыта</span></h2><p class="muted">${esc(o.shift.name)} · ${esc(o.shift.businessDate)} · ${esc(o.shift.timezone)}</p></div></div>${freshness()}${metrics(o.summary)}<section class="panel"><h2>Сотрудники</h2><div class="table-wrap"><table class="staff-table"><thead><tr><th>Сотрудник</th><th class="amount">Открытых столов</th><th class="amount">Не оплачено</th><th class="amount">Оплаченных чеков</th><th class="amount">Оплачено</th><th></th></tr></thead><tbody>${o.staff.map(s=>`<tr><td><div class="staff-name"><span class="avatar">${esc((s.name||"?").split(" ").map(n=>n[0]).slice(0,2).join(""))}</span><div>${esc(s.name||"Автор неизвестен")}${!s.hasActivity?'<small>Нет открытых счетов и продаж</small>':""}</div></div></td><td class="amount">${s.openTableCount}</td><td class="amount">${esc(amount(s.openNetAmount))}</td><td class="amount">${s.paidCheckCount}</td><td class="amount">${esc(amount(s.paidNetAmount))}</td><td><button data-waiter="${esc(String(s.accountId))}">Показать счета</button></td></tr>`).join("")}</tbody><tfoot><tr><td>Итого</td><td class="amount">${o.summary.openTableCount}</td><td class="amount">${esc(amount(o.summary.openNetAmount))}</td><td class="amount">${o.summary.paidCheckCount}</td><td class="amount">${esc(amount(o.summary.paidNetAmount))}</td><td></td></tr></tfoot></table></div></section><div class="section-head"><div><h2>Открытые столы</h2><p class="muted">Неоплаченные счета отдельно от оплаченных чеков</p></div><select id="waiter-filter" aria-label="Фильтр по сотруднику"><option value="">Все сотрудники</option>${o.staff.map(s=>`<option value="${esc(String(s.accountId))}" ${state.filterWaiter===String(s.accountId)?"selected":""}>${esc(s.name||"Автор неизвестен")}</option>`).join("")}</select></div><div class="cards">${filtered.flatMap(s=>s.openOrders.map(order=>orderCard(order,s.name))).join("")}</div><p class="footnote">Нулевая активность не означает присутствие сотрудника на работе. Разделённые счета одного стола считаются одним столом.</p>`;
+  }
+  function renderReport(){
+    const r=state.report;
+    const picker=`<div class="toolbar"><select id="report-picker" aria-label="Выберите смену"><option value="">Выберите смену</option>${state.data.shifts.map(s=>`<option value="${esc(s.id)}" ${r?.shiftId===s.id?"selected":""}>${esc(s.shiftName)} · ${esc(s.date)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"}</option>`).join("")}</select></div>`;
+    if(!r){$("report-view").innerHTML=picker+'<p class="empty">Выберите смену для просмотра отчёта.</p>';return;}
+    const m=n=>money(n,r.currency),avg=r.totals.paidReceipts?r.totals.paidRevenue/r.totals.paidReceipts:null,cash=r.payments.find(p=>p.method==="CASH"),card=r.payments.find(p=>p.method==="CARD_EXTERNAL"),proportion=r.totals.paidRevenue>0?cash.paidRevenue/r.totals.paidRevenue*100:0;
+    const cashRows=[["На начало",r.cash.openingFloat],["Наличные продажи",r.cash.salesRevenue],["Внесения",r.cash.cashIn],["Выдачи",r.cash.cashOut],["Инкассация",r.cash.safeDrop],["Ожидается",r.cash.expected],["Пересчитано",r.cash.actual]];
+    $("report-view").innerHTML=`<div class="report">${picker}<div class="section-head"><div><h2>Отчёт по смене</h2><span class="muted">${esc(r.shiftName)}</span> <span class="badge">${r.status==="closed"?"Закрыта":"Открыта"}</span></div><button class="primary" data-action="print">Распечатать</button></div><div class="report-meta"><span>Открыта ${esc(date(r.openedAt))} · ${esc(r.openedBy?.name||"Ответственный неизвестен")}</span><span>Закрыта ${esc(date(r.closedAt))} · ${esc(r.closedBy?.name||"Ответственный неизвестен")}</span><span>${esc(r.timezone)} · Учётная дата ${esc(r.businessDate)}</span></div><div class="metrics"><div class="metric"><small>Выручка</small><strong>${esc(m(r.totals.paidRevenue))}</strong><p>После применённых скидок</p></div><div class="metric"><small>Оплаченных чеков</small><strong>${r.totals.paidReceipts}</strong></div><div class="metric"><small>Средний чек</small><strong>${esc(m(avg))}</strong></div></div><div class="report-columns"><div><section class="panel"><h3>Продажи по официантам</h3><div class="table-wrap"><table><thead><tr><th>Сотрудник</th><th class="amount">Выручка</th><th class="amount">Чеков</th><th class="amount">Средний чек</th></tr></thead><tbody>${r.employees.map(e=>`<tr><td>${esc(e.name||"Автор неизвестен")}</td><td class="amount"><strong>${esc(m(e.paidRevenue))}</strong></td><td class="amount">${e.paidReceipts}</td><td class="amount">${esc(m(e.paidReceipts?e.paidRevenue/e.paidReceipts:null))}</td></tr>`).join("")}</tbody><tfoot><tr><td>Итого</td><td class="amount">${esc(m(r.totals.paidRevenue))}</td><td class="amount">${r.totals.paidReceipts}</td><td class="amount">${esc(m(avg))}</td></tr></tfoot></table></div></section><section class="panel"><h3>Способы оплаты</h3><div class="paybar"><span id="cash-proportion"></span><span id="card-proportion" class="card"></span></div>${r.payments.map(p=>`<div class="cash-row"><span>${esc({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешний терминал",UNSPECIFIED:"Способ не указан"}[p.method])}</span><strong>${esc(m(p.paidRevenue))}</strong></div>`).join("")}</section></div><section class="panel cash-panel"><h3>Сверка кассы</h3>${cashRows.map(([label,value],i)=>`<div class="cash-row ${i>4?"emphasis":""}"><span>${label}</span><strong>${esc(m(value))}</strong></div>`).join("")}<div class="difference ${r.cash.variance===0?"good":""}"><strong>Расхождение · ${esc(m(r.cash.variance))}</strong><p>${r.cash.status==="NEGATIVE_EXPECTED"?"Ожидаемая сумма отрицательна: проверьте кассовые движения.":r.cash.variance==null?"Для сверки не хватает данных.":r.cash.variance===0?"Касса сошлась.":"Проверьте кассовые движения и пересчёт."}</p></div></section></div><section class="panel"><h3>Контроль операций</h3><div class="audit-grid"><div><small>Скидки</small><strong>${esc(m(r.totals.paidDiscountAmount))}</strong><small>До скидок ${esc(m(r.totals.paidGrossRevenue))}</small></div><div><small>Возвраты оплаты</small><strong>Недоступны</strong><small>Оплаченные возвраты через кассу пока не поддерживаются</small></div><div><small>Аннулированные продажи</small><strong>${esc(m(r.totals.reversedRevenue))}</strong><small>${r.totals.reversedReceipts} чеков исключены из выручки</small></div></div><details><summary>Кассовые движения · ${r.cash.entries?.length||0}</summary>${(r.cash.entries||[]).map(e=>`<p>${esc(date(e.at))} · ${esc(e.actor.name)} · ${esc({IN:"Внесение",OUT:"Выдача",SAFE_DROP:"Инкассация"}[e.kind])}: ${esc(m(e.amount))}<br><small>${esc(e.reason)}</small></p>`).join("")}</details></section><p class="footnote">Нефискальный управленческий отчёт. Себестоимость не включена; выручка не равна прибыли. Закрытый отчёт — исторический снимок.</p></div>`;
+    $("cash-proportion").style.width=proportion+"%";$("card-proportion").style.width=(r.totals.paidRevenue>0?card.paidRevenue/r.totals.paidRevenue*100:0)+"%";
+  }
+  function renderDiscounts(){ $("discounts-view").innerHTML=`<div class="section-head"><div><h2>Настройка скидок</h2><p class="muted">Одна скидка на весь счёт, без накопления. Процент или фиксированная сумма.</p></div><button class="primary" data-action="new-rule">Создать</button></div><div class="rule-list">${state.rules.map(r=>`<div class="rule"><div><strong>${esc(r.name)}</strong><small>${r.kind==="PERCENT"?esc(r.value)+"%":esc(money(r.value))} · ${r.active?"Активна":"Выключена"}</small></div><button data-rule="${esc(r.id)}">Изменить</button></div>`).join("")||'<p class="empty">Правила скидок ещё не созданы.</p>'}</div>`; }
+  async function changeView(view){
+    if(["overview","report","discounts"].includes(view)&&!senior())return;
+    state.view=view;state.waiter=null;state.filterWaiter="";
+    if(view==="overview")await reload();
+    else if(view==="discounts"){state.rules=(await request("/api/pos-discounts")).rules;render();}
+    else if(view==="report"){const id=state.report?.shiftId||state.data.shifts.at(-1)?.id;if(id)state.report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(id))).report;render();}
+    else render();window.scrollTo({top:0,behavior:"instant"});
+  }
+  function openOrder(id){state.orderId=id;state.view="cashier";document.body.dataset.pane="order";render();window.scrollTo({top:0,behavior:"instant"});}
+  async function createOrder(fromQuick=false){
+    if(!shift())throw Error("Сначала откройте смену.");
+    dialog("Новый заказ",field("table","Номер стола","number","","required min=1 max=9999 step=1 inputmode=numeric")+field("comment","Комментарий","text",fromQuick?state.quick.comment:"","maxlength=500"),async form=>{
+      const id=uuid(),result=await mutate("/api/pos-orders",{action:"create",operationId:uuid(),orderId:id,expectedRevision:0,shiftId:shift().id,tableNumber:String(form.get("table")),comment:String(form.get("comment")),lines:fromQuick?state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity})):[]});
+      if(fromQuick){state.quick={id:uuid(),lines:[],comment:""};saveLocal();}
+      openOrder(result.order.id);notice("Заказ сохранён. Добавьте позиции из меню.");
+    },"Создать заказ");
+  }
+  function reasonAction(title,action,extra={}){dialog(title,field("reason","Причина","text","","required maxlength=500"),async f=>{await orderAction(action,{...extra,reason:String(f.get("reason"))});render();});}
+  async function showPayment(){
+    const order=selectedOrder(),sum=order?pricing(order):quickTotal();
+    if(sum==null)throw Error("Цена недоступна. Проверьте позиции.");
+    dialog("Оплата",`<p class="total">К оплате <strong>${esc(money(sum))}</strong></p><div class="payment-choices"><label><input type="radio" name="method" value="CASH" checked>Наличные</label><label><input type="radio" name="method" value="CARD_EXTERNAL">Внешний терминал</label></div><p class="footnote">Подтвердите фактически полученную оплату. Интеграция эквайринга и фискализация отсутствуют.</p>`,async form=>{
+      const method=String(form.get("method")),payment={id:uuid(),method,amount:sum};let result;
+      if(order){
+        const body={orderId:order.id,expectedRevision:order.revision,payment};
+        const preview=await request("/api/pos-orders",{...body,action:"preview_payment",operationId:uuid()});
+        result=await mutate("/api/pos-orders",{...body,action:"pay",operationId:uuid(),previewHash:preview.previewHash});
+      } else {
+        const command={id:state.quick.id,source:"POS_API",shiftId:shift().id,comment:state.quick.comment,payments:[payment],lines:state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))};
+        const preview=await request("/api/sales-events",{action:"preview",command});
+        result=await mutate("/api/sales-events",{action:"post",command,previewHash:preview.previewHash});
+      }
+      state.orderId=null;state.view="receipts";render();notice(result.duplicate?"Оплата уже была сохранена. Повторного списания нет.":"Продажа проведена и сохранена в общем журнале.");
+    },"Подтвердить оплату");
+  }
+  function showReceipt(id){
+    const event=state.data.events.find(e=>e.id===id)||state.overview?.staff.flatMap(s=>s.paidReceipts).find(e=>e.id===id);if(!event)return;
+    dialog("Оплаченный чек",`<p class="success-title">Оплачено · ${esc(date(event.acceptedAt))}</p><p>${esc(event.tableNumber?"Стол "+event.tableNumber:"Быстрая продажа")} · ${esc(paymentLabel(event))}</p>${event.prices.map(l=>`<div class="cash-row"><span>${esc(l.name)} × ${l.quantity}</span><strong>${esc(money(l.total))}</strong></div>`).join("")}<div class="cash-row"><span>До скидки</span><strong>${esc(money(event.grossAmount))}</strong></div><div class="cash-row"><span>Скидка</span><strong>${esc(money(event.discountAmount))}</strong></div><p class="total">Оплачено <strong>${esc(money(event.revenue))}</strong></p><p class="muted">Официант: ${esc(event.orderActor?.name||event.waiter?.name||event.actor?.name||"Неизвестно")}<br>Оплату принял: ${esc(event.actor?.name||"Неизвестно")}</p><p class="footnote long-id">Номер: ${esc(event.id)}<br>Нефискальное подтверждение. Оплаченные возвраты пока недоступны.</p>`,null);
+  }
+  function showRule(id){const rule=state.rules.find(r=>r.id===id);dialog(rule?"Изменить скидку":"Новая скидка",field("name","Название","text",rule?.name||"","required maxlength=120")+`<label>Тип<select name="kind"><option value="PERCENT" ${rule?.kind!=="FIXED"?"selected":""}>Процент</option><option value="FIXED" ${rule?.kind==="FIXED"?"selected":""}>Фиксированная сумма</option></select></label>`+field("value","Значение","number",rule?.value??"","required min=0 step=0.01 inputmode=decimal")+`<label>Состояние<select name="active"><option value="true" ${rule?.active!==false?"selected":""}>Активна</option><option value="false" ${rule?.active===false?"selected":""}>Выключена</option></select></label>`,async form=>{
+    await mutate("/api/pos-discounts",{action:"save",ruleId:rule?.id||uuid(),expectedRevision:rule?.revision||0,operationId:uuid(),rule:{name:String(form.get("name")),kind:String(form.get("kind")),value:Number(form.get("value")),active:form.get("active")==="true"}});state.rules=(await request("/api/pos-discounts")).rules;render();notice("Правило сохранено. Оплаченные чеки не изменены.");
+  },"Сохранить");}
+  async function handleAction(action){
+    if(action==="dismiss"){$("dialog").close();return;}
+    if(action==="identity"){dialog("Аккаунт",`<p>${esc(state.data.actor.name)} · ${esc(labels[state.data.actor.jobTitle||state.data.actor.role])}</p><p>${esc(state.data.venueName)}</p><a href="/team-access">Мои заведения и доступ</a><p class="footnote">При смене заведения касса обновит контекст. Незавершённые запросы сохранятся.</p>`,null);return;}
+    if(action==="quick"){state.orderId=null;document.body.dataset.pane="order";render();return;}
+    if(action==="create-order"||action==="save-quick"){await createOrder(action==="save-quick");return;}
+    if(action==="payment"){await showPayment();return;}
+    if(action==="precheck"){await orderAction("precheck");notice("Предчек сохранён. Это нефискальный документ.");render();return;}
+    if(action==="cancel-precheck"){reasonAction("Отмена предчека","cancel_precheck");return;}
+    if(action==="cancel-order"){reasonAction("Отменить заказ","cancel_order");return;}
+    if(action==="split"){
+      const order=selectedOrder();dialog("Разделить счёт",`<p class="muted">Выберите количество для нового счёта. Исходный официант и номер стола сохранятся.</p>${order.lines.map(l=>`<label class="split-line">${esc(l.name)} · ${l.quantity} шт.<input name="${esc(l.id)}" type="number" min="0" max="${l.quantity}" step="1" value="0"></label>`).join("")}`,async form=>{const lines=order.lines.map(l=>({lineId:l.id,quantity:Number(form.get(l.id))})).filter(l=>l.quantity>0);await orderAction("split",{newOrderId:uuid(),lines});render();});return;
+    }
+    if(action==="discount"){
+      const order=selectedOrder();if(order.discount){reasonAction("Снять скидку","remove_discount");return;}
+      state.rules=(await request("/api/pos-discounts")).rules;const active=state.rules.filter(r=>r.active);
+      if(!active.length)throw Error("Нет активных правил скидок. Их настраивает владелец или управляющий.");
+      dialog("Применить скидку",`<label>Правило<select name="rule">${active.map(r=>`<option value="${esc(r.id)}">${esc(r.name)} · ${r.kind==="PERCENT"?esc(r.value)+"%":esc(money(r.value))}</option>`).join("")}</select></label>`+field("reason","Причина","text","","required maxlength=500")+'<p class="footnote">Скидка применяется на весь счёт. Перед изменением позиций или разделением старший должен снять её.</p>',async form=>{const rule=active.find(r=>r.id===form.get("rule"));await orderAction("apply_discount",{ruleId:rule.id,ruleRevision:rule.revision,reason:String(form.get("reason"))});render();});return;
+    }
+    if(action==="open-shift"){
+      dialog("Открыть смену",field("name","Название смены","text","","required maxlength=160")+field("float","Размен на начало","number","","min=0 step=0.01 inputmode=decimal")+'<p class="footnote">Пустое значение означает неизвестную сумму, а не ноль.</p>',async form=>{await mutate("/api/sales-events",{action:"open_shift",shiftId:uuid(),name:String(form.get("name")),...(form.get("float")!==""?{openingFloat:Number(form.get("float"))}:{})});render();notice("Смена открыта.");},"Открыть смену");return;
+    }
+    if(action==="close-shift"){
+      if(activeOrders().length)throw Error("Перед закрытием оплатите или отмените все открытые заказы.");
+      dialog("Закрыть смену",field("actual","Пересчитано наличных","number","","min=0 step=0.01 inputmode=decimal")+'<p class="footnote">Пустое значение останется неизвестным. Отчёт сохранится как исторический снимок.</p>',async form=>{const result=await mutate("/api/sales-events",{action:"close_shift",shiftId:shift().id,...(form.get("actual")!==""?{actualCash:Number(form.get("actual"))}:{})});state.report=result.report;state.view="report";render();notice("Смена закрыта. Итоговый отчёт сохранён.");},"Закрыть смену");return;
+    }
+    if(action==="cash"){
+      dialog("Кассовая операция",`<label>Операция<select name="kind"><option value="IN">Внесение</option><option value="OUT">Выдача</option><option value="SAFE_DROP">Инкассация</option></select></label>`+field("amount","Сумма","number","","required min=0.01 step=0.01 inputmode=decimal")+field("reason","Причина","text","","required maxlength=500"),async form=>{await mutate("/api/sales-events",{action:"cash",shiftId:shift().id,cash:{operationId:uuid(),kind:String(form.get("kind")),amount:Number(form.get("amount")),reason:String(form.get("reason"))}});notice("Кассовое движение сохранено.");});return;
+    }
+    if(action==="all-staff"){state.waiter=null;render();return;}
+    if(action==="print"){window.print();return;}
+    if(action==="new-rule"){showRule();return;}
+    if(action==="retry"){const saved=state.pending;const result=await sendPending();if(result?.report){state.report=result.report;state.view="report";}else if(result?.event){state.orderId=null;state.view="receipts";}else if(saved?.body.action==="create")state.orderId=result?.order.id;render();notice("Результат подтверждён. Операция учтена один раз.");return;}
+    if(action==="legacy"){
+      const old=state.legacy,draft=old.draft,pending=draft.pending||draft,command=pending.command;
+      if(command){
+        const result=await request("/api/sales-events?externalId="+encodeURIComponent(command.id));
+        const found=result.events.find(e=>e.externalId===command.id&&e.source==="POS_API");
+        if(found){(old.storage==="session"?sessionStorage:localStorage).removeItem(old.key);state.legacy=null;await reload();state.view="receipts";render();notice("Прежняя оплата уже сохранена. Повтор не нужен.");return;}
+        dialog("Восстановить прежнюю оплату",`<p>Сохранённая сумма: ${esc(money(command.payments?.[0]?.amount))}</p><p>Сервер пока не нашёл этот чек. Повтор сохранит исходный номер операции.</p>`,async()=>{
+          const preview=await request("/api/sales-events",{action:"preview",command});await request("/api/sales-events",{action:"post",command,previewHash:preview.previewHash});
+          (old.storage==="session"?sessionStorage:localStorage).removeItem(old.key);state.legacy=null;await reload();state.view="receipts";render();notice("Прежняя оплата восстановлена.");
+        },"Повторить исходную оплату");
+      } else {
+        if(state.quick.lines.length)throw Error("Есть ещё один быстрый черновик. Старый заказ сохранён и требует отдельной проверки.");
+        state.quick={id:draft.id,lines:draft.lines.map((l,i)=>({...l,id:"line-"+(i+1)})),comment:draft.comment||""};saveLocal();localStorage.removeItem(old.key);state.legacy=null;render();notice("Черновик восстановлен. Проверьте актуальные цены.");
+      }return;
     }
   }
-  function scheduleLayoutMetrics() {
-    if(layoutFrame)return;
-    layoutFrame=requestAnimationFrame(()=>{
-      layoutFrame=0;
-      // Resize delivery never writes to the observed layout synchronously.
-      measureLayoutMetrics();
+  document.addEventListener("click",event=>{
+    const button=event.target.closest("button");if(!button||button.disabled)return;
+    if(button.dataset.action==="dismiss"){$("dialog").close();return;}
+    if(button.dataset.pane){document.body.dataset.pane=button.dataset.pane;render();window.scrollTo({top:0,behavior:"instant"});return;}
+    void working(async()=>{
+      if(button.dataset.view)await changeView(button.dataset.view);
+      else if(button.dataset.order)openOrder(button.dataset.order);
+      else if(button.dataset.category){state.category=button.dataset.category;render();}
+      else if(button.dataset.add){
+        if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");
+        const item=state.data.menu.find(m=>m.id===button.dataset.add);if(!item)return;
+        const order=selectedOrder();
+        if(order){await orderAction("add_items",{lines:[{id:uuid(),menuItemId:item.id,quantity:1}]});render();}
+        else{const existing=state.quick.lines.find(l=>l.menuItemId===item.id);if(existing){if(existing.quantity>=999)return;existing.quantity++;}else{if(state.quick.lines.length>=100)throw Error("В одном чеке до 100 позиций.");state.quick.lines.push({id:uuid(),menuItemId:item.id,quantity:1,name:item.name});}saveLocal();render();notice("Позиция добавлена.");}
+      }else if(button.dataset.cancelLine){if(!senior())return;if(selectedOrder())reasonAction("Отменить позицию","cancel_item",{lineId:button.dataset.cancelLine});else{state.quick.lines=state.quick.lines.filter(l=>l.id!==button.dataset.cancelLine);saveLocal();render();}}
+      else if(button.dataset.waiter!==undefined){state.waiter=button.dataset.waiter;state.detailTab="tables";render();window.scrollTo({top:0,behavior:"instant"});}
+      else if(button.dataset.detail){state.detailTab=button.dataset.detail;render();}
+      else if(button.dataset.receipt)showReceipt(button.dataset.receipt);
+      else if(button.dataset.rule)showRule(button.dataset.rule);
+      else if(button.dataset.action)await handleAction(button.dataset.action);
     });
-  }
-  const layoutObserver=new ResizeObserver(scheduleLayoutMetrics);
-  layoutObserver.observe(document.querySelector(".pos-shell"));
-  layoutObserver.observe(document.querySelector(".pos-cart-foot"));
-  function selectPane(order) {
-    orderView=order;document.body.classList.toggle("pos-order-view",order);
-    $("show-menu").setAttribute("aria-pressed",String(!order));$("show-cart").setAttribute("aria-pressed",String(order));
-    // Reserve the visible checkout before the first Order frame, not a frame later.
-    measureLayoutMetrics();
-    updateJump();window.scrollTo({top:0,behavior:"instant"});
-  }
-  function updateJump() {$("order-jump").hidden=!(matchMedia("(max-width:767px)").matches&&!orderView&&activeShift&&data?.permissions.post&&$("receipt").hidden);}
-  function renderShift() {
-    const shifts = openShifts();
-    if (activeShift && !pending && !shifts.some(shift => shift.id === activeShift.id)) activeShift=null;
-    if (!activeShift && shifts.length === 1) activeShift=shifts[0];
-    if(activeShift&&draftKey!==draftIdentity(activeShift.id))restoreDraft();
-    const ready=Boolean(activeShift && data.permissions.post);
-    $("shift-gate").hidden=ready; $("cashier").hidden=!ready;updateJump();
-    if (!ready) {
-      const message=!data.permissions.post?"У вашей роли нет права проводить продажи в кассе.":shifts.length?"Выберите открытую смену для этой продажи.":"Открытых смен нет. Откройте смену согласно вашим правам.";
-      text("shift-message",message);
-      $("shift-picker-label").hidden=shifts.length === 0 || !data.permissions.post;
-      $("shift-picker").innerHTML=`<option value="">Выберите смену</option>`+shifts.map(shift=>`<option value="${esc(shift.id)}">${esc(shift.shiftName)} · ${esc(shift.date)}</option>`).join("");
-      $("open-shift").hidden=!data.permissions.shifts || shifts.length>0;
-    }
-    if (activeShift) text("shift-title",`${activeShift.shiftName} · ${activeShift.date}`);
-    renderButtons();
-  }
-  function visibleMenu() {
-    const query=$("search").value.trim().toLocaleLowerCase("ru-RU");
-    return data.menu.filter(item=>item.name && item.salePrice != null && Number.isFinite(Number(item.salePrice)) && (query ? String(item.name).toLocaleLowerCase("ru-RU").includes(query) : (department==="all" || departmentKey(item)===department) && (category==="all" || String(item.categoryId||item.category)===category) && (subcategory==="all" || String(item.subcategoryId||"")===subcategory)));
-  }
-  function renderMenu() {
-    const labels=Object.fromEntries(data.menu.map(item=>[departmentKey(item),item.department]));
-    const departments=Object.keys(labels);
-    const searching=Boolean($("search").value.trim());
-    $("departments").innerHTML=`<button type="button" data-department="all" aria-pressed="${department==="all"}">Все</button>`+departments.map(key=>`<button type="button" data-department="${esc(key)}" aria-pressed="${department===key}">${esc(labels[key]||key)}</button>`).join("");
-    const categoryMap=new Map(data.menu.filter(item=>department==="all"||departmentKey(item)===department).map(item=>[String(item.categoryId||item.category),item.category]));
-    const categories=[...categoryMap.keys()];
-    if(category!=="all"&&!categories.includes(category))category="all";
-    $("categories").innerHTML=`<button type="button" data-category="all" aria-pressed="${category==="all"}">Все категории</button>`+categories.map(name=>`<button type="button" data-category="${esc(name)}" aria-pressed="${category===name}">${esc(categoryMap.get(name))}</button>`).join("");
-    const subcategoryMap=new Map(data.menu.filter(item=>(department==="all"||departmentKey(item)===department)&&(category==="all"||String(item.categoryId||item.category)===category)).filter(item=>item.subcategoryId).map(item=>[String(item.subcategoryId),item.subcategory]));
-    $("subcategories").hidden=category==="all"||!subcategoryMap.size||searching;
-    $("subcategories").innerHTML='<button type="button" data-subcategory="all" aria-pressed="'+(subcategory==="all")+'">Все подразделы</button>'+[...subcategoryMap].map(([id,name])=>'<button type="button" data-subcategory="'+esc(id)+'" aria-pressed="'+(subcategory===id)+'">'+esc(name)+'</button>').join("");
-    $("categories").hidden=searching;$("departments").hidden=searching;
-    $("search-context").hidden=!searching;
-    const items=visibleMenu();
-    $("menu").innerHTML=items.length?items.map(item=>`<button type="button" class="pos-item" data-add="${esc(item.id)}"><strong>${esc(item.name)}</strong><span><small>${esc([...(item.sectionPath?.length?item.sectionPath.map(node=>node.name):[item.department]),item.category,item.subcategory].filter(Boolean).join(" → "))}</small><br><span class="pos-item-price">${esc(money(item.salePrice))} · +1</span></span></button>`).join(""):`<p class="pos-empty">Позиций по этому запросу нет.</p>`;
-  }
-  function total() {if([...cart.values()].some(row=>row.item.unavailable))return null;return Math.round([...cart.values()].reduce((sum,row)=>sum+Number(row.item.salePrice)*row.quantity,0)*100)/100;}
-  function renderCart() {
-    const rows=[...cart.values()]; text("cart-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);text("mobile-count",rows.reduce((sum,row)=>sum+row.quantity,0));
-    $("cart-lines").innerHTML=rows.length?rows.map(row=>`<div class="pos-line"><div><strong>${esc(row.item.name)}</strong><small>${esc(money(row.item.salePrice))} × ${row.quantity} = ${esc(row.item.unavailable?"Позиция недоступна":money(Number(row.item.salePrice)*row.quantity))}</small></div><div class="pos-qty"><button type="button" data-decrease="${esc(row.item.id)}" aria-label="Уменьшить ${esc(row.item.name)}">−</button><output>${row.quantity}</output><button type="button" data-increase="${esc(row.item.id)}" aria-label="Увеличить ${esc(row.item.name)}">+</button><button type="button" class="pos-remove" data-remove="${esc(row.item.id)}" aria-label="Убрать ${esc(row.item.name)}">×</button></div></div>`).join(""):`<p class="pos-empty">Нажмите на позицию меню, чтобы добавить её в заказ.</p>`;
-    text("total",money(total()));text("jump-count",`${rows.reduce((sum,row)=>sum+row.quantity,0)} шт.`);text("jump-total",money(total()));renderButtons();updateJump();
-  }
-  function renderButtons() {$("shift-picker").disabled=busy||Boolean(pending);$("open-shift").querySelector("button").disabled=busy;$("new-order").disabled=busy;$("work").setAttribute("aria-busy",String(busy));$("pay").textContent=busy?"Проводим…":"Оплатить";$("pay").disabled=busy||frozen||storageFailed||[...cart.values()].some(row=>row.item.unavailable)||Boolean(pending)||!activeShift||cart.size===0||!data?.permissions.post;$("retry").hidden=!pending;$("retry").disabled=busy||frozen;$("comment").disabled=busy||Boolean(pending);document.querySelectorAll('input[name="payment"]').forEach(input=>input.disabled=busy||Boolean(pending));}
-  function showReceipt(event, duplicate=false) {
-    $("cashier").hidden=true;$("shift-gate").hidden=true;$("order-jump").hidden=true;$("receipt").hidden=false;
-    const details=event.prices.map(line=>`<p class="receipt-line"><span>${esc(line.name)} <small>× ${line.quantity}</small></span><b>${esc(money(line.total))}</b></p>`).join("");
-    const composition=event.prices.length>3?`<details class="receipt-details"><summary>Состав продажи · ${event.prices.length} позиций</summary>${details}</details>`:details;
-    const shift=data.shifts.find(s=>s.id===event.shiftId);
-    const payment=(event.payments||event.batch.payments||[]).map(p=>({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешняя оплата"})[p.method]||"Другой способ").join(", ")||"Не указан";
-    $("receipt-detail").innerHTML=`<strong class="receipt-amount">${esc(money(event.revenue))}</strong><p class="receipt-payment">${esc(payment)}</p><p class="receipt-shift">${esc(shift?.shiftName||activeShift?.shiftName||"Смена без названия")}</p><div class="receipt-lines">${composition}</div><details class="receipt-details"><summary>Детали продажи</summary><p>Себестоимость: ${esc(window.bdFormatSalesCost(event.batch,data.currency))}</p><p>Сотрудник: ${esc(event.actor?.name||event.batch.createdBy?.name||"Не указан")}</p></details>`;
-    $("receipt-sale").href="/sales-import?venue="+encodeURIComponent(data.venueId)+"&batch="+encodeURIComponent(event.id);
-    selectPane(false);
-    notice(duplicate?"Продажа уже проведена. Повторного списания нет.":"Продажа проведена и сохранена.");
-  }
-  async function refresh() {
-    data=await request();window.bdVenueTime.context(data);text("venue-name",data.venueName||"Заведение");text("employee-name",data.actor?.name||"Сотрудник");
-    $("work").hidden=false;
-    const selected=localStorage.getItem(selectionKey());activeShift=data.shifts.find(shift=>shift.id===selected&&shift.closingStatus==="open")||null;
-    const legacy=sessionStorage.getItem(sessionKey());
-    if(legacy){const saved=JSON.parse(legacy);activeShift=data.shifts.find(shift=>shift.id===saved.command.shiftId)||activeShift;if(activeShift){restoreDraft();pending=saved;orderId=saved.command.id;cart=new Map(saved.command.lines.map(line=>{const item=data.menu.find(item=>item.id===line.menuItemId)||{id:line.menuItemId,name:"Недоступная позиция",salePrice:null,unavailable:true};return[String(item.id),{item,quantity:line.quantity}];}));$("comment").value=saved.command.comment||"";if(!persistDraft())throw Error("Не удалось сохранить предыдущий запрос оплаты.");sessionStorage.removeItem(sessionKey());}}
-    else if(activeShift)restoreDraft();
-    else if(selected){const old=window.bdPosDraft.read(localStorage,draftIdentity(selected));if(old?.pending){activeShift=data.shifts.find(shift=>shift.id===selected)||{id:selected};restoreDraft();}}
-
-    if(pending){const checked=await request(undefined,pending.command.id);const event=checked.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");if(event){complete(event,true);return;}notice("Результат оплаты не подтверждён. Проверьте его повторным запросом.");}
-    renderShift();renderMenu();renderCart();if(cart.size||pending)selectPane(true);if(!pending&&!cart.size)notice("Выберите позиции и способ оплаты.");
-  }
-  async function submitPending() {
-    if(!pending)return;
-    const existing=data.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");
-    if(existing){complete(existing,true);return;}
-    const preview=await request({action:"preview",command:pending.command});
-    if(preview.duplicate){complete(preview.event,true);return;}
-    const result=await request({action:"post",command:pending.command,previewHash:preview.previewHash});
-    complete(result.event,Boolean(result.duplicate));
-  }
-  $("departments").onclick=event=>{const button=event.target.closest("[data-department]");if(button&&!busy){department=button.dataset.department;category="all";subcategory="all";renderMenu();}};
-  $("categories").onclick=event=>{const button=event.target.closest("[data-category]");if(button&&!busy){category=button.dataset.category;subcategory="all";renderMenu();}};
-  $("subcategories").onclick=event=>{if(event.target.dataset.subcategory){subcategory=event.target.dataset.subcategory;renderMenu();}};
-  $("search").oninput=renderMenu;
-  $("menu").onclick=event=>{const button=event.target.closest("[data-add]");if(!button||busy||pending)return;const item=data.menu.find(item=>String(item.id)===button.dataset.add);if(!item)return;const row=cart.get(String(item.id));if(!row&&cart.size>=100){notice("В одном заказе может быть до 100 позиций.");return;}cart.set(String(item.id),{item,quantity:Math.min(999,(row?.quantity||0)+1)});persistDraft();renderCart();};
-  $("cart-lines").onclick=event=>{const button=event.target.closest("[data-increase],[data-decrease],[data-remove]");if(!button||busy||pending)return;const id=button.dataset.increase??button.dataset.decrease??button.dataset.remove,row=cart.get(id);if(!row)return;if(button.hasAttribute("data-remove"))cart.delete(id);else{row.quantity+=button.hasAttribute("data-increase")?1:-1;if(row.quantity<=0)cart.delete(id);else row.quantity=Math.min(row.quantity,999);}persistDraft();renderCart();};
-  $("shift-picker").onchange=()=>{if(busy||pending)return;activeShift=openShifts().find(shift=>shift.id===$("shift-picker").value)||null;restoreDraft();renderShift();renderCart();if(cart.size||pending)selectPane(true);};
-  $("open-shift").onsubmit=event=>{event.preventDefault();working(async()=>{let conflict=false;try{await request({action:"open_shift",shiftId:crypto.randomUUID(),name:$("shift-name").value.trim()});}catch(error){if(error.code!=="SALES_EVENT_SHIFT_ALREADY_OPEN")throw error;conflict=true;}data=await request();renderShift();renderMenu();notice(conflict?"Уже открыта кассовая смена. Продолжайте в ней или сначала закройте её.":"Смена открыта.");});};
-  async function handlePendingFailure(error) {
-    if(error.authRequired)return;
-    if(error.status>=400&&error.status<500&&pending){
-      try{
-        data=await request(undefined,pending.command.id);
-        const saved=data.events.find(event=>event.externalId===pending.command.id&&event.source==="POS_API");
-        if(saved){complete(saved,true);return;}
-        pending=null;persistDraft();renderShift();renderCart();
-        notice(`${error.message} Исправьте заказ и повторите оплату.`);return;
-      }catch{ /* The server could not confirm the result; retain the original idempotency key. */ }
-    }
-    notice(`${error.message} Заказ сохранён для безопасного повтора.`);
-  }
-  $("pay").onclick=()=>working(async()=>{
-    if(!activeShift||!cart.size||pending||!persistDraft())return;
-    const amount=total(),method=document.querySelector('input[name="payment"]:checked').value;
-    pending={command:{id:orderId,source:"POS_API",shiftId:activeShift.id,comment:$("comment").value,lines:[...cart.values()].map((row,i)=>({id:`line-${i+1}`,menuItemId:row.item.id,quantity:row.quantity})),payments:[{id:"payment-1",method,amount}]}};
-    if(!persistDraft()){pending=null;return;}
-    try{await submitPending();}catch(error){await handlePendingFailure(error);}
   });
-  $("comment").oninput=()=>{if(!busy&&!pending)persistDraft();};
-  $("payment").onchange=()=>{if(!busy&&!pending)persistDraft();};
-  $("order-jump").onclick=()=>selectPane(true);
-  $("show-menu").onclick=()=>selectPane(false);$("show-cart").onclick=()=>selectPane(true);
-  $("retry").onclick=()=>working(async()=>{try{data=await request(undefined,pending?.command.id);await submitPending();}catch(error){await handlePendingFailure(error);}});
-  $("new-order").onclick=()=>working(async()=>{await refresh();selectPane(false);$("comment-panel").open=false;$("receipt").hidden=true;updateJump();});
-  window.addEventListener("scroll",updateJump,{passive:true});window.addEventListener("resize",updateJump);
-  window.addEventListener("online",()=>online(true));window.addEventListener("offline",()=>online(false));
-  window.addEventListener("storage",event=>{if(event.key===draftKey||["bd_active_venue_id","bd_session","bd_session_token"].includes(event.key)){frozen=true;$("work").hidden=true;notice("Заведение или аккаунт изменились. Обновите кассу.");}});
-  working(refresh, "Загружаем кассу…");
+  document.addEventListener("input",event=>{
+    if(event.target.id==="menu-search"){const caret=event.target.selectionStart;state.search=event.target.value;renderCashier();$("menu-search").focus();$("menu-search").setSelectionRange?.(caret,caret);}
+    if(event.target.id==="quick-comment"){state.quick.comment=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
+  });
+  document.addEventListener("change",event=>{
+    if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
+    if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{state.report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report;render();});
+  });
+  window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():""].includes(event.key))clearSensitive("Аккаунт, заведение или черновик изменились в другой вкладке. Обновите кассу.");});
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
+  window.addEventListener("pagehide",()=>refreshController?.stop());
+  document.body.dataset.pane="order";
+  void (async()=>{
+    try{
+      const value=await load();state.data=value.data;state.orders=value.orders;restoreLocal();accept(value);
+      notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"Касса готова. Выберите заказ или начните быструю продажу.");
+      refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
+    }catch(error){errorView(error);}
+  })();
 })();

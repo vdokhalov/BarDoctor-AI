@@ -478,6 +478,8 @@ async function authenticateScopedRequest(
     actorAccountId: identitySession.account.id,
     venueId: context.venue.id,
     membershipId: context.membership.id,
+    membershipPermissionsJson: context.membership.permissionsJson,
+    membershipJobTitle: context.membership.jobTitle,
     jobTitle: context.jobTitle,
     permissions: context.permissions,
   };
