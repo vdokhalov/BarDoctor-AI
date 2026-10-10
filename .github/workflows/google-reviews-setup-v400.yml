@@ -308,6 +308,11 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Build pinned upstream libsoup fix for WebKit network heap corruption
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libglib2.0-dev libnghttp2-dev libsqlite3-dev libpsl-dev libbrotli-dev glib-networking
+          bash scripts/qa/build-webkit-libsoup.sh "$RUNNER_TEMP/bd-webkit-libsoup"
       - name: Owner QA writeoff payroll repair persisted mobile WebKit
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/owner-qa-regressions-browser.mjs
       - name: Complete v485 navigation and functionality parity WebKit
@@ -322,8 +327,10 @@ jobs:
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/owner-uat-v493-browser.mjs
       - name: Health Doctor performance and bounded loading WebKit 390 820 1280
         run: BD_CURATED_BROWSER=webkit node --import tsx scripts/health-doctor-performance-browser.mjs
-      - name: Narrow WebKit environment classifier negative controls
-        run: node --import tsx --test tests/webkit-environment-gate.test.ts
+      - name: Narrow WebKit environment classifier and strict release negative controls
+        run: |
+          node --import tsx --test tests/webkit-environment-gate.test.ts
+          node --test tests/webkit-release-gate.test.mjs
       - name: Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280
         run: node scripts/webkit-stable-gate.mjs
       - name: Mandatory Phase 3A.10 stable WebKit metric source integration accepted revisions 390 820 1280
@@ -334,7 +341,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y strace
           fi
-      - name: WebKit Health lifecycle PASS FAIL or evidenced ENVIRONMENT_BLOCKED
+      - name: Mandatory WebKit Health lifecycle all six PASS, native failures block release
         run: node scripts/webkit-health-lifecycle-gate.mjs
       - name: Measured navigation and embedded auth failures
         run: |
@@ -364,6 +371,7 @@ jobs:
             outputs/curated-doctor-phase4c
             outputs/health-doctor-performance
             outputs/webkit-health-lifecycle
+            outputs/webkit-runtime
             outputs/management-loop-targeted
             outputs/provenance-phase3a10
             outputs/webkit-stable-gate
@@ -386,6 +394,11 @@ jobs:
       - run: npm run install:ci
       - name: Install Chromium and WebKit
         run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Build pinned upstream libsoup fix for WebKit network heap corruption
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libglib2.0-dev libnghttp2-dev libsqlite3-dev libpsl-dev libbrotli-dev glib-networking
+          bash scripts/qa/build-webkit-libsoup.sh "$RUNNER_TEMP/bd-webkit-libsoup"
       - name: First gesture and layout stability with isolated real handlers
         run: |
           BD_SCROLL_LABEL=ci-first BD_SCROLL_BROWSER=webkit BD_SCROLL_PROFILE=tablet BD_SCROLL_DELAYS=0 node --import tsx scripts/sales-scroll-layout-qa.ts
@@ -401,7 +414,9 @@ jobs:
         if: always()
         with:
           name: sales-scroll-layout-evidence
-          path: outputs/scroll-stability/ci*
+          path: |
+            outputs/scroll-stability/ci*
+            outputs/webkit-runtime
 
   verify:
     if: always()

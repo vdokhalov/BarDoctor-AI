@@ -5,6 +5,8 @@ import { execFileSync } from "node:child_process";
 import { webkit } from "playwright-core";
 import { classifyWebKitLifecycle, WEBKIT_LIFECYCLE_SUITES } from "./qa/webkit-environment-classifier.mjs";
 
+import { isWebKitLifecycleReleaseReady } from "./qa/webkit-release-gate.mjs";
+
 const out = resolve("outputs/webkit-health-lifecycle"), results = [];
 mkdirSync(out, { recursive: true });
 suites: for (const suite of WEBKIT_LIFECYCLE_SUITES) for (const width of [390, 820, 1280]) {
@@ -26,3 +28,5 @@ suites: for (const suite of WEBKIT_LIFECYCLE_SUITES) for (const width of [390, 8
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n| ${suite} | WebKit ${width}px | **${result.status}** | ${result.reason ?? "unchanged assertions passed; no native fatal signal"} |\n`);
   if (result.status === "FAIL") { process.exitCode = 1; break suites; }
 }
+
+if (!isWebKitLifecycleReleaseReady(results)) process.exitCode = 1;
