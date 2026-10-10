@@ -121,6 +121,9 @@ export async function claimVenueInvite(
   if (existingMembership) return null;
   const now = new Date().toISOString();
   const d1 = getD1();
+  // D1 batch is one transaction. Recheck membership inside the first write;
+  // then chain each statement to the previous successful write. A stale
+  // preflight must consume neither another invite nor its title/workspace.
   const [claim, membership] = await d1.batch([
     d1
       .prepare(
@@ -129,9 +132,11 @@ export async function claimVenueInvite(
          WHERE id = ?
            AND used_at IS NULL
            AND revoked_at IS NULL
-           AND expires_at > ?`,
+           AND expires_at > ?
+           AND NOT EXISTS (SELECT 1 FROM venue_memberships vm
+             WHERE vm.venue_id=venue_invites.venue_id AND vm.account_id=?)`,
       )
-      .bind(now, account.id, invite.id, now),
+      .bind(now, account.id, invite.id, now, account.id),
     d1
       .prepare(
         `INSERT INTO venue_memberships (
@@ -141,16 +146,10 @@ export async function claimVenueInvite(
          SELECT venue_id, ?, role, permissions_json, 'active',
                 created_by_account_id, ?, ?, ?
          FROM venue_invites
-         WHERE id = ? AND used_by_account_id = ? AND used_at = ?
+         WHERE id = ? AND used_by_account_id = ? AND used_at = ? AND changes() = 1
          ON CONFLICT(venue_id, account_id) DO NOTHING`,
       )
       .bind(account.id, now, now, now, invite.id, account.id, now),
-    d1.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at)
-      SELECT ?, ? || i.venue_id, j.data_json, ? FROM venue_invites i
-      JOIN domain_data j ON j.account_id=i.created_by_account_id AND j.store_key=? || i.code_hash
-      WHERE i.id=? AND i.used_by_account_id=? AND i.used_at=?
-      ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`)
-      .bind(account.id,MEMBER_JOB_PREFIX,now,INVITE_JOB_PREFIX,invite.id,account.id,now),
     d1
       .prepare(
         `INSERT INTO workspace_memberships (
@@ -158,7 +157,7 @@ export async function claimVenueInvite(
          )
          SELECT ?, ?, 'member', 'active', ?, ?, ?
          FROM venue_invites
-         WHERE id = ? AND used_by_account_id = ? AND used_at = ?
+         WHERE id = ? AND used_by_account_id = ? AND used_at = ? AND changes() = 1
          ON CONFLICT(workspace_id, account_id) DO UPDATE SET
            status = 'active',
            updated_at = excluded.updated_at`,
@@ -173,6 +172,12 @@ export async function claimVenueInvite(
         account.id,
         now,
       ),
+    d1.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at)
+      SELECT ?, ? || i.venue_id, j.data_json, ? FROM venue_invites i
+      JOIN domain_data j ON j.account_id=i.created_by_account_id AND j.store_key=? || i.code_hash
+      WHERE i.id=? AND i.used_by_account_id=? AND i.used_at=? AND changes() = 1
+      ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`)
+      .bind(account.id,MEMBER_JOB_PREFIX,now,INVITE_JOB_PREFIX,invite.id,account.id,now),
   ]);
   if ((claim.meta.changes ?? 0) !== 1 || (membership.meta.changes ?? 0) !== 1) {
     return null;

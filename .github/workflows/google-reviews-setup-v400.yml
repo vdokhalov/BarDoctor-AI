@@ -89,6 +89,8 @@ jobs:
         run: |
           node --import tsx --test tests/production-rca-health-v496.test.ts
           node --test tests/production-recovery-v496.test.mjs
+      - name: Staff invitation concurrent claims on native D1
+        run: node --test tests/staff-invite-d1-runtime.test.mjs
       - name: Typecheck
         run: npm run typecheck
       - name: Lint
