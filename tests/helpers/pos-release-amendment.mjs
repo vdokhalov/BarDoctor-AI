@@ -24,11 +24,19 @@ export function posAmendment(manifest=JSON.parse(readFileSync('tests/fixtures/po
   assert.equal(posDigest(read(path)),item.after,path+' exact POS implementation');
   old.set(path,before);
  }
- // Preserve the historical package bytes only after proving the sole allowed
- // change: remove duplicate preparation from the aggregate test command.
+ // Preserve historical boundaries after proving only the approved aggregate
+ // preparation edit and exact upstream test-runtime pin. No other dependency changes.
  const packageBefore=revision('package.json');
- assert.equal(read('package.json').toString(),packageBefore.toString().replace('"test": "npm run pretest:artifact && ','"test": "'),'exact aggregate preparation change');
- old.set('package.json',packageBefore);
+ const expectedPackage=packageBefore.toString().replace('"test": "npm run pretest:artifact && ','"test": "').replace('"playwright-core": "^1.58.2"','"playwright-core": "1.64.0"');
+ assert.equal(read('package.json').toString(),expectedPackage,'exact preparation and approved test-runtime changes');
+ const lockBefore=revision('package-lock.json'),expectedLock=JSON.parse(lockBefore);
+ expectedLock.packages[''].devDependencies['playwright-core']='1.64.0';
+ Object.assign(expectedLock.packages['node_modules/playwright-core'],{
+  version:'1.64.0',resolved:'https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.0.tgz',
+  integrity:'sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==',engines:{node:'>=20'},
+ });
+ assert.deepEqual(JSON.parse(read('package-lock.json')),expectedLock,'only exact approved Playwright lock entry changes');
+ old.set('package.json',packageBefore);old.set('package-lock.json',lockBefore);
  return {
   paths(paths){return paths.filter(path=>!old.has(path)||old.get(path)!==null);},
   read(path){return old.has(path)?old.get(path):read(path);},

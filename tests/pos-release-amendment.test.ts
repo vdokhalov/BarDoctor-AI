@@ -25,3 +25,16 @@ test('npm aggregate removes only the duplicate artifact preparation; artifact li
  for(const [name,value] of Object.entries(before))if(name!=='test')assert.equal(after[name],value,name);
  assert.equal(Object.keys(after).length,Object.keys(before).length);
 });
+
+type RuntimeLock={packages:Record<string,{version?:string;integrity?:string;dependencies:Record<string,string>}>};
+
+test('test-runtime amendment rejects unrelated dependencies, versions and integrity changes',()=>{
+ for(const change of [
+  (lock:RuntimeLock)=>{lock.packages['node_modules/playwright-core'].version='1.64.1';},
+  (lock:RuntimeLock)=>{lock.packages['node_modules/playwright-core'].integrity='sha512-unapproved';},
+  (lock:RuntimeLock)=>{lock.packages[''].dependencies.next='0.0.0';},
+ ]){
+  const lock=JSON.parse(readFileSync('package-lock.json','utf8'));change(lock);
+  assert.throws(()=>posAmendment(undefined,(path:string)=>path==='package-lock.json'?Buffer.from(JSON.stringify(lock)):readFileSync(path)));
+ }
+});

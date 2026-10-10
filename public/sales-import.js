@@ -173,7 +173,14 @@
     if (!(history.state && history.state.salesEditor)) history.pushState({ salesEditor: true }, "", location.href);
   }
   function closeEditor(force) {
+    if (state.editorHistoryClosing && !force) return;
     if (state.dirty && !force && !confirm("Есть несохранённые изменения. Закрыть без сохранения?")) return;
+    // Keep the editor visible until its owned history entry is removed. Otherwise
+    // an embedded Back can restore the closed editor's previous Import URL.
+    if (!force && editor.open && history.state && history.state.salesEditor) {
+      state.editorHistoryClosing = true; setDirty(false); history.back(); return;
+    }
+    state.editorHistoryClosing = false;
     setDirty(false); state.batch = null; state.mode = "preview";
     if (editor.open) editor.close();
   }
