@@ -3,7 +3,7 @@
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
-  const state={data:null,orders:[],rules:[],overview:null,report:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,refreshController;
   const notice=message=>{$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
@@ -102,17 +102,27 @@
     if(state.view==="cashier")renderCashier();if(state.view==="orders")renderOrders();if(state.view==="receipts")renderReceipts();if(state.view==="overview")renderOverview();if(state.view==="report")renderReport();if(state.view==="discounts")renderDiscounts();
     renderRecovery();setBusy();
   }
+  function visibleMenu() {
+    const query=state.search.trim().toLocaleLowerCase("ru");
+    return state.data.menu.filter(m=>query ? m.name.toLocaleLowerCase("ru").includes(query)
+      : (state.department==="all"||m.sectionId===state.department)
+        && (state.category==="all"||m.categoryId===state.category)
+        && (state.subcategory==="all"||m.subcategoryId===state.subcategory));
+  }
   function renderCashier(){
     const current=shift(),order=selectedOrder();
     if(!current){$("cashier-view").innerHTML=`<section class="panel"><h2>Кассовая смена закрыта</h2><p>${state.data.permissions.shifts?"Откройте смену и укажите размен для сверки наличных.":"Попросите администратора, управляющего или владельца открыть смену."}</p>${state.data.permissions.shifts?'<button class="primary" data-action="open-shift">Открыть смену</button>':""}</section>`;return;}
     const orders=activeOrders(),lines=order?order.lines:quickLines(),total=order?pricing(order):quickTotal();
-    const categories=[...new Set(state.data.menu.map(m=>m.category).filter(Boolean))];
-    const menu=state.data.menu.filter(m=>(state.search?m.name.toLocaleLowerCase("ru").includes(state.search.toLocaleLowerCase("ru")):state.category==="all"||m.category===state.category));
+    const departments=[...new Map(state.data.menu.filter(m=>m.sectionId).map(m=>[m.sectionId,m.section||m.sectionName||m.sectionId])).entries()];
+    const categoryItems=state.data.menu.filter(m=>state.department==="all"||m.sectionId===state.department);
+    const categories=[...new Map(categoryItems.filter(m=>m.categoryId).map(m=>[m.categoryId,m.category])).entries()];
+    const subcategories=[...new Map(categoryItems.filter(m=>m.subcategoryId&&(state.category==="all"||m.categoryId===state.category)).map(m=>[m.subcategoryId,m.subcategory])).entries()];
+    const menu=visibleMenu();
     const locked=!!order?.precheck||!!order?.discount,blocked=state.pending||state.legacy||total==null||!lines.length||!state.data.permissions.post;
     $("cashier-view").innerHTML=`<div class="toolbar"><small>${esc(current.shiftName)} · ${esc(current.date)} · ${esc(state.data.timezone||"UTC")}</small>${state.data.permissions.shifts?'<div class="actions"><button data-action="cash">Кассовая операция</button><button data-action="close-shift">Закрыть смену</button></div>':""}</div>
       <div class="order-tabs"><button data-action="quick" aria-pressed="${!order}">Быстрая продажа<small>${esc(money(quickTotal()))}</small></button>${orders.map(o=>`<button data-order="${esc(o.id)}" aria-pressed="${order?.id===o.id}">Стол ${esc(o.tableNumber)}<small>${esc(money(pricing(o)))}</small></button>`).join("")}<button data-action="create-order">${icon("plus")} Заказ</button></div>
       <div class="mobile-tabs"><button data-pane="order" aria-pressed="${document.body.dataset.pane!=="menu"}">Заказ · ${lines.reduce((n,l)=>n+l.quantity,0)}</button><button data-pane="menu" aria-pressed="${document.body.dataset.pane==="menu"}">Меню</button></div>
-      <div class="layout"><section class="menu-panel panel"><label><span class="muted">Цены в ${esc(currency())}</span><input id="menu-search" type="search" placeholder="Поиск по меню" value="${esc(state.search)}"></label><div class="categories"><button data-category="all" aria-pressed="${state.category==="all"}">Все</button>${categories.map(c=>`<button data-category="${esc(c)}" aria-pressed="${state.category===c}">${esc(c)}</button>`).join("")}</div><div class="menu-grid">${menu.length?menu.map(m=>`<button class="menu-item" data-add="${esc(m.id)}" ${locked||m.salePrice==null?'disabled data-ineligible':''}>${m.imageUrl?`<img src="${esc(m.imageUrl)}" alt="" loading="lazy">`:""}<strong>${esc(m.name)}</strong><span>${esc(money(m.salePrice))}</span></button>`).join(""):'<p class="empty">Позиций по этому запросу нет.</p>'}</div></section>
+      <div class="layout"><section class="menu-panel panel"><label><span class="muted">Цены в ${esc(currency())}</span><input id="menu-search" type="search" placeholder="Поиск по меню" value="${esc(state.search)}"></label>${departments.length?`<label>Раздел<select id="menu-department"><option value="all">Все разделы</option>${departments.map(([id,name])=>`<option value="${esc(id)}" ${state.department===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="categories"><button data-category="all" aria-pressed="${state.category==="all"}">Все</button>${categories.map(([id,name])=>`<button data-category="${esc(id)}" aria-pressed="${state.category===id}">${esc(name)}</button>`).join("")}</div>${subcategories.length?`<label>Подкатегория<select id="menu-subcategory"><option value="all">Все подкатегории</option>${subcategories.map(([id,name])=>`<option value="${esc(id)}" ${state.subcategory===id?"selected":""}>${esc(name)}</option>`).join("")}</select></label>`:""}<div class="menu-grid">${menu.length?menu.map(m=>`<button class="menu-item" data-add="${esc(m.id)}" ${locked||m.salePrice==null?'disabled data-ineligible':''}>${m.imageUrl?`<img src="${esc(m.imageUrl)}" alt="" loading="lazy">`:""}<strong>${esc(m.name)}</strong><span>${esc(money(m.salePrice))}</span></button>`).join(""):'<p class="empty">Позиций по этому запросу нет.</p>'}</div></section>
       <section class="cart panel"><div class="section-head"><div><h2>${order?"Стол "+esc(order.tableNumber):"Быстрая продажа"}</h2><small>${order?esc(order.createdBy.name)+" · "+esc(time(order.createdAt)):"Выберите позиции из меню"}</small></div>${order?badge(order):""}</div><div class="lines">${lines.length?lines.map(l=>`<div class="line"><div class="copy"><strong>${esc(l.name)}</strong><small>${l.quantity} × ${esc(money(l.unitPrice))}</small></div><strong class="line-sum">${esc(money(l.pricingUnavailable?null:l.total))}</strong>${senior()&&!locked?`<button data-cancel-line="${esc(l.id)}" aria-label="Отменить позицию ${esc(l.name)}">${icon("circle-off")}</button>`:""}</div>`).join(""):'<p class="empty">Добавьте позиции из меню.</p>'}</div>
       <button data-pane="menu" class="mobile-tabs">Добавить позиции</button>${order?.comment?`<p class="muted">${esc(order.comment)}</p>`:!order?`<label>Комментарий<textarea id="quick-comment" rows="2" maxlength="500">${esc(state.quick.comment)}</textarea></label>`:""}
       <div class="cart-foot">${order?.discount?`<p class="readonly">${esc(order.discount.name)} · Скидка ${esc(money(order.discount.discountAmount))}<br><small>До скидки ${esc(money(order.discount.grossAmount))}</small></p>`:""}<div class="total"><span>Итого</span><strong>${esc(money(total))}</strong></div><div class="actions">${order&&!order.precheck?`<button data-action="precheck" ${!lines.length||total==null?'disabled data-ineligible':''}>Предчек</button>`:""}<button class="primary" data-action="payment" ${blocked?'disabled data-ineligible':''}>К оплате · ${esc(amount(total))}</button></div>
@@ -241,7 +251,7 @@
     void working(async()=>{
       if(button.dataset.view)await changeView(button.dataset.view);
       else if(button.dataset.order)openOrder(button.dataset.order);
-      else if(button.dataset.category){state.category=button.dataset.category;render();}
+      else if(button.dataset.category){state.category=button.dataset.category;state.subcategory="all";render();}
       else if(button.dataset.add){
         if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");
         const item=state.data.menu.find(m=>m.id===button.dataset.add);if(!item)return;
@@ -261,12 +271,15 @@
     if(event.target.id==="quick-comment"){state.quick.comment=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
   });
   document.addEventListener("change",event=>{
+    if(event.target.id==="menu-department"){state.department=event.target.value;state.category="all";state.subcategory="all";renderCashier();}
+    if(event.target.id==="menu-subcategory"){state.subcategory=event.target.value;renderCashier();}
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
     if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{state.report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report;render();});
   });
   window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():""].includes(event.key))clearSensitive("Аккаунт, заведение или черновик изменились в другой вкладке. Обновите кассу.");});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
   window.addEventListener("pagehide",()=>refreshController?.stop());
+  window.addEventListener("pageshow",event=>{if(event.persisted&&!state.frozen){refreshController?.start();void refreshController?.refresh(true);}});
   document.body.dataset.pane="order";
   void (async()=>{
     try{

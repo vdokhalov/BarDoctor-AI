@@ -33,11 +33,11 @@ test("F01 missing canonical link is explicit; absent subgroup and partial legacy
  assert.equal(menuTaxonomyPresentation({nomenclatureStructure:structure},{subcategoryId:"bread"}).sectionId,"kitchen");
 });
 test("F03/F04 actual cashier filter: global case-insensitive query ignores filters and clearing restores context",()=>{
- const source=readFileSync("public/cashier.js","utf8"),start=source.indexOf("  function visibleMenu()"),end=source.indexOf("  function renderMenu()",start);
+ const source=readFileSync("public/cashier.js","utf8"),start=source.indexOf("  function visibleMenu()"),end=source.indexOf("  function renderCashier()",start);
  const scope={data:{menu:[{name:"QA Вода",salePrice:1,sectionId:"bar",categoryId:"water",subcategoryId:"soda"},{name:"Хлеб".repeat(60),salePrice:1,sectionId:"kitchen",categoryId:"food",subcategoryId:"bread"},{name:"Булочка",salePrice:1,sectionId:"kitchen",categoryId:"food",subcategoryId:"other"}]},department:"kitchen",category:"food",subcategory:"bread",query:"вОдА",departmentKey:(item:{sectionId:string})=>item.sectionId};
- const context=vm.createContext({...scope,$:()=>({value:scope.query})});vm.runInContext(source.slice(start,end),context);
+ const state={...scope,search:scope.query};const context=vm.createContext({state});vm.runInContext(source.slice(start,end),context);
  const result=()=>vm.runInContext("visibleMenu()",context) as {name:string}[];
- assert.deepEqual(Array.from(result(),i=>i.name),["QA Вода"]);scope.query="";assert.equal(result().length,1);assert.equal(result()[0].name,"Хлеб".repeat(60));scope.query="булочка";assert.equal(result()[0].name,"Булочка");
+ assert.deepEqual(Array.from(result(),i=>i.name),["QA Вода"]);state.search="";assert.equal(result().length,1);assert.equal(result()[0].name,"Хлеб".repeat(60));state.search="булочка";assert.equal(result()[0].name,"Булочка");
 });
 const presentation=()=>{const window={} as {bdFormatSalesCost:(batch:unknown,currency:string)=>string};vm.runInNewContext(readFileSync("public/accounting-currency.js","utf8"),{window,Intl});return window.bdFormatSalesCost;};
 for(const scenario of ["KNOWN","UNKNOWN","ZERO","NONE","MIXED"] as const)test("F07 real handler SQLite distinguishes "+scenario,async t=>{

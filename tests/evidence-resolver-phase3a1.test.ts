@@ -81,11 +81,12 @@ test("revalidate session, venue and workspace membership and permissions on EVER
 
 test("private ingestion staging keeps inventory.manage and hides inaccessible relations/DTOs", async t => {
   const r = await evidenceRuntime(); t.after(r.close);
-  r.permissions("cashier", [], ["inventory.view"]);
+  // POS scope amendment: cashier permissions are now bounded; retain granular relation tests with a restricted administrator.
+  r.permissions("shift_manager", ["inventory.manage"]);
   const allowed = evidence((await r.resolve(r.reference("MENU_ITEM", "beer"), r.member)).body);
   assert.equal(allowed.projection.type, "MENU_ITEM");
   for (const id of [r.draft.id, "guessed-draft"]) assert.equal((await r.resolve(r.reference("MENU_INGESTION_DRAFT", id), r.member)).body.outcome, "restricted");
-  r.permissions("cashier", ["shifts.view"]);
+  r.permissions("shift_manager", ["shifts.view", "inventory.view", "inventory.manage"]);
   const sale = evidence((await r.resolve(r.reference("SALE_EVENT", r.event.id), r.member)).body);
   assert.deepEqual(sale.relations.map(r => r.reference.kind), ["CAPTURED_COST"]); assert.equal(sale.page.nextOffset, null);
   const cost = evidence((await r.resolve(sale.relations[0].reference, r.member)).body);

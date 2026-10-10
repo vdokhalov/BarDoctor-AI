@@ -64,8 +64,8 @@ export async function GET(request:Request) {
     return reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
-      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(posShiftView),
-      events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(posSalesEventView),
+      shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : shift),
+      events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(event => account.role === "cashier" ? posSalesEventView(event) : event),
       permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage")} });
   } catch(error) { return controlled(error); }
 }
@@ -91,14 +91,14 @@ async function command(request:Request):Promise<Response> {
       const plan = await planSalesEvent(c,body.command);
       if (plan.duplicate && !canReadPosSaleHistory(c.actor,plan.event)) return reply({ok:false,code:"ACCESS_DENIED"},403);
       accountingMonth = plan.event.businessDate.slice(0,7);
-      result = {ok:true,duplicate:plan.duplicate,event:posSalesEventView(plan.event),previewHash:plan.previewHash};
+      result = {ok:true,duplicate:plan.duplicate,event:account.role === "cashier" ? posSalesEventView(plan.event) : plan.event,previewHash:plan.previewHash};
       if (body.action === "preview" || plan.duplicate) return reply(result);
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
     } else if (body.action === "reverse") {
       const target=c.events.find(event => event.id === body.eventId && event.venueId === c.venueId);
       if (target?.source === "POS_API") return reply({ok:false,code:"POS_REVERSAL_NOT_AVAILABLE",error:"Отмена кассовой продажи пока недоступна."},409);
-      const plan=planReverseSalesEvent(c,body.eventId); accountingMonth=plan.event.businessDate.slice(0,7); result={ok:true,duplicate:plan.duplicate,event:posSalesEventView(plan.event)};
+      const plan=planReverseSalesEvent(c,body.eventId); accountingMonth=plan.event.businessDate.slice(0,7); result={ok:true,duplicate:plan.duplicate,event:account.role === "cashier" ? posSalesEventView(plan.event) : plan.event};
       if (plan.duplicate) return reply(result);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
     } else if (body.action === "cash") {

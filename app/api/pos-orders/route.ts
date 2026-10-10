@@ -25,7 +25,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: PosOrderContext = { ...venueTimeFromJson(account.restaurantJson), venueId: account.venueId,
     currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now: new Date().toISOString(),
     actor: { accountId: account.actorAccountId, name: [account.firstName, account.lastName].filter(Boolean).join(" "), role: account.role, ...(account.jobTitle ? { jobTitle: account.jobTitle } : {}) },
-    discountRules: parsePosDiscountRules(read(POS_DISCOUNT_STORE_KEY, null)),
+    discountRules: parsePosDiscountRules(rows(POS_DISCOUNT_STORE_KEY)),
     assortment: assortment as Record<string, unknown>, movements: rows("bd_stock_movements"), events, revenues: rows("bd_finance_revenue"),
     mappings: rows("bd_sales_mappings"), warehouseRoutes: rows("bd_sales_warehouse_routes"), warehouses: rows("bd_warehouses"), closedMonths: closedMonthsFromStore(read("bd_month_closings", null)),
   };

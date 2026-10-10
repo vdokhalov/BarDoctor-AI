@@ -26,6 +26,7 @@ menu[0].name="Капучино";
 r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(owner.userId,"bd_assortment_v1",JSON.stringify(fixture.assortment));
 async function call(user:typeof owner,route:string,body:object){const headers=new Headers(r.request(user,"/api").headers);headers.set("X-Venue-Id",String(owner.activeVenueId));const response=await r.api[route].POST(new Request("https://isolated.test/api",{method:"POST",headers,body:JSON.stringify({venueId:owner.activeVenueId,...body})}));const result=await response.json() as Record<string,unknown>;assert(response.ok,JSON.stringify(result));return result;}
 await call(owner,"sales",{action:"open_shift",shiftId:"night",name:"Ночная смена",openingFloat:100});
+await call(owner,"discounts",{action:"save",ruleId:"qa-rule",expectedRevision:0,operationId:"qa-rule-create",rule:{name:"QA 10%",kind:"PERCENT",value:10,active:true}});
 for(let n=1;n<=10;n++){
  await call(anna,"orders",{action:"create",operationId:"create-"+n,orderId:"table-"+n,expectedRevision:0,shiftId:"night",tableNumber:String(n),lines:[{id:"line-"+n,menuItemId:"beer",quantity:n%3+1}]});
  if(n%2===0)await call(anna,"orders",{action:"precheck",operationId:"precheck-"+n,orderId:"table-"+n,expectedRevision:1});
@@ -70,8 +71,37 @@ try{
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="menu"]').first().click();
   await page.locator('[data-add="beer"]').click();
   if(profile.width<600)await page.locator('.mobile-tabs [data-pane="order"]').first().click();
-  await page.getByRole("button",{name:/К оплате/}).click();await page.getByRole("button",{name:"Подтвердить оплату",exact:true}).click();await page.locator("#receipts-view:not([hidden])").waitFor();
-  assert.match(await page.locator("#notice").innerText(),/Продажа проведена/);
+  if(profile.name==="desktop")await page.route("**/api/sales-events",async route=>{
+    if(route.request().method()==="POST"&&route.request().postDataJSON().action==="post"){
+      const response=await route.fetch();assert.equal(response.status(),201);await route.abort("failed");
+    }else await route.continue();
+  });
+  await page.getByRole("button",{name:/К оплате/}).click();await page.getByRole("button",{name:"Подтвердить оплату",exact:true}).click();
+  if(profile.name==="desktop"){
+    await page.getByText("Результат операции ещё не подтверждён.",{exact:true}).waitFor();
+    await page.unroute("**/api/sales-events");await page.reload();await page.locator('[data-action="retry"]').click();
+    await page.getByText("Результат подтверждён. Операция учтена один раз.",{exact:true}).waitFor();
+  }
+  await page.locator("#receipts-view:not([hidden])").waitFor();
+  assert.equal(await page.locator("#receipts-view .receipt-row").count(),2+["desktop","tablet","iphone"].indexOf(profile.name));
+  // Exercise mutations through the UI, including a frozen precheck, audited discount and split.
+  await page.getByRole("button",{name:"Касса",exact:true}).click();await page.locator('[data-action="create-order"]').click();
+  await page.locator('dialog [name="table"]').fill("20");await page.getByRole("button",{name:"Создать заказ",exact:true}).click();await page.locator("dialog").waitFor({state:"hidden"});
+  if(profile.width<600)await page.locator('.mobile-tabs [data-pane="menu"]').first().click();
+  await page.locator('[data-add="beer"]').click();await page.locator('[data-add="beer"]').click();
+  if(profile.width<600)await page.locator('.mobile-tabs [data-pane="order"]').first().click();
+  await page.locator('[data-action="precheck"]').click();await page.locator(".admin-actions summary").click();
+  await page.locator('[data-action="cancel-precheck"]').click();await page.locator('dialog [name="reason"]').fill("Synthetic correction");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Synthetic discount");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  assert.match(await page.locator(".cart .readonly").innerText(),/QA 10%/);
+  await page.locator(".admin-actions summary").click();await page.locator('[data-action="discount"]').click();await page.locator('dialog [name="reason"]').fill("Before split");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  await page.locator(".admin-actions summary").click();await page.locator('[data-action="split"]').click();await page.locator('dialog input[type="number"]').first().fill("1");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  const currentOrders=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_pos_orders_v1'").get(owner.userId)!.data_json));
+  const split=currentOrders.filter((order:{status:string;tableNumber:string})=>order.status==="OPEN"&&order.tableNumber==="20");assert.equal(split.length,2);
+  for(const order of split){
+    await page.locator(`[data-order="${order.id}"]`).first().click();await page.locator(".admin-actions summary").click();await page.locator('[data-action="cancel-order"]').click();await page.locator('dialog [name="reason"]').fill("End synthetic flow");await page.locator("#dialog-submit").click();await page.locator("dialog").waitFor({state:"hidden"});
+  }
+
   await page.reload();await page.locator("#work").waitFor({state:"visible"});assert.equal(await page.locator("#recovery").isVisible(),false);
   await context.close();
  }
@@ -84,5 +114,5 @@ try{
  await call(owner,"sales",{action:"cash",shiftId:"night",cash:{operationId:"cash-in",kind:"IN",amount:20,reason:"Synthetic float adjustment"}});
  await call(owner,"sales",{action:"close_shift",shiftId:"night",actualCash:198});
  const final=await browser.newContext({viewport:{width:1440,height:1000}});await final.addInitScript(({user,venue})=>{localStorage.setItem("bd_session",user.email);localStorage.setItem("bd_session_token",user.token);localStorage.setItem("bd_active_venue_id",String(venue));},{user:owner,venue:owner.activeVenueId});const report=await final.newPage();report.on("pageerror",error=>errors.push(error.message));await report.goto(base+"/cashier");await report.locator("#work").waitFor({state:"visible"});await report.getByRole("button",{name:"Отчёт смены",exact:true}).click();await report.locator(".report .metrics").waitFor();await report.screenshot({path:join(output,"desktop-report.png"),fullPage:true});await report.setViewportSize({width:390,height:844});assert(await report.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await report.screenshot({path:join(output,"iphone-report.png"),fullPage:true});await final.close();
- assert.deepEqual(errors,[]);writeFileSync(join(output,"result.json"),JSON.stringify({status:"PASS",viewports:[1440,820,390],realApi:true,persistentSyntheticSqlite:true,apiCalls,consoleErrors:errors,physicalIPhone:false,hardware:false},null,2));console.log(JSON.stringify({status:"PASS",apiCalls,viewports:[1440,820,390],consoleErrors:errors}));
+ assert.deepEqual(errors,[]);writeFileSync(join(output,"result.json"),JSON.stringify({status:"PASS",viewports:[1440,820,390],realApi:true,persistentSyntheticSqlite:true,apiCalls,consoleErrors:errors,scenarios:["Anna ten tables","paid receipts","management only","return to list","stale and refresh","lost payment response and reload replay","create and add","precheck and cancellation","apply and remove discount","split and cancel","cash reconciliation"],physicalIPhone:false,hardware:false},null,2));console.log(JSON.stringify({status:"PASS",apiCalls,viewports:[1440,820,390],consoleErrors:errors}));
 }finally{await browser.close();await new Promise<void>(resolve=>server.close(()=>resolve()));r.close();}

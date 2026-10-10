@@ -4,6 +4,8 @@ import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {recoveryApprovedHashes,recoveryBaseline,recoveryFiles} from './helpers/health-doctor-recovery-guard.mjs';
 
+import {posAmendment} from './helpers/pos-release-amendment.mjs';
+
 import {businessDateBackend,assertBusinessDateBackend} from './helpers/business-dates-guard.mjs';
 
 test('recovery approval is exact and cannot admit another file or later edit',()=>{
@@ -21,14 +23,15 @@ test('all API, auth, provider, schema, bindings and other backend files stay byt
  const roots=['app/api','lib/bardoctor','db','drizzle','migrations','.openai/hosting.json','package-lock.json'];
  const paths=execFileSync('git',['ls-tree','-r','--name-only',recoveryBaseline,...roots],{encoding:'utf8'}).trim().split('\n');
  const current=execFileSync('git',['ls-files','--',...roots],{encoding:'utf8'}).trim().split('\n');
- assert.deepEqual(current,paths,'no added or removed production boundary files');
+ const pos=posAmendment();
+ assert.deepEqual(pos.paths(current),paths,'no unapproved added or removed production boundary files');
  assert.ok(paths.length>300);
  const approved=recoveryApprovedHashes();
  assertBusinessDateBackend();
  for(const path of paths){
   if(path===businessDateBackend)continue;
   if(Object.hasOwn(approved,path))continue; // Exact contents already asserted above.
-  assert.deepEqual(readFileSync(path),execFileSync('git',['show',recoveryBaseline+':'+path],{maxBuffer:64*1024*1024}),path);
+  assert.deepEqual(pos.read(path),execFileSync('git',['show',recoveryBaseline+':'+path],{maxBuffer:64*1024*1024}),path);
  }
 });
 

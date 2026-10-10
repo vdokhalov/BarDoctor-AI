@@ -1,0 +1,114 @@
+{
+  "baseline": "4644a85c2843f0f51935555c4122facc3e1030ad",
+  "scope": "POS orders, discounts, cash/report, cashier privacy and nullable staff titles. No changes to previous release manifests.",
+  "files": {
+    "app/api/access/active-venue/route.ts": {
+      "before": "20f11d193f32765bd426ddd031ffaaa0197d7fc10ff413b0ca23e549365a1029",
+      "after": "965682a9a94141c6cdbabf5ad55e790053202e5cfaa7fbd511b3f16665e620a8"
+    },
+    "app/api/access/invites/[id]/route.ts": {
+      "before": "fb6ebbceb5aeae3d0ce7dd2c67309dcd63759e2fcca4fc60c3cf364af4d600d8",
+      "after": "e9bc18c6552ad1f2a21ce9310eca255b272a2926fc56c42f228d42b67a063c31"
+    },
+    "app/api/access/join/route.ts": {
+      "before": "b866b70ef0754b6705cf025381894b9cd3a61482c7bba9d4de7ca0787bfcf8e5",
+      "after": "631f8c7287e1ed1661c2183870546f8b5f7b0502c0360f7975f947f027b40258"
+    },
+    "app/api/access/members/[id]/route.ts": {
+      "before": "e6c4821aa4dd1cf24e76a982459e5be15be6a6f2ad46b7c92ff0145b1196a453",
+      "after": "f2fccf148572aa3b133cd9b304ce1255899cd6dafa5975041628b99be54606fe"
+    },
+    "app/api/access/route.ts": {
+      "before": "207be20de3a77dfcc39689998cb83dc0e8d905ed3a974e7fa6b6887c1709c791",
+      "after": "8ac2da68ad9fc3d6cded676ef95db8d0fa78aa1b7dc4dec5f64eb1700c5978eb"
+    },
+    "app/api/pos-discounts/route.ts": {
+      "before": null,
+      "after": "da2134e480c8616fd168866d72cb88d10f653f6e514dd2d862f77a3719194d3f"
+    },
+    "app/api/pos-orders/route.ts": {
+      "before": null,
+      "after": "ac49f130b40b76e3854a862d55d5917635f7260abb6eb850b21a2fc6346d90a2"
+    },
+    "app/api/pos-overview/route.ts": {
+      "before": null,
+      "after": "6f11a04f0b537620e5d3c15c7a9b056a83c309817b0c71fd762c8eda15b87f98"
+    },
+    "app/api/sales-batches/route.ts": {
+      "before": "006ea50b3c49513d654840686eac0326aa37cc01e79c026afe2f962a1c90d173",
+      "after": "9f031e2d9a34193fca4aaabdfd8377d6ee2d6cb1a1198aee0d6cb113ee56af42"
+    },
+    "app/api/sales-events/route.ts": {
+      "before": "f61f61d9363a455bc4b98efa2f0ba01d3fb937699c31412cbd4fc7e356d3193b",
+      "after": "01437e7b689bd96a3df6a59f5d0fc1737441dc800140465696fd39a320cb06ce"
+    },
+    "db/schema.ts": {
+      "before": "d2fde5703e3d02d1bb83e8b375f93b2e1db124ad88785197fdf5111f96887085",
+      "after": "a3d8649ed2d1e69826624c0436a751009ed22dbc0d6e2d9d7d60093f1a4a0ba3"
+    },
+    "drizzle/0026_cashier_staff_job_titles.sql": {
+      "before": null,
+      "after": "0ec47e4e1350b633183f1924c3c40c677af8d8c4c285e843c028a320ca6aea6c"
+    },
+    "lib/bardoctor/access-control.ts": {
+      "before": "83a2a8b859bbd2b4746b4831d9decddccb7deac326b10056c9c4ae03ef7f5fed",
+      "after": "bb63a193974cebda9b0b0ffa89ae4f4673e559409598ea25023a0a2e5048e5e4"
+    },
+    "lib/bardoctor/access-service.ts": {
+      "before": "05dcf400ddfc75da830b3af7b42a05b698156343100f3e235672d48244d018f3",
+      "after": "66be57f9684f004afcb177b34f4b4481d93dedb476cfd609e7d4e51974108b4d"
+    },
+    "lib/bardoctor/auth.ts": {
+      "before": "9228d51110f57191790a7531313349ff21d0641714b4b72db8f33255d01d0be4",
+      "after": "7c3bd497c6cecdad5784935af0cca740eb4017f20a8bdff2894268c5301e4400"
+    },
+    "lib/bardoctor/cost-evidence.ts": {
+      "before": "4171e39d5237010937f4ef4a50aca7aa2626c033a33994612b8db6539bec5960",
+      "after": "d82b3c2447e01be4f3f8ff27389668cd6441927415d9487f0f18b97fcff5abe7"
+    },
+    "lib/bardoctor/data-trust.ts": {
+      "before": "b438e69faed1d6e9c362735be0de5f470c7bbcdf5cc4226eab7adbb2801a40da",
+      "after": "5bb5cb3d8411bb935eb33e721a18760aa68ef9235fc14778b93b57a343fbbf6a"
+    },
+    "lib/bardoctor/evidence-resolver.ts": {
+      "before": "15e49ff0b3b7518f2fd717098bc49a08f7c349dd5a79880d0ba98f3145815c71",
+      "after": "a9827aa68bd816df45e8d0922e41d360820f0db9a76ae3a9cf7c0ae44200abf4"
+    },
+    "lib/bardoctor/pos-auth-guard.ts": {
+      "before": null,
+      "after": "8582ddb162a439a8bc142710dab234740365b7488f85ee798f427cd52e4100f1"
+    },
+    "lib/bardoctor/pos-discounts.ts": {
+      "before": null,
+      "after": "c6bfef4ba69084ec4c22aa7866158a5a87e3f9060e872db7045e2e226a36fe0e"
+    },
+    "lib/bardoctor/pos-live-overview.ts": {
+      "before": null,
+      "after": "d25b9a445b73ab72404593fd9278ffb361bad5decda6c5ef788635210590b9b4"
+    },
+    "lib/bardoctor/pos-orders.ts": {
+      "before": null,
+      "after": "3ae191fa97429ca78076aaa2cb6ed356f89cc2cd609fc520e62c08deec43341c"
+    },
+    "lib/bardoctor/pos-shift-cash.ts": {
+      "before": null,
+      "after": "e7035e15c9b29901d7a7cf9995f78dea3be6b4afc0e745b25268f9a6097dbf44"
+    },
+    "lib/bardoctor/pos-shift-report.ts": {
+      "before": null,
+      "after": "8f7ecc74020f1bf12b5cb59beb9ec8f8a931195f6b8399d4543b3846b149b14e"
+    },
+    "lib/bardoctor/sales-consumption.ts": {
+      "before": "8d1d642688b554d0f0982eada2ce7d6a4bf3eb52cabdb63659e16bb52c6429e6",
+      "after": "dfbf9c1013feaac0951f0f049039258fcd1ba2d290343f8ba5847c3111e03f3c"
+    },
+    "lib/bardoctor/sales-events.ts": {
+      "before": "a5f888bf3aa4b6e240f058f6b5ce28639e35310995ada55811f63603302b8c88",
+      "after": "11b16744c67e849287267fc2088d12b2d4f4d5acab25a06e35be1c5a8a0a825c"
+    },
+    "lib/bardoctor/staff-job-title.ts": {
+      "before": null,
+      "after": "40c3bfb64ef5e826c98b1718fab946d4170ee54ba14dca6397f61b126d10d881"
+    }
+  }
+}

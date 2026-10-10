@@ -107,7 +107,8 @@ test("L/M: each resolve reauthorizes scope, IDs, nested parents, data owner and 
     assert.equal((await r.resolve(target, r.foreign, "", r.foreign.activeVenueId)).body.code, "EVIDENCE_UNAVAILABLE");
   }
   assert.equal((await r.cost(e.id, "another-parent-line")).body.code, "EVIDENCE_UNAVAILABLE");
-  r.permissions("cashier", ["inventory.view"]); assert.equal((await r.resolve(movement, r.member)).body.code, "ACCESS_DENIED");
+  // Preserve granular non-cashier evidence coverage; cashier COGS denial is tested separately.
+  r.permissions("shift_manager", ["inventory.view", "inventory.manage"]); assert.equal((await r.resolve(movement, r.member)).body.code, "ACCESS_DENIED");
   const restricted = costFact((await r.cost(e.id, undefined, r.member)).body); assert.equal(restricted.evidenceStatus, "PARTIAL");
   r.permissions("cashier", ["sales.view"], ["inventory.view"]); assert.equal((await r.cost(e.id, undefined, r.member)).body.code, "ACCESS_DENIED");
   assert.equal((await r.resolve(ref, r.member)).body.code, "ACCESS_DENIED");
