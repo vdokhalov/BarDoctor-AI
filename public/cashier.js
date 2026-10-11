@@ -4,7 +4,7 @@
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
   const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
-  let dialogSubmit=null,refreshController;
+  let dialogSubmit=null,refreshController,navigationGeneration=0,navigationLoading=false;
   const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
   const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
@@ -72,40 +72,35 @@
       state.orderId=null;
     }
   }
-  async function load() {
-    const data=await request("/api/sales-events");
-    // Apply known access changes immediately, even if a later read in this refresh fails.
-    if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){
-      state.data=data;state.orders=[];reconcileAccess();render();
-    }
-    const orders=await request("/api/pos-orders");
+  async function load(view=state.view) {
+    const dataPromise=request("/api/sales-events").then(data=>{
+      // Revoke cached management data even if the independent orders request fails first.
+      if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){state.data=data;state.orders=[];reconcileAccess();render();}
+      return data;
+    });
+    const [data,orders]=await Promise.all([dataPromise,request("/api/pos-orders")]);
     if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
-    let overview=null;
-    const current=selectedShift(data);
-    if(state.view==="overview"&&["owner","manager","shift_manager"].includes(data.actor.role)&&current)overview=await request("/api/pos-overview?shiftId="+encodeURIComponent(current.id));
-    let report;
-    if(state.view==="report"&&["owner","manager","shift_manager"].includes(data.actor.role)&&state.report?.status==="open"){
-      report=(await request("/api/sales-events?reportShiftId="+encodeURIComponent(state.report.shiftId))).report;
-    }
-    let workday=null;
-    const businessDate=state.view==="report"?(report||state.report)?.businessDate:state.view==="overview"?current?.date:null;
-    if(data.permissions.managementDay&&businessDate){
-      const days=await request("/api/operational-days");
-      if(days.venueId!==data.venueId)throw Error("Заведение изменилось. Обновите кассу.");
-      workday=days.days.find(day=>day.businessDate===businessDate)||null;
-    }
+    const current=selectedShift(data),management=["owner","manager","shift_manager"].includes(data.actor.role),reportId=state.report?.shiftId||data.shifts.at(-1)?.id;
+    const [overview,reportResult,days]=await Promise.all([
+      view==="overview"&&management&&current?request("/api/pos-overview?shiftId="+encodeURIComponent(current.id)):null,
+      view==="report"&&management&&reportId&&(state.report?.status!=="closed"||state.report.shiftId!==reportId)?request("/api/sales-events?reportShiftId="+encodeURIComponent(reportId)):null,
+      data.permissions.managementDay&&["report","overview"].includes(view)?request("/api/operational-days"):null
+    ]);
+    const report=reportResult?.report,businessDate=view==="report"?(report||state.report)?.businessDate:view==="overview"?current?.date:null;
+    if(days&&days.venueId!==data.venueId)throw Error("Заведение изменилось. Обновите кассу.");
+    const workday=days?.days.find(day=>day.businessDate===businessDate)||null;
     return {data,orders:orders.orders,overview,report,workday};
   }
   function accept(value) { if(state.frozen)return;state.data=value.data;syncQuickShift();state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render(); }
   async function reload(){accept(await load());}
   function errorView(error){state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
-    if(state.busy||state.frozen||refreshController?.state().running)return;
+    if(state.busy||navigationLoading||state.frozen||refreshController?.state().running)return;
     state.busy=true;setBusy();
     try{await task();}catch(error){errorView(error);if($("dialog").open)$("dialog-error").textContent=error.message;}
     finally{state.busy=false;setBusy();renderRecovery();}
   }
-  function setBusy(){document.querySelectorAll("button").forEach(b=>{if(!b.hasAttribute("data-ineligible"))b.disabled=state.busy;});$("work").setAttribute("aria-busy",String(state.busy));}
+  function setBusy(){document.querySelectorAll("button").forEach(b=>{if(!b.hasAttribute("data-ineligible"))b.disabled=b.dataset.view?false:state.busy||navigationLoading;});$("work").setAttribute("aria-busy",String(state.busy||navigationLoading));}
   // Exact canonical draft fingerprint; provenance stays client-side, outside the server command.
   function quickOrigin(draft){return {kind:"quick_to_table",draftId:draft.id,fingerprint:JSON.stringify({id:draft.id,comment:draft.comment||"",lines:draft.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))})};}
   function matchesQuick(draft,origin){return !!draft&&Array.isArray(draft.lines)&&draft.id===origin.draftId&&quickOrigin(draft).fingerprint===origin.fingerprint;}
@@ -236,12 +231,14 @@
   }
   function renderDiscounts(){ $("discounts-view").innerHTML=`<div class="section-head"><div><h2>Настройка скидок</h2><p class="muted">Одна скидка на весь счёт, без накопления. Процент или фиксированная сумма.</p></div><button class="primary" data-action="new-rule">Создать</button></div><div class="rule-list">${state.rules.map(r=>`<div class="rule"><div><strong>${esc(r.name)}</strong><small>${r.kind==="PERCENT"?esc(r.value)+"%":esc(money(r.value))} · ${r.active?"Активна":"Выключена"}</small></div><button data-rule="${esc(r.id)}">Изменить</button></div>`).join("")||'<p class="empty">Правила скидок ещё не созданы.</p>'}</div>`; }
   async function changeView(view){
-    if(["overview","report","discounts"].includes(view)&&!senior())return;
-    state.view=view;state.waiter=null;state.filterWaiter="";
-    if(view==="overview")await reload();
-    else if(view==="discounts"){state.rules=(await request("/api/pos-discounts")).rules;render();}
-    else if(view==="report"){const id=state.report?.shiftId||state.data.shifts.at(-1)?.id;if(id)setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(id))).report);await reload();}
-    else render();window.scrollTo({top:0,behavior:"instant"});
+    if(state.frozen||state.busy||["overview","report","discounts"].includes(view)&&!senior())return;
+    const generation=++navigationGeneration;state.view=view;state.waiter=null;state.filterWaiter="";
+    navigationLoading=["overview","report","discounts"].includes(view);render();window.scrollTo({top:0,behavior:"instant"});
+    if(!navigationLoading)return;
+    $("connection").textContent="Обновляем данные…";
+    try{if(view==="discounts"){const value=await request("/api/pos-discounts");if(generation===navigationGeneration&&!state.frozen){state.rules=value.rules;render();}}else{const value=await load(view);if(generation===navigationGeneration)accept(value);}}
+    catch(error){if(generation===navigationGeneration)errorView(error);}
+    finally{if(generation===navigationGeneration){navigationLoading=false;setBusy();}}
   }
   function openOrder(id){state.orderId=id;state.view="cashier";document.body.dataset.pane="order";render();window.scrollTo({top:0,behavior:"instant"});}
   async function createOrder(fromQuick=false){
@@ -346,9 +343,9 @@
     if(button.id==="dialog-submit")return; // The form submit handler owns this transaction.
     if(button.dataset.action==="dismiss"){$("dialog").close();return;}
     if(button.dataset.pane){document.body.dataset.pane=button.dataset.pane;render();window.scrollTo({top:0,behavior:"instant"});return;}
+    if(button.dataset.view){void changeView(button.dataset.view);return;}
     void working(async()=>{
-      if(button.dataset.view)await changeView(button.dataset.view);
-      else if(button.dataset.order)openOrder(button.dataset.order);
+      if(button.dataset.order)openOrder(button.dataset.order);
       else if(button.dataset.category){state.category=button.dataset.category;state.subcategory="all";render();}
       else if(button.dataset.add){
         if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");
@@ -400,7 +397,7 @@
     try{
       const value=await load();state.data=value.data;state.orders=value.orders;restoreLocal();accept(value);
       notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"Касса готова. Выберите заказ или начните быструю продажу.");
-      refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
+      refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!navigationLoading&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
     }catch(error){errorView(error);}
   })();
 })();

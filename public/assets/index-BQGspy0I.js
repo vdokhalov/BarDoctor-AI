@@ -312,6 +312,10 @@ function bdCashierEntryHref(){const venue=localStorage.getItem("bd_active_venue_
 function bdCashierEntry({onNavigate}){return typeof window.bdHasClientPermission==="function"&&window.bdHasClientPermission("sales.view")?i.jsx("button",{type:"button",className:"bd-more-quick-v166","data-bd-cashier-entry":true,onClick:()=>onNavigate(bdCashierEntryHref()),children:"Касса · столы, заказы и оплата"}):null}
 const bdOwnerUATFixesV285="owner-uat-v285";
 
+
+
+
+
 function useHomeCalendarClock(){const[now,setNow]=S.useState(()=>new Date());S.useEffect(()=>{const tick=()=>{if(!document.hidden)setNow(new Date())},timer=setInterval(tick,30000);window.addEventListener('focus',tick);document.addEventListener('visibilitychange',tick);return()=>{clearInterval(timer);window.removeEventListener('focus',tick);document.removeEventListener('visibilitychange',tick)}},[]);return now;}
 
 
@@ -834,7 +838,7 @@ const j7=S.forwardRef(({className:e,...t},n)=>i.jsx("div",{ref:n,className:X("ro
 const bdQuickAddPurchaseVersionV372="v372";/* bd-quick-add-purchase-v372 */
 function Tle(){
   const[e,t]=bt(),n=ste(),[r,a]=S.useState(!1);
-  const u=[
+  const u=localStorage.getItem("bd_active_role")==="cashier"?[{key:"sales",name:"Продажи",href:"/cashier",icon:kX}]:[
     {key:"home",name:"Главная",href:"/home",icon:pQ},
     {key:"shifts",name:"Смены",href:"/shifts",icon:SQ},
     {key:"finance",name:"Финансы",href:"/finance",icon:$c},bdMoreHasPermissionV166("reviews.view")&&{key:"reviews",name:"Отзывы",href:"/reviews",icon:Mf},
@@ -850,11 +854,11 @@ function Tle(){
   ];
   function f(m){a(!1);if(String(m).startsWith("/suppliers?create=1")&&window.location.pathname.startsWith("/suppliers")){window.dispatchEvent(new CustomEvent("bd:open-purchase-entry-v372"));return}t(m)}
   function v(m){
-    const h=m.key==="home"?e==="/home"||e.startsWith("/analysis")||e==="/market"||e==="/opportunities":
+    const h=m.key==="sales"?e==="/cashier":m.key==="home"?e==="/home"||e.startsWith("/analysis")||e==="/market"||e==="/opportunities":
       m.key==="shifts"?e==="/shifts"||e.startsWith("/finance/shift/"):
       m.key==="finance"?e.startsWith("/finance")&&!e.startsWith("/finance/shift/")||["/reports","/warehouse"].some(g=>e===g||e.startsWith(g+"/"))||e.startsWith("/salaries")&&window.bdReadNavigationQuery("return","team")==="finance":
       m.key==="team"?["/employees","/tasks","/payroll"].some(g=>e===g||e.startsWith(g+"/"))||e.startsWith("/salaries")&&window.bdReadNavigationQuery("return","team")!=="finance":
-      m.key==="reviews"?e==="/reviews"||e.startsWith("/reviews/"):m.key==="more"?Ele.some(g=>(g!=="/reviews"||window.matchMedia("(max-width: 1023px)").matches)&&(e===g||e.startsWith(g+"/"))):!1;
+      m.key==="reviews"?e==="/reviews"||e.startsWith("/reviews/"):m.key==="more"?["/sales-import","/cashier"].includes(e)||Ele.some(g=>(g!=="/reviews"||window.matchMedia("(max-width: 1023px)").matches)&&(e===g||e.startsWith(g+"/"))):!1;
     const y=m.icon;
     const p={position:"relative",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,minWidth:0,width:"100%",height:"100%",padding:0,border:0,background:"transparent",color:h?"#5B55F5":"#A5AABA",textDecoration:"none",WebkitTapHighlightColor:"transparent"};
     const c=i.jsxs("span",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:5,minWidth:0},children:[
@@ -3803,9 +3807,10 @@ function bdIntegrationsPage(){return i.jsx(bdEmbeddedPage,{source:"/integrations
 function bdNotificationsPage(){return i.jsx(bdEmbeddedPage,{source:"/notifications",title:"Уведомления BarDoctor"})}
 function bdReviewsPage(){return i.jsx(bdEmbeddedPage,{source:"/reviews",title:"Отзывы гостей"})}
 /* sales-navigation-performance:start */
-function bdSalesPosPage(){const[,navigate]=bt(),path=window.location.pathname,search=ste(),query=new URLSearchParams(search);query.set("embedded","1");return i.jsx("iframe",{src:path+"?"+query.toString(),title:"Продажи и склад","data-bd-sales-surface":"true",onLoad:event=>bdPrepareEmbeddedPage(event,navigate),style:{position:"fixed",inset:0,zIndex:80,display:"block",width:"100%",height:"100dvh",border:0,background:"#f5f6fb"}})}
+function bdSalesPosPage(){const[,navigate]=bt(),path=window.location.pathname,search=ste(),query=new URLSearchParams(search);query.set("embedded","1");return i.jsx(nt,{showBottomNav:!0,children:i.jsx("iframe",{src:path+"?"+query.toString()+window.location.hash,title:"Продажи и склад","data-bd-sales-surface":"true",onLoad:event=>bdPrepareEmbeddedPage(event,navigate),style:{display:"block",width:"100%",height:"calc(100dvh - var(--bd-header-total,64px) - 78px - env(safe-area-inset-bottom,0px))",border:0,background:"#f5f6fb"}})})}
+
 /* sales-navigation-performance:end */
-function bdSalesImportPage(){const[,e]=bt(),t=new URLSearchParams(window.location.search);t.set("embedded","1");const n="/sales-import?"+t.toString()+window.location.hash;return i.jsx("iframe",{src:n,title:"Продажи и склад",onLoad:r=>bdPrepareEmbeddedPage(r,e),style:{position:"fixed",inset:0,zIndex:80,display:"block",width:"100%",height:"100dvh",border:0,background:"#F8F9FC"}})}
+function bdSalesImportPage(){return i.jsx(bdSalesPosPage,{})}
 function bdSupplierAlternativesPage(){return i.jsx(bdEmbeddedPage,{source:"/supplier-alternatives",title:"Новые поставщики"})}
 function bdVenueCreatePage(){return i.jsx(bdEmbeddedPage,{source:"/venues/new",title:"Новое заведение"})}
 

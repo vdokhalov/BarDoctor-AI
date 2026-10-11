@@ -25,7 +25,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
     if (name) response = await runtime.api[name][req.method || "GET"](new Request(url, { method: req.method, headers: req.headers as HeadersInit, ...(body.length ? { body } : {}) }), { params: Promise.resolve({ key }) } as never);
     else if(url.pathname==="/sales-import")response=salesPage(new Request(url));
-    else if(url.pathname==="/cashier") response=cashierPage();
+    else if(url.pathname==="/cashier") response=cashierPage(new Request(url));
     else if (["/more", "/shifts", "/warehouse", "/finance", "/home", "/login"].includes(url.pathname)) response = barDoctorResponse();
     else {
       const file = resolve("public", "." + url.pathname);
@@ -47,13 +47,13 @@ try{for(const role of ['owner','shift_manager','cashier']){
  runtime.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'Тестовое заведение',currency:'MDL',timezone:'Europe/Chisinau',workingDays:{1:true,2:true,3:true,4:true,5:true,6:true,7:true},openTime:'18:00',closeTime:'04:00'}),owner.userId);
  let actor=owner;if(role!=='owner'){actor=await runtime.register(role+'-nav-user@isolated.test');const workspace=runtime.sqlite.prepare('SELECT workspace_id FROM venues WHERE id=?').get(venueId)!.workspace_id!;runtime.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace,actor.userId);runtime.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status) VALUES (?,? ,?,'active')").run(venueId,actor.userId,role);}
  const context=await browser.newContext({viewport:{width:390,height:844},timezoneId:'America/Los_Angeles'});await context.addInitScript(({email,token,venueId})=>{localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venueId));},{email:actor.email,token:actor.token,venueId});
- const page=salesSurfacePage(await context.newPage()),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ const rawPage=await context.newPage(),page=salesSurfacePage(rawPage),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  try{
  await page.goto(base+'/more?venue='+venueId);const sales=page.getByRole('button',{name:'Продажи',exact:true});await sales.waitFor();assert.equal(await page.getByRole('button',{name:'Касса',exact:true}).count(),0);
  if(role==='owner')await page.screenshot({path:out+'/more-sales-390.png',fullPage:false});
  await sales.click();await page.waitForURL(url=>url.pathname===(role==='cashier'?'/cashier':'/sales-import'));assert.equal(new URL(page.url()).searchParams.get('venue'),String(venueId));
- if(role!=='cashier'){const iframe=page.locator('iframe');await iframe.waitFor();const frame=await(await iframe.elementHandle())!.contentFrame();assert.ok(frame);await frame!.locator('#open-cashier').waitFor();if(role==='owner')await page.screenshot({path:out+'/sales-workspace-390.png',fullPage:true});assert.ok((await frame!.locator('#open-cashier').getAttribute('href'))?.startsWith('/shifts'));await frame!.locator('.sales-navigation a[href="/cashier"]').click();}
- await page.locator('[data-workday-required]').waitFor();assert.equal(await page.locator('[data-action="open-shift"]').count(),0);
+ if(role!=='cashier'){assert.ok(await page.locator('[data-bd-nav-key=home]').count());const iframe=page.locator('iframe');await iframe.waitFor();const frame=await(await iframe.elementHandle())!.contentFrame();assert.ok(frame);await frame!.locator('#open-cashier').waitFor();if(role==='owner')await page.screenshot({path:out+'/sales-workspace-390.png',fullPage:true});assert.ok((await frame!.locator('#open-cashier').getAttribute('href'))?.startsWith('/shifts'));await frame!.locator('.sales-navigation a[href="/cashier"]').click();}
+ await page.locator('[data-workday-required]').waitFor();if(role==='cashier'){assert.equal(await rawPage.locator('[data-bd-nav-key=sales]').count(),1);assert.equal(await rawPage.locator('[data-bd-nav-key=finance]').count(),0);assert.equal(await rawPage.locator('[data-bd-nav-key=team]').count(),0);}assert.equal(await page.locator('[data-action="open-shift"]').count(),0);
  if(role==='cashier'){assert.match(await page.locator('[data-workday-required]').innerText(),/Попросите руководителя/);assert.equal(await page.locator('[data-workday-required] a').count(),0);}else{
  await page.locator('[data-workday-required] a').click();await page.locator('[data-workday-state]').waitFor();await page.locator('[data-bd-cashier-entry]').click();await page.locator('[data-workday-required]').waitFor();
  await page.goto(base+'/home?venue='+venueId);await page.locator('[data-bd-home-today]').waitFor();assert.equal(await page.locator('[data-bd-cashier-entry]').count(),0);const expected=new Intl.DateTimeFormat('ru-RU',{timeZone:'Europe/Chisinau',day:'numeric',month:'long',weekday:'long'}).format(new Date());assert.ok((await page.locator('.bd-home-section-title').allTextContents()).some(text=>text.includes(expected)));

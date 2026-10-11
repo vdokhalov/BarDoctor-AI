@@ -1,4 +1,6 @@
-export function GET(): Response {
+import { barDoctorResponse } from "../bar-doctor-response";
+export function GET(request?: Request): Response {
+  if(request&&new URL(request.url).searchParams.get("embedded")!=="1")return barDoctorResponse();
   return new Response(`<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Касса — BarDoctor</title>
 <link rel="stylesheet" href="/sales-navigation.css?v=sales-scroll-stability"><script src="/sales-navigation.js?v=sales-scroll-stability" defer></script><link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297"><script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script><link rel="icon" href="/icons/icon-192.png"><link rel="stylesheet" href="/cashier.css?v=pos-recovery-1"><script src="/accounting-currency.js?v=pos1-functional" defer></script><script src="/pos-draft.js?v=1" defer></script><script src="/pos-refresh.js?v=1" defer></script><script src="/cashier.js?v=pos-recovery-1" defer></script></head>
 <body data-bd-parent-route="/sales-import"><aside class="sidebar"><a class="brand" href="/cashier"><img src="/icons/icon-192.png" alt="">BarDoctor</a><nav id="navigation" aria-label="Разделы кассы"></nav><a id="management-link" hidden href="/home" class="management">Управление</a></aside>

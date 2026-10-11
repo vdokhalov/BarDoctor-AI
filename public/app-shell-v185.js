@@ -312,6 +312,7 @@
       decorateTabs();
       if (isPublicOrEmbedded()) return;
       var config = resolveRoute();
+      if(config && location.pathname==="/cashier" && localStorage.getItem("bd_active_role")==="cashier")config={...config,parent:null,variant:"root"};
       var existing = document.querySelector("body > bd-app-header");
       if (startupPending()) {
         if (existing) {
