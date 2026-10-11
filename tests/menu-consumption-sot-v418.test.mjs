@@ -25,13 +25,13 @@ test("closing a catalog detail removes its URL ownership instead of reopening hi
     const previous = `/catalog?venue=1&tab=recipes&itemId=sprite`;
     const calls = [];
     const context = {
-      URLSearchParams,
-      window: { location: { search: current.slice(current.indexOf("?")) },
+      URLSearchParams, URL, localStorage: {getItem:()=>"1"}, s:{activeVenueId:1}, bdDetailClosePendingV512:{current:""},
+      window: { history:{state:{}}, location: { href:"https://bardoctor.test"+current, search: current.slice(current.indexOf("?")) },
         bdNavigateBack: () => { current = previous; calls.push("back"); } },
       se: (value) => { selected = value; },
       e: (url, options) => { current = url; calls.push(options.replace ? "replace" : "push"); },
     };
-    runInNewContext(`${bundle.slice(queryStart, queryEnd)};const ${handler};be();`, context);
+    runInNewContext(`${readFileSync(new URL("scripts/fragments/catalog-detail-history-v512.fragment.txt",root),"utf8")}\n${bundle.slice(queryStart, queryEnd)};const ${handler};be();`, context);
     const url = new URL(current, "https://bardoctor.test");
     assert.equal(selected, null);
     assert.equal(url.searchParams.has("itemId"), false, "close must not return to a prior detail URL");

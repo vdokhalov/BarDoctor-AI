@@ -539,12 +539,28 @@ function patchImportApplyHandler(source) {
 }
 
 function finalizePhase3Bundle(source) {
-  // Closing a URL-owned item sheet means removing itemId, not visiting an
-  // arbitrary previous catalog URL (which can own the same sheet again).
-  const closeDetail = 'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),e(w,{replace:!0})}';
-  if (!source.includes(closeDetail)) source = replaceOnce(source,
-    'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),window.bdNavigateBack(w)}',
-    closeDetail, 'deterministic item detail close');
+  // Consume only this card's verified list entry; arbitrary history can reopen
+  // another detail or cross a venue boundary and must still use replacement.
+  const closeDetail = 'be=()=>{bdCloseCatalogDetailV512(e,()=>se(null),s.activeVenueId,bdDetailClosePendingV512)}';
+  if (!source.includes(closeDetail)) {
+    const old = [
+      'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),e(w,{replace:!0})}',
+      'be=()=>{const w=bdAssortmentQueryUrlV170({itemId:null});se(null),window.bdNavigateBack(w)}',
+    ].find(value => source.includes(value));
+    if (!old) throw new Error('Catalog detail close handler missing');
+    source = replaceOnce(source, old, closeDetail, 'scoped item detail close');
+  }
+  if (!source.includes('const bdDetailClosePendingV512=S.useRef("");')) source = replaceOnce(source,
+    'function bdAssortmentCommandPageV170(){',
+    'function bdAssortmentCommandPageV170(){const bdDetailClosePendingV512=S.useRef("");', 'detail close pending guard');
+  const historyFragment = fs.readFileSync(path.join(root, 'scripts/fragments/catalog-detail-history-v512.fragment.txt'), 'utf8').trim();
+  const historyStart = source.indexOf('/* catalog-detail-history-v512:start */');
+  const historyEndMarker = '/* catalog-detail-history-v512:end */';
+  if (historyStart >= 0) {
+    const historyEnd = source.indexOf(historyEndMarker, historyStart);
+    if (historyEnd < 0) throw new Error('Catalog detail history helper boundary missing');
+    source = source.slice(0, historyStart) + historyFragment + source.slice(historyEnd + historyEndMarker.length);
+  } else source = replaceOnce(source, 'function bdAssortmentQueryUrlV170(', historyFragment + '\nfunction bdAssortmentQueryUrlV170(', 'detail close helper');
   const malformedImportClosure = ']},h.id)})})}),e.menuItems.length>l&&i.jsx("button",{type:"button",className:"load-more"';
   const validImportClosure = ']},h.id)})}),e.menuItems.length>l&&i.jsx("button",{type:"button",className:"load-more"';
   if (source.includes(malformedImportClosure)) {

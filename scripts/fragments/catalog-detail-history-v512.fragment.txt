@@ -1,0 +1,32 @@
+/* catalog-detail-history-v512:start */
+function bdCloseCatalogDetailV512(navigate, clearSelection, venueId, pending) {
+  const venue=String(Number(venueId)||""),active=String(localStorage.getItem("bd_active_venue_id")||"");
+  const current=new URL(window.location.href),state=window.history.state||{};
+  if(!venue||active!==venue||current.pathname!=="/catalog"||!current.searchParams.get("itemId"))return false;
+  const entry=String(state.bdEntryId||"");
+  if(pending.current&&pending.current===entry)return false;
+  if(window.bdConfirmDiscard&&!window.bdConfirmDiscard())return false;
+  const target=new URL(current);target.searchParams.delete("itemId");
+  // A stale URL must never navigate back into the venue that was just left.
+  if(target.searchParams.has("venue"))target.searchParams.set("venue",venue);
+  const canonical=url=>{const copy=new URL(url);copy.searchParams.set("venue",venue);copy.searchParams.sort();return copy.pathname+copy.search+copy.hash;};
+  let ownPrevious=false;
+  try {
+    const previous=new URL(state.bdPreviousUrl,current);
+    ownPrevious=Boolean(window.history.length>1&&entry&&state.bdPreviousEntryId&&state.bdPreviousEntryId!==entry
+      &&state.bdNavigationVersion==="canonical-navigation-v247"&&String(state.bdVenueId)===venue
+      &&(!current.searchParams.has("venue")||current.searchParams.get("venue")===venue)
+      &&previous.origin===current.origin&&previous.pathname==="/catalog"&&!previous.searchParams.has("itemId")
+      &&(!previous.searchParams.has("venue")||previous.searchParams.get("venue")===venue)
+      &&canonical(previous)===canonical(target));
+  } catch { /* Unknown history has a deterministic local fallback. */ }
+  clearSelection();
+  if(ownPrevious) {
+    pending.current=entry;
+    const settled=()=>{if(window.history.state?.bdEntryId===entry)return;pending.current="";window.removeEventListener("popstate",settled,true);};
+    window.addEventListener("popstate",settled,true);
+    window.history.back();
+  } else navigate(target.pathname+target.search+target.hash,{replace:true});
+  return true;
+}
+/* catalog-detail-history-v512:end */
