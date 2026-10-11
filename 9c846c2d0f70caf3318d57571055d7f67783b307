@@ -1,0 +1,78 @@
+{
+  "source_commit": "9c846c2d0f70caf3318d57571055d7f67783b307",
+  "version": {
+    "id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_b5bc935644c48191ab806d7b469e9d23",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "version_number": 511,
+    "source": {
+      "commit_sha": "9c846c2d0f70caf3318d57571055d7f67783b307"
+    },
+    "archive_storage": {
+      "archive_format": "tar",
+      "sediment_file_id": "file_0000000095b482308584306ee7bb4bf2",
+      "content_hash": "sha256:3baf3d6228ae3f7b5986ce70f20fbe4689e30f09fe33cd8e8007f0c5c20a3d72",
+      "size_bytes": 55193600,
+      "file_count": 287
+    },
+    "screenshot_url": null,
+    "deployment_id": null
+  },
+  "deployment": {
+    "id": "appgdep_6acb5623b24881919e7d482aff1f43a8",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "title": "BarDoctor Preview",
+    "version_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_b5bc935644c48191ab806d7b469e9d23",
+    "type": "publish",
+    "status": "succeeded",
+    "url": "https://bardoctor-preview.v-dokhalov.chatgpt.site",
+    "has_mcp": false,
+    "screenshot_asset_pointer": null,
+    "provider_deployment_id": "v-dokhalov--bardoctor-preview",
+    "failure_message": null,
+    "env_set_revision": 14,
+    "updated_at": "2026-10-11T09:26:09.489297+00:00"
+  },
+  "rollback_version": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_c5f05f9cd364819191a77a9f1a616578",
+  "access_revision": 2,
+  "notes": "Explicit publication approval received 2026-10-11 09:24:00 UTC. No migration/hosting source changes. No real venue data writes.",
+  "live_checks": {
+    "/api/healthz": {
+      "status": 200,
+      "bytes": 36,
+      "sha256": "2aacb58bde048675745be7ee7ca152c36e29a9f7a2c60a668f737bded7dd87df",
+      "body": {
+        "status": "ok",
+        "storage": "sites-d1"
+      }
+    },
+    "/assets/index-BQGspy0I-a4b6189b010b.js": {
+      "status": 200,
+      "bytes": 2883243,
+      "sha256": "a4b6189b010bee3f543fc5737e5f93880dd54f920ad93abcd68b56447e7e2b60",
+      "matches_local": true
+    },
+    "/catalog.css": {
+      "status": 200,
+      "bytes": 57567,
+      "sha256": "e4df67bdc5876dd660748fbfb2e314f4019bb572346c4ca55d13ea6ccadf3a90",
+      "matches_local": true
+    },
+    "/embedded-shell-v269.css": {
+      "status": 200,
+      "bytes": 720,
+      "sha256": "17cf910c55531cc9610faba10cab6e040e46dd7f787781bb971a1fc98a84a00c",
+      "matches_local": true
+    }
+  },
+  "site": {
+    "version": 511,
+    "access": "public",
+    "access_revision": 2
+  },
+  "github_status_attempt": {
+    "status": "blocked",
+    "http_status": 403,
+    "reason": "Resource not accessible by integration"
+  },
+  "durable_receipt_ref": "refs/notes/sites-v511"
+}
