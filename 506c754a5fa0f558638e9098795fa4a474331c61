@@ -1,0 +1,63 @@
+# Unpublished correction after production v514
+
+Base source:2e970e752385d430a532219117429ef56b0673b9. Internal worktagv516 is not a Sites version.
+
+Warehouse RCA: monetary card reused physical-card CSS grid-template-columns:minmax(0,1fr) auto with six independent children. Real CSS reproduced heading and link width0. Own one-column grid now prevents compression; link has44px minimum height. No data, routing target or inventory semantics changed.
+
+Finance RCA: BAe still derived monthlyReport using local bdBuildMonthlyReport while Reports consumed authorized GET/api/month-close. Finance now uses the same bdUseMonthlyReportV513 server hook keyed by venue/month, including refresh, scope checking, null during loading/denial, closed snapshots and detailed blocker reasons. Canonical hasFinancialData does not depend on stale/empty local arrays. False stock-mismatch warning removed when canonical result is known. Formulas, API, permissions and writes unchanged.
+
+Native previously verified v514 canonical September38010 =63900−13494−7550−468−4378. This patch fixes Finance projection, not that formula. Live Finance confirmation awaits approved publication; no new deploy or business-data write performed.
+
+Validation:
+-15 focused tests PASS, no skips.
+-FullSPA realAPI realCSS inventory390/1165/1440: heading width280/778/846,height22.4; link height44; ordinaryclick opens actual selected-month reportwizard; no domainwrites.
+-Finance fullSPA realAPI Chromium390/1440 and WebKit390: same profit314/payroll100 as canonical fixture, correct monthnavigation, pending403 no localfallback, actual blockers visible, no writes.
+-Build PASS, Sites ESM/default.fetch/hosting manifest validationPASS, typecheck/scopedESLint/diff-check PASS, aggregate idempotent.
+-Independent review confirmed no blockers; includes canonical-only input, zero saved results and legacy inventoryMismatch flag negatives.
+
+Built bundle:index-BQGspy0I-8ff4a2cc37f7.js
+SHA256:8ff4a2cc37f754a3f08007e0544a8d2efbeec1cab994c602e5f40cb72354c87f
+Remote fullCI not run for this unpublishedpatch. Production staysv514. Library401 unchanged; authorized GitHubnotes checkpoint instead.
+
+ExactSHA:506c754a5fa0f558638e9098795fa4a474331c61
+ArchiveSHA256:3461cd412dcad97565bedf0b8ab0dd4ef83a66a1b92e68beb39f498c8db44c68
+{
+  "commit": "506c754a5fa0f558638e9098795fa4a474331c61",
+  "base": "2e970e752385d430a532219117429ef56b0673b9",
+  "published": false,
+  "files": {
+    "inventory-full-spa-layout-390.png": "7cf3947cf83e203cc963d215687d278aff7884309704057ab4dd0492462fba79",
+    "independent-layout-v516.log": "eeb804edb6df3a51edf2ab1ec40bcfd36e3b0896f236cb0d95cb552c2da90041",
+    "inventory-card-layout-390.png": "a441839b8f0e71850471560364e69c8f9bdc2e6fc510f1032de7444893775bff",
+    "v516-finance-webkit.log": "50b9a1367893149623ffef1e9661bc58d3125b8aa624f2c451b0379e023eabe6",
+    "inventory-full-spa-layout-1440.png": "6a3e2c9f0c7631841180759bdc47062aaea271c169602f1f0f62a17f3865009a",
+    "independent-finance-unit-v516.log": "6dee3cb0a882620851a9f53a2f205a70b7e6c6f0f0266f2069373dfc334d5d32",
+    "bundle-verification.txt": "d95a8a87f33676b95a1138fadf01adaa5b01b3ca85a26c8a9c91b69c9201befb",
+    "inventory-full-spa-layout-1165.png": "ed2d474ee468f0042238c6f1a66f2154415a2a44efdd29675dffb18c4010b906",
+    "inventory-card-layout-1165.png": "5278a1494849328994e1cad5300a5ed41f0a646d60fd75a26b4bc9888c0907e2",
+    "v516-build.log": "34be8fa47e042476e9f74b192c9578d5566e9ba14d20076d228910d25c56a845",
+    "v516-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "repository.bundle": "64a78ada870fe613231713d0e3e8652801bc207de48fcda856651e213db2f2b1",
+    "independent-v516-review.md": "24d52e687391e9049ff5b76591fa23f2c4a09511a445c9d7babf4007ffc44c6a",
+    "independent-finance-unit-v516-final.log": "f2dcdefa7c577258930de6a709784222b7fa0314f78048cc8ea09e166c84b4d1",
+    "v516-inventory-full-spa.log": "eeb804edb6df3a51edf2ab1ec40bcfd36e3b0896f236cb0d95cb552c2da90041",
+    "v516-inventory-layout-browser.log": "a32841cd0c3d2b3719e26e5e381222667671525aebe79ef57fc6128a0d5c9d13",
+    "independent-v516-source-sha256.txt": "c9696413c41712229cf9668698c6ff2055e0c7cd2a02c23880bff10d5ac62144",
+    "independent-finance-browser-v516.log": "24061ad9a5e7add40c6192100c10af45b341827f35ba1a621964f5989c0e6085",
+    "v516-inventory-layout-baseline.log": "3825473a5fa1fdd8009b21edb7615ea54e5e55a2a402bbc1fc7308e5779062e5",
+    "v516-tests.log": "655eba6bb4705bc7162bd80be5ace25c9cdd43cfa0011e01511444ff57c75208",
+    "inventory-card-layout-1440.png": "2ff9a94e65bc45a011a3c27efbb47cd39f3bf3d5b78d8b8ffb26388a941a8ce3",
+    "v516-result.md": "970d0be9f6d7db863a730fe83cb14d3ef796f6f120d99a079c5f1557894e55f1",
+    "changes.patch": "f6b15ffe4682616219b09094e8252de3eb825469acdab83632b910cc565b084b"
+  }
+}
+Independent review of unpublished layout + Finance delta atop2e970e752385d430a532219117429ef56b0673b9. No confirmed remaining P1/P2.
+
+Layout independently rerun: node --import tsx scripts/inventory-layout-full-spa-v516.ts PASS390/1165/1440. Actual SPA/CSS, authenticated isolated API, ordinary link.click (no force/dispatch) opens actual September closing wizard. Heading widths280/778/846 and height22.4; links44high. All domain stores unchanged. Patch only monetary card layout and idempotent fragment update.
+
+Finance independently rerun: node --test tests/finance-canonical-v515.test.mjs 3PASS; node --import tsx scripts/finance-canonical-browser-v515.ts PASSChromium390 actualSPA/API. Canonical314profit/100payroll rendered; delayed load and denied403 no local result; nestedforeign data causes visible blocker, no reference/value leak; ordinary report navigation preserves September; stores unchanged.
+
+Source: Finance monthlyReport uses shared venue/month server hook, no bdBuildMonthlyReport fallback. Existing shared stale/disposed/read-scope checks remain unchanged. Closed/null report passed unchanged; no server formula/permission changes. Review identified local-array-dependent hasFinancialData and discussed with author; now replaced by canonicalreport fields. Final reasonhelper now follows serverfinality rather than inventoryMismatch inference.
+Own independent VM assertions after final helper changes PASS: server-only payroll/revenue visible without localrows, null loading hidden, closedzero preserved, valid server314 not overridden by inventoryMismatch. Final4units rerun after latest helper changes. FullSPA run preceded those final text/visibility changes; no final browser rerun claimed.
+
+No deployment/live writes/paidAI/fullCI. Final commit and generatedasset integration belong to root. Source SHA256 recorded alongside report.
