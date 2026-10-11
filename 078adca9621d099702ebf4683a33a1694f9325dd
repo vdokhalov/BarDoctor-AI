@@ -1,0 +1,145 @@
+{
+  "source_commit": "078adca9621d099702ebf4683a33a1694f9325dd",
+  "version": {
+    "id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_71b592967f8481919d37aef1f524d30f",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "version_number": 513,
+    "source": {
+      "commit_sha": "078adca9621d099702ebf4683a33a1694f9325dd"
+    },
+    "archive_storage": {
+      "archive_format": "tar",
+      "sediment_file_id": "file_000000003d64823088bb72c6ecb9f051",
+      "content_hash": "sha256:07dd60239c8466e44ed5634bdfb955312f11ac03120639cca93ca283ab1f3d9d",
+      "size_bytes": 61102080,
+      "file_count": 289
+    },
+    "screenshot_url": null,
+    "deployment_id": null
+  },
+  "deployment": {
+    "id": "appgdep_6acb8ae4a718819196a7113720e9d359",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "title": "BarDoctor Preview",
+    "version_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_71b592967f8481919d37aef1f524d30f",
+    "type": "publish",
+    "status": "succeeded",
+    "url": "https://bardoctor-preview.v-dokhalov.chatgpt.site",
+    "has_mcp": false,
+    "screenshot_asset_pointer": null,
+    "provider_deployment_id": "v-dokhalov--bardoctor-preview",
+    "failure_message": null,
+    "env_set_revision": 14,
+    "updated_at": "2026-10-11T13:11:16.758442+00:00"
+  },
+  "rollback_version": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_d882b7cee11881919050c2929de90fbe",
+  "rollback_source": "2fa4d06de563b74d991bdb22a2c9d0b0fa387e93",
+  "access_revision": 2,
+  "archive_sha256": "f6869662d5a262f15313ad29e34b3a50e91dfb7e97a3fdc57fb6da4fe09276fe",
+  "migration_changes": false,
+  "authorization": "User explicit Yes 2026-10-11T13:08:35Z; parent delegated exact078adca9",
+  "live_data_changes": false,
+  "live_checks": {
+    "/api/healthz": {
+      "status": 200,
+      "bytes": 36,
+      "sha256": "2aacb58bde048675745be7ee7ca152c36e29a9f7a2c60a668f737bded7dd87df",
+      "body": {
+        "status": "ok",
+        "storage": "sites-d1"
+      }
+    },
+    "/api/auth/bootstrap": {
+      "status": 401,
+      "bytes": 129,
+      "sha256": "7f29ce0dbb950f28c95d90570a72980b734ddf5d300e8fbea8e10906232718aa",
+      "needsLogin": true,
+      "method": "POST",
+      "authenticated_verification": "deferred to native browser UAT"
+    },
+    "/cashier": {
+      "status": 200,
+      "bytes": 40045,
+      "sha256": "027d6dfbe113b2ce81802b44b0e0f451c1176222d9fa78bbda83f2304520d131",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/reports?month=2026-09": {
+      "status": 200,
+      "bytes": 40041,
+      "sha256": "7447fccf2b70248ce766d1a2c36b32de9b8694280d1b32a7f88e6c33f1751de8",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/finance": {
+      "status": 200,
+      "bytes": 40041,
+      "sha256": "7447fccf2b70248ce766d1a2c36b32de9b8694280d1b32a7f88e6c33f1751de8",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/warehouse": {
+      "status": 200,
+      "bytes": 40041,
+      "sha256": "7447fccf2b70248ce766d1a2c36b32de9b8694280d1b32a7f88e6c33f1751de8",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/equipment": {
+      "status": 200,
+      "bytes": 40041,
+      "sha256": "7447fccf2b70248ce766d1a2c36b32de9b8694280d1b32a7f88e6c33f1751de8",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/data-control": {
+      "status": 200,
+      "bytes": 40045,
+      "sha256": "027d6dfbe113b2ce81802b44b0e0f451c1176222d9fa78bbda83f2304520d131",
+      "versioned_client_reference": true,
+      "bootstrap_loader": true
+    },
+    "/assets/index-BQGspy0I-32a8b81c05c8.js": {
+      "status": 200,
+      "bytes": 2905519,
+      "sha256": "32a8b81c05c87963702211b3fa8a5e7cf56bb627cac3f17d5a79074583b3069c",
+      "matches_local": true
+    },
+    "/cashier.js": {
+      "status": 200,
+      "bytes": 83936,
+      "sha256": "5d54c4791301c6c997f924edb5e6bb890ca4885ab4885b9aea2f032ba53b789b",
+      "matches_local": true
+    },
+    "/reviews.js": {
+      "status": 200,
+      "bytes": 46704,
+      "sha256": "a4ad6e2057a5b5fc63d7bdc538f34057154a5d680d71d96218b5a647358200da",
+      "matches_local": true
+    },
+    "/opportunities.js": {
+      "status": 200,
+      "bytes": 21146,
+      "sha256": "21e1645a3eb2bd06869a7e2a910a42a9c4098671d08ca9131b6eb04a8de7cb7c",
+      "matches_local": true
+    },
+    "/market.js": {
+      "status": 200,
+      "bytes": 17395,
+      "sha256": "44db971eb83f03f1a6941b5af3057bfb5277c47003f7082c1766bc4005ccdfc6",
+      "matches_local": true
+    },
+    "/supplier-alternatives.js": {
+      "status": 200,
+      "bytes": 38606,
+      "sha256": "c662e68b61f61f33c3c7b7aa8bc5ca63a785ba50653845a5ff80b6e654f75f12",
+      "matches_local": true
+    },
+    "/bardoctor-preview.js": {
+      "status": 200,
+      "bytes": 94713,
+      "sha256": "184a611550222033e74fd3640b13d8337249fe2bb6c338cfc3b0c6c7c1950f1e",
+      "matches_local": true
+    }
+  }
+}
