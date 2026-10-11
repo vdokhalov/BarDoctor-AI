@@ -1,0 +1,18 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';import {build} from 'esbuild';import {chromium} from 'playwright-core';import {createRequire} from 'node:module';import {patchInventoryBoundaryPresentationV515} from './patch-inventory-boundary-presentation-v515.mjs';
+const runtime=createRequire(import.meta.url)('./browser-runtime.cjs');
+const source=patchInventoryBoundaryPresentationV515(fs.readFileSync('public/assets/index-BQGspy0I.js','utf8'));
+const fragment=fs.readFileSync('scripts/fragments/inventory-boundary-presentation-v515.fragment.txt','utf8');
+const sheet=source.slice(source.indexOf('function bdInventoryCountSheet('),source.indexOf('function bdWriteoffSheet',source.indexOf('function bdInventoryCountSheet(')));
+const listStart=source.indexOf('children:V.map(B=>{if(bdInventoryAccountingBoundaryV515');const listEnd=source.indexOf('})}):i.jsxs("div",{className:"bd-warehouse-empty"',listStart);
+const map=source.slice(listStart+'children:'.length,listEnd+2);
+const entry=`import * as S from 'react';import * as i from 'react/jsx-runtime';import {createRoot} from 'react-dom/client';
+const bdWarehouseDecimal=String,bdWarehouseNumber=Number,sg=x=>x,bdInventoryCountStatusLabel=()=> 'Подсчёт',bdInventoryDisplayLabelV270=()=> 'Физическая инвентаризация',bdInventoryCanDeleteV270=()=>true,z=false,e=()=>{},bdWarehouseNavigationUrlV247=()=>'/warehouse';
+${fragment}\n${sheet}
+const boundary={id:'sep',venueId:3389,date:'2026-09-01',currency:'PMR_RUB',sections:{Бар:1200},total:1200};
+const V=[boundary,{id:'physical',date:'2026-10-11',status:'counting',items:[]}];
+createRoot(document.getElementById('list')).render(i.jsx(i.Fragment,{children:${map}}));
+createRoot(document.getElementById('direct')).render(i.jsx(bdInventoryCountSheet,{initial:boundary,onClose:()=>{document.getElementById('closed').textContent='closed'}}));`;
+const bundle=await build({stdin:{contents:entry,resolveDir:process.cwd()},bundle:true,write:false,format:'iife'});
+const browser=await chromium.launch({headless:true,executablePath:process.env.BD_QA_BROWSER||await runtime.resolveBrowserExecutable(chromium.executablePath())});
+try{for(const width of [390,1440]){const page=await browser.newPage({viewport:{width,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.setContent('<div id="list"></div><div id="direct"></div><div id="closed"></div>');await page.addScriptTag({content:bundle.outputFiles[0].text});
+assert.equal(await page.locator('#list .bd-inventory-accounting-boundary-v515').count(),1);assert.equal(await page.locator('#list').getByText('Продолжить',{exact:true}).count(),1);assert.equal(await page.locator('#direct').getByText('Продолжить',{exact:true}).count(),0);assert.equal(await page.locator('#direct').getByRole('button',{name:/Удалить|Завершить|Провести/}).count(),0);assert.equal(await page.locator('#direct a').getAttribute('href'),'/reports?month=2026-09&venue=3389&closeMonth=1');await page.locator('#direct').getByRole('button',{name:'Закрыть',exact:true}).click();assert.equal(await page.locator('#closed').innerText(),'closed');assert.deepEqual(errors,[]);console.log(JSON.stringify({width,mixedList:true,directBoundaryNoPhysicalActions:true,correctReportLink:true}));await page.close();}}finally{await browser.close()}

@@ -126,7 +126,12 @@ async function runtime() {
       items: [{ id: "qa-cancel-receipt-line", name: "Beans", rawName: "Beans", nomenclatureId: "nom-coffee",
         purchaseProductKey: "coffee-stock", quantity: 2, unit: "kg", quantityMode: "measure", unitPrice: 100,
         lineTotal: 200, category: "products", mappingSource: "manual" }] } }, 201);
-    const command = { ...saleCommand("coffee", 10), id: "qa-cancel-historical-sale" };
+    // Current POS contract requires an open workday with a team and its own cash shift.
+    // Seed only prerequisite fixture data, then create the cash shift through the real handler.
+    r.put("bd_operational_reports_v1", [{ id: "qa-cancel-workday", venueId: 1,
+      date: new Date().toISOString().slice(0, 10), workdayStatus: "OPEN", staffing: [{ employeeId: "qa-worker" }] }]);
+    await send(sale, { action: "open_shift", shiftId: "qa-cancel-cash", name: "QA cash", openingFloat: 0 }, 201);
+    const command = { ...saleCommand("coffee", 10), shiftId: "qa-cancel-cash", id: "qa-cancel-historical-sale" };
     const preview = await send(sale, { action: "preview", command }, 200);
     const posted = await send(sale, { action: "post", command, previewHash: preview.previewHash }, 201);
     assert.equal(posted.event.batch.totalTheoreticalCost, 8);

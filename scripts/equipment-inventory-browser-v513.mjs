@@ -9,10 +9,12 @@ const source=patchEquipmentInventoryV513(fs.readFileSync('public/assets/index-BQ
 const component=source.slice(source.indexOf('const bdInventoryScopeHierarchyVersion='),source.indexOf('function bdWriteoffSheet',source.indexOf('const bdInventoryScopeHierarchyVersion=')));
 const navigation=fs.readFileSync('public/bardoctor-preview-v397.js','utf8');
 const guard=navigation.slice(navigation.indexOf('  var bdDirtySurfaces ='),navigation.indexOf('  /* Start the application shell',navigation.indexOf('  var bdDirtySurfaces =')));
+const boundaryHelpers=fs.readFileSync("scripts/fragments/inventory-boundary-presentation-v515.fragment.txt","utf8");
 const script=`import * as S from 'react';import * as i from 'react/jsx-runtime';import * as ug from 'react-dom';import {createRoot} from 'react-dom/client';
 const W={div:({initial,animate,exit,...props})=>i.jsx('div',props)};
 const bdWarehouseNumber=(x,d=0)=>Number.isFinite(Number(x))?Number(x):d,bdWarehouseDecimal=x=>String(x),bdWarehouseUnit=x=>({kg:'кг',l:'л',ml:'мл',g:'г',pcs:'шт.'}[x]||x),bdWarehouseMoney=x=>String(x),ca=()=>({}),Ot=()=>1,bdDateKey=()=> '2026-10-11',bdInventoryDisplayLabelV270=()=> 'Инвентаризация',bdConfirmInventoryDeleteV270=()=>false;
 ${guard}
+${boundaryHelpers}
 installNavigationConsistencyGuards();
 ${component}
 const doc={id:'inventory',status:'counting',date:'2026-10-11',items:[{productKey:'coffee',productName:'Coffee',unit:'kg',entryUnit:'шт.',entryFactor:1,expected:4.86,actual:null}],summary:{totalLines:1,countedLines:0,uncountedLines:1}};

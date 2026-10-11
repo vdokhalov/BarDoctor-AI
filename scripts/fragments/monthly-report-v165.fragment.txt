@@ -321,7 +321,7 @@ async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
   const scope = value.inputManifest?.scope || value.closing?.inputManifest?.scope;
   const legacyScope = value.closing && (!value.closing.venueId || value.closing.venueId === "primary" || Number(value.closing.venueId) === venueId);
   if ((scope ? Number(scope.venueId) !== venueId : !legacyScope) || (value.closing?.monthKey || value.report?.meta?.key) !== monthKey || !value.report) throw new Error("Контекст отчёта изменился. Повторите загрузку.");
-  return { report: value.closing ? { ...value.report, ...bdMonthlyClosedFieldsPhase7(value.report), meta: value.report.meta || bdMonthMeta(monthKey), isClosed: true } : value.report, reasons: value.reasons || [], evidenceStatus: value.evidenceStatus };
+  return { report: value.closing ? { ...value.report, ...bdMonthlyClosedFieldsPhase7(value.report), meta: value.report.meta || bdMonthMeta(monthKey), isClosed: true } : value.report, reasons: value.reasons || [], reasonDetails: value.reasonDetails || [], reasonDetailsTruncated: value.reasonDetailsTruncated === true, evidenceStatus: value.evidenceStatus };
 }
 
 function bdMonthlyReadControllerV513(load, publish) {
@@ -353,10 +353,92 @@ function bdUseMonthlyReportV513(venueId, monthKey, revision) {
   return { ...(state?.key === key ? state : { report: null, error: null, reasons: [] }), retry: () => setRetry(value => value + 1) };
 }
 
-function bdMonthlyPendingReasonsV513({ reasons }) {
-  const labels = { INVENTORY_BOUNDARY_UNKNOWN: "не подтверждены остатки на границах месяца", PERIOD_NOT_ENDED: "месяц ещё не закончился", BUSINESS_DAY_COVERAGE_INCOMPLETE: "не все рабочие дни учтены", REVENUE_NOT_FINAL: "не вся выручка подтверждена", PAYROLL: "не все начисления зарплаты подтверждены", CURRENCY_UNKNOWN_OR_UNCONVERTED: "не все суммы приведены к валюте учёта", EXPENSES_OR_CURRENCY: "требуют проверки расходы или их валюта", RECURRING_INPUT_UNKNOWN: "неполны настройки регулярных расходов", PURCHASE_AMOUNT_UNKNOWN: "неполны суммы закупок" };
-  const messages = [...new Set(reasons.map(reason => labels[reason] || "требуют проверки исходные документы и их связи"))];
-  return messages.length ? i.jsx("p", { role: "status", children: "Итоговая прибыль пока не подтверждена: " + messages.join("; ") + ". Сохранённая себестоимость продаж показана отдельно, если её данные полны." }) : null;
+const bdMonthlyReasonCatalogV515 = {
+  REVENUE_OR_CURRENCY: ["Выручка или валюта части операций не подтверждена.", "/finance", "Проверить выручку"],
+  PAYROLL: ["Не все начисления зарплаты подтверждены.", "/salaries", "Проверить зарплаты"],
+  EXPENSES_OR_CURRENCY: ["Суммы или валюта части расходов не определены.", "/finance?view=expenses", "Проверить расходы"],
+  ACCOUNTING_CURRENCY_UNKNOWN: ["Не определена валюта управленческого учёта.", "/finance/settings", "Проверить настройки"],
+  BATCH_CAPTURE_MISSING: ["Нет полного сохранённого снимка себестоимости проведённого пакета продаж.", "/sales-import", "Проверить пакет продаж"],
+  BATCH_COST_MISMATCH: ["Итог себестоимости пакета не совпадает с суммой его строк.", "/sales-import", "Сверить пакет продаж"],
+  DUPLICATE_BATCH_LINE: ["В пакете продаж обнаружены повторяющиеся строки.", "/sales-import", "Проверить строки продаж"],
+  DUPLICATE_FINANCIAL_HISTORY: ["В истории финансовых операций есть повторяющиеся записи.", "/data-control?tab=journal", "Проверить журнал"],
+  HISTORICAL_SALES_COST_MISSING: ["Для части выручки отсутствует сохранённая историческая себестоимость.", "/sales-import", "Проверить документы продаж"],
+  HISTORICAL_SALES_COST_UNKNOWN: ["Историческая стоимость продажи не подтверждена в валюте учёта.", "/sales-import", "Проверить стоимость продажи"],
+  INGREDIENT_CAPTURE_MISSING: ["В снимке продажи отсутствует состав ингредиентов.", "/sales-import", "Проверить снимок продажи"],
+  INGREDIENT_COST_MISMATCH: ["Стоимость ингредиента не совпадает с сохранённым количеством и ценой.", "/sales-import", "Сверить ингредиент продажи"],
+  INGREDIENT_COST_UNKNOWN: ["Не подтверждены количество, стоимость или валюта ингредиента продажи.", "/sales-import", "Проверить стоимость ингредиента"],
+  INGREDIENT_STATUS_CONFLICT: ["Статус нулевой стоимости ингредиента противоречит сохранённой сумме.", "/sales-import", "Проверить статус стоимости"],
+  INGREDIENT_ZERO_UNPROVEN: ["Нулевая стоимость ингредиента сохранена без подтверждения известного нуля.", "/sales-import", "Проверить нулевую стоимость"],
+  INVENTORY_ADJUSTMENT_COST_UNKNOWN: ["Стоимость или валюта корректировки инвентаризации неизвестна.", "/warehouse", "Проверить корректировки"],
+  INVENTORY_COST_UNKNOWN: ["Не подтверждена стоимость товаров в инвентаризации.", "/warehouse", "Проверить оценку запасов"],
+  INVENTORY_CURRENCY_UNKNOWN: ["Не определена валюта инвентаризационного документа.", "/warehouse", "Проверить валюту остатков"],
+  INVENTORY_ITEMS_MISSING: ["В инвентаризационном документе отсутствуют позиции.", "/warehouse", "Проверить состав инвентаризации"],
+  INVENTORY_NOT_COMPLETED: ["Инвентаризация для границы периода не завершена.", "/warehouse", "Проверить состояние инвентаризации"],
+  INVENTORY_QUANTITY_UNKNOWN: ["В инвентаризации не определены фактические количества.", "/warehouse", "Проверить количества"],
+  INVENTORY_SCOPE_INCOMPLETE: ["Инвентаризация не охватывает необходимый состав запасов.", "/warehouse", "Проверить охват подсчёта"],
+  INVENTORY_SECTIONS_MISSING: ["В учётных остатках отсутствуют суммы по разделам.", "/reports?closeMonth=1", "Проверить границы месяца"],
+  INVENTORY_SECTION_MISMATCH: ["Суммы разделов остатков расходятся с оценкой входящих товаров.", "/warehouse", "Сверить разделы остатков"],
+  INVENTORY_SECTION_UNKNOWN: ["Стоимость одного из разделов остатков неизвестна.", "/reports?closeMonth=1", "Проверить разделы остатков"],
+  INVENTORY_TOTAL_MISMATCH: ["Общий итог остатков не совпадает с суммой разделов.", "/reports?closeMonth=1", "Сверить итог остатков"],
+  INVENTORY_TOTAL_UNKNOWN: ["Общая стоимость остатков не определена.", "/reports?closeMonth=1", "Проверить итог остатков"],
+  LINE_CAPTURE_MISSING: ["В строке продажи отсутствует полный сохранённый снимок рецептуры и стоимости.", "/sales-import", "Проверить строку продажи"],
+  LINE_COST_CURRENCY_UNKNOWN: ["Состав или валюта себестоимости строки продажи не подтверждены.", "/sales-import", "Проверить валюту строки"],
+  LINE_COST_MISMATCH: ["Себестоимость строки продажи не совпадает с суммой ингредиентов.", "/sales-import", "Сверить строку продажи"],
+  NONE_CAPTURE_INVALID: ["Снимок продажи без расхода запасов содержит несовместимые состав, стоимость или валюту.", "/sales-import", "Проверить режим расхода"],
+  REVENUE_CURRENCY_MISMATCH: ["Валюта строки выручки не соответствует валюте учёта.", "/finance", "Проверить валюту выручки"],
+  REVENUE_VENUE_MISMATCH: ["Связь выручки с заведением не прошла проверку.", "/data-control?tab=journal", "Проверить связи данных"],
+  SALES_BATCH_AMBIGUOUS: ["Не удаётся однозначно найти пакет расхода для документа продажи.", "/sales-import", "Проверить связь с пакетом"],
+  SALES_BATCH_REFERENCED_TWICE: ["Один пакет расхода связан с несколькими продажами.", "/sales-import", "Проверить повторную связь"],
+  SALES_DOCUMENT_AMBIGUOUS: ["Связанный документ продажи отсутствует или найден неоднозначно.", "/sales-import", "Проверить документ продажи"],
+  SALES_DOCUMENT_CAPTURE_MISSING: ["Дата, статус, валюта или связь проведённого документа продажи не подтверждены.", "/sales-import", "Проверить проведение продажи"],
+  SALES_DOCUMENT_HISTORY_MISSING: ["Не загружена полная история связанных документов и пакетов продаж.", "/sales-import", "Проверить историю продаж"],
+  SALES_DOCUMENT_IDENTITIES_MISSING: ["В строке выручки отсутствуют корректные ссылки на документы продаж.", "/finance", "Проверить источник выручки"],
+  SALES_DOCUMENT_REVENUE_MISMATCH: ["Выручка документов продаж не совпадает с связанной финансовой строкой.", "/sales-import", "Сверить документы и выручку"],
+  SALES_REVENUE_HISTORY_MISMATCH: ["Сумма выручки или число чеков расходятся с историей оплаченных продаж.", "/sales-import", "Сверить оплаченные продажи"],
+  UNLINKED_SALES_CONSUMPTION: ["Есть расход запасов от продаж без подтверждённой связи с выручкой.", "/sales-import", "Проверить связи расхода и продаж"],
+  BUSINESS_DAY_COVERAGE_INCOMPLETE: ["Не все ожидаемые рабочие дни месяца учтены.", "/shifts", "Проверить рабочие дни"],
+  CURRENCY_UNKNOWN_OR_UNCONVERTED: ["Часть сумм не приведена к валюте учёта либо валюта учёта отсутствует.", "/finance", "Проверить валюты операций"],
+  INVENTORY_BOUNDARY_UNKNOWN: ["Не подтверждена стоимость запасов на начале или конце месяца.", "/reports?closeMonth=1", "Проверить границы месяца"],
+  INVENTORY_BOUNDARY_COST_UNKNOWN: ["Стоимость одной из граничных инвентаризаций неизвестна.", "/warehouse", "Проверить граничные документы"],
+  FINANCIAL_CURRENCY_UNCONVERTED: ["Финансовые суммы в другой валюте не пересчитаны в валюту учёта.", "/finance", "Проверить пересчёт валют"],
+  NESTED_INPUT_SCOPE_MISMATCH: ["В исходных данных найдены несовместимые ссылки на заведение или рабочее пространство.", "/data-control?tab=journal", "Проверить принадлежность данных"],
+  PERIOD_NOT_ENDED: ["Месяц ещё не закончился; итог нельзя подтвердить окончательно.", "/reports", "Посмотреть выбранный период"],
+  PURCHASE_AMOUNT_UNKNOWN: ["У подтверждённой закупки отсутствует проверяемая итоговая сумма.", "/suppliers", "Проверить закупки"],
+  RECURRING_INPUT_UNKNOWN: ["Не полностью настроены налоги или коммунальные расходы.", "/finance/settings", "Проверить регулярные расходы"],
+  REVENUE_NOT_FINAL: ["Не вся выручка рабочих дней подтверждена окончательно.", "/shifts", "Проверить подтверждение дней"],
+};
+function bdMonthlyReasonLinkV515(path, monthKey, venueId) {
+  const allowed = ["/finance", "/finance/settings", "/salaries", "/suppliers", "/sales-import", "/warehouse", "/data-control", "/reports", "/shifts"];
+  let url;
+  try { url = new URL(path, "https://bardoctor.invalid"); } catch { return null; }
+  if (url.origin !== "https://bardoctor.invalid" || !allowed.includes(url.pathname) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(monthKey) || !Number.isSafeInteger(venueId) || venueId <= 0) return null;
+  for (const key of [...url.searchParams.keys()]) if (!["view", "tab", "documentId", "inventory", "closeMonth", "workday"].includes(key)) url.searchParams.delete(key);
+  url.searchParams.set("month", monthKey); url.searchParams.set("venue", String(venueId)); url.hash = "";
+  return url.pathname + url.search;
+}
+function bdMonthlyPendingReasonsV513({ reasons = [], reasonDetails = [], reasonDetailsTruncated = false, monthKey, venueId }) {
+  const codes = [...new Set(reasons.filter(code => typeof code === "string" && code.length))];
+  if (!codes.length) return null;
+  return i.jsxs("section", { "data-bd-monthly-reasons": "v515", "data-bd-monthly-blockers": "v515", role: "status", className: "bd-monthly-card-v165", children: [
+    i.jsx("h3", { children: "Почему итоговая прибыль недоступна" }),
+    i.jsx("ul", { children: codes.map(code => {
+      const known = bdMonthlyReasonCatalogV515[code];
+      const href = bdMonthlyReasonLinkV515(known?.[1] || "/data-control?tab=journal", monthKey, venueId);
+      const details = Array.isArray(reasonDetails) ? reasonDetails.filter(detail => detail && detail.code === code) : [];
+      return i.jsxs("li", { style: { margin: "12px 0", overflowWrap: "anywhere" }, children: [
+        i.jsx("p", { children: known?.[0] || "Неподтверждённое условие расчёта: " + code }),
+        href && i.jsx("a", { href, children: known?.[2] || "Проверить данные" }),
+        details.length > 0 && i.jsx("ul", { children: details.map((detail, index) => {
+          const target = bdMonthlyReasonLinkV515(detail.href || known?.[1] || "/data-control?tab=journal", monthKey, venueId);
+          const date = typeof detail.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(detail.date) ? detail.date : null;
+          const sourceName = { bd_payroll_entries: "Зарплатная операция", bd_finance_revenue: "Выручка рабочего дня", bd_operational_reports_v1: "Операционный отчёт", bd_sales_events_v1: "Продажа POS", bd_sales_documents: "Документ продажи", bd_sales_batches: "Пакет расхода продаж", bd_inventory_snapshots: "Остатки", bd_stock_movements: "Движение склада", bd_inventory_writeoffs: "Списание", bd_opening_stock_v1: "Начальные запасы", bd_purchase_documents: "Закупка", bd_finance_expenses: "Расход", bd_finance_settings: "Финансовые настройки" }[detail.sourceKey] || "Источник";
+          return i.jsxs("li", { children: [date ? sourceName + " от " + date + (detail.outsidePeriod ? " — за пределами выбранного месяца. " : ". ") : sourceName + " требует проверки. ", target && i.jsx("a", { href: target, children: "Открыть источник" })] }, code + ":" + index);
+        }) }),
+      ] }, code);
+    }) }),
+    reasonDetailsTruncated && i.jsx("p", { children: "Показана только часть проблемных источников. Полный набор исходных документов доступен в соответствующих разделах." }),
+    i.jsx("p", { children: "Подтверждённая себестоимость продаж показана отдельно. Неизвестные суммы не заменяются нулём; подтверждение остатков не устраняет ошибки связей документов." }),
+  ] });
 }
 
 function bdMonthlyReportPage() {
@@ -386,9 +468,9 @@ function bdMonthlyReportPage() {
     i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance", right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
       i.jsx("nav", { className: "bd-monthly-period-v165", "aria-label": "Выбор месяца", children: months.map((month) => i.jsx("button", { type: "button", onClick: () => setPeriod(month), className: period === month ? "is-active" : "", children: bdMonthDisplay(month) }, month)) }),
+      report && i.jsx(bdMonthlyPendingReasonsV513, { reasons: verified.reasons, reasonDetails: verified.reasonDetails, reasonDetailsTruncated: verified.reasonDetailsTruncated, monthKey: period, venueId: bdMonthlyVenueIdPhase7(profile, settings) }),
       !report ? i.jsxs("section", { role: verified.error ? "alert" : "status", children: [i.jsx("p", { children: verified.error || "Проверяем данные месяца…" }), verified.error && i.jsx("button", { type: "button", onClick: verified.retry, children: "Повторить" })] }) : hasFinancialData ? i.jsxs(i.Fragment, { children: [
         ["LEGACY_PARTIAL", "INVALID"].includes(verified.evidenceStatus) && i.jsx("p", { role: "status", children: "Показан сохранённый исторический отчёт. Полнота и происхождение его исходных данных не подтверждены; суммы не пересчитаны." }),
-        i.jsx(bdMonthlyPendingReasonsV513, { reasons: verified.reasons }),
         i.jsx(bdMonthlyHeroV165, { report, previous }),
         i.jsx(bdMonthlyCurrencyBoundaryNoticeV320, { report }),
         i.jsx(bdMonthlyReadinessV165, { report, closingLauncher: i.jsx(bdMonthClosingLauncher, { settings, report, revenues: revenue.filter(row => String(row.date).slice(0, 7) === period), expenses: expenses.filter(row => String(row.date).slice(0, 7) === period), monthKey: period, navigate }, period) }),

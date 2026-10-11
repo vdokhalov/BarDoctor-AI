@@ -120,7 +120,12 @@ test("Phase 7 HTTP/SQLite: stale count cannot restore stock already consumed by 
     assert.equal(r.quantity("coffee-stock"), 2);
     const document = await r.reviewed("coffee-stock", 2);
 
-    const command = { ...saleCommand("coffee", 10), id: "phase7-after-count-sale" };
+    // Current POS contract requires an open workday with a team and its own cash shift.
+    // Seed only prerequisite fixture data, then create the cash shift through the real handler.
+    r.put("bd_operational_reports_v1", [{ id: "phase7-after-count-workday", venueId: 1,
+      date: new Date().toISOString().slice(0, 10), workdayStatus: "OPEN", staffing: [{ employeeId: "qa-worker" }] }]);
+    await r.send(r.sale, { action: "open_shift", shiftId: "phase7-after-count-cash", name: "QA cash", openingFloat: 0 }, 201);
+    const command = { ...saleCommand("coffee", 10), shiftId: "phase7-after-count-cash", id: "phase7-after-count-sale" };
     const quote = await r.send(r.sale, { action: "preview", command }, 200);
     const posted = await r.send(r.sale, { action: "post", command, previewHash: quote.previewHash }, 201);
     assert.equal(r.quantity("coffee-stock"), 1.92);

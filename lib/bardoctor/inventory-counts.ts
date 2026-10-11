@@ -145,6 +145,13 @@ export function inventoryCountHasStockEffects(document: unknown, stockMovements:
   );
 }
 
+/** Legacy monetary boundaries share the snapshot store but are not count documents. */
+export function isInventoryAccountingBoundary(value: unknown): boolean {
+  const item = record(value);
+  return !Array.isArray(item.items) && item.scope == null && item.internalId == null
+    && (Object.hasOwn(item, "sections") || Object.hasOwn(item, "total"));
+}
+
 export type InventoryCountDeleteResult =
   | { ok: true; deleted: boolean; idempotent: boolean; snapshots: unknown[]; document?: InventoryCountDocument }
   | { ok: false; code: "INVENTORY_NOT_FOUND" | "INVENTORY_DELETE_PROTECTED"; error: string; snapshots: unknown[] };
@@ -171,7 +178,7 @@ export function deleteInventoryCountDocument(input: {
   }
   const status = text(raw.status, "", 30);
   const safeStatus = !status || ["draft", "counting", "review"].includes(status);
-  if (!safeStatus || inventoryCountHasStockEffects(raw, input.stockMovements ?? [])) {
+  if (isInventoryAccountingBoundary(raw) || !safeStatus || inventoryCountHasStockEffects(raw, input.stockMovements ?? [])) {
     return {
       ok: false,
       code: "INVENTORY_DELETE_PROTECTED",

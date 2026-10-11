@@ -1,4 +1,6 @@
 import { derivedInputBelongs } from "./derived-input-scope";
+import { normalizeLegacyPayrollEntries } from "./payroll-entry-scope";
+import { monthCloseReasonDetails } from "./month-close-diagnostics";
 import { getD1 } from "../../db";
 import { authenticatedEvidenceContext } from "./evidence-resolver";
 import { hasPermission, permissionPayload, isAccessRole } from "./access-control";
@@ -32,7 +34,8 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const currency = accountingCurrencyFromProfile(profile);
   const startDate = `${monthKey}-01`, endDate = new Date(Date.UTC(Number(monthKey.slice(0, 4)), Number(monthKey.slice(5)), 0)).toISOString().slice(0, 10);
   const scope = { venueId, workspaceId, dataAccountId };
-  const data = Object.fromEntries(Object.entries(stores).map(([key, values]) => [key, scopedBusinessRows(values.map(value => value.venueId === "primary" ? { ...value, venueId } : value), scope)]));
+  const normalizedStores = { ...stores, bd_payroll_entries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries ?? [], profile, scope) };
+  const data = Object.fromEntries(Object.entries(normalizedStores).map(([key, values]) => [key, scopedBusinessRows(values.map(value => value.venueId === "primary" ? { ...value, venueId } : value), scope)]));
   const finance = readFinanceInputs({ ...scope, currency, asOf, startDate, endDate, revenues: data.bd_finance_revenue ?? [], reports: data.bd_operational_reports_v1, events: data.bd_sales_events_v1, documents: data.bd_sales_documents, expenses: data.bd_finance_expenses, payrollEntries: data.bd_payroll_entries });
   const snapshots = monthlySnapshotRows(data.bd_inventory_snapshots, venueId);
   const settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
@@ -46,7 +49,7 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
     if (model.mode != null && !["manual", "fixed", "percent"].includes(String(model.mode)) || model.mode === "fixed" && finiteBusinessNumber(model.amount) == null || model.mode === "percent" && finiteBusinessNumber(model.percent) == null) reasons.push("RECURRING_INPUT_UNKNOWN");
   }
   if ((data.bd_purchase_documents ?? []).some(value => value.status === "confirmed" && value.documentType !== "price_list" && String(value.date).slice(0, 7) === monthKey && finiteBusinessNumber(value.total) == null)) reasons.push("PURCHASE_AMOUNT_UNKNOWN");
-  if (Object.values(stores).some(values => !derivedInputBelongs(values, scope))) reasons.push("NESTED_INPUT_SCOPE_MISMATCH");
+  if (Object.values(normalizedStores).some(values => !derivedInputBelongs(values, scope))) reasons.push("NESTED_INPUT_SCOPE_MISMATCH");
   if (!currency || Number(report.unconvertedForeignCurrencyCount) > 0) reasons.push("CURRENCY_UNKNOWN_OR_UNCONVERTED");
   if (!report.periodPast) reasons.push("PERIOD_NOT_ENDED");
   if (report.expectedShifts !== report.accountedShifts) reasons.push("BUSINESS_DAY_COVERAGE_INCOMPLETE");
@@ -56,7 +59,7 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const payrollDelta = finance.payroll == null ? null : finance.payroll - Number(report.payroll);
   const adjust = (value: unknown) => value == null || payrollDelta == null ? null : money(Number(value) - payrollDelta);
   const snapshot = JSON.parse(JSON.stringify({ ...report, revenue: finance.revenue, payroll: finance.payroll, payrollBase: finance.payrollBase, payrollBonuses: finance.payrollBonuses, payrollPaid: finance.payrollPaid, payrollDeductions: finance.payrollDeductions, payrollSource: finance.payrollBasis, payrollNet: finance.payroll == null || finance.payrollDeductions == null ? null : money(finance.payroll - finance.payrollDeductions), resultBeforeCost: adjust(report.resultBeforeCost), cashResult: adjust(report.cashResult), shiftEstimates: array(report.shiftEstimates).map(shift => { const payroll = finance.payrollByDay.find(day => day.businessDate === shift.date)?.amount ?? null; const adjustDay = (value: unknown) => value == null || payroll == null ? null : money(Number(value) + Number(shift.payroll) - payroll); return { ...shift, payroll, estimatedCost: history.known ? money(history.daily[String(shift.date)]?.cost ?? 0) : null, resultBeforeCost: adjustDay(shift.resultBeforeCost), estimatedResult: adjustDay(shift.estimatedResult) }; }), costOfGoods: history.known ? history.cost : null, rawCostOfGoods: history.known ? history.cost : null, grossProfit: history.known && finance.revenue != null ? money(finance.revenue - history.cost) : null, costBasis: "historical_sales_snapshots", inventoryAdjustmentNet: history.known ? history.adjustment : null, operatingResult: finalProfit, finalProfit, isClosed: false, status: "preliminary" })) as Row;
-  return { currency, startDate, endDate, snapshot, eligible: finalProfit != null && Number.isFinite(finalProfit), reasons: [...new Set(reasons)], components: { revenue: finance.revenue, recordedFOT: finance.payroll, payrollByDay: finance.payrollByDay, activeExpenses: finance.operatingExpenses, capturedCOGS: history.cost, inventoryAdjustment: history.adjustment, openingId: row(report.openingSnapshot).id ?? null, closingId: row(report.closingSnapshot).id ?? null, openingBoundaryBasis: row(report.openingSnapshot).phase7PhysicalSnapshot === true ? "CAPTURED_PHYSICAL_VALUATION" : "LEGACY_RECORDED_TOTAL", closingBoundaryBasis: row(report.closingSnapshot).phase7PhysicalSnapshot === true ? "CAPTURED_PHYSICAL_VALUATION" : "LEGACY_RECORDED_TOTAL", finalResult: finalProfit } };
+  return { ...monthCloseReasonDetails({ reasons: [...new Set(reasons)], stores: normalizedStores, scope, monthKey, payrollByDay: finance.payrollByDay, days: finance.days, excluded: finance.excluded }), currency, startDate, endDate, snapshot, eligible: finalProfit != null && Number.isFinite(finalProfit), reasons: [...new Set(reasons)], components: { revenue: finance.revenue, recordedFOT: finance.payroll, payrollByDay: finance.payrollByDay, activeExpenses: finance.operatingExpenses, capturedCOGS: history.cost, inventoryAdjustment: history.adjustment, openingId: row(report.openingSnapshot).id ?? null, closingId: row(report.closingSnapshot).id ?? null, openingBoundaryBasis: row(report.openingSnapshot).phase7PhysicalSnapshot === true ? "CAPTURED_PHYSICAL_VALUATION" : "LEGACY_RECORDED_TOTAL", closingBoundaryBasis: row(report.closingSnapshot).phase7PhysicalSnapshot === true ? "CAPTURED_PHYSICAL_VALUATION" : "LEGACY_RECORDED_TOTAL", finalResult: finalProfit } };
 }
 
 export async function verifiedMonthCloseRequest(request: Request): Promise<Response> {

@@ -7,6 +7,7 @@ import { closedMonthsFromStore } from "../../../../lib/bardoctor/data-trust";
 import {
   createInventoryCountDocument,
   deleteInventoryCountDocument,
+  isInventoryAccountingBoundary,
   INVENTORY_COUNT_STORE_KEY,
   type InventoryCountDocument,
   type InventoryCountScope,
@@ -333,6 +334,10 @@ async function postOnce(request: Request): Promise<Response> {
   const now = new Date().toISOString();
   const name = actorName(account);
   const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson) ?? undefined;
+
+  const targetId = text(action === "create" || action === "legacy_finalize" ? requestedSnapshot.id : body.id ?? requestedSnapshot.id, "", 100);
+  const accountingBoundary = snapshots.find((value) => text(record(value).id, "", 100) === targetId && isInventoryAccountingBoundary(value));
+  if (accountingBoundary) return Response.json({ ok: false, code: action === "delete" ? "INVENTORY_DELETE_PROTECTED" : "INVENTORY_ACCOUNTING_BOUNDARY", error: "Учётные остатки изменяются в месячном отчёте и не могут быть проведены или удалены как инвентаризация." }, { status: 409 });
 
   if (action === "create" || action === "legacy_finalize") {
     const requestedScope = record(body.scope);
