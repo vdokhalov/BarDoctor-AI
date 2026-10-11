@@ -1,0 +1,85 @@
+# Reports→Finance complete navigation correction; not published
+Base:f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9, productionSitesv516.
+
+RCA1: relatedФинансы and emptyОткрытьфинансы used raw/finance; other callbacks omittedvenue, sharedglobalFinance tab bypassedReports handlers. Reports callbackwrapper nowsetsselectedmonth/venue onFinance+settings whilepreservingview; Reports-only bootstrapnormalizer fillsmissingcontext forsharednav. Existingdiagnosticanchors alreadyexplicitlyscoped.
+RCA2: previousnavigationfix waspresent inpublic butnotemitteddist/clientbootstrap. Thelatepatchran afterbuildcopiedruntimeassets. Localpublic-basedSPAchecks andbytecomparisonagainstthatflawedartifactcouldnotdetectthis. Livev39794861317fb4b lackedreportParentV516. Newruntimepatch appliesbothpublicanddist/client. Mandatorybuildverification readsactualemittedbootstrap,contractandversionedbundle.
+
+Verified allreachablefamilies: relatedFinance; emptyOpenFinance; globalFinance; expensecategories; shiftsection andshiftrows; headersettings; wizardexpenses/settings; diagnosticprimary/detailanchors; Back. Dormantlegacyreportfunction isnotrouted.
+
+ActualemittedHTMLextractedfromdist/serverincludingcanonicalUserShellAssets declarations; staticresourcesfromdist/client; realisolatedAPI. Eachcontrol usesfreshbrowsercontext, notpreparedhistory.
+- Chromium12/12PASS: Back,relatedFinance,globalFinance,categories,shifts,empty ×390/1440.
+- WebKit12/12PASS samefreshcontexts/emittedfiles.
+-18targetedtestsPASS; typecheck/scopedESLint/diff-check/buildPASS; public+emittedpatchidempotencePASS.
+-Independentreview independentlyrepeated12Chromiumcases, executedwizardcallbacks andnegativecases, inventoriedalllinks; no confirmedblocker. ASTcompare changedonlybdMonthlyReportPage function; nofinancialfunctions changed/deleted.
+-Backend, formulas, permissions, migrations andbusinessdata unchanged. ReadonlyliveHTML/bootstrap inspection only; noAIcalls.
+
+Bundle:index-BQGspy0I-9d39f5701c3f.js
+SHA256:9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c
+No publication; no fullremoteCI. Library401 notbypassed; GitHubnotesdurability authorized.
+
+ExactSHA:691ab51840266c9b6297fda7a84ee2077694a75f
+ArchiveSHA256:9980e3b0f11c740bc627c502704f399e83e5bac0f894b788c24ce665b6428fe0
+{
+  "commit": "691ab51840266c9b6297fda7a84ee2077694a75f",
+  "base": "f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9",
+  "published": false,
+  "files": {
+    "v518-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "v518-emitted-browser.log": "3fa9d4732919a04a572b58796f14735c09363182ba28c9e66436e800bb828cf9",
+    "v518-result.md": "7beb32d9055c7e7d8ed06dce8d9447185132514027e91aeb88daa0ab951b2cc0",
+    "v518-build.log": "84895e87ec9285206e54e06a2896b9a5392d9d05ebb99a4ecc62c15ca4027467",
+    "bundle-verification.txt": "991494b910fa1e9f4e34ea2d083b7519879b9e2711f7e011bab764db6341c81f",
+    "v518-fresh-diagnostic.log": "2dd39f9a7d7cd73a89b5dc51cf257b9c766b17cf675ccbb4762191dd5743158f",
+    "v518-unit.log": "a3084f63e4123c6eb8f075631ca739d928ec7d498c7cc92ef764da4cb59f38b4",
+    "v518-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "independent-reports-finance-v518.log": "3fa9d4732919a04a572b58796f14735c09363182ba28c9e66436e800bb828cf9",
+    "independent-reports-finance-unit-v518.log": "4df08e24e8e7b2f2baa8b2f054d93b1445c1e2c3d731d567f3e0504a20e6b45a",
+    "repository.bundle": "c13a621c9635204d5024175da26d41c029c0bd3628e550568c23ca5f8e033640",
+    "v518-emitted-webkit.log": "030f692850390aaaea6ca08b6e21aaac67846f9f55df3231d9ead9c0d6b0c394",
+    "v518-live-report-shell.html": "dd05a46b4c9721f05d8ef8831274cb888fba0d46892fb3d25ce59f6fa9536415",
+    "changes.patch": "ce4acaec8c815eefea2bc18fe9f7a22f568eab618f8022f7c8330be755232526",
+    "reports-finance-link-inventory-v518.md": "93761c53040b81cd8e313c0cd100dca296f9a42bd0f0b9dae78546dd1e867f4b"
+  }
+}
+Independent exhaustive Reports→Finance inventory, baseline f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9.
+
+Reachable route is /reports -> bdMonthlyReportPage. bdMonthlyReportLegacyPage occurs only once (declaration), so legacy links are dormant.
+
+Callback paths to audit through page-local navigate wrapper:
+1 Report footer 'Финансы': /finance.
+2 Empty-report 'Открыть финансы': /finance.
+3 Accounting header right 'Настройки': /finance/settings (presentation can hide localheader behind globalheader; still scoped).
+4 Expense section 'Все категории': /finance?month=<period>&view=expenses.
+5 Shift section 'Открыть смены': /finance?month=<period>&view=revenue.
+6 Each shift row: same view=revenue target.
+7 Closing wizard step2 'Открыть расходы': /finance, through stepbody.onNavigate -> launcher.navigate -> page wrapper.
+8 Closing wizard step6 'Открыть финансовые настройки': /finance/settings through same chain.
+
+Separate anchor paths:
+9 Main diagnostic reason links: bdMonthlyReasonLinkV515 injects active month/venue into allowed Finance/FinanceSettings routes.
+10 Diagnostic detail links: same helper; month/venue overridden from active scope, external/command paths rejected.
+Relevant reason codes: REVENUE_OR_CURRENCY, EXPENSES_OR_CURRENCY, ACCOUNTING_CURRENCY_UNKNOWN, REVENUE_CURRENCY_MISMATCH, SALES_DOCUMENT_IDENTITIES_MISSING, CURRENCY_UNKNOWN_OR_UNCONVERTED, FINANCIAL_CURRENCY_UNCONVERTED, RECURRING_INPUT_UNKNOWN. Server detail fallback may also select /finance for other reason codes; both anchorfamilies covered by shared helper.
+
+Back:
+11 Visible global header uses current history or scoped contract/direct-link-seeded Finance parent from v516.
+12 Local AccountingHeader fallback includes period+venue, as in v516.
+
+Additional actual path discovered independently outside page wrapper:
+13 Tle shared Finance navigation item renders Zl href='/finance' in bottomnav/desktoprail, and Reports showBottomNav=true. Parent notified: needs Reports-only scoping to meet ALLlinks requirement; preserving otherpages default behavior.
+
+Non-Finance outputs (salary, warehouse, sales-import, suppliers, shifts standalone) excluded from target rewrite. Wizard rows/drilldown are displays rather than additional Finance navigation callbacks. No other Finance URL handler found in active report fragment or active wizard children.
+
+FINAL REVIEW OUTCOME
+Reviewed working delta atop f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9, emitted asset index-BQGspy0I-9d39f5701c3f.js. No confirmed remaining blocker.
+
+Previously published bootstrap missed v516 fix because late aggregate patched public runtime after build copying, while dist/client retained earlier loader. Public-served browser tests could not prove emitted behavior. Fixed runtime patch now covers public AND dist/client. Strengthened mandatory verifier reads dist bootstrap, dist navigation contract, resolves the actual versioned module from bootstrap and verifies the Reportswrapper in that emitted module. Independently rerun verifier PASS.
+
+All inventory paths now covered: page wrapper feeds all child callbacks and launcher/wizard chain; primary/detail reasons independently scope anchors; visible Back uses corrected emitted parent seed; newly discovered bottomnav/desktoprail Finance path covered by Reports-only global normalizer.
+
+Independent emitted-artifact browser:12/12PASS =6 controls(back, related Finance, globalnav Finance, allcategories, openshifts, emptyOpenFinance) ×390/1440. Fresh context every control, actual BAR_DOCTOR_HTML from dist/server with emitted constants, ALL static assets from dist/client, real authenticated isolated API. All source stores unchanged. Log independent-reports-finance-v518.log.
+
+Additional independent VM checks: Reportswrapper overwrites wrongincoming month/venue for Finance/settings, preserves view/section; unrelated/external targets unchanged. Actual wizard stepbody callbacks for expenses/settings pass through wrapper and produce September/3389. Emitted globalnormalizer scopes Finance/settings only while on Reports; does not affect unrelatedpages/external URLs. Actual versioned module contains wrapper. Reasonanchor6tests independentlyPASS.
+
+Final canonical AST token comparison versus baseline: only bdMonthlyReportPage changed, no removed function declarations. Earlier unrelated differences were intermediate build regeneration, absent from final artifact. No formulas/backend/data changes. Legacy report function remains unreachable.
+
+Limits: independentbrowser Chromium only; root performs WebKit separately. Header settings and per-shift-row covered by codepath/wrapper review, wizard actions additionally executed in VM; not claimed independently browser-clicked. Final commit/deploy belongs to root; no deploy performed by reviewer.
