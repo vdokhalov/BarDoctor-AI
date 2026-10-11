@@ -1,0 +1,73 @@
+{
+  "source_commit": "2fa4d06de563b74d991bdb22a2c9d0b0fa387e93",
+  "version": {
+    "id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_d882b7cee11881919050c2929de90fbe",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "version_number": 512,
+    "source": {
+      "commit_sha": "2fa4d06de563b74d991bdb22a2c9d0b0fa387e93"
+    },
+    "archive_storage": {
+      "archive_format": "tar",
+      "sediment_file_id": "file_00000000afe48230b264e379915d8edf",
+      "content_hash": "sha256:580c73b3076eeec3496f2f004f88285e2b59de4c8f09ba4638d15992cad85267",
+      "size_bytes": 58091520,
+      "file_count": 288
+    },
+    "screenshot_url": null,
+    "deployment_id": null
+  },
+  "deployment": {
+    "id": "appgdep_6acb5e2f3df08191a6b89fc6b6518fa0",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "title": "BarDoctor Preview",
+    "version_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_d882b7cee11881919050c2929de90fbe",
+    "type": "publish",
+    "status": "succeeded",
+    "url": "https://bardoctor-preview.v-dokhalov.chatgpt.site",
+    "has_mcp": false,
+    "screenshot_asset_pointer": null,
+    "provider_deployment_id": "v-dokhalov--bardoctor-preview",
+    "failure_message": null,
+    "env_set_revision": 14,
+    "updated_at": "2026-10-11T10:00:30.054123+00:00"
+  },
+  "rollback_version": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_b5bc935644c48191ab806d7b469e9d23",
+  "access_revision": 2,
+  "durable_receipt_ref": "refs/notes/sites-v512",
+  "notes": "Explicit user approval 2026-10-11 09:58:54 UTC. No migration/hosting changes, no real venue data writes. Parent QA3389 pending.",
+  "live_checks": {
+    "/api/healthz": {
+      "status": 200,
+      "bytes": 36,
+      "sha256": "2aacb58bde048675745be7ee7ca152c36e29a9f7a2c60a668f737bded7dd87df",
+      "body": {
+        "status": "ok",
+        "storage": "sites-d1"
+      }
+    },
+    "/assets/index-BQGspy0I-06e165aaffde.js": {
+      "status": 200,
+      "bytes": 2885400,
+      "sha256": "06e165aaffde671338fe3ed1df651c939e5bc12d56c433ebe43ab4adaad610c6",
+      "matches_local": true
+    },
+    "/catalog.css": {
+      "status": 200,
+      "bytes": 57567,
+      "sha256": "e4df67bdc5876dd660748fbfb2e314f4019bb572346c4ca55d13ea6ccadf3a90",
+      "matches_local": true
+    },
+    "/embedded-shell-v269.css": {
+      "status": 200,
+      "bytes": 720,
+      "sha256": "17cf910c55531cc9610faba10cab6e040e46dd7f787781bb971a1fc98a84a00c",
+      "matches_local": true
+    },
+    "catalog_bootstrap": {
+      "status": 200,
+      "bootstraps": 3,
+      "executes": "index-BQGspy0I-06e165aaffde.js"
+    }
+  }
+}
