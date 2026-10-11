@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { patchReportsFinanceScopeV518 } from './patch-reports-finance-scope-v518.mjs';
 import { patchMonthlyReturnV516, patchMonthlyReturnRuntimeV516 } from './patch-monthly-return-v516.mjs';
 import { patchFinanceCanonicalV515 } from './patch-finance-canonical-v515.mjs';
 import { patchPayrollConfirmation } from './patch-payroll-confirmation-v513.mjs';
@@ -15,4 +16,5 @@ let source = fs.readFileSync(file, 'utf8');
 for (const patch of [patchPayrollConfirmation, patchDataControlNavigation, patchEquipmentInventoryV513, patchMonthlyReportV513, patchDiagnosisBudget, patchAccountingBoundaryV514, patchMonthlyReasonsV515, patchInventoryBoundaryPresentationV515, patchFinanceCanonicalV515, patchMonthlyReturnV516]) source = patch(source);
 fs.writeFileSync(file, source);
 patchMonthlyReturnRuntimeV516();
+patchReportsFinanceScopeV518();
 console.log('QA audit v513 client fixes applied');

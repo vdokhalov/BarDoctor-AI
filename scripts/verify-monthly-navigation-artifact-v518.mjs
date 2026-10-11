@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const bootstrap=fs.readFileSync('dist/client/bardoctor-preview-v397.js','utf8');
+assert(bootstrap.includes('var reportParentV516 = new URL(currentUrl, window.location.origin);'),'Emitted bootstrap lacks independent report parent');
+assert(bootstrap.includes('var reportScopeV518 = new URL(window.location.href);'),'Emitted bootstrap lacks Reports→Finance context');
+assert(fs.readFileSync('dist/client/navigation-contract-v247.js','utf8').includes('finance.searchParams.set(key'),'Emitted report navigation contract lacks context');
+const names=[...new Set(bootstrap.match(/index-BQGspy0I-[a-f0-9]+\.js/g)||[])];
+assert.equal(names.length,1,'Exactly one emitted canonical bundle required');
+const client=fs.readFileSync('dist/client/assets/'+names[0],'utf8');
+assert(client.includes('return rawNavigate(url.pathname + url.search + url.hash);'),'Report callback wrapper missing');
+console.log('Emitted monthly navigation contract verified');

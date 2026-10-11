@@ -582,6 +582,11 @@
   function normalizeApplicationHref(value) {
     try {
       var url = new URL(String(value), window.location.href);
+      if (window.location.pathname === "/reports" && url.origin === window.location.origin && ["/finance", "/finance/settings"].includes(url.pathname)) {
+        var reportScopeV518 = new URL(window.location.href);
+        ["month", "venue"].forEach(function(key) { if (!url.searchParams.has(key) && reportScopeV518.searchParams.has(key)) url.searchParams.set(key, reportScopeV518.searchParams.get(key)); });
+        return url.pathname + url.search + url.hash;
+      }
       if (url.origin === window.location.origin && url.pathname === "/decisions") {
         url.pathname = "/analysis";
         return url.pathname + url.search + url.hash;

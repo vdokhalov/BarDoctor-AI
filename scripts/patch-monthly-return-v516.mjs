@@ -20,5 +20,5 @@ export function patchMonthlyReturnRuntimeV516(){
       else { var reportQueryV516 = reportParentV516.searchParams; reportParentV516 = new URL("/finance", window.location.origin); ["month", "venue"].forEach(function(key) { if (reportQueryV516.has(key)) reportParentV516.searchParams.set(key, reportQueryV516.get(key)); }); }
       parentUrl = reportParentV516.pathname + reportParentV516.search;
     }`]];
- for(const [name,before,after] of paths){const path=new URL(name,import.meta.url);let source=fs.readFileSync(path,'utf8');if(source.includes(after))continue;if(source.split(before).length!==2)throw Error('Monthly runtime return anchor missing: '+name);source=source.replace(before,after);fs.writeFileSync(path,source)}
+ for(const [name,before,after] of paths)for(const target of [name,name.replace('../public/','../dist/client/')]){const path=new URL(target,import.meta.url);if(!fs.existsSync(path))continue;let source=fs.readFileSync(path,'utf8');if(source.includes(after))continue;if(source.split(before).length!==2)throw Error('Monthly runtime return anchor missing: '+target);source=source.replace(before,after);fs.writeFileSync(path,source)}
 }

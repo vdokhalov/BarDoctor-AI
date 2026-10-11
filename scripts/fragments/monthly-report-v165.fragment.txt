@@ -442,7 +442,7 @@ function bdMonthlyPendingReasonsV513({ reasons = [], reasonDetails = [], reasonD
 }
 
 function bdMonthlyReportPage() {
-  const [, navigate] = bt();
+  const [, rawNavigate] = bt();
   const { profile } = Un();
   const { revenue, expenses, gapReasons } = Ur();
   const { settings, snapshots } = bdUseAccountingStore(profile);
@@ -453,6 +453,14 @@ function bdMonthlyReportPage() {
   const revision = S.useMemo(() => ({}), [profile, revenue, expenses, snapshots, settings, gapReasons]);
   const verified = bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile, settings), period, revision);
   const report = verified.report;
+  const navigate = (path) => {
+    const url = new URL(path, window.location.origin);
+    if (url.origin === window.location.origin && ["/finance", "/finance/settings"].includes(url.pathname)) {
+      url.searchParams.set("month", period); url.searchParams.set("venue", String(bdMonthlyVenueIdPhase7(profile, settings)));
+      return rawNavigate(url.pathname + url.search + url.hash);
+    }
+    return rawNavigate(path);
+  };
   const previous = S.useMemo(() => {
     const currentIndex = months.indexOf(period);
     const earlier = currentIndex >= 0 ? months.slice(currentIndex + 1) : [];
