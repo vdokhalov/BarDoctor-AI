@@ -1,11 +1,5 @@
 .bd-app-header-leading { min-width: 0; }
-body[data-bd-route="/sales-import"] > bd-app-header { display: none; }
-body[data-bd-route="/sales-import"] iframe[title="Продажи и склад"] {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100dvh !important;
-}
+/* Sales uses the shared app shell; its header, sidebar and bottom nav own the frame offsets. */
 .bd-warehouse-movement-filters-v275 {
   display: flex;
   gap: 8px;
