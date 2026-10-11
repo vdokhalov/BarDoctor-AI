@@ -1,0 +1,52 @@
+{
+  "commit": "926fa50bac5b18a0da8e6a383c688f07692a4282",
+  "base": "2fa4d06de563b74d991bdb22a2c9d0b0fa387e93",
+  "branch": "recovery/cashier-v505-20261010",
+  "publication": "not authorized; not performed",
+  "checks": {
+    "build": "PASS",
+    "typecheck": "PASS",
+    "scoped_lint": "PASS",
+    "final_targeted_tests": 22,
+    "ui_contract_tests": 29,
+    "domain_tests": 62,
+    "cashier_browser_widths": [
+      390,
+      412,
+      1440
+    ],
+    "generated_bundle_extra_eslint": "OOM; source lint and artifact validation pass"
+  },
+  "remaining": [
+    "Separate accounting-boundary document awaits explicit valuation choice; no stock or QA data modified",
+    "Physical iPhone/WebKit not tested",
+    "Employee UUID display not reproduced"
+  ],
+  "asset_sha256": "c9e7bde7ca4c14c4ffe4e5ea478207284b2dc7d1849624d480bba032549a4296",
+  "files": {
+    "repository.bundle": "874f4b274a33886534646433ca91bc27371f5fa32b9e2fce7e5c7c6ffe418315",
+    "changes.patch": "38b63f1cfd230ee78355331aca1909d7a5a126858a932e9fb428cc163bcd8309",
+    "evidence/v513-ui-contracts.log": "9c1b1e1261f77e0832b5361506098991c1594dd83f348908962b3fdae08244e6",
+    "evidence/v513-domain.log": "c7640128205de2fcaa4fb4c4807f953bafc1e3b3130152fcc8403322df1f4acf",
+    "evidence/v513-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "evidence/v513-final-ui.log": "a28cfa9acadd35f730044655235123771bc1f405dd301905a240d349d2e62c10",
+    "evidence/v513-integrated-targeted.log": "27de9a5f37ca9d9439abe34fd91697f21bbcc54a11233bff8bf26ff5a79d23aa",
+    "evidence/v513-scoped-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evidence/v513-final-targeted.log": "8b0367ae7966c435494ed26d0d2c7e061779625087e2bcb735470285464c96ff",
+    "evidence/v513-cashier-dialog-unit.log": "bcc4f05d20a24badd9f7feac3bf58d2c7f75afeda1af9a611f31ae70827c7c82",
+    "evidence/v513-cashier-dialog-browser.json": "efa351df523ba84251ca69c0e873eef3c5218f5c9618b8a593debcfbb692d694",
+    "evidence/v513-build.log": "00c2bc26324abcb3aa922c7cfd94bff79fb19180bbbdc42a309fbfabb2441089",
+    "evidence/v513-final-lint.log": "3bfc5dc790d826949ed4f46884993bea60b8742f0a7cb2c063261206e36a1733"
+  },
+  "checkpoint_archive": {
+    "path": "/workspace/checkpoints/BarDoctor-926fa50b-QA-fixes.tar.gz",
+    "sha256": "11a4d09bf834d2cd88ebf206e50b7d389b8160018c69d03aad2f5d9400d3388f"
+  },
+  "library_result": "FAILED HTTP 401 before upload; no Library ID; official prepared route only",
+  "receipts": {
+    "v513-final-targeted.log": "✔ terminal CANCELLED order cannot remain selected or claim to be Open (3.930745ms)\n✔ terminal PAID order cannot remain selected or claim to be Open (0.986633ms)\n✔ unchanged staff access purges management caches without dismissing a POS dialog (1.135984ms)\n✔ recovery rejects changed role without clicking or submitting (1.553266ms)\n✔ recovery rejects changed permissions without clicking or submitting (1.306728ms)\n✔ recovery rejects changed shift without clicking or submitting (1.088232ms)\n✔ recovery rejects changed order without clicking or submitting (0.920692ms)\n✔ recovery rejects changed quick without clicking or submitting (1.096874ms)\n✔ recovery rejects changed menu without clicking or submitting (1.12918ms)\n✔ recovery rejects changed pending without clicking or submitting (1.262306ms)\n✔ revoked access before initial bootstrap erases transient drafts, retaining cart and unrelated session data (2.048983ms)\n✔ successful read clears only transient connection notice; pending=false (2.217867ms)\n✔ successful read clears only transient connection notice; pending=true (0.781115ms)\n✔ success cannot erase an operation error or overwrite frozen identity state (2.474283ms)\n✔ team permission revocation removes management data from every cached view (1.201652ms)\n✔ late refresh cannot replace the current order data or render (1.119765ms)\n✔ normal report reads authorized server COGS despite excluded raw bootstrap and unknown boundaries; GET writes nothing (333.221672ms)\n✔ server denial and scope mismatch never fall back to local figures (3.849581ms)\n✔ legacy and invalid closed snapshots remain viewable with explicit provenance status, never recomputed (6.921045ms)\n✔ superseded and disposed report requests cannot publish old venue/month data; errors clear data (1.15196ms)\n✔ Finance quick action preserves selected September in Report navigation (48.350606ms)\n✔ monthly readiness mounts the real close launcher with September context, not a dead query-only link (1.990575ms)\nℹ tests 22\nℹ suites 0\nℹ pass 22\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 625.67956\n",
+    "v513-final-ui.log": "✔ calendar automatic invocation and cancelled consent perform no POST (3.710856ms)\n✔ saved review loads never invoke paid analysis; reload after imports also stays read-only (0.925978ms)\n✔ supplier global action chooses a group without fan-out (1.927999ms)\n✔ web search request/tool/output budgets; provider status 200 (87.280597ms)\n✔ web search request/tool/output budgets; provider status 400 (14.971288ms)\n✔ web search request/tool/output budgets; provider status 422 (9.135197ms)\n✔ web search request/tool/output budgets; provider status 500 (9.995622ms)\n✔ diagnosis budget patch is replay safe and disables retries (17.887372ms)\n✔ explicit reviews analyzes at most25 and one summary, repeated handler is guarded (4.004341ms)\n✔ review result from previous venue cannot be persisted into newly selected venue (2.126469ms)\n✔ all Home bootstrap variants only read saved AI data (7.530449ms)\n✔ market ignores automatic and declined paid requests; saving location does not launch AI (2.078623ms)\n✔ supplier picker can launch any group without saved results (2.608072ms)\n✔ subsection query updates reach the iframe without remounting the outer route (3.76562ms)\n✔ explicit empty search, venue switch and browser back cannot reuse stale window query (3.053849ms)\n✔ other embedded pages retain their location fallback, title and preparation handler (1.575531ms)\n✔ patch is repeatable and fails closed against unexpected source (1.633484ms)\n✔ new equipment detail excludes unrelated venue expenses (1.901143ms)\n✔ dated repair keeps one450 entry before and after fixed/verified history (18.378759ms)\n✔ work order/history dedupe remains identity based across dates without finance (0.261418ms)\n✔ unrelated standalone historical repairs retained (0.409064ms)\n✔ review uses base quantity for persisted kg/l snapshots and package inputs (2.762876ms)\n✔ persisted layout resets only owned surface after commit, never failed or dirty edits (2.29436ms)\n✔ equipment passport exposes name/state instead of technical key; replay stable (25.04601ms)\n✔ payroll patch is idempotent and does not change the approval filter or persistence hook (4.629368ms)\n✔ existing pending deduction explicitly confirms in editor, keeping ID, date and amount (17.131989ms)\n✔ all deduction categories retain pending exclusion, confirmed and legacy inclusion (6.425933ms)\n✔ editing an unconfirmed or rejected entry without confirmation preserves its status (18.419554ms)\n✔ new deduction stays unconfirmed by default; edit cancellation performs no save; pending rows explain exclusion (7.012669ms)\nℹ tests 29\nℹ suites 0\nℹ pass 29\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 664.244224\n",
+    "v513-cashier-dialog-browser.json": "{\"fixture\":\"isolated real API / same-context bootstrap refresh\",\"results\":[{\"width\":390,\"addRecovery\":true,\"editRecovery\":true,\"paymentRecovery\":true,\"cancelDoesNotRestore\":true,\"changedPriceDoesNotRestore\":true,\"noAutomaticPayment\":true,\"cancelledSelectionCleared\":true,\"quickDraftPreserved\":true,\"embeddedNavigations\":6},{\"width\":412,\"addRecovery\":true,\"editRecovery\":true,\"paymentRecovery\":true,\"cancelDoesNotRestore\":true,\"changedPriceDoesNotRestore\":true,\"noAutomaticPayment\":true,\"cancelledSelectionCleared\":true,\"quickDraftPreserved\":true,\"embeddedNavigations\":6},{\"width\":1440,\"addRecovery\":true,\"editRecovery\":true,\"paymentRecovery\":true,\"cancelDoesNotRestore\":true,\"changedPriceDoesNotRestore\":true,\"noAutomaticPayment\":true,\"cancelledSelectionCleared\":true,\"quickDraftPreserved\":true,\"embeddedNavigations\":6}]}\n",
+    "v513-scoped-lint.log": ""
+  }
+}
