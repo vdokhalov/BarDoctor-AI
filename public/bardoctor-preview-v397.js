@@ -1474,6 +1474,12 @@
       return;
     }
     var parentUrl = queryParentUrl || bdLogicalParentRoute(path);
+    if (path === "/reports") {
+      var reportParentV516 = new URL(currentUrl, window.location.origin);
+      if (reportParentV516.searchParams.has("closeMonth")) reportParentV516.searchParams.delete("closeMonth");
+      else { var reportQueryV516 = reportParentV516.searchParams; reportParentV516 = new URL("/finance", window.location.origin); ["month", "venue"].forEach(function(key) { if (reportQueryV516.has(key)) reportParentV516.searchParams.set(key, reportQueryV516.get(key)); }); }
+      parentUrl = reportParentV516.pathname + reportParentV516.search;
+    }
     if (!parentUrl || parentUrl === currentUrl) {
       bdEnsureCurrentEntry();
       return;

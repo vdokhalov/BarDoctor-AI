@@ -127,6 +127,7 @@
     if (path === "/shifts" && query.has("closeShift")) return { type: "create", title: "Закрытие смены", parent: clean(url, ["closeShift"]), headerMode: "underlay" };
     if (path === "/tasks" && query.get("new") === "1") return { type: "create", title: "Новое поручение", parent: clean(url, ["new", "title", "responsible"]), headerMode: "underlay" };
     if (path === "/reports" && query.has("closeMonth")) return { type: "wizard", title: "Закрытие периода", parent: clean(url, ["closeMonth"]), headerMode: "underlay" };
+    if (path === "/reports") { var finance = new URL("/finance", url.origin); ["month", "venue"].forEach(function(key) { if (query.has(key)) finance.searchParams.set(key, query.get(key)); }); return { type: "report", title: "Месячный отчёт", parent: finance.pathname + finance.search }; }
     return null;
   }
 

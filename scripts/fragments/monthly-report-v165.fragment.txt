@@ -465,7 +465,7 @@ function bdMonthlyReportPage() {
   }, [profile, period, revenue, expenses, snapshots, settings, gapReasons, months]);
   const hasFinancialData = report && (report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0);
   return i.jsx(nt, { showBottomNav: true, className: "pb-32", children: i.jsxs($e, { className: "pt-0", children: [
-    i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance", right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
+    i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance?month=" + period + "&venue=" + bdMonthlyVenueIdPhase7(profile, settings), right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
       i.jsx("nav", { className: "bd-monthly-period-v165", "aria-label": "Выбор месяца", children: months.map((month) => i.jsx("button", { type: "button", onClick: () => setPeriod(month), className: period === month ? "is-active" : "", children: bdMonthDisplay(month) }, month)) }),
       report && i.jsx(bdMonthlyPendingReasonsV513, { reasons: verified.reasons, reasonDetails: verified.reasonDetails, reasonDetailsTruncated: verified.reasonDetailsTruncated, monthKey: period, venueId: bdMonthlyVenueIdPhase7(profile, settings) }),
