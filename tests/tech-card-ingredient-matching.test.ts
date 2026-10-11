@@ -363,3 +363,17 @@ test("matching eval keeps HIGH precision at 100% on the false-positive guard set
   assert.equal(metrics.falsePositives, 0);
   assert.equal(metrics.highConfidence, 1);
 });
+
+test('canonical v4 and legacy piece conversions use the candidate quantity basis', () => {
+  for (const [unit, conversionUnit, expected] of [['l','ml',0.2],['kg','g',0.2],['ml','ml',200],['g','g',200]] as const) {
+    const candidate = candidates(assortmentWith([{ productKey:'canonical', name:'Canonical QA', unit, baseUnit:unit, unitModelVersion:4 }]))[0];
+    const ingredient={quantity:2,unit:'pcs',unitConversion:{amount:100,unit:conversionUnit,confirmedByUser:true}};
+    const resolution=reconcileIngredientQuantity({ingredient,candidate});
+    assert.equal(resolution.status,'packaging_compatible');assert.equal(resolution.normalizedAmount,expected);assert.equal(resolution.normalizedUnit,unit);
+    for(const conversion of [{amount:100,unit:conversionUnit,confirmedByUser:false},{amount:0,unit:conversionUnit,confirmedByUser:true},{amount:Infinity,unit:conversionUnit,confirmedByUser:true},{amount:100,unit:unit==='l'||unit==='ml'?'g':'ml',confirmedByUser:true}]) {
+      assert.notEqual(reconcileIngredientQuantity({ingredient:{...ingredient,unitConversion:conversion},candidate}).status,'packaging_compatible');
+    }
+    const packaged=reconcileIngredientQuantity({ingredient:{quantity:1,unit:'pcs'},candidate:{...candidate,packageSize:unit==='l'||unit==='ml'?'1 л':'1 кг'}});
+    assert.equal(packaged.status,'packaging_compatible');assert.equal(packaged.normalizedAmount,unit==='l'||unit==='kg'?1:1000);
+  }
+});

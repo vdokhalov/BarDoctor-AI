@@ -26,3 +26,19 @@ test('actual store persistence clears old product conversion without touching st
   assert.equal(line.unitConversion,undefined);assert.notEqual(line.normalizedQuantity,200);assert.equal(line.cost,undefined);assert.equal(after.recipes[0].status,'draft');assert.deepEqual(after.stockBalances,before.stockBalances);
  }finally{runtime.close()}
 });
+
+for(const unit of ['l','kg','ml','g'])test(`actual save/reopen preserves confirmed piece conversion for ${unit}`,async()=>{
+ const runtime=await storeRuntime(901);
+ try{
+  const product={id:'canonical',key:'canonical-key',productKey:'canonical-key',name:'Canonical QA',unit,baseUnit:unit,unitModelVersion:4,venueId:901,active:true,kind:'stock'};
+  const ingredient={id:'line',name:product.name,quantity:2,unit:'pcs',purchaseProductKey:product.key,productKey:product.key,nomenclatureItemId:product.id,linkConfirmedByUser:true,normalizedQuantity:200,normalizedUnit:['l','ml'].includes(unit)?'ml':'g',unitResolutionStatus:'packaging_compatible',unitConversion:{amount:100,unit:['l','ml'].includes(unit)?'ml':'g',confirmedByUser:true}};
+  const before={menuItems:[{id:'menu',name:'Recipe QA',type:'composite',consumptionMode:'RECIPE',venueId:901,active:true}],recipes:[{id:'recipe',menuItemId:'menu',ownerId:'menu',ownerType:'menu_item',venueId:901,status:'draft',current:true,lifecycleStatus:'current',ingredients:[ingredient]}],nomenclature:[product],stockBalances:[{...product,current:10}]};
+  runtime.seed('bd_assortment_v1',before);
+  const next=structuredClone(before);next.recipes[0].status='confirmed';next.recipes[0].reviewStatus='approved';
+  const saved=await runtime.put('bd_assortment_v1',next,'QA confirm canonical piece conversion',before);
+  assert.equal(saved.status,200,JSON.stringify(saved.body));
+  const after=(await runtime.get('bd_assortment_v1')).body.data;
+  const line=after.recipes[0].ingredients[0];
+  assert.equal(line.unitResolutionStatus,'packaging_compatible');assert.equal(line.normalizedQuantity,['l','kg'].includes(unit)?0.2:200);assert.equal(line.normalizedUnit,unit);assert.equal(after.recipes[0].status,'confirmed');assert.deepEqual(after.stockBalances,before.stockBalances);
+ }finally{runtime.close()}
+});

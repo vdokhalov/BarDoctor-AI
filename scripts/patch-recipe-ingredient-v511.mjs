@@ -38,6 +38,17 @@ if(hs>=0)source=source.slice(0,hs)+helper+'\n'+source.slice(he);
 else source=source.replace('function bdCatImportReview(',helper+'\nfunction bdCatImportReview(');
 source=source.replace('function bdCatIngredientMatchV375({ingredient:e,products:t,','function bdCatIngredientMatchV375({ingredient:e,venueId:bdPickerVenueV511,products:t,');
 source=source.replace('products=bdTechCompleteProductsV375(t),sections=','products=bdTechCompleteProductsV375(t).filter(item=>!bdPickerVenueV511||!item.venueId||Number(item.venueId)===Number(bdPickerVenueV511)),sections=');
+// Preserve the stock quantity unit before the legacy search adapter normalizes to ml/g.
+const adapterStart=source.indexOf('function bdCatMatchingProductsV258('),adapterEnd=source.indexOf('function ',adapterStart+9);
+let adapter=source.slice(adapterStart,adapterEnd);
+if(!adapter.includes('bdCatToBase(1,a.unitModelVersion'))adapter=adapter.replace(':f.unit!=="unknown"?f.unit:d.unit||"unknown"', ':bdCatToBase(1,a.unitModelVersion===4?a.unit:a.baseUnit||a.unit).unit!=="unknown"?bdCatToBase(1,a.unitModelVersion===4?a.unit:a.baseUnit||a.unit).unit:f.unit!=="unknown"?f.unit:d.unit||"unknown"');
+if(adapter.includes('canonicalStockUnit:'))adapter=adapter.replace('canonicalStockUnit:a.canonicalStockUnit||a.baseUnit||a.unit||d.canonicalStockUnit','canonicalStockUnit:a.canonicalStockUnit||(a.unitModelVersion===4&&["l","kg","pcs"].includes(a.unit)?a.unit:a.baseUnit||a.unit)||d.canonicalStockUnit');
+if(!adapter.includes('canonicalStockUnit:')){
+ const anchor='n.set(l,{...d,...a,key:l,';
+ if(!adapter.includes(anchor))throw Error('Canonical picker unit anchor missing');
+ adapter=adapter.replace(anchor,'n.set(l,{...d,...a,canonicalStockUnit:a.canonicalStockUnit||(a.unitModelVersion===4&&["l","kg","pcs"].includes(a.unit)?a.unit:a.baseUnit||a.unit)||d.canonicalStockUnit,key:l,');
+}
+source=source.slice(0,adapterStart)+adapter+source.slice(adapterEnd);
 fs.writeFileSync(file,source);
 for(const path of ['app/bar-doctor-response.ts','public/app.html']) {
  const before=fs.readFileSync(path,'utf8');

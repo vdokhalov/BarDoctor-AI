@@ -477,12 +477,14 @@ function explicitUnitConversion(ingredient: JsonRecord, candidateUnit: BaseInven
   const conversion = record(ingredient.unitConversion);
   if (conversion.confirmedByUser !== true) return null;
   const amount = Number(conversion.amount);
-  const unit = toInventoryBaseAmount(1, conversion.unit).unit;
-  if (!(amount > 0) || unit !== candidateUnit) return null;
+  const converted = toInventoryBaseAmount(amount, conversion.unit,
+    ["l", "kg"].includes(candidateUnit) ? candidateUnit : undefined);
+  const unit = converted.unit;
+  if (!(amount > 0) || !Number.isFinite(amount) || !(converted.amount > 0) || !Number.isFinite(converted.amount) || unit !== candidateUnit) return null;
   return {
-    amount,
+    amount: converted.amount,
     unit,
-    label: text(conversion.label, `1 ${text(ingredient.unit, "шт.")} = ${amount} ${unit}`, 120),
+    label: text(conversion.label, `1 ${text(ingredient.unit, "шт.")} = ${amount} ${text(conversion.unit)}`, 120),
   };
 }
 
@@ -491,8 +493,11 @@ export function reconcileIngredientQuantity(input: {
   candidate: IngredientMatchCandidate;
 }): IngredientUnitResolution {
   const ingredient = record(input.ingredient);
-  const ingredientAmount = toInventoryBaseAmount(ingredient.quantity ?? 1, ingredient.unit,
-    ["l", "kg"].includes(input.candidate.baseUnit) ? input.candidate.baseUnit : undefined);
+  // Keep pieces intact until explicit conversion or unique packaging resolves them.
+  const physicalAmount = toInventoryBaseAmount(ingredient.quantity ?? 1, ingredient.unit);
+  const ingredientAmount = physicalAmount.unit === "pcs" ? physicalAmount
+    : toInventoryBaseAmount(ingredient.quantity ?? 1, ingredient.unit,
+      ["l", "kg"].includes(input.candidate.baseUnit) ? input.candidate.baseUnit : undefined);
   const candidateUnit = input.candidate.baseUnit;
   const base = {
     ingredientUnit: ingredientAmount.unit,
@@ -548,14 +553,16 @@ export function reconcileIngredientQuantity(input: {
   }
 
   const packages = packageOptionLabels(input.candidate)
-    .map((label) => ({ label, ...inventoryPackageAmount(label, input.candidate.unit) }))
+    .map((label) => ({ label, ...inventoryPackageAmount(label, input.candidate.unit,
+      ["l", "kg"].includes(candidateUnit) ? candidateUnit : undefined) }))
     .filter((value) => value.amount > 0 && value.unit === candidateUnit);
   const uniquePackages = [...new Map(packages.map((value) => [
     `${value.unit}:${value.amount}`,
     value,
   ])).values()];
   const confirmedPackages = confirmedPieceConversionLabels(input.candidate)
-    .map((label) => ({ label, ...inventoryPackageAmount(label, input.candidate.unit) }))
+    .map((label) => ({ label, ...inventoryPackageAmount(label, input.candidate.unit,
+      ["l", "kg"].includes(candidateUnit) ? candidateUnit : undefined) }))
     .filter((value) => value.amount > 0 && value.unit === candidateUnit);
   const uniqueConfirmedPackages = [...new Map(confirmedPackages.map((value) => [
     `${value.unit}:${value.amount}`,

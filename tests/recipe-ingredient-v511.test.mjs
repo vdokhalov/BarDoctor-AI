@@ -5,7 +5,7 @@ import vm from 'node:vm';
 import {parse} from 'acorn';
 const source=fs.readFileSync('public/assets/index-BQGspy0I.js','utf8');
 const ast=parse(source,{ecmaVersion:'latest',sourceType:'script'});
-const names=['bdCatNumber','bdCatToBase','bdTechCostUnitV376','bdIngredientReferencePatchV440','bdRecipeProductV511','bdRecipeAmountV511','bdRecipeChooseV511','bdRecipeLineCostV511'];
+const names=['bdCatArray','bdCatPackage','bdCatMatchingProductsV258','bdCatNumber','bdCatToBase','bdTechCostUnitV376','bdIngredientReferencePatchV440','bdRecipeProductV511','bdRecipeAmountV511','bdRecipeChooseV511','bdRecipeLineCostV511'];
 const context=vm.createContext({});
 vm.runInContext(ast.body.filter(node=>node.type==='FunctionDeclaration'&&names.includes(node.id.name)).map(node=>source.slice(node.start,node.end)).join('\n'),context);
 const product={id:'milk',key:'stock:milk',name:'Молоко 1 л',unit:'l',venueId:801};
@@ -29,3 +29,23 @@ test('unknown, blank, negative and unconfirmed prices do not manufacture known c
 test('imported names remain available after explicit matching; new query text does not invent identity',()=>{const imported=choose(line);assert.equal(imported.originalName,'Milk');const fresh=choose({...line,name:'Молоко',_editorNewIngredient:true});assert.equal(fresh.unit,'л');assert.equal(fresh.originalName,undefined);assert.equal(fresh._editorNewIngredient,false);});
 
 test('unresolved references and explicit unit-review states never show known cost',()=>{for(const extra of [{productKey:'another'},{linkStatus:'missing'},{resolutionStatus:'reference_conflict'}])assert.equal(cost({...bound,...extra},[price]).reason,'mapping');for(const status of ['requires_review','invalid','missing'])assert.equal(cost({...bound,unitResolutionStatus:status},[price]).reason,'unit');});
+
+test('real catalog adapter preserves canonical stock unit for new rows and quick-create parity',()=>{
+ for(const unit of ['l','kg']){
+  const raw={...product,unit,baseUnit:unit,unitModelVersion:4,packageSize:''};
+  const adapted=context.bdCatMatchingProductsV258({nomenclature:[raw]},[])[0];
+  assert.equal(adapted.unit,unit==='l'?'ml':'g');assert.equal(adapted.canonicalStockUnit,unit);
+  assert.equal(choose({...line,_editorNewIngredient:true},adapted).unit,choose({...line,_editorNewIngredient:true},raw).unit);
+ }
+});
+test('existing packaging resolution recomputes same-product package and rejects stale or ambiguous values',()=>{
+ const p={...product,packageSize:'1 л'};
+ const packaged={...bound,unit:'шт.',quantity:1,unitResolutionStatus:'packaging_compatible',normalizedQuantity:99999,normalizedUnit:'ml'};
+ assert.equal(cost(packaged,[price],[p]).cost,12);assert.equal(cost(packaged,[price],[{...p,packageSize:'6 x 1 л'}]).cost,72);
+ assert.equal(cost({...packaged,quantity:2},[price],[p]).cost,24);
+ assert.equal(cost(packaged,[price],[{...p,packageOptions:['500 мл']}]).reason,'unit');
+ assert.equal(cost({...packaged,purchaseProductKey:'old',productKey:'old'},[price],[p]).reason,'mapping');
+ const replacement={...p,id:'replacement',key:'replacement'};
+ const next={...packaged,...context.bdRecipeChooseV511(packaged,replacement,801)};
+ assert.equal(next.normalizedQuantity,undefined);assert.equal(next.unitResolutionStatus,'requires_review');
+});

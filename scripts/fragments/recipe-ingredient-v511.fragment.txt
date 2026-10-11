@@ -14,6 +14,14 @@ function bdRecipeAmountV511(line, product) {
     const converted=bdCatToBase(Number(conversion.amount),conversion.unit);
     if(converted.amount>0&&Number.isFinite(converted.amount)&&converted.unit===target.unit)return {amount:amount.amount*converted.amount,unit:converted.unit};
   }
+  // Recompute an existing server-validated package conversion from this product only.
+  // Never trust a cached normalized quantity or carry packaging across replacement.
+  if(amount.unit==="pcs"&&line.unitResolutionStatus==="packaging_compatible"&&!conversion&&bdRecipeProductV511(line,[product],product.venueId)){
+    const labels=[...(Array.isArray(product.packageOptions)?product.packageOptions:[]),product.packageSize,product.displayPackageSize,product.purchasePackageSize];
+    const packages=labels.map(value=>{const label=String(typeof value==="object"?value?.label||value?.packageSize:value||"").replace(/,/g,"."),multi=label.match(/(\d+(?:\.\d+)?)\s*[xх×*]\s*(\d+(?:\.\d+)?)\s*(мл|ml|л|l|литр(?:а|ов)?|г|гр|g|кг|kg|шт|pcs)/i);return multi?bdCatToBase(Number(multi[1])*Number(multi[2]),multi[3]):bdCatPackage(label)}).filter(value=>value.amount>0&&Number.isFinite(value.amount)&&value.unit===target.unit);
+    const unique=[...new Map(packages.map(value=>[value.unit+":"+value.amount,value])).values()];
+    if(unique.length===1)return {amount:amount.amount*unique[0].amount,unit:target.unit};
+  }
   return null;
 }
 function bdRecipeChooseV511(line, product, venueId) {
@@ -25,7 +33,7 @@ function bdRecipeChooseV511(line, product, venueId) {
   if(changed)Object.assign(patch,{unitConversion:undefined,unitResolutionStatus:undefined,unitResolutionReason:undefined,unitResolutionEvidence:undefined,unitPackageOptions:undefined,normalizedQuantity:undefined,normalizedUnit:undefined,plausibilityWarnings:[],unitCost:undefined,unitPrice:undefined,cost:undefined,totalCost:undefined,costStatus:undefined});
   // Only untouched, newly added rows get a default unit. Existing quantities retain their meaning.
   if(line._editorNewIngredient&&Number(line.quantity)===1&&line.unit==="шт."){
-    patch.unit=({ml:"мл",l:"л",g:"г",kg:"кг",pcs:"шт."})[product.unit||product.baseUnit]||line.unit;
+    patch.unit=({ml:"мл",l:"л",g:"г",kg:"кг",pcs:"шт."})[product.canonicalStockUnit||product.baseUnit||product.unit]||line.unit;
   }
   const next={...line,...patch}, amount=bdRecipeAmountV511(next,product);
   Object.assign(patch,{unitResolutionStatus:amount?"exact_compatible":"requires_review",resolutionStatus:amount?"linked_ready":"linked_unit_review",normalizedQuantity:amount?.amount,normalizedUnit:amount?.unit});
