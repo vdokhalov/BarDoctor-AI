@@ -15,6 +15,11 @@ header.top {
   display: none !important;
 }
 
+/* The shared Sales shell owns back navigation and the venue switcher. */
+html[data-bd-embedded="true"] body[data-sales-experience] > .sales-topbar {
+  display: none !important;
+}
+
 .market-page,
 .opportunity-page,
 .trust-page,

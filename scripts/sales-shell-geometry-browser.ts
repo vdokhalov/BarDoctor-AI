@@ -54,9 +54,28 @@ try{
  assert.equal(geometry.frameHit,true,'top-left iframe content must receive a real pointer hit');assert.ok(geometry.iframe.y>=geometry.header!.bottom-1,'iframe below shared header');assert.ok(geometry.iframe.right<=width+1);assert.ok(geometry.iframe.bottom<=900+1);
  if(width>=900){assert.ok(geometry.iframe.x>=geometry.nav!.right-1,'iframe to right of desktop sidebar');}else{assert.ok(geometry.iframe.bottom<=geometry.nav!.y+1,'iframe clear of mobile bottom nav');}
  await page.reload();await frameElement.waitFor();frame=await(await frameElement.elementHandle())!.contentFrame();assert.ok(frame);await frame!.locator(route==='/cashier'?'#work':'.sales-navigation').waitFor({state:'visible'});await page.waitForLoadState('networkidle');const reloaded=await frameElement.boundingBox();assert.ok(reloaded);assert.equal(reloaded.x,geometry.iframe.x);assert.equal(reloaded.y,geometry.iframe.y);
- const target=frame!.locator(route==='/sales-import'?'a[aria-label="Вернуться в Ещё"]':'#sales-journal');await target.scrollIntoViewIfNeeded();const box=await target.boundingBox();assert.ok(box);const hit=await page.evaluate(({x,y})=>document.elementFromPoint(x,y)?.matches('iframe[data-bd-sales-surface]'),{x:box.x+box.width/2,y:box.y+box.height/2});assert.equal(hit,true,'back link center must not be covered by shared shell');
+ if(route==='/sales-import'){
+ assert.equal(await frame!.locator('.sales-topbar').isVisible(),false,'embedded journal must not repeat the shared header');
+ assert.equal(await page.locator('body>bd-app-header').isVisible(),true);
+ assert.equal(await frame!.locator('#journal-venue').isVisible(),true);
+ assert.equal(await frame!.locator('#open-cashier').isVisible(),true);
+ assert.equal(await frame!.locator('.sales-navigation').isVisible(),true);
+ await page.setViewportSize({width,height:500});
+ await frame!.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
+ await frame!.waitForFunction(()=>scrollY>0,{},{timeout:3000});
+ assert.ok(await frame!.evaluate(()=>scrollY)>0,'journal content must scroll inside the shared shell');
+ await page.screenshot({path:`${out}/scrolled-journal-${width}.png`});
+ await page.setViewportSize({width,height:900});
+ }
+ const target=route==='/sales-import'?page.locator('body>bd-app-header .bd-app-back'):frame!.locator('#sales-journal');await target.scrollIntoViewIfNeeded();const box=await target.boundingBox();assert.ok(box);const hit=await page.evaluate(({x,y,route})=>route==='/sales-import'?!!document.elementFromPoint(x,y)?.closest('body>bd-app-header .bd-app-back'):document.elementFromPoint(x,y)?.matches('iframe[data-bd-sales-surface]'),{x:box.x+box.width/2,y:box.y+box.height/2,route});assert.equal(hit,true,'back link center must not be covered by shared shell');
  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);await page.waitForURL(url=>url.pathname===(route==='/sales-import'?'/more':'/sales-import'));await page.waitForLoadState('networkidle');assert.equal(new URL(page.url()).searchParams.get('venue'),String(venueId));if(route==='/cashier'){await page.frameLocator('iframe[data-bd-sales-surface]').locator('.sales-navigation').waitFor();const returned=await page.locator('iframe[data-bd-sales-surface]').boundingBox();assert.ok(returned);assert.equal(returned.x,geometry.iframe.x);assert.equal(returned.y,geometry.iframe.y);}
  }
+ await page.goto(base+'/sales-import?embedded=1&venue='+venueId);await page.waitForLoadState('networkidle');
+ assert.equal(await page.locator('.sales-topbar').isVisible(),true,'standalone journal retains its own header');
+ assert.equal(await page.locator('.sales-topbar [data-bd-venue-host]').count(),1);
+ assert.equal(await page.locator('#journal-venue').isVisible(),true);
+ await page.screenshot({path:`${out}/standalone-journal-${width}.png`});
+ await page.locator('.sales-topbar [data-bd-back]').click();await page.waitForURL(url=>url.pathname==='/more');await page.waitForLoadState('networkidle');
  assert.deepEqual(errors,[]);
  }finally{await context.close();}
  }
