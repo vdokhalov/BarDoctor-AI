@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, extname } from "node:path";
 import { createRequire } from "node:module";
-import { chromium } from "playwright-core";
+import { chromium, webkit } from "playwright-core";
 import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
 import { GET as salesPage } from "../app/sales-import/route";
 import { GET as cashierPage } from "../app/cashier/route";
@@ -41,7 +41,8 @@ const server = createServer((req, res) => {
 });
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
-const browser = await chromium.launch({ executablePath: process.env.BD_QA_BROWSER || await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
+const engine = process.env.BD_QA_ENGINE === "webkit" ? "webkit" : "chromium";
+const browser = engine === "webkit" ? await webkit.launch({ headless: true }) : await chromium.launch({ executablePath: process.env.BD_QA_BROWSER || await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
 try{
  const owner=await runtime.register('perf-owner@isolated.test'),venueId=owner.activeVenueId;
  runtime.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"currency":"MDL","timezone":"UTC"}',owner.userId);
@@ -69,6 +70,6 @@ try{
  await frame.locator('details.admin-actions summary').click();await frame.locator('[data-action="cancel-order"]').click();await frame.locator('[name="reason"]').fill('Isolated cancellation regression');await frame.locator('#dialog-submit').click();await frame.locator('dialog[open]').waitFor({state:'hidden'});assert.equal(await frame.locator('.cart h2').innerText(),'Быстрая продажа');assert.equal(await frame.locator('[data-action="cancel-order"]').count(),0);assert.match(await frame.locator('.lines').innerText(),/12/);
  assert.equal(salesWrites,0);assert.deepEqual(errors,[]);results.push({width,addRecovery:true,editRecovery:true,paymentRecovery:true,cancelDoesNotRestore:true,changedPriceDoesNotRestore:true,noAutomaticPayment:true,cancelledSelectionCleared:true,quickDraftPreserved:true,embeddedNavigations});await context.close();
  }
- console.log(JSON.stringify({fixture:'isolated real API / same-context bootstrap refresh',results}));
+ console.log(JSON.stringify({engine,fixture:'isolated real API / same-context bootstrap refresh',results}));
 
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close()}
