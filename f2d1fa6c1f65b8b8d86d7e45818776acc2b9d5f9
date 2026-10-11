@@ -1,0 +1,50 @@
+# Unpublished navigation-only fix after Sites v515
+
+Base source:506c754a5fa0f558638e9098795fa4a474331c61.
+Expected contract: in-app accounting card opens report/wizard with a pushed history entry; wizard close only dismisses wizard; Back returns to the actual previous scoped screen. A direct report without usable previous context falls back to Finance for the selected month/venue.
+
+Confirmed defects:
+1. Plain card anchor caused a full document navigation; initial navigation seeding could replace the actual warehouse return context with a synthetic parent.
+2. Closing wizard only changed React state; closeMonth=1 remained in URL and the navigation contract still treated the report as a wizard. Header fallback was unscoped /finance.
+3. On direct loads, bootstrap ran before navigation-contract availability, so synthetic parent could become /home. Actual isolated history.state.bdPreviousUrl=/home reproduced this.
+
+Fixes: plain unmodified card clicks use existing bdNavigate push/popstate mechanism (modified clicks remain native). Wizard close removes only closeMonth through existing replace-query helper. Reports canonical parent includes month/venue; bootstrap constructs Reports parent from current URL independently of script load order. No shared header behavior changes, calculations, APIs, permissions, storage formats or business writes.
+
+Verification:
+-20 targeted tests PASS.
+-Actual full SPA/API/CSS at390/1165/1440: Septembercard -> closewizard -> visibleheaderBack -> samewarehouse counts+venue; Octobercard -> close -> browserBack -> samewarehouse; directSeptemberReport -> FinanceSeptember samevenue. Domain stores byte unchanged.
+-Independent review repeated all3widths and negative externalURL/foreignhistory/modifiedclick checks; no blockers.
+-Build, typecheck, scopedESLint and patch idempotence PASS. No remoteCI or publication for this patch. Production staysv515.
+-Postbuild WebKit390/1165/1440 all three return journeys PASS, domain stores unchanged.
+-Built bundle:index-BQGspy0I-472d8da65f4d.js; SHA256:472d8da65f4d8f5e42804b721bc628f1c7485267e4c22af07c122a0aaeb26764.
+
+ExactSHA:f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9
+ArchiveSHA256:f2eb6b4c01f7f84f608d894781d896ce1ee50085283559b62aa274e448ec3d07
+{
+  "commit": "f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9",
+  "base": "506c754a5fa0f558638e9098795fa4a474331c61",
+  "published": false,
+  "files": {
+    "v517-return-webkit.log": "ccd2a346a7ec9c322adfb97a37d519541a2199726f1fc2a0c2e5998459be898b",
+    "bundle-verification.txt": "8860840a497c2492906d9f7d6a847ade6324849f75a844bb13f96949780e559b",
+    "independent-monthly-return-review-v516.md": "901554d88ab5f0f4d514c6bd92740e29fad6e35c9d4299b51c0f5a43e456317b",
+    "v517-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "v517-result.md": "328406650d5400a27cedc38fa44608279f285af19d8caff439b0c3eb05db0cdd",
+    "repository.bundle": "b86c696103aec517d76cf3ff7827133d785c5c9a1c996fbf4ad4316a81063d28",
+    "v517-return-browser.log": "6b0f0342e9ee1353f3ab69dcb19ab2a69b8d156829e4247178c6953af89e737c",
+    "v517-build.log": "fbbf420dcbddf6421fc67743619e2af12cac74ca9dcf1c471cd50a4595364ba2",
+    "v517-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v517-nav-tests.log": "1313377988b3321d40cb219df6148a388f9c8456f138700352b5a551b0a23d1a",
+    "independent-monthly-return-unit.log": "480d462f2345311efda9f2e66559544a6eff275e052211e268f156bd8fafac48",
+    "changes.patch": "a76bc192d33b3387cf9fb153f26a3e55d9115811ce7bf3f57c6636ad5f9fd845",
+    "independent-monthly-return-browser-v516.log": "6b0f0342e9ee1353f3ab69dcb19ab2a69b8d156829e4247178c6953af89e737c"
+  }
+}
+Independent navigation delta review atop506c754a5fa0f558638e9098795fa4a474331c61. No confirmed source P1/P2.
+Final reviewed approach: ordinary monetary-card click goes through bdNavigate and preserves managed history; modified/middle/right clicks retain native behavior. Wizard close only removes closeMonth query via replace semantics. Reports queryScreen parent is same-origin Finance carrying only month/venue, direct-link seeding uses this parent only for reports. Abandoned optional shared-header callback/helper removed. No business logic/data writes.
+18 tests independently rerun PASS: navigation-contract-v247(6), data-control-navigation-v513(4), inventory-boundary-presentation-v515(5), monthly-return-v516(3). Independent VM checks: external/javascript/API unsafe; foreign bdVenueId history rejected; valid scope accepted; report parent retains month/venue without returnTo injection; wizard parent only clears closeMonth; patch idempotent. Card ctrl/meta/shift/alt/middle/right click doesn't preventDefault or SPA navigate; missing router preserves anchor fallback.
+Final browser result: independently reran stable script after root fixed real direct-link bootstrap ordering bug (navigation contract unavailable when initial parent was seeded; previous/home resulted). Final seed constructs same-origin report/Finance parent directly from current URL, only for reports. Independent VM negatives confirm no contract dependency, external-looking parameter values remain encoded under /finance, only month/venue copied, wizard flag removed, other route unchanged.
+
+Full actualSPA/API browser PASS390/1165/1440: September card -> close wizard -> visible global header Back -> Warehouse; October card -> close wizard -> browser Back -> Warehouse; direct September Report -> header Back -> Finance September with samevenue. All domain stores unchanged. Stable final3unit tests rerun PASS; nearby15 unchanged PASS.
+
+No remaining confirmed blocker. No deployment, production writes/fullCI. Exact final commit belongs to root; reviewed working delta atop506c754a. Logs alongside report.
