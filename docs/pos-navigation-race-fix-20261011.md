@@ -1,0 +1,11 @@
+# Unified cashier read freshness
+
+Review found that an older background read could finish after a newer navigation read, restoring privileged cached data. All load calls now receive one monotonic generation; request-response side effects and accept both reject superseded generations. Context invalidation increments the generation, and stale errors cannot overwrite current state. Early role revocation remains effective even if the independent orders read fails. A local tab switch does not cancel the only pending authoritative permissions read. Refresh last-success advances only when its result is accepted. Initial load also passes through the same acceptance boundary.
+
+Eight deterministic tests execute the actual request/load/accept/changeView/reconcileAccess functions and pos-refresh controller: delayed privileged report and delayed base response, staff downgrade,403role loss, venue change, signout, reverse refresh/navigation ordering, already-resolved obsolete snapshots, and local navigation during a role revocation read. All PASS. Existing security/recovery contracts6PASS; real POS262API calls390/820/1440PASS; targeted lintPASS.
+
+## Read-only proposal: venue-wide unpaid accounts
+
+No list/recovery implementation is included. `/api/pos-orders` already returns venue-scoped order views; `activeOrders()` currently filters them to the selected cash shift. Add an explicit All unpaid view over the same in-memory response (`status===OPEN`), with date/cash/table/waiter and order details. No per-cash fetch or duplicate full load is needed. Metadata can be joined once from existing revenue snapshots using a shiftId map; expose only id/date/name/status, never cash/COGS/payroll data to staff. Existing staff policy allows viewing OPEN orders of the venue, while paid-history access remains self-scoped; preserve it.
+
+Opening a historical unpaid order must resolve its own shiftId and show that source explicitly, without silently adopting it into the current cash. Server permission and recovery eligibility remain authoritative per operation. Do not turn this list into paid-sale returns. A future lightweight GET projection could skip mutation-only stores and filter OPEN orders before price projection; that optimization is not needed for the minimal zero-additional-request list and is not implemented here.

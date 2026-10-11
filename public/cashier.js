@@ -4,7 +4,7 @@
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
   const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:"cashier",orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
-  let dialogSubmit=null,refreshController,navigationGeneration=0,navigationLoading=false;
+  let dialogSubmit=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
   const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
   const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
@@ -28,16 +28,19 @@
     }
     if(!configure()){state.rules=[];clearView("discounts");if(state.view==="discounts")state.view="cashier";}
   }
-  function clearSensitive(message) { state.frozen=true;state.workday=null;state.adminActionsOpen=false;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("cashier-venue-host").hidden=true;$("venue-timezone-label").replaceChildren();$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
-  async function request(path,body) {
+  function clearSensitive(message) { ++loadGeneration;++navigationGeneration;navigationLoading=false;state.frozen=true;state.workday=null;state.adminActionsOpen=false;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("cashier-venue-host").hidden=true;$("venue-timezone-label").replaceChildren();$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
+  function assertCurrentLoad(generation){if(generation!==undefined&&(generation!==loadGeneration||state.frozen)){const error=Error("Устаревшее обновление пропущено.");error.stale=true;throw error;}}
+  async function request(path,body,generation) {
+    assertCurrentLoad(generation);
     if(state.frozen)throw Error("Обновите кассу перед продолжением.");
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
     const headers={"Content-Type":"application/json"};const email=localStorage.getItem("bd_session"),token=localStorage.getItem("bd_session_token");
     if(email&&token){headers["X-Session-Email"]=email;headers["X-Session-Token"]=token;}if(initialVenue)headers["X-Venue-Id"]=initialVenue;
     let response;
     try { response=await fetch(path,{method:body?"POST":"GET",headers,cache:"no-store",...(body?{body:JSON.stringify({...body,venueId:state.data.venueId})}:{}),signal:AbortSignal.timeout(20000)}); }
-    catch { const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;error.network=true;throw error; }
+    catch { assertCurrentLoad(generation);const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;error.network=true;throw error; }
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
+    assertCurrentLoad(generation);
     if([401,403].includes(response.status)) {
       clearSensitive(response.status===401?"Сессия завершена. Войдите снова.":"Доступ или заведение изменились. Обновите кассу.");
       if(response.status===401){
@@ -48,6 +51,7 @@
     }
     let data,malformed=false;try{data=await response.json();if(!data||typeof data!=="object"||Array.isArray(data)){data={};malformed=true;}}catch{data={};malformed=true;}
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");throw Error("Контекст изменился");}
+    assertCurrentLoad(generation);
     if(data.code==="VENUE_CHANGED"&&!state.frozen)clearSensitive("Доступ или заведение изменились. Обновите кассу.");
     if(malformed){const error=Error("Ответ сервера получен не полностью. Сохранённый запрос можно проверить и повторить.");error.uncertain=true;throw error;}
     if(path==="/api/sales-events"&&!body&&!state.frozen)$("sales-journal").hidden=response.headers.get("X-BD-Sales-Journal")!=="1";
@@ -73,27 +77,30 @@
     }
   }
   async function load(view=state.view) {
-    const dataPromise=request("/api/sales-events").then(data=>{
+    const generation=++loadGeneration,read=path=>request(path,undefined,generation);
+    const dataPromise=read("/api/sales-events").then(data=>{
+      assertCurrentLoad(generation);
       // Revoke cached management data even if the independent orders request fails first.
       if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){state.data=data;state.orders=[];reconcileAccess();render();}
       return data;
     });
-    const [data,orders]=await Promise.all([dataPromise,request("/api/pos-orders")]);
+    const [data,orders]=await Promise.all([dataPromise,read("/api/pos-orders")]);
     if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
     const current=selectedShift(data),management=["owner","manager","shift_manager"].includes(data.actor.role),reportId=state.report?.shiftId||data.shifts.at(-1)?.id;
     const [overview,reportResult,days]=await Promise.all([
-      view==="overview"&&management&&current?request("/api/pos-overview?shiftId="+encodeURIComponent(current.id)):null,
-      view==="report"&&management&&reportId&&(state.report?.status!=="closed"||state.report.shiftId!==reportId)?request("/api/sales-events?reportShiftId="+encodeURIComponent(reportId)):null,
-      data.permissions.managementDay&&["report","overview"].includes(view)?request("/api/operational-days"):null
+      view==="overview"&&management&&current?read("/api/pos-overview?shiftId="+encodeURIComponent(current.id)):null,
+      view==="report"&&management&&reportId&&(state.report?.status!=="closed"||state.report.shiftId!==reportId)?read("/api/sales-events?reportShiftId="+encodeURIComponent(reportId)):null,
+      data.permissions.managementDay&&["report","overview"].includes(view)?read("/api/operational-days"):null
     ]);
     const report=reportResult?.report,businessDate=view==="report"?(report||state.report)?.businessDate:view==="overview"?current?.date:null;
     if(days&&days.venueId!==data.venueId)throw Error("Заведение изменилось. Обновите кассу.");
     const workday=days?.days.find(day=>day.businessDate===businessDate)||null;
-    return {data,orders:orders.orders,overview,report,workday};
+    assertCurrentLoad(generation);
+    return {generation,data,orders:orders.orders,overview,report,workday};
   }
-  function accept(value) { if(state.frozen)return;state.data=value.data;syncQuickShift();state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render(); }
+  function accept(value) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;syncQuickShift();state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
   async function reload(){accept(await load());}
-  function errorView(error){state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
+  function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
     if(state.busy||navigationLoading||state.frozen||refreshController?.state().running)return;
     state.busy=true;setBusy();
@@ -236,7 +243,7 @@
     navigationLoading=["overview","report","discounts"].includes(view);render();window.scrollTo({top:0,behavior:"instant"});
     if(!navigationLoading)return;
     $("connection").textContent="Обновляем данные…";
-    try{if(view==="discounts"){const value=await request("/api/pos-discounts");if(generation===navigationGeneration&&!state.frozen){state.rules=value.rules;render();}}else{const value=await load(view);if(generation===navigationGeneration)accept(value);}}
+    try{if(view==="discounts"){const value=await request("/api/pos-discounts",undefined,++loadGeneration);if(generation===navigationGeneration&&!state.frozen){state.rules=value.rules;render();}}else{const value=await load(view);if(generation===navigationGeneration)accept(value);}}
     catch(error){if(generation===navigationGeneration)errorView(error);}
     finally{if(generation===navigationGeneration){navigationLoading=false;setBusy();}}
   }
@@ -395,7 +402,7 @@
   document.body.dataset.pane="order";
   void (async()=>{
     try{
-      const value=await load();state.data=value.data;state.orders=value.orders;restoreLocal();accept(value);
+      const value=await load();if(!accept(value))return;restoreLocal();render();
       notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"Касса готова. Выберите заказ или начните быструю продажу.");
       refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!navigationLoading&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
     }catch(error){errorView(error);}
