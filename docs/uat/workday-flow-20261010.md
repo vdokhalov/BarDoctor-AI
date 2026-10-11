@@ -33,3 +33,11 @@ Four findings on efd7762b are fixed in the follow-up commit:
 - Workday close rejects revenue/fact MISMATCH before recording CLOSED, with no report or audit write.
 
 Validation: 40 related handler/domain tests passed, including four new real HTTP/isolated D1 regressions; 11 access-control/data-trust tests passed; typecheck and changed-file lint passed. No full CI or publication was run. The previously built UI is unchanged; the follow-up server changes must be included in the final release artifact after review.
+
+## Rule-dependent inputs, 2026-10-11
+
+Hours now appear only when the assigned rule has an enabled hourly block, including the closing summary. Fixed-shift and percentage rules do not show empty-hour warnings. The save/confirmation labels refer to team data and payroll rather than requiring hours universally. Server calculations, rates, permissions, diagnostics and persisted payroll are unchanged.
+
+Targeted real-handler browser verification: `node --import tsx scripts/workday-rule-inputs-browser.ts`, owner390/admin1280. Fixed500 without hours (including disabled hourly block); personal percentage100 from sales1000 without hours; hourly800 from8h; mixed600 from fixed200 +8h at50. Initial missing hours only belong to hourly/mixed. Closing summary omits irrelevant hours. Missing/unknown rules remain INCOMPLETE with no payroll breakdown. Both role projections expose requirements/results without rule blocks or rates. Eight existing workday lifecycle/review boundary tests, typecheck and lint pass (three existing unrelated lint warnings). No full CI, full build or publication requested/run for this UI patch.
+
+Screenshot: `outputs/workday-rule-inputs/payment-types-390.png`, Library `libfile_018b86e4a318819192572df30da13f91`. All data synthetic; payment-type labels are fixture employee names for illustration. Heading marked test data only during capture; unrelated sticky chrome hidden only during element screenshot.

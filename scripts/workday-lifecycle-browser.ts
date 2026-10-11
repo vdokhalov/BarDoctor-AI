@@ -63,7 +63,7 @@ try {
  await flow.getByLabel('Начало смены',{exact:true}).fill('18:00');await page.screenshot({path:`${out}/${width}-opening.png`,fullPage:true});
  await flow.getByRole('button',{name:'Открыть смену',exact:true}).click();await page.locator('[data-workday-state="OPEN"]').waitFor();assert.equal(get('bd_finance_revenue').length,0);assert.equal(get('bd_operational_reports_v1')[0].payrollBreakdown,undefined);
  for(const id of ['employee-0','employee-3'])await flow.locator(`[data-workday-employee="${id}"]`).getByLabel('Часы · обязательно',{exact:true}).fill('8');
- await flow.getByRole('button',{name:'Сохранить команду и часы',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[data-workday-state]')?.textContent?.includes('1 600'));assert.equal(get('bd_operational_reports_v1')[0].workdayPayrollDraft.payrollBreakdown.total,1600);
+ await flow.getByRole('button',{name:'Сохранить данные команды',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[data-workday-state]')?.textContent?.includes('1 600'));assert.equal(get('bd_operational_reports_v1')[0].workdayPayrollDraft.payrollBreakdown.total,1600);
  await flow.getByRole('button',{name:'Открыть кассу',exact:true}).click();await page.locator('#work:not([hidden])').waitFor();
  await page.locator('[data-action="open-shift"]').click();await page.locator('#dialog input[name="name"]').fill('QA cash');await page.locator('#dialog input[name="float"]').fill('100');await page.locator('#dialog-submit').click();
  const cash=get('bd_finance_revenue')[0];assert.equal(cash.date,get('bd_operational_reports_v1')[0].date);
@@ -78,7 +78,7 @@ try {
  assert.equal((await send({action:'close_shift',shiftId:cash.id,actualCash:140})).status,201);
  await page.reload();await page.locator('[data-workday-state="OPEN"]').waitFor();await flow.getByRole('button',{name:'Перейти к закрытию',exact:true}).click();
  const finish=flow.getByRole('button',{name:'Закрыть смену',exact:true});assert.equal(await finish.isDisabled(),true);
- await flow.getByRole('checkbox',{name:'Списания · не было',exact:true}).check();await flow.getByRole('checkbox',{name:width===390?'Происшествия · проверено (1)':'Происшествия · не было',exact:true}).check();await flow.getByRole('checkbox',{name:'Команда, часы и ФОТ · проверены',exact:true}).check();
+ await flow.getByRole('checkbox',{name:'Списания · не было',exact:true}).check();await flow.getByRole('checkbox',{name:width===390?'Происшествия · проверено (1)':'Происшествия · не было',exact:true}).check();await flow.getByRole('checkbox',{name:'Команда и расчёт ФОТ · проверены',exact:true}).check();
  await page.screenshot({path:`${out}/${width}-closing.png`,fullPage:true});await finish.click();await page.locator('[data-workday-state="CLOSED"]').waitFor();
  assert.equal(get('bd_operational_reports_v1')[0].payrollBreakdown.total,1600);assert.equal(get('bd_finance_revenue')[0].revenue,40);assert.equal(get('bd_stock_movements').length,1);assert.equal(get('bd_payroll_entries').length,0);assert.equal(get('bd_cases').length,width===390?1:0);
  await page.reload();await page.locator('[data-workday-state="CLOSED"]').waitFor();assert.match(await flow.innerText(),/Итоговый отчёт/);assert.deepEqual(errors,[]);
