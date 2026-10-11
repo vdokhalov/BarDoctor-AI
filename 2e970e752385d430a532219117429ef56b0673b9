@@ -1,0 +1,80 @@
+# Verified correction checkpoint
+
+# Post-v513 correction — no publication
+
+Base: 078adca9621d099702ebf4683a33a1694f9325dd (published Sites v513).
+
+## RCA
+Payroll editor stores current profile.id || profile.name || primary as venueId. Salary/Finance support that legacy key. Verified month-close filtered it as foreign and its raw nested-scope check also blocked the calculation. Read-only, payroll-only normalization now accepts the exact account-local profile key and retains every explicit foreign numeric/nested ownership guard. No stored rows, SQL, snapshots, or migration metadata changed.
+Native observed base7450 + bonus100 = grossFOT7550, while month report omitted bonus. The correction reproduces and tests this class; live corrected amount awaits an approved publication/native read. Confirmed deduction25 and payment300 change payable/debt, not gross payroll expense. Closing-stock revaluation975 is not profit or captured COGS.
+
+Monthly blockers now have distinct labels, safe section/date references and month/venue links on report and wizard. Unknown codes remain visible. Server finalProfit stays null while any required input fails. No assertions or calculation gates weakened; no fabricated final profit.
+
+Wizard progress is separate from server calculation eligibility. bdMonthClosingWizard initializes expenses/writeoffs/fixed in React state and resets them on open/month change unless period is closed. 43% = shifts + two boundaries; native-confirmed expenses/writeoffs temporarily produce71%. Reopening resets local review acknowledgements, not source financial records. Persistence of these interim acknowledgements is unchanged.
+
+Warehouse stored both monetary boundaries and physical counts in bd_inventory_snapshots; list assumed every row was physical, causing Подсчёт0/0. New accounting cards display date/amount/currency and report link; direct sheet entry has no count actions. Physical API commands cannot alter/delete/collide with boundaries, including malformed total-only records and dual-ID payloads. No stock/snapshot rewrite.
+
+## Verification
+- 69 targeted automated tests PASS after build; zero skipped.
+- 24 negative actual HTTP scenarios inside boundary test; snapshots/stock/audit/batches unchanged.
+- Full SPA/actual API Chromium390 and WebKit390: bonus included, blocker visible report+wizard, scoped links, no foreign details, finalProfit null, no writes.
+- Inventory browser Chromium390/1440 mixed list and direct boundary link PASS.
+- npm run build PASS, Sites artifact ESM/default.fetch/hosting manifest validation PASS.
+- Typecheck/scoped ESLint/diff-check PASS; aggregate patch idempotent.
+- Independent review:26 targeted tests and independent actual API negatives PASS; no remaining P1/P2. Reviewer found dual-ID and malformed-boundary gaps; both fixed and independently retested.
+- Two nearby physical inventory HTTP fixtures updated for mandatory workday/open-shift prerequisites; original assertions retained,9PASS.
+
+Asset: index-BQGspy0I-69a98451ccf7.js
+Canonical SHA256:69a98451ccf7ace9701733b81497f74acf53d4c8b63000e02064ca950f56c867.
+
+Full remote CI not rerun for this unapproved-publication patch. No new deployment or live data writes. Existing production remains v513 / appgdep_6acb8ae4a718819196a7113720e9d359. Library previously returned401; parent authorized GitHub notes durability instead of waiting. Hardware iPhone unverified.
+
+Exact source: 2e970e752385d430a532219117429ef56b0673b9
+
+Checkpoint archive SHA256: c541117f9155615d259b5d560b2dcafd256912148c5e567adabc98526f846f19
+
+{
+  "commit": "2e970e752385d430a532219117429ef56b0673b9",
+  "base": "078adca9621d099702ebf4683a33a1694f9325dd",
+  "branch": "recovery/cashier-v505-20261010",
+  "publication": "not requested/approved for this patch; production remains v513",
+  "files": {
+    "independent-delta-payroll-month.log": "a36e5d69eae1d01addf34338e3100397ab93697c2c07311702d61138e0825d8d",
+    "v515-monthly-browser.log": "12b4e2dd05559b9b80ece9d8fdf43c22543835709d6023d195727ff7791f6b1a",
+    "independent-delta-warehouse.log": "3f30ad0a11c4aaf9304a1f067b9c152b7a3e8bee449023637a875130e79070c9",
+    "independent-delta-payroll-extra.ts": "2a3a4d8bb87636e7341b16f2c4e09293160ff682c714a3901317f8a03014facb",
+    "v515-targeted.log": "91327fdde0f6635c840b7262cc5107cd265ebca8322586fdcbd36a594fa2a0d9",
+    "bundle-verification.txt": "faf6a49b1ec699c004752961562db6812ee93c894d5aca239f265eb55bf78afc",
+    "v515-inventory-browser.log": "64cc2a58dd99399940973092da0a7d63fb7320f576d39bb307057d27b51b39b7",
+    "v515-monthly-webkit.log": "d7799a5e5451cf6c20367d2df573210b0a8320271a7bc27d827e5263dd21d0e8",
+    "v515-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "independent-delta-warehouse-extra.ts": "4fd857a364ad6664b3140341ecb29869f525e20c3cebde331c0262bb13f3bb32",
+    "independent-delta-payroll-review.md": "aa2d5d521af1905b56b975bcf233455f173364083505f12c271cf8f141569a3a",
+    "v515-result.md": "da4ee75c86f3cde0779bb2d4327205e6db22705f44ce176e7e6d67ee0d857cd3",
+    "v515-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "repository.bundle": "f5b65332d2c492ad083c05e6b98c64446d595b8c58fff34dc998813996cfda38",
+    "v515-build.log": "a59820074e69bb912d927e12858f0719fc9bb4db82ebb4499a8e491573e15231",
+    "changes.patch": "78e4ae59e73b7f671d7ff416d2b61bd183725b1c929c64e7265735f30912dcee"
+  }
+}
+
+Independent read-only delta review, base078adca9621d099702ebf4683a33a1694f9325dd, uncommitted source delta inspected. No confirmed P1/P2 blockers.
+
+Reviewed normalizeLegacyPayrollEntries, monthCloseReasonDetails, calculateVerifiedMonth integration, reason catalog/rendering/link allowlist, wizard metadata patch.
+20 narrow tests PASS: payroll-month-legacy-scope-v514, month-close-diagnostics-v514, monthly-report-read-v513 (15 total) and monthly-reasons-v515 (5).
+Additional independent isolated checks PASS: profile.id precedence rather than profile.name; foreign explicit workspace/dataAccount/nested array venue exclusion; frozen old closing values unchanged despite new compatible payroll bonus; GET no writes.
+
+Confirmed: only payroll exact authenticated profile legacykey is normalized; numeric foreign venue and nested foreign ownership remain rejected. Bonus100 added exactly once to gross payroll; payment300 and confirmed25deduction settle balance only, pending excluded; Octoberbonus excluded fromSeptember. Existing finality reasons still make finalProfit null. Revaluation975 changes neither capturedCOGS nor finalProfit. Diagnostics omit foreign numeric root IDs/dates and all raw ownership values/amounts/bodies; account-local parent references only. Unknown reasons remain distinct visible code; URLs allowlisted and active venue/month forced. Existing closed-snapshot branch unchanged and independently exercised.
+
+Not yet a final asset/commit signoff: new wizard patch and modified report fragment must be applied and wired by integrator; public canonical asset unchanged at review. No fullCI/browser/deploy/liveAPI/AI run performed. Root should bind this review to final commit and verify generatedasset integration.
+
+SHA256 reviewed core sources:
+54e625e5dfaef229f849dc76eba81d83583c1a9d8978787585f2185f5ea8198e lib/bardoctor/payroll-entry-scope.ts
+b6569aa92d5131b2aa7e4027e7a884f77e747ed1f291dd22aa35c0332c981b69 lib/bardoctor/month-close-diagnostics.ts
+eb39d1f48210f912af776bb8ac515cd5a4901f667601cfded4be8a8be30cf5c8 lib/bardoctor/verified-month-close.ts
+UI concurrently being finalized; tests use current fragment and patch, not old generatedasset.
+
+Warehouse review addendum:
+6 warehouse presentation/API tests independently rerun PASS. Own actual authenticated API fixture verifies monetary boundary delete/update/finalize/create-ID-collision/legacy-finalize-ID-collision all409 and all stores/audit unchanged; damaged total-only boundary delete409.
+Two issues identified during authoring and resolved before this verdict: create guard preferred body.id while actual create used snapshot.id; malformed total-only boundary was not classified/protected. Current action-specific target matches persistence and classifier covers sections or total even malformed.
+Source inspection confirms list uses monetary card; direct physical sheet short-circuits; delete affordance false for monetary boundary. No physical operation handlers offered by monetary card. Invalid sums display unknown rather than zero. No remaining confirmed P1/P2. Final exact commit/generatedasset integration belongs to root; this review covered the working delta atop078adca9.
