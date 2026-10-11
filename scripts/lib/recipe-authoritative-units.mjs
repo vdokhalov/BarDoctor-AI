@@ -22,6 +22,7 @@ export function patchRecipeAuthoritativeUnits(source) {
   const start = source.indexOf(startMarker);
   const end = source.indexOf(endMarker, start);
   if (end <= start) throw new Error("recipe authoritative units: invalid editor boundaries");
+  if (source.slice(start, end).includes("bdRecipeLineCostV511(p,")) return source;
   let editor = replaceSupported(source.slice(start, end), oldAdapter, newAdapter, "cost adapter");
   editor = replaceSupported(editor, "bdCatUnitLabel(bdLineCostV418.unit)", "bdAssortmentUnitLabelV293(bdLineCostV418.unit)", "price unit label");
   return source.slice(0, start) + editor + source.slice(end);

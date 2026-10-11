@@ -21,10 +21,11 @@ type Result = { rows: (Row & { complete: boolean; cost: number | null })[]; tota
 function editorCosts(ingredients: Row[], costs: Row[]): Result {
   const before = JSON.stringify({ ingredients, costs });
   const result = vm.runInNewContext([
-    ...["bdCatNumber", "bdCatToBase", "bdTechCostUnitV376"].map(helper),
+    ...["bdCatNumber", "bdCatToBase", "bdTechCostUnitV376", "bdRecipeProductV511", "bdRecipeAmountV511", "bdRecipeLineCostV511"].map(helper),
+    "const bdRecipeProductsV511=n;",
     editor.slice(start, end),
     ";JSON.stringify({rows:bdRecipeCalculatedCostsV418,total:bdRecipeTotalCostV418,currency:bdRecipeTotalCurrencyV418,missing:bdMissingCostCount})",
-  ].join("\n"), { l: { ingredients }, bdRecipeCostRows: costs, bdCatArray: (value: unknown) => Array.isArray(value) ? value : [] });
+  ].join("\n"), { l: { ingredients }, bdRecipeCostRows: costs, bdRecipeVenueId: 1, n: ingredients.map(p=>({id:p.nomenclatureItemId||"stock-id",key:p.purchaseProductKey,unit:p.unit})), bdTechCompleteProductsV375: (value: unknown)=>value, bdCatArray: (value: unknown) => Array.isArray(value) ? value : [] });
   assert.equal(JSON.stringify({ ingredients, costs }), before, "cost preview cannot rewrite recipe or price snapshots");
   return JSON.parse(result) as Result;
 }
@@ -126,8 +127,10 @@ test("cost patch is byte-stable and rejects changed or duplicated adapters", () 
   const legacy = bundle.replace(editor.slice(start, end), legacyModel)
     .replace("bdAssortmentUnitLabelV293(bdLineCostV418.unit)", "bdCatUnitLabel(bdLineCostV418.unit)");
   assert.notEqual(legacy, bundle);
-  assert.deepEqual(Buffer.from(patchRecipeAuthoritativeUnits(legacy)), Buffer.from(bundle), "v431 upgrade must emit the exact fixed adapter");
+  const upgraded=patchRecipeAuthoritativeUnits(legacy);
+  assert.match(upgraded,/bdRecipePriceQuantityPhase7\*R/);
+  assert.equal(patchRecipeAuthoritativeUnits(upgraded),upgraded);
   assert.deepEqual(Buffer.from(patchRecipeAuthoritativeUnits(bundle)), Buffer.from(bundle));
-  assert.throws(() => patchRecipeAuthoritativeUnits(bundle.replace("bdRecipePriceQuantityPhase7*R", "bdRecipePriceQuantityPhase7+R")), /unexpected cost adapter anchors/);
+  assert.throws(() => patchRecipeAuthoritativeUnits(upgraded.replace("bdRecipePriceQuantityPhase7*R", "bdRecipePriceQuantityPhase7+R")), /unexpected cost adapter anchors/);
   assert.throws(() => patchRecipeAuthoritativeUnits(bundle + "\nfunction bdCatRecipeEditor(){}"), /unique editor boundaries/);
 });

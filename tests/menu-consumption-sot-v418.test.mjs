@@ -216,9 +216,10 @@ test("Menu and Tech Cards share one persisted recipe identity", () => {
 test("Tech Card editor uses authoritative current, line and total costs", () => {
   assert.match(recipe, /bdRecipeAuthoritativeCostByIdV418/);
   assert.match(recipe, /bdRecipeAuthoritativeCostByReferenceV418/);
-  assert.match(recipe, /p\.nomenclatureItemId\|\|p\.purchaseProductKey/);
+  assert.match(recipe, /bdRecipeLineCostV511\(p,bdRecipeCostRows/);
   assert.match(command, /he\.nomenclatureCosts\|\|\[\]/);
-  assert.match(recipe, /costStatus:c\?\.costStatus\|\|\(W&&R===0\?"KNOWN_ZERO":"UNKNOWN"\)/);
+  assert.match(recipe, /costStatus:"UNKNOWN"/);
+  assert.match(recipe, /cost\?\.complete!==true/);
   assert.match(recipe, /Текущая стоимость:/);
   assert.match(recipe, /Стоимость строки:/);
   assert.match(recipe, /Текущая себестоимость техкарты/);

@@ -128,7 +128,7 @@ try{
    await page.getByRole('button',{name:'Редактировать техкарту',exact:true}).click();await recipe.waitFor();
    await recipe.getByText('ID и складской ключ ингредиента указывают на разные товары.',{exact:false}).waitFor();
    await page.screenshot({path:path.join(output,viewport.width+'-conflict.png')});
-   await recipe.locator('button').filter({hasText:/Изменить товар|Найти в номенклатуре/}).first().click();
+   if(!await recipe.getByLabel('Поиск по всей номенклатуре').isVisible())await recipe.locator('.bd-recipe-selected-v511').first().click();
    await recipe.getByLabel('Поиск по всей номенклатуре').fill('Водка Volk QA');
    await recipe.locator('.bd-tech-card-groups-v375 button').filter({hasText:'Водка Volk QA'}).click();
    await recipe.getByRole('button',{name:'Сохранить',exact:true}).filter({visible:true}).click();await recipe.waitFor({state:'hidden'});

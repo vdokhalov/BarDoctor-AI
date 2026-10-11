@@ -1911,3 +1911,10 @@
   .bd-explicit-mobile-more-v439{min-width:40px;padding-inline:5px}
   .bd-explicit-mobile-save-v439{min-width:78px!important;padding-inline:10px!important}
 }
+
+/* Single explicit ingredient selection; keep the standard editor action bar. */
+.bd-recipe-ingredient-v511{display:grid;gap:12px;min-width:0}
+.bd-recipe-field-title-v511{font-size:13px;font-weight:650;color:#4b556b}
+.bd-recipe-selected-v511{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;padding:13px 14px;min-height:52px;background:#fff;border:1px solid #cfd5e5;border-radius:12px;text-align:left;color:#272c42;font:inherit}
+.bd-recipe-selected-v511>span:first-child{display:grid;gap:4px;min-width:0}.bd-recipe-selected-v511 strong{overflow-wrap:anywhere}.bd-recipe-selected-v511 small,.bd-recipe-ingredient-v511>small{font-size:12px;color:#626b80}.bd-recipe-selected-v511>span:last-child{color:#5947d6;font-size:13px}
+.bd-recipe-alias-v511 summary{font-size:13px;color:#5d537e;cursor:pointer;min-height:32px;padding:5px 0}.bd-recipe-alias-v511[open]{display:grid;gap:8px}.bd-recipe-alias-v511 small{font-size:12px;color:#626b80}

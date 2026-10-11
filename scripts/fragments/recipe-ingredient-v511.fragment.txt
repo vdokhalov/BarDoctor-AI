@@ -1,0 +1,102 @@
+/* Recipe ingredient selection v511: explicit product identity, separate recipe label. */
+function bdRecipeProductV511(line, products, venueId) {
+  if(line.linkStatus==="missing"||line.resolutionStatus==="reference_conflict"||line.purchaseProductKey&&line.productKey&&line.purchaseProductKey!==line.productKey)return undefined;
+  const key=line.purchaseProductKey||line.productKey, id=line.nomenclatureItemId;
+  return products.find(p=>(p.key||p.productKey)===key&&(!id||String(p.id||p.nomenclatureItemId||p.key)===String(id))&&p.active!==false&&!p.archived&&p.status!=="archived"&&p.kind!=="service"&&p.type!=="service"&&(!p.venueId||Number(p.venueId)===Number(venueId)));
+}
+function bdRecipeAmountV511(line, product) {
+  if(["requires_review","invalid","missing"].includes(line.unitResolutionStatus))return null;
+  const amount=bdCatToBase(line.quantity,line.unit), target=bdCatToBase(1,product?.unit||product?.baseUnit);
+  if(!(amount.amount>0)||amount.unit==="unknown"||target.unit==="unknown")return null;
+  if(amount.unit===target.unit)return amount;
+  const conversion=line.unitConversion;
+  if(amount.unit==="pcs"&&conversion?.confirmedByUser===true&&Number(conversion.amount)>0){
+    const converted=bdCatToBase(Number(conversion.amount),conversion.unit);
+    if(converted.amount>0&&Number.isFinite(converted.amount)&&converted.unit===target.unit)return {amount:amount.amount*converted.amount,unit:converted.unit};
+  }
+  return null;
+}
+function bdRecipeChooseV511(line, product, venueId) {
+  const key=product?.key||product?.productKey;
+  if(!key||!bdRecipeProductV511({purchaseProductKey:key,nomenclatureItemId:product.id||product.nomenclatureItemId||key},[product],venueId))return null;
+  const changed=key!==(line.purchaseProductKey||line.productKey)||String(product.id||product.nomenclatureItemId||key)!==String(line.nomenclatureItemId||"");
+  const patch={...bdIngredientReferencePatchV440(product,key),name:product.name,matchedName:product.name,matchedBaseUnit:product.unit||product.baseUnit,linkStatus:"linked",linkSource:"manual",linkConfirmedByUser:true,matchTier:"high",matchScore:100,matchEvidence:["подтверждено пользователем"],matchSuggestions:[],_editorNewIngredient:false};
+  if(!line._editorNewIngredient&&!line.purchaseProductKey&&line.name&&!line.originalName)patch.originalName=line.name;
+  if(changed)Object.assign(patch,{unitConversion:undefined,unitResolutionStatus:undefined,unitResolutionReason:undefined,unitResolutionEvidence:undefined,unitPackageOptions:undefined,normalizedQuantity:undefined,normalizedUnit:undefined,plausibilityWarnings:[],unitCost:undefined,unitPrice:undefined,cost:undefined,totalCost:undefined,costStatus:undefined});
+  // Only untouched, newly added rows get a default unit. Existing quantities retain their meaning.
+  if(line._editorNewIngredient&&Number(line.quantity)===1&&line.unit==="шт."){
+    patch.unit=({ml:"мл",l:"л",g:"г",kg:"кг",pcs:"шт."})[product.unit||product.baseUnit]||line.unit;
+  }
+  const next={...line,...patch}, amount=bdRecipeAmountV511(next,product);
+  Object.assign(patch,{unitResolutionStatus:amount?"exact_compatible":"requires_review",resolutionStatus:amount?"linked_ready":"linked_unit_review",normalizedQuantity:amount?.amount,normalizedUnit:amount?.unit});
+  return patch;
+}
+function bdRecipeLineCostV511(line, costs, products, venueId) {
+  const product=bdRecipeProductV511(line,products,venueId),amount=product&&bdRecipeAmountV511(line,product);
+  const unknown=reason=>({id:line.id,complete:false,cost:null,unitPrice:null,reason,costStatus:"UNKNOWN"});
+  if(!product)return unknown("mapping");
+  if(!amount)return unknown("unit");
+  const key=product.key||product.productKey,id=String(product.id||product.nomenclatureItemId||key);
+  // A stable line ID alone cannot authorize a price after changing its stock product.
+  const matches=costs.filter(c=>{
+    const refs=[c.productKey,c.purchaseProductKey].filter(Boolean);
+    return (refs.length?refs.every(ref=>ref===key):String(c.nomenclatureItemId||"")===id)&&(!c.nomenclatureItemId||String(c.nomenclatureItemId)===id)&&(!c.venueId||Number(c.venueId)===Number(venueId));
+  });
+  const cost=matches.find(c=>!c.id)||matches.find(c=>String(c.id)===String(line.id))||matches[0];
+  const price=typeof cost?.unitPrice==="number"||typeof cost?.unitPrice==="string"&&cost.unitPrice.trim()?Number(cost.unitPrice):NaN;
+  if(cost?.complete!==true||!Number.isFinite(price)||price<0||!cost.currency||cost.costStatus==="UNKNOWN")return unknown("price");
+  const basis=bdTechCostUnitV376(cost.unit);
+  if(basis.unit!==amount.unit||!(basis.factor>0))return unknown("price_unit");
+  const quantity=amount.amount/basis.factor;
+  if(!Number.isFinite(quantity*price))return unknown("unit");
+  return {...cost,id:line.id,complete:true,reason:null,amount:quantity,cost:Math.round(quantity*price*100)/100,unitPrice:price};
+}
+function bdRecipeIngredientV511({line,products,venueId,onChange,onChoose}) {
+  const product=bdRecipeProductV511(line,products,venueId),[open,setOpen]=S.useState(!product),[query,setQuery]=S.useState(product?"":line.name||""),[conversion,setConversion]=S.useState("");
+  const amount=product&&bdRecipeAmountV511(line,product),target=bdCatToBase(1,product?.unit||product?.baseUnit).unit;
+  const options=target==="ml"?["мл","л"]:target==="g"?["г","кг"]:target==="pcs"?["шт."]:["мл","л","г","кг","шт."];
+  if(!options.includes(line.unit))options.unshift(line.unit||"шт.");
+  function select(key,item){onChoose(key,item);setOpen(false);setQuery("");setConversion("");}
+  function changeMeasure(patch){onChange({...patch,_editorNewIngredient:false,unitConversion:undefined,normalizedQuantity:undefined,normalizedUnit:undefined,unitResolutionStatus:undefined,resolutionStatus:undefined});}
+  return i.jsxs("div",{className:"bd-recipe-ingredient-v511",children:[
+    i.jsx("span",{className:"bd-recipe-field-title-v511",children:"Ингредиент"}),
+    open?i.jsx(bdCatIngredientMatchV375,{ingredient:line,venueId,products:products.filter(p=>!p.venueId||Number(p.venueId)===Number(venueId)),showAll:true,query,onQuery:value=>{setQuery(value);if(line._editorNewIngredient&&!product)onChange({name:value})},onChoose:select,onShowAll:()=>setOpen(false)}):i.jsxs("button",{type:"button",className:"bd-recipe-selected-v511",onClick:()=>{setQuery(product?"":line.name||"");setOpen(true)},children:[i.jsxs("span",{children:[i.jsx("strong",{children:product?.name||line.name||"Выбрать ингредиент"}),i.jsx("small",{children:product?[product.packageSize,bdAssortmentUnitLabelV293(product.unit||product.baseUnit)].filter(Boolean).join(" · "):"Выберите складской товар"})]}),i.jsx("span",{children:"Изменить"})]}),
+    product&&open&&i.jsx("small",{children:"Сейчас выбрано: "+product.name+". Связь изменится только после выбора результата."}),
+    !product&&line.name&&!line._editorNewIngredient&&i.jsx("small",{children:"Исходное название: "+line.name+". Выберите товар, чтобы связать со складом."}),
+    line.originalName&&line.originalName!==line.name&&i.jsx("small",{children:"Исходное название: "+line.originalName}),
+    product&&i.jsxs("details",{className:"bd-recipe-alias-v511",children:[i.jsx("summary",{children:line.name!==product.name?"Название в рецепте: "+line.name:"Другое название в рецепте"}),i.jsx(bdCatField,{label:"Название в рецепте",children:i.jsx("input",{value:line.name,onChange:event=>onChange({name:event.target.value}),placeholder:product.name})}),i.jsx("small",{children:"Меняет только подпись в рецепте. Складской товар остаётся выбранным выше."})]}),
+    i.jsxs("div",{className:"bd-catalog-grid",children:[i.jsx(bdCatField,{label:"Количество на порцию",children:i.jsx("input",{type:"number",step:"0.001",inputMode:"decimal",value:line.quantity,onChange:event=>onChange({quantity:event.target.value,_editorNewIngredient:false,normalizedQuantity:undefined,normalizedUnit:undefined,unitResolutionStatus:undefined,resolutionStatus:undefined})})}),i.jsx(bdCatField,{label:"Единица",children:i.jsx("select",{"aria-label":"Единица",value:line.unit||"шт.",onChange:event=>changeMeasure({unit:event.target.value}),children:options.map(unit=>i.jsx("option",{value:unit,children:unit},unit))})})]}),
+    product&&!amount&&i.jsxs("div",{className:"bd-ingredient-unit-review-v259",role:"status",children:[i.jsx("strong",{children:"Уточните количество и единицу"}),i.jsx("p",{children:"Указано "+line.quantity+" "+line.unit+". Товар учитывается в "+bdAssortmentUnitLabelV293(product.unit||product.baseUnit)+". Измените норму явно — количество не пересчитывается автоматически."}),bdCatToBase(1,line.unit).unit==="pcs"&&["g","ml"].includes(target)&&i.jsxs("div",{className:"bd-ingredient-conversion-v259",children:[i.jsx("input",{type:"number",min:"0",step:"0.001",value:conversion,onChange:event=>setConversion(event.target.value),"aria-label":"Вес или объём одной штуки",placeholder:"На одну штуку"}),i.jsx("span",{children:bdAssortmentUnitLabelV293(target)}),i.jsx("button",{type:"button",disabled:!(Number(conversion)>0),onClick:()=>onChange({unitConversion:{amount:Number(conversion),unit:target,confirmedByUser:true,source:"manual"},normalizedQuantity:Number(line.quantity)*Number(conversion),normalizedUnit:target,unitResolutionStatus:"packaging_compatible",resolutionStatus:"linked_ready"}),children:"Подтвердить конверсию"})]})]}),
+    product&&amount&&line.unitConversion?.confirmedByUser&&i.jsx("small",{children:"Подтверждено: 1 шт. = "+line.unitConversion.amount+" "+bdAssortmentUnitLabelV293(line.unitConversion.unit)})
+  ]});
+}
+
+function bdUseRecipeBackV511(close,dirty,surface) {
+  const latest=S.useRef(close);latest.current=close;
+  S.useEffect(()=>{
+    const url=location.pathname+location.search+location.hash;
+    // The item-detail route owns one layer; give its nested recipe its own history entry.
+    if(!new URLSearchParams(location.search).get("itemId"))return;
+    const id=crypto.randomUUID(),state={...history.state,bdRecipeEditorV511:id};
+    let entry;const restore=()=>{history.pushState(state,"",url);entry=history.state?.bdEntryId||history.state?.bdRecipeEditorV511;};
+    restore();
+    const back=event=>{
+      if(location.pathname+location.search+location.hash!==url)return;
+      if((history.state?.bdEntryId||history.state?.bdRecipeEditorV511)===entry)return;
+      event.stopImmediatePropagation();
+      const quick=document.querySelector('.bd-quick-create-sheet-v336');
+      if(quick){
+        const control=quick.querySelector('button[aria-label="Закрыть"]');
+        if(control&&(!quick.hasAttribute('data-bd-unsaved-changes')||window.confirm("Изменения новой позиции не сохранены. Закрыть её и вернуться в техкарту?"))){
+          window.bdMarkNavigationClean?.(quick);
+          control.setAttribute('data-bd-internal-step-navigation','true');control.click();
+        }
+        if(dirty.current)surface.current?.setAttribute("data-bd-unsaved-changes","true");
+        restore();return;
+      }
+      if(latest.current()===false)restore();
+    };
+    window.addEventListener("popstate",back,true);
+    return()=>{window.removeEventListener("popstate",back,true);if(location.pathname+location.search+location.hash===url&&(history.state?.bdEntryId||history.state?.bdRecipeEditorV511)===entry)history.back();};
+  },[]);
+}
