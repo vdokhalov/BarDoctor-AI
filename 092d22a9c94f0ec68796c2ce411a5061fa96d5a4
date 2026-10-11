@@ -1,0 +1,13 @@
+{
+  "commit": "092d22a9c94f0ec68796c2ce411a5061fa96d5a4",
+  "product_commit": "926fa50bac5b18a0da8e6a383c688f07692a4282",
+  "webkit": "PASS 390/412/1440; eight assertions each; no paid calls or production data",
+  "runtime": "Playwright WebKit2370; dependency libraries supplied locally; host preflight bypassed because it does not search bundled dependencies. Actual browser and all assertions executed.",
+  "published": false,
+  "library": "Prior prepared upload failed HTTP401; no confirmed ID",
+  "files": {
+    "webkit.log": "786cb6d64964465103ed8f630af559d21590dd49858660fb2a48833dc95b1816",
+    "repository.bundle": "75bbb69d922ee5a39af576a30c3efce4847a6108ee94b9f95c03141478fbbed3",
+    "changes.patch": "143f590bcb1d95fc69807caf5b44a3811e32020a8315db614c59a8187e60ac31"
+  }
+}
