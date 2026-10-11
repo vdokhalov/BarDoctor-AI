@@ -1,0 +1,43 @@
+{
+  "commit": "078adca9621d099702ebf4683a33a1694f9325dd",
+  "base": "092d22a9c94f0ec68796c2ce411a5061fa96d5a4",
+  "branch": "recovery/cashier-v505-20261010",
+  "publication": "NOT AUTHORIZED / NOT PERFORMED",
+  "live_data_changes": false,
+  "storage": "Existing bd_inventory_snapshots legacy format; no DDL, stock, movements or POS writes",
+  "checks": {
+    "build": "PASS",
+    "typecheck": "PASS",
+    "eslint": "PASS",
+    "targeted_tests": 44,
+    "existing_cost_basis_tests": 8,
+    "postbuild_client_tests": 6,
+    "isolated_full_SPA_real_API": "Chromium390 and WebKit390 PASS; two audits; untouched other stores; capturedCOGS and formula retained",
+    "isolated_React_editor": "390/412/1440 PASS; stable idempotent retry after lost response",
+    "independent_review": "No confirmed blockers"
+  },
+  "risk": "Ambiguous existing boundary slots fail closed; resolve conflicting records before edits. No automatic valuation selection or data entry.",
+  "qa_control": "Historical Sep prices240/18/9 and closing3483 user confirmed; live entry deferred until publication and separate reconciliation",
+  "asset_sha256": "32a8b81c05c87963702211b3fa8a5e7cf56bb627cac3f17d5a79074583b3069c",
+  "library_prior_status": "HTTP401; no new confirmed Library ID",
+  "files": {
+    "repository.bundle": "73f2af0ec7712424e9344b4efe53fbc7eb2d45e1ac0436c620a6b78f7d6e9fa9",
+    "changes.patch": "04a93f6f7821e746dca273f77fb51f52cb171cf022b9ebf911e2d2dea79032f1",
+    "evidence/v514-wizard-webkit.log": "a236387189b7868534bcb3ba3785d824b2873340dc01c2ed6c67759f3e1c764f",
+    "evidence/v514-final-client.log": "e56a563b1d97ac6347f05867eef1cea0b110b7de943fbf28a442a18dcdb30953",
+    "evidence/v514-typecheck.log": "91070dd0816a8effcddad4b3fc5b674d4aff9615dbabadded89d0483eda71226",
+    "evidence/v514-wizard-browser.log": "ab2890983d85267b913c9f19cf1efce4b27458bc26e2ac114a33f617f8f71993",
+    "evidence/v514-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "evidence/v514-final-targeted.log": "57b9c7a1ba321ba61df2f539ae4e088dd3f0d8db1fbb1060dc33cfd4a938b8cc",
+    "evidence/v514-build.log": "d6c30eff904c3b47bc2b3de9ba1f7f57c7325c2f7c27cf7cd8f83e2ee125f664",
+    "evidence/v514-existing-cost-basis.log": "a8ba4ede772108f2ab1319719f894dee880a8b502a94c0bcca4ddda35308cbf9"
+  },
+  "archive_sha256": "f884fce5d439a351cb814cf33249cab12d3ec369063fbb6e3ffc27269812ce17",
+  "library_status": "Prepared upload failed HTTP401 before transfer; no Library ID",
+  "receipts": {
+    "v514-final-targeted.log": "✔ new boundaries use venue sections and require explicit values/source; negative/nonfinite/oversized inputs fail (2.039981ms)\n✔ ambiguous and physical boundaries fail closed; foreign venue is not edited; unique existing id survives (0.867299ms)\n✔ exact first-of-month mandatory and note budget includes synthetic marking (0.254144ms)\n✔ patch installs actual wizard step3/4 editor plus scoped authoritative preview refresh and repeats safely (68.219183ms)\n✔ leadership plus explicit inventory permission gates editor; cashier and revoked permission fail closed (1.055112ms)\n✔ authenticated scoped request preserves server conflict instead of reporting a local success (1.114122ms)\n✔ boundary write atomically audits once, preserves physical/stock data, returns accepted data; identical replay is idempotent (821.265717ms)\n✔ invalid values, scope, dates, ambiguity and missing audit reason never mutate snapshots (652.634475ms)\n✔ physical edit and delete require inventory lifecycle (436.108914ms)\n✔ both adjacent month locks and malformed closing history fail closed (499.758345ms)\n✔ concurrent month close, profile change, membership revocation and competing snapshot cannot pass the atomic guard (1490.523171ms)\n✔ administrator leadership retains permission; staff grant and leadership permission denial fail closed (663.645805ms)\n✔ audit insertion failure rolls back the boundary write; explicit zero remains a valid documented value (415.827423ms)\n✔ G12 5,null: same rated denominator/null/rounding (4.131121ms)\n✔ G12 all null: same rated denominator/null/rounding (0.418856ms)\n✔ G12 empty: same rated denominator/null/rounding (0.373803ms)\n✔ G12 invalid zero: same rated denominator/null/rounding (0.332251ms)\n✔ G12 rounding: same rated denominator/null/rounding (0.38966ms)\n✔ G12 analyzed denominator, repeated compliments and complaints, pending sentiment excluded (13.051439ms)\n✔ G12 selected Google A/B and legacy unbound stay separate from manual population (1.294759ms)\n✔ G13 native, retry, reversal and stable renamed item identity use accepted quantities/revenue/cost (38.601056ms)\n✔ G13 unknown captured cost is null even if a provisional zero exists; foreign nested facts excluded (1.997418ms)\n✔ G07 canonical components, content manifest, idempotent close, read proof and frozen history (799.988973ms)\n✔ G07 stale read A / accepted expense B / close A conflicts, atomic CAS race and rollback (484.948619ms)\n✔ G07 legacy partial never rewritten; guessed/foreign scope and nested authorization fail closed (384.021125ms)\n✔ G13 legacy/import plus native totals, stable item grain, no Finance double-add and current purchase never recosts past sales (8.168615ms)\n✔ G07 explicit reopen followed by verified reclose; generic close cannot bypass manifest (560.485883ms)\n✔ G07 owner/permitted manager/restricted manager/revoked/foreign tenant and atomic membership revocation (569.035771ms)\n✔ G07 unknown recurring cannot be finalized (424.550388ms)\n✔ G07 unknown acquisition cannot be finalized (458.554766ms)\n✔ G07 unknown FOT cannot be finalized (440.802008ms)\n✔ G07 unknown currency cannot be finalized (409.468514ms)\n✔ G07 unknown boundary cannot be finalized (285.912824ms)\n✔ G07 unknown captured COGS cannot be finalized (247.992243ms)\n✔ G13 newer receipt changes current recipe estimate, preserves captured historical margin byte for byte (11.646742ms)\n✔ G07 verified manifest cannot escape through raw/bulk store with restricted nested permissions (296.570764ms)\n✔ G12 calendar window includes the whole end day, excludes future and does not double-count a boundary day (0.827546ms)\n✔ G07 permitted manager closes using recorded zero FOT plus bonus, never settlement payment (285.659584ms)\n✔ normal report reads authorized server COGS despite excluded raw bootstrap and unknown boundaries; GET writes nothing (699.442976ms)\n✔ server denial and scope mismatch never fall back to local figures (4.508385ms)\n✔ legacy and invalid closed snapshots remain viewable with explicit provenance status, never recomputed (9.500648ms)\n✔ superseded and disposed report requests cannot publish old venue/month data; errors clear data (1.351591ms)\n✔ Finance quick action preserves selected September in Report navigation (83.339591ms)\n✔ monthly readiness mounts the real close launcher with September context, not a dead query-only link (2.046949ms)\nℹ tests 44\nℹ suites 0\nℹ pass 44\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 6118.970438\n",
+    "v514-wizard-browser.log": "{\"engine\":\"chromium\",\"width\":390,\"fullSpa\":true,\"realApi\":true,\"opening\":0,\"closing\":3483,\"capturedCOGS\":720,\"unchangedFinalProfit\":314,\"audits\":2,\"stockAndOtherStoresUnchanged\":true}\n",
+    "v514-wizard-webkit.log": "Skipping host requirements validation logic because `PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS` env variable is set.\n{\"engine\":\"webkit\",\"width\":390,\"fullSpa\":true,\"realApi\":true,\"opening\":0,\"closing\":3483,\"capturedCOGS\":720,\"unchangedFinalProfit\":314,\"audits\":2,\"stockAndOtherStoresUnchanged\":true}\n",
+    "v514-typecheck.log": "\n> bardoctor-preview@0.1.0 typecheck\n> bash scripts/sites-env.sh -- tsc --noEmit --incremental false --pretty false\n\n"
+  }
+}
