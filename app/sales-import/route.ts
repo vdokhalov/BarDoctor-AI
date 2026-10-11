@@ -34,7 +34,7 @@ const HTML = `<!doctype html>
       <div class="journal-primary"><a class="primary-action" id="open-cashier" href="/cashier">Открыть кассу</a><div id="pos-drafts"></div></div>
     </section>
     <nav class="sales-navigation" aria-label="Разделы продаж">
-      <button type="button" data-sales-view="journal" aria-current="page">Журнал</button><a href="/cashier">Касса</a><a href="/sales-entry?view=shifts">Смены</a><button type="button" data-sales-view="manual">Ручной ввод</button><button type="button" data-sales-view="import">Импорт</button>
+      <button type="button" data-sales-view="journal" aria-current="page">Журнал</button><a href="/cashier">Касса</a><a href="/cashier?view=orders">Незакрытые счета</a><a href="/sales-entry?view=shifts">Смены</a><button type="button" data-sales-view="manual">Ручной ввод</button><button type="button" data-sales-view="import">Импорт</button>
     </nav>
     <section id="journal-metrics" class="journal-metrics" aria-label="Продажи за выбранный период">
       <article><span>Выручка</span><strong id="journal-revenue">—</strong></article><article><span>Чеки</span><strong id="journal-receipts">—</strong></article><article><span>Средний чек</span><strong id="journal-average">—</strong></article>

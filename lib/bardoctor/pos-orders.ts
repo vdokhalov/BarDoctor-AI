@@ -1,3 +1,4 @@
+import { posWorkdayGate } from "./pos-workday-gate";
 import { capturePosDiscount, posDiscountCents, validatePosDiscountSnapshot, type PosDiscountRule, type PosDiscountSnapshot, type PosDiscountTotals } from "./pos-discounts";
 import { canManagePosPrivilegedAction, type AccessRole } from "./access-control";
 import { EVENT_REVENUE_SOURCE, planSalesEvent, stableSalesValue, type PosPayment, type SalesEvent, type SalesEventContext } from "./sales-events";
@@ -57,6 +58,67 @@ function assertShiftOpen(c: SalesEventContext, shiftId: string) {
   if (row.closingStatus !== "open") fail("SHIFT_CLOSED");
   if (row.revenueSource !== EVENT_REVENUE_SOURCE || row.currency !== c.currency || !/^\d{4}-\d{2}-\d{2}$/.test(String(row.date))) fail("SHIFT_NEEDS_REVIEW");
   if (c.closedMonths.has(String(row.date).slice(0, 7))) throw new Error("SALES_EVENT_MONTH_LOCKED");
+}
+function validAccountShift(c: SalesEventContext, shift: Record<string, unknown>): boolean {
+  const date=shift.date;
+  return identifier(shift.id) && shift.revenueSource===EVENT_REVENUE_SOURCE && shift.currency===c.currency
+    && ["open","closed"].includes(String(shift.closingStatus)) && typeof date==="string"
+    && /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date))
+    && new Date(date).toISOString().slice(0,10)===date;
+}
+function cancellationIndex(c:SalesEventContext){
+  const shifts=new Map<string,Record<string,unknown>[]>(),paidOrders=new Set<string>();
+  for(const row of c.revenues.filter(row=>row.venueId===c.venueId)){const id=String(row.id);shifts.set(id,[...(shifts.get(id)||[]),row]);}
+  for(const event of c.events.filter(event=>event.venueId===c.venueId)){if(typeof event.orderId==="string")paidOrders.add(event.orderId);if(typeof event.externalId==="string"&&event.externalId.startsWith("pos-order:"))paidOrders.add(event.externalId.slice(10));}
+  return {shifts,paidOrders,openCash:c.revenues.filter(row=>row.venueId===c.venueId&&row.closingStatus==="open").length};
+}
+/** Only an unpaid draft may be cancelled; no sale, stock or closed report is rewritten. */
+export function assertUnpaidOrderCancellation(c: SalesEventContext, order: PosOrder, index=cancellationIndex(c)) {
+  const raw=order as PosOrder & Record<string,unknown>;
+  if(order.status!=="OPEN" || order.salesEventId || order.paidAt || order.paidBy
+    || raw.payment || raw.payments!=null&&(!Array.isArray(raw.payments)||raw.payments.length>0) || raw.partialPayment || raw.partiallyPaid
+    || [raw.paidAmount,raw.amountPaid].some(value=>value!=null&&value!==0)
+    || order.operations.some(op=>["pay","payment","partial_payment"].includes(op.action))
+    || index.paidOrders.has(order.id))fail("CANCELLATION_HAS_PAYMENT");
+  const matches=index.shifts.get(order.shiftId)||[];
+  if(matches.length!==1)fail("SHIFT_NEEDS_REVIEW");
+  const shift=matches[0];
+  if(!validAccountShift(c,shift)||shift.closingStatus==="open"&&index.openCash!==1)fail("SHIFT_NEEDS_REVIEW");
+  if(c.closedMonths.has(String(shift.date).slice(0,7)))throw Error("SALES_EVENT_MONTH_LOCKED");
+}
+
+/** Only CLOSED-day + OPEN-cash is a recovery exception to the ordinary workday gate. */
+export function posOrderCancellationDayAllowed(c: SalesEventContext, shiftId: string, workdays: Record<string,unknown>[]) {
+  const matches=c.revenues.filter(row=>row.venueId===c.venueId&&row.id===shiftId);
+  if(matches.length!==1)return false;
+  return cancellationDayAllowed(c,matches[0],workdays);
+}
+function cancellationDayAllowed(c:SalesEventContext,shift:Record<string,unknown>,workdays:Record<string,unknown>[]){
+  const days=workdays.filter(row=>row.venueId===c.venueId);
+  if(shift.closingStatus==="closed")return true;
+  if(posWorkdayGate(workdays,c.venueId,String(shift.date)).ok)return true;
+  const sameDate=days.filter(row=>row.date===shift.date);
+  return shift.closingStatus==="open"&&sameDate.length===1&&sameDate[0].workdayStatus==="CLOSED"&&!days.some(row=>row.workdayStatus==="OPEN");
+}
+
+/** Venue-wide list projection; reuse the existing snapshot, with no per-shift reads. */
+export function posOrderAccountViews(c: SalesEventContext, orders: PosOrder[], workdays: Record<string,unknown>[], canCancel: boolean) {
+  const index=cancellationIndex(c),shifts=index.shifts,dayEligibility=new Map<string,boolean>(),daysByDate=new Map<unknown,Record<string,unknown>[]>();
+  for(const day of workdays.filter(row=>row.venueId===c.venueId))daysByDate.set(day.date,[...(daysByDate.get(day.date)||[]),day]);
+  const openCash=c.revenues.filter(row=>row.venueId===c.venueId&&row.closingStatus==="open"),openDays=workdays.filter(row=>row.venueId===c.venueId&&row.workdayStatus==="OPEN");
+  return orders.filter(order=>order.venueId===c.venueId&&canReadOrder(c.actor,order)).map(order=>{
+    if(order.status!=="OPEN")return order;
+    const matches=shifts.get(order.shiftId)||[],shift=matches.length===1?matches[0]:null;
+    const valid=shift&&validAccountShift(c,shift);
+    const sourceDays=shift?daysByDate.get(shift.date)||[]:[];
+    const ambiguous=!valid||shift.closingStatus==="open"&&(openCash.length!==1||openDays.length>1||sourceDays.length!==1||!["OPEN","CLOSED"].includes(String(sourceDays[0].workdayStatus)));
+    const group=ambiguous?"REVIEW":shift.closingStatus==="open"&&openDays.length===1&&openDays[0].date===shift.date?"CURRENT":"PAST";
+    let cancelCode=canCancel?null:"POS_ORDER_ACCESS_DENIED";
+    if(canCancel){try{assertUnpaidOrderCancellation(c,order,index);}catch(error){cancelCode=error instanceof Error?error.message:"POS_ORDER_STORE_NEEDS_REVIEW";}}
+    if(!cancelCode&&shift){if(!dayEligibility.has(order.shiftId))dayEligibility.set(order.shiftId,cancellationDayAllowed(c,shift,workdays));if(!dayEligibility.get(order.shiftId))cancelCode="POS_ORDER_WORKDAY_REQUIRED";}
+    if(ambiguous)cancelCode="POS_ORDER_SHIFT_NEEDS_REVIEW";
+    return {...(group==="CURRENT"?posOrderViews(c,[order])[0]:order),accountContext:{group,shift:valid?{id:shift.id,name:shift.shiftName||String(shift.id),date:shift.date,status:shift.closingStatus}:null,canCancel:cancelCode===null,cancelCode}};
+  });
 }
 function totals(lines: PosOrderLine[], currency: string): PosDiscountTotals {
   const cents = lines.reduce((sum, line) => { const next = sum + posDiscountCents(line.total); if (!Number.isSafeInteger(next)) fail("PRICE_NEEDS_REVIEW"); return next; }, 0);
@@ -226,7 +288,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
     if (!order || !canReadOrder(c.actor, order)) fail("NOT_FOUND");
     if (order.revision !== command.expectedRevision) fail("REVISION_CONFLICT");
     if (order.status !== "OPEN") fail("NOT_OPEN");
-    assertShiftOpen(c, order.shiftId);
+    if(command.action==="cancel_order")assertUnpaidOrderCancellation(c,order);else assertShiftOpen(c, order.shiftId);
     if (order.precheck && ["add_items", "set_quantity", "cancel_item", "split", "precheck", "apply_discount", "remove_discount"].includes(command.action)) fail("PRECHECK_LOCKED");
     if (order.discount && ["add_items", "set_quantity", "cancel_item", "split"].includes(command.action)) fail(command.action === "split" ? "SPLIT_DISCOUNTED" : "DISCOUNT_LOCKED");
     order = { ...order, revision: order.revision + 1 };

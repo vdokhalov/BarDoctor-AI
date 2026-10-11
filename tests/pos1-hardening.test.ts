@@ -38,6 +38,7 @@ test("Real auth + SQLite: canonical event is visible in document journal and lin
   const user=await r.register("pos-hardening@isolated.test"),other=await r.register("pos-other@isolated.test");
   r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({name:"QA",currency:"PMR_RUB"}),user.userId);
   const venueId=user.activeVenueId;
+  r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?)").run(user.userId,"bd_operational_reports_v1",JSON.stringify([{venueId,date:new Date().toISOString().slice(0,10),workdayStatus:"OPEN",staffing:[{employeeId:"fixture"}]}]));
   r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(user.userId,"bd_assortment_v1",JSON.stringify({nomenclatureStructure:taxonomy,menuItems:[{id:"service",venueId,name:"QA Сервис",type:"service",consumptionMode:"NONE",active:true,salePrice:30,currency:"PMR_RUB",department:"bar",category:"Без подраздела",sectionId:"kitchen",taxonomyCategoryId:"food"}]}),"test");
   const send=(body:unknown)=>r.api.events.POST(r.request(user,"/api/sales-events","POST",body));
   assert.equal((await send({action:"open_shift",venueId,shiftId:"night",name:"Night"})).status,201);

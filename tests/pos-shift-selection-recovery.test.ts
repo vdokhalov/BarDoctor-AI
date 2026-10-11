@@ -43,7 +43,7 @@ test('unchanged selection preserves the original draft identity, shift and lines
 
 for (const open of [true, false]) test(`legacy draft restoration retains its original shift (${open ? 'open' : 'closed'})`, async () => {
   const text = readFileSync('public/cashier.js', 'utf8');
-  const source = text.slice(text.indexOf('  async function handleAction('), text.indexOf('  document.addEventListener("click"'));
+  const source = text.slice(text.indexOf('  async function handleAction('), text.indexOf('  document.addEventListener(', text.indexOf('  async function handleAction(')));
   const key = 'bd_pos_draft_v1:1:2:A', selectionKey = 'bd_pos_shift_v1:1:2';
   const draft = { id: 'legacy-A', lines: [{ menuItemId: 'beer', quantity: 2 }], comment: 'original-A' };
   const stored = new Map([[key, JSON.stringify(draft)], [selectionKey, 'B']]);

@@ -12,7 +12,7 @@ import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../..
 import { SALES_EVENT_STORE_KEY } from "../../../lib/bardoctor/sales-events";
 import { POS_DISCOUNT_STORE_KEY, parsePosDiscountRules } from "../../../lib/bardoctor/pos-discounts";
 import { posSalesEventView } from "../../../lib/bardoctor/pos-shift-report";
-import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, planPosOrder, type PosOrderCommand, type PosOrderContext } from "../../../lib/bardoctor/pos-orders";
+import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountViews, posOrderCancellationDayAllowed, planPosOrder, type PosOrderCommand, type PosOrderContext } from "../../../lib/bardoctor/pos-orders";
 
 const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -37,6 +37,8 @@ function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
   if (error instanceof Error && /^(POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
+      POS_ORDER_CANCELLATION_HAS_PAYMENT: "У счёта есть признаки оплаты. Отмена неоплаченного счёта недоступна; возвраты рассматриваются отдельно.",
+      POS_ORDER_SHIFT_NEEDS_REVIEW: "Исходная кассовая смена не определена однозначно. Ничего не изменено.",
       POS_ORDER_DISCOUNT_LOCKED: "Руководитель должен снять скидку перед изменением позиций.",
       POS_ORDER_SPLIT_DISCOUNTED: "Разделение счёта со скидкой не поддерживается. Руководитель должен сначала снять скидку, разделить счёт и применить скидку отдельно.",
       POS_ORDER_DISCOUNT_PRICE_CHANGED: "Цены изменились после применения скидки. Руководитель должен снять скидку и проверить новые цены.",
@@ -64,8 +66,8 @@ export async function GET(request: Request): Promise<Response> {
   const account = await authenticateRequest(request); if (!account) return unauthorized();
   if (!hasPermission(account, "sales.view")) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
   try {
-    const { context, orders } = await load(account);
-    return reply({ ok: true, venueId: account.venueId, serverNow: context.now, orders: posOrderViews(context, orders),
+    const { context, orders, workdays } = await load(account);
+    return reply({ ok: true, venueId: account.venueId, serverNow: context.now, orders: posOrderAccountViews(context, orders, workdays, hasPermission(account,"sales.create")&&canManagePosPrivilegedAction(account)),
       permissions: { create: hasPermission(account, "sales.create"), pay: hasPermission(account, "sales.create") && hasPermission(account, "sales.post"), privileged: hasPermission(account, "sales.create") && canManagePosPrivilegedAction(account) } });
   } catch (error) { return controlled(error); }
 }
@@ -82,7 +84,7 @@ async function command(request: Request): Promise<Response> {
     const { db, snapshots, context, orders, workdays } = await load(account);
     const plan = await planPosOrder(context, orders, body);
     const result = { ok: true, duplicate: plan.duplicate, order: plan.order, orders: posOrderViews(context, plan.orders), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
-    if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok)return reply(gate,409);}
+    if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);
     const updates: [string, unknown][] = [[POS_ORDER_STORE_KEY, plan.orders]];
     if (plan.salesPlan) updates.push(["bd_assortment_v1", plan.salesPlan.assortment], ["bd_stock_movements", plan.salesPlan.movements], [SALES_EVENT_STORE_KEY, plan.salesPlan.events], ["bd_finance_revenue", plan.salesPlan.revenues]);

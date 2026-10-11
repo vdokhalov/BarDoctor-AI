@@ -16,6 +16,7 @@ function isolated() {
     recipes:[{id:"vodka-recipe",menuItemId:"vodka40",ownerId:"vodka40",venueId:1,version:1,current:true,status:"confirmed",reviewStatus:"approved",ingredients:[{id:"vodka-line",nomenclatureItemId:"vodka",purchaseProductKey:"vodka-stock",name:"TEST VODKA",quantity:0.04,unit:"l",normalizedQuantity:0.04,normalizedUnit:"l",venueId:1}]}]
   };
   r.put("bd_assortment_v1",fixture.assortment);
+  r.put("bd_operational_reports_v1",[{venueId:1,date:new Date().toISOString().slice(0,10),workdayStatus:"OPEN",staffing:[{employeeId:"fixture"}]}]);
   r.put("bd_stock_movements",[{id:"vodka-receipt",type:"receipt",venueId:1,productKey:"vodka-stock",productName:"TEST VODKA",amount:1,unit:"l",costAmount:300,costStatus:"KNOWN",currency:"PMR_RUB",date:"2026-09-01",sourceDocumentId:"confirmed-purchase",sourceLineId:"purchase-line",createdAt:"2026-09-01T10:00:00Z"}]);
   const send=(body:object,venue=1)=>r.api.POST(new Request("http://localhost/api/sales-events",{method:"POST",headers:{"Content-Type":"application/json","X-Venue-Id":String(venue)},body:JSON.stringify({venueId:venue,...body})}));
   const getApi=()=>r.api.GET(new Request("http://localhost/api/sales-events",{headers:{"X-Venue-Id":"1"}}));
