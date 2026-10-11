@@ -1,0 +1,103 @@
+/* accounting-boundary-v514:start */
+function bdBoundaryAllowedV514() {
+  return ["owner", "manager", "shift_manager"].includes(localStorage.getItem("bd_active_role")) && typeof window.bdHasClientPermission === "function" && window.bdHasClientPermission("inventory.manage");
+}
+function bdBoundaryIdentityV514() { return [localStorage.getItem("bd_session_userid"), localStorage.getItem("bd_session")].join(":"); }
+function bdBoundaryPhysicalV514(row) {
+  return row.scope != null || row.internalId != null || row.status === "completed" || (Array.isArray(row.items) && row.items.some(item => item.valuationKnown != null));
+}
+function bdBoundaryDraftV514(rows, venueId, date, currency, sectionNames) {
+  if (!Array.isArray(rows)) throw Error("Не удалось прочитать сохранённые остатки.");
+  const matches = rows.filter(row => row && (!row.venueId || row.venueId === "primary" || Number(row.venueId) === venueId) && String(row.date || "").slice(0, 10) === date);
+  if (matches.length > 1) throw Error("На эту дату несколько документов. Сначала устраните неоднозначность источников.");
+  const existing = matches[0];
+  if (existing && bdBoundaryPhysicalV514(existing)) throw Error("На эту дату есть физическая инвентаризация. Её нельзя изменять через учётные остатки.");
+  if (existing && (existing.currency !== currency || !existing.sections || Array.isArray(existing.sections))) throw Error("Существующий документ требует проверки валюты и разделов.");
+  return { existing, sections: Object.entries(existing?.sections || Object.fromEntries((sectionNames?.length ? sectionNames : ["Прочее"]).map(name => [name, ""]))).map(([name, amount]) => ({ name, amount: String(amount) })), note: existing?.note || "", synthetic: false };
+}
+function bdBoundaryRecordV514(draft, venueId, date, currency, id) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])-01$/.test(date) || !Number.isSafeInteger(venueId) || venueId <= 0 || !currency) throw Error("Не определены дата, заведение или валюта учёта.");
+  if (!draft.note.trim() || draft.note.trim().length + (draft.synthetic ? 25 : 0) > 500) throw Error("Укажите источник и причину подтверждения остатков (до 500 символов).");
+  const sections = {};
+  for (const item of draft.sections) {
+    const value = String(item.amount).trim();
+    const amount = Number(value.replace(",", "."));
+    if (!item.name.trim() || Object.hasOwn(sections, item.name.trim()) || !value || !Number.isFinite(amount) || amount < 0 || amount > 1e12 || item.name.trim().length > 120) throw Error("Для каждого раздела укажите неотрицательную сумму. Ноль подтвердите явно.");
+    sections[item.name.trim()] = amount;
+  }
+  if (!Object.keys(sections).length || Object.keys(sections).length > 50) throw Error("Укажите хотя бы один раздел.");
+  const total = Math.round(Object.values(sections).reduce((sum, value) => sum + value, 0) * 100) / 100;
+  if (!Number.isFinite(total)) throw Error("Сумма остатков слишком велика.");
+  return { ...draft.existing, id: draft.existing?.id || id, venueId, date, currency, sections, total, note: (draft.synthetic ? "СИНТЕТИЧЕСКИЕ QA-ДАННЫЕ. " : "") + draft.note.trim() };
+}
+async function bdBoundaryRequestV514(venueId, options) {
+  const response = await fetch("/api/store/bd_inventory_snapshots?venueId=" + venueId, { cache: "no-store", ...options, headers: { ...ca(Ot() || ""), ...options.headers, "X-Venue-Id": String(venueId) } });
+  const value = await response.json();
+  if (!response.ok || !value.ok) throw Error(value.code === "STORE_WRITE_CONFLICT" ? "Остатки изменились на сервере. Ввод сохранён в форме; загрузите актуальные данные перед повторным сохранением." : value.error || "Не удалось сохранить учётные остатки.");
+  return value;
+}
+function bdAccountingBoundaryEditorV514({ venueId, date, currency, sectionNames, onClose }) {
+  const [draft, setDraft] = S.useState(null), [error, setError] = S.useState(""), [busy, setBusy] = S.useState(false);
+  const base = S.useRef(null), alive = S.useRef(true), sequence = S.useRef(0), pending = S.useRef(false), draftId = S.useRef(null), original = S.useRef(""), identity = S.useRef(bdBoundaryIdentityV514());
+  const current = () => alive.current && identity.current === bdBoundaryIdentityV514() && bdMonthlyVenueIdPhase7(null, null) === venueId && bdBoundaryAllowedV514();
+  const load = async () => {
+    if (!current()) return;
+    const request = ++sequence.current;
+    setBusy(true); setError("");
+    try {
+      const result = await bdBoundaryRequestV514(venueId, { method: "GET" });
+      if (!current() || request !== sequence.current) return;
+      const rows = result.data == null ? [] : result.data;
+      const next = bdBoundaryDraftV514(rows, venueId, date, currency, sectionNames);
+      base.current = { data: result.data, rows };
+      draftId.current = next.existing?.id || crypto.randomUUID(); original.current = JSON.stringify(next); setDraft(next);
+    } catch (problem) { if (current() && request === sequence.current) setError(problem.message); }
+    finally { if (current() && request === sequence.current) setBusy(false); }
+  };
+  S.useEffect(() => { alive.current = true; load(); return () => { alive.current = false; ++sequence.current; }; }, [venueId, date, currency]);
+  const close = () => { if (!pending.current && (!draft || JSON.stringify(draft) === original.current || window.confirm("Закрыть форму? Несохранённый ввод будет потерян."))) onClose(); };
+  const save = async event => {
+    event.preventDefault();
+    if (!current() || !draft || !base.current || pending.current) return;
+    pending.current = true; setBusy(true); setError("");
+    try {
+      const document = bdBoundaryRecordV514(draft, venueId, date, currency, draftId.current);
+      const data = draft.existing ? base.current.rows.map(row => row.id === draft.existing.id ? document : row) : [...base.current.rows, document];
+      await bdBoundaryRequestV514(venueId, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ data, baseData: base.current.data, reason: document.note }) });
+      if (current()) { window.dispatchEvent(new CustomEvent("bd:accounting-boundary-saved", { detail: { venueId, date } })); window.dispatchEvent(new Event("focus")); onClose(); }
+    } catch (problem) { if (current()) setError(problem.message); }
+    finally { pending.current = false; if (current()) setBusy(false); }
+  };
+  const fieldStyle = { display: "block", width: "100%", minHeight: 44, padding: 10, border: "1px solid #CBD5E1", borderRadius: 10, background: "#fff" };
+  return i.jsx("div", { role: "dialog", "aria-modal": true, "aria-label": "Учётные остатки", "data-bd-accounting-boundary": "v514", style: { position: "fixed", inset: 0, zIndex: 9100, background: "#F5F7FB", overflowY: "auto" }, children: i.jsxs("form", { onSubmit: save, style: { maxWidth: 560, margin: "0 auto", padding: "0 16px 32px" }, children: [
+    i.jsxs("header", { style: { position: "sticky", top: 0, padding: "max(12px, env(safe-area-inset-top)) 0 12px", background: "#F5F7FB", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, zIndex: 1 }, children: [i.jsx("button", { type: "button", disabled: busy, onClick: close, style: { minHeight: 44 }, children: "Отмена" }), i.jsx("strong", { children: "Учётные остатки" }), i.jsx("button", { type: "submit", disabled: busy || !draft, style: { minHeight: 44 }, children: busy ? "Подождите…" : "Сохранить" })] }),
+    i.jsx("p", { children: "Подтверждение стоимости запасов на границе месяца. Это не физическая инвентаризация: количества и движения склада не изменяются." }),
+    i.jsx("p", { children: "Используйте учётные документы и подтверждённую стоимость на выбранную дату. Сегодняшние цены и цены продажи не подтверждают исторические остатки." }),
+    i.jsxs("label", { children: ["Дата границы", i.jsx("input", { type: "date", value: date, readOnly: true, style: fieldStyle })] }),
+    i.jsx("p", { children: "Валюта учёта: " + currency }),
+    error && i.jsx("p", { role: "alert", children: error }),
+    !draft && !error && i.jsx("p", { role: "status", children: "Загружаем актуальные документы…" }),
+    draft && i.jsxs(i.Fragment, { children: [
+      ...draft.sections.map((section, index) => i.jsxs("label", { style: { display: "block", margin: "12px 0" }, children: [section.name + " · " + currency, i.jsx("input", { type: "text", inputMode: "decimal", required: true, disabled: busy, value: section.amount, style: fieldStyle, onChange: event => setDraft(value => ({ ...value, sections: value.sections.map((row, at) => at === index ? { ...row, amount: event.target.value } : row) })) })] }, section.name)),
+      i.jsxs("label", { style: { display: "block", margin: "16px 0" }, children: ["Источник и причина подтверждения", i.jsx("textarea", { required: true, maxLength: 475, disabled: busy, value: draft.note, style: { ...fieldStyle, minHeight: 100 }, onChange: event => setDraft(value => ({ ...value, note: event.target.value })) })] }),
+      i.jsxs("label", { children: [i.jsx("input", { type: "checkbox", checked: draft.synthetic, disabled: busy, onChange: event => setDraft(value => ({ ...value, synthetic: event.target.checked })) }), " Синтетические данные для QA — не фактические остатки"] }),
+    ] }),
+    error && i.jsx("button", { type: "button", disabled: busy, onClick: () => { if (!draft || window.confirm("Загрузить данные заново? Текущий ввод будет заменён сохранённым документом.")) load(); }, children: "Загрузить актуальные данные" }),
+  ] }) });
+}
+function bdAccountingBoundaryStepV514({ report, step, settings }) {
+  const [editing, setEditing] = S.useState(false);
+  const venueId = bdMonthlyVenueIdPhase7(null, settings), meta = bdMonthMeta(report.meta.key), date = step === 2 ? meta.start : meta.nextStart;
+  const snapshot = step === 2 ? report.openingSnapshot : report.closingSnapshot;
+  const currency = report.accountingCurrency;
+  const incompatible = snapshot && (String(snapshot.date).slice(0, 10) !== date || snapshot.phase7PhysicalSnapshot === true || bdBoundaryPhysicalV514(snapshot));
+  return i.jsxs("div", { children: [
+    i.jsx("h3", { children: step === 2 ? "Учётные остатки на начало месяца" : "Учётные остатки на конец месяца" }),
+    i.jsx("p", { children: "Граница: " + date + ". Стоимость по учётным документам; сохранённая себестоимость продаж рассчитывается отдельно." }),
+    snapshot && i.jsxs("p", { children: ["Сохранённый документ от ", String(snapshot.date).slice(0, 10), ": ", bdMonthClosingMoney(bdSnapshotTotal(snapshot))] }),
+    incompatible && i.jsx("p", { role: "status", children: "Уже выбран физический документ или документ другой даты. Уточните источник границы; эта форма его не изменяет." }),
+    i.jsx("button", { type: "button", disabled: !bdBoundaryAllowedV514() || !!incompatible || !currency || !Number.isSafeInteger(venueId) || report.isClosed, onClick: () => setEditing(true), children: snapshot ? "Проверить учётные остатки" : "Внести учётные остатки" }),
+    editing && i.jsx(bdAccountingBoundaryEditorV514, { venueId, date, currency, sectionNames: settings?.inventorySections, onClose: () => setEditing(false) }, venueId + ":" + date),
+  ] });
+}
+/* accounting-boundary-v514:end */

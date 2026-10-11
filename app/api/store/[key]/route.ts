@@ -1,4 +1,5 @@
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
+import { writeAccountingBoundaries } from "../../../../lib/bardoctor/accounting-boundary-write";
 import { canReadSavedDiagnosis, restrictedVenueContext } from "../../../../lib/bardoctor/venue-context-access";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "../../../../db";
@@ -142,6 +143,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     );
   }
 
+  if (key === INVENTORY_SNAPSHOT_STORE_KEY) return writeAccountingBoundaries(account, body);
   const db = getDb();
   const [existing] = await db
     .select()
