@@ -116,6 +116,7 @@ async function command(request:Request):Promise<Response> {
       const original=c.revenues.find(row=>row.id===body.shiftId && row.venueId===c.venueId);
       if (body.action==="close_shift") assertPosShiftClosable(orders,c.venueId,body.shiftId);
       const active=workdays.filter(row=>row?.venueId===c.venueId&&row.workdayStatus==="OPEN");
+      if(body.action==="open_shift"&&!original){const other=c.revenues.find(r=>r.venueId===c.venueId&&r.closingStatus==="open");if(other)return reply({ok:false,code:"SALES_EVENT_SHIFT_ALREADY_OPEN",error:"Сначала закройте кассу «"+String(other.shiftName||other.id)+"» за "+String(other.date)+".",blockingCash:{id:other.id,date:other.date,name:other.shiftName,href:"/cashier?venue="+c.venueId}},409);}
       if(body.action==="open_shift"&&!original&&active.length>1)return reply({ok:false,code:"WORKDAY_NEEDS_REVIEW",error:"Найдены несколько открытых рабочих смен."},409);
       let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name,body.action==="open_shift"?active[0]?.date:undefined);
       if (revenues===c.revenues) {

@@ -26,3 +26,11 @@ Existing cash sessions, orders, receipts and reports are never adopted, closed o
 - No full CI, remote CI or publication initiated for this candidate. Old fixtures that intentionally created live cash without a workday need explicit workday setup; changed targeted fixtures preserve their original assertions.
 
 Screenshots and complete logs are included in the recovery archive.
+
+## Follow-up: single active workday and cash session
+
+User clarification supersedes the earlier suggestion to open a workday matching an already open legacy cash session: **no new workday may open while any workday OR cash session remains open in this venue, including the same date**. New cash requires an active staffed workday and no other open cash session. Existing successful open replays remain permitted. Both stores participate in CAS; concurrent-device tests allow exactly one winner.
+
+The blocked cashier screen now retains manager-only close for an existing cash session without outstanding orders, and read-only navigation to orders/report. With outstanding orders it explicitly explains that closure, payment and cancellation are unavailable pending an explicit recovery decision. Six mobile browser cases (MISSING/CLOSED × empty/outstanding/staff) pass and preserve workday JSON. The workday screen shows the exact blocking session/date and a link to finish it. Eleven targeted server tests pass, including simultaneous cash/day opens, previous/same dates, CLOSED-day legacy cash, venue isolation, overnight and replay.
+
+Production existence of conflicting legacy records remains unknown; no broad production scan or mutation was performed.

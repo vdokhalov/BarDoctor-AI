@@ -31,13 +31,14 @@ async function load(request:Request){
 }
 type Loaded=Extract<Awaited<ReturnType<typeof load>>,{account:unknown}>;
 function projection(c:Loaded,date:string){return operationalDay({venueId:c.account.venueId,workspaceId:c.context.workspaceId,dataAccountId:c.account.id,businessDate:date,asOf:c.now,currency:accountingCurrencyFromRestaurantJson(c.account.restaurantJson),revenues:c.rows(keys[1]),events:c.rows(keys[2]),documents:c.rows(keys[3]),reports:c.rows(keys[0]),writeOffs:c.rows(keys[7]),incidents:c.rows(keys[8])});}
+function openingBlockers(c:Loaded){return [...c.rows(keys[0]).filter(r=>r.workdayStatus==="OPEN").map(r=>({kind:"workday",id:r.id,date:r.date,name:"Рабочий день",href:"/shifts?venue="+c.account.venueId+"&workday="+encodeURIComponent(String(r.date))+"&month="+String(r.date).slice(0,7)})),...c.rows(keys[1]).filter(r=>r.closingStatus==="open").map(r=>({kind:"cash",id:r.id,date:r.date,name:r.shiftName||"Касса",href:"/cashier?venue="+c.account.venueId}))];}
 export async function GET(request:Request){
  const c=await load(request);if(c.error)return c.error;
  const localDate=venueDate(c.now,c.timezone),clock=venueClock(c.now,c.timezone),overnight=typeof c.profile.openTime==="string"&&typeof c.profile.closeTime==="string"&&c.profile.closeTime<=c.profile.openTime&&clock<c.profile.closeTime,defaultDate=overnight?new Date(Date.parse(localDate+"T12:00:00Z")-86400000).toISOString().slice(0,10):localDate;
  const open=c.rows(keys[0]).find(r=>r.workdayStatus==="OPEN"),query=new URL(request.url).searchParams.get("date"),date=query||String(open?.date||defaultDate);
  if(!validDate(date))return reply({ok:false,code:"DATE_INVALID"},400);
  const report=c.rows(keys[0]).find(r=>r.date===date),rules=c.rows(keys[5]);
- return reply({ok:true,venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
+ return reply({ok:true,openingBlockers:openingBlockers(c),venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
 }
 export async function POST(request:Request){return withStoreCasRetries(request,command);}
 async function command(request:Request):Promise<Response>{
@@ -55,7 +56,7 @@ async function command(request:Request):Promise<Response>{
  if(body.action==="open"){
   if(body.startTime!==undefined&&(typeof body.startTime!=="string"||!/^([01]\d|2[0-3]):[0-5]\d$/.test(body.startTime)))return reply({ok:false,code:"WORKDAY_START_TIME_INVALID"},422);
   if(previous||projection(c,date).report)return reply({ok:false,code:"WORKDAY_ALREADY_EXISTS",error:"Отчёт дня уже существует. Откройте его для просмотра."},409);
-  if(reports.some(r=>r.workdayStatus==="OPEN")||c.rows(keys[1]).some(r=>r.closingStatus==="open"&&r.date!==date))return reply({ok:false,code:"WORKDAY_ALREADY_OPEN",error:"Сначала завершите ранее открытую рабочую или кассовую смену."},409);
+  const blockers=openingBlockers(c);if(blockers.length)return reply({ok:false,code:"WORKDAY_ALREADY_OPEN",blockers,error:"Сначала завершите: "+blockers.map(b=>b.name+" · "+b.date).join(", ")+"."},409);
  }else if(previous?.workdayStatus!=="OPEN")return reply({ok:false,code:"WORKDAY_NOT_OPEN"},409);
  const staffing=body.action==="close"?previous?.staffing:body.staffing;
  if(!Array.isArray(staffing)||!staffing.length||staffing.length>200||new Set(staffing.map(s=>record(s).employeeId)).size!==staffing.length)return reply({ok:false,code:"WORKDAY_TEAM_REQUIRED",error:"Выберите работавших сотрудников."},422);
