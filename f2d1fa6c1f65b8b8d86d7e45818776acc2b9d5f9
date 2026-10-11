@@ -1,0 +1,268 @@
+{
+  "source_commit": "f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9",
+  "version": {
+    "id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_3e83d2192cdc8191b86e88581537585d",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "version_number": 516,
+    "source": {
+      "commit_sha": "f2d1fa6c1f65b8b8d86d7e45818776acc2b9d5f9"
+    },
+    "archive_storage": {
+      "archive_format": "tar",
+      "sediment_file_id": "file_00000000c22482308d9d29e31ed56fe5",
+      "content_hash": "sha256:5b65775c87555948b5d0b4be4188a0df67a7783fa447fc263a1acc66f1f009f0",
+      "size_bytes": 69959680,
+      "file_count": 292
+    },
+    "screenshot_url": null,
+    "deployment_id": null
+  },
+  "deployment": {
+    "id": "appgdep_6acba163f8b48191a69bc98113560d52",
+    "project_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b",
+    "title": "BarDoctor Preview",
+    "version_id": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_3e83d2192cdc8191b86e88581537585d",
+    "type": "publish",
+    "status": "succeeded",
+    "url": "https://bardoctor-preview.v-dokhalov.chatgpt.site",
+    "has_mcp": false,
+    "screenshot_asset_pointer": null,
+    "provider_deployment_id": "v-dokhalov--bardoctor-preview",
+    "failure_message": null,
+    "env_set_revision": 14,
+    "updated_at": "2026-10-11T14:47:15.642267+00:00"
+  },
+  "rollback_version": "appgprj_6a5734bb1abc81919ff978ed0020c64b~appgver_c6bca26946e8819196da654f81cc5086",
+  "rollback_source": "506c754a5fa0f558638e9098795fa4a474331c61",
+  "access_revision": 2,
+  "migration_changes": false,
+  "authorization": "User explicit Yes 2026-10-11T14:45:19Z; parent delegated exactf2d1fa6c",
+  "asset": "index-BQGspy0I-472d8da65f4d.js",
+  "bootstrap_releases": {
+    "bardoctor-preview.js": "5e84c25aa469",
+    "bardoctor-preview-v396.js": "5e84c25aa469",
+    "bardoctor-preview-v397.js": "94861317fb4b"
+  },
+  "health": {
+    "status": "ok",
+    "storage": "sites-d1"
+  },
+  "unauthenticated_bootstrap": {
+    "status": 401,
+    "body": {
+      "ok": false,
+      "needsLogin": true,
+      "error": "\u0412\u043e\u0439\u0434\u0438\u0442\u0435 \u043e\u0434\u0438\u043d \u0440\u0430\u0437, \u0447\u0442\u043e\u0431\u044b \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u043f\u0435\u0440\u0435\u043d\u043e\u0441 \u0438\u0437 Replit"
+    }
+  },
+  "routes": {
+    "/cashier": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    },
+    "/reports?month=2026-09&venue=3389": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    },
+    "/finance": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    },
+    "/warehouse": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    },
+    "/equipment": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    },
+    "/data-control": {
+      "status": 200,
+      "bundle": "index-BQGspy0I-472d8da65f4d.js",
+      "bootstrap": {
+        "bardoctor-preview.js": "5e84c25aa469",
+        "bardoctor-preview-v396.js": "5e84c25aa469",
+        "bardoctor-preview-v397.js": "94861317fb4b"
+      }
+    }
+  },
+  "assets": {
+    "/more-hub-qa-v166.js": {
+      "status": 200,
+      "bytes": 2651,
+      "sha256": "42b4c85f6e08218e5fefee8d1430476de8529b4280f07a136b65fb045cb18e04",
+      "matches_local": true
+    },
+    "/equipment-qa-v167.js": {
+      "status": 200,
+      "bytes": 9357,
+      "sha256": "abb4633567cba50d98f483f46f9e1282d247eb26e547f2d39631ea20cfb166e4",
+      "matches_local": true
+    },
+    "/competitor-market-client-v329.js": {
+      "status": 200,
+      "bytes": 3816,
+      "sha256": "a1ae5f9befd80e38cb6f983eabddd83a9de50d7446e0b098a4116551a53a059c",
+      "matches_local": true
+    },
+    "/navigation-transient-v247.js": {
+      "status": 200,
+      "bytes": 5576,
+      "sha256": "1382e5f01350722216dbafdef75b301a771e867f457e4ed8033c8c7fc2d8af7d",
+      "matches_local": true
+    },
+    "/assortment-qa-v170.js": {
+      "status": 200,
+      "bytes": 33302,
+      "sha256": "a34e50a004389a312bbf5d8e995ffc64cc247728441749c8a8e4c59a8b82f257",
+      "matches_local": true
+    },
+    "/server-migration-discovery-v262.js": {
+      "status": 200,
+      "bytes": 2464,
+      "sha256": "27471535b4c2635adab51dd4d82e3bc05f8f9d0bfe7f91fafa012997d6968221",
+      "matches_local": true
+    },
+    "/bardoctor-preview-v396.js": {
+      "status": 200,
+      "bytes": 94713,
+      "sha256": "5e84c25aa469d5f7e4a88166f53914f189e5203914ad6a10f3109d3e74ccf250",
+      "matches_local": true
+    },
+    "/catalog-accounting-v207.js": {
+      "status": 200,
+      "bytes": 6127,
+      "sha256": "7c36d5ab1005e7895b1fc0b7812eb9f46a6ac2580b7e3c591400b15e3da599fa",
+      "matches_local": true
+    },
+    "/navigation-contract-v247.js": {
+      "status": 200,
+      "bytes": 15013,
+      "sha256": "e561914f4e4642c189f4fc429a350c87a7602a92284f84bf8ee11a710b465447",
+      "matches_local": true
+    },
+    "/assets/index-BQGspy0I-472d8da65f4d.js": {
+      "status": 200,
+      "bytes": 2924845,
+      "sha256": "472d8da65f4d8f5e42804b721bc628f1c7485267e4c22af07c122a0aaeb26764",
+      "matches_local": true
+    },
+    "/monthly-report-qa-v165.js": {
+      "status": 200,
+      "bytes": 8769,
+      "sha256": "5f0340918cb7ed5f33fdf8810a59e55ecc0d91af86a64f314e7bb6c10c02aae2",
+      "matches_local": true
+    },
+    "/bardoctor-preview-v397.js": {
+      "status": 200,
+      "bytes": 99033,
+      "sha256": "94861317fb4b67df709c8d25c815b192665639b7be2e7f3effcfafac4d41876a",
+      "matches_local": true
+    },
+    "/procurement-qa-v168.js": {
+      "status": 200,
+      "bytes": 38097,
+      "sha256": "da0bfcfc3cd81391e45175e9de0844f67fa052f3dcf8f9fc6994fe812572b29a",
+      "matches_local": true
+    },
+    "/bardoctor-preview.js": {
+      "status": 200,
+      "bytes": 94713,
+      "sha256": "5e84c25aa469d5f7e4a88166f53914f189e5203914ad6a10f3109d3e74ccf250",
+      "matches_local": true
+    },
+    "/venue-switcher.js": {
+      "status": 200,
+      "bytes": 21138,
+      "sha256": "44ef6a9fbbb43b3f3bbaa4cd1c8c6726b57f2e157c2dafd3dbc18faca6ea87e2",
+      "matches_local": true
+    },
+    "/nomenclature-qa-v238.js": {
+      "status": 200,
+      "bytes": 14704,
+      "sha256": "177debfc86c2ad136ae2f883c6ee68d2449af4108e3dd7ac2b548ee065923fbd",
+      "matches_local": true
+    },
+    "/opportunity-calendar-client-v327.js": {
+      "status": 200,
+      "bytes": 3909,
+      "sha256": "1b1a3b9026ce79f4b48240e7cb9bc931fe86ef2c19a14982ade9faf51e34c42a",
+      "matches_local": true
+    },
+    "/app-shell-v185.js": {
+      "status": 200,
+      "bytes": 16450,
+      "sha256": "3c176fe2e08c26e19406c3a64d54ea2fd18dae119b2fa726afe5e002f21abbc3",
+      "matches_local": true
+    },
+    "/modern-polish.js": {
+      "status": 200,
+      "bytes": 13555,
+      "sha256": "4c5a1e697e27930c2e964f6cb2ee143a543d9a97f73603f880b12a5cb629a895",
+      "matches_local": true
+    },
+    "/opportunity-calendar-qa-v327.js": {
+      "status": 200,
+      "bytes": 7287,
+      "sha256": "10c70ce346ca5c368ea12b4fb13fd1b194313dda6c15455cf09c0f3d2477d2dc",
+      "matches_local": true
+    },
+    "/competitor-market-qa-v329.js": {
+      "status": 200,
+      "bytes": 6533,
+      "sha256": "6a88ae164258a6d9b92a07232fa67d8d5a1c2bb2c1da8dfbf22e9f61013c47df",
+      "matches_local": true
+    },
+    "/accounting-currency.js": {
+      "status": 200,
+      "bytes": 1257,
+      "sha256": "22324fde52f4537190557bb8920e6eb4ca70572f37060f9df67bd99f3ee08643",
+      "matches_local": true
+    },
+    "/venue-timezone.js": {
+      "status": 200,
+      "bytes": 4166,
+      "sha256": "c9ed154fe4240467a0119b2401efc57710a333149975f7557c2849042451062c",
+      "matches_local": true
+    },
+    "/health-score-experience.js": {
+      "status": 200,
+      "bytes": 9805,
+      "sha256": "1be67c217937b148682abe1fa885edd8206bed49e2c2bcd1ac732df079afe4e3",
+      "matches_local": true
+    },
+    "/venue-schedule.js": {
+      "status": 200,
+      "bytes": 5038,
+      "sha256": "7f1a6813a9211421ab21c68ea2f380a0c43a2397864903ef8579554494e22cf2",
+      "matches_local": true
+    }
+  },
+  "archive_sha256": "4ca035eab97915c052cfcaaecb6cf3376ada6f81e752bd2e34ee322c432e5d69",
+  "verification_note": "Initial /equipment response did not contain expected bundle immediately after deploy; unchanged URL passed on retry. Subsequent full six-route and25-asset verification passed. HTML advertises stale-while-revalidate caching."
+}
