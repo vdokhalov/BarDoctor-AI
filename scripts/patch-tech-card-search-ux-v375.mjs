@@ -47,7 +47,16 @@ source = source.replace(
 const oldChooseHandler = "onChoose:(G,H)=>N(p,G,H),showAll:m[p.id]===!0";
 const newChooseHandler = "onChoose:(G,H)=>{N(p,G,H),h(J=>({...J,[p.id]:!1}))},showAll:m[p.id]===!0";
 if (source.includes(oldChooseHandler)) source = source.replace(oldChooseHandler, newChooseHandler);
-else if (!source.includes(newChooseHandler)) throw new Error("Explicit tech-card picker collapse handler not found");
+else if (!source.includes(newChooseHandler)) {
+  const editorStart = source.indexOf("function bdCatRecipeEditor(");
+  const editorEnd = source.indexOf("/* Recipe ingredient selection v511:", editorStart);
+  const editor = source.slice(editorStart, editorEnd);
+  const unifiedChoose = "onChoose:(G,H)=>{N(p,G,H),h(J=>({...J,[p.id]:!1}))}})";
+  const unifiedCollapse = 'function select(key,item){onChoose(key,item);setOpen(false);setQuery("");setConversion("");}';
+  if (editorStart < 0 || editorEnd < editorStart || !editor.includes("i.jsx(bdRecipeIngredientV511,") || !editor.includes(unifiedChoose) || !source.includes(unifiedCollapse)) {
+    throw new Error("Explicit tech-card picker collapse handler not found");
+  }
+}
 
 fs.writeFileSync(bundlePath, source);
 
