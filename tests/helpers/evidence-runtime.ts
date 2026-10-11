@@ -31,6 +31,8 @@ export async function evidenceRuntime(options: { now?: string } = {}) {
     assert.ok(response.ok, JSON.stringify(await response.clone().json()));
     return response.json();
   };
+  // Live sales require a persisted workday; this is an isolated fixture, not an API bypass.
+  put("bd_operational_reports_v1", [{ venueId, date: new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Chisinau" }).format(new Date(options.now ?? Date.now())), workdayStatus: "OPEN", staffing: [{ employeeId: "evidence-fixture" }] }]);
   await command("sales", { action: "open_shift", shiftId: "evidence-shift", name: "Evidence shift" });
   const sale = { ...saleCommand("beer", 1), id: "evidence-sale", shiftId: "evidence-shift" };
   const preview = await command("sales", { action: "preview", command: sale }) as { previewHash: string };

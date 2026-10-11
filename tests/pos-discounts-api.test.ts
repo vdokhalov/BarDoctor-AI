@@ -16,6 +16,7 @@ function runtime() {
   const r = openingRuntime(new URL("../app/api/pos-orders/route.ts", import.meta.url), deps);
   const config = r.loadRoute(new URL("../app/api/pos-discounts/route.ts", import.meta.url));
   const c = salesEventFixture(); c.revenues = planSalesShift(c, "open_shift", "shift", "Day");
+  r.put("bd_operational_reports_v1", [{venueId:1,date:c.revenues[0].date,workdayStatus:"OPEN",staffing:[{employeeId:"fixture-staff"}]}]);
   r.put("bd_assortment_v1", c.assortment); r.put("bd_finance_revenue", c.revenues);
   const send = (api: typeof config, body: object) => api.POST(new Request("http://localhost/api", { method: "POST", body: JSON.stringify({ venueId: 1, ...body }) }));
   const save = (extra: object = {}) => ({ action: "save", ruleId: "rule", operationId: "save", expectedRevision: 0, rule: { name: "Loyalty", kind: "PERCENT", value: 10, active: true }, ...extra });

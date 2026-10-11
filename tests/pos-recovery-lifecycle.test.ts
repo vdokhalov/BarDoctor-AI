@@ -10,7 +10,7 @@ import { hasPermission, permissionsFor } from "../lib/bardoctor/access-control";
 import { canReadStore, canWriteStore } from "../lib/bardoctor/data-trust";
 function fixture() {
  const c=salesEventFixture(); c.now="2026-09-09T22:30:00.000Z"; c.revenues=planSalesShift(c,"open_shift","night","Night"); c.revenues[0].openingFloat=100;
- const r=openingRuntime(new URL("../app/api/sales-events/route.ts",import.meta.url));r.put("bd_assortment_v1",c.assortment);r.put("bd_finance_revenue",c.revenues);
+ const r=openingRuntime(new URL("../app/api/sales-events/route.ts",import.meta.url));r.put("bd_assortment_v1",c.assortment);r.put("bd_finance_revenue",c.revenues);r.put("bd_operational_reports_v1",[{venueId:1,date:c.revenues[0].date,workdayStatus:"OPEN",staffing:[{employeeId:"fixture-staff"}]}]);
  const orderApi=r.loadRoute(new URL("../app/api/pos-orders/route.ts",import.meta.url));
  const send=(api:typeof r.api,body:object)=>api.POST(new Request("https://test/api",{method:"POST",body:JSON.stringify({venueId:1,...body})}));
  return {c,r,send,orderApi};

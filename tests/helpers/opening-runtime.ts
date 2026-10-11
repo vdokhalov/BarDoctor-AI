@@ -1,3 +1,4 @@
+import * as posWorkday from "../../lib/bardoctor/pos-workday-gate";
 import * as posShiftCash from "../../lib/bardoctor/pos-shift-cash";
 import * as posShiftReport from "../../lib/bardoctor/pos-shift-report";
 import * as posDiscounts from "../../lib/bardoctor/pos-discounts";
@@ -48,7 +49,7 @@ export function openingRuntime(route = new URL("../../app/api/inventory/opening/
       if (i === failAt) throw new Error("SIMULATED_D1_WRITE_FAILURE"); out.push(await statements[i].run());
     } sqlite.exec("COMMIT"); return out; } catch (e) { sqlite.exec("ROLLBACK"); throw e; }
   } };
-  const dependencies = { ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport, ...managementWorkday,
+  const dependencies = { ...posWorkday, ...posOrders, ...posDiscounts, ...posShiftReport, ...posShiftCash, ...retention, ...opening, ...csv, ...cas, ...taxonomy, ...inventory, ...nomenclature, ...currency, ...http, ...trust, ...access, ...venueIdentity, ...venueTime, ...salesEvents, ...operationalDay, ...operationalReport, ...managementWorkday,
     // This fixture explicitly substitutes auth; real membership/CAS coverage lives in lifecycleRuntime.
     posMembershipGuard: () => db.prepare("SELECT 1"),
     getD1: () => db as unknown as D1Database,

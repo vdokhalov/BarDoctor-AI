@@ -52,7 +52,7 @@
     "/notifications": { type: "list", title: "Уведомления", parent: "/more" },
     "/cashier": { type: "create", title: "Касса", parent: "/sales-import", shell: "fullscreen", bottomNav: false, headerMode: "owned" },
     "/sales-entry": { type: "list", title: "Продажи", parent: "/sales-import", shell: "fullscreen", bottomNav: false, headerMode: "owned" },
-    "/sales-import": { type: "wizard", title: "Импорт продаж", parent: "/warehouse", shell: "fullscreen", bottomNav: false },
+    "/sales-import": { type: "wizard", title: "Продажи", parent: "/more", shell: "fullscreen", bottomNav: false },
     "/supplier-alternatives": { type: "list", title: "Новые поставщики", parent: "/suppliers" },
     "/venues/new": { type: "create", title: "Новое заведение", parent: "/more", shell: "fullscreen", bottomNav: false },
     "/settings": { type: "settings", title: "Настройки", parent: "/more" },

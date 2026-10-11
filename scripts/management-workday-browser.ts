@@ -7,23 +7,25 @@ import { createRequire } from "node:module";
 import { chromium } from "playwright-core";
 import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
 import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
+import { GET as salesPage } from "../app/sales-import/route";
 import { GET as cashierPage } from "../app/cashier/route";
 import { barDoctorResponse } from "../app/bar-doctor-response";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const fixedTime = process.env.BD_OPERATIONAL_TEST_INSTANT;
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
-const runtime = await lifecycleRuntime({ workdays: "./app/api/workdays/route", orders: "./app/api/pos-orders/route", posOverview: "./app/api/pos-overview/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" }, { now: fixedTime });
+const runtime = await lifecycleRuntime({ batches:"./app/api/sales-batches/route", workdays: "./app/api/workdays/route", orders: "./app/api/pos-orders/route", posOverview: "./app/api/pos-overview/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" }, { now: fixedTime });
 const pendingHandlers = new Set<Promise<void>>();
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url || "/", "http://localhost"), chunks = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const body = Buffer.concat(chunks), key = url.pathname.match(/^\/api\/store\/([^/]+)$/)?.[1];
-    const routes: Record<string, string> = { "/api/workdays": "workdays", "/api/pos-orders": "orders", "/api/pos-overview": "posOverview", "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs" };
+    const routes: Record<string, string> = { "/api/sales-batches":"batches", "/api/workdays": "workdays", "/api/pos-orders": "orders", "/api/pos-overview": "posOverview", "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs" };
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
     if (name) response = await runtime.api[name][req.method || "GET"](new Request(url, { method: req.method, headers: req.headers as HeadersInit, ...(body.length ? { body } : {}) }), { params: Promise.resolve({ key }) } as never);
+    else if(url.pathname==="/sales-import")response=salesPage(new Request(url));
     else if(url.pathname==="/cashier") response=cashierPage();
     else if (["/more", "/shifts", "/finance", "/home", "/login"].includes(url.pathname)) response = barDoctorResponse();
     else {
@@ -48,6 +50,7 @@ try {
   const put=(key:string,value:unknown)=>runtime.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(user.userId,key,JSON.stringify(value),new Date().toISOString());
   const get=(key:string)=>JSON.parse(String(runtime.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").get(user.userId,key)?.data_json||"null"));
   put("bd_assortment_v1",JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1','"venueId":'+venueId)));
+  put("bd_operational_reports_v1",[{id:"gate-fixture",venueId,date:new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Chisinau",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(fixedTime||Date.now())),workdayStatus:"OPEN",staffing:[{employeeId:"fixture-staff"}]}]);
   const send=(body:object)=>runtime.api.sales.POST(runtime.request(user,"/api/sales-events","POST",{venueId,...body}));
   assert.equal((await send({action:"open_shift",shiftId:"cash",name:"Cash"})).status,201);
   const command={id:"sale",source:"POS_API",shiftId:"cash",lines:[{id:"line",menuItemId:"beer",quantity:1}],payments:[{id:"cash",method:"CASH",amount:20}]};
@@ -57,11 +60,12 @@ try {
   await context.addInitScript(({email,token,venueId})=>{localStorage.setItem("bd_session",email);localStorage.setItem("bd_session_token",token);localStorage.setItem("bd_active_venue_id",String(venueId));},{email:user.email,token:user.token,venueId});
   const page=salesSurfacePage(await context.newPage()),errors:string[]=[];page.on("pageerror",error=>errors.push(error.message));
   try {
-   for(const route of ["/home","/more","/shifts"]){
+   await page.goto(base+"/home?venue="+venueId);await page.locator("[data-bd-home-today]").waitFor();assert.equal(await page.locator("[data-bd-cashier-entry]").count(),0);
+   for(const route of ["/more","/shifts"]){
     await page.goto(base+route+"?venue="+venueId);
-    const entry=route==="/more"?page.getByRole("button",{name:"Касса",exact:true}):page.locator("[data-bd-cashier-entry]");
+    const entry=route==="/more"?page.getByRole("button",{name:"Продажи",exact:true}):page.locator("[data-bd-cashier-entry]");
     await entry.waitFor();await page.screenshot({path:`${out}/${width}-${route.slice(1)}-entry.png`,fullPage:true});
-    await entry.click();await page.locator("#work:not([hidden]) #cashier-view:not([hidden])").waitFor();
+    await entry.click();if(route==="/more"){const frame=page.locator("iframe");await frame.waitFor();await (await (await frame.elementHandle())!.contentFrame())!.locator("#open-cashier").click();}await page.locator("#work:not([hidden]) #cashier-view:not([hidden])").waitFor();
     assert.equal(new URL(page.url()).pathname,"/cashier");assert.equal(new URL(page.url()).searchParams.get("venue"),String(venueId));
    }
    await page.locator("details.admin-actions summary").click();
@@ -91,6 +95,8 @@ try {
    await page.locator('[data-management-workday]').waitFor();assert.match(await page.locator('[data-management-workday]').innerText(),/ФОТ не сохранён/);
    await page.locator('[data-view="cashier"]').click();await page.locator('[data-action="close-shift"]').click();await page.locator('#dialog-submit').click();
    await page.locator('#report-view [data-management-workday]').waitFor();
+   // Independent legacy-history phase: seed a historical closed cash record without a working-day report.
+   put("bd_operational_reports_v1",[]);
    const day=await (await runtime.api.days.GET(runtime.request(user,"/api/operational-days"))).json() as {days:{businessDate:string}[]};const date=day.days[0].businessDate;
    await page.locator('#report-view [data-management-workday] a').click();await page.locator('[data-workday-state="NEW"]').waitFor();assert.equal(new URL(page.url()).searchParams.get('workday'),date);await page.goto(base+'/shifts?venue='+venueId+'&month='+date.slice(0,7)+'&shift='+encodeURIComponent('operational-report:'+venueId+':'+date));await page.getByRole('dialog').waitFor();
    assert.equal(new URL(page.url()).searchParams.get('month'),date.slice(0,7));assert.match(await page.getByRole('dialog').innerText(),/Рабочий день/);
@@ -104,7 +110,7 @@ try {
    await page.locator('#report-view [data-management-workday]').filter({hasText:'Anna QA'}).waitFor();assert.match(await page.locator('#report-view [data-management-workday]').innerText(),/70/);
    await page.screenshot({path:`${out}/${width}-report.png`,fullPage:true});
    await page.reload();await page.locator('#work:not([hidden])').waitFor();await page.locator('[data-view="report"]').click();await page.locator('#report-view [data-management-workday]').filter({hasText:'Anna QA'}).waitFor();
-   assert.deepEqual(errors,[]);results.push({width,status:'PASS',entrypoints:3,reload:true,staffingHours:7,recordedPayroll:70,revenueUnchanged:true,panelPreserved:true,connectionRecovered:true,quantityInitialAndSaved:true,precheckLocked:true});
+   assert.deepEqual(errors,[]);results.push({width,status:'PASS',entrypoints:2,homeCashierRemoved:true,reload:true,staffingHours:7,recordedPayroll:70,revenueUnchanged:true,panelPreserved:true,connectionRecovered:true,quantityInitialAndSaved:true,precheckLocked:true});
   } catch(error){writeFileSync(`${out}/${width}-failure.json`,JSON.stringify({url:page.url(),errors,frames:page.frames().map(frame=>frame.url()),text:await page.evaluate(()=>document.body.innerText)},null,2));await page.screenshot({path:`${out}/${width}-failure.png`,fullPage:true});throw error;} finally{await context.close();}
  }
  writeFileSync(out+'/results.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results));

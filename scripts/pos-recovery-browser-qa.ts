@@ -28,6 +28,8 @@ for(const item of menu){item.venueId=owner.activeVenueId;item.category="Напи
 menu[0].name="Капучино";
 r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(owner.userId,"bd_assortment_v1",JSON.stringify(fixture.assortment));
 async function call(user:typeof owner,route:string,body:object){const headers=new Headers(r.request(user,"/api").headers);headers.set("X-Venue-Id",String(owner.activeVenueId));const response=await r.api[route].POST(new Request("https://isolated.test/api",{method:"POST",headers,body:JSON.stringify({venueId:owner.activeVenueId,...body})}));const result=await response.json() as Record<string,unknown>;assert(response.ok,JSON.stringify(result));return result;}
+// Explicit workday prerequisite for the isolated POS fixture.
+r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?)").run(owner.userId,"bd_operational_reports_v1",JSON.stringify([{venueId:owner.activeVenueId,date:new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Chisinau"}).format(new Date()),workdayStatus:"OPEN",staffing:[{employeeId:"qa-fixture"}]}]));
 await call(owner,"sales",{action:"open_shift",shiftId:"night",name:"Ночная смена",openingFloat:100});
 await call(owner,"discounts",{action:"save",ruleId:"qa-rule",expectedRevision:0,operationId:"qa-rule-create",rule:{name:"QA 10%",kind:"PERCENT",value:10,active:true}});
 for(let n=1;n<=10;n++){

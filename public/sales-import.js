@@ -503,14 +503,15 @@
       var context=await pendingContext;
       if(venue!==localStorage.getItem('bd_active_venue_id')||email!==localStorage.getItem('bd_session')||String(context.venueId)!==String(state.payload?.venueId))return;
       state.pos=context;
+      var cashEntry=document.getElementById("open-cashier"),needsDay=!context.workday?.ok&&context.permissions.managementDay;cashEntry.textContent=needsDay?"Открыть рабочий день в Сменах":"Открыть кассу";cashEntry.href=(needsDay?"/shifts":"/cashier")+"?venue="+encodeURIComponent(context.venueId);
       // Include every POS shift, including names older than the import API's 60-row selector.
       state.payload.shifts=[...(context.shifts || []),...(state.payload.shifts || [])];
       document.getElementById('journal-venue').textContent=context.venueName || 'Ваше заведение';
       document.getElementById('open-cashier').hidden=!context.permissions.post;
-      document.getElementById('manual-sale-link').hidden=!context.permissions.post;
+      document.getElementById('manual-sale-link').hidden=!context.permissions.post||!context.workday?.ok;
       document.querySelector('[data-source="manual"]').hidden=!state.payload.capabilities.create;
       var open=context.shifts.filter(function(s){return s.closingStatus==='open';});
-      document.getElementById('pos-shift-status').textContent=open.length?'Открытые кассовые смены: '+open.map(function(s){return s.shiftName;}).join(' · '):'Кассовая смена закрыта · откройте её в кассе';
+      document.getElementById('pos-shift-status').textContent=!context.workday?.ok?'Рабочий день не открыт · откройте его с командой в разделе Смены':open.length?'Открытые кассовые смены: '+open.map(function(s){return s.shiftName;}).join(' · '):'Кассовая смена закрыта · откройте её в кассе';
       var drafts=[];
       // Resolve each recovered basket to its own shift; never label a legacy
       // parallel-shift basket with whichever row happens to be first.

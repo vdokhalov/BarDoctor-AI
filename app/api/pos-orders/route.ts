@@ -1,3 +1,5 @@
+import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
+import { OPERATIONAL_REPORT_STORE_KEY } from "../../../lib/bardoctor/operational-day";
 import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { getD1 } from "../../../db";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -12,7 +14,7 @@ import { POS_DISCOUNT_STORE_KEY, parsePosDiscountRules } from "../../../lib/bard
 import { posSalesEventView } from "../../../lib/bardoctor/pos-shift-report";
 import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, planPosOrder, type PosOrderCommand, type PosOrderContext } from "../../../lib/bardoctor/pos-orders";
 
-const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings"];
+const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, keys);
@@ -29,7 +31,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
     assortment: assortment as Record<string, unknown>, movements: rows("bd_stock_movements"), events, revenues: rows("bd_finance_revenue"),
     mappings: rows("bd_sales_mappings"), warehouseRoutes: rows("bd_sales_warehouse_routes"), warehouses: rows("bd_warehouses"), closedMonths: closedMonthsFromStore(read("bd_month_closings", null)),
   };
-  return { db, snapshots, context, orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+  return { db, snapshots, context, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
@@ -77,9 +79,10 @@ async function command(request: Request): Promise<Response> {
     || ["split", "cancel_item", "cancel_order", "cancel_precheck", "apply_discount", "remove_discount"].includes(body.action) && !canManagePosPrivilegedAction(account)) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
   if (body.venueId !== account.venueId) return reply({ ok: false, code: "VENUE_CHANGED" }, 409);
   try {
-    const { db, snapshots, context, orders } = await load(account);
+    const { db, snapshots, context, orders, workdays } = await load(account);
     const plan = await planPosOrder(context, orders, body);
     const result = { ok: true, duplicate: plan.duplicate, order: plan.order, orders: posOrderViews(context, plan.orders), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
+    if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok)return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);
     const updates: [string, unknown][] = [[POS_ORDER_STORE_KEY, plan.orders]];
     if (plan.salesPlan) updates.push(["bd_assortment_v1", plan.salesPlan.assortment], ["bd_stock_movements", plan.salesPlan.movements], [SALES_EVENT_STORE_KEY, plan.salesPlan.events], ["bd_finance_revenue", plan.salesPlan.revenues]);

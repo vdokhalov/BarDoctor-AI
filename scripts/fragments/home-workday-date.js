@@ -1,0 +1,15 @@
+/* Calendar date belongs to the venue; business dates belong to persisted days. */
+function bdHomeTodayState(profile, revenue, now, days=[]) {
+ let timezone='UTC';try{timezone=new Intl.DateTimeFormat('en',{timeZone:profile?.timezone||'UTC'}).resolvedOptions().timeZone}catch{}
+ const parts=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(now).map(p=>[p.type,p.value]));
+ const calendarDate=parts.year+'-'+parts.month+'-'+parts.day,minutes=Number(parts.hour)*60+Number(parts.minute),parse=s=>/^\d{2}:\d{2}$/.test(s||'')?Number(s.slice(0,2))*60+Number(s.slice(3)):null,from=parse(profile?.openTime),to=parse(profile?.closeTime),overnight=from!==null&&to!==null&&to<=from;
+ const previous=new Date(Date.parse(calendarDate+'T12:00:00Z')-86400000).toISOString().slice(0,10),scheduledDate=overnight&&minutes<to?previous:calendarDate;
+ const saved=days.find(day=>day.report?.workdayStatus==='OPEN')||days.find(day=>day.businessDate===calendarDate&&day.report?.workdayStatus==='CLOSED'),operatingDate=saved?.businessDate||scheduledDate,workingDay=new Date(scheduledDate+'T12:00:00Z').getUTCDay()||7,workingDays=window.bdVenueSchedule?.daysOf(profile?.workingDays),configured=!!workingDays;
+ let status=!configured?'unspecified':workingDays[workingDay-1]===false?'non_working':from===null||to===null?'unspecified':(overnight?(scheduledDate===previous||minutes>=from):(minutes>=from&&minutes<to))?'active':minutes<from?'upcoming':'completed';
+ if(saved)status=saved.report.workdayStatus==='OPEN'?'active':'completed';
+ const reportFilled=saved?saved.report.workdayStatus==='CLOSED':revenue.some(row=>row.date?.slice(0,10)===operatingDate&&bdShiftRecordKindV156(row)==='closed');
+ return {calendarDate,timezone,operatingDate,status,reportFilled,schedule:from!==null&&to!==null?profile.openTime+'–'+profile.closeTime:'График не указан',venueStatus:status==='active'?'Работает':status==='upcoming'?'Откроется сегодня':status==='completed'?'Смена завершена':status==='non_working'?'Выходной по графику':'График не указан',shiftStatus:saved?(saved.report.workdayStatus==='OPEN'?'Рабочий день открыт':'Рабочий день закрыт'):'Рабочий день не открыт',reportStatus:reportFilled?'Заполнен':'Не заполнен',contextLabel:saved?'Рабочий день · '+bdHomeLongDateV151(operatingDate):'По графику · '+bdHomeLongDateV151(operatingDate),actionLabel:'Открыть Смены',actionHref:'/shifts?workday='+encodeURIComponent(operatingDate)+'&month='+operatingDate.slice(0,7)};
+}
+function useHomeCalendarClock(){const[now,setNow]=S.useState(()=>new Date());S.useEffect(()=>{const tick=()=>{if(!document.hidden)setNow(new Date())},timer=setInterval(tick,30000);window.addEventListener('focus',tick);document.addEventListener('visibilitychange',tick);return()=>{clearInterval(timer);window.removeEventListener('focus',tick);document.removeEventListener('visibilitychange',tick)}},[]);return now;}
+
+export { bdHomeTodayState, useHomeCalendarClock };

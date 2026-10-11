@@ -12,6 +12,7 @@ test("real-auth POS retries recheck membership denial and private cashier histor
  r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status) VALUES (?,?,'cashier','active')").run(venue,staff.userId);
  r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({currency:"MDL"}),owner.userId);
  r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(owner.userId,"bd_assortment_v1",JSON.stringify(salesEventFixture().assortment));
+ r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?)").run(owner.userId,"bd_operational_reports_v1",JSON.stringify([{venueId:venue,date:new Date().toISOString().slice(0,10),workdayStatus:"OPEN",staffing:[{employeeId:"fixture-staff"}]}]));
  function request(user:typeof owner,method="GET",body?:object,selected=venue){const headers=new Headers(r.request(user,"/api").headers);headers.set("X-Venue-Id",String(selected));return new Request("https://isolated.test/api",{method,headers,...(body?{body:JSON.stringify({venueId:selected,...body})}:{})});}
  assert.equal((await r.api.sales.POST(request(owner,"POST",{action:"open_shift",shiftId:"shift",name:"Synthetic",openingFloat:0}))).status,201);
  const command=(id:string)=>({id,source:"POS_API",shiftId:"shift",payments:[{id:"p",method:"CASH",amount:20}],lines:[{id:"l",menuItemId:"beer",quantity:1}]});

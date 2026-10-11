@@ -21,9 +21,9 @@ const HTML = `<!doctype html>
   <script src="/sales-journal.js?v=sales-scroll-stability" defer></script>
   <script src="/sales-import.js?v=sales-scroll-stability" defer></script>
 </head>
-<body data-bd-parent-route="/warehouse" data-sales-experience="v278">
+<body data-bd-parent-route="/more" data-sales-experience="v278">
   <header class="sales-topbar">
-    <a href="/warehouse" aria-label="Вернуться на склад" data-bd-back><img src="/integration-icons/arrow-left.svg" alt=""></a>
+    <a href="/more" aria-label="Вернуться в Ещё" data-bd-back><img src="/integration-icons/arrow-left.svg" alt=""></a>
     <div class="sales-topbar-copy"><b>Продажи</b><span>Журнал и касса</span></div>
     <div class="bd-standalone-venue-host" data-bd-venue-host></div>
   </header>

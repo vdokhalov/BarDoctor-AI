@@ -31,7 +31,8 @@ function addEntry(name,anchor,entry){
  if(!code.includes(entry)){if(!code.includes(anchor))throw Error('Cashier entry anchor missing: '+name);code=code.replace(anchor,entry+anchor);}
  source=source.slice(0,node.start)+code+source.slice(node.end);
 }
-addEntry('Dce','i.jsx(bdHomeDaily,','i.jsx(bdCashierEntry,{onNavigate:a}),');
+source=source.replace('i.jsx(bdCashierEntry,{onNavigate:a}),','');
 addEntry('bdShiftsPage','i.jsxs("div",{className:"bd-shifts-layout"','i.jsx(bdCashierEntry,{onNavigate:navigate}),');
+source=source.replace('key:"cashier",icon:kX,title:"Касса",description:"Столы, заказы и оплата",onClick:()=>e(bdCashierEntryHref())','key:"sales",icon:kX,title:"Продажи",description:"Касса и журнал продаж",onClick:()=>e((localStorage.getItem("bd_active_role")==="cashier"?"/cashier":"/sales-import")+"?venue="+encodeURIComponent(localStorage.getItem("bd_active_venue_id")||""))');
 fs.writeFileSync(path,source);
 console.log('POS-1 navigation and shared money presentation applied');

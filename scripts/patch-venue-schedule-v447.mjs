@@ -2,6 +2,8 @@ import fs from "node:fs";
 const asset = "public/assets/index-BQGspy0I.js";
 let code = fs.readFileSync(asset, "utf8");
 function replace(label, before, after) {
+  // The operational-day replacement owns venue-calendar and unknown-schedule semantics.
+  if (label === "home unknown" && code.includes("function bdHomeTodayState(profile, revenue, now, days=[])") && code.includes("workingDays=window.bdVenueSchedule?.daysOf(profile?.workingDays)")) return;
   if (label === "shared React bridge" && code.includes("function bdVenueScheduleReact(")) return;
   if (label === "wizard payload" && code.includes("workingDays:u.workingDays,timezone:u.timezone")) return;
   if (label === "main profile visible schedule" && code.includes("workingDays:C.workingDays,timezone:C.timezone??N.timezone")) return;

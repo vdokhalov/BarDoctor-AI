@@ -1,3 +1,4 @@
+import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
 import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { posDiscountCents } from "../../../lib/bardoctor/pos-discounts";
 import { POS_ORDER_STORE_KEY, parsePosOrders, assertPosShiftClosable, canReadPosSaleHistory } from "../../../lib/bardoctor/pos-orders";
@@ -31,7 +32,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now:new Date().toISOString(),
     actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role, ...(account.jobTitle ? { jobTitle:account.jobTitle } : {}) },
     assortment:assortment as Record<string,unknown>,movements:rows(keys[1]),events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
-  return { db,snapshots,context, orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+  return { db,snapshots,context, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error:unknown) {
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
@@ -56,7 +57,7 @@ export async function GET(request:Request) {
   if (!hasPermission(account,"sales.view")) return reply({ok:false,code:"ACCESS_DENIED"},403);
   const navigation = (response: Response) => { response.headers.set("X-BD-Sales-Journal", canManagePosPrivilegedAction(account) ? "1" : "0"); return response; };
   try {
-    const {context:c} = await load(account);
+    const {context:c,workdays} = await load(account);
     const reportShift = new URL(request.url).searchParams.get("reportShiftId");
     if (reportShift) {
       if (!canManagePosPrivilegedAction(account)) return reply({ok:false,code:"ACCESS_DENIED"},403);
@@ -65,6 +66,7 @@ export async function GET(request:Request) {
     const menu = Array.isArray(c.assortment.menuItems) ? c.assortment.menuItems : [];
     const taxonomy = canonicalTaxonomyForAssortment(c.assortment);
     return navigation(reply({ok:true,serverNow:c.now,timezone:c.timezone,timezoneConfigured:c.timezoneConfigured,venueId:c.venueId,venueName:venueIdentityFromJson(account.restaurantJson).name,actor:c.actor,currency:c.currency,
+      workday:posWorkdayGate(workdays,c.venueId),
       menu:menu.filter(m => m && typeof m === "object" && (m.venueId == null || m.venueId === c.venueId) && m.active !== false && m.archived !== true)
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : workdayPersonnelView(shift,canReadManagementWorkday(account))),
@@ -86,7 +88,7 @@ async function command(request:Request):Promise<Response> {
   if (pricingKeys.some(key => Object.hasOwn(body,key) || body.command && Object.hasOwn(body.command,key))
     || body.command?.lines?.some(line=>pricingKeys.some(key=>Object.hasOwn(line,key)))) return reply({ok:false,code:"SALES_EVENT_DISCOUNT_REQUIRES_ORDER"},422);
   try {
-    const {db,snapshots,context:c,orders} = await load(account);
+    const {db,snapshots,context:c,orders,workdays} = await load(account);
     let updates: [string,unknown][], result:unknown;
     let accountingMonth = venueDate(c.now, c.timezone).slice(0,7);
     if (body.action === "preview" || body.action === "post") {
@@ -95,6 +97,7 @@ async function command(request:Request):Promise<Response> {
       if (plan.duplicate && !canReadPosSaleHistory(c.actor,plan.event)) return reply({ok:false,code:"ACCESS_DENIED"},403);
       accountingMonth = plan.event.businessDate.slice(0,7);
       result = {ok:true,duplicate:plan.duplicate,event:account.role === "cashier" ? posSalesEventView(plan.event) : plan.event,previewHash:plan.previewHash};
+      if (!plan.duplicate) { const gate=posWorkdayGate(workdays,c.venueId,plan.event.businessDate); if(!gate.ok)return reply(gate,409); if(!body.command.shiftId)return reply({ok:false,code:"SALES_EVENT_SHIFT_NOT_FOUND",error:"Откройте связанную кассу рабочего дня."},409); }
       if (body.action === "preview" || plan.duplicate) return reply(result);
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
@@ -112,10 +115,8 @@ async function command(request:Request):Promise<Response> {
     } else {
       const original=c.revenues.find(row=>row.id===body.shiftId && row.venueId===c.venueId);
       if (body.action==="close_shift") assertPosShiftClosable(orders,c.venueId,body.shiftId);
-      const workdays=JSON.parse(snapshots.find(row=>row.key===OPERATIONAL_REPORT_STORE_KEY)?.dataJson??"[]");
-      if(!Array.isArray(workdays))throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
       const active=workdays.filter(row=>row?.venueId===c.venueId&&row.workdayStatus==="OPEN");
-      if(body.action==="open_shift"&&active.length>1)return reply({ok:false,code:"WORKDAY_NEEDS_REVIEW",error:"Найдены несколько открытых рабочих смен."},409);
+      if(body.action==="open_shift"&&!original&&active.length>1)return reply({ok:false,code:"WORKDAY_NEEDS_REVIEW",error:"Найдены несколько открытых рабочих смен."},409);
       let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name,body.action==="open_shift"?active[0]?.date:undefined);
       if (revenues===c.revenues) {
         if (body.action==="open_shift" && body.openingFloat!==undefined && body.openingFloat!==original?.openingFloat) return reply({ok:false,code:"SALES_EVENT_IDEMPOTENCY_CONFLICT"},409);
@@ -123,6 +124,7 @@ async function command(request:Request):Promise<Response> {
       }
       if (body.action==="open_shift") {
         const date=revenues.find(row=>row.id===body.shiftId&&row.venueId===c.venueId)?.date;
+        const gate=posWorkdayGate(workdays,c.venueId,String(date));if(!gate.ok)return reply(gate,409);
         if(workdays.some(row=>row?.venueId===c.venueId&&row.date===date&&row.workdayStatus==="CLOSED"))return reply({ok:false,code:"WORKDAY_CLOSED",error:"Рабочий день за эту дату уже закрыт. Новую кассовую смену открыть нельзя."},409);
         if (body.openingFloat!==undefined) posDiscountCents(body.openingFloat);
         revenues=revenues.map(row=>row.id===body.shiftId ? {...row,openingFloat:body.openingFloat??null}:row);
