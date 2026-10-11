@@ -69,13 +69,13 @@ function bdMonthlyHeroV165({ report, previous }) {
 }
 
 function bdMonthlyExecutiveV165({ report }) {
-  const otherCosts = Number(report.otherExpenses || 0) + Number(report.writeoffs || 0);
+  const otherCosts = report.otherExpenses == null || report.writeoffs == null ? null : Number(report.otherExpenses) + Number(report.writeoffs);
   const metrics = [
     { key: "revenue", label: "Выручка", value: report.revenue },
     { key: "cogs", label: "Себестоимость проданного", value: report.costOfGoods },
     { key: "payroll", label: "ФОТ", value: report.payroll },
     { key: "expenses", label: "Прочие расходы", value: otherCosts },
-    { key: "recurring", label: "Налоги + коммунальные", value: Number(report.taxes || 0) + Number(report.utilities || 0) },
+    { key: "recurring", label: "Налоги + коммунальные", value: report.taxes == null || report.utilities == null ? null : Number(report.taxes) + Number(report.utilities) },
     { key: "profit", label: "Чистая прибыль", value: report.operatingResult, accent: true },
   ];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-executive-v165", children: [
@@ -265,7 +265,7 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
   const best = ordered[0];
   const worst = ordered[ordered.length - 1];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-shifts-v165", children: [
-    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? (report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам каждой смены" : "Себестоимость распределена пропорционально выручке") : "Показан результат без себестоимости", action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
+    i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? (report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам каждой смены" : "Себестоимость распределена пропорционально выручке") : "Показан результат без себестоимости", ...(shifts.some(shift => shift.estimatedResult == null) ? { caption: "Неподтверждённый результат показан до себестоимости; сохранённая себестоимость указана отдельно." } : {}), action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
     i.jsx("div", { className: "bd-monthly-shift-summary-v165", children: [
       { key: "all", label: "Завершено", value: shifts.length },
       { key: "profit", label: "Прибыльных", value: profitable },
@@ -278,14 +278,14 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
       const result = resultOf(shift);
       return i.jsxs("button", { type: "button", onClick: () => navigate("/finance?month=" + period + "&view=revenue"), children: [
         i.jsxs("span", { children: [i.jsx("strong", { children: sg(shift.date) }), i.jsxs("small", { children: ["Выручка ", bdMoney2(shift.revenue), " · Себестоимость ", shift.estimatedCost === null ? "—" : bdMoney2(shift.estimatedCost), " · ФОТ ", bdMoney2(shift.payroll), " · Постоянные ", bdMoney2(shift.recurringAllocation)] })] }),
-        i.jsx("b", { className: Number(result) >= 0 ? "is-positive" : "is-negative", children: bdMoney2(result) }),
+        i.jsx("b", { className: Number(result) >= 0 ? "is-positive" : "is-negative", children: (shift.estimatedResult == null ? "До себестоимости: " : "") + bdMoney2(result) }),
       ] }, shift.date);
     }) }),
     i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
   ] });
 }
 
-function bdMonthlyReadinessV165({ report, navigate }) {
+function bdMonthlyReadinessV165({ report, closingLauncher }) {
   if (report.isClosed) return null;
   const issues = [];
   if (report.openingInventory === null) issues.push("не внесены начальные остатки");
@@ -300,7 +300,7 @@ function bdMonthlyReadinessV165({ report, navigate }) {
       i.jsx("div", { children: i.jsx("i", { style: { width: Math.max(0, Math.min(100, report.coveragePercent)) + "%" } }) }),
     ] }),
     issues.length ? i.jsx("ul", { children: issues.map((issue) => i.jsx("li", { children: issue }, issue)) }) : i.jsx("p", { children: "Данные прошедших смен учтены. Можно продолжить закрытие месяца." }),
-    i.jsx("button", { type: "button", className: "bd-monthly-primary-action-v165", onClick: () => navigate("/reports?closeMonth=1"), children: "Продолжить закрытие" }),
+    closingLauncher,
   ] });
 }
 
@@ -314,6 +314,51 @@ function bdMonthlyCurrencyBoundaryNoticeV320({ report }) {
   ] });
 }
 
+async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
+  const response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
+  const value = await response.json();
+  if (!response.ok || !value.ok) throw new Error("Не удалось проверить отчёт. Проверьте доступ и повторите загрузку.");
+  const scope = value.inputManifest?.scope || value.closing?.inputManifest?.scope;
+  const legacyScope = value.closing && (!value.closing.venueId || value.closing.venueId === "primary" || Number(value.closing.venueId) === venueId);
+  if ((scope ? Number(scope.venueId) !== venueId : !legacyScope) || (value.closing?.monthKey || value.report?.meta?.key) !== monthKey || !value.report) throw new Error("Контекст отчёта изменился. Повторите загрузку.");
+  return { report: value.closing ? { ...value.report, ...bdMonthlyClosedFieldsPhase7(value.report), meta: value.report.meta || bdMonthMeta(monthKey), isClosed: true } : value.report, reasons: value.reasons || [], evidenceStatus: value.evidenceStatus };
+}
+
+function bdMonthlyReadControllerV513(load, publish) {
+  let disposed = false, sequence = 0, controller;
+  return {
+    async refresh() {
+      const current = ++sequence;
+      controller?.abort(); controller = new AbortController();
+      try { const value = await load(controller.signal); if (!disposed && current === sequence) publish({ ...value, error: null }); }
+      catch (error) { if (!disposed && current === sequence) publish({ report: null, reasons: [], error: error.message }); }
+    },
+    dispose() { disposed = true; ++sequence; controller?.abort(); },
+  };
+}
+
+function bdUseMonthlyReportV513(venueId, monthKey, revision) {
+  const key = venueId + ":" + monthKey;
+  const [state, setState] = S.useState(null);
+  const [retry, setRetry] = S.useState(0);
+  S.useEffect(() => {
+    if (!Number.isSafeInteger(venueId)) return;
+    const reader = bdMonthlyReadControllerV513(signal => bdFetchMonthlyReportV513(venueId, monthKey, signal), value => setState({ key, ...value }));
+    reader.refresh();
+    const refresh = () => { if (document.visibilityState === "visible") reader.refresh(); };
+    const timer = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
+    return () => { reader.dispose(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [key, revision, retry]);
+  return { ...(state?.key === key ? state : { report: null, error: null, reasons: [] }), retry: () => setRetry(value => value + 1) };
+}
+
+function bdMonthlyPendingReasonsV513({ reasons }) {
+  const labels = { INVENTORY_BOUNDARY_UNKNOWN: "не подтверждены остатки на границах месяца", PERIOD_NOT_ENDED: "месяц ещё не закончился", BUSINESS_DAY_COVERAGE_INCOMPLETE: "не все рабочие дни учтены", REVENUE_NOT_FINAL: "не вся выручка подтверждена", PAYROLL: "не все начисления зарплаты подтверждены", CURRENCY_UNKNOWN_OR_UNCONVERTED: "не все суммы приведены к валюте учёта", EXPENSES_OR_CURRENCY: "требуют проверки расходы или их валюта", RECURRING_INPUT_UNKNOWN: "неполны настройки регулярных расходов", PURCHASE_AMOUNT_UNKNOWN: "неполны суммы закупок" };
+  const messages = [...new Set(reasons.map(reason => labels[reason] || "требуют проверки исходные документы и их связи"))];
+  return messages.length ? i.jsx("p", { role: "status", children: "Итоговая прибыль пока не подтверждена: " + messages.join("; ") + ". Сохранённая себестоимость продаж показана отдельно, если её данные полны." }) : null;
+}
+
 function bdMonthlyReportPage() {
   const [, navigate] = bt();
   const { profile } = Un();
@@ -323,25 +368,30 @@ function bdMonthlyReportPage() {
   const requestedMonth = window.bdReadNavigationQuery("month", "");
   const [period, setPeriod] = S.useState(() => months.includes(requestedMonth) ? requestedMonth : months[0]);
   S.useEffect(() => { window.bdSyncNavigationQuery({ month: period }); }, [period]);
-  const report = S.useMemo(() => bdBuildMonthlyReport(profile, period, revenue, expenses, snapshots, settings, gapReasons), [profile, period, revenue, expenses, snapshots, settings, gapReasons]);
+  const revision = S.useMemo(() => ({}), [profile, revenue, expenses, snapshots, settings, gapReasons]);
+  const verified = bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile, settings), period, revision);
+  const report = verified.report;
   const previous = S.useMemo(() => {
     const currentIndex = months.indexOf(period);
     const earlier = currentIndex >= 0 ? months.slice(currentIndex + 1) : [];
     for (const month of earlier) {
-      const candidate = bdBuildMonthlyReport(profile, month, revenue, expenses, snapshots, settings, gapReasons);
-      if (candidate.isClosed) return candidate;
+      const venueId = bdMonthlyVenueIdPhase7(profile, settings);
+      const saved = bdProcArray("bd_month_closings").find(row => row.status === "closed" && row.monthKey === month && Number(row.venueId) === venueId && row.snapshot);
+      if (saved) return { ...saved.snapshot, ...bdMonthlyClosedFieldsPhase7(saved.snapshot), meta: saved.snapshot.meta || bdMonthMeta(month), isClosed: true };
     }
     return null;
   }, [profile, period, revenue, expenses, snapshots, settings, gapReasons, months]);
-  const hasFinancialData = report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0;
+  const hasFinancialData = report && (report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0);
   return i.jsx(nt, { showBottomNav: true, className: "pb-32", children: i.jsxs($e, { className: "pt-0", children: [
     i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance", right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
       i.jsx("nav", { className: "bd-monthly-period-v165", "aria-label": "Выбор месяца", children: months.map((month) => i.jsx("button", { type: "button", onClick: () => setPeriod(month), className: period === month ? "is-active" : "", children: bdMonthDisplay(month) }, month)) }),
-      hasFinancialData ? i.jsxs(i.Fragment, { children: [
+      !report ? i.jsxs("section", { role: verified.error ? "alert" : "status", children: [i.jsx("p", { children: verified.error || "Проверяем данные месяца…" }), verified.error && i.jsx("button", { type: "button", onClick: verified.retry, children: "Повторить" })] }) : hasFinancialData ? i.jsxs(i.Fragment, { children: [
+        ["LEGACY_PARTIAL", "INVALID"].includes(verified.evidenceStatus) && i.jsx("p", { role: "status", children: "Показан сохранённый исторический отчёт. Полнота и происхождение его исходных данных не подтверждены; суммы не пересчитаны." }),
+        i.jsx(bdMonthlyPendingReasonsV513, { reasons: verified.reasons }),
         i.jsx(bdMonthlyHeroV165, { report, previous }),
         i.jsx(bdMonthlyCurrencyBoundaryNoticeV320, { report }),
-        i.jsx(bdMonthlyReadinessV165, { report, navigate }),
+        i.jsx(bdMonthlyReadinessV165, { report, closingLauncher: i.jsx(bdMonthClosingLauncher, { settings, report, revenues: revenue.filter(row => String(row.date).slice(0, 7) === period), expenses: expenses.filter(row => String(row.date).slice(0, 7) === period), monthKey: period, navigate }, period) }),
         i.jsx(bdMonthlyExecutiveV165, { report }),
         i.jsx(bdMonthlyComparisonV165, { report, previous }),
         i.jsx(bdMonthlyChainV165, { report }),

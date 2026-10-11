@@ -346,7 +346,7 @@ function entryDefinition(balance: JsonRecord): { entryUnit: string; entryFactor:
     && packageAmount > 0;
   if (hasSinglePackage) {
     const packageSize = text(balance.packageSize, "уп.", 120).toLocaleLowerCase("ru");
-    const entryUnit = /(?:л|мл)/.test(packageSize) ? "бут." : /(?:кг|г)/.test(packageSize) ? "уп." : "шт.";
+    const entryUnit = /(?:л|мл|(?:^|\s)(?:ml|l)\b)/.test(packageSize) ? "бут." : /(?:кг|г|(?:^|\s)(?:kg|g)\b)/.test(packageSize) ? "уп." : "шт.";
     return { entryUnit, entryFactor: rounded(packageAmount, 6) };
   }
   if (unit === "ml") return { entryUnit: "л", entryFactor: 1_000 };

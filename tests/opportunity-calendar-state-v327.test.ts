@@ -93,15 +93,16 @@ test("successful refresh replaces the shared snapshot and failed refresh never c
   assert.doesNotMatch(client, /catch[\s\S]{0,180}state\.calendar = null/);
 });
 
-test("Home and Calendar use the same shared selector, cache and refresh lease", () => {
+test("Home and Calendar use the same saved selector/cache without paid Home refresh", () => {
   const home = readFileSync(new URL("../public/bardoctor-preview.js", import.meta.url), "utf8");
   const calendarClient = readFileSync(new URL("../public/opportunities.js", import.meta.url), "utf8");
   for (const source of [home, calendarClient]) {
     assert.match(source, /bdOpportunityCalendarClientV327/);
     assert.match(source, /shared\.summary\(/);
     assert.match(source, /shared\.writeSnapshot\(/);
-    assert.match(source, /shared\.acquireRefreshLease\(/);
+
   }
+  assert.doesNotMatch(home, /backgroundRefresh\(result\)|automatic: true/);
   assert.doesNotMatch(home, /potentialScore \|\| 0\) - Number\(left\.potentialScore/);
 });
 

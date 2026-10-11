@@ -266,7 +266,8 @@
   }
 
   async function refreshCalendar(automatic) {
-    if (state.refreshing) return;
+    if (state.refreshing || automatic) return;
+    if (!window.confirm("Платный AI-поиск календаря: один запрос, до 6 поисковых действий и 7000 выходных токенов. Данные заведения отправляются AI-провайдеру. Денежный потолок не установлен. Продолжить?")) return;
     var lease = automatic && shared ? shared.acquireRefreshLease() : "manual";
     if (automatic && !lease) return;
     state.refreshing = true; state.refreshFailed = false; render();
@@ -315,7 +316,7 @@
     }
     try {
       var result = await api("/api/opportunities", {}, 15_000); applyResponse(result, false); if (shared) shared.writeSnapshot(result); render();
-      if (result.stale) setTimeout(function () { refreshCalendar(true); }, 300);
+      if (result.stale) showNotice("Показан сохранённый календарь. Для платного AI-поиска нажмите «Обновить».", "info");
     } catch (error) {
       if (error.status === 401) { showNotice("Сначала войдите в BarDoctor.", "warning"); setTimeout(function () { location.href = "/"; }, 900); return; }
       if (cached && cached.calendar) { applyResponse(cached, true); render(); }

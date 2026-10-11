@@ -418,6 +418,7 @@ export async function POST(request: Request): Promise<Response> {
       throw new AIServiceError("Сначала заполните профиль заведения.", 400);
     }
     const previousAnalysis = record(await cachedAnalysis(account.id));
+    if (body.automatic === true) throw new AIServiceError("Запустите платный анализ рынка явно кнопкой обновления.", 400);
     if (body.automatic === true && !shouldRunAutomaticMarketRefresh({
       analysis: previousAnalysis,
       knownGeneratedAt: text(body.knownGeneratedAt, "", 60),

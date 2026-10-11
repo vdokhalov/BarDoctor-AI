@@ -14,8 +14,8 @@ let bundle = await readFile(bundlePath, "utf8");
 let fragment = (await readFile(fragmentPath, "utf8")).trim();
 fragment = fragment
   .replace(
-    "O=bdEquipmentCostsV167(m,T,d.filter(M=>M.equipmentId===b.id))",
-    "O=bdEquipmentCostsV167(m,T,d.filter(M=>M.equipmentId===b.id)).filter(I=>{const V=new Date;V.setMonth(V.getMonth()-12);return new Date(I.date||I.createdAt)>=V})",
+    "O=bdEquipmentCostsV167(m.filter(I=>I.equipmentId===b.id),T,d.filter(M=>M.equipmentId===b.id))",
+    "O=bdEquipmentCostsV167(m.filter(I=>I.equipmentId===b.id),T,d.filter(M=>M.equipmentId===b.id)).filter(I=>{const V=new Date;V.setMonth(V.getMonth()-12);return new Date(I.date||I.createdAt)>=V})",
   )
   .replace("за 12 мес. / всю историю", "за 12 месяцев");
 const existingStart = bundle.indexOf(startMarker);

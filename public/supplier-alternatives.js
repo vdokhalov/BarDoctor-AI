@@ -603,9 +603,10 @@
     node.textContent = message || "";
   }
 
-  async function runTargetSearch(target) {
-    var segment = findSegmentForTarget(target);
+  async function runTargetSearch(target, segmentId) {
+    var segment = segmentId ? searchPlan.find(function (item) { return item.id === segmentId; }) : findSegmentForTarget(target);
     if (!segment || searchRunning) return;
+    if (!window.confirm("Платный поиск одной группы (до 3 товаров): один запрос, до 6 поисковых действий и 9000 выходных токенов. Названия товаров, закупочные цены, поставщики и контекст заведения отправляются AI-провайдеру. Денежный потолок не установлен. Продолжить?")) return;
     searchRunning = true;
     setProgress("Ищем предложения для группы: " + segment.label);
     updateSnapshotStatus("Ищем новые предложения…", "searching");
@@ -626,32 +627,31 @@
   async function runFullSearch() {
     if (searchRunning) return;
     if (!searchPlan.length) { location.href = "/catalog"; return; }
-    searchRunning = true;
-    configureRefresh();
-    var failures = [];
-    updateSnapshotStatus("Ищем новые предложения…", "searching");
-    for (var index = 0; index < searchPlan.length; index += 1) {
-      setProgress("Ищем предложения · " + (index + 1) + " / " + searchPlan.length + " групп · " + searchPlan[index].label);
-      try {
-        currentData = (await api("POST", { segment: searchPlan[index].id, reset: index === 0 })).data;
-        render();
-      } catch (error) {
-        failures.push(error.message);
-      }
-    }
-    searchRunning = false;
-    setProgress("");
-    configureRefresh();
-    if (failures.length) updateSnapshotStatus("Показаны последние данные · часть поиска временно недоступна", "error");
-    else updateSnapshotStatus("Данные сохранены · проверено " + formatDate(currentData && currentData.generatedAt), "success");
-    render();
+    // Every group remains available even before the first saved search.
+    setView("positions");
+    var existing = document.getElementById("supplier-search-group-picker");
+    if (existing) existing.remove();
+    var picker = element("section", "missing-tools");
+    picker.id = "supplier-search-group-picker";
+    var select = document.createElement("select");
+    select.setAttribute("aria-label", "Группа товаров для платного поиска");
+    searchPlan.forEach(function (segment) { select.append(new Option(segment.label, segment.id)); });
+    var launch = element("button", "secondary-button", "Поиск выбранной группы");
+    launch.type = "button";
+    launch.onclick = function () {
+      var segment = searchPlan.find(function (item) { return item.id === select.value; });
+      if (segment) runTargetSearch(segment.label, segment.id);
+    };
+    picker.append(select, launch);
+    $("#results").prepend(picker);
+    setProgress("До 3 товаров за один подтверждённый запуск. Сохранённые предложения остаются доступными.");
   }
 
   function configureRefresh() {
     var button = $("#refresh");
     button.disabled = searchRunning;
     if (!searchPlan.length) button.textContent = "Открыть ассортимент";
-    else button.textContent = searchRunning ? "Ищем…" : (currentData ? "Обновить" : "Запустить поиск");
+    else button.textContent = searchRunning ? "Ищем…" : "Выбрать группу для поиска";
   }
 
   async function load() {

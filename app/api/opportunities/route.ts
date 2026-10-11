@@ -299,6 +299,7 @@ export async function POST(request: Request): Promise<Response> {
       && previous.profileSignature === expectedSignature,
     );
     const automatic = body.automatic === true;
+    if (automatic) throw new AIServiceError("Запустите платный поиск явно кнопкой обновления.", 400);
     const knownGeneratedAt = text(body.knownGeneratedAt, "", 80);
     const today = new Date().toISOString().slice(0, 10);
     if (automatic && previous && (

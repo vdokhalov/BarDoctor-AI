@@ -139,11 +139,6 @@ function responsesEndpoint(baseUrl: string): string {
   return base.endsWith("/v1") ? `${base}/responses` : `${base}/v1/responses`;
 }
 
-function chatCompletionsEndpoint(baseUrl: string): string {
-  const base = baseUrl.replace(/\/+$/, "");
-  return base.endsWith("/v1") ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
-}
-
 function openAIContent(
   message: AIMessage,
   imageDetail: "auto" | "low" | "high" | "original" = "auto",
@@ -402,7 +397,8 @@ export async function openAIWebSearch(input: {
         tools: [webTool],
         tool_choice: "auto",
         include: ["web_search_call.action.sources"],
-        max_output_tokens: input.maxTokens,
+        max_output_tokens: Math.min(9_000, input.maxTokens),
+        max_tool_calls: 6,
         store: false,
       }),
       signal: AbortSignal.timeout(120_000),
@@ -428,67 +424,9 @@ export async function openAIWebSearch(input: {
   }
 
   const primaryCode = await providerErrorCode(response);
-  if (![400, 404, 422].includes(response.status)) {
-    await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "error", errorCode: primaryCode || `http_${response.status}` });
-    throw new AIServiceError(
-      providerErrorMessage(response.status, primaryCode),
-      response.status >= 500 ? 502 : response.status,
-    );
-  }
-
-  const searchModel = "gpt-5-search-api";
-  const approximate = Object.keys(location).length
-    ? { user_location: { type: "approximate", approximate: location } }
-    : {};
-  let fallback: Response;
-  try {
-    fallback = await fetch(chatCompletionsEndpoint(baseUrl), {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: searchModel,
-        web_search_options: { search_context_size: "high", ...approximate },
-        messages: [
-          { role: "system", content: input.system },
-          { role: "user", content: input.prompt },
-        ],
-        max_tokens: input.maxTokens,
-      }),
-      signal: AbortSignal.timeout(120_000),
-    });
-  } catch {
-    await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: searchModel, startedAt, status: "error", errorCode: "network" });
-    throw new AIServiceError("Не удалось соединиться с веб-поиском OpenAI.", 502);
-  }
-  if (!fallback.ok) {
-    const fallbackCode = await providerErrorCode(fallback);
-    await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: searchModel, startedAt, status: "error", errorCode: fallbackCode || `http_${fallback.status}` });
-    throw new AIServiceError(
-      providerErrorMessage(fallback.status, fallbackCode),
-      fallback.status >= 500 ? 502 : fallback.status,
-    );
-  }
-  const payload = await fallback.json() as {
-    usage?: OpenAIResponsePayload["usage"];
-    choices?: Array<{
-      message?: {
-        content?: unknown;
-        annotations?: unknown[];
-      };
-    }>;
-  };
-  const message = payload.choices?.[0]?.message;
-  const text = typeof message?.content === "string" ? message.content.trim() : "";
-  if (!text) throw new AIServiceError("OpenAI вернул пустой результат поиска.", 502);
-  await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: searchModel, startedAt, status: "success", payload });
-  return {
-    text,
-    sources: uniqueWebSources((message?.annotations ?? []).map(normaliseWebSource)),
-    model: searchModel,
-  };
+  await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "error", errorCode: primaryCode || `http_${response.status}` });
+  // Fail closed: a fallback model would bypass the declared single-request/tool budget.
+  throw new AIServiceError(providerErrorMessage(response.status, primaryCode), response.status >= 500 ? 502 : response.status);
 }
 
 export async function openAIText(input: OpenAITextInput): Promise<string> {

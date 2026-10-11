@@ -11,6 +11,7 @@
     source: "all",
     importInspection: null,
     analysisAttempted: false,
+    aiRunning: false,
     doctorAttempted: false,
     doctor: null,
     googleSettings: null,
@@ -292,7 +293,7 @@
     root.appendChild(sourceRow({
       mark: "+",
       title: "Ручные отзывы",
-      description: reviewCount(methods.manual || 0) + " · проходят тот же AI-анализ",
+      description: reviewCount(methods.manual || 0) + " · доступны для AI-анализа",
       action: canManageReviews() ? { label: "Добавить", handler: openManual } : null
     }));
     root.appendChild(sourceRow({
@@ -600,6 +601,7 @@
   async function analyzePending() {
     if (state.analysisAttempted || !canManageReviews()) return;
     state.analysisAttempted = true;
+    var venueAtStart = currentVenueId();
     var pending = reviews().filter(function (review) { return review.aiStatus === "pending"; }).slice(0, 25);
     if (!pending.length) return loadDoctorSummary();
     try {
@@ -607,19 +609,22 @@
         method: "POST",
         body: JSON.stringify({ reviews: pending.map(function (review) { return { id: review.id, source: review.source, rating: review.rating, text: review.text, date: review.publishedAt }; }) })
       });
+      if (venueAtStart !== currentVenueId()) return;
       var results = analyzed.data && Array.isArray(analyzed.data.results) ? analyzed.data.results : [];
       var persisted = await api("/api/review-layer/analysis", { method: "POST", body: JSON.stringify({ updates: results }) });
+      if (venueAtStart !== currentVenueId()) return;
       if (persisted.data) state.layer = persisted.data;
       renderAll();
     } catch {
       showMessage("AI-анализ временно недоступен. Отзывы сохранены и не потеряны.", true);
     }
-    loadDoctorSummary();
+    if (venueAtStart === currentVenueId()) await loadDoctorSummary();
   }
 
   async function loadDoctorSummary() {
     if (state.doctorAttempted || !canManageReviews() || !summary().total) return;
     state.doctorAttempted = true;
+    var venueAtStart = currentVenueId();
     var cacheKey = "bd_review_doctor::" + currentVenueId() + "::" + (state.layer.updatedAt || "unknown");
     try {
       var cached = JSON.parse(sessionStorage.getItem(cacheKey) || "null");
@@ -643,6 +648,7 @@
           staffMentions: []
         })
       });
+      if (venueAtStart !== currentVenueId()) return;
       state.doctor = result.data || null;
       if (state.doctor) sessionStorage.setItem(cacheKey, JSON.stringify(state.doctor));
       renderDoctor();
@@ -652,6 +658,7 @@
   }
 
   async function prepareReply(review, target) {
+    if (!window.confirm("Подготовить ответ через платный AI? Текст отзыва и контекст заведения будут отправлены AI-провайдеру. Денежный потолок не установлен.")) return;
     target.disabled = true;
     try {
       var originalText = reviewOriginalText(review);
@@ -690,10 +697,12 @@
       state.analysisAttempted = false;
       state.doctorAttempted = false;
       state.doctor = null;
+      try { state.doctor = JSON.parse(sessionStorage.getItem("bd_review_doctor::" + currentVenueId() + "::" + (state.layer.updatedAt || "unknown")) || "null"); } catch { /* Saved summaries remain optional. */ }
       renderAll();
+      aiButton.disabled = state.aiRunning || !canManageReviews();
       loading.classList.add("hidden");
       content.classList.remove("hidden");
-      analyzePending();
+      // Loading saved reviews never starts paid AI.
     } catch (problem) {
       if (problem && problem.name === "AbortError") return;
       loading.classList.add("hidden");
@@ -704,6 +713,19 @@
       }
     }
   }
+
+  var aiButton = node("button", "", "Запустить AI-анализ отзывов");
+  aiButton.type = "button";
+  aiButton.id = "reviews-explicit-ai";
+  document.getElementById("reviews-analysis-state").parentNode.appendChild(aiButton);
+  aiButton.addEventListener("click", async function () {
+    if (state.aiRunning || !canManageReviews()) return;
+    if (!window.confirm("Платный AI-анализ: до 25 отзывов и сводка, не более двух запросов (4000 + 2000 выходных токенов). Тексты отзывов и контекст заведения отправляются AI-провайдеру. Денежный потолок не установлен. Продолжить?")) return;
+    state.aiRunning = true; aiButton.disabled = true;
+    state.analysisAttempted = false; state.doctorAttempted = false;
+    try { await analyzePending(); }
+    finally { state.aiRunning = false; aiButton.disabled = !canManageReviews(); }
+  });
 
   document.getElementById("reviews-retry").addEventListener("click", loadData);
   document.getElementById("add-review").addEventListener("click", openManual);
@@ -759,7 +781,7 @@
       var result = await api("/api/review-layer/reviews", { method: "POST", body: JSON.stringify(values) });
       manualDialog.close();
       form.reset();
-      showMessage(result.result && result.result.skipped ? "Такой отзыв уже есть — дубль не создан." : "Отзыв добавлен и передан на единый AI-анализ.");
+      showMessage(result.result && result.result.skipped ? "Такой отзыв уже есть — дубль не создан." : "Отзыв сохранён. AI-анализ можно запустить отдельно.");
       await loadData();
     } catch (problem) {
       showMessage(problem.message || "Не удалось сохранить отзыв.", true);

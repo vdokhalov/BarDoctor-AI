@@ -707,15 +707,6 @@
       shared.writeSnapshot(result);
       return true;
     }
-    function refreshInBackground(result) {
-      var lease = shared.acquireRefreshLease();
-      if (!lease) return;
-      fetch("/api/market", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ automatic: true, knownGeneratedAt: result.analysis && result.analysis.generatedAt }) })
-        .then(function (response) { return response.json(); })
-        .then(function (fresh) { if (fresh && fresh.ok !== false && (fresh.analysis || fresh.data)) render({ ok: true, restaurant: fresh.restaurant || result.restaurant, analysis: fresh.analysis || fresh.data, stale: false }, false); })
-        .catch(function () {})
-        .finally(function () { shared.releaseRefreshLease(lease); });
-    }
     var cached = shared.readSnapshot();
     if (cached) render(cached, false);
     fetch("/api/market")
@@ -727,7 +718,7 @@
           entry.querySelector("[data-bd-competitors-confirmed]").textContent = "0";
           entry.querySelector("[data-bd-competitors-changes]").textContent = "0";
         }
-        if (result.analysis && result.stale) refreshInBackground(result);
+        // Paid market refresh requires explicit action in Market.
       })
       .catch(function () {
         if (cached) render(cached, true);
@@ -824,34 +815,6 @@
       }
       entry.querySelector("[data-bd-opportunity-important]").textContent = String(summary.highCount || 0) + " важных событий";
     }
-    function backgroundRefresh(result) {
-      if (!result.stale || !shared) return;
-      var lease = shared.acquireRefreshLease();
-      if (!lease) return;
-      fetch("/api/opportunities", {
-        method: "POST",
-        headers: opportunityHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          action: "refresh",
-          automatic: true,
-          knownGeneratedAt: result.calendar && result.calendar.generatedAt,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Chisinau"
-        })
-      }).then(function (response) {
-        return response.json().then(function (body) {
-          if (!response.ok || body.ok === false) throw new Error(body.error || "refresh failed");
-          return body;
-        });
-      }).then(function (refreshResult) {
-        var next = Object.assign({}, result, refreshResult, { restaurant: result.restaurant });
-        shared.writeSnapshot(next);
-        renderOpportunity(next, "saved");
-      }).catch(function () {
-        renderOpportunity(result, "failed");
-      }).finally(function () {
-        shared.releaseRefreshLease(lease);
-      });
-    }
     var cached = shared && shared.readSnapshot();
     if (cached && cached.calendar) renderOpportunity(cached, "saved");
     var controller = new AbortController();
@@ -861,7 +824,7 @@
       .then(function (result) {
         if (shared) shared.writeSnapshot(result);
         renderOpportunity(result, "saved");
-        backgroundRefresh(result);
+        // Paid calendar refresh requires explicit action in Calendar.
       })
       .catch(function () {
         if (cached && cached.calendar) renderOpportunity(cached, "offline");

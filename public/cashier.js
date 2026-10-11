@@ -4,7 +4,7 @@
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
   const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:new URLSearchParams(location.search).get("view")==="orders"?"orders":"cashier",unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
-  let dialogSubmit=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
+  let dialogSubmit=null,dialogDraft=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
   const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
   const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
@@ -15,7 +15,7 @@
   const senior=()=>["owner","manager","shift_manager"].includes(state.data?.actor.role), configure=()=>["owner","manager"].includes(state.data?.actor.role);
   const shiftSelectionKey=()=>`bd_pos_shift_v1:${state.data.actor.accountId}:${state.data.venueId}`;
   const selectedShift=data=>{if(!data)return;const open=data.shifts.filter(s=>s.closingStatus==="open"),saved=localStorage.getItem(`bd_pos_shift_v1:${data.actor.accountId}:${data.venueId}`);return open.find(s=>s.id===saved)||(open.length===1?open[0]:undefined);};
-  const shift=()=>selectedShift(state.data), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
+  const shift=()=>selectedShift(state.data), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId&&o.status==="OPEN"), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
   const storageKey=()=>`bd_pos_workspace_v2:${state.data.actor.accountId}:${state.data.venueId}`;
   function clearView(name){const view=$(name+"-view");view.replaceChildren();view.hidden=true;}
   function setReport(report){if(state.report?.businessDate!==report?.businessDate)state.workday=null;state.report=report;state.reportLastSuccess=report?Date.now():null;}
@@ -23,12 +23,12 @@
     if(!state.data?.permissions.managementDay){state.workday=null;document.querySelectorAll("[data-management-workday]").forEach(node=>node.remove());}
     if(!senior()){
       state.overview=null;state.workday=null;state.adminActionsOpen=false;setReport(null);state.waiter=null;state.filterWaiter="";
-      clearView("overview");clearView("report");$("dialog").close();$("dialog-content").replaceChildren();
+      clearView("overview");clearView("report");
       if(["overview","report"].includes(state.view))state.view="cashier";
     }
     if(!configure()){state.rules=[];clearView("discounts");if(state.view==="discounts")state.view="cashier";}
   }
-  function clearSensitive(message) { ++loadGeneration;++navigationGeneration;navigationLoading=false;state.frozen=true;state.workday=null;state.adminActionsOpen=false;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("cashier-venue-host").hidden=true;$("venue-timezone-label").replaceChildren();$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
+  function clearSensitive(message) { clearDialogDraft(true);++loadGeneration;++navigationGeneration;navigationLoading=false;state.frozen=true;state.workday=null;state.adminActionsOpen=false;state.overview=null;setReport(null);state.rules=[];state.orders=[];state.data=null;state.view="cashier";["cashier","orders","receipts","overview","report","discounts"].forEach(clearView);$("work").hidden=true;$("sales-journal").hidden=true;$("management-link").hidden=true;$("cashier-venue-host").hidden=true;$("venue-timezone-label").replaceChildren();$("navigation").replaceChildren();$("employee-name").textContent="Требуется обновление";$("employee-role").textContent="";$("dialog").close();$("dialog-content").replaceChildren();refreshController?.stop();notice(message); }
   function assertCurrentLoad(generation){if(generation!==undefined&&(generation!==loadGeneration||state.frozen)){const error=Error("Устаревшее обновление пропущено.");error.stale=true;throw error;}}
   async function request(path,body,generation) {
     assertCurrentLoad(generation);
@@ -81,7 +81,7 @@
     const dataPromise=read("/api/sales-events").then(data=>{
       assertCurrentLoad(generation);
       // Revoke cached management data even if the independent orders request fails first.
-      if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){state.data=data;state.orders=[];reconcileAccess();render();}
+      if(state.data&&(state.data.actor.role!==data.actor.role||JSON.stringify(state.data.permissions)!==JSON.stringify(data.permissions))){clearDialogDraft();$("dialog").close();$("dialog-content").replaceChildren();state.data=data;state.orders=[];reconcileAccess();render();}
       return data;
     });
     const [data,orders]=await Promise.all([dataPromise,read("/api/pos-orders")]);
@@ -98,7 +98,7 @@
     assertCurrentLoad(generation);
     return {generation,data,orders:orders.orders,overview,report,workday};
   }
-  function accept(value) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;syncQuickShift();state.orders=value.orders;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
+  function accept(value) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;syncQuickShift();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
   async function reload(){accept(await load());}
   function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
@@ -144,10 +144,41 @@
     const result=await mutate("/api/pos-orders",{action,orderId:order.id,expectedRevision:order.revision,operationId:uuid(),...extra});
     notice("Заказ сохранён.");return result;
   }
-  function dialog(title,content,submit,label="Подтвердить") {
-    $("dialog-title").textContent=title;$("dialog-content").innerHTML=content;$("dialog-error").textContent="";$("dialog-submit").textContent=label;$("dialog-submit").hidden=!submit;dialogSubmit=submit;$("dialog").showModal();
+  // Session-only form recovery; never restore a command, preview hash or submission.
+  const dialogDraftKey=()=>state.data?storageKey()+":dialog":null;
+  function dialogContext(orderId=state.orderId){
+    const order=orderId?state.orders.find(o=>o.id===orderId&&o.status==="OPEN"):null;
+    return {actor:state.data.actor.accountId,role:state.data.actor.role,permissions:state.data.permissions,venue:state.data.venueId,currency:state.data.currency,shift:shift()?.id||null,orderId:orderId||null,order:order?{id:order.id,revision:order.revision,shiftId:order.shiftId}:null,quick:orderId?null:{id:state.quick.id,shiftId:state.quick.shiftId,comment:state.quick.comment,lines:state.quick.lines.map(l=>({id:l.id,menuItemId:l.menuItemId,quantity:l.quantity}))},menu:state.data.menu.map(m=>({id:m.id,price:m.salePrice}))};
   }
-  $("dialog-form").onsubmit=event=>{event.preventDefault();void working(async()=>{if(dialogSubmit)await dialogSubmit(new FormData($("dialog-form")));if(!state.frozen)$("dialog").close();});};
+  function clearDialogDraft(all=false){const key=dialogDraftKey();dialogDraft=null;try{if(all){for(let i=sessionStorage.length-1;i>=0;i--){const candidate=sessionStorage.key(i);if(candidate?.startsWith("bd_pos_workspace_v2:")&&candidate.endsWith(":dialog"))sessionStorage.removeItem(candidate);}}else if(key)sessionStorage.removeItem(key);}catch{}}
+  function saveDialogDraft(){
+    if(!dialogDraft||!$("dialog").open||state.frozen)return;
+    const values={};for(const input of $("dialog-form").querySelectorAll('[name="quantity"],[name="method"]'))if(input.type!=="radio"||input.checked)values[input.name]=input.value;
+    try{sessionStorage.setItem(dialogDraftKey(),JSON.stringify({...dialogDraft,values}));}catch{ /* Editing and the existing durable transaction guard still work. */ }
+  }
+  function restoreDialogDraft(){
+    let saved;try{saved=JSON.parse(sessionStorage.getItem(dialogDraftKey())||"null");}catch{return;}
+    if(!saved)return;clearDialogDraft();
+    if(state.frozen||state.pending||state.legacy||!saved.context?.shift||JSON.stringify(saved.context)!==JSON.stringify(dialogContext(saved.context.orderId)))return;
+    if(!["add","quantity","payment"].includes(saved.kind))return;
+    state.orderId=saved.context.orderId;state.view="cashier";render();
+    const selector=saved.kind==="add"?'[data-add]':saved.kind==="quantity"?'[data-edit-quantity]':'[data-action="payment"]';
+    const button=Array.from(document.querySelectorAll(selector)).find(b=>saved.kind==="payment"||(saved.kind==="add"?b.dataset.add:b.dataset.editQuantity)===saved.id);
+    if(!button||button.disabled)return;button.click();
+    if(!dialogDraft||!$("dialog").open)return;
+    for(const input of $("dialog-form").querySelectorAll('[name="quantity"],[name="method"]')){
+      if(typeof saved.values?.[input.name]!=="string")continue;
+      if(input.type==="radio")input.checked=input.value===saved.values[input.name];else input.value=saved.values[input.name];
+    }
+    saveDialogDraft();notice("Незавершённый ввод восстановлен. Проверьте данные перед подтверждением.");
+  }
+  function dialog(title,content,submit,label="Подтвердить",draft=null) {
+    clearDialogDraft();if(draft){saveLocal();dialogDraft={...draft,context:dialogContext()};}
+    $("dialog-title").textContent=title;$("dialog-content").innerHTML=content;$("dialog-error").textContent="";$("dialog-submit").textContent=label;$("dialog-submit").hidden=!submit;dialogSubmit=submit;$("dialog").showModal();saveDialogDraft();
+  }
+  $("dialog-form").addEventListener("input",saveDialogDraft);$("dialog-form").addEventListener("change",saveDialogDraft);
+  $("dialog").addEventListener("close",()=>{if(!$("dialog").open)clearDialogDraft();});
+  $("dialog-form").onsubmit=event=>{event.preventDefault();void working(async()=>{if(dialogDraft&&JSON.stringify(dialogDraft.context)!==JSON.stringify(dialogContext())){clearDialogDraft();$("dialog").close();throw Error("Данные заказа изменились. Проверьте заказ и откройте действие снова.");}if(dialogSubmit)await dialogSubmit(new FormData($("dialog-form")));if(!state.frozen){clearDialogDraft();$("dialog").close();}});};
   const field=(name,label,type="text",value="",attrs="")=>`<label>${esc(label)}<input name="${name}" type="${type}" value="${esc(value)}" ${attrs}></label>`;
   function renderRecovery(){
     $("recovery").hidden=!state.pending&&!state.legacy;
@@ -160,7 +191,7 @@
   function pricing(order){return order.lines.some(l=>l.pricingUnavailable)?null:order.totals?.netAmount??order.lines.reduce((n,l)=>n+Math.round(l.total*100),0)/100;}
   function quickLines(){return state.quick.lines.map(l=>{const item=state.data.menu.find(m=>m.id===l.menuItemId);const valid=item&&typeof item.salePrice==="number"&&Number.isFinite(item.salePrice)&&Math.abs(item.salePrice*100-Math.round(item.salePrice*100))<0.000001;return {...l,name:item?.name||l.name||"Недоступная позиция",unitPrice:valid?item.salePrice:null,total:valid?Math.round(item.salePrice*100)*l.quantity/100:null};});}
   function quickTotal(){const lines=quickLines();return lines.some(l=>l.total==null)?null:lines.reduce((n,l)=>n+Math.round(l.total*100),0)/100;}
-  const badge=o=>`<span class="badge ${o.precheck||o.status==="PRECHECK"?"precheck":""}">${o.precheck||o.status==="PRECHECK"?"Предчек":"Открыт"}</span>`;
+  const badge=o=>`<span class="badge ${o.precheck||o.status==="PRECHECK"?"precheck":""}">${o.status==="CANCELLED"?"Отменён":o.status==="PAID"?"Оплачен":o.precheck||o.status==="PRECHECK"?"Предчек":"Открыт"}</span>`;
   function orderCard(o,owner){const total=o.totals?.netAmount===null?null:o.totals?.netAmount??pricing(o);return `<button class="order-card" data-order="${esc(o.id)}"><strong>Стол ${esc(o.tableNumber)}</strong><span class="muted">${esc(owner||o.createdBy?.name||"")}</span><b>${esc(amount(total))} <span class="currency">${esc(currency())}</span></b>${badge(o)}<span class="card-arrow">${icon("chevron-right")}</span></button>`;}
   function render(){
     if(!state.data||state.frozen)return;
@@ -297,7 +328,7 @@
         result=await mutate("/api/sales-events",{action:"post",command,previewHash:preview.previewHash});
       }
       state.orderId=null;state.view="receipts";render();notice(result.duplicate?"Оплата уже была сохранена. Повторного списания нет.":"Продажа проведена и сохранена в общем журнале.");
-    },"Подтвердить оплату");
+    },"Подтвердить оплату",{kind:"payment"});
   }
   function showReceipt(id){
     const event=state.data.events.find(e=>e.id===id)||state.overview?.staff.flatMap(s=>s.paidReceipts).find(e=>e.id===id);if(!event)return;
@@ -386,7 +417,7 @@
           if(selectedOrder())await orderAction("add_items",{lines:[{id:uuid(),menuItemId:item.id,quantity:count}]});
           else{const existing=state.quick.lines.find(l=>l.menuItemId===item.id);if(existing){if(existing.quantity+count>999)throw Error("В одной позиции до 999 штук.");existing.quantity+=count;}else{if(state.quick.lines.length>=100)throw Error("В одном чеке до 100 позиций.");state.quick.lines.push({id:uuid(),menuItemId:item.id,quantity:count,name:item.name});}saveLocal();}
           render();notice("Позиция добавлена.");
-        },"Добавить");
+        },"Добавить",{kind:"add",id:item.id});
       }else if(button.dataset.increaseLine||button.dataset.decreaseLine||button.dataset.editQuantity){
         if(state.pending||state.legacy)return;
         const id=button.dataset.increaseLine||button.dataset.decreaseLine||button.dataset.editQuantity,order=selectedOrder(),line=(order?order.lines:state.quick.lines).find(l=>l.id===id);if(!line)return;
@@ -397,7 +428,7 @@
           else{state.quick.lines=state.quick.lines.flatMap(l=>l.id!==id?[l]:count?[{...l,quantity:count}]:[]);saveLocal();}
           render();notice(count?"Количество сохранено.":"Позиция удалена до предчека.");
         };
-        if(button.dataset.editQuantity)dialog("Количество · "+line.name,field("quantity","Количество, шт.","number",line.quantity,"required min=0 max=999 step=1 inputmode=numeric")+'<p>Ноль удалит неоплаченную позицию. После выдачи предчека сначала нужна его отмена руководителем.</p>',async form=>apply(Number(form.get("quantity"))),"Сохранить количество");
+        if(button.dataset.editQuantity)dialog("Количество · "+line.name,field("quantity","Количество, шт.","number",line.quantity,"required min=0 max=999 step=1 inputmode=numeric")+'<p>Ноль удалит неоплаченную позицию. После выдачи предчека сначала нужна его отмена руководителем.</p>',async form=>apply(Number(form.get("quantity"))),"Сохранить количество",{kind:"quantity",id});
         else await apply(line.quantity+(button.dataset.increaseLine?1:-1));
       }else if(button.dataset.cancelLine){if(!senior())return;if(selectedOrder())reasonAction("Отменить позицию","cancel_item",{lineId:button.dataset.cancelLine});else{state.quick.lines=state.quick.lines.filter(l=>l.id!==button.dataset.cancelLine);saveLocal();render();}}
       else if(button.dataset.waiter!==undefined){state.waiter=button.dataset.waiter;state.detailTab="tables";render();window.scrollTo({top:0,behavior:"instant"});}
@@ -427,7 +458,7 @@
   void (async()=>{
     try{
       const value=await load();if(!accept(value))return;restoreLocal();try{const view=JSON.parse(sessionStorage.getItem(storageKey()+":unpaid")||"null");if(view){state.unpaidOrderId=view.orderId;state.unpaidReasons=view.reasons||{}}}catch{}render();
-      notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"");
+      notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"");restoreDialogDraft();
       refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!navigationLoading&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
     }catch(error){errorView(error);}
   })();

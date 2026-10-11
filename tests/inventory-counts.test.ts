@@ -480,3 +480,28 @@ test("blind A4 print sheet uses the inventory snapshot and never prints expected
   assert.doesNotMatch(html, /Учёт|Ожидаем|expected|averageUnitCost|inventoryValue/);
   assert.equal((html.match(/<tr>/g) ?? []).length, 141);
 });
+
+test("canonical ASCII kg/l package labels never become piece count units", () => {
+  const document = createInventoryCountDocument({
+    assortment: {
+      nomenclature: [
+        { productKey: "coffee-kg", name: "Coffee", unit: "kg", packageSize: "1 kg", packageAmount: 1 },
+        { productKey: "milk-l", name: "Milk", unit: "l", packageSize: "1 l", packageAmount: 1 },
+      ],
+      stockBalances: [
+        { productKey: "coffee-kg", name: "Coffee", unit: "kg", current: 4.86, packageSize: "1 kg", packageAmount: 1 },
+        { productKey: "milk-l", name: "Milk", unit: "l", current: 75.2, packageSize: "1 l", packageAmount: 1 },
+      ],
+    },
+    venueId: 1, sequenceNumber: 12, scope: { type: "all", label: "Весь склад" }, accountingCurrency: "PMR_RUB", creator,
+  });
+  assert.equal(document.items.length, 2);
+  const coffee = document.items.find((item) => item.productKey === "coffee-kg")!;
+  const milk = document.items.find((item) => item.productKey === "milk-l")!;
+  assert.equal(coffee.entryUnit, "уп.");
+  assert.equal(milk.entryUnit, "бут.");
+  assert.equal(coffee.entryFactor, 1);
+  assert.equal(milk.entryFactor, 1);
+  assert.equal(coffee.expected, 4.86);
+  assert.equal(milk.expected, 75.2);
+});
