@@ -76,15 +76,15 @@
     },
     "scripts/lib/reference-slice-recovery-compare.mjs": {
       "before": "c07025badd6df36dfac836f0a04059174fcb1adcf24d6f7d6bd8999acf36f9cf",
-      "after": "57cdc646cd719f618702136f1294414600efc1438c6a27ac9b450fbd3a622974"
+      "after": "f5033b5eb0c01f905f03b1fbed2fee27e9957be19dee939c8d67503a137921f1"
     },
     "scripts/lib/released-reports-more-parity.mjs": {
       "before": null,
-      "after": "08b3de10cda013ecc8ecf3bbe77c2c2c4f0fd51fe9a83ff87f144788cc19a412"
+      "after": "58fe04f5a233b1af08f26a6cfd58f60f6452c21e9d0c97a0f45d6d27c5aadd12"
     },
     "scripts/reference-slice-recovery-parity.mjs": {
       "before": "a070cca32f868afe39cd89fe9fad0e0b5410e3798592de6e32258adfe7486058",
-      "after": "701a0a06d503adfac285d665c2815973beb38867b9ffd6c9343029bd42cc08f4"
+      "after": "268e3ea0e1d16b6db5381f23ff4251de806c1504d33acc6a0c03c455d51e33aa"
     },
     "scripts/patch-monthly-return-v516.mjs": {
       "before": "572f17238a44ed37b1be13fd35e125fbcd7e626640ad11534510d4f6fc5e9812",
@@ -92,7 +92,7 @@
     },
     "scripts/lib/released-module-parity.mjs": {
       "before": null,
-      "after": "3f5cce9038a01a709df34f38c5ba23b07f879bae8134cb5e65c0bc429a2b6f8d"
+      "after": "bb6d3a9151ce034efec25756edc2be0d3da63831eca30f956067ce593153ea11"
     },
     "scripts/recheck-released-parity-390.mjs": {
       "before": null,
@@ -209,6 +209,10 @@
     "app/sales-import/route.ts": {
       "before": "752de142add6538e11a0cc361658be8709d06422af57eb17ae4f441608b40f43",
       "after": "c5bb975b8b46135c13311a9311e5f4cd1dcae111e8e658ebf4de1aa62d52cd7d"
+    },
+    "scripts/recheck-chromium-parity-ci-snapshots.mjs": {
+      "before": null,
+      "after": "3ededec44842f9b02d36961147c9a5c902e3de749c3a9f989c373194989cfdac"
     }
   }
 }

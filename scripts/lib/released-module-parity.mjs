@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {normalized, reportLinks, releasedEntries, reportMasterLabel, releasedReportAction, assertSalesEntry,releasedViewport} from './released-reports-more-parity.mjs';
 
-// Only the deterministic owner fixture at WebKit 390/820/1280. Source provenance and
+// Only the deterministic owner fixture at individually audited WebKit and Chromium 390/820/1280. Source provenance and
 // independently captured before/after records are pinned by the unit fixtures.
 export const releasedModulePaths = new Set([
   '/finance','/opportunities','/reviews','/warehouse','/month-closing',

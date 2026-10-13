@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-// Narrow v517 expectations for the October owner fixture, WebKit 390/820/1280 only.
+// Narrow v517 expectations for the October owner fixture and independently audited engine/width profiles.
 // These transform historical expectations, never filter candidate controls.
 export const reportDayLabel = '2 окт.Выручка 200,00 MDL · Себестоимость — · ФОТ Неизвестно · Постоянные 3,00 MDLНеизвестно';
 export const reportMasterLabel = 'Мастер закрытия месяца8 последовательных проверок→';
@@ -11,7 +11,10 @@ export function releasedActionLabel(path, label) {
   return label;
 }
 export const normalized = value => value.replace(/[\d.,]+/g, '').trim().replace(/\s+/g, ' ');
-export const releasedViewport = (engine,width) => engine === 'webkit' && [390,820,1280].includes(width);
+// Each engine is backed by its own immutable snapshots and negative controls.
+// This is not a fallback for unmeasured browsers or intermediate widths.
+export const releasedProfiles = Object.freeze({webkit:Object.freeze([390,820,1280]),chromium:Object.freeze([390,820,1280])});
+export const releasedViewport = (engine,width) => Object.hasOwn(releasedProfiles,engine) && releasedProfiles[engine].includes(width);
 export function releasedScope(path, before, engine, width) {
   return releasedViewport(engine,width) &&
     ((path === '/reports' && before.contract.type === 'report') ||

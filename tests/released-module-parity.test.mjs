@@ -98,16 +98,17 @@ test('query routes require full controls; source-specific transitions do not spr
   }
   assert.equal(releasedModuleScope('/finance?addExpense=1',captured.v485['/finance'].before,'webkit',390),false);
   assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'webkit',1024),false);
-  assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'chromium',390),false);
+  assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'firefox',390),false);
   assert.notEqual(evaluate(captured,itemFor('/sales-entry'),'webkit',1280).verdict,'PASS');
 });
-test('all newly allowed product controls and copy already exist unchanged in production v517',()=>{
-  const baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
-  for(const path of ['public/reviews.js','public/opportunities.js','public/supplier-alternatives.js','public/navigation-contract-v247.js','scripts/patch-pos1-hardening.mjs','scripts/patch-operational-day-phase1a.mjs'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',baseline+':'+path],{maxBuffer:16*1024*1024}),path);
+test('released controls derive from v517 with the separately approved workday reconciliation pinned',()=>{
+  const baseline='691ab51840266c9b6297fda7a84ee2077694a75f',workdayRepair='269d7436bef3aed158988df140bddfe12846aa81';
+  for(const path of ['public/reviews.js','public/opportunities.js','public/supplier-alternatives.js','public/navigation-contract-v247.js','scripts/patch-pos1-hardening.mjs','scripts/patch-operational-day-phase1a.mjs'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',(path==='scripts/patch-operational-day-phase1a.mjs'?workdayRepair:baseline)+':'+path],{maxBuffer:16*1024*1024}),path);
   const functions=source=>new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(node=>node.type==='FunctionDeclaration').map(node=>[node.id.name,source.slice(node.start,node.end)]));
   const before=functions(execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString()),after=functions(readFileSync('public/assets/index-BQGspy0I.js','utf8'));
+  const repaired=functions(execFileSync('git',['show',workdayRepair+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString());
   for(const name of ['Tle','bdWarehousePage','bdShiftsPage','bdCashierEntry','bdSalesImportPage','bdSalesPosPage','bdFinanceQuickActionsV160','bdFinanceCanonicalStatusV515','bdMonthlyReasonLinkV515','bdMonthlyPendingReasonsV513']) {
-    assert.ok(before.has(name),name+' released');assert.equal(after.get(name),before.get(name),name+' unchanged');
+    assert.ok(before.has(name),name+' released');assert.equal(after.get(name),name==='bdShiftsPage'?repaired.get(name):before.get(name),name+' exact approved implementation');
   }
   // Copy transformations use the existing normalization, never erase extra errors.
   assert.equal(normalized('1. ФОТ, налоги'),'ФОТ налоги');

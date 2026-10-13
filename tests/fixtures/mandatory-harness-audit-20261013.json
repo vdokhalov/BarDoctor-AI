@@ -1424,18 +1424,18 @@
     },
     "scripts/lib/reference-slice-recovery-compare.mjs": {
       "hits": [],
-      "sha256": "57cdc646cd719f618702136f1294414600efc1438c6a27ac9b450fbd3a622974",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "f5033b5eb0c01f905f03b1fbed2fee27e9957be19dee939c8d67503a137921f1",
+      "review": "Chromium independently audited at390/820/1280; exact released controls/contracts retained, capture engine/width validated, More Sales and renamed Reports click/reload required. No full browser rerun."
     },
     "scripts/lib/released-module-parity.mjs": {
       "hits": [],
-      "sha256": "3f5cce9038a01a709df34f38c5ba23b07f879bae8134cb5e65c0bc429a2b6f8d",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "bb6d3a9151ce034efec25756edc2be0d3da63831eca30f956067ce593153ea11",
+      "review": "Chromium independently audited at390/820/1280; exact released controls/contracts retained, capture engine/width validated, More Sales and renamed Reports click/reload required. No full browser rerun."
     },
     "scripts/lib/released-reports-more-parity.mjs": {
       "hits": [],
-      "sha256": "08b3de10cda013ecc8ecf3bbe77c2c2c4f0fd51fe9a83ff87f144788cc19a412",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "58fe04f5a233b1af08f26a6cfd58f60f6452c21e9d0c97a0f45d6d27c5aadd12",
+      "review": "Chromium independently audited at390/820/1280; exact released controls/contracts retained, capture engine/width validated, More Sales and renamed Reports click/reload required. No full browser rerun."
     },
     "scripts/menu-consumption-browser-qa-v418.cjs": {
       "hits": [],
@@ -1625,8 +1625,8 @@
           "text": "locator=locator.first();await locator.waitFor({state:'visible'});if(item.entryScope==='legacy-diagnosis'){await locator.click({trial:true});record.actions[item.id]={activation:'PASS (actual run tested in separate isolated legacy diagnosis fixture)',handler:'Uce.A → POST /api/ai/diagnosis'};continue;}"
         }
       ],
-      "sha256": "701a0a06d503adfac285d665c2815973beb38867b9ffd6c9343029bd42cc08f4",
-      "review": "NO EXECUTED DIAGNOSIS: trial-only actionability; actual consent+handler coverage delegated to mandatory legacy Doctor harness."
+      "sha256": "268e3ea0e1d16b6db5381f23ff4251de806c1504d33acc6a0c03c455d51e33aa",
+      "review": "Chromium independently audited at390/820/1280; exact released controls/contracts retained, capture engine/width validated, More Sales and renamed Reports click/reload required. No full browser rerun."
     },
     "scripts/restricted-manager-403-browser.mjs": {
       "hits": [],

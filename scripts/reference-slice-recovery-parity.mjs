@@ -12,9 +12,10 @@ const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require(
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const masterOnly=process.env.BD_RECOVERY_RECHECK==='reports-master-390';
 const remaining=process.env.BD_RECOVERY_RECHECK==='remaining-18-390';
-const narrow=remaining||masterOnly||process.env.BD_RECOVERY_RECHECK==='reports-more-390';
-if(narrow){assert.equal(engine,'webkit');assert.equal(process.env.BD_RECOVERY_WIDTH,'390');assert.notEqual(process.env.BD_RECOVERY_RESUME,'unfinished','Fresh two-page snapshots required');}
-const out='outputs/reference-slice-recovery/'+(remaining?'remaining-18-390-':masterOnly?'reports-master-390-':narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
+const chromiumNarrow=process.env.BD_RECOVERY_RECHECK==='chromium-reports-more';
+const narrow=chromiumNarrow||remaining||masterOnly||process.env.BD_RECOVERY_RECHECK==='reports-more-390';
+if(narrow){if(chromiumNarrow){assert.equal(engine,'chromium');if(process.env.BD_RECOVERY_WIDTH)assert.ok([390,820,1280].includes(Number(process.env.BD_RECOVERY_WIDTH)));}else{assert.equal(engine,'webkit');assert.equal(process.env.BD_RECOVERY_WIDTH,'390');}assert.notEqual(process.env.BD_RECOVERY_RESUME,'unfinished','Fresh two-page snapshots required');}
+const out='outputs/reference-slice-recovery/'+(chromiumNarrow?'reports-more-audited-':remaining?'remaining-18-390-':masterOnly?'reports-master-390-':narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
 const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v485-functional-inventory.json','utf8'));
 if(remaining){const scope=JSON.parse(readFileSync('tests/fixtures/p0-parity-remaining-390.json','utf8'));inventory.items=inventory.items.filter(item=>scope.paths.includes(item.path)||scope.actions.includes(item.id));assert.equal(new Set(inventory.items.map(item=>item.path??item.from)).size,18);assert.equal(inventory.items.length,22);}
 else if(narrow){const ids=new Set(['route:/reports','route:/more','context:/reports:Продолжить закрытие','context:/reports:'+reportDayLabel]);inventory.items=inventory.items.filter(item=>ids.has(item.id));assert.equal(inventory.items.length,4);if(masterOnly)inventory.items=inventory.items.filter(item=>item.id==='route:/reports'||item.id==='context:/reports:Продолжить закрытие');}
@@ -218,6 +219,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
     }
     finally{writeFileSync(`${out}/${version}-${width}-requests.json`,JSON.stringify(runtime.requests,null,2));writeFileSync(`${out}/${version}-${width}-runtime-errors.json`,JSON.stringify(errors,null,2));await context.close();await runtime.close();}
   }
+  versions.capture={engine,width};writeFileSync(`${out}/capture-${width}.json`,JSON.stringify(versions.capture));
   const {compareRecoveryParity}=await import('./lib/reference-slice-recovery-compare.mjs');
   matrix.push(...compareRecoveryParity(inventory,versions,engine,width));
   for(const row of matrix.filter(row=>row.width===width&&row.verdict!=='PASS'))console.error(JSON.stringify({parityFailure:row}));
