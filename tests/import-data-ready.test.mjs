@@ -1,0 +1,3 @@
+import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import {importDataReady} from './helpers/import-data-ready.mjs';
+const ready=({rows=12,count=15,notice='',venue='Atelier'}={})=>vm.runInNewContext('('+importDataReady.toString()+')(12)',{document:{querySelector:s=>s==='#quality-list'?{querySelectorAll:()=>Array(rows)}:s==='#quality-count'?{textContent:String(count)}:s==='#notice'?{textContent:notice}:{textContent:venue}}});
+test('visible Import alone cannot start idle; data rows, cleared loading notice and venue are required',()=>{assert.equal(ready(),true);for(const state of [{rows:0},{rows:11},{count:0},{notice:'Загружаем журнал…'},{notice:'Ошибка загрузки'},{venue:'Loading'}])assert.equal(ready(state),false);});

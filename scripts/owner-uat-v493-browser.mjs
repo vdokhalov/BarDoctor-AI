@@ -1,3 +1,4 @@
+import {confirmDoctorAction} from '../tests/helpers/doctor-confirmation.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
@@ -32,12 +33,7 @@ try{for(const width of doctorOnly?[390]:[390,820,1280]){
   await page.getByRole('button',{name:'Открыть AI Doctor',exact:true}).click();await page.waitForURL(u=>u.pathname==='/analysis');
   const run=page.getByRole('button',{name:'Запустить диагностику',exact:true});await run.waitFor();
   let injected=false;await page.route('**/api/ai/diagnosis',route=>{if(!injected){injected=true;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,error:'Isolated QA negative control'})});}return route.continue();});
-  const confirmRun=async button=>{
-   const dialogPromise=page.waitForEvent('dialog');
-   const clicked=button.click();const dialog=await dialogPromise;
-   assert.equal(dialog.type(),'confirm');assert.match(dialog.message(),/^Платный AI Doctor: один запрос, до 8000 выходных токенов\./);
-   await dialog.accept();await clicked;
-  };
+  const confirmRun=button=>confirmDoctorAction(page,button);
   const rejected=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/ai/diagnosis'&&response.status()===503);
   await confirmRun(run);assert.equal((await(await rejected).json()).success,false);assert.equal(injected,true);assert.equal(model.calls.length,0);
   await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();

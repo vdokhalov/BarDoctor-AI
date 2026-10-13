@@ -1,3 +1,4 @@
+import {waitForImportData} from '../tests/helpers/import-data-ready.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync,existsSync,mkdirSync,writeFileSync } from 'node:fs';
@@ -112,9 +113,21 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
   assert.ok(pass,'FIRST GESTURE '+label+' '+id);assert.deepEqual(errors,[]);
  }
  async function stable(label:string){const before=await metrics();await p.waitForTimeout(300);const after=await metrics();writeFileSync(out+'/'+id+'-stable-'+label.replace(/[^a-z0-9]+/gi,'-')+'.json',JSON.stringify({id,label,before,after},null,2));checks.push({label,unexpectedScroll:after.scrollTop-before.scrollTop,heightDelta:after.documentHeight-before.documentHeight,observerDelta:((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks)});assertIdleScroll(before,after,label+' '+id);}
+ async function importReadyAndIdle(release=()=>{}){
+  const before=await metrics();release();await waitForImportData(f());const ready=await metrics();
+  // Data may add rows; loading must not move the current reading position or entry.
+  assert.ok(Math.abs(ready.scrollTop-before.scrollTop)<=1,'Import loading moved scroll');
+  const entry=(m:typeof before)=>m.blocks.find(b=>b?.id==='import-entry')!;
+  assert.ok(Math.abs(entry(ready).rect.y-entry(before).rect.y)<=1,'Import loading moved entry');
+  checks.push({label:'Import data completion',before,ready});
+  await stable('import idle');
+ }
  async function toTop(){await f().evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));}
  async function readyJournal(){await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();await l('.journal-row').first().waitFor();}
  try {
+ if(process.env.BD_SCROLL_IMPORT_ONLY==='1'){
+  holdSalesReads();await p.goto(base+'/sales-import?venue='+venue+'&view=import');await l('#import-entry:not([hidden])').waitFor();await gesture('J import first');await gesture('J import repeated');await importReadyAndIdle(releaseReads);assert.deepEqual(errors,[]);results.push({id,scope:'import-only',pass:true,checks:checks.length});console.log(id+' IMPORT PASS '+checks.length);continue;
+ }
  if(process.env.BD_SCROLL_CLEAN_IMPORT==='1'){
   apiDelay=1200;holdSalesReads();await p.goto(base+'/sales-import?venue='+venue+'&view=import');await l('#import-entry').waitFor();await gesture('clean Import during load',120);
   const before=await l('#import-metrics').boundingBox(),start=await metrics();releaseReads();await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();const after=await l('#import-metrics').boundingBox(),end=await metrics();
@@ -151,7 +164,7 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  const importUrl=new URL(p.url());importUrl.searchParams.set('embedded','1');
  await f().waitForFunction(previous=>performance.timeOrigin!==previous,importPreviousDocument);
  await f().waitForURL(importUrl.href,{waitUntil:'domcontentloaded'});
- await l('#import-entry:not([hidden])').waitFor();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');await gesture('J import repeated');await stable('import idle');await p.screenshot({path:out+'/'+id+'-import.png'});
+ await l('#import-entry:not([hidden])').waitFor();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');await gesture('J import repeated');await importReadyAndIdle();await p.screenshot({path:out+'/'+id+'-import.png'});
  await toTop();await l('#quality-list [data-batch]').first().tap();await l('.mapping-select select').first().waitFor();if(width===390)assert.ok(await l('.mapping-select select').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('.mapping-select select').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('.mapping-select select').first().blur();await p.setViewportSize({width,height});await gesture('keyboard import mapping restored');await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await toTop();const journalPreviousDocument=await f().evaluate(()=>performance.timeOrigin);await l('[data-sales-view="journal"]').tap();
  await p.waitForURL(url=>!url.searchParams.has('view')||url.searchParams.get('view')==='journal');
  const journalUrl=new URL(p.url());journalUrl.searchParams.set('embedded','1');

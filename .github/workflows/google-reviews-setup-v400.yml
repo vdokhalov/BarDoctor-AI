@@ -268,6 +268,7 @@ jobs:
           path: |
             outputs/reference-slice-recovery/chromium
             outputs/reference-slice-recovery/legacy-doctor-chromium
+            outputs/owner-qa-regressions/chromium
       - name: Phase 2 unified menu ingestion mobile desktop isolated HTTP
         run: node --import tsx scripts/menu-ingestion-phase2-browser.ts
       - name: Phase 3 menu consumption browser QA
@@ -396,6 +397,7 @@ jobs:
           name: sales-navigation-timings
           path: |
             outputs/sales-navigation-performance/ci
+            outputs/owner-qa-regressions/webkit
             outputs/finance-inputs-phase3a6/webkit
             outputs/v495-rca
             outputs/owner-uat-v493
