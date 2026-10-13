@@ -14,6 +14,10 @@ test("A/B/C: independent posted sales, open provisional -> closed final, unchang
   assert.equal((await r.days()).days[0].status, "OPERATING");
   const shift = resolvedEvidence((await r.resolve(r.reference("CASH_SHIFT", "evidence-shift"))).body).reference;
   await r.command("sales", { action: "close_shift", shiftId: "evidence-shift" });
+  // Closing cash does not close the separately persisted workday. Keep that
+  // contract, then model this case's absent operational data explicitly.
+  assert.equal((await r.days()).days[0].status, "OPERATING");
+  r.put("bd_operational_reports_v1", []);
   const closed = await r.prove();
   assert.equal(closed.fact.value, open.fact.value); assert.equal(closed.fact.finality, "FINAL");
   assert.deepEqual(closed.ids, open.ids); assert.equal(closed.fact.factId, open.fact.factId); assert.notEqual(closed.fact.revision, open.fact.revision);
@@ -37,6 +41,10 @@ test("D: venue timezone boundary and overnight shift date are preserved, never r
   revenues[0].date = "2026-09-30"; r.put("bd_finance_revenue", revenues);
   const events = r.get("bd_sales_events_v1") as SalesEvent[];
   events[0].businessDate = "2026-09-30"; events[0].batch.businessDate = "2026-09-30"; r.put("bd_sales_events_v1", events);
+  // The overnight cash session and its required workday belong to the same
+  // business date; changing only sales/Finance leaves an invalid fixture.
+  const reports = r.get("bd_operational_reports_v1") as Record<string, unknown>[];
+  reports[0].date = "2026-09-30"; r.put("bd_operational_reports_v1", reports);
   await r.post("overnight", "whisky");
   const overnight = await r.prove("2026-09-30");
   assert.equal(overnight.fact.value, 60); assert.equal(overnight.ids.size, 2);
