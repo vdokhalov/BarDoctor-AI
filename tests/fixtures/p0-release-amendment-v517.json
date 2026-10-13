@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery, scoped Reports/More390 parity diagnostics and minimal Reports launcher route repair for month/venue/closeMonth/reload/Back; no calculation changes",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for scoped WebKit390, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -76,7 +76,7 @@
     },
     "scripts/lib/reference-slice-recovery-compare.mjs": {
       "before": "c07025badd6df36dfac836f0a04059174fcb1adcf24d6f7d6bd8999acf36f9cf",
-      "after": "509c7f6d0aa3daeab29d88ff3296a82cc587c566247ce959e3cab02c563de034"
+      "after": "19c9241176b2bc87c9d9692945f5403010c7ac90a004b1442719c344ae1fb419"
     },
     "scripts/lib/released-reports-more-parity.mjs": {
       "before": null,
@@ -89,6 +89,14 @@
     "scripts/patch-monthly-return-v516.mjs": {
       "before": "572f17238a44ed37b1be13fd35e125fbcd7e626640ad11534510d4f6fc5e9812",
       "after": "e91c3bbbaf1abc93bdf6c995fd04a4f48c10512bf114304d162bae6ea5d97d14"
+    },
+    "scripts/lib/released-module-parity.mjs": {
+      "before": null,
+      "after": "816700647535ff6c506fb5e2f544e852406ef59fbe048ed6c56aa4314940fc20"
+    },
+    "scripts/recheck-released-parity-390.mjs": {
+      "before": null,
+      "after": "908eb24e2f3f8987a6f88fc53365de24ae240dbd641af5490906c6f1afa47a27"
     }
   }
 }
