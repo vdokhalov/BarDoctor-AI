@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -33,6 +34,7 @@ test("warehouse inventory tab exposes draft continuation and immutable completed
 
 test("inventory workflow preserves all warehouse entry points", async () => {
   const bundle = await read("public/assets/index-BQGspy0I.js");
+  assertCanonicalSalesEntry(bundle);
   for (const label of [
     "Остатки",
     "Движения",
@@ -40,7 +42,6 @@ test("inventory workflow preserves all warehouse entry points", async () => {
     "Списания",
     "Провести инвентаризацию",
     "Сканировать ведомость",
-    "Импортировать продажи",
     "Добавить покупку",
     "Номенклатура",
     "Требуют распределения",

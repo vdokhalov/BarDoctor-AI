@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -49,10 +50,10 @@ test("warehouse v241 keeps controls compact, complete and fully actionable", asy
   assert.match(response, /accounting-currency-v243/);
   assert.match(preview, /accounting-currency-v243/);
 
+  assertCanonicalSalesEntry(bundle);
   for (const label of [
     "Провести инвентаризацию",
     "Сканировать ведомость",
-    "Импортировать продажи",
     "Добавить покупку",
     "Остатки",
     "Движения",

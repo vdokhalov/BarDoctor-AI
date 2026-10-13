@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -56,10 +57,10 @@ test("warehouse v240 keeps all existing actions, tabs and product flows", async 
   assert.ok(start >= 0 && end > start);
   const implementation = bundle.slice(start, end);
 
+  assertCanonicalSalesEntry(bundle);
   for (const label of [
     "Провести инвентаризацию",
     "Сканировать ведомость",
-    "Импортировать продажи",
     "Добавить покупку",
     "Остатки",
     "Движения",

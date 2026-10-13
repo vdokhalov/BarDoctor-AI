@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -132,7 +133,7 @@ test("warehouse reads canonical names from nomenclature and remains operational"
 
   assert.match(bundle, /function bdWarehouseCanonicalBalances/);
   assert.match(bundle, /\[N,E\]=S\.useState\(\(\)=>bdWarehouseCanonicalBalances\(xr\("bd_assortment_v1"\)\)\)/);
-  assert.match(bundle, /const Se=\{stock:"Остатки",movements:"Движения",sales:"Продажи",counts:"Инвентаризации",writeoffs:"Списания"\}/);
+  assert.match(bundle, /const Se=\{stock:"Остатки",movements:"Движения",counts:"Инвентаризации",writeoffs:"Списания"\}/);
   assert.match(bundle, /children:"Товары на складе"/);
   assert.match(bundle, /className:"bd-warehouse-nomenclature-link-v241","aria-label":"Настроить структуру склада",onClick:\(\)=>e\("\/nomenclature\?view=taxonomy&returnTo=warehouse"\)/);
   assert.match(bundle, /function bdWarehouseGroupedStock/);
@@ -144,7 +145,7 @@ test("warehouse reads canonical names from nomenclature and remains operational"
   assert.match(bundle, /bd-warehouse-subcategory-v214/);
   assert.match(bundle, /bdInventoryCountSheet/);
   assert.match(bundle, /bdWriteoffSheet/);
-  assert.match(bundle, /data-bd-warehouse-sales-entry/);
+  assertCanonicalSalesEntry(bundle);
   assert.match(bundle, /async function bdWarehouseRepairProducts\(\)\{try\{const [A-Za-z]+=await fetch\("\/api\/inventory\/products",\{method:"POST",credentials:"include",headers:\{"Content-Type":"application\/json",\.\.\.ca\(Ot\(\)\)\},body:JSON\.stringify\(\{action:"repair"\}\)\}\)/);
   assert.match(bundle, /title:"Очистка дублей не выполнена"/);
   assert.match(bundle, /title:"Дубли объединены"/);
