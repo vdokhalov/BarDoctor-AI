@@ -1,0 +1,28 @@
+{
+  "paths": [
+    "/finance",
+    "/opportunities",
+    "/reviews",
+    "/warehouse",
+    "/month-closing",
+    "/cashier",
+    "/sales-entry",
+    "/sales-import",
+    "/supplier-alternatives",
+    "/shifts",
+    "/warehouse?writeoff=new",
+    "/warehouse?inventory=new",
+    "/warehouse?product=qa-stock",
+    "/finance?repairEquipmentId=qa-equipment",
+    "/finance?closeShift=1",
+    "/shifts?closeShift=1",
+    "/reports?closeMonth=1",
+    "/finance/settings"
+  ],
+  "actions": [
+    "context:/finance:Есть расхождение остатков",
+    "context:/finance:Мастер закрытия месяца",
+    "context:/warehouse:Импортировать продажиСписать по техкартам",
+    "context:/warehouse:Продажи"
+  ]
+}

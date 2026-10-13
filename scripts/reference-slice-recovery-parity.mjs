@@ -11,11 +11,13 @@ import {installApiReadTracker} from './qa/api-read-tracker.mjs';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require('./browser-runtime.cjs');
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const masterOnly=process.env.BD_RECOVERY_RECHECK==='reports-master-390';
-const narrow=masterOnly||process.env.BD_RECOVERY_RECHECK==='reports-more-390';
+const remaining=process.env.BD_RECOVERY_RECHECK==='remaining-18-390';
+const narrow=remaining||masterOnly||process.env.BD_RECOVERY_RECHECK==='reports-more-390';
 if(narrow){assert.equal(engine,'webkit');assert.equal(process.env.BD_RECOVERY_WIDTH,'390');assert.notEqual(process.env.BD_RECOVERY_RESUME,'unfinished','Fresh two-page snapshots required');}
-const out='outputs/reference-slice-recovery/'+(masterOnly?'reports-master-390-':narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
+const out='outputs/reference-slice-recovery/'+(remaining?'remaining-18-390-':masterOnly?'reports-master-390-':narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
 const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v485-functional-inventory.json','utf8'));
-if(narrow){const ids=new Set(['route:/reports','route:/more','context:/reports:Продолжить закрытие','context:/reports:'+reportDayLabel]);inventory.items=inventory.items.filter(item=>ids.has(item.id));assert.equal(inventory.items.length,4);if(masterOnly)inventory.items=inventory.items.filter(item=>item.id==='route:/reports'||item.id==='context:/reports:Продолжить закрытие');}
+if(remaining){const scope=JSON.parse(readFileSync('tests/fixtures/p0-parity-remaining-390.json','utf8'));inventory.items=inventory.items.filter(item=>scope.paths.includes(item.path)||scope.actions.includes(item.id));assert.equal(new Set(inventory.items.map(item=>item.path??item.from)).size,18);assert.equal(inventory.items.length,22);}
+else if(narrow){const ids=new Set(['route:/reports','route:/more','context:/reports:Продолжить закрытие','context:/reports:'+reportDayLabel]);inventory.items=inventory.items.filter(item=>ids.has(item.id));assert.equal(inventory.items.length,4);if(masterOnly)inventory.items=inventory.items.filter(item=>item.id==='route:/reports'||item.id==='context:/reports:Продолжить закрытие');}
 else if(process.env.BD_RECOVERY_RECHECK){const paths=process.env.BD_RECOVERY_RECHECK==='pos'?['/cashier','/team-access']:process.env.BD_RECOVERY_RECHECK==='compatibility'?['/employees/qa-barista','/warehouse?inventory=new','/data-control?event=qa-event']:['/analysis','/health','/finance?repairEquipmentId=qa-equipment'];inventory.items=inventory.items.filter(i=>paths.includes(i.path??i.from));}
 if(!process.env.BD_RECOVERY_WIDTH){
  const widths=[390,820,1280];
@@ -173,8 +175,8 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
           }
           assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[],item.id+' HTTP 500');
         }
-        if(version==='candidate'&&engine==='webkit'&&width===390&&path==='/more'){
-          await visit(path);const sales=page.getByRole('button',{name:'Продажи',exact:true});
+        if(version==='candidate'&&engine==='webkit'&&width===390&&(path==='/more'||remaining&&path==='/warehouse')){
+          await visit('/more');const sales=page.getByRole('button',{name:'Продажи',exact:true});
           await sales.waitFor({state:'visible'});assert.equal(await sales.isEnabled(),true);
           await sales.click();await page.waitForURL(url=>url.pathname==='/sales-import');await settle();
           const destination=new URL(page.url()).pathname;assert.equal((await state()).venue,String(r.venueId));
@@ -219,7 +221,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
   const {compareRecoveryParity}=await import('./lib/reference-slice-recovery-compare.mjs');
   matrix.push(...compareRecoveryParity(inventory,versions,engine,width));
   for(const row of matrix.filter(row=>row.width===width&&row.verdict!=='PASS'))console.error(JSON.stringify({parityFailure:row}));
-  results.push({engine,width,scope:masterOnly?'Reports master only; not full parity':narrow?'Reports/More only; not full parity':'inventory',parity:inventory.items.length+'/'+inventory.items.length,status:matrix.some(row=>row.width===width&&row.verdict!=='PASS')?'FAIL':'PASS'});
+  results.push({engine,width,scope:remaining?'18 affected origins and 4 changed actions only; not full parity':masterOnly?'Reports master only; not full parity':narrow?'Reports/More only; not full parity':'inventory',parity:inventory.items.length+'/'+inventory.items.length,status:matrix.some(row=>row.width===width&&row.verdict!=='PASS')?'FAIL':'PASS'});
   writeFileSync(`${out}/parity-matrix-${width}.json`,JSON.stringify(matrix.filter(row=>row.width===width),null,2));
 }}finally{await browser.close();baseline.close();writeFileSync(`${out}/results-${process.env.BD_RECOVERY_WIDTH}.json`,JSON.stringify(results,null,2));assert.equal(createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex'),clientHash,'Candidate changed during parity verification');}
 console.log(JSON.stringify(results));
