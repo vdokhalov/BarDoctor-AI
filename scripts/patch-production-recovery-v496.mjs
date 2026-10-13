@@ -3,6 +3,7 @@ import {parse} from 'acorn';
 
 function findFunction(node,name){if(!node||typeof node!=='object')return null;if(node.type==='FunctionDeclaration'&&node.id?.name===name)return node;for(const value of Object.values(node)){for(const child of Array.isArray(value)?value:[value]){const found=findFunction(child,name);if(found)return found;}}return null;}
 function finishBootstrap(boot){
+ boot=boot.replaceAll('controller.abort(); reject(new DOMException("Bootstrap timed out", "TimeoutError"));', 'var timeout = new DOMException("Bootstrap timed out", "TimeoutError"); controller.abort(timeout); reject(timeout);');
  const assignment='    window.__bdAuthBootstrapV274 = result.bootstrap && typeof result.bootstrap.state === "string"\n      ? result.bootstrap\n      : { state: "recovery_required", reason: "bootstrap_contract_missing" };';
  if(!boot.includes('bd-bootstrap-storage-commit-v496')){
   const helper=findFunction(parse(boot,{ecmaVersion:'latest',sourceType:'script'}),'rememberAccessContext');
@@ -46,6 +47,12 @@ Vse:String.raw`function Vse({children:e}){const[t,n]=S.useState(()=>bz()),[r,a]=
 };
 for(const node of parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').sort((a,b)=>b.start-a.start)){
  if(replacements[node.id.name])source=source.slice(0,node.start)+replacements[node.id.name]+source.slice(node.end);
+ else if(node.id.name==='Rse'){
+  const original=source.slice(node.start,node.end),updated=original
+   .replace('setTimeout(()=>n.abort(),15e3)','setTimeout(()=>n.abort(new DOMException("Login timed out","TimeoutError")),15e3)')
+   .replace('a?.name==="AbortError"?', '(a?.name==="TimeoutError"||a?.name==="AbortError")?');
+  source=source.slice(0,node.start)+updated+source.slice(node.end);
+ }
  else if(node.id.name==='bdBootstrapRecoveryV274'){
  const original=source.slice(node.start,node.end);
  let updated=original.replace('onClick:()=>window.location.reload()','onClick:()=>window.__bdRetryBootstrapV496?.()');
@@ -53,6 +60,7 @@ for(const node of parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.
  .replace('children:t?"Заведение','children:bdRecoveryBusyV496?"Проверяем доступ…":t?"Заведение')
  .replace('type:"button",onClick:()=>window.__bdRetryBootstrapV496?.()','type:"button",disabled:bdRecoveryBusyV496,onClick:()=>window.__bdRetryBootstrapV496?.()')
  .replace('children:"Повторить загрузку"','children:bdRecoveryBusyV496?"Проверяем доступ…":"Повторить загрузку"');
+ updated=updated.replace('children:t?"Аккаунт и владение найдены', 'children:bdRecoveryBusyV496?"Загружаем аккаунт. Это может занять несколько секунд.":t?"Аккаунт и владение найдены');
   source=source.slice(0,node.start)+updated+source.slice(node.end);
  }
  else if(node.id.name==='pt'){

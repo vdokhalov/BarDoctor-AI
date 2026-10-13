@@ -8,6 +8,23 @@ const source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
 const functions=new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration').map(n=>[n.id.name,source.slice(n.start,n.end)]));
 const storage=()=>{const data=new Map([['bd_session','qa@isolated.test'],['bd_session_token','qa-only'],['bd_active_venue_id','1']]);return{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k),key:i=>[...data.keys()][i],get length(){return data.size}};};
 const flush=()=>new Promise(done=>setImmediate(done));
+test('login timeout abort carries TimeoutError and returns retryable failure without retry',async()=>{
+ const timers=[];let calls=0,signal;
+ const context=vm.createContext({AbortController,DOMException,hz:'/api/auth',setTimeout:fn=>(timers.push(fn),1),clearTimeout:()=>{},fetch:async(_url,init)=>{calls++;signal=init.signal;return new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));}});
+ vm.runInContext(functions.get('Rse'),context);
+ const pending=context.Rse('qa@isolated.test','fixture-password');timers[0]();const result=await pending;
+ assert.equal(calls,1);assert.equal(signal.reason.name,'TimeoutError');assert.equal(result.ok,false);assert.match(result.error,/слишком много времени/);
+});
+test('recovery loading copy does not claim a failure; terminal failure permits retry',()=>{
+ const window={__bdBootstrapPending:true};
+ const context=vm.createContext({window,Un:()=>({isReady:false}),bdAuthBootstrapV274:()=>({state:'loading'}),i:{jsx:(type,props)=>({type,...props}),jsxs:(type,props)=>({type,...props})}});
+ vm.runInContext(functions.get('bdBootstrapRecoveryV274'),context);
+ const loading=JSON.stringify(context.bdBootstrapRecoveryV274());
+ assert.match(loading,/Загружаем аккаунт/);assert.doesNotMatch(loading,/Не удалось/);assert.match(loading,/"disabled":true/);
+ window.__bdBootstrapPending=false;context.bdAuthBootstrapV274=()=>({state:'error'});
+ const failed=JSON.stringify(context.bdBootstrapRecoveryV274());
+ assert.match(failed,/Не удалось/);assert.match(failed,/Повторить загрузку/);assert.match(failed,/"disabled":false/);
+});
 function provider(fetch,cachedProfile=null){
  const localStorage=storage(),window=new EventTarget(),states=[],refs=[],effects=[];let index=0,ref=0,cacheWrites=0;
  window.__bdBootstrapPending=true;window.__bdAuthBootstrapV274={state:'loading'};
