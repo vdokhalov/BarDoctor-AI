@@ -1680,8 +1680,8 @@
     },
     "scripts/sales-browser-qa-phase5.ts": {
       "hits": [],
-      "sha256": "5c643f01e1da42600755b6d0e0cef56465216181fe5db4dc2361189606e019b8",
-      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+      "sha256": "fe7b92f2d80cce989575ecfe016f501b20977c33fdd58679594f6d2acb3e6fc7",
+      "review": "Opens prerequisite cash shift through real UI before manual sale; preserves OPEN/team workday fixture. Selects persisted shift ID. Cancel/post/retry transaction counts measured after explicit shift-open transaction; cancellation stock equality, unknown cost, exact stock delta, reversal, shift close, venue isolation remain strict. Failure DOM evidence retained."
     },
     "scripts/sales-iphone-browser.ts": {
       "hits": [
