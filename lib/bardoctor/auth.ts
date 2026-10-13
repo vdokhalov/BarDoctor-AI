@@ -149,7 +149,7 @@ export async function synchronizeServerSession(
   return account ? { account, token } : null;
 }
 
-async function sessionForRequest(request: Request, readOnly = false): Promise<{
+async function sessionForRequest(request: Request, readOnly = false, schemaRequest: Request = request): Promise<{
   account: Account;
   activeVenueId: number | null;
 } | null> {
@@ -157,7 +157,7 @@ async function sessionForRequest(request: Request, readOnly = false): Promise<{
   if (!credentials) return null;
   const { email, token } = credentials;
 
-  if (!readOnly) await ensureAuthSchema(request);
+  if (!readOnly) await ensureAuthSchema(schemaRequest);
   const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
   const [row] = await getDb()
@@ -450,11 +450,12 @@ export async function authResult(account: Account, token: string, request?: Requ
   const requestedValue = Number(requestedHeader);
   const rememberedVenueId = request
     ? (await sessionForRequest(new Request(request.url, {
+      signal: request.signal,
       headers: {
         "x-session-email": account.appEmail,
         "x-session-token": token,
       },
-    })))?.activeVenueId ?? null
+    }), false, request))?.activeVenueId ?? null
     : null;
   const requestedVenueId = Number.isInteger(requestedValue) && requestedValue > 0
     ? requestedValue

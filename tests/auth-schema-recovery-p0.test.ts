@@ -10,11 +10,17 @@ test("cold/warm password login and session restoration retain auth and reject in
   const r = await lifecycleRuntime(routes);
   try {
     const user = await r.register("p0@isolated.test");
+    let probes = 0;
+    r.onRead(sql => { if (probe(sql)) probes++; });
     for (let i = 0; i < 2; i++) {
+      probes = 0;
       const response = await r.api.login.POST(r.request(user, "/api/auth/login", "POST", { email: user.email, password }));
       assert.equal(response.status, 200); assert.ok(response.headers.get("set-cookie"));
+      assert.equal(probes, 1, "authResult retains the original login schema scope");
     }
+    probes = 0;
     assert.equal((await r.api.bootstrap.POST(r.request(user, "/api/auth/bootstrap", "POST"))).status, 200);
+    assert.equal(probes, 1, "authResult retains the original bootstrap schema scope");
     const me = await r.api.usersMe.GET(r.request(user, "/api/users/me"));
     assert.equal(me.status, 200); assert.equal((await me.json() as {user:{email:string}}).user.email, user.email);
     const invalid = { ...user, token: "invalid-token" };
@@ -22,6 +28,22 @@ test("cold/warm password login and session restoration retain auth and reject in
     r.sqlite.exec("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z'");
     assert.equal((await r.api.usersMe.GET(r.request(user, "/api/users/me"))).status, 401);
     assert.equal((await r.api.login.POST(r.request(user, "/api/auth/login", "POST", { email: user.email, password: "wrong" }))).status, 401);
+  } finally { r.close(); }
+});
+
+test("authResult keeps original request cancellation after a completed schema check", async () => {
+  const r = await lifecycleRuntime(routes);
+  try {
+    const user = await r.register("result-cancel@isolated.test");
+    const controller = new AbortController();
+    const request = new Request(r.request(user, "/api/auth/bootstrap", "POST"), { signal: controller.signal });
+    let probes = 0;
+    r.onRead(sql => { if (probe(sql)) probes++; });
+    const account = await r.api.auth.authenticateIdentityRequest(request);
+    assert.ok(account);
+    controller.abort();
+    await assert.rejects(r.api.auth.authResult(account, user.token, request), { name: "AbortError", code: "AUTH_SCHEMA_UNAVAILABLE" });
+    assert.equal(probes, 1, "no second detached probe after cancellation");
   } finally { r.close(); }
 });
 

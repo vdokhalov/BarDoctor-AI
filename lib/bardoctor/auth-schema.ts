@@ -58,6 +58,7 @@ async function probe(request: Request | undefined, id: string, started: number):
 
 export function ensureAuthSchema(request?: Request): Promise<void> {
   return observedAwait("auth.schema", () => {
+    if (request?.signal.aborted) return Promise.reject(new AuthSchemaUnavailable("aborted"));
     const previous = request ? requests.get(request) : undefined;
     if (previous) {
       observedAuthSchema({ attemptId: previous.id, ageMs: Date.now() - previous.started, outcome: "join" });
