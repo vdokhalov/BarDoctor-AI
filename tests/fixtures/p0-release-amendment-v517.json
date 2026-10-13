@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; isolated Doctor confirm harness and scroll diagnostics, 2026-10-13; no production UI change in this amendment",
+  "scope": "User-approved P0 recovery; isolated Doctor/scroll diagnostics and v517 Reports/More WebKit390 parity harness, 2026-10-13; no additional product change",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -73,6 +73,18 @@
     "scripts/owner-uat-v493-browser.mjs": {
       "before": "d11aa37a7442b12315f6159b4a6394097e6205b3fa04bc2356d3b3caf73a3e05",
       "after": "0cfb47f42559e79818aa0ee14918d8c006430afc319f93afd87a06401a824435"
+    },
+    "scripts/lib/reference-slice-recovery-compare.mjs": {
+      "before": "c07025badd6df36dfac836f0a04059174fcb1adcf24d6f7d6bd8999acf36f9cf",
+      "after": "509c7f6d0aa3daeab29d88ff3296a82cc587c566247ce959e3cab02c563de034"
+    },
+    "scripts/lib/released-reports-more-parity.mjs": {
+      "before": null,
+      "after": "97e7bcd7031de34c90112dd9fe2cacebd09f2f49b22e6bf7fa7dff9f8b3ae111"
+    },
+    "scripts/reference-slice-recovery-parity.mjs": {
+      "before": "a070cca32f868afe39cd89fe9fad0e0b5410e3798592de6e32258adfe7486058",
+      "after": "3931776cf9bb6a426deffcce52c114afb719d0986e6cc11bba80d775b3d97019"
     }
   }
 }

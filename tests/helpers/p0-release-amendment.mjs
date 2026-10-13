@@ -5,8 +5,9 @@ import {readFileSync} from 'node:fs';
 
 export const p0Baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
 export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','build','db','drizzle','migrations','.openai','.github','package.json','package-lock.json','vite.config.ts','tsconfig.json','next.config.ts','drizzle.config.ts','postcss.config.mjs','.npmrc','.gitignore','eslint.config.mjs']);
-// User-approved P0 recovery plus isolated Doctor/scroll harness diagnostics (2026-10-13). No directory exemption.
+// User-approved P0 recovery plus isolated Doctor/scroll and Reports/More390 parity diagnostics (2026-10-13). No directory exemption.
 export const p0Paths=Object.freeze([
+ 'scripts/lib/reference-slice-recovery-compare.mjs','scripts/lib/released-reports-more-parity.mjs','scripts/reference-slice-recovery-parity.mjs',
  '.github/workflows/google-reviews-setup-v400.yml',
  'app/api/auth/bootstrap/route.ts','app/api/auth/login/route.ts','app/api/users/me/route.ts',
  'lib/bardoctor/auth-schema-error.ts','lib/bardoctor/auth-schema.ts','lib/bardoctor/auth.ts','lib/bardoctor/request-observability.ts',
