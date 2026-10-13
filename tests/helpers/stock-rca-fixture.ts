@@ -5,6 +5,9 @@ import { stockRuntime, type StockRow } from './stock-runtime';
 export async function stockRcaFixture(options: { now?: string | null } = {}) {
   const r = await stockRuntime(options);
   try {
+    const now = options.now === undefined ? '2026-10-02T12:00:00.000Z' : options.now ?? new Date().toISOString();
+    // The fixture's UTC venue needs a staffed workday before opening live POS.
+    r.put('bd_operational_reports_v1', [{ venueId: r.venueId, date: now.slice(0, 10), workdayStatus: 'OPEN', staffing: [{ employeeId: 'stock-fixture' }] }]);
     r.put('bd_warehouses', [{ id: 'qa-bar', name: 'QA bar', venueId: r.venueId, active: true }]);
     assert.ok((await r.confirm('x', 'pcs', 2, 20)).response.ok);
     const key = String((r.get('bd_stock_movements') as StockRow[])[0].productKey);
