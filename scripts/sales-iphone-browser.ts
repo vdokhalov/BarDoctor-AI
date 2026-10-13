@@ -62,7 +62,7 @@ for(const [i,source] of ['POS_API','MANUAL_GRID','POS_API'].entries()){
 const imported=await runtime.api.batches.POST(runtime.request(user,'/api/sales-batches','POST',{venueId:venue,action:'import_text',text:'Неизвестный коктейль 3\nБокал Pinot Noir 2',businessDate:'2026-09-27'}));assert.equal(imported.status,201);
 const executablePath=process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath());
 const browserType=process.env.BD_IPHONE_BROWSER==='webkit'?webkit:chromium;
-const browser=await browserType.launch(browserType===chromium?{executablePath,headless:true,args:chromiumArgs}:{headless:true});
+const browser=await browserType.launch(browserType===chromium?{executablePath,headless:true,args:chromiumArgs}:{headless:true,...(process.env.BD_WEBKIT_EXECUTABLE?{executablePath:process.env.BD_WEBKIT_EXECUTABLE}:{})});
 const results:unknown[]=[];
 const get=(key:string)=>JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(user.userId,key)?.data_json||'null'));
 // Two pre-existing cash shifts exercise legacy selection, not permission to create new parallel shifts.

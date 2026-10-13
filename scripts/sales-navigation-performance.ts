@@ -114,7 +114,7 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  else {writeFileSync(out+'/home-controls.json',JSON.stringify(await page.locator('a,button').allTextContents()));await measure('A Home → Sales (canonical bridge; no direct Home control)',()=>page.evaluate(()=>{(window as unknown as {bdNavigate:(path:string)=>void}).bdNavigate('/sales-import')}),journalReady);}
  await measure('B Sales → Cashier',()=>frame().locator('#open-cashier').tap(),cashReady);
  if(browserType===webkit&&width===390){await page.evaluate(()=>{document.documentElement.style.setProperty('--bd-safe-top','59px');document.documentElement.style.setProperty('--bd-safe-bottom','34px')});const back=await page.locator('#sales-journal').boundingBox();assert.ok(back&&back.y>=59&&back.height>=44&&back.width>=44);assert.equal(await page.locator('#sales-journal').evaluate(e=>{const b=e.getBoundingClientRect();return e.contains(document.elementFromPoint(b.x+b.width/2,b.y+b.height/2))}),true);await page.screenshot({path:out+'/webkit-'+width+'-'+delay+'-safe-area.png'});await page.evaluate(()=>{document.documentElement.style.removeProperty('--bd-safe-top');document.documentElement.style.removeProperty('--bd-safe-bottom')});}
- if(width===390){await posPane(page,false);await measure('K Menu → Order',()=>page.locator('.mobile-tabs [data-pane=order]').tap(),()=>page.locator('.mobile-tabs [data-pane=order][aria-pressed=true]').waitFor());
+ if(width<=950){await posPane(page,false);await measure('K Menu → Order',()=>page.locator('.mobile-tabs [data-pane=order]').tap(),()=>page.locator('.mobile-tabs [data-pane=order][aria-pressed=true]').waitFor());
  await measure('L Order → Menu',()=>page.locator('.mobile-tabs [data-pane=menu]').tap(),()=>page.locator('.mobile-tabs [data-pane=menu][aria-pressed=true]').waitFor());}else{await page.locator('.menu-panel').waitFor();await page.locator('.cart').waitFor();console.log(JSON.stringify({menuAndOrderTogether:true,width}));}
  await measure('C Cashier Back → Sales',()=>page.locator('#sales-journal').tap(),journalReady);
  await measure('D Journal → Cashier',()=>frame().locator('.sales-navigation a[href="/cashier"]').tap(),cashReady);
@@ -137,8 +137,8 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  await page.locator('#sales-journal').tap();await frame().locator('[data-resume-shift="ux2-open"]').waitFor();
  await measure('Q Resume → Cashier',()=>frame().locator('[data-resume-shift="ux2-open"]').tap(),()=>page.locator('.cart .line').waitFor());
  await posPay(page);await posReceiptList(page);
- await measure('R Success → New order',()=>posNewQuick(page),async()=>{await cashReady();assert.equal(await page.locator('.cart .line').count(),0);if(width===390)await page.locator('.mobile-tabs [data-pane=menu][aria-pressed=true]').waitFor();else{await page.locator('.menu-panel').waitFor();await page.locator('.cart').waitFor();}});
- await posAddItem(page,'[data-add="menu-0"]',"tap");if(width===390)await page.locator('.mobile-tabs [data-pane=order]').tap();await posPay(page);await posReceiptList(page);
+ await measure('R Success → New order',()=>posNewQuick(page),async()=>{await cashReady();assert.equal(await page.locator('.cart .line').count(),0);if(width<=950)await page.locator('.mobile-tabs [data-pane=menu][aria-pressed=true]').waitFor();else{await page.locator('.menu-panel').waitFor();await page.locator('.cart').waitFor();}});
+ await posAddItem(page,'[data-add="menu-0"]',"tap");if(width<=950)await page.locator('.mobile-tabs [data-pane=order]').tap();await posPay(page);await posReceiptList(page);
  await page.locator('#receipts-view .receipt-row').first().tap();
  await measure('S Success → Document',()=>page.locator('#receipt-sale').tap(),()=>frame().locator('.pos-event-summary').waitFor());
 
@@ -154,7 +154,7 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
   assert.equal(new URL(hostPage.url()).pathname,'/cashier','host entered the actual cashier route');
   assert.equal(new URL(hostPage.url()).searchParams.get('venue'),String(venue),'cashier retains venue');
   assert.equal(trace.filter(e=>e.kind==='request'&&e.type==='document'&&e.path==='/cashier').length,1,'one iframe navigation for two taps');
-  if(width===390){await page.locator('.mobile-tabs [data-pane=order]').tap();await page.locator('.mobile-tabs [data-pane=menu]').tap();}
+  if(width<=950){await page.locator('.mobile-tabs [data-pane=order]').tap();await page.locator('.mobile-tabs [data-pane=menu]').tap();}
   assert.equal(await page.locator('#sales-navigation-status').count(),0,'no stale pending on destination');
  }
  if(journalOnly){

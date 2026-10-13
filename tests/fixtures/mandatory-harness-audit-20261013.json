@@ -1698,8 +1698,8 @@
           "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
         }
       ],
-      "sha256": "174be79d3a4dfabe11a703776bc5ebbce24a2f2e6b73e9b88d937540246bb744",
-      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+      "sha256": "5f5d5515ed6f7ca77b0bdf8d42da227f9273e2b5cca4df6c08c49d5901671afb",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained. Optional BD_WEBKIT_EXECUTABLE matches navigation harness; default CI browser launch and every test assertion remain unchanged. Existing portable WebKit runtime verified with actual GLES dlopen."
     },
     "scripts/sales-navigation-performance.ts": {
       "hits": [
@@ -1716,8 +1716,8 @@
           "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
         }
       ],
-      "sha256": "f1a5fe89a553fd9b81230eb7ea42950058e8528d78774f61bc459bf33c899d09",
-      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained. B2: await history-owned editor dismissal/actionability, retain physical double touch and actual cashier/venue/single-document assertions; focused b2 scenario available."
+      "sha256": "1d43526ff37bc3397d91c7b98e5cca49eafb1f298c42b2ba49c8d0d186886eb3",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained. B2: await history-owned editor dismissal/actionability, retain physical double touch and actual cashier/venue/single-document assertions; focused b2 scenario available. Released cashier CSS uses tabbed Menu/Order through950px. Measure K/L and new-order/double-tap destination controls at390/820; retain simultaneous Menu/Order visibility at1280. Every timing/auth/DOM/request invariant retained."
     },
     "scripts/sales-observations-browser.ts": {
       "hits": [
