@@ -68,9 +68,10 @@ test("visual viewport drives the mobile sheet above iPhone and Android keyboards
 
 test("cancel, X, backdrop and Escape share unsaved-change protection", () => {
   const start = recipe.indexOf("const bdTechMarkDirtyV438=");
-  const end = recipe.indexOf(";S.useEffect", start);
+  const end = recipe.indexOf(";bdUseRecipeBackV511", start);
   assert.ok(start >= 0 && end > start);
   const lifecycle = recipe.slice(start, end);
+  assert.match(recipe, /bdUseRecipeBackV511\(bdTechCloseV438,bdTechDirtyRefV438,bdTechDialogRefV354\)/);
 
   const run = ({ dirty, saving, confirm }) => {
     const surface = {
@@ -126,7 +127,18 @@ test("editing ingredient quantity, unit, link, add and remove marks the recipe d
   assert.match(recipe, /b=\(\)=>\{bdTechMarkDirtyV438\(\)/);
   assert.match(recipe, /className:"bd-catalog-remove",onClick:\(\)=>\{bdTechMarkDirtyV438\(\)/);
   assert.match(recipe, /onChoose:\(G,H\)=>\{N\(p,G,H\)/);
-  assert.match(recipe, /onConfirmConversion:\(G,H\)=>K\(p,G,H\)/);
+  assert.match(recipe, /i\.jsx\(bdRecipeIngredientV511,\{[^}]*onChange:patch=>j\(p\.id,patch\)/);
+  const conversion = recipe.match(/onClick:\(\)=>onChange\(\{unitConversion:\{amount:Number\(conversion\)[^\n]+?\}\)(?=,children:"Подтвердить конверсию")/);
+  assert.ok(conversion, "Explicit conversion uses the same dirty-state onChange path");
+  let update;
+  vm.runInNewContext(`(${conversion[0].slice('onClick:'.length)})()`, {
+    conversion: '200', target: 'ml', line: { quantity: 2 }, onChange: value => { update = value; },
+  });
+  assert.deepEqual(JSON.parse(JSON.stringify(update)), {
+    unitConversion: { amount: 200, unit: 'ml', confirmedByUser: true, source: 'manual' },
+    normalizedQuantity: 400, normalizedUnit: 'ml', unitResolutionStatus: 'packaging_compatible', resolutionStatus: 'linked_ready',
+  });
+  assert.match(recipe, /disabled:!\(Number\(conversion\)>0\),onClick:\(\)=>onChange/);
 });
 
 test("all application shells carry the v438 cache identity", () => {
