@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "f4e6217ae8cdab58434fe8ab666346622252fad85e6450fb66f7c6466217245c"
+      "after": "1caf772e08a5da22b60e523cac72a4bb4cbb750f4e1d6cc00ad1e2f9f90e9c0e"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -56,7 +56,7 @@
     },
     "scripts/fragments/monthly-report-v165.fragment.txt": {
       "before": "4984041b2cfd434dd6d112fb71f94c030bb0a131926bdeafc784cdf24504c7c2",
-      "after": "fd5a9bf0f1f7038be0e4f1d9872096da9548c03d66b2c8a70fba6a291314e072"
+      "after": "62f5bf86301c29bb1e308827b5a6d816de6f01fe4b44b5c9ae742a6fdb27434b"
     },
     "scripts/patch-finance-canonical-v515.mjs": {
       "before": "4ad55e6f83e602983e93fcd71d50b94c3326c3d915c05d7cc3ba110c5bdb789d",

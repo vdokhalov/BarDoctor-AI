@@ -456,7 +456,7 @@ function bdMonthlyReportPage() {
   const requestedMonth = window.bdReadNavigationQuery("month", "");
   const [period, setPeriod] = S.useState(() => months.includes(requestedMonth) ? requestedMonth : months[0]);
   S.useEffect(() => { window.bdSyncNavigationQuery({ month: period }); }, [period]);
-  const revision = S.useMemo(() => ({}), [profile, revenue, expenses, snapshots, settings, gapReasons]);
+  const revision = S.useMemo(() => JSON.stringify([profile, revenue, expenses, snapshots, settings, gapReasons]), [profile, revenue, expenses, snapshots, settings, gapReasons]);
   const verified = bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile, settings), period, revision);
   const report = verified.report;
   const navigate = (path) => {

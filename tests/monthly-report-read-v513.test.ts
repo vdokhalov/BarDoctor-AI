@@ -153,3 +153,17 @@ test('monthly hook binds pagehide/pageshow and removes every listener and timer 
  context.document.visibilityState='hidden';listeners.get('visibilitychange')!();assert.equal(events.length,4);
  cleanup();assert.equal(listeners.size,0);assert.equal(events.at(-1),'dispose');
 });
+
+test('Reports revision ignores fresh object identity but changes for every report input', () => {
+ const declaration=fragment.match(/const revision = S\.useMemo\([^\n]+/)!;
+ assert.ok(declaration);
+ const inputs={profile:{id:1},revenue:[{revenue:10}],expenses:[],snapshots:[],settings:{},gapReasons:[]};
+ const revision=(values:typeof inputs)=>vm.runInNewContext(declaration[0]+'\nrevision;',{...values,S:{useMemo:(read:()=>unknown)=>read()}});
+ const before=revision(inputs);
+ assert.equal(revision(structuredClone(inputs)),before,'response-driven render with equal data cannot restart the reader');
+ for(const key of Object.keys(inputs) as (keyof typeof inputs)[]) {
+  const changed=structuredClone(inputs) as Record<string,unknown>;
+  changed[key]=Array.isArray(changed[key])?[...(changed[key] as unknown[]),{changed:true}]:{...(changed[key] as object),changed:true};
+  assert.notEqual(revision(changed as typeof inputs),before,key+' must invalidate the report');
+ }
+});
