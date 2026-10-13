@@ -1,0 +1,214 @@
+{
+  "baseCommit": "1a64ac2c",
+  "scope": "QA-only explicit Reviews consent; endpoint fully fulfilled locally, no paid AI or external publication",
+  "scriptSha256": "bec230afdab1fec14a9dd2c41400527f11504f7a52c951d19e5acf024408dd69",
+  "navigation": {
+    "pass": 32,
+    "failures": [],
+    "cases": [
+      {
+        "profile": "iphone-13",
+        "scenario": "writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "shift-canonical-writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "inventory-fullscreen",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "inventory-delete",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "warehouse-nomenclature",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "shifts",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "suppliers-purchases",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "menu-tech-cards",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "embedded-modules",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "critical-form-close",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "critical-modules",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "business-health-cold-start",
+        "passed": true
+      },
+      {
+        "profile": "iphone-13",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "shift-canonical-writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "inventory-fullscreen",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "inventory-delete",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "warehouse-nomenclature",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "shifts",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "suppliers-purchases",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "menu-tech-cards",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "embedded-modules",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "critical-form-close",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "critical-modules",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "business-health-cold-start",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "embedded-modules",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "shift-canonical-writeoffs",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "inventory-delete",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "business-health-cold-start",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "home-reviews",
+        "passed": true
+      }
+    ]
+  },
+  "reviews": {
+    "pass": 5,
+    "failures": [],
+    "cases": [
+      {
+        "profile": "iphone-small",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "iphone-normal",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "iphone-large",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "pixel-7",
+        "scenario": "home-reviews",
+        "passed": true
+      },
+      {
+        "profile": "desktop-chrome",
+        "scenario": "home-reviews",
+        "passed": true
+      }
+    ]
+  },
+  "consentAssertions": [
+    "exact native confirm text/type",
+    "cancel: zero reply requests and no reply dialog",
+    "accept: exactly one local mock request carrying original English review",
+    "reply draft has no Publish action"
+  ],
+  "checks": {
+    "releaseGuards": "3 PASS",
+    "types": "PASS",
+    "lint": "PASS"
+  },
+  "continuation": "All 19 browser steps PASS; two Sales navigation steps in progress. No final CI or deployment yet."
+}

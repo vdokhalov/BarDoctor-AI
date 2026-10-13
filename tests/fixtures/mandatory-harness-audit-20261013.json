@@ -1454,8 +1454,8 @@
     },
     "scripts/mobile-navigation-qa-v269.cjs": {
       "hits": [],
-      "sha256": "02940823b4c601f37e1b3d15dffdb4a6d9501461f5c38ef1a7218e787561b5c5",
-      "review": "CANNED DATA: bd_ai_diagnosis_v9 envelope; no actual diagnosis launch."
+      "sha256": "bec230afdab1fec14a9dd2c41400527f11504f7a52c951d19e5acf024408dd69",
+      "review": "Home Reviews only: exact paid-AI consent text/type, explicit cancel produces zero reply requests; accept produces one locally fulfilled mock request carrying original review text. Global dialog rejection and no-publishing assertions retained; no paid AI transport."
     },
     "scripts/opening-browser-qa-phase5.ts": {
       "hits": [],
