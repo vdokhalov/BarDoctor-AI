@@ -130,3 +130,26 @@ test('monthly readiness mounts the real close launcher with September context, n
   const section = context.bdMonthlyReadinessV165(readiness.props);
   assert.ok(section.props.children.includes(launcher));
 });
+
+test('departed and disposed readers never start new requests; restored pages read fresh data', async () => {
+ const c=client(globalThis.fetch),signals:AbortSignal[]=[],published:unknown[]=[];
+ let resolve:(value:unknown)=>void=()=>{};
+ const reader=c.bdMonthlyReadControllerV513((signal:AbortSignal)=>{signals.push(signal);return new Promise(done=>{resolve=done;});},(value:unknown)=>published.push(value));
+ const pending=reader.refresh();reader.pause();assert.equal(signals[0].aborted,true);
+ await reader.refresh();assert.equal(signals.length,1);
+ resolve({report:{stale:true}});await pending;assert.equal(published.length,0);
+ reader.resume();const restored=reader.refresh();assert.equal(signals.length,2);resolve({report:{fresh:true}});await restored;assert.equal(published.length,1);
+ reader.dispose();reader.resume();await reader.refresh();assert.equal(signals.length,2);
+});
+
+test('monthly hook binds pagehide/pageshow and removes every listener and timer on unmount', async () => {
+ const listeners=new Map<string,()=>void>(),events:string[]=[];let cleanup:()=>void=()=>{};
+ const hook=fragment.slice(fragment.indexOf('function bdUseMonthlyReportV513'),fragment.indexOf('const bdMonthlyReasonCatalogV515'));
+ const target={addEventListener:(name:string,fn:()=>void)=>listeners.set(name,fn),removeEventListener:(name:string,fn:()=>void)=>{assert.equal(listeners.get(name),fn);listeners.delete(name);}};
+ const context=vm.createContext({Number,S:{useState:()=>[null,()=>{}],useEffect:(fn:()=>()=>void)=>{cleanup=fn();}},document:{...target,visibilityState:'visible'},window:target,setInterval:(_fn:()=>void,ms:number)=>{assert.equal(ms,15000);return 17;},clearInterval:(id:number)=>assert.equal(id,17),bdFetchMonthlyReportV513:()=>{},bdMonthlyReadControllerV513:()=>({refresh:()=>events.push('read'),pause:()=>events.push('pause'),resume:()=>events.push('resume'),dispose:()=>events.push('dispose')})});
+ vm.runInContext(hook+'\nbdUseMonthlyReportV513(1,"2026-10","same");',context);
+ listeners.get('pagehide')!();listeners.get('pageshow')!();
+ assert.deepEqual(events,['read','pause','resume','read']);
+ context.document.visibilityState='hidden';listeners.get('visibilitychange')!();assert.equal(events.length,4);
+ cleanup();assert.equal(listeners.size,0);assert.equal(events.at(-1),'dispose');
+});

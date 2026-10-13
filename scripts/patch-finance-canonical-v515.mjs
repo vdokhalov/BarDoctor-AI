@@ -15,9 +15,15 @@ function replaceOne(source, before, after) {
   return source.replace(before,after);
 }
 export function patchFinanceCanonicalV515(source) {
+  // Store adapters may return fresh arrays on each render. The revision must
+  // represent input content, not object identity, or publishing a read loops.
+  const legacyRevision='bdFinanceRevisionV515=S.useMemo(()=>({}),[profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons])';
+  const stableRevision='bdFinanceRevisionV515=S.useMemo(()=>JSON.stringify([profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons]),[profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons])';
+  if(source.includes(legacyRevision))source=replaceOne(source,legacyRevision,stableRevision);
+
   source=replaceOne(source,
     'monthlyReport=S.useMemo(()=>profile?bdBuildMonthlyReport(profile,monthKey,revenue,expenses,financeSnapshots,financeSettings,gapReasons):null,[profile,monthKey,revenue,expenses,financeSnapshots,financeSettings,gapReasons])',
-    'bdFinanceRevisionV515=S.useMemo(()=>({}),[profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons]),bdFinanceVerifiedV515=bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile,financeSettings),monthKey,bdFinanceRevisionV515),monthlyReport=bdFinanceVerifiedV515.report');
+    stableRevision+',bdFinanceVerifiedV515=bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile,financeSettings),monthKey,bdFinanceRevisionV515),monthlyReport=bdFinanceVerifiedV515.report');
   source=replaceOne(source,
     'monthlyReport&&i.jsx(bdFinanceMonthResultV160,',
     'i.jsx(bdFinanceCanonicalStatusV515,{verified:bdFinanceVerifiedV515,monthKey,venueId:bdMonthlyVenueIdPhase7(profile,financeSettings)}),monthlyReport&&i.jsx(bdFinanceMonthResultV160,');

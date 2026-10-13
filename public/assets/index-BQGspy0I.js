@@ -312,30 +312,6 @@ function bdCashierEntryHref(){const venue=localStorage.getItem("bd_active_venue_
 function bdCashierEntry({onNavigate}){return typeof window.bdHasClientPermission==="function"&&window.bdHasClientPermission("sales.view")?i.jsx("button",{type:"button",className:"bd-more-quick-v166","data-bd-cashier-entry":true,onClick:()=>onNavigate(bdCashierEntryHref()),children:"Касса · столы, заказы и оплата"}):null}
 const bdOwnerUATFixesV285="owner-uat-v285";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* inventory-boundary-presentation-v515 */
 function bdInventoryAccountingBoundaryV515(value){return!!value&&typeof value==="object"&&!Array.isArray(value.items)&&value.scope==null&&value.internalId==null&&(Object.hasOwn(value,"sections")||Object.hasOwn(value,"total"))}
 function bdInventoryBoundaryInfoV515(value){const amounts=value.sections&&typeof value.sections==="object"&&!Array.isArray(value.sections)?Object.values(value.sections):[],valid=amounts.length>0&&amounts.every(x=>typeof x==="number"&&Number.isFinite(x)&&x>=0),sum=valid?Math.round(amounts.reduce((a,b)=>a+b,0)*100)/100:null,total=value.total,known=valid&&(total===undefined||typeof total==="number"&&Number.isFinite(total)&&Math.round(total*100)===Math.round(sum*100))&&(value.status==null||value.status==="confirmed"||value.status==="completed");const date=String(value.date||""),parsed=new Date(date+"T00:00:00Z"),dateValid=/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===date,month=dateValid?date.slice(0,7):null,venue=String(value.venueId||new URLSearchParams(window.location.search).get("venue")||window.localStorage?.getItem("bd_active_venue_id")||"");const query=new URLSearchParams;if(month)query.set("month",month);if(venue&&venue!=="primary")query.set("venue",venue);if(month&&date.endsWith("-01"))query.set("closeMonth","1");return{known,amount:known?sum:null,date:dateValid?date:"Дата не указана",currency:String(value.currency||value.accountingCurrency||"").toUpperCase(),href:"/reports"+(query.size?"?"+query.toString():"")}}
@@ -1936,14 +1912,17 @@ async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
 }
 
 function bdMonthlyReadControllerV513(load, publish) {
-  let disposed = false, sequence = 0, controller;
+  let disposed = false, paused = false, sequence = 0, controller;
   return {
     async refresh() {
+      if (disposed || paused) return;
       const current = ++sequence;
       controller?.abort(); controller = new AbortController();
       try { const value = await load(controller.signal); if (!disposed && current === sequence) publish({ ...value, error: null }); }
       catch (error) { if (!disposed && current === sequence) publish({ report: null, reasons: [], error: error.message }); }
     },
+    pause() { paused = true; ++sequence; controller?.abort(); },
+    resume() { if (!disposed) paused = false; },
     dispose() { disposed = true; ++sequence; controller?.abort(); },
   };
 }
@@ -1957,9 +1936,12 @@ function bdUseMonthlyReportV513(venueId, monthKey, revision) {
     const reader = bdMonthlyReadControllerV513(signal => bdFetchMonthlyReportV513(venueId, monthKey, signal), value => setState({ key, ...value }));
     reader.refresh();
     const refresh = () => { if (document.visibilityState === "visible") reader.refresh(); };
+    const pause = () => reader.pause();
+    const resume = () => { reader.resume(); refresh(); };
     const timer = setInterval(refresh, 15000);
     window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
-    return () => { reader.dispose(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+    window.addEventListener("pagehide", pause); window.addEventListener("pageshow", resume);
+    return () => { reader.dispose(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("pagehide", pause); window.removeEventListener("pageshow", resume); };
   }, [key, revision, retry]);
   return { ...(state?.key === key ? state : { report: null, error: null, reasons: [] }), retry: () => setRetry(value => value + 1) };
 }
@@ -3083,7 +3065,7 @@ const[,navigate]=bt(),location=ste(),{profile}=Un(),{revenue,expenses,gapReasons
 S.useEffect(()=>{const e=new URLSearchParams(location),t=e.get("repairEquipmentId");if(e.get("closeShift")==="1"){setRecordMode("revenue"),setEditingRevenue(void 0),setSheet("revenue");return}if(e.get("addExpense")==="1"){navigate("/suppliers?create=1&returnTo=finance");return}if(e.get("tab")==="shifts"){setRecordMode("revenue"),setDetailMode("revenue");return}t&&(setRecordMode("expenses"),setInitialEquipmentId(t),setEditingExpense(void 0),setSheet("expense"))},[location]);
 const areas=profile?.areas??[],now=new Date,months=S.useMemo(()=>{const e=[];for(let t=0;t<6;t++){const n=new Date(now.getFullYear(),now.getMonth()-t,1);e.push({year:n.getFullYear(),month:n.getMonth()+1})}return e},[now.getFullYear(),now.getMonth()]),[selected,setSelected]=S.useState(()=>{const e=window.bdReadNavigationQuery("month","");return months.find(t=>toe(t.year,t.month)===e)||months[0]}),monthKey=toe(selected.year,selected.month),selectedIndex=months.findIndex(e=>e.year===selected.year&&e.month===selected.month);
 const bdFinanceNavigationContext=S.useEffect(()=>{window.bdSyncNavigationQuery({view:detailMode,month:monthKey})},[detailMode,monthKey]);
-const isCurrentMonth=selected.year===now.getFullYear()&&selected.month===now.getMonth()+1,period=S.useMemo(()=>profile?wo(profile,now,selected.year,selected.month):null,[profile,selected.year,selected.month,now.getDate()]),previousPeriod=S.useMemo(()=>{if(!profile)return null;const e=Tz(selected.year,selected.month);return wo(profile,now,e.year,e.month)},[profile,selected.year,selected.month,now.getDate()]),coverage=S.useMemo(()=>profile&&period?kC(profile,revenue,gapReasons,now,period):null,[profile,period,revenue,gapReasons,now.getDate()]),periodContext=S.useMemo(()=>{const e=new Date,t=new Date(e);t.setHours(0,0,0,0);const n=new Date(e);n.setHours(23,59,59,999);const r=wn([],[],t,t),a=period?.periodEnd?wn(revenue,expenses,period.monthStart,period.periodEnd):r,s=previousPeriod?.periodEnd?wn(revenue,expenses,previousPeriod.monthStart,previousPeriod.periodEnd):void 0,l=profile?bdFinanceWeekContext(profile,e,revenue,expenses):null;return{day:wn(revenue,expenses,t,n),week:l?.week??r,month:a,prevWeek:l?.prevWeek,prevMonth:s,weekRangeLabel:l?.weekRangeLabel??"",scheduleLabel:l?.scheduleLabel??"",weekCompletedShifts:l?.completedShifts??0,weekScheduledShifts:l?.scheduledShifts??0,nextWorkingLabel:l?.nextWorkingLabel??null}},[revenue,expenses,period,previousPeriod,profile]),bdFinanceAccountingCurrency=bdMonthlyAccountingCurrencyV320(profile,financeSettings),monthRevenue=S.useMemo(()=>bdMonthlyCurrencyPartitionV320(revenue.filter(e=>e.date.slice(0,7)===monthKey),"revenue",bdFinanceAccountingCurrency).included,[revenue,monthKey,bdFinanceAccountingCurrency]),monthExpenses=S.useMemo(()=>bdMonthlyCurrencyPartitionV320(expenses.filter(e=>e.date.slice(0,7)===monthKey&&e?.status!=="voided"&&!e?.reversedAt),"expense",bdFinanceAccountingCurrency).included,[expenses,monthKey,bdFinanceAccountingCurrency]),bdFinanceRevisionV515=S.useMemo(()=>({}),[profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons]),bdFinanceVerifiedV515=bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile,financeSettings),monthKey,bdFinanceRevisionV515),monthlyReport=bdFinanceVerifiedV515.report,shiftResultByDate=S.useMemo(()=>new Map((monthlyReport?.shiftEstimates??[]).map(e=>[e.date.slice(0,10),e])),[monthlyReport]),charts=S.useMemo(()=>{if(!period)return{revenue:[],avgCheck:[],guests:[],expenses:[]};const e=new Map(monthRevenue.map(t=>[t.date,t])),t=[],n=isCurrentMonth?now:period.monthEnd;for(let r=new Date(period.monthStart);r<=period.monthEnd&&r<=n;r.setDate(r.getDate()+1)){const a=r.toISOString().slice(0,10),s=e.get(a);t.push({date:a,revenue:s?s.revenue:null,avgCheck:s?Ym(s):null,guests:s?.guests??null})}const r=new Map;monthExpenses.forEach(a=>r.set(a.date,(r.get(a.date)??0)+a.amount));return{revenue:t.map(a=>({date:a.date,value:a.revenue})),avgCheck:t.map(a=>({date:a.date,value:a.avgCheck})),guests:t.map(a=>({date:a.date,value:a.guests})),expenses:t.map(a=>({date:a.date,value:r.get(a.date)??null}))}},[monthRevenue,monthExpenses,period,isCurrentMonth]),missingDates=S.useMemo(()=>profile&&period?Iz(profile,revenue,gapReasons,now,period):[],[profile,period,revenue,gapReasons,now.getDate()]),[gapDate,setGapDate]=S.useState(null),hasFinancialData=!!(monthlyReport&&(monthlyReport.isClosed||monthlyReport.revenue>0||monthlyReport.periodExpenses>0||monthlyReport.payroll>0||monthlyReport.receipts>0||monthlyReport.dataShiftCount>0||monthlyReport.accountedShifts>0||monthlyReport.openingInventory!=null||monthlyReport.closingInventory!=null));
+const isCurrentMonth=selected.year===now.getFullYear()&&selected.month===now.getMonth()+1,period=S.useMemo(()=>profile?wo(profile,now,selected.year,selected.month):null,[profile,selected.year,selected.month,now.getDate()]),previousPeriod=S.useMemo(()=>{if(!profile)return null;const e=Tz(selected.year,selected.month);return wo(profile,now,e.year,e.month)},[profile,selected.year,selected.month,now.getDate()]),coverage=S.useMemo(()=>profile&&period?kC(profile,revenue,gapReasons,now,period):null,[profile,period,revenue,gapReasons,now.getDate()]),periodContext=S.useMemo(()=>{const e=new Date,t=new Date(e);t.setHours(0,0,0,0);const n=new Date(e);n.setHours(23,59,59,999);const r=wn([],[],t,t),a=period?.periodEnd?wn(revenue,expenses,period.monthStart,period.periodEnd):r,s=previousPeriod?.periodEnd?wn(revenue,expenses,previousPeriod.monthStart,previousPeriod.periodEnd):void 0,l=profile?bdFinanceWeekContext(profile,e,revenue,expenses):null;return{day:wn(revenue,expenses,t,n),week:l?.week??r,month:a,prevWeek:l?.prevWeek,prevMonth:s,weekRangeLabel:l?.weekRangeLabel??"",scheduleLabel:l?.scheduleLabel??"",weekCompletedShifts:l?.completedShifts??0,weekScheduledShifts:l?.scheduledShifts??0,nextWorkingLabel:l?.nextWorkingLabel??null}},[revenue,expenses,period,previousPeriod,profile]),bdFinanceAccountingCurrency=bdMonthlyAccountingCurrencyV320(profile,financeSettings),monthRevenue=S.useMemo(()=>bdMonthlyCurrencyPartitionV320(revenue.filter(e=>e.date.slice(0,7)===monthKey),"revenue",bdFinanceAccountingCurrency).included,[revenue,monthKey,bdFinanceAccountingCurrency]),monthExpenses=S.useMemo(()=>bdMonthlyCurrencyPartitionV320(expenses.filter(e=>e.date.slice(0,7)===monthKey&&e?.status!=="voided"&&!e?.reversedAt),"expense",bdFinanceAccountingCurrency).included,[expenses,monthKey,bdFinanceAccountingCurrency]),bdFinanceRevisionV515=S.useMemo(()=>JSON.stringify([profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons]),[profile,revenue,expenses,financeSnapshots,financeSettings,gapReasons]),bdFinanceVerifiedV515=bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile,financeSettings),monthKey,bdFinanceRevisionV515),monthlyReport=bdFinanceVerifiedV515.report,shiftResultByDate=S.useMemo(()=>new Map((monthlyReport?.shiftEstimates??[]).map(e=>[e.date.slice(0,10),e])),[monthlyReport]),charts=S.useMemo(()=>{if(!period)return{revenue:[],avgCheck:[],guests:[],expenses:[]};const e=new Map(monthRevenue.map(t=>[t.date,t])),t=[],n=isCurrentMonth?now:period.monthEnd;for(let r=new Date(period.monthStart);r<=period.monthEnd&&r<=n;r.setDate(r.getDate()+1)){const a=r.toISOString().slice(0,10),s=e.get(a);t.push({date:a,revenue:s?s.revenue:null,avgCheck:s?Ym(s):null,guests:s?.guests??null})}const r=new Map;monthExpenses.forEach(a=>r.set(a.date,(r.get(a.date)??0)+a.amount));return{revenue:t.map(a=>({date:a.date,value:a.revenue})),avgCheck:t.map(a=>({date:a.date,value:a.avgCheck})),guests:t.map(a=>({date:a.date,value:a.guests})),expenses:t.map(a=>({date:a.date,value:r.get(a.date)??null}))}},[monthRevenue,monthExpenses,period,isCurrentMonth]),missingDates=S.useMemo(()=>profile&&period?Iz(profile,revenue,gapReasons,now,period):[],[profile,period,revenue,gapReasons,now.getDate()]),[gapDate,setGapDate]=S.useState(null),hasFinancialData=!!(monthlyReport&&(monthlyReport.isClosed||monthlyReport.revenue>0||monthlyReport.periodExpenses>0||monthlyReport.payroll>0||monthlyReport.receipts>0||monthlyReport.dataShiftCount>0||monthlyReport.accountedShifts>0||monthlyReport.openingInventory!=null||monthlyReport.closingInventory!=null));
 function saveGapReason(e,t){if(!gapDate||!profile)return;const[n,r,a]=gapDate.split("-").map(Number),s=Ig(profile,new Date(n,r-1,a));setRevenueGapReason({date:gapDate,shiftStart:s.start.toISOString(),shiftEnd:s.end.toISOString(),accountingMonth:gapDate.slice(0,7),reason:e,note:t}),e==="zero_revenue"&&upsertDailyRevenue({date:gapDate,revenue:0,receipts:0}),toast({variant:"success",title:"Причина сохранена"}),setGapDate(null)}
 function saveRevenue(e){const t=upsertDailyRevenue(e,editingRevenue?.id);toast(t?{variant:"success",title:editingRevenue?"Смена обновлена":"Смена закрыта",description:"Финансы, зарплаты, команда и анализ получили новые данные."}:{variant:"warning",title:"Мало памяти",description:"Запись сохранена только в текущей сессии."}),setSheet(null),setEditingRevenue(void 0),window.bdSyncNavigationQuery({closeShift:null,view:detailMode,month:monthKey})}
 function saveExpense(e){if(editingExpense)updateExpense(editingExpense.id,e),toast({variant:"success",title:"Расход обновлён"});else{const t=addExpense(e);toast(t?{variant:"success",title:"Расход добавлен"}:{variant:"warning",title:"Мало памяти",description:"Расход сохранён только в текущей сессии."})}setSheet(null),setEditingExpense(void 0),setInitialEquipmentId(void 0)}

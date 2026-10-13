@@ -2,39 +2,25 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-import {posAmendment,posBaseline,posPaths} from './helpers/pos-release-amendment.mjs';
-test('POS amendment pins exact files and bytes while preserving untouched release boundaries',()=>{
- const manifest=JSON.parse(readFileSync('tests/fixtures/pos-release-amendment.json','utf8'));
- const view=posAmendment();
- assert.deepEqual(view.read('app/api/sales-events/route.ts'),execFileSync('git',['show',posBaseline+':app/api/sales-events/route.ts']));
- const extra=structuredClone(manifest);extra.files['lib/bardoctor/operational-day.ts']=extra.files[posPaths[0]];assert.throws(()=>posAmendment(extra));
- const wrong=structuredClone(manifest);wrong.baseline='HEAD';assert.throws(()=>posAmendment(wrong));
- const digest=structuredClone(manifest);digest.files[posPaths[0]].after='0'.repeat(64);assert.throws(()=>posAmendment(digest));
- const altered=(path:string)=>Buffer.concat([readFileSync(path),Buffer.from('\n// unreviewed')]);
- assert.throws(()=>posAmendment(manifest,(path:string)=>path===posPaths[0]?altered(path):readFileSync(path)));
- const unchanged='lib/bardoctor/operational-day.ts';
- const changedView=posAmendment(manifest,(path:string)=>path===unchanged?altered(path):readFileSync(path));
- assert.throws(()=>assert.deepEqual(changedView.read(unchanged),execFileSync('git',['show',posBaseline+':'+unchanged])));
- assert.ok(view.paths(['unexpected/new.ts']).includes('unexpected/new.ts'));
- assert.throws(()=>posAmendment(manifest,(path:string)=>path==='package.json'?Buffer.from(JSON.stringify({...JSON.parse(readFileSync(path,'utf8')),unapproved:true})):readFileSync(path)));
-});
-test('npm aggregate removes only the duplicate artifact preparation; artifact lifecycle preserves every gate',()=>{
- const before=JSON.parse(execFileSync('git',['show',posBaseline+':package.json'],{encoding:'utf8'})).scripts;
- const after=JSON.parse(readFileSync('package.json','utf8')).scripts;
- assert.equal(after.test,before.test.replace(/^npm run pretest:artifact && /,''));
- for(const [name,value] of Object.entries(before))if(name!=='test')assert.equal(after[name],value,name);
- assert.equal(Object.keys(after).length,Object.keys(before).length);
-});
+import {p0Amendment,p0Baseline,p0Paths,p0Roots} from './helpers/p0-release-amendment.mjs';
 
-type RuntimeLock={packages:Record<string,{version?:string;integrity?:string;dependencies:Record<string,string>}>};
-
-test('test-runtime amendment rejects unrelated dependencies, versions and integrity changes',()=>{
- for(const change of [
-  (lock:RuntimeLock)=>{lock.packages['node_modules/playwright-core'].version='1.64.1';},
-  (lock:RuntimeLock)=>{lock.packages['node_modules/playwright-core'].integrity='sha512-unapproved';},
-  (lock:RuntimeLock)=>{lock.packages[''].dependencies.next='0.0.0';},
- ]){
-  const lock=JSON.parse(readFileSync('package-lock.json','utf8'));change(lock);
-  assert.throws(()=>posAmendment(undefined,(path:string)=>path==='package-lock.json'?Buffer.from(JSON.stringify(lock)):readFileSync(path)));
+test('v517 amendment pins exact files, baseline and bytes; rejects additional or missing paths',()=>{
+ const manifest=JSON.parse(readFileSync('tests/fixtures/p0-release-amendment-v517.json','utf8'));
+ assert.ok(p0Amendment());
+ const extra=structuredClone(manifest);extra.files['lib/bardoctor/operational-day.ts']=extra.files[p0Paths[0]];assert.throws(()=>p0Amendment({manifest:extra}));
+ const wrong=structuredClone(manifest);wrong.baseline='HEAD';assert.throws(()=>p0Amendment({manifest:wrong}));
+ const digest=structuredClone(manifest);digest.files[p0Paths[0]].after='0'.repeat(64);assert.throws(()=>p0Amendment({manifest:digest}));
+ const before=structuredClone(manifest);before.files[p0Paths[0]].before='0'.repeat(64);assert.throws(()=>p0Amendment({manifest:before}));
+ for(const path of [p0Paths[0],'lib/bardoctor/auth.ts','lib/bardoctor/operational-day.ts','db/schema.ts','worker/index.ts','build/sites-vite-plugin.ts','.openai/hosting.json','package.json','package-lock.json']){
+  assert.throws(()=>p0Amendment({read:(name:string)=>name===path?Buffer.concat([readFileSync(name),Buffer.from('\n// unreviewed')]):readFileSync(name)}),path);
  }
+ const paths=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','--',...p0Roots],{encoding:'utf8'}).trim().split('\n');
+ assert.throws(()=>p0Amendment({paths:[...paths,'app/api/unapproved/route.ts']}));
+ assert.throws(()=>p0Amendment({paths:paths.filter(path=>path!=='lib/bardoctor/auth.ts')}));
+});
+test('v517 aggregate scripts retain every gate and dependency entry byte-for-byte',()=>{
+ for(const path of ['package.json','package-lock.json'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',p0Baseline+':'+path],{maxBuffer:8*1024*1024}));
+});
+test('historical approval implementations and manifests remain immutable',()=>{
+ for(const path of ['tests/helpers/pos-release-amendment.mjs','tests/helpers/health-doctor-recovery-guard.mjs','tests/helpers/business-dates-guard.mjs','tests/fixtures/pos-release-amendment.json','tests/fixtures/health-doctor-recovery-approved-files.json'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',p0Baseline+':'+path]));
 });

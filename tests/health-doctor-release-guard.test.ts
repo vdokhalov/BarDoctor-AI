@@ -2,38 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
-import {recoveryApprovedHashes,recoveryBaseline,recoveryFiles} from './helpers/health-doctor-recovery-guard.mjs';
 
-import {posAmendment} from './helpers/pos-release-amendment.mjs';
 
-import {businessDateBackend,assertBusinessDateBackend} from './helpers/business-dates-guard.mjs';
+import {p0Amendment,p0Baseline} from './helpers/p0-release-amendment.mjs';
 
-test('recovery approval is exact and cannot admit another file or later edit',()=>{
- const manifest=JSON.parse(readFileSync('tests/fixtures/health-doctor-recovery-approved-files.json','utf8'));
- assert.deepEqual(Object.keys(recoveryApprovedHashes()),[...recoveryFiles]);
- const extra=structuredClone(manifest);extra.files['lib/bardoctor/auth.ts']=extra.files[recoveryFiles[0]];
- assert.throws(()=>recoveryApprovedHashes(extra));
- const changed=structuredClone(manifest);changed.files[recoveryFiles[0]].after='0'.repeat(64);
- assert.throws(()=>recoveryApprovedHashes(changed));
- const wrongBase=structuredClone(manifest);wrongBase.baseline='HEAD';
- assert.throws(()=>recoveryApprovedHashes(wrongBase));
+
+
+test('historical recovery approval remains immutable; current exact boundaries use v517',()=>{
+ for(const path of ['tests/helpers/health-doctor-recovery-guard.mjs','tests/fixtures/health-doctor-recovery-approved-files.json'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',p0Baseline+':'+path]));
 });
 
-test('all API, auth, provider, schema, bindings and other backend files stay byte-identical to v501',()=>{
- const roots=['app/api','lib/bardoctor','db','drizzle','migrations','.openai/hosting.json','package-lock.json'];
- const paths=execFileSync('git',['ls-tree','-r','--name-only',recoveryBaseline,...roots],{encoding:'utf8'}).trim().split('\n');
- const current=execFileSync('git',['ls-files','--',...roots],{encoding:'utf8'}).trim().split('\n');
- const pos=posAmendment();
- assert.deepEqual(pos.paths(current),paths,'no unapproved added or removed production boundary files');
- assert.ok(paths.length>300);
- const approved=recoveryApprovedHashes();
- assertBusinessDateBackend();
- for(const path of paths){
-  if(path===businessDateBackend)continue;
-  if(Object.hasOwn(approved,path))continue; // Exact contents already asserted above.
-  assert.deepEqual(pos.read(path),execFileSync('git',['show',recoveryBaseline+':'+path],{maxBuffer:64*1024*1024}),path);
- }
-});
+test('v517 production boundaries admit only the exact P0 amendment',()=>{ assert.ok(p0Amendment().files>300); });
 
 test('linked and unlinked stress use actual authenticated handlers within the hard CPU budget',{timeout:180000},()=>{
  const output=execFileSync(process.execPath,['--import','tsx','scripts/health-doctor-recovery-cpu.mjs'],{

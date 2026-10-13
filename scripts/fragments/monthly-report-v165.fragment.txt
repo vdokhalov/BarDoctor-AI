@@ -325,14 +325,17 @@ async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
 }
 
 function bdMonthlyReadControllerV513(load, publish) {
-  let disposed = false, sequence = 0, controller;
+  let disposed = false, paused = false, sequence = 0, controller;
   return {
     async refresh() {
+      if (disposed || paused) return;
       const current = ++sequence;
       controller?.abort(); controller = new AbortController();
       try { const value = await load(controller.signal); if (!disposed && current === sequence) publish({ ...value, error: null }); }
       catch (error) { if (!disposed && current === sequence) publish({ report: null, reasons: [], error: error.message }); }
     },
+    pause() { paused = true; ++sequence; controller?.abort(); },
+    resume() { if (!disposed) paused = false; },
     dispose() { disposed = true; ++sequence; controller?.abort(); },
   };
 }
@@ -346,9 +349,12 @@ function bdUseMonthlyReportV513(venueId, monthKey, revision) {
     const reader = bdMonthlyReadControllerV513(signal => bdFetchMonthlyReportV513(venueId, monthKey, signal), value => setState({ key, ...value }));
     reader.refresh();
     const refresh = () => { if (document.visibilityState === "visible") reader.refresh(); };
+    const pause = () => reader.pause();
+    const resume = () => { reader.resume(); refresh(); };
     const timer = setInterval(refresh, 15000);
     window.addEventListener("focus", refresh); document.addEventListener("visibilitychange", refresh);
-    return () => { reader.dispose(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+    window.addEventListener("pagehide", pause); window.addEventListener("pageshow", resume);
+    return () => { reader.dispose(); clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); window.removeEventListener("pagehide", pause); window.removeEventListener("pageshow", resume); };
   }, [key, revision, retry]);
   return { ...(state?.key === key ? state : { report: null, error: null, reasons: [] }), retry: () => setRetry(value => value + 1) };
 }

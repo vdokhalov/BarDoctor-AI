@@ -69,6 +69,9 @@ for(const node of parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.
   source=source.slice(0,node.start)+updated+source.slice(node.end);
  }
 }
+// Legacy marker reinsertion accumulates blank separator lines on every build.
+// Canonicalize only this generated separator so exact release bytes are stable.
+source=source.replace(/\n{3,}(?=\/\* inventory-boundary-presentation-v515 \*\/)/,'\n\n');
 parse(source,{ecmaVersion:'latest',sourceType:'module'});writeFileSync(file,source);
 
 for(const file of ['public/bardoctor-preview.js','public/bardoctor-preview-v397.js']){

@@ -1,0 +1,74 @@
+{
+  "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
+  "scope": "User-approved P0 auth recovery and Finance monthly-read lifecycle, 2026-10-13",
+  "files": {
+    ".github/workflows/google-reviews-setup-v400.yml": {
+      "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
+      "after": "d9b399fd497d702e1fb727639b044737ea8cc72c1ed15c4d061ee3ad10f43e9a"
+    },
+    "app/api/auth/bootstrap/route.ts": {
+      "before": "f01ec62d4b0749c57d68dd3268e9fb6a4dba3c29eb6f4d799370859d6457ffff",
+      "after": "d57965829585a9872d7d9d5fb58c1a59daf13e7df63ae404918fc31a75139c0f"
+    },
+    "app/api/auth/login/route.ts": {
+      "before": "e072f3472eb9a6abcd2a301632f87ccdb3c256becb9a84a5c9e89a6d40ce3e34",
+      "after": "a9455a1d96bd60a16f4c193b5a386a153a9f6e1e2909190c541d65c76bdd5c1a"
+    },
+    "app/api/users/me/route.ts": {
+      "before": "e4748f0ff488c2ec3f62d7967cafac4df273c751203ac0a024c52a6d7a060490",
+      "after": "398fb5b36ccd8d07b20533a7cd79fa086ebffe3a1e0020d7834b894dfcdeaaa8"
+    },
+    "lib/bardoctor/auth-schema-error.ts": {
+      "before": null,
+      "after": "752f78815d81a22ab803f352aaf2d9b16efe896e456a1473825cd31a2a9e3244"
+    },
+    "lib/bardoctor/auth-schema.ts": {
+      "before": null,
+      "after": "f264d7ca7054db5193cf67cd27c520f4bdd5513c417b89fdb30a47d0d97a0eb7"
+    },
+    "lib/bardoctor/auth.ts": {
+      "before": "15cbf6e1d0288bc65888a5a029656d57b57f0ebb597120b1de3855a08aa8ef3e",
+      "after": "b2c0b1cb4b99696488ae0291b1f7916002f4162f1e37f8b39c4b0784d56d62de"
+    },
+    "lib/bardoctor/request-observability.ts": {
+      "before": "488a9c0c2db72f1735d9e8a7bf825b46bea1df7e950b23b8e2585099e752fb57",
+      "after": "5451f3c545e375d4c790790e0053bf432ee3504f2c6c6e9e67ecfe23f0e3386b"
+    },
+    "public/assets/index-BQGspy0I.js": {
+      "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
+      "after": "f4e6217ae8cdab58434fe8ab666346622252fad85e6450fb66f7c6466217245c"
+    },
+    "public/bardoctor-preview-v396.js": {
+      "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
+      "after": "77e3ef9be421296500efc3227b8e722875ca3daeec38c7f8392756a35c48ddbc"
+    },
+    "public/bardoctor-preview-v397.js": {
+      "before": "6df285ccbde6709e5255b1c2a9608cc5880d5b8d6fdb5e2fcf4e67be13179e5a",
+      "after": "88d94e0178ccb841144aab43b6be706a16379f89ab580a5a86f14a0776d5344a"
+    },
+    "public/bardoctor-preview.js": {
+      "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
+      "after": "77e3ef9be421296500efc3227b8e722875ca3daeec38c7f8392756a35c48ddbc"
+    },
+    "scripts/auth-recovery-p0-browser.ts": {
+      "before": null,
+      "after": "e57b7c2c6f4d1bbaad5ff5bcfc9424e1d5c21c9d132b50551c6c8a08b3bc636d"
+    },
+    "scripts/fragments/monthly-report-v165.fragment.txt": {
+      "before": "4984041b2cfd434dd6d112fb71f94c030bb0a131926bdeafc784cdf24504c7c2",
+      "after": "fd5a9bf0f1f7038be0e4f1d9872096da9548c03d66b2c8a70fba6a291314e072"
+    },
+    "scripts/patch-finance-canonical-v515.mjs": {
+      "before": "4ad55e6f83e602983e93fcd71d50b94c3326c3d915c05d7cc3ba110c5bdb789d",
+      "after": "2761ac22bc594e8ab2752ceaecdfd4f423633fa94dcdfb271efcdaf07ebfa895"
+    },
+    "scripts/patch-production-recovery-v496.mjs": {
+      "before": "5423528e2dfafa6280e224e7f932f99bd5d26f6f0705dca8f53cedfe3cb4f870",
+      "after": "4b45824d911c20cf85a9c6d9b66401b8df12e434dfd6ca9c8b177e89c9afe8fe"
+    },
+    "scripts/sales-scroll-layout-qa.ts": {
+      "before": "97b6cd4328c4c21ec1ab7381ef7874d8f91aea2ab2b05d2e22a8c7994dbe4aee",
+      "after": "e07f6e822e532f4e2f4e52a194361afdd14527cb4ed553406e1533655013237b"
+    }
+  }
+}
