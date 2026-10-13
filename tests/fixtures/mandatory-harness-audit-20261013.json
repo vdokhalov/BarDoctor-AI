@@ -1334,8 +1334,9 @@
     },
     "scripts/derived-metrics-phase3a8-browser.ts": {
       "hits": [],
-      "sha256": "284b26ca5ae71524d3bc4f3fe0647a8de6e2598d032f4b1dd05818538adf24b2",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "8ec64d355676707287960b0b228dd40bd30749ed1dd727f3edc633a396dce9f5",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found.",
+      "followupReview": "Lifecycle observability only; no new diagnosis or cash opening action; strict negative assertions retained."
     },
     "scripts/evidence-foundation-browser.ts": {
       "hits": [],
@@ -1553,13 +1554,15 @@
     },
     "scripts/qa/webkit-environment-classifier.mjs": {
       "hits": [],
-      "sha256": "c6c27022f0ad7e329f5399aac968162a51ff43ce51924b7ecc9053b91043abde",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "527c8d21074b58f3bb157d1a9c74f048c4d9e1c7e8e86914984a1031f6b41e4f",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found.",
+      "followupReview": "Lifecycle observability only; no new diagnosis or cash opening action; strict negative assertions retained."
     },
     "scripts/qa/webkit-lifecycle-evidence.ts": {
       "hits": [],
-      "sha256": "011ac87a18e37891bfcc3eb28a3937a279f621e75edbbaff17e78f880b8c6801",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "304e7099bb13ca79144a276f7bb32bb9b1b6a0cb1b11df3bae561bf05f430450",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found.",
+      "followupReview": "Lifecycle observability only; no new diagnosis or cash opening action; strict negative assertions retained."
     },
     "scripts/qa/webkit-native-trace.sh": {
       "hits": [],
@@ -1573,8 +1576,9 @@
     },
     "scripts/qa/webkit-session-observer.js": {
       "hits": [],
-      "sha256": "9b431e451cd05f92f3da4fc82f229dbaaf4912026ee374842cfb51e72195885d",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "be81574bc1d3a807431cca6da0a743248219b8ad8fe7f9569b13e888d85840fb",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found.",
+      "followupReview": "Lifecycle observability only; no new diagnosis or cash opening action; strict negative assertions retained."
     },
     "scripts/reference-slice-legacy-doctor-browser.mjs": {
       "hits": [
@@ -2039,5 +2043,7 @@
     ],
     "removedDependency": "finance-save-refresh-observer.js no longer called by current native workday close flow; prior WIP count58 becomes57",
     "limitations": "Static audit of the specified remaining gates; not a full CI or all-width browser PASS. Previously completed gates excluded. Product routes, permissions, workflow and package dependencies unchanged."
-  }
+  },
+  "followupCommitBase": "95d28596bef4364d64579d6d2db06a8f00631b8e",
+  "followupScope": "Late workday view reconciliation; exact month-preview request/dispose/abort/replacement evidence; DOM identity guard in separate scroll gate."
 }

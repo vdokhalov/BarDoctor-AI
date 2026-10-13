@@ -7,7 +7,9 @@ export const p0Baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
 export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','build','db','drizzle','migrations','.openai','.github','package.json','package-lock.json','vite.config.ts','tsconfig.json','next.config.ts','drizzle.config.ts','postcss.config.mjs','.npmrc','.gitignore','eslint.config.mjs']);
 // User-approved P0 recovery plus isolated Doctor/scroll and audited 390/820/1280 released-module parity and current-picker harness diagnostics + Reports wizard route repair (2026-10-13). No directory exemption.
 // Confirmed 2026-10-13 mandatory harness consent/workday fixture repairs; QA only.
+// Three-blocker repair: exact workday view reconciliation and strict QA lifecycle evidence.
 export const p0Paths=Object.freeze([
+ 'scripts/derived-metrics-phase3a8-browser.ts','scripts/patch-operational-day-phase1a.mjs','scripts/qa/webkit-environment-classifier.mjs','scripts/qa/webkit-lifecycle-evidence.ts','scripts/qa/webkit-session-observer.js',
  'scripts/acquisition-stock-phase3a7-browser.ts','scripts/finance-inputs-phase3a6-browser.ts','scripts/operational-day-browser.ts','scripts/pos1-browser-qa.ts','scripts/pos1-hardening-browser.ts','scripts/restricted-manager-regression.mjs','scripts/sales-browser-qa-phase5.ts','scripts/sales-iphone-browser.ts','scripts/sales-navigation-performance.ts','scripts/sales-observations-browser.ts','scripts/sales-ux2-browser.ts',
  'scripts/management-cost-phase4a-browser.ts','scripts/management-cost-correction-phase4a-browser.ts','scripts/recheck-parity-ci-snapshots.mjs',
  'scripts/owner-qa-regressions-browser.mjs','scripts/reference-slice-legacy-doctor-browser.mjs',

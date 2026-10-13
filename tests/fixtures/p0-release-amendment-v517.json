@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "de3b09fa79b72bdfc988f9f350cc398ab5fefd87c399d57bc565fb08a7564f10"
+      "after": "eb077a99ef8056b66275605f9483404ac8f05c9d5e5ff4c989cf3beeba85dbcf"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -68,7 +68,7 @@
     },
     "scripts/sales-scroll-layout-qa.ts": {
       "before": "97b6cd4328c4c21ec1ab7381ef7874d8f91aea2ab2b05d2e22a8c7994dbe4aee",
-      "after": "1747fafa4206777691c8fbf2971f593ea88614c953285ff3b2044a3668489c27"
+      "after": "1a3c14449849ac9f7dd78ea2bca8f3d116b02793240707b3c17e28b49e79d664"
     },
     "scripts/owner-uat-v493-browser.mjs": {
       "before": "d11aa37a7442b12315f6159b4a6394097e6205b3fa04bc2356d3b3caf73a3e05",
@@ -173,6 +173,26 @@
     "scripts/sales-ux2-browser.ts": {
       "before": "3d24eb3b5ee3f2633f37c9d257b739e27548b182d3340f802b2c5e1c3e82ed93",
       "after": "ece19ec5c0b5c76efbb926bac5411aa3577e3686277dab42cd2d9ce0906c8095"
+    },
+    "scripts/derived-metrics-phase3a8-browser.ts": {
+      "before": "284b26ca5ae71524d3bc4f3fe0647a8de6e2598d032f4b1dd05818538adf24b2",
+      "after": "8ec64d355676707287960b0b228dd40bd30749ed1dd727f3edc633a396dce9f5"
+    },
+    "scripts/patch-operational-day-phase1a.mjs": {
+      "before": "0d9210b6506d925d99184cbdc4825beaf4c71793f5089a338d5e6e6bf7fffdb5",
+      "after": "8f233f97ce7a62bdb2b7decc1bbecad6b25b3c2b6e3a230668ef8b2aa38302e9"
+    },
+    "scripts/qa/webkit-environment-classifier.mjs": {
+      "before": "c6c27022f0ad7e329f5399aac968162a51ff43ce51924b7ecc9053b91043abde",
+      "after": "527c8d21074b58f3bb157d1a9c74f048c4d9e1c7e8e86914984a1031f6b41e4f"
+    },
+    "scripts/qa/webkit-lifecycle-evidence.ts": {
+      "before": "011ac87a18e37891bfcc3eb28a3937a279f621e75edbbaff17e78f880b8c6801",
+      "after": "304e7099bb13ca79144a276f7bb32bb9b1b6a0cb1b11df3bae561bf05f430450"
+    },
+    "scripts/qa/webkit-session-observer.js": {
+      "before": "9b431e451cd05f92f3da4fc82f229dbaaf4912026ee374842cfb51e72195885d",
+      "after": "be81574bc1d3a807431cca6da0a743248219b8ad8fe7f9569b13e888d85840fb"
     }
   }
 }
