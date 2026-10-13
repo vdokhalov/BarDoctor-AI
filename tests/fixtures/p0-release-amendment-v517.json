@@ -164,7 +164,7 @@
     },
     "scripts/sales-navigation-performance.ts": {
       "before": "4103ca4106282f51e7be25d988d646e81d8e0936d34b2a0473d92ba5618282b9",
-      "after": "99a9dd2a6544b58ad136361de5f358364b9ace0512a4bddc5b66b3877a71cabc"
+      "after": "4645e44fbfb4ea6fc7a2834b8cce4d5260993831c8c0b5b4d915758c5a9e979d"
     },
     "scripts/sales-observations-browser.ts": {
       "before": "d53d325ecff43650bb99fce54c9d08d4612cc11b5d254f2ec23c724ca952d9bc",
@@ -193,6 +193,22 @@
     "scripts/qa/webkit-session-observer.js": {
       "before": "9b431e451cd05f92f3da4fc82f229dbaaf4912026ee374842cfb51e72195885d",
       "after": "be81574bc1d3a807431cca6da0a743248219b8ad8fe7f9569b13e888d85840fb"
+    },
+    "public/sales-navigation.js": {
+      "before": "e319b8ac42033aeda0c46ff1df659ff6c1eb596113e76f2be7b2c4eb2df67aea",
+      "after": "fac37f8f6691e49e27d48862d8d382edfe9bd74b1cb1e79d19bd6f39079a1b79"
+    },
+    "app/cashier/route.ts": {
+      "before": "fd3efbcd75038175e3eaa62155d2531c297c481851ed5ebc58bda1e9d31852bc",
+      "after": "71574cc10cb2d790018076400a462c5b6e45e23f9e426d3c0ba345cf2b827895"
+    },
+    "app/sales-entry/route.ts": {
+      "before": "9fb08d70a5f23e30325cbc2843747bbfb07012ba427de3fc81a7a60f8c4ada31",
+      "after": "434175683ecb59f81b1e3e65caf2529d2fbe43574b3d018a7253d4ea753e1d89"
+    },
+    "app/sales-import/route.ts": {
+      "before": "752de142add6538e11a0cc361658be8709d06422af57eb17ae4f441608b40f43",
+      "after": "c5bb975b8b46135c13311a9311e5f4cd1dcae111e8e658ebf4de1aa62d52cd7d"
     }
   }
 }

@@ -17,7 +17,8 @@ import { GET as manual } from '../app/sales-entry/route';
 import { GET as journal } from '../app/sales-import/route';
 import { barDoctorResponse } from '../app/bar-doctor-response';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
-const label=process.env.BD_PERF_LABEL||'baseline';const out='outputs/sales-navigation-performance/'+label;mkdirSync(out,{recursive:true});
+const b2Only=process.env.BD_PERF_SCENARIO==='b2';
+const label=process.env.BD_PERF_LABEL||(b2Only?'b2':'baseline');const out='outputs/sales-navigation-performance/'+label;mkdirSync(out,{recursive:true});
 const runtime=await lifecycleRuntime({orders:"./app/api/pos-orders/route",health:'./app/api/business-health/route',products:'./app/api/inventory/products/route',events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
 const requests:{path:string;status:number;method:string}[]=[];let failure=false;let latency=0,apiDelay=0;
 let demo: {email:string;token:string;activeVenueId:number}|null=null;
@@ -60,7 +61,7 @@ const imported=await runtime.api.batches.POST(runtime.request(user,'/api/sales-b
 type Trace={kind:string;at:number;[key:string]:unknown};
 const browserType=process.env.BD_PERF_BROWSER==='webkit'?webkit:chromium;
 const browser=await browserType.launch(browserType===chromium?{executablePath:process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs}:{headless:true,...(process.env.BD_WEBKIT_EXECUTABLE?{executablePath:process.env.BD_WEBKIT_EXECUTABLE}:{})});
-const results:unknown[]=[];let diagnosticPage:import('playwright-core').Page|undefined;
+const results:unknown[]=[];let diagnosticPage:import('playwright-core').Page|undefined;let failureTrace:Trace[]=[];
 try{
 for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number)){
  latency=delay===1200?0:delay;apiDelay=delay===1200?1200:0;
@@ -78,11 +79,17 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  const journalReady=async()=>{await frame().locator('#journal-venue').filter({hasText:'Atelier'}).waitFor();await frame().locator('#journal-count').filter({hasText:'документов'}).waitFor();};
  const cashReady=async()=>{await page.locator('#work:not([hidden]) #cashier-view:not([hidden])').waitFor();await page.locator('[data-add="menu-0"]').waitFor({state:'attached'});};
  async function measure(name:string,action:()=>Promise<unknown>,ready:()=>Promise<unknown>){
-  trace=[];const start=Date.now();await action();await ready();await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve())));trace.push({kind:'T8:interactive',at:Date.now()});
+  trace=[];failureTrace=trace;const start=Date.now();await action();await ready();await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>resolve())));trace.push({kind:'T8:interactive',at:Date.now()});
   const tap=trace.find(e=>e.kind==='T0:pointer'&&e.at>=start)?.at||start;trace=trace.filter(e=>e.at>=tap);const offset=(event:Trace|undefined)=>event?Math.round(event.at-tap):null;
   const api=trace.filter(e=>e.kind==='T5:fetch'&&String(e.path).startsWith('/api/'));
   const stage=name[0];const critical=(event:Trace)=>stage==='O'||['/api/sales-events','/api/sales-batches','/api/pos-orders'].includes(String(event.path));const readyTrace=trace.find(e=>e.kind==='ui:state'&&({A:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),B:e.cashier,C:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),D:e.cashier,E:e.shift,F:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),G:e.manual,H:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),I:e.view==='import',J:e.view==='journal',K:e.cashier&&e.pane==='order',L:e.cashier&&e.pane==='menu',M:e.document,N:!e.document&&String(e.journal).includes('документов'),O:e.warehouse,P:e.document,Q:e.cashier&&Number(e.lines)>0,R:e.cashier&&!e.receipt&&(width!==390||e.pane==='menu'),S:e.document} as Record<string,unknown>)[stage]);const navigation=trace.filter(e=>e.kind==='T4:dom'&&e.navigation).map(e=>e.navigation as {start:number;response:number;committed:number});const feedback=trace.find(e=>e.kind==='ui:feedback'||e.kind==='ui:state'&&(e.pending||String(e.notice).includes('Выполняем')||e===readyTrace));const data={name,delay,width,browser:browserType.name(),duration:Date.now()-tap,T0:trace.some(e=>e.kind==='T0:pointer')?0:null,feedbackMs:offset(feedback),T1:offset(trace.find(e=>e.kind==='T1:click')),T2:(()=>{const marks=[offset(trace.find(e=>e.kind.startsWith('T2:'))),navigation[0]?Math.round(navigation[0].start-tap):null].filter((v):v is number=>v!==null&&v>=0);return marks.length?Math.min(...marks):null})(),T3:navigation[0]?Math.round(navigation[0].response-tap):null,T4:navigation[0]?Math.round(navigation[0].committed-tap):offset(readyTrace),T5:offset(api.find(critical)),T6:offset(trace.filter(e=>e.kind==='T6:fetch'&&critical(e)).at(-1)),T7:offset(readyTrace),T8:stage==='O'?offset(trace.at(-1)):offset(readyTrace)||offset(trace.at(-1)),automationWaitMs:offset(trace.at(-1)),api:api.map(e=>e.path),documents:trace.filter(e=>e.kind==='request'&&e.type==='document').map(e=>({path:e.path,top:e.top})),trace:[...trace]};if(label!=='baseline'&&['C','E','F','H'].includes(stage)&&delay>=100){const reads=api.filter(e=>['/api/sales-events','/api/sales-batches'].includes(String(e.path)));const firstResponse=trace.find(e=>e.kind==='T6:fetch'&&['/api/sales-events','/api/sales-batches'].includes(String(e.path)));assert.equal(reads.length,2);assert.ok(firstResponse&&reads.every(e=>e.at<firstResponse.at),name+' parallel critical reads');}if(label!=='baseline'&&['B','C','D','E','F','G','H','Q','S'].includes(stage)){assert.equal(data.documents.filter(d=>d.top).length,0,name+' retains SPA host');assert.equal(api.filter(e=>e.path==='/api/auth/bootstrap').length,0,name+' no repeated auth bootstrap');}results.push(data);writeFileSync(out+'/'+browserType.name()+'-'+width+'.json',JSON.stringify(results,null,2));console.log(JSON.stringify({...data,trace:undefined}));
  }
+ if(b2Only){
+  // Minimal B2 precondition: close an actual sales document through its owned history entry.
+  await page.goto(base+'/sales-import?venue='+venue);await journalReady();
+  await frame().locator('.journal-row').filter({hasText:'POS'}).first().tap();
+  await frame().locator('.pos-event-summary').waitFor();
+ }else{
  // Home's canonical navigation control is discovered rather than replaced by a synthetic link.
  await page.goto(base+'/home?venue='+venue);await page.waitForFunction(()=>typeof (window as unknown as {bdNavigate:unknown}).bdNavigate==='function');
  const homeSales=page.getByText('Продажи',{exact:true});
@@ -118,14 +125,22 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  await page.locator('#receipts-view .receipt-row').first().tap();
  await measure('S Success → Document',()=>page.locator('#receipt-sale').tap(),()=>frame().locator('.pos-event-summary').waitFor());
 
+ }
  if(label!=='baseline'){
-  await frame().locator('#editor-close').tap();await journalReady();
+  await frame().locator('#editor-close').tap();
+  // Close traverses history and can replace the iframe. Journal text is present
+  // behind the modal too; wait for dismissal and real hit-target actionability.
+  await frame().locator('#editor-dialog').waitFor({state:'hidden'});await journalReady();
+  await frame().locator('#open-cashier').tap({trial:true});
   await measure('B2 rapid/double tap → Cashier',async()=>{const box=await frame().locator('#open-cashier').boundingBox();assert.ok(box);await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);},cashReady);
+  assert.equal(trace.find(e=>e.kind==='T0:pointer')?.control,'open-cashier','first physical tap reaches the cashier entry');
+  assert.equal(new URL(hostPage.url()).pathname,'/cashier','host entered the actual cashier route');
+  assert.equal(new URL(hostPage.url()).searchParams.get('venue'),String(venue),'cashier retains venue');
   assert.equal(trace.filter(e=>e.kind==='request'&&e.type==='document'&&e.path==='/cashier').length,1,'one iframe navigation for two taps');
   if(width===390){await page.locator('.mobile-tabs [data-pane=order]').tap();await page.locator('.mobile-tabs [data-pane=menu]').tap();}
   assert.equal(await page.locator('#sales-navigation-status').count(),0,'no stale pending on destination');
  }
- if(label!=='baseline'&&delay===0){
+ if(!b2Only&&label!=='baseline'&&delay===0){
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();failure=true;await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'Нет связи.'}).waitFor();assert.equal(await page.locator('#connection').textContent(),'Нет соединения');assert.equal(new URL(page.url()).pathname,'/cashier');await page.unroute('**/api/sales-events*');
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);await frame().locator('#open-cashier').tap();await page.waitForURL(url=>url.pathname==='/login');await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);
@@ -133,4 +148,4 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
  }
  assert.deepEqual(errors,[]);await page.screenshot({path:out+'/'+browserType.name()+'-'+width+'-'+delay+'.png'});writeFileSync(out+'/'+browserType.name()+'-errors.json',JSON.stringify(errors));writeFileSync(out+'/'+browserType.name()+'-server-requests.json',JSON.stringify(requests));await context.close();
 }
-}catch(error){writeFileSync(out+'/'+browserType.name()+'-'+(process.env.BD_PERF_WIDTH||390)+'-failure.json',JSON.stringify({error:String(error),requests,url:diagnosticPage?.url()},null,2));await diagnosticPage?.screenshot({path:out+'/failure.png',fullPage:true}).catch(()=>{});throw error;}finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));runtime.close();}
+}catch(error){writeFileSync(out+'/'+browserType.name()+'-'+(process.env.BD_PERF_WIDTH||390)+'-failure.json',JSON.stringify({error:String(error),requests,url:diagnosticPage?.url(),trace:failureTrace},null,2));await diagnosticPage?.screenshot({path:out+'/failure.png',fullPage:true}).catch(()=>{});throw error;}finally{await browser.close();await new Promise<void>(r=>server.close(()=>r()));runtime.close();}
