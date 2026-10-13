@@ -1,10 +1,21 @@
 import fs from 'node:fs';
+import {parse} from 'acorn';
 export function patchMonthlyReturnV516(source) {
  const changes=[
  ['closure:h,onClose:()=>m(!1),onNavigate:', 'closure:h,onClose:()=>{m(!1);window.bdSyncNavigationQuery({closeMonth:null})},onNavigate:'],
  ];
  for(const [before,after] of changes){if(source.includes(after))continue;if(source.split(before).length!==2)throw Error('Monthly return anchor missing or ambiguous: '+before);source=source.replace(before,after)}
- return source;
+ // Only Reports owns a query-backed launcher. Keep the shared launcher's
+ // calculations, persistence callbacks and other callers byte-for-byte.
+ const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(node=>node.type==='FunctionDeclaration'&&node.id.name==='bdMonthClosingLauncher');
+ if(!node)throw Error('Monthly launcher required');
+ let launcher=source.slice(node.start,node.end);
+ const routeChanges=[
+  ['onClick:()=>m(!0)', 'onClick:()=>{if(window.location.pathname==="/reports"){const q=new URL(window.location.href);q.searchParams.set("month",a);q.searchParams.set("venue",String(bdMonthlyVenueIdPhase7(null,e)));q.searchParams.set("closeMonth","1");window.bdNavigate(q.pathname+q.search+q.hash)}m(!0)}'],
+  ['y=h?.status==="closed";return', 'y=h?.status==="closed";S.useEffect(()=>{if(window.location.pathname!=="/reports")return;const sync=()=>m(new URLSearchParams(window.location.search).get("closeMonth")==="1");window.addEventListener("bd:navigation-change",sync);return()=>window.removeEventListener("bd:navigation-change",sync)},[]);return'],
+ ];
+ for(const [before,after] of routeChanges){if(launcher.includes(after))continue;if(launcher.split(before).length!==2)throw Error('Monthly launcher route anchor missing or ambiguous');launcher=launcher.replace(before,after)}
+ return source.slice(0,node.start)+launcher+source.slice(node.end);
 }
 if(process.argv[1]?.endsWith('/patch-monthly-return-v516.mjs')){const p=new URL('../public/assets/index-BQGspy0I.js',import.meta.url);fs.writeFileSync(p,patchMonthlyReturnV516(fs.readFileSync(p,'utf8')))}
 

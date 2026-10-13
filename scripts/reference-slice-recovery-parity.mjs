@@ -10,11 +10,12 @@ import {installApiReadTracker} from './qa/api-read-tracker.mjs';
 
 const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require('./browser-runtime.cjs');
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
-const narrow=process.env.BD_RECOVERY_RECHECK==='reports-more-390';
+const masterOnly=process.env.BD_RECOVERY_RECHECK==='reports-master-390';
+const narrow=masterOnly||process.env.BD_RECOVERY_RECHECK==='reports-more-390';
 if(narrow){assert.equal(engine,'webkit');assert.equal(process.env.BD_RECOVERY_WIDTH,'390');assert.notEqual(process.env.BD_RECOVERY_RESUME,'unfinished','Fresh two-page snapshots required');}
-const out='outputs/reference-slice-recovery/'+(narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
+const out='outputs/reference-slice-recovery/'+(masterOnly?'reports-master-390-':narrow?'reports-more-390-':process.env.BD_RECOVERY_RECHECK==='compatibility'?'recheck-compatibility-':process.env.BD_RECOVERY_RECHECK?'recheck-':'')+engine;mkdirSync(out,{recursive:true});
 const inventory=JSON.parse(readFileSync('tests/fixtures/reference-slice-recovery/v485-functional-inventory.json','utf8'));
-if(narrow){const ids=new Set(['route:/reports','route:/more','context:/reports:Продолжить закрытие','context:/reports:'+reportDayLabel]);inventory.items=inventory.items.filter(item=>ids.has(item.id));assert.equal(inventory.items.length,4);}
+if(narrow){const ids=new Set(['route:/reports','route:/more','context:/reports:Продолжить закрытие','context:/reports:'+reportDayLabel]);inventory.items=inventory.items.filter(item=>ids.has(item.id));assert.equal(inventory.items.length,4);if(masterOnly)inventory.items=inventory.items.filter(item=>item.id==='route:/reports'||item.id==='context:/reports:Продолжить закрытие');}
 else if(process.env.BD_RECOVERY_RECHECK){const paths=process.env.BD_RECOVERY_RECHECK==='pos'?['/cashier','/team-access']:process.env.BD_RECOVERY_RECHECK==='compatibility'?['/employees/qa-barista','/warehouse?inventory=new','/data-control?event=qa-event']:['/analysis','/health','/finance?repairEquipmentId=qa-equipment'];inventory.items=inventory.items.filter(i=>paths.includes(i.path??i.from));}
 if(!process.env.BD_RECOVERY_WIDTH){
  const widths=[390,820,1280];
@@ -142,7 +143,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
           }
           locator=locator.first();await locator.waitFor({state:'visible'});if(item.entryScope==='legacy-diagnosis'){await locator.click({trial:true});record.actions[item.id]={activation:'PASS (actual run tested in separate isolated legacy diagnosis fixture)',handler:'Uce.A → POST /api/ai/diagnosis'};continue;}
           if(await locator.isDisabled()){record.actions[item.id]={disabled:true};continue;}
-          const actionOrigin=await state();await locator.click({trial:true});await locator.click();try{await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));}catch(error){if(!String(error).includes('Execution context was destroyed'))throw error;await page.waitForLoadState('domcontentloaded');}await settle();
+          const actionOrigin=await state(),masterAction=version==='candidate'&&engine==='webkit'&&width===390&&item.id==='context:/reports:Продолжить закрытие',domainBeforeMaster=masterAction?JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all()):null;await locator.click({trial:true});await locator.click();try{await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));}catch(error){if(!String(error).includes('Execution context was destroyed'))throw error;await page.waitForLoadState('domcontentloaded');}await settle();
           let after=await state();const originalPayrollFailure=version==='v485'&&errors.slice(errorsAtAction).some(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname);if(originalPayrollFailure){const original=after.url;await visit(after.url);after=await state();after.approvedPayrollProbe={original,explicitMonth:'2026-10'};}assert.equal(after.venue,String(r.venueId),item.id+' venue');
           record.actions[item.id]={url:after.url,contract:after.contract,actionOrigin:{url:actionOrigin.url,question:actionOrigin.activeDoctorQuestion},approvedPayrollProbe:after.approvedPayrollProbe??null,baselineDefects:errors.slice(errorsAtAction).filter(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname),opened:after.entries.map(e=>({label:e.label,tag:e.tag,href:e.href}))};
           if(item.target&&item.target!==after.url){
@@ -151,6 +152,28 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
             for(const[k,v]of b.searchParams)if(a.searchParams.has(k))assert.equal(a.searchParams.get(k),v,item.id+' query');
           }
           if(after.url!==actionOrigin.url){await settle();await page.reload();await settle();const reloaded=await state();assert.equal(new URL(reloaded.url,runtime.base).pathname,new URL(after.url,runtime.base).pathname,item.id+' reload destination');assert.equal(reloaded.venue,String(r.venueId),item.id+' reload venue');record.actions[item.id].reloaded={url:reloaded.url,contract:reloaded.contract,venue:reloaded.venue};}
+          if(masterAction){
+            const dialog=page.getByRole('dialog',{name:'Мастер закрытия месяца',exact:true});
+            await dialog.waitFor({state:'visible'});
+            const scope=new URL(actionOrigin.url,runtime.base);
+            const checkMasterRoute=async open=>{
+              const value=await state(),url=new URL(value.url,runtime.base);
+              assert.equal(url.pathname,'/reports');assert.equal(url.searchParams.get('month'),scope.searchParams.get('month'));
+              assert.equal(url.searchParams.get('venue'),String(r.venueId));assert.equal(value.venue,String(r.venueId));
+              assert.equal(url.searchParams.get('closeMonth'),open?'1':null);assert.equal(value.contract.type,open?'wizard':'report');
+              await dialog.waitFor({state:open?'visible':'hidden'});return value.url;
+            };
+            const reloaded=await checkMasterRoute(true);
+            await page.goBack();await settle();const back=await checkMasterRoute(false);
+            await page.goForward();await settle();const forward=await checkMasterRoute(true);
+            await page.getByRole('button',{name:'Вернуться назад',exact:true}).first().click();await settle();
+            const headerBack=await checkMasterRoute(false);
+            await page.goForward();await settle();await checkMasterRoute(true);
+            await page.getByRole('button',{name:'Закрыть мастер',exact:true}).click();await settle();const closed=await checkMasterRoute(false);
+            assert.equal(JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all()),domainBeforeMaster,'Reports navigation must not mutate domain data');
+            assert.deepEqual(fatalErrors(),[],item.id+' runtime errors');
+            record.masterNavigation={reloaded,back,forward,headerBack,closed,noDomainWrites:true};
+          }
           assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[],item.id+' HTTP 500');
         }
         if(version==='candidate'&&engine==='webkit'&&width===390&&path==='/more'){
@@ -199,7 +222,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
   const {compareRecoveryParity}=await import('./lib/reference-slice-recovery-compare.mjs');
   matrix.push(...compareRecoveryParity(inventory,versions,engine,width));
   for(const row of matrix.filter(row=>row.width===width&&row.verdict!=='PASS'))console.error(JSON.stringify({parityFailure:row}));
-  results.push({engine,width,scope:narrow?'Reports/More only; not full parity':'inventory',parity:inventory.items.length+'/'+inventory.items.length,status:matrix.some(row=>row.width===width&&row.verdict!=='PASS')?'FAIL':'PASS'});
+  results.push({engine,width,scope:masterOnly?'Reports master only; not full parity':narrow?'Reports/More only; not full parity':'inventory',parity:inventory.items.length+'/'+inventory.items.length,status:matrix.some(row=>row.width===width&&row.verdict!=='PASS')?'FAIL':'PASS'});
   writeFileSync(`${out}/parity-matrix-${width}.json`,JSON.stringify(matrix.filter(row=>row.width===width),null,2));
 }}finally{await browser.close();baseline.close();writeFileSync(`${out}/results-${process.env.BD_RECOVERY_WIDTH}.json`,JSON.stringify(results,null,2));assert.equal(createHash('sha256').update(readFileSync('public/assets/index-BQGspy0I.js')).digest('hex'),clientHash,'Candidate changed during parity verification');}
 console.log(JSON.stringify(results));

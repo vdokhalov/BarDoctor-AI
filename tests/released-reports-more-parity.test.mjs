@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
+import {patchMonthlyReturnV516} from '../scripts/patch-monthly-return-v516.mjs';
 import {compareRecoveryParity} from '../scripts/lib/reference-slice-recovery-compare.mjs';
 import {releasedEntries, releasedActionLabel, reportDayLabel, normalized, reportLinks, reportWizardContract} from '../scripts/lib/released-reports-more-parity.mjs';
 
@@ -76,14 +77,14 @@ test('Reports renamed day still requires click and unchanged finance destination
   assert.equal(f.evaluate().verdict,'PASS');
   for(const mutation of [a=>a.absent=true,a=>a.disabled=true,a=>a.url='/home',a=>a.reloaded.url='/home']){f.candidate.actions[day]=structuredClone(action);mutation(f.candidate.actions[day]);assert.equal(f.evaluate().verdict,'FAIL');}
 });
-test('Reports/More approved presentation functions are byte-identical to released v517',()=>{
+test('Reports/More presentation matches v517 except the exact approved launcher route amendment',()=>{
   const baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
   const release=execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString();
   const current=readFileSync('public/assets/index-BQGspy0I.js','utf8');
   const functions=source=>new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(node=>node.type==='FunctionDeclaration').map(node=>[node.id.name,source.slice(node.start,node.end)]));
   const before=functions(release),after=functions(current);
   for(const name of ['t_e','bdMonthlyReasonLinkV515','bdMonthlyPendingReasonsV513','bdMonthClosingLauncher','bdMonthClosingWizard','bdMonthlyShiftAnalysisV165']){
-    assert.ok(before.has(name),name+' released');assert.equal(after.get(name),before.get(name),name+' unchanged presentation');
+    assert.ok(before.has(name),name+' released');assert.equal(after.get(name),name==='bdMonthClosingLauncher'?functions(patchMonthlyReturnV516(release)).get(name):before.get(name),name+' unchanged presentation except approved route amendment');
   }
   assert.equal(readFileSync('public/navigation-contract-v247.js','utf8'),execFileSync('git',['show',baseline+':public/navigation-contract-v247.js']).toString());
   execFileSync('git',['merge-base','--is-ancestor','22be1618',baseline]);

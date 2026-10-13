@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; isolated Doctor/scroll diagnostics and v517 Reports/More WebKit390 parity harness, 2026-10-13; no additional product change",
+  "scope": "User-approved P0 recovery, scoped Reports/More390 parity diagnostics and minimal Reports launcher route repair for month/venue/closeMonth/reload/Back; no calculation changes",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "1caf772e08a5da22b60e523cac72a4bb4cbb750f4e1d6cc00ad1e2f9f90e9c0e"
+      "after": "2d35b1b33611d2ce6da3febc335b09ac39d08499a96af634485926394b9d8542"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -84,7 +84,11 @@
     },
     "scripts/reference-slice-recovery-parity.mjs": {
       "before": "a070cca32f868afe39cd89fe9fad0e0b5410e3798592de6e32258adfe7486058",
-      "after": "3931776cf9bb6a426deffcce52c114afb719d0986e6cc11bba80d775b3d97019"
+      "after": "05e1ce4e68a426b55b06f380106c1ebc91ba58726482787804411b32ee47d632"
+    },
+    "scripts/patch-monthly-return-v516.mjs": {
+      "before": "572f17238a44ed37b1be13fd35e125fbcd7e626640ad11534510d4f6fc5e9812",
+      "after": "e91c3bbbaf1abc93bdf6c995fd04a4f48c10512bf114304d162bae6ea5d97d14"
     }
   }
 }
