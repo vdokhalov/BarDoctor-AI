@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { authSchemaFailureResponse } from "./auth-schema-error";
 
 // No payload, raw URL/SQL/error text, identity IDs or credentials. Exception
 // diagnostics use a closed vocabulary: unknown text is never copied to logs.
@@ -97,6 +98,8 @@ export function withInfrastructureErrorBoundary(request: Request, operation: () 
   const execute = async () => {
     try { return await operation(); } catch (error) {
       observedFailure(error, "api.boundary");
+      const schemaFailure = authSchemaFailureResponse(error);
+      if (schemaFailure) { emit("error.boundary", { outcome: "auth_schema_unavailable", status: 503 }); return schemaFailure; }
       emit("error.boundary", { outcome: "infrastructure_failure", status: 500 });
       return Response.json({ ok: false, code: "INFRASTRUCTURE_ERROR",
         error: "Не удалось выполнить операцию. Изменения не подтверждены.",
@@ -115,6 +118,7 @@ function failureKind(error: unknown): "abort" | "timeout" | "error" {
 }
 
 function emit(event: string, fields: { stage?: Stage; span?: number; parentSpan?: number;
+  attemptId?: string; ageMs?: number;
   durationMs?: number; status?: number; outcome?: string; timeoutSource?: string;
   operation?: Stage | "api.boundary"; authenticationStage?: Stage; ownerReconciliationStage?: Stage;
   attempt?: number; casAttempt?: number; casMaxAttempts?: number; error?: SafeError } = {}) {
@@ -140,6 +144,10 @@ export function observedScope(authenticated: boolean, authorizedVenue = false): 
 }
 
 export function observedBoundary(): void { emit("error.boundary", { outcome: "controlled_response" }); }
+
+export function observedAuthSchema(fields: { attemptId: string; ageMs: number; outcome: string }): void {
+  emit("auth.schema.lifecycle", { stage: "auth.schema", ...fields });
+}
 
 export async function observedAwait<T>(stage: Stage, operation: () => T | PromiseLike<T>): Promise<T> {
   const c = contexts.getStore();

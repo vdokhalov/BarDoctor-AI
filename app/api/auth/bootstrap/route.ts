@@ -1,3 +1,4 @@
+import { authSchemaFailureResponse } from "../../../../lib/bardoctor/auth-schema-error";
 import {
   authenticateIdentityRequest,
   authResult,
@@ -48,7 +49,9 @@ export async function POST(request: Request): Promise<Response> {
       { ok: false, needsLogin: true, error: "Войдите один раз, чтобы завершить перенос из Replit" },
       { status: 401 },
     );
-  } catch {
+  } catch (error) {
+    const failure = authSchemaFailureResponse(error);
+    if (failure) return failure;
     observedBoundary();
     return Response.json(
       { ok: false, error: "Не удалось подготовить локальную сессию" },

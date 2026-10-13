@@ -1,3 +1,5 @@
+import { ensureAuthSchema } from "./auth-schema";
+export { ensureAuthSchema } from "./auth-schema";
 import { membershipWithJobTitle } from "./staff-job-storage";
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
@@ -39,49 +41,6 @@ export function normalizeEmail(value: string): string {
   return normalizeAccountEmail(value);
 }
 
-let authSchemaReady: Promise<void> | null = null;
-
-async function initializeAuthSchema(): Promise<void> {
-  const d1 = getD1();
-  const columns = await d1
-    .prepare("PRAGMA table_info(accounts)")
-    .all<{ name: string }>();
-  const existing = new Set(columns.results.map((column) => column.name));
-  const statements: D1PreparedStatement[] = [];
-
-  if (!existing.has("password_hash")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN password_hash text"));
-  }
-  if (!existing.has("password_salt")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN password_salt text"));
-  }
-  if (!existing.has("password_iterations")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN password_iterations integer"));
-  }
-  if (!existing.has("owns_venue")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN owns_venue integer DEFAULT 1 NOT NULL"));
-  }
-  if (!existing.has("account_kind")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN account_kind text DEFAULT 'user' NOT NULL"));
-  }
-  if (!existing.has("avatar_id")) {
-    statements.push(d1.prepare("ALTER TABLE accounts ADD COLUMN avatar_id text"));
-  }
-  statements.push(d1.prepare("DROP INDEX IF EXISTS accounts_chatgpt_email_uq"));
-
-  await d1.batch(statements);
-}
-
-export async function ensureAuthSchema(): Promise<void> {
-  if (!authSchemaReady) {
-    authSchemaReady = initializeAuthSchema().catch((error) => {
-      authSchemaReady = null;
-      throw error;
-    });
-  }
-  await observedAwait("auth.schema", () => authSchemaReady);
-}
-
 function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -105,8 +64,8 @@ export function getChatGPTEmail(request: Request): string | null {
   return value?.trim() ? normalizeEmail(value) : null;
 }
 
-export async function findAccountByAppEmail(email: string): Promise<Account | null> {
-  await ensureAuthSchema();
+export async function findAccountByAppEmail(email: string, request?: Request): Promise<Account | null> {
+  await ensureAuthSchema(request);
   const [account] = await getDb()
     .select()
     .from(accounts)
@@ -198,7 +157,7 @@ async function sessionForRequest(request: Request, readOnly = false): Promise<{
   if (!credentials) return null;
   const { email, token } = credentials;
 
-  if (!readOnly) await ensureAuthSchema();
+  if (!readOnly) await ensureAuthSchema(request);
   const tokenHash = await sha256Hex(token);
   const now = new Date().toISOString();
   const [row] = await getDb()

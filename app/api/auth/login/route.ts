@@ -1,3 +1,4 @@
+import { authSchemaFailureResponse } from "../../../../lib/bardoctor/auth-schema-error";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { accounts } from "../../../../db/schema";
@@ -36,7 +37,7 @@ export async function POST(request: Request): Promise<Response> {
     }
 
     const email = normalizeEmail(body.email);
-    const existing = await findAccountByAppEmail(email);
+    const existing = await findAccountByAppEmail(email, request);
     if (existing?.passwordHash) {
       const valid = await verifyPassword(body.password, existing);
       if (!valid) {
@@ -107,6 +108,8 @@ export async function POST(request: Request): Promise<Response> {
         : null,
     }, token, request);
   } catch (error) {
+    const failure = authSchemaFailureResponse(error);
+    if (failure) return failure;
     console.error(
       "BarDoctor login failed",
       error instanceof Error ? error.message : "Unknown login error",

@@ -328,6 +328,10 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
 /* inventory-boundary-presentation-v515 */
 function bdInventoryAccountingBoundaryV515(value){return!!value&&typeof value==="object"&&!Array.isArray(value.items)&&value.scope==null&&value.internalId==null&&(Object.hasOwn(value,"sections")||Object.hasOwn(value,"total"))}
 function bdInventoryBoundaryInfoV515(value){const amounts=value.sections&&typeof value.sections==="object"&&!Array.isArray(value.sections)?Object.values(value.sections):[],valid=amounts.length>0&&amounts.every(x=>typeof x==="number"&&Number.isFinite(x)&&x>=0),sum=valid?Math.round(amounts.reduce((a,b)=>a+b,0)*100)/100:null,total=value.total,known=valid&&(total===undefined||typeof total==="number"&&Number.isFinite(total)&&Math.round(total*100)===Math.round(sum*100))&&(value.status==null||value.status==="confirmed"||value.status==="completed");const date=String(value.date||""),parsed=new Date(date+"T00:00:00Z"),dateValid=/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===date,month=dateValid?date.slice(0,7):null,venue=String(value.venueId||new URLSearchParams(window.location.search).get("venue")||window.localStorage?.getItem("bd_active_venue_id")||"");const query=new URLSearchParams;if(month)query.set("month",month);if(venue&&venue!=="primary")query.set("venue",venue);if(month&&date.endsWith("-01"))query.set("closeMonth","1");return{known,amount:known?sum:null,date:dateValid?date:"Дата не указана",currency:String(value.currency||value.accountingCurrency||"").toUpperCase(),href:"/reports"+(query.size?"?"+query.toString():"")}}
