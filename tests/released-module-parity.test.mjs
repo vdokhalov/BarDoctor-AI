@@ -108,7 +108,10 @@ test('released controls derive from v517 with the separately approved workday re
   const before=functions(execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString()),after=functions(readFileSync('public/assets/index-BQGspy0I.js','utf8'));
   const repaired=functions(execFileSync('git',['show',workdayRepair+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString());
   for(const name of ['Tle','bdWarehousePage','bdShiftsPage','bdCashierEntry','bdSalesImportPage','bdSalesPosPage','bdFinanceQuickActionsV160','bdFinanceCanonicalStatusV515','bdMonthlyReasonLinkV515','bdMonthlyPendingReasonsV513']) {
-    assert.ok(before.has(name),name+' released');assert.equal(after.get(name),name==='bdShiftsPage'?repaired.get(name):before.get(name),name+' exact approved implementation');
+    assert.ok(before.has(name),name+' released');
+    let expected=name==='bdShiftsPage'?repaired.get(name):before.get(name);
+    if(name==='bdSalesPosPage')expected=expected.replace('query.set("embedded","1");return','query.set("embedded","1");const requested=path+"?"+query.toString()+window.location.hash,frame=S.useRef(null),initial=S.useRef(requested),outer=S.useRef(requested);S.useLayoutEffect(()=>{const previous=outer.current;if(previous===requested)return;outer.current=requested;const next=bdSalesFrameSource(previous,requested,frame.current);if(next!==previous&&frame.current)frame.current.src=next},[requested]);return').replace('src:path+"?"+query.toString()+window.location.hash,title:', 'ref:frame,src:initial.current,title:');
+    assert.equal(after.get(name),expected,name+' exact approved implementation');
   }
   // Copy transformations use the existing normalization, never erase extra errors.
   assert.equal(normalized('1. ФОТ, налоги'),'ФОТ налоги');

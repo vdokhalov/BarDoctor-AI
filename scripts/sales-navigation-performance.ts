@@ -17,8 +17,8 @@ import { GET as manual } from '../app/sales-entry/route';
 import { GET as journal } from '../app/sales-import/route';
 import { barDoctorResponse } from '../app/bar-doctor-response';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
-const b2Only=process.env.BD_PERF_SCENARIO==='b2';
-const label=process.env.BD_PERF_LABEL||(b2Only?'b2':'baseline');const out='outputs/sales-navigation-performance/'+label;mkdirSync(out,{recursive:true});
+const b2Only=process.env.BD_PERF_SCENARIO==='b2',journalOnly=process.env.BD_PERF_SCENARIO==='journal-document',scopedOnly=b2Only||journalOnly;
+const label=process.env.BD_PERF_LABEL||(journalOnly?'journal-document':b2Only?'b2':'baseline');const out='outputs/sales-navigation-performance/'+label;mkdirSync(out,{recursive:true});
 const runtime=await lifecycleRuntime({orders:"./app/api/pos-orders/route",health:'./app/api/business-health/route',products:'./app/api/inventory/products/route',events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route'});
 const requests:{path:string;status:number;method:string}[]=[];let failure=false;let latency=0,apiDelay=0;
 let demo: {email:string;token:string;activeVenueId:number}|null=null;
@@ -84,10 +84,27 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
   const api=trace.filter(e=>e.kind==='T5:fetch'&&String(e.path).startsWith('/api/'));
   const stage=name[0];const critical=(event:Trace)=>stage==='O'||['/api/sales-events','/api/sales-batches','/api/pos-orders'].includes(String(event.path));const readyTrace=trace.find(e=>e.kind==='ui:state'&&({A:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),B:e.cashier,C:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),D:e.cashier,E:e.shift,F:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),G:e.manual,H:e.venue==='Atelier · Wine & Kitchen'&&String(e.journal).includes('документов'),I:e.view==='import',J:e.view==='journal',K:e.cashier&&e.pane==='order',L:e.cashier&&e.pane==='menu',M:e.document,N:!e.document&&String(e.journal).includes('документов'),O:e.warehouse,P:e.document,Q:e.cashier&&Number(e.lines)>0,R:e.cashier&&!e.receipt&&(width!==390||e.pane==='menu'),S:e.document} as Record<string,unknown>)[stage]);const navigation=trace.filter(e=>e.kind==='T4:dom'&&e.navigation).map(e=>e.navigation as {start:number;response:number;committed:number});const feedback=trace.find(e=>e.kind==='ui:feedback'||e.kind==='ui:state'&&(e.pending||String(e.notice).includes('Выполняем')||e===readyTrace));const data={name,delay,width,browser:browserType.name(),duration:Date.now()-tap,T0:trace.some(e=>e.kind==='T0:pointer')?0:null,feedbackMs:offset(feedback),T1:offset(trace.find(e=>e.kind==='T1:click')),T2:(()=>{const marks=[offset(trace.find(e=>e.kind.startsWith('T2:'))),navigation[0]?Math.round(navigation[0].start-tap):null].filter((v):v is number=>v!==null&&v>=0);return marks.length?Math.min(...marks):null})(),T3:navigation[0]?Math.round(navigation[0].response-tap):null,T4:navigation[0]?Math.round(navigation[0].committed-tap):offset(readyTrace),T5:offset(api.find(critical)),T6:offset(trace.filter(e=>e.kind==='T6:fetch'&&critical(e)).at(-1)),T7:offset(readyTrace),T8:stage==='O'?offset(trace.at(-1)):offset(readyTrace)||offset(trace.at(-1)),automationWaitMs:offset(trace.at(-1)),api:api.map(e=>e.path),documents:trace.filter(e=>e.kind==='request'&&e.type==='document').map(e=>({path:e.path,top:e.top})),trace:[...trace]};if(label!=='baseline'&&['C','E','F','H'].includes(stage)&&delay>=100){const reads=api.filter(e=>['/api/sales-events','/api/sales-batches'].includes(String(e.path)));const firstResponse=trace.find(e=>e.kind==='T6:fetch'&&['/api/sales-events','/api/sales-batches'].includes(String(e.path)));assert.equal(reads.length,2);assert.ok(firstResponse&&reads.every(e=>e.at<firstResponse.at),name+' parallel critical reads');}if(label!=='baseline'&&['B','C','D','E','F','G','H','Q','S'].includes(stage)){assert.equal(data.documents.filter(d=>d.top).length,0,name+' retains SPA host');assert.equal(api.filter(e=>e.path==='/api/auth/bootstrap').length,0,name+' no repeated auth bootstrap');}results.push(data);writeFileSync(out+'/'+browserType.name()+'-'+width+'.json',JSON.stringify(results,null,2));console.log(JSON.stringify({...data,trace:undefined}));
  }
- if(b2Only){
+ if(scopedOnly){
   // Minimal B2 precondition: close an actual sales document through its owned history entry.
   await page.goto(base+'/sales-import?venue='+venue);await journalReady();
-  await frame().locator('.journal-row').filter({hasText:'POS'}).first().tap();
+  if(journalOnly){
+   await waitForSalesHostReads(hostPage);
+   const ledger=()=>JSON.stringify(runtime.sqlite.prepare("SELECT store_key,data_json FROM domain_data WHERE account_id=? AND store_key IN ('bd_sales_events_v1','bd_sales_batches') ORDER BY store_key").all(user.userId));
+   const before=ledger();const documentHandle=await frame().locator('body').evaluateHandle(e=>e.ownerDocument);
+   const documentButton=frame().locator('.journal-row').filter({hasText:'POS'}).first();
+   await measure('I Journal → Import',()=>frame().locator('[data-sales-view=import]').tap(),()=>frame().locator('#import-entry:not([hidden])').waitFor());
+   await measure('J Import → Journal',()=>frame().locator('[data-sales-view=journal]').tap(),()=>frame().locator('#journal-layout:not([hidden])').waitFor());
+   await measure('M Journal → Document',()=>documentButton.tap(),()=>frame().locator('.pos-event-summary').waitFor());
+   const detail=await frame().locator('.pos-event-summary').innerText();assert.ok(detail.trim());
+   await measure('N Document → Journal',()=>frame().locator('#editor-dialog [data-close-editor],#editor-close').first().tap(),()=>frame().locator('#editor-dialog:not([open])').waitFor({state:'attached'}));
+   await journalReady();
+   assert.equal(await frame().locator('body').evaluate((e,doc)=>e.ownerDocument===doc,documentHandle),true,'view query echo retains the actual document');
+   assert.equal((results as {documents:unknown[]}[]).flatMap(r=>r.documents).length,0,'I/J/M/N do not navigate the iframe');
+   await documentButton.tap();await frame().locator('.pos-event-summary').waitFor();
+   assert.equal(await frame().locator('.pos-event-summary').innerText(),detail,'same saved document reopens after return');
+   assert.equal(ledger(),before,'navigation preserves posted sales and batches');
+   await documentHandle.dispose();
+  }else await frame().locator('.journal-row').filter({hasText:'POS'}).first().tap();
   await frame().locator('.pos-event-summary').waitFor();
  }else{
  // Home's canonical navigation control is discovered rather than replaced by a synthetic link.
@@ -140,7 +157,17 @@ for(const delay of (process.env.BD_PERF_DELAYS||'0,300').split(',').map(Number))
   if(width===390){await page.locator('.mobile-tabs [data-pane=order]').tap();await page.locator('.mobile-tabs [data-pane=menu]').tap();}
   assert.equal(await page.locator('#sales-navigation-status').count(),0,'no stale pending on destination');
  }
- if(!b2Only&&label!=='baseline'&&delay===0){
+ if(journalOnly){
+  await page.locator('#sales-journal').tap();await journalReady();
+  await frame().locator('[data-sales-view=import]').tap();await frame().locator('#import-entry:not([hidden])').waitFor();
+  await hostPage.waitForURL(url=>url.searchParams.get('view')==='import');
+  await hostPage.evaluate(()=>{(window as unknown as {bdNavigate:(path:string,options:object)=>void}).bdNavigate('/sales-import?venue='+localStorage.bd_active_venue_id,{replace:true});});
+  await journalReady();await frame().locator('#journal-layout:not([hidden])').waitFor();
+  assert.equal(new URL(hostPage.url()).searchParams.get('view'),null,'external query return is reflected in both documents');
+  const actual=await frame().locator('body').evaluate(()=>location.href);assert.equal(new URL(actual).searchParams.get('view'),null);
+  console.log(JSON.stringify({externalQueryReturn:true,documentReopenedUnchanged:true,postedLedgerUnchanged:true,width,delay}));
+ }
+ if(!scopedOnly&&label!=='baseline'&&delay===0){
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();failure=true;await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await frame().locator('#open-cashier').tap();await page.locator('#notice').filter({hasText:'Нет связи.'}).waitFor();assert.equal(await page.locator('#connection').textContent(),'Нет соединения');assert.equal(new URL(page.url()).pathname,'/cashier');await page.unroute('**/api/sales-events*');
   await waitForSalesHostReads(hostPage);await page.goto(base+'/sales-import?venue='+venue);await journalReady();runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);await frame().locator('#open-cashier').tap();await page.waitForURL(url=>url.pathname==='/login');await page.locator('input[type=email]').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('bd_session_token')),null);runtime.sqlite.prepare('UPDATE sessions SET expires_at=? WHERE account_id=?').run(new Date(Date.now()+86400000).toISOString(),user.userId);

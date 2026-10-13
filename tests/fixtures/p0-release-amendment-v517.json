@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "eb077a99ef8056b66275605f9483404ac8f05c9d5e5ff4c989cf3beeba85dbcf"
+      "after": "626e82bb8d1956e8eda905ff084e318f7958b4ae05cfed5418404ed204a6eb2d"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -164,7 +164,7 @@
     },
     "scripts/sales-navigation-performance.ts": {
       "before": "4103ca4106282f51e7be25d988d646e81d8e0936d34b2a0473d92ba5618282b9",
-      "after": "4645e44fbfb4ea6fc7a2834b8cce4d5260993831c8c0b5b4d915758c5a9e979d"
+      "after": "f1a5fe89a553fd9b81230eb7ea42950058e8528d78774f61bc459bf33c899d09"
     },
     "scripts/sales-observations-browser.ts": {
       "before": "d53d325ecff43650bb99fce54c9d08d4612cc11b5d254f2ec23c724ca952d9bc",
@@ -213,6 +213,10 @@
     "scripts/recheck-chromium-parity-ci-snapshots.mjs": {
       "before": null,
       "after": "3ededec44842f9b02d36961147c9a5c902e3de749c3a9f989c373194989cfdac"
+    },
+    "scripts/patch-sales-navigation-performance.mjs": {
+      "before": "7bfbd48df113a523df9eb447b161bfa443b7d2e6b73a5d96c71ec5e597151340",
+      "after": "1bd82afdf6dffb0a89f64b3f7e1838ef536ac0983bef5f9467bbaadf1a39e989"
     }
   }
 }

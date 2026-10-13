@@ -10,7 +10,9 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Three-blocker repair: exact workday view reconciliation and strict QA lifecycle evidence.
 // Confirmed B2 cross-document double-touch repair and its three asset references.
 // Chromium release parity: independent CI observations plus mandatory scoped More/Reports capture.
+// Preserve child-owned Sales document across query echo; real external navigation stays active.
 export const p0Paths=Object.freeze([
+ 'scripts/patch-sales-navigation-performance.mjs',
  'scripts/recheck-chromium-parity-ci-snapshots.mjs',
  'public/sales-navigation.js','app/cashier/route.ts','app/sales-entry/route.ts','app/sales-import/route.ts',
  'scripts/derived-metrics-phase3a8-browser.ts','scripts/patch-operational-day-phase1a.mjs','scripts/qa/webkit-environment-classifier.mjs','scripts/qa/webkit-lifecycle-evidence.ts','scripts/qa/webkit-session-observer.js',

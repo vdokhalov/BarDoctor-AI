@@ -3,7 +3,8 @@ const path='public/assets/index-BQGspy0I.js';
 let source=fs.readFileSync(path,'utf8');
 const start='/* sales-navigation-performance:start */',end='/* sales-navigation-performance:end */';
 const fragment=`${start}
-function bdSalesPosPage(){const[,navigate]=bt(),path=window.location.pathname,search=ste(),query=new URLSearchParams(search);query.set("embedded","1");return i.jsx(nt,{showBottomNav:!0,children:i.jsx("iframe",{src:path+"?"+query.toString()+window.location.hash,title:"Продажи и склад","data-bd-sales-surface":"true",onLoad:event=>bdPrepareEmbeddedPage(event,navigate),style:{display:"block",width:"100%",height:"calc(100dvh - var(--bd-header-total,64px) - 78px - env(safe-area-inset-bottom,0px))",border:0,background:"#f5f6fb"}})})}
+function bdSalesFrameSource(previous,requested,frame){if(previous&&frame){try{const current=new URL(frame.contentWindow.location.href),target=new URL(requested,window.location.origin);current.searchParams.sort();target.searchParams.sort();if(current.href===target.href)return previous}catch{}}return requested}
+function bdSalesPosPage(){const[,navigate]=bt(),path=window.location.pathname,search=ste(),query=new URLSearchParams(search);query.set("embedded","1");const requested=path+"?"+query.toString()+window.location.hash,frame=S.useRef(null),initial=S.useRef(requested),outer=S.useRef(requested);S.useLayoutEffect(()=>{const previous=outer.current;if(previous===requested)return;outer.current=requested;const next=bdSalesFrameSource(previous,requested,frame.current);if(next!==previous&&frame.current)frame.current.src=next},[requested]);return i.jsx(nt,{showBottomNav:!0,children:i.jsx("iframe",{ref:frame,src:initial.current,title:"Продажи и склад","data-bd-sales-surface":"true",onLoad:event=>bdPrepareEmbeddedPage(event,navigate),style:{display:"block",width:"100%",height:"calc(100dvh - var(--bd-header-total,64px) - 78px - env(safe-area-inset-bottom,0px))",border:0,background:"#f5f6fb"}})})}
 
 ${end}
 `;

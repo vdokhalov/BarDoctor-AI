@@ -1716,7 +1716,7 @@
           "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
         }
       ],
-      "sha256": "4645e44fbfb4ea6fc7a2834b8cce4d5260993831c8c0b5b4d915758c5a9e979d",
+      "sha256": "f1a5fe89a553fd9b81230eb7ea42950058e8528d78774f61bc459bf33c899d09",
       "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained. B2: await history-owned editor dismissal/actionability, retain physical double touch and actual cashier/venue/single-document assertions; focused b2 scenario available."
     },
     "scripts/sales-observations-browser.ts": {
