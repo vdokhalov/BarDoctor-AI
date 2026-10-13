@@ -68,7 +68,7 @@
     },
     "scripts/sales-scroll-layout-qa.ts": {
       "before": "97b6cd4328c4c21ec1ab7381ef7874d8f91aea2ab2b05d2e22a8c7994dbe4aee",
-      "after": "1a3c14449849ac9f7dd78ea2bca8f3d116b02793240707b3c17e28b49e79d664"
+      "after": "142be2f9997ea22f00c82b04b0185636ccafe4f729953877abaf0528d8d0789f"
     },
     "scripts/owner-uat-v493-browser.mjs": {
       "before": "d11aa37a7442b12315f6159b4a6394097e6205b3fa04bc2356d3b3caf73a3e05",

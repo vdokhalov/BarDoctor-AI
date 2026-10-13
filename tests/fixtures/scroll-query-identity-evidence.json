@@ -1,0 +1,88 @@
+{
+  "baseCommit": "5264f3b8c5492bc7f2b70b6e3fd1dddb8f77cc66",
+  "failedRun": 38451174342,
+  "scope": "QA-only Journal/Import identity readiness; no product/workflow/helper changes",
+  "checks": 39,
+  "profile": {
+    "engine": "webkit",
+    "width": 820,
+    "height": 1000,
+    "delay": 0
+  },
+  "transitionChecks": [
+    {
+      "label": "Journal to Import document retained",
+      "documentCheck": {
+        "sameDocument": true,
+        "departed": false,
+        "beforeTimeOrigin": 1791919711993,
+        "afterTimeOrigin": 1791919711993
+      }
+    },
+    {
+      "label": "Import to Journal document retained",
+      "documentCheck": {
+        "sameDocument": true,
+        "departed": false,
+        "beforeTimeOrigin": 1791919711993,
+        "afterTimeOrigin": 1791919711993
+      }
+    }
+  ],
+  "browserErrors": [],
+  "negativeControls": {
+    "tests": 2,
+    "pass": 2,
+    "covers": [
+      "same-document history accepted",
+      "timestamp drift accepted for same DOM document",
+      "real reload rejected even with identical timeOrigin",
+      "pagehide departure rejected",
+      "post-gesture scroll shift rejected",
+      "after-ready layout shift rejected",
+      "missing scrollend rejected"
+    ]
+  },
+  "staticScan": {
+    "otherReloadWait": "scripts/auth-recovery-p0-browser.ts:71",
+    "decision": "Retained: real full document replacement after successful login, unrelated to query-only iframe panels. No other stale reload requirement found in scripts/tests."
+  },
+  "attempts": [
+    {
+      "result": "FAIL",
+      "reason": "Exact URL string assumed query parameter order: view before embedded. Same complete parameter set with embedded before view. Fixed by sorting URLSearchParams on both full URLs."
+    },
+    {
+      "result": "PASS",
+      "checks": 39
+    }
+  ],
+  "runtime": "Existing verified WebKit2370 + pinned libsoup; explicit executable supplied. Negative-control preload only selects same executable; test files/helpers/assertions unchanged.",
+  "validation": {
+    "lint": "PASS",
+    "healthDoctorReleaseGuard": "PASS",
+    "types": "PASS",
+    "releaseGuardTests": 3
+  },
+  "evidenceSha256": {
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "webkit-executable.mjs": "590fb597464c2ee92e09c5d139c564c97a9746115310f46e49efc2540f683cac",
+    "timeorigin-static-scan.txt": "04b3f2f4a1bf9c5d94c924de44f23fdbcc6945de29617a8cfc86f3661ea49b2d",
+    "webkit-tablet-delay0.log": "6fb3d403b7bd4015e0a7fd30836196bdd7a6c4ddd5ca744441c3b4817f0465b5",
+    "attempt1-query-order.log": "23740b5ab9eb67122a152fb07157acd7b4cc6312172f45ac00079389a7fabe78",
+    "negative-controls.log": "24ca3442593b2e0488a18853edf912547a0f5f495fd45010aab07377c39f73b0",
+    "attempt1-failure.json": "e0b6c4590900565f9ff9704f22d91dff1790e09134405d965ba7ac5ab2db9ebd",
+    "release-guard.log": "f3d1d632869421f9f0df40b885789adb1419487a699f151bb642db3b051d8abc",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "passed/webkit-tablet-summary.json": "8e308610d70d404fd547d80571363b73383c9f3fcefa85df19e7a0b611fb9c3b",
+    "passed/webkit-tablet-0-stable-order-5.json": "2e83e82563c179eb53ceda78e96627aa309017baeacea57fb90aa5ca66688c89",
+    "passed/webkit-tablet-0-stable-order-1.json": "8f6ad8ce2cc0ca852a9d7aaefcc3e2524284a9b624c43568fab47a287f9cd8cb",
+    "passed/webkit-tablet-0-stable-order-13.json": "792a804b67fc3924ee0d1000fc59e40c20d6202e72eb69dd4b0e01eb19f6cd62",
+    "passed/webkit-tablet-0-stable-import-idle.json": "05ee9bc2141f9c9976e190c3890525c4ffd0ad601d9ea24bab1e7d279e26737c",
+    "passed/webkit-tablet-0-stable-journal-idle.json": "b36ca021a51c6a33ec71ebd7ea306604985cef50f1de21964d5a83e0b0e786fa",
+    "passed/webkit-tablet-0.json": "be9e9ede3a41b79f85a3154f43b0b41479a0fb377db5304bcbc2c37842154056",
+    "passed/webkit-tablet-0-identity.json": "f25e860197bab9ae727e8e69c1e10ad2347233595afc4d30edf91b1742cbf146",
+    "passed/webkit-tablet-0-stable-order-0.json": "d6f96450204aa8758daf5528711f19db1eaa0d139b8300d0f7a8191b940a0e28"
+  },
+  "remaining": "Current CI5264 still running other browser jobs. This local harness change is not pushed; no second CI started."
+}

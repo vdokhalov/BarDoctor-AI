@@ -157,20 +157,19 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  await toTop();await l('#manual-nav').tap();await l('#sale:not([hidden])').waitFor();await gesture('H manual first');for(let i=0;i<8;i++)await l('#add-line').tap();await gesture('H manual long');
  await l('[data-menu]').first().selectOption('menu-0');await l('[data-quantity]').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('[data-quantity]').first().blur();await p.setViewportSize({width,height});await gesture('keyboard manual restored');
  await toTop();await l('header>a').tap();await readyJournal();await gesture('I manual journal');
- await toTop();const importPreviousDocument=await f().evaluate(()=>performance.timeOrigin);await l('[data-sales-view="import"]').tap();
- // Wait for the destination document, not the old iframe's already-visible
- // Import pane while the host is still replacing its src after navigation.
- // replaceState changes the old URL synchronously; document identity must change.
+ await toTop();const importPreviousDocument=await captureDocumentIdentity(f());await l('[data-sales-view="import"]').tap();
+ // Query-only panel switches retain the child document. Require both URLs and
+ // the destination pane to be ready, then prove the real DOM document survives
+ // the first gesture; a host echo that reloads the iframe must fail.
  await p.waitForURL(url=>url.searchParams.get('view')==='import');
- const importUrl=new URL(p.url());importUrl.searchParams.set('embedded','1');
- await f().waitForFunction(previous=>performance.timeOrigin!==previous,importPreviousDocument);
- await f().waitForURL(importUrl.href,{waitUntil:'domcontentloaded'});
- await l('#import-entry:not([hidden])').waitFor();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');await gesture('J import repeated');await importReadyAndIdle();await p.screenshot({path:out+'/'+id+'-import.png'});
- await toTop();await l('#quality-list [data-batch]').first().tap();await l('.mapping-select select').first().waitFor();if(width===390)assert.ok(await l('.mapping-select select').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('.mapping-select select').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('.mapping-select select').first().blur();await p.setViewportSize({width,height});await gesture('keyboard import mapping restored');await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await toTop();const journalPreviousDocument=await f().evaluate(()=>performance.timeOrigin);await l('[data-sales-view="journal"]').tap();
+ const importUrl=new URL(p.url());importUrl.searchParams.set('embedded','1');importUrl.searchParams.sort();
+ await f().waitForURL(url=>{url.searchParams.sort();return url.href===importUrl.href;},{waitUntil:'domcontentloaded'});
+ await l('#import-entry:not([hidden])').waitFor();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');checks.push({label:'Journal to Import document retained',documentCheck:await assertDocumentIdentity(f(),importPreviousDocument,id+' Journal to Import')});await gesture('J import repeated');await importReadyAndIdle();await p.screenshot({path:out+'/'+id+'-import.png'});
+ await toTop();await l('#quality-list [data-batch]').first().tap();await l('.mapping-select select').first().waitFor();if(width===390)assert.ok(await l('.mapping-select select').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('.mapping-select select').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('.mapping-select select').first().blur();await p.setViewportSize({width,height});await gesture('keyboard import mapping restored');await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await toTop();const journalPreviousDocument=await captureDocumentIdentity(f());await l('[data-sales-view="journal"]').tap();
  await p.waitForURL(url=>!url.searchParams.has('view')||url.searchParams.get('view')==='journal');
- const journalUrl=new URL(p.url());journalUrl.searchParams.set('embedded','1');
- await f().waitForFunction(previous=>performance.timeOrigin!==previous,journalPreviousDocument);
- await f().waitForURL(journalUrl.href,{waitUntil:'domcontentloaded'});await readyJournal();
+ const journalUrl=new URL(p.url());journalUrl.searchParams.set('embedded','1');journalUrl.searchParams.sort();
+ await f().waitForURL(url=>{url.searchParams.sort();return url.href===journalUrl.href;},{waitUntil:'domcontentloaded'});await readyJournal();
+ checks.push({label:'Import to Journal document retained',documentCheck:await assertDocumentIdentity(f(),journalPreviousDocument,id+' Import to Journal')});
  await l('.journal-row').filter({hasText:'POS'}).last().tap();await l('.pos-event-summary').waitFor();await gesture('K document');await p.screenshot({path:out+'/'+id+'-document.png'});await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await gesture('K close first');
  await toTop();await l('a[href="/sales-entry?view=shifts"]').tap();await l('.cash-shift').first().waitFor();await p.goBack();await readyJournal();await gesture('L history back');await p.goForward();await l('.cash-shift').first().waitFor();await gesture('L history forward');
  // Delay read completion while a user has already started scrolling Import.

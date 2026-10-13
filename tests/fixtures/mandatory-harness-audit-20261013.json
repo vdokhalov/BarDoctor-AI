@@ -2005,6 +2005,11 @@
       "hits": [],
       "sha256": "093a1d02131201888f4ac2186240b3aa29911e72eea11504fdf70d987b63a518",
       "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/sales-scroll-layout-qa.ts": {
+      "sha256": "142be2f9997ea22f00c82b04b0185636ccafe4f729953877abaf0528d8d0789f",
+      "hits": [],
+      "review": "Approved minimal follow-up for CI38451174342: query-only Journal/Import transitions must retain DOM document identity. Require complete normalized host/iframe URL equality and ready destination pane; actual DOM handle rejects reload even with identical timeOrigin. Preserve all gesture, idle scroll, late-data, overlay, venue, API, and error assertions. Shared negative-control helpers unchanged."
     }
   },
   "reviewedAt": "2026-10-13",
@@ -2014,7 +2019,7 @@
     "package.json": "ef820f478050259325486ea5d7f39b0f6ca660cd6d70db3398f15218f2ed5005"
   },
   "counts": {
-    "scripts": 57,
+    "scripts": 58,
     "supportFiles": 37
   },
   "dynamicResolution": [
@@ -2045,5 +2050,5 @@
     "limitations": "Static audit of the specified remaining gates; not a full CI or all-width browser PASS. Previously completed gates excluded. Product routes, permissions, workflow and package dependencies unchanged."
   },
   "followupCommitBase": "95d28596bef4364d64579d6d2db06a8f00631b8e",
-  "followupScope": "Late workday view reconciliation; exact month-preview request/dispose/abort/replacement evidence; DOM identity guard in separate scroll gate."
+  "followupScope": "Late workday view reconciliation; exact month-preview request/dispose/abort/replacement evidence; DOM identity guard in separate scroll gate. Scroll query-only transitions: exact normalized URL readiness and retained DOM identity replace obsolete reload requirements."
 }
