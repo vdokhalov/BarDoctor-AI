@@ -1,0 +1,40 @@
+{
+  "baseCommit": "b2b0ab53",
+  "scriptSha256": "837eb0da2bd4b644e3a8f38c1c6a2ed46108597021e463875c6eed3ab0778d60",
+  "scope": "QA prerequisite only: explicit venue-date OPEN/team fixture and real UI cash opening; no product or workflow change",
+  "results": [
+    {
+      "width": 390,
+      "deviceTimezone": "America/Los_Angeles",
+      "venueDateChisinau": "2026-10-01",
+      "persistedVenueTimezone": "America/New_York",
+      "saleDate": "2026-09-30",
+      "journalTime": "17:30",
+      "errors": []
+    },
+    {
+      "width": 820,
+      "deviceTimezone": "America/Los_Angeles",
+      "venueDateChisinau": "2026-10-01",
+      "persistedVenueTimezone": "America/New_York",
+      "saleDate": "2026-09-30",
+      "journalTime": "17:30",
+      "errors": []
+    },
+    {
+      "width": 1280,
+      "deviceTimezone": "America/Los_Angeles",
+      "venueDateChisinau": "2026-10-01",
+      "persistedVenueTimezone": "America/New_York",
+      "saleDate": "2026-09-30",
+      "journalTime": "17:30",
+      "errors": []
+    }
+  ],
+  "checks": {
+    "releaseGuards": "3 PASS",
+    "types": "PASS",
+    "lint": "PASS"
+  },
+  "release": "Continuation still running; exact-head CI and publication pending"
+}

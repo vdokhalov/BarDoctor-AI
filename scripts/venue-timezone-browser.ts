@@ -1,4 +1,5 @@
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
+import { seedOpenWorkday } from '../tests/helpers/pos-workday-fixture';
 import assert from 'node:assert/strict';
 import {mock} from 'node:test';
 mock.timers.enable({apis:['Date'],now:Date.parse('2026-09-30T21:30:00Z')});
@@ -64,7 +65,17 @@ for(const width of [390,820,1280]){
   await select.scrollIntoViewIfNeeded();const box=await select.boundingBox();assert.ok(box&&box.width<=width);await p.screenshot({path:out+'/'+width+'-timezone-setting.png',fullPage:true});
   const saved=p.waitForResponse(r=>new URL(r.url()).pathname.replace(/\/$/,'')==='/api/restaurants'&&r.request().method()==='POST');await p.getByRole('button',{name:'Сохранить',exact:true}).click();const response=await saved;assert.equal(response.status(),200);assert.equal((await response.json()).restaurant.timezone,'America/New_York');
   await p.goto(base+'/profile/venue');await select.waitFor();assert.equal(await select.inputValue(),'America/New_York');
+  // The fixed instant is Sep 30 in the saved venue timezone, not Oct 1 in Chisinau.
+  seedOpenWorkday(runtime.sqlite,user.userId,venue,'2026-09-30');
+  await p.goto(base+'/sales-entry?view=shifts&venue='+venue);
+  await p.locator('#open-shift:not([hidden])').waitFor();
+  await p.locator('#shift-name').fill('Timezone QA');
+  await p.getByRole('button',{name:'Открыть смену',exact:true}).click();
+  await p.waitForFunction(()=>document.getElementById('notice')?.textContent==='Смена открыта.');
   await p.goto(base+'/sales-entry?venue='+venue);await p.locator('#work:not([hidden])').waitFor();assert.match(await p.locator('#venue-timezone-label').innerText(),/America\/New_York/);
+  await p.locator('#sale:not([hidden])').waitFor();
+  const cashShiftId=await p.locator('#shift option').nth(1).getAttribute('value');assert.ok(cashShiftId);
+  await p.locator('#shift').selectOption(cashShiftId);
   await p.locator('[data-menu]').first().selectOption('beer');await p.locator('#sale button[type=submit]').click();await p.locator('#preview:not([hidden])').waitFor();const post=p.waitForResponse(r=>r.url().endsWith('/api/sales-events')&&r.request().method()==='POST'&&r.request().postDataJSON()?.action==='post');await p.locator('#post').click();const posted=await post;assert.equal(posted.status(),201);const event=(await posted.json()).event;assert.equal(event.businessDate,'2026-09-30');
   await p.goto(base+'/sales-import?embedded=1&venue='+venue+'&batch='+encodeURIComponent(event.id));await p.locator('#editor-dialog[open]').waitFor();assert.match(await p.locator('#editor-body').innerText(),/17:30/);await p.screenshot({path:out+'/'+width+'-journal-new-york.png',fullPage:true});
   assert.deepEqual(errors,[]);report.push({width,deviceTimezone:'America/Los_Angeles',venueDateChisinau:'2026-10-01',persistedVenueTimezone:'America/New_York',saleDate:'2026-09-30',journalTime:'17:30',errors});

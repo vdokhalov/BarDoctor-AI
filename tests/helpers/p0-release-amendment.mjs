@@ -18,6 +18,7 @@ export const p0Paths=Object.freeze([
  'scripts/derived-metrics-phase3a8-browser.ts','scripts/patch-operational-day-phase1a.mjs','scripts/qa/webkit-environment-classifier.mjs','scripts/qa/webkit-lifecycle-evidence.ts','scripts/qa/webkit-session-observer.js',
  'scripts/acquisition-stock-phase3a7-browser.ts','scripts/finance-inputs-phase3a6-browser.ts','scripts/operational-day-browser.ts','scripts/pos1-browser-qa.ts','scripts/pos1-hardening-browser.ts','scripts/restricted-manager-regression.mjs','scripts/sales-browser-qa-phase5.ts','scripts/sales-iphone-browser.ts','scripts/sales-navigation-performance.ts','scripts/sales-observations-browser.ts','scripts/sales-ux2-browser.ts',
  'scripts/management-cost-phase4a-browser.ts','scripts/management-cost-correction-phase4a-browser.ts','scripts/recheck-parity-ci-snapshots.mjs',
+ 'scripts/venue-timezone-browser.ts',
  'scripts/menu-consumption-browser-qa-v418.cjs',
  'scripts/owner-qa-regressions-browser.mjs','scripts/reference-slice-legacy-doctor-browser.mjs',
  'scripts/lib/stable-ui-v485.mjs','scripts/lib/health-request-lifecycle.mjs','scripts/patch-qa-audit-v513.mjs',

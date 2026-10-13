@@ -221,6 +221,10 @@
     "scripts/menu-consumption-browser-qa-v418.cjs": {
       "before": "117048a340e4f3c16572e16cca2ffecebb28ea1c9de2a2438f684b920ca4f852",
       "after": "f612235dc4cde74848ada374ff12221af4cf8c998ca0d87ce7df1bde73f53bbc"
+    },
+    "scripts/venue-timezone-browser.ts": {
+      "before": "957fac0dc03f0b91238e84c1512bf7efaa7efa2468af9391ba94197885a0ea5d",
+      "after": "837eb0da2bd4b644e3a8f38c1c6a2ed46108597021e463875c6eed3ab0778d60"
     }
   }
 }

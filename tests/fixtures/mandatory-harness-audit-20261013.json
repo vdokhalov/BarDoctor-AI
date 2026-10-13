@@ -1780,8 +1780,8 @@
     },
     "scripts/venue-timezone-browser.ts": {
       "hits": [],
-      "sha256": "957fac0dc03f0b91238e84c1512bf7efaa7efa2468af9391ba94197885a0ea5d",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "837eb0da2bd4b644e3a8f38c1c6a2ed46108597021e463875c6eed3ab0778d60",
+      "review": "Seeds explicit OPEN/team workday for Sep30 in saved America/New_York timezone; opens cash shift through real UI, selects persisted shift before manual sale. Chisinau Oct1/device LosAngeles/import gating/persisted setting/sale Sep30/journal17:30 assertions retained."
     },
     "scripts/warehouse-readonly-phase3a7-browser.ts": {
       "hits": [],
