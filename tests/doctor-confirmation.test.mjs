@@ -12,3 +12,8 @@ test('all mandatory legacy Doctor action harnesses use shared consent and an iso
  const legacy=readFileSync('scripts/reference-slice-legacy-doctor-browser.mjs','utf8');for(const action of ['run','refresh','footerRefresh']){assert.ok(legacy.includes('await runConfirmed('+action+')'));assert.ok(!legacy.includes('await '+action+'.click()'));}assert.match(legacy,/runConfirmed\(page.getByRole\('button',\{name:'Попробовать снова'/);assert.match(legacy,/diagnosisRequests,4/);assert.match(legacy,/model.calls.length,3/);assert.match(legacy,/maxTokens===8000/);
  for(const name of ['stable-ui-rollback-browser.mjs','health-doctor-performance-browser.mjs']){const s=readFileSync('scripts/'+name,'utf8');assert.ok(workflow.includes(name));assert.doesNotMatch(s,/name:'Запустить диагностику',exact:true\}\)\.click/);}
 });
+
+test('restricted manager exercises real server denial only after exact shared consent',()=>{
+ const s=readFileSync('scripts/restricted-manager-regression.mjs','utf8');
+ assert.match(s,/await confirmDoctorAction\(page,page.getByRole/);assert.match(s,/Legacy diagnosis must exercise the server permission boundary/);assert.match(s,/assert.equal\(req.status,403\)/);assert.match(s,/assert.equal\(req.body\?\.availability,'RESTRICTED'\)/);assert.match(s,/assert.ok\(!req.body\?\.data\)/);
+});

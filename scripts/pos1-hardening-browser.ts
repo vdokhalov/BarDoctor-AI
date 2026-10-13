@@ -1,3 +1,4 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
 import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posOpenShift, posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
@@ -25,6 +26,7 @@ try{for(const profile of [{name:"mobile",width:390,height:844},{name:"tablet",wi
   const restaurant={name:"Isolated POS QA",currency:"PMR_RUB"};
   r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify(restaurant),user.userId);
   const put=(key:string,value:unknown)=>r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,'test') ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(user.userId,key,JSON.stringify(value));
+  seedOpenWorkday(r.sqlite,user.userId,venue);
   const get=(key:string)=>JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").get(user.userId,key)?.data_json||"null"));
   const structure={sections:[{id:"bar",name:"Бар"},{id:"kitchen",name:"Кухня"},{id:"hookah",name:"Кальянная"}],categories:[{id:"water",name:"Безалкогольные напитки",parentId:"bar"},{id:"food",name:"Продукты",parentId:"kitchen"},{id:"tobacco",name:"Табак",parentId:"hookah"}],subcategories:[{id:"soda",name:"Вода и газировка",parentId:"water"},{id:"bread",name:"Хлеб и выпечка",parentId:"food"},...Array.from({length:12},(_,i)=>({id:"bread-"+i,name:"Очень длинное название подраздела "+i,parentId:"food"}))]};
   const menu=[{id:"water",name:"QA Вода",sectionId:"bar",taxonomyCategoryId:"water",subcategoryId:"soda"},{id:"service",name:"QA Сервис",sectionId:"kitchen",taxonomyCategoryId:"food",subcategoryId:"bread"},{id:"hookah",name:"QA Кальян",sectionId:"hookah",taxonomyCategoryId:"tobacco"},...Array.from({length:14},(_,i)=>({id:"long-"+i,name:"ОченьДлинноеНазваниеБезПробелов".repeat(3)+" "+i,sectionId:i%2?"kitchen":"bar",taxonomyCategoryId:i%2?"food":"water",subcategoryId:i%2?"bread-"+(i%12):"soda"}))].map(item=>({...item,venueId:venue,department:"bar",category:"Без подраздела",type:"service",consumptionMode:"NONE",salePrice:30,currency:"PMR_RUB",active:true}));

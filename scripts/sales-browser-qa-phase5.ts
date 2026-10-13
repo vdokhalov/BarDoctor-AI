@@ -1,3 +1,4 @@
+import {openWorkdayFixture} from '../tests/helpers/pos-workday-fixture';
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -28,6 +29,7 @@ try {
   for(const viewport of [{width:390,height:844},{width:1280,height:720}]) {
     const runtime=openingRuntime(new URL("../app/api/sales-events/route.ts",import.meta.url),sales);
     runtime.put("bd_assortment_v1",salesEventFixture().assortment);
+    runtime.put("bd_operational_reports_v1",[openWorkdayFixture(1)]);
     const errors:string[]=[];
     let losePostResponse=false;
     const server=createServer(async(req,res)=>{

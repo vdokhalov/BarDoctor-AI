@@ -1,0 +1,2043 @@
+{
+  "scope": "remaining mandatory core from40, all browser, navigation from14; recursive local imports, script references, npm pre/post scripts; explicit lifecycle suite interpolation",
+  "commands": [
+    {
+      "origin": "verify-core:Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance",
+      "command": "BD_QA_MODE=regression BD_QA_LABEL=ci node scripts/restricted-manager-403-browser.mjs\nnode scripts/restricted-manager-regression.mjs\n"
+    },
+    {
+      "origin": "verify-core:Phase 3A.6 isolated multi-session Finance report recorded payroll mobile tablet desktop",
+      "command": "node --import tsx scripts/finance-inputs-phase3a6-browser.ts"
+    },
+    {
+      "origin": "verify-core:Phase 3A.7 isolated acquisition stock and historical cost mobile tablet desktop",
+      "command": "node --import tsx scripts/acquisition-stock-phase3a7-browser.ts"
+    },
+    {
+      "origin": "verify-core:Phase 3A.10 Chromium metric source and integration accepted revisions 390 820 1280",
+      "command": "node --import tsx scripts/provenance-phase3a10-browser.ts"
+    },
+    {
+      "origin": "verify-core:Phase 3A.9 Chromium canonical Health, source revisions, reload and venue switch",
+      "command": "node --import tsx scripts/health-inputs-phase3a9-browser.ts"
+    },
+    {
+      "origin": "verify-core:Phase 3A.8 Chromium verified close, stale-tab rejection, review aggregate, reload and venue switch",
+      "command": "node --import tsx scripts/derived-metrics-phase3a8-browser.ts"
+    },
+    {
+      "origin": "verify-core:Phase 3A.7 warehouse readiness and valuation coverage contract",
+      "command": "node --test tests/warehouse-readonly-client-phase3a7.test.mjs"
+    },
+    {
+      "origin": "verify-core:Phase 3A.7 Chromium read-only warehouse navigation and venue switch",
+      "command": "node --import tsx scripts/warehouse-readonly-phase3a7-browser.ts"
+    },
+    {
+      "origin": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "command": "node --import tsx scripts/operational-day-browser.ts\nBD_OPERATIONAL_CACHED_PROFILE=1 node --import tsx scripts/operational-day-browser.ts\nBD_OPERATIONAL_TEST_INSTANT=2026-09-30T21:02:00Z node --import tsx scripts/operational-day-browser.ts\nBD_OPERATIONAL_TEST_INSTANT=2026-09-30T21:02:00Z BD_OPERATIONAL_CACHED_PROFILE=1 BD_OPERATIONAL_API_DELAY=600 node --import tsx scripts/operational-day-browser.ts\nBD_OPERATIONAL_TEST_INSTANT=2026-12-31T22:02:00Z BD_OPERATIONAL_CACHED_PROFILE=1 BD_OPERATIONAL_API_DELAY=600 node --import tsx scripts/operational-day-browser.ts\n"
+    },
+    {
+      "origin": "verify-core:Actual compiled Worker and static client release integrity mobile desktop",
+      "command": "node --test tests/client-release-browser.test.mjs"
+    },
+    {
+      "origin": "verify-core:Observability real bootstrap D1 and mobile desktop correlation QA",
+      "command": "BD_OBSERVABILITY_BROWSER_QA=1 node --test --test-concurrency=1 tests/request-observability-runtime.test.mjs tests/ingestion-d1-failure-runtime.test.mjs"
+    },
+    {
+      "origin": "verify-browser:Install locked dependencies",
+      "command": "npm run install:ci"
+    },
+    {
+      "origin": "verify-browser:Install locked dependencies",
+      "npm": "install:ci",
+      "command": "bash scripts/install-ci.sh"
+    },
+    {
+      "origin": "verify-browser:Validate restored build integrity",
+      "command": "npm run validate:artifact"
+    },
+    {
+      "origin": "verify-browser:Validate restored build integrity",
+      "npm": "validate:artifact",
+      "command": "bash scripts/validate-artifact.sh"
+    },
+    {
+      "origin": "verify-browser:Install Chromium for browser QA",
+      "command": "npm run browser:install"
+    },
+    {
+      "origin": "verify-browser:Install Chromium for browser QA",
+      "npm": "browser:install",
+      "command": "bash scripts/sites-env.sh -- playwright-core install chromium"
+    },
+    {
+      "origin": "verify-browser:Owner QA writeoff payroll repair persisted mobile Chromium",
+      "command": "node --import tsx scripts/owner-qa-regressions-browser.mjs"
+    },
+    {
+      "origin": "verify-browser:Complete v485 navigation and functionality parity Chromium",
+      "command": "node --import tsx scripts/reference-slice-recovery-parity.mjs\nnode --import tsx scripts/reference-slice-legacy-doctor-browser.mjs\n"
+    },
+    {
+      "origin": "verify-browser:Phase 2 unified menu ingestion mobile desktop isolated HTTP",
+      "command": "node --import tsx scripts/menu-ingestion-phase2-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Phase 3 menu consumption browser QA",
+      "command": "npm run test:menu-consumption-browser"
+    },
+    {
+      "origin": "verify-browser:Phase 3 menu consumption browser QA",
+      "npm": "test:menu-consumption-browser",
+      "command": "bash scripts/sites-env.sh -- node scripts/menu-consumption-browser-qa-v418.cjs"
+    },
+    {
+      "origin": "verify-browser:General tech card real server SQLite mobile desktop",
+      "command": "node --import tsx scripts/general-tech-card-browser-v440.ts"
+    },
+    {
+      "origin": "verify-browser:First venue setup registration wizard real server SQLite mobile desktop",
+      "command": "node --import tsx scripts/first-venue-setup-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Account and venue lifecycle real server SQLite mobile desktop",
+      "command": "node --import tsx scripts/account-lifecycle-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Phase 4 purchase units mobile and desktop QA",
+      "command": "BD_QA_SCENARIO=phase4-conversion npm run test:procurement-browser"
+    },
+    {
+      "origin": "verify-browser:Phase 4 purchase units mobile and desktop QA",
+      "npm": "test:procurement-browser",
+      "command": "bash scripts/sites-env.sh -- bash scripts/run-procurement-browser-qa-v190.sh"
+    },
+    {
+      "origin": "verify-browser:Phase 5 opening stock and CSV mobile desktop persisted HTTP QA",
+      "command": "node --import tsx scripts/opening-browser-qa-phase5.ts"
+    },
+    {
+      "origin": "verify-browser:Phase 5 sales mobile desktop persisted HTTP QA",
+      "command": "node --import tsx scripts/sales-browser-qa-phase5.ts"
+    },
+    {
+      "origin": "verify-browser:POS-1 cashier real sales handler SQLite mobile desktop QA",
+      "command": "node --import tsx scripts/pos1-browser-qa.ts"
+    },
+    {
+      "origin": "verify-browser:POS-1 hardening navigation drafts journal and retries mobile tablet desktop",
+      "command": "node --import tsx scripts/pos1-hardening-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Sales UX step 2 journal checkout import mobile tablet desktop",
+      "command": "node --import tsx scripts/sales-ux2-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Sales iPhone safe areas touch navigation and single shift regression",
+      "command": "node --import tsx scripts/sales-iphone-browser.ts\nBD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_OUT=outputs/sales-iphone-hardening/normal node --import tsx scripts/sales-iphone-browser.ts\nBD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_DELAY=600 BD_IPHONE_OUT=outputs/sales-iphone-hardening/delayed node --import tsx scripts/sales-iphone-browser.ts\n"
+    },
+    {
+      "origin": "verify-browser:Venue timezone settings and Sales date mobile tablet desktop",
+      "command": "node --import tsx scripts/venue-timezone-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Accounting report reversal guard mobile tablet desktop",
+      "command": "node --import tsx scripts/accounting-guard-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Sales v454 overnight shifts and cashier auth network browser regression",
+      "command": "node --import tsx scripts/sales-observations-browser.ts"
+    },
+    {
+      "origin": "verify-browser:Startup recovery browser QA",
+      "command": "npm run test:startup-recovery"
+    },
+    {
+      "origin": "verify-browser:Startup recovery browser QA",
+      "npm": "test:startup-recovery",
+      "command": "bash scripts/sites-env.sh -- bash scripts/run-startup-recovery-browser-qa-v341.sh"
+    },
+    {
+      "origin": "verify-browser:Anonymous mobile desktop startup handoff",
+      "command": "node --test tests/auth-splash-handoff-v423.test.mjs"
+    },
+    {
+      "origin": "verify-browser:Existing venue root startup without reload",
+      "command": "node --test tests/venue-root-splash-handoff.test.mjs"
+    },
+    {
+      "origin": "verify-browser:Purchase direct load and reload runtime",
+      "command": "node --test tests/purchase-reload-runtime.test.mjs"
+    },
+    {
+      "origin": "verify-browser:Mobile and desktop navigation QA",
+      "command": "npm run test:mobile-navigation"
+    },
+    {
+      "origin": "verify-browser:Mobile and desktop navigation QA",
+      "npm": "test:mobile-navigation",
+      "command": "bash scripts/sites-env.sh -- bash scripts/run-mobile-navigation-qa-v269.sh"
+    },
+    {
+      "origin": "verify-browser:Home reviews viewport QA",
+      "command": "npm run test:home-reviews-browser"
+    },
+    {
+      "origin": "verify-browser:Home reviews viewport QA",
+      "npm": "test:home-reviews-browser",
+      "command": "BD_QA_SCENARIO=home-reviews bash scripts/sites-env.sh -- bash scripts/run-mobile-navigation-qa-v269.sh"
+    },
+    {
+      "origin": "sales-navigation:Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280",
+      "command": "node scripts/webkit-stable-gate.mjs"
+    },
+    {
+      "origin": "sales-navigation:Mandatory Phase 3A.10 stable WebKit metric source integration accepted revisions 390 820 1280",
+      "command": "BD_PROVENANCE_BROWSER=webkit node --import tsx scripts/provenance-phase3a10-browser.ts"
+    },
+    {
+      "origin": "sales-navigation:Native process observation for the two allowlisted Health lifecycle suites",
+      "command": "if ! command -v strace >/dev/null; then\n  sudo apt-get update\n  sudo apt-get install -y strace\nfi\n"
+    },
+    {
+      "origin": "sales-navigation:Mandatory WebKit Health lifecycle all six PASS, native failures block release",
+      "command": "node scripts/webkit-health-lifecycle-gate.mjs"
+    },
+    {
+      "origin": "sales-navigation:Measured navigation and embedded auth failures",
+      "command": "BD_PERF_LABEL=ci BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts\nBD_PERF_LABEL=ci BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts\nfor width in 820 1280; do\n  BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts\n  BD_PERF_LABEL=ci BD_PERF_WIDTH=$width BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0 node --import tsx scripts/sales-navigation-performance.ts\ndone\n"
+    },
+    {
+      "origin": "sales-navigation:WebKit iPhone repeated pending Back navigation",
+      "command": "BD_IPHONE_BROWSER=webkit BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_OUT=outputs/sales-navigation-performance/ci/iphone-normal node --import tsx scripts/sales-iphone-browser.ts\nBD_IPHONE_BROWSER=webkit BD_IPHONE_NAV_ONLY=1 BD_IPHONE_REPEAT=3 BD_IPHONE_DELAY=600 BD_IPHONE_OUT=outputs/sales-navigation-performance/ci/iphone-delayed node --import tsx scripts/sales-iphone-browser.ts\n"
+    },
+    {
+      "origin": "scripts/menu-consumption-browser-qa-v418.cjs:platform-dependent npmArguments",
+      "npm": "dev",
+      "command": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite"
+    }
+  ],
+  "edges": [
+    {
+      "from": "verify-core:Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance",
+      "to": "scripts/restricted-manager-403-browser.mjs"
+    },
+    {
+      "from": "verify-core:Restricted Finance 403 actual client manager owner desktop mobile and strict error acceptance",
+      "to": "scripts/restricted-manager-regression.mjs"
+    },
+    {
+      "from": "verify-core:Phase 3A.6 isolated multi-session Finance report recorded payroll mobile tablet desktop",
+      "to": "scripts/finance-inputs-phase3a6-browser.ts"
+    },
+    {
+      "from": "verify-core:Phase 3A.7 isolated acquisition stock and historical cost mobile tablet desktop",
+      "to": "scripts/acquisition-stock-phase3a7-browser.ts"
+    },
+    {
+      "from": "verify-core:Phase 3A.10 Chromium metric source and integration accepted revisions 390 820 1280",
+      "to": "scripts/provenance-phase3a10-browser.ts"
+    },
+    {
+      "from": "verify-core:Phase 3A.9 Chromium canonical Health, source revisions, reload and venue switch",
+      "to": "scripts/health-inputs-phase3a9-browser.ts"
+    },
+    {
+      "from": "verify-core:Phase 3A.8 Chromium verified close, stale-tab rejection, review aggregate, reload and venue switch",
+      "to": "scripts/derived-metrics-phase3a8-browser.ts"
+    },
+    {
+      "from": "verify-core:Phase 3A.7 warehouse readiness and valuation coverage contract",
+      "to": "tests/warehouse-readonly-client-phase3a7.test.mjs"
+    },
+    {
+      "from": "verify-core:Phase 3A.7 Chromium read-only warehouse navigation and venue switch",
+      "to": "scripts/warehouse-readonly-phase3a7-browser.ts"
+    },
+    {
+      "from": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "to": "scripts/operational-day-browser.ts"
+    },
+    {
+      "from": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "to": "scripts/operational-day-browser.ts"
+    },
+    {
+      "from": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "to": "scripts/operational-day-browser.ts"
+    },
+    {
+      "from": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "to": "scripts/operational-day-browser.ts"
+    },
+    {
+      "from": "verify-core:Operational Day Phase 1A mobile desktop with real isolated handlers",
+      "to": "scripts/operational-day-browser.ts"
+    },
+    {
+      "from": "verify-core:Actual compiled Worker and static client release integrity mobile desktop",
+      "to": "tests/client-release-browser.test.mjs"
+    },
+    {
+      "from": "verify-core:Observability real bootstrap D1 and mobile desktop correlation QA",
+      "to": "tests/request-observability-runtime.test.mjs"
+    },
+    {
+      "from": "verify-core:Observability real bootstrap D1 and mobile desktop correlation QA",
+      "to": "tests/ingestion-d1-failure-runtime.test.mjs"
+    },
+    {
+      "from": "npm:install:ci",
+      "to": "scripts/install-ci.sh"
+    },
+    {
+      "from": "npm:validate:artifact",
+      "to": "scripts/validate-artifact.sh"
+    },
+    {
+      "from": "npm:browser:install",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "verify-browser:Owner QA writeoff payroll repair persisted mobile Chromium",
+      "to": "scripts/owner-qa-regressions-browser.mjs"
+    },
+    {
+      "from": "verify-browser:Complete v485 navigation and functionality parity Chromium",
+      "to": "scripts/reference-slice-recovery-parity.mjs"
+    },
+    {
+      "from": "verify-browser:Complete v485 navigation and functionality parity Chromium",
+      "to": "scripts/reference-slice-legacy-doctor-browser.mjs"
+    },
+    {
+      "from": "verify-browser:Phase 2 unified menu ingestion mobile desktop isolated HTTP",
+      "to": "scripts/menu-ingestion-phase2-browser.ts"
+    },
+    {
+      "from": "npm:test:menu-consumption-browser",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "npm:test:menu-consumption-browser",
+      "to": "scripts/menu-consumption-browser-qa-v418.cjs"
+    },
+    {
+      "from": "verify-browser:General tech card real server SQLite mobile desktop",
+      "to": "scripts/general-tech-card-browser-v440.ts"
+    },
+    {
+      "from": "verify-browser:First venue setup registration wizard real server SQLite mobile desktop",
+      "to": "scripts/first-venue-setup-browser.ts"
+    },
+    {
+      "from": "verify-browser:Account and venue lifecycle real server SQLite mobile desktop",
+      "to": "scripts/account-lifecycle-browser.ts"
+    },
+    {
+      "from": "npm:test:procurement-browser",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "npm:test:procurement-browser",
+      "to": "scripts/run-procurement-browser-qa-v190.sh"
+    },
+    {
+      "from": "verify-browser:Phase 5 opening stock and CSV mobile desktop persisted HTTP QA",
+      "to": "scripts/opening-browser-qa-phase5.ts"
+    },
+    {
+      "from": "verify-browser:Phase 5 sales mobile desktop persisted HTTP QA",
+      "to": "scripts/sales-browser-qa-phase5.ts"
+    },
+    {
+      "from": "verify-browser:POS-1 cashier real sales handler SQLite mobile desktop QA",
+      "to": "scripts/pos1-browser-qa.ts"
+    },
+    {
+      "from": "verify-browser:POS-1 hardening navigation drafts journal and retries mobile tablet desktop",
+      "to": "scripts/pos1-hardening-browser.ts"
+    },
+    {
+      "from": "verify-browser:Sales UX step 2 journal checkout import mobile tablet desktop",
+      "to": "scripts/sales-ux2-browser.ts"
+    },
+    {
+      "from": "verify-browser:Sales iPhone safe areas touch navigation and single shift regression",
+      "to": "scripts/sales-iphone-browser.ts"
+    },
+    {
+      "from": "verify-browser:Sales iPhone safe areas touch navigation and single shift regression",
+      "to": "scripts/sales-iphone-browser.ts"
+    },
+    {
+      "from": "verify-browser:Sales iPhone safe areas touch navigation and single shift regression",
+      "to": "scripts/sales-iphone-browser.ts"
+    },
+    {
+      "from": "verify-browser:Venue timezone settings and Sales date mobile tablet desktop",
+      "to": "scripts/venue-timezone-browser.ts"
+    },
+    {
+      "from": "verify-browser:Accounting report reversal guard mobile tablet desktop",
+      "to": "scripts/accounting-guard-browser.ts"
+    },
+    {
+      "from": "verify-browser:Sales v454 overnight shifts and cashier auth network browser regression",
+      "to": "scripts/sales-observations-browser.ts"
+    },
+    {
+      "from": "npm:test:startup-recovery",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "npm:test:startup-recovery",
+      "to": "scripts/run-startup-recovery-browser-qa-v341.sh"
+    },
+    {
+      "from": "verify-browser:Anonymous mobile desktop startup handoff",
+      "to": "tests/auth-splash-handoff-v423.test.mjs"
+    },
+    {
+      "from": "verify-browser:Existing venue root startup without reload",
+      "to": "tests/venue-root-splash-handoff.test.mjs"
+    },
+    {
+      "from": "verify-browser:Purchase direct load and reload runtime",
+      "to": "tests/purchase-reload-runtime.test.mjs"
+    },
+    {
+      "from": "npm:test:mobile-navigation",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "npm:test:mobile-navigation",
+      "to": "scripts/run-mobile-navigation-qa-v269.sh"
+    },
+    {
+      "from": "npm:test:home-reviews-browser",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "npm:test:home-reviews-browser",
+      "to": "scripts/run-mobile-navigation-qa-v269.sh"
+    },
+    {
+      "from": "sales-navigation:Mandatory stable WebKit Finance stock warehouse Health session APIs and RBAC 390 820 1280",
+      "to": "scripts/webkit-stable-gate.mjs"
+    },
+    {
+      "from": "sales-navigation:Mandatory Phase 3A.10 stable WebKit metric source integration accepted revisions 390 820 1280",
+      "to": "scripts/provenance-phase3a10-browser.ts"
+    },
+    {
+      "from": "sales-navigation:Mandatory WebKit Health lifecycle all six PASS, native failures block release",
+      "to": "scripts/webkit-health-lifecycle-gate.mjs"
+    },
+    {
+      "from": "sales-navigation:Measured navigation and embedded auth failures",
+      "to": "scripts/sales-navigation-performance.ts"
+    },
+    {
+      "from": "sales-navigation:Measured navigation and embedded auth failures",
+      "to": "scripts/sales-navigation-performance.ts"
+    },
+    {
+      "from": "sales-navigation:Measured navigation and embedded auth failures",
+      "to": "scripts/sales-navigation-performance.ts"
+    },
+    {
+      "from": "sales-navigation:Measured navigation and embedded auth failures",
+      "to": "scripts/sales-navigation-performance.ts"
+    },
+    {
+      "from": "sales-navigation:WebKit iPhone repeated pending Back navigation",
+      "to": "scripts/sales-iphone-browser.ts"
+    },
+    {
+      "from": "sales-navigation:WebKit iPhone repeated pending Back navigation",
+      "to": "scripts/sales-iphone-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-health-lifecycle-gate.mjs:WEBKIT_LIFECYCLE_SUITES",
+      "to": "scripts/health-inputs-phase3a9-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-health-lifecycle-gate.mjs:WEBKIT_LIFECYCLE_SUITES",
+      "to": "scripts/derived-metrics-phase3a8-browser.ts"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "scripts/qa/webkit-native-trace.sh"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "scripts/qa/webkit-lifecycle-evidence.ts"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "tests/helpers/month-close-fixture.ts"
+    },
+    {
+      "from": "scripts/derived-metrics-phase3a8-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/month-close-fixture.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/qa/webkit-lifecycle-evidence.ts",
+      "to": "scripts/qa/webkit-native-trace.sh"
+    },
+    {
+      "from": "scripts/qa/webkit-lifecycle-evidence.ts",
+      "to": "scripts/qa/webkit-session-observer.js"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "scripts/qa/webkit-native-trace.sh"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "tests/helpers/health-inputs-fixture.ts"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "scripts/qa/webkit-lifecycle-evidence.ts"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/health-inputs-fixture.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/sales-iphone-trace.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-iphone-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-navigation-performance.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/webkit-health-lifecycle-gate.mjs",
+      "to": "scripts/qa/webkit-environment-classifier.mjs"
+    },
+    {
+      "from": "scripts/webkit-health-lifecycle-gate.mjs",
+      "to": "scripts/qa/webkit-release-gate.mjs"
+    },
+    {
+      "from": "scripts/qa/webkit-release-gate.mjs",
+      "to": "scripts/qa/webkit-environment-classifier.mjs"
+    },
+    {
+      "from": "scripts/provenance-phase3a10-browser.ts",
+      "to": "tests/helpers/provenance-runtime.ts"
+    },
+    {
+      "from": "scripts/provenance-phase3a10-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/provenance-runtime.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/finance-inputs-phase3a6-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/acquisition-stock-phase3a7-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/warehouse-readonly-phase3a7-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/health-inputs-phase3a9-stable-webkit.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/evidence-foundation-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/cost-warehouse-trace-browser.ts"
+    },
+    {
+      "from": "scripts/webkit-stable-gate.mjs",
+      "to": "scripts/menu-origin-trace-browser.ts"
+    },
+    {
+      "from": "scripts/menu-origin-trace-browser.ts",
+      "to": "tests/helpers/menu-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/menu-origin-trace-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/menu-trace-runtime.ts",
+      "to": "tests/helpers/menu-import-runtime.ts"
+    },
+    {
+      "from": "tests/helpers/menu-import-runtime.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/cost-warehouse-trace-browser.ts",
+      "to": "tests/helpers/cost-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/cost-warehouse-trace-browser.ts",
+      "to": "tests/helpers/revenue-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/cost-warehouse-trace-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/revenue-trace-runtime.ts",
+      "to": "tests/helpers/evidence-runtime.ts"
+    },
+    {
+      "from": "tests/helpers/evidence-runtime.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "tests/helpers/evidence-runtime.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "tests/helpers/cost-trace-runtime.ts",
+      "to": "tests/helpers/evidence-runtime.ts"
+    },
+    {
+      "from": "tests/helpers/cost-trace-runtime.ts",
+      "to": "tests/helpers/revenue-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/evidence-foundation-browser.ts",
+      "to": "tests/helpers/revenue-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/evidence-foundation-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/health-inputs-phase3a9-stable-webkit.ts",
+      "to": "tests/helpers/health-inputs-fixture.ts"
+    },
+    {
+      "from": "scripts/warehouse-readonly-phase3a7-browser.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/warehouse-readonly-phase3a7-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/warehouse-readonly-phase3a7-browser.ts",
+      "to": "tests/helpers/warehouse-readonly-fixture.ts"
+    },
+    {
+      "from": "scripts/warehouse-readonly-phase3a7-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/warehouse-readonly-phase3a7-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/warehouse-readonly-fixture.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "tests/helpers/revenue-trace-runtime.ts"
+    },
+    {
+      "from": "scripts/acquisition-stock-phase3a7-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/finance-inputs-phase3a6-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/run-mobile-navigation-qa-v269.sh",
+      "to": "scripts/mobile-navigation-qa-v269.cjs"
+    },
+    {
+      "from": "scripts/mobile-navigation-qa-v269.cjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/sites-env.sh",
+      "to": "scripts/sites-env.sh"
+    },
+    {
+      "from": "tests/purchase-reload-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/purchase-reload-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/venue-root-splash-handoff.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/venue-root-splash-handoff.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/auth-splash-handoff-v423.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/auth-splash-handoff-v423.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/run-startup-recovery-browser-qa-v341.sh",
+      "to": "scripts/startup-recovery-browser-qa-v341.cjs"
+    },
+    {
+      "from": "scripts/startup-recovery-browser-qa-v341.cjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-observations-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/accounting-guard-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/accounting-guard-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/accounting-guard-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/venue-timezone-browser.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/venue-timezone-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/venue-timezone-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/venue-timezone-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-ux2-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/pos1-hardening-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "tests/helpers/pos-browser-driver.ts"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "tests/helpers/opening-runtime.ts"
+    },
+    {
+      "from": "scripts/pos1-browser-qa.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/sales-browser-qa-phase5.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-browser-qa-phase5.ts",
+      "to": "tests/helpers/sales-surface-page.ts"
+    },
+    {
+      "from": "scripts/sales-browser-qa-phase5.ts",
+      "to": "tests/helpers/opening-runtime.ts"
+    },
+    {
+      "from": "scripts/sales-browser-qa-phase5.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/sales-browser-qa-phase5.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/opening-browser-qa-phase5.ts",
+      "to": "tests/helpers/opening-runtime.ts"
+    },
+    {
+      "from": "scripts/opening-browser-qa-phase5.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/run-procurement-browser-qa-v190.sh",
+      "to": "scripts/procurement-browser-qa-v168.cjs"
+    },
+    {
+      "from": "scripts/procurement-browser-qa-v168.cjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/procurement-browser-qa-v168.cjs",
+      "to": "scripts/purchase-units-qa-store.cjs"
+    },
+    {
+      "from": "scripts/purchase-units-qa-store.cjs",
+      "to": "tests/fixtures/purchase-stock-other-production.json"
+    },
+    {
+      "from": "scripts/account-lifecycle-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/account-lifecycle-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/first-venue-setup-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/first-venue-setup-browser.ts",
+      "to": "tests/helpers/setup-server.ts"
+    },
+    {
+      "from": "tests/helpers/setup-server.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/general-tech-card-browser-v440.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/general-tech-card-browser-v440.ts",
+      "to": "tests/helpers/store-runtime.ts"
+    },
+    {
+      "from": "scripts/general-tech-card-browser-v440.ts",
+      "to": "scripts/menu-consumption-browser-qa-v418.cjs"
+    },
+    {
+      "from": "scripts/menu-consumption-browser-qa-v418.cjs",
+      "to": "tests/helpers/store-runtime.ts"
+    },
+    {
+      "from": "scripts/menu-consumption-browser-qa-v418.cjs",
+      "to": "tests/helpers/recipe-picker-pointer-qa.mjs"
+    },
+    {
+      "from": "scripts/menu-consumption-browser-qa-v418.cjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/menu-consumption-browser-qa-v418.cjs",
+      "to": "tests/helpers/store-runtime.ts"
+    },
+    {
+      "from": "scripts/menu-consumption-browser-qa-v418.cjs",
+      "to": "tests/helpers/recipe-picker-pointer-qa.mjs"
+    },
+    {
+      "from": "scripts/menu-ingestion-phase2-browser.ts",
+      "to": "tests/helpers/menu-import-runtime.ts"
+    },
+    {
+      "from": "scripts/menu-ingestion-phase2-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/menu-ingestion-phase2-browser.ts",
+      "to": "tests/helpers/menu-action-readiness.ts"
+    },
+    {
+      "from": "scripts/menu-ingestion-phase2-browser.ts",
+      "to": "tests/helpers/menu-analytics-state-qa.ts"
+    },
+    {
+      "from": "scripts/menu-ingestion-phase2-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/menu-analytics-state-qa.ts",
+      "to": "tests/helpers/menu-action-readiness.ts"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/doctor-confirmation.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/owner-doctor-mock.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/doctor-confirmation.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/owner-doctor-mock.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-legacy-doctor-browser.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/helpers/reference-slice-recovery-runtime.mjs",
+      "to": "tests/helpers/reference-slice-recovery-ssr.mjs"
+    },
+    {
+      "from": "tests/helpers/reference-slice-recovery-runtime.mjs",
+      "to": "tests/helpers/curated-doctor-fixture.ts"
+    },
+    {
+      "from": "tests/helpers/curated-doctor-fixture.ts",
+      "to": "tests/helpers/management-actions-fixture.ts"
+    },
+    {
+      "from": "tests/helpers/management-actions-fixture.ts",
+      "to": "tests/helpers/month-close-fixture.ts"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "scripts/lib/released-reports-more-parity.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "scripts/qa/api-read-tracker.mjs"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/reference-slice-recovery-parity.mjs",
+      "to": "scripts/lib/reference-slice-recovery-compare.mjs"
+    },
+    {
+      "from": "scripts/lib/reference-slice-recovery-compare.mjs",
+      "to": "scripts/lib/released-reports-more-parity.mjs"
+    },
+    {
+      "from": "scripts/lib/reference-slice-recovery-compare.mjs",
+      "to": "scripts/lib/released-module-parity.mjs"
+    },
+    {
+      "from": "scripts/lib/released-module-parity.mjs",
+      "to": "scripts/lib/released-reports-more-parity.mjs"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/browser-lifecycle-diagnostics.mjs"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "scripts/qa/sales-navigation-probe.js"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/browser-lifecycle-diagnostics.mjs"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/sales-navigation-settled.ts"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "tests/helpers/reference-slice-recovery-runtime.mjs"
+    },
+    {
+      "from": "scripts/owner-qa-regressions-browser.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/validate-artifact.sh",
+      "to": "scripts/lib/client-release-integrity.mjs"
+    },
+    {
+      "from": "scripts/lib/client-release-integrity.mjs",
+      "to": "scripts/lib/phase5-receipt-cost.mjs"
+    },
+    {
+      "from": "tests/ingestion-d1-failure-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/ingestion-d1-failure-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/request-observability-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/request-observability-runtime.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/client-release-browser.test.mjs",
+      "to": "scripts/lib/phase5-receipt-cost.mjs"
+    },
+    {
+      "from": "tests/client-release-browser.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "tests/client-release-browser.test.mjs",
+      "to": "scripts/lib/phase5-receipt-cost.mjs"
+    },
+    {
+      "from": "tests/client-release-browser.test.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/operational-day-browser.ts",
+      "to": "tests/helpers/pos-workday-fixture.ts"
+    },
+    {
+      "from": "scripts/operational-day-browser.ts",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/operational-day-browser.ts",
+      "to": "tests/helpers/sales-event-fixture.ts"
+    },
+    {
+      "from": "scripts/operational-day-browser.ts",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/restricted-manager-regression.mjs",
+      "to": "tests/helpers/doctor-confirmation.mjs"
+    },
+    {
+      "from": "scripts/restricted-manager-regression.mjs",
+      "to": "tests/helpers/doctor-confirmation.mjs"
+    },
+    {
+      "from": "scripts/restricted-manager-regression.mjs",
+      "to": "scripts/qa/restricted-manager-runtime.mjs"
+    },
+    {
+      "from": "scripts/restricted-manager-regression.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    },
+    {
+      "from": "scripts/qa/restricted-manager-runtime.mjs",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/qa/restricted-manager-runtime.mjs",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/qa/restricted-manager-runtime.mjs",
+      "to": "tests/helpers/lifecycle-runtime.ts"
+    },
+    {
+      "from": "scripts/restricted-manager-403-browser.mjs",
+      "to": "scripts/qa/restricted-manager-runtime.mjs"
+    },
+    {
+      "from": "scripts/restricted-manager-403-browser.mjs",
+      "to": "scripts/browser-runtime.cjs"
+    }
+  ],
+  "files": {
+    "scripts/account-lifecycle-browser.ts": {
+      "hits": [],
+      "sha256": "4e66586d9d1a6948c2111af20d6ae861ca4773c6dc0967d5e27129311e1cbb6a",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/accounting-guard-browser.ts": {
+      "hits": [],
+      "sha256": "30be648b9fbdd4e9d6e9679aa2530577f5b6c6182aee0ea0fe5c9cdba50e8e9b",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/acquisition-stock-phase3a7-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 67,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime,profile.timezone));"
+        },
+        {
+          "line": 68,
+          "text": "await send('sales',{action:'open_shift',shiftId:'stock-qa',name:'QA'});"
+        }
+      ],
+      "sha256": "bde4a0b09934e666ee35608db36e38d70c5235203170424c977ebad5eab608e9",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/browser-runtime.cjs": {
+      "hits": [],
+      "sha256": "0bde61ae4d78dffd2e3635943d1014710b9e6d9f92e59420031d63757f6c47b5",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/cost-warehouse-trace-browser.ts": {
+      "hits": [],
+      "sha256": "fe86a96b7c640a4f521dad7ae0142b69345a7b99fba888703dc5802549d02081",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/derived-metrics-phase3a8-browser.ts": {
+      "hits": [],
+      "sha256": "284b26ca5ae71524d3bc4f3fe0647a8de6e2598d032f4b1dd05818538adf24b2",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/evidence-foundation-browser.ts": {
+      "hits": [],
+      "sha256": "eb84239c952e1bf0c737c19c9a5d439bf6a023be29c6f5981e64aeb8bc80d574",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/finance-inputs-phase3a6-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 56,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime,profile.timezone),[{employeeId:'qa',hours:8}]);"
+        },
+        {
+          "line": 59,
+          "text": "const opened=await send({ action: \"open_shift\", shiftId, name: shiftId });assert.equal(opened.status,201,JSON.stringify(await opened.json()));"
+        },
+        {
+          "line": 66,
+          "text": "const opened=await send({ action: \"open_shift\", shiftId: \"C\", name: \"C\" });assert.equal(opened.status,201,JSON.stringify(await opened.json()));"
+        },
+        {
+          "line": 150,
+          "text": "const blocked=await send({action:\"open_shift\",shiftId:\"after-close\",name:\"Forbidden\"});assert.equal(blocked.status,409);assert.equal((await blocked.json() as {code:string}).code,\"WORKDAY_CLOSED\");"
+        }
+      ],
+      "sha256": "161810b86d3fd699cf16f546de3d75541d21361605d5a0408e7add27e22e8039",
+      "review": "FIX: OPEN workday in Chisinau with qa team; native team/close calculates90; legacy operations cannot accrue draft FOT. Real month-close fixture route; current CLOSED readonly UI. Final revenue300/FOT90/result210."
+    },
+    "scripts/first-venue-setup-browser.ts": {
+      "hits": [],
+      "sha256": "9951a8f5603fc98e2585347568dc084c04a881e12ce7530cf26ed4ed6fb6571a",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/general-tech-card-browser-v440.ts": {
+      "hits": [],
+      "sha256": "411ea7c13fe86968e8d2c0a1a8c60cfac4bd0b87bffc13e9120806fdf46f3289",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/health-inputs-phase3a9-browser.ts": {
+      "hits": [
+        {
+          "line": 46,
+          "text": "if (url.pathname === '/api/ai/diagnosis') response = await r.api.doctor.handleDiagnosis(request);"
+        },
+        {
+          "line": 63,
+          "text": "const d=await call('/api/ai/diagnosis','POST',{profile:{},equipment:[{repairCount:100}],cases:[{priority:'critical',status:'open'}]});assert.equal(d.status,200);assert.deepEqual(d.body.data.businessHealthSnapshot,a.body.data.businessHealthSnapshot);"
+        }
+      ],
+      "sha256": "1d9ef44415c369202d6b75eae5225e3bf4c415fc933ab7a8f1124d7adf2cf526",
+      "review": "DIRECT API FIXTURE: diagnosis is server contract probe, no UI launch; isolated lifecycle bindings contain DB/BUCKET only, with no provider credentials."
+    },
+    "scripts/health-inputs-phase3a9-stable-webkit.ts": {
+      "hits": [
+        {
+          "line": 21,
+          "text": "else if (url.pathname === \"/api/ai/diagnosis\") response = await r.api.doctor.handleDiagnosis(request);"
+        },
+        {
+          "line": 52,
+          "text": "const doctor = await call(\"/api/ai/diagnosis\", \"POST\", { profile: {}, cases: [{ priority: \"critical\", status: \"open\" }] }); assert.equal(doctor.status, 200); assert.deepEqual(doctor.body.data.businessHealthSnapshot, empty.body.data.businessHealthSnapshot);"
+        }
+      ],
+      "sha256": "96eb0db9fb21b754292524683a481f582d7c6fb8c7b1008c15279a2c44a303c1",
+      "review": "DIRECT API FIXTURE: diagnosis is server contract probe, no UI launch; isolated lifecycle bindings contain DB/BUCKET only, with no provider credentials."
+    },
+    "scripts/install-ci.sh": {
+      "hits": [],
+      "sha256": "c86541a04dec39f982eb6b103b60e3b376c518e84816b7876635877fb4c8569f",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/lib/client-release-integrity.mjs": {
+      "hits": [],
+      "sha256": "9927be9ff10f2abdcb9003d91c928f4edf8c0003d947bacdb68a467cfb0307d0",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/lib/phase5-receipt-cost.mjs": {
+      "hits": [],
+      "sha256": "d9a0da77355c0b759fc0e0f3e620e3a7893384164b577bc34aec6e39467ac0a4",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/lib/reference-slice-recovery-compare.mjs": {
+      "hits": [],
+      "sha256": "57cdc646cd719f618702136f1294414600efc1438c6a27ac9b450fbd3a622974",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/lib/released-module-parity.mjs": {
+      "hits": [],
+      "sha256": "3f5cce9038a01a709df34f38c5ba23b07f879bae8134cb5e65c0bc429a2b6f8d",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/lib/released-reports-more-parity.mjs": {
+      "hits": [],
+      "sha256": "08b3de10cda013ecc8ecf3bbe77c2c2c4f0fd51fe9a83ff87f144788cc19a412",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/menu-consumption-browser-qa-v418.cjs": {
+      "hits": [],
+      "sha256": "117048a340e4f3c16572e16cca2ffecebb28ea1c9de2a2438f684b920ca4f852",
+      "review": "NO TARGET ACTION: platform-dependent npm dev server resolved explicitly; canned server routes."
+    },
+    "scripts/menu-ingestion-phase2-browser.ts": {
+      "hits": [],
+      "sha256": "03329e6a9d494b33ced9ff1b8ab563d9638c67a00ec8f60627d81474e8ee4980",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/menu-origin-trace-browser.ts": {
+      "hits": [],
+      "sha256": "2e0887cafc4c7f104c2919dd41f6053640cb768edd9b3c272b74f51ba803a561",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/mobile-navigation-qa-v269.cjs": {
+      "hits": [],
+      "sha256": "02940823b4c601f37e1b3d15dffdb4a6d9501461f5c38ef1a7218e787561b5c5",
+      "review": "CANNED DATA: bd_ai_diagnosis_v9 envelope; no actual diagnosis launch."
+    },
+    "scripts/opening-browser-qa-phase5.ts": {
+      "hits": [],
+      "sha256": "6cf9f760885b39c8a28c00360627a3a0e5155ba52f68e3ec2b0123b62aaaca43",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/operational-day-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 54,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime??new Date().toISOString(),'Europe/Chisinau'));"
+        },
+        {
+          "line": 56,
+          "text": "assert.equal((await send({ action: \"open_shift\", shiftId: \"cash\", name: \"Cash\" })).status, 201);"
+        }
+      ],
+      "sha256": "82df90aa7385922a6c30085c98128547062e5efa4d9ad7d95fa95e32504dd755",
+      "review": "FIX: venue-date OPEN/team; current workday operations starts at step3; native reviewed close accrues explicit fixture0, never draft FOT; CLOSED readonly screen."
+    },
+    "scripts/owner-qa-regressions-browser.mjs": {
+      "hits": [],
+      "sha256": "55ab15ab85ffadd79904dd96ef9764ab8133123a4593677dadbdf7ec64305511",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/pos1-browser-qa.ts": {
+      "hits": [
+        {
+          "line": 62,
+          "text": "const response=await fixture.api.POST(new Request(\"http://localhost/api/sales-events\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\",\"X-Venue-Id\":\"1\"},body:JSON.stringify({venueId:1,action:\"open_shift\",shiftId:\"second-shift\",name:\"SECOND SHIFT\"})}));"
+        }
+      ],
+      "sha256": "0db3deb28e358a06728885f880be0e1601058e2e4ab485d5189b53859bf223d8",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/pos1-hardening-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 29,
+          "text": "seedOpenWorkday(r.sqlite,user.userId,venue);"
+        },
+        {
+          "line": 91,
+          "text": "assert.equal((await request({action:\"open_shift\",venueId:venue,shiftId:\"second\",name:\"Second\"})).status,409);"
+        }
+      ],
+      "sha256": "6fda8de52e8f3c8e58050610b95af28065128ce3cac08e86cd39023cc87b1488",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/procurement-browser-qa-v168.cjs": {
+      "hits": [],
+      "sha256": "b4e75020d2ed442a3199764d3b0334da1b0ba0800268ba02b7b764fda44642b7",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/provenance-phase3a10-browser.ts": {
+      "hits": [
+        {
+          "line": 27,
+          "text": "else if (url.pathname === \"/api/ai/diagnosis\") response = await r.api.doctor.handleDiagnosis(request);"
+        },
+        {
+          "line": 46,
+          "text": "const diagnosis = await call(\"/api/ai/diagnosis\", \"POST\", { profile: { currency: \"USD\" }, finance: { monthToDate: { revenue: 999999 }, recentDaily: [{ date: \"2026-10-03\", revenue: 999999 }] } });"
+        }
+      ],
+      "sha256": "ac223b5f39633b30befd09635c06bc26547c4abc1780cf5858805687794c6f48",
+      "review": "DIRECT API FIXTURE: diagnosis is server provenance contract probe, no UI launch; isolated lifecycle bindings contain DB/BUCKET only, with no provider credentials."
+    },
+    "scripts/purchase-units-qa-store.cjs": {
+      "hits": [],
+      "sha256": "49d19abfdf8110a6d9d4475f63ce6d55bceba876ea095fe20654cae895795995",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/api-read-tracker.mjs": {
+      "hits": [],
+      "sha256": "9f0738979ae4d0d3fe878eeaf0fa2df1166337528023e4ec8534dd7588d46200",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/restricted-manager-runtime.mjs": {
+      "hits": [],
+      "sha256": "70e7bb37992109118c13ef94d564a8e06c8a0e97750fae2a052a9d43bc1c0a2f",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/sales-navigation-probe.js": {
+      "hits": [],
+      "sha256": "ba18277721e259bf69f8b112d77df22683ce6a1afba56505495e49fe3f870f11",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/webkit-environment-classifier.mjs": {
+      "hits": [],
+      "sha256": "c6c27022f0ad7e329f5399aac968162a51ff43ce51924b7ecc9053b91043abde",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/webkit-lifecycle-evidence.ts": {
+      "hits": [],
+      "sha256": "011ac87a18e37891bfcc3eb28a3937a279f621e75edbbaff17e78f880b8c6801",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/webkit-native-trace.sh": {
+      "hits": [],
+      "sha256": "55b4a4a334e17a5a87143969440c076cf089aeb287e07e5866e35b2b479b29d4",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/webkit-release-gate.mjs": {
+      "hits": [],
+      "sha256": "4eb5cdcdd495ab0b064648a84cf03eddd9c4cbee904b3c5014eade7d696b61f8",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/qa/webkit-session-observer.js": {
+      "hits": [],
+      "sha256": "9b431e451cd05f92f3da4fc82f229dbaaf4912026ee374842cfb51e72195885d",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/reference-slice-legacy-doctor-browser.mjs": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {confirmDoctorAction} from '../tests/helpers/doctor-confirmation.mjs';"
+        },
+        {
+          "line": 25,
+          "text": "const page=await context.newPage(),errors=[];const runConfirmed=button=>confirmDoctorAction(page,button,{required:requiresConfirmation});page.on('pageerror',e=>errors.push(e.message));"
+        },
+        {
+          "line": 29,
+          "text": "const run=page.getByRole('button',{name:'Запустить диагностику',exact:true});await run.waitFor();"
+        },
+        {
+          "line": 30,
+          "text": "let failed=false,diagnosisRequests=0;await page.route('**/api/ai/diagnosis',async route=>{diagnosisRequests++;if(!failed){failed=true;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,error:'QA: временная недоступность диагностики'})});}else await route.continue();});"
+        },
+        {
+          "line": 31,
+          "text": "await runConfirmed(run);await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();assert.ok((await page.locator('body').innerText()).includes('QA: временная недоступность диагностики'));assert.equal(diagnosisRequests,1);assert.equal(model.calls.length,0);"
+        },
+        {
+          "line": 32,
+          "text": "const wait=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/ai/diagnosis'&&res.status()===200);await runConfirmed(page.getByRole('button',{name:'Попробовать снова',exact:true}));const response=await wait,data=await response.json();assert.equal(data.success,true);"
+        },
+        {
+          "line": 37,
+          "text": "const refresh=page.getByRole('button',{name:'Обновить анализ',exact:true}).first(),refreshed=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/ai/diagnosis'&&res.status()===200);await runConfirmed(refresh);assert.equal((await (await refreshed).json()).success,true);await page.locator('[data-bd-ai-result]').waitFor();await settle();"
+        },
+        {
+          "line": 42,
+          "text": "const footerRefresh=page.locator('.bd-ai-refresh'),footerResponse=page.waitForResponse(res=>new URL(res.url()).pathname==='/api/ai/diagnosis'&&res.status()===200);await runConfirmed(footerRefresh);assert.equal((await (await footerResponse).json()).success,true);await page.locator('[data-bd-ai-result]').waitFor();await settle();"
+        }
+      ],
+      "sha256": "c414ef4d9471986bfbbd5fab547799f2200ce7544e8f6b6ccab2e406c68d0ef6",
+      "review": "EXISTING: shared confirmation wraps run/retry/refresh/footer; candidate requires consent, historical v485 optional; isolated model and request/token assertions."
+    },
+    "scripts/reference-slice-recovery-parity.mjs": {
+      "hits": [
+        {
+          "line": 146,
+          "text": "locator=locator.first();await locator.waitFor({state:'visible'});if(item.entryScope==='legacy-diagnosis'){await locator.click({trial:true});record.actions[item.id]={activation:'PASS (actual run tested in separate isolated legacy diagnosis fixture)',handler:'Uce.A → POST /api/ai/diagnosis'};continue;}"
+        }
+      ],
+      "sha256": "701a0a06d503adfac285d665c2815973beb38867b9ffd6c9343029bd42cc08f4",
+      "review": "NO EXECUTED DIAGNOSIS: trial-only actionability; actual consent+handler coverage delegated to mandatory legacy Doctor harness."
+    },
+    "scripts/restricted-manager-403-browser.mjs": {
+      "hits": [],
+      "sha256": "b1669fd8b990c1402cc1c2d7ff6da8da63b5270ced884ab150dc1b342b9115a8",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/restricted-manager-regression.mjs": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {confirmDoctorAction} from '../tests/helpers/doctor-confirmation.mjs';"
+        },
+        {
+          "line": 11,
+          "text": "const expectedRestricted=new Set(['/api/store/bd_finance_expenses','/api/business-health','/api/ai/diagnosis','/api/recommendations/check','/api/ai/curated','/api/month-close']);"
+        },
+        {
+          "line": 79,
+          "text": "await confirmDoctorAction(page,page.getByRole('button',{name:'Запустить диагностику',exact:true}));await settled(page);"
+        },
+        {
+          "line": 80,
+          "text": "const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/diagnosis');"
+        },
+        {
+          "line": 84,
+          "text": "await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();"
+        },
+        {
+          "line": 93,
+          "text": "for(const [path,method,body] of [['/api/business-health','GET'],[curatedPath,'GET'],['/api/ai/diagnosis','POST',{}],['/api/recommendations/check','POST',{recommendations:[{}]}]]){"
+        }
+      ],
+      "sha256": "db855e2788595eadfc98bffb77c69de9d1962cf84e0054afc8cd0fd9a6cab040",
+      "review": "FIX: explicit Doctor consent before mandatory actual403 assertion. Only manager GET month-close ACCESS_DENIED accepted; owner, POST, wrong body,401,500 and foreign venue negatives retained."
+    },
+    "scripts/run-mobile-navigation-qa-v269.sh": {
+      "hits": [],
+      "sha256": "50f557bbbbf3765b40b0c9e6546262907ff8f4868b03eaf6686eceaa125f5571",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/run-procurement-browser-qa-v190.sh": {
+      "hits": [],
+      "sha256": "6fa2efca5a6bdbbdbb8f751c128751d4922f17c524741489ac8047c090db8bb0",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/run-startup-recovery-browser-qa-v341.sh": {
+      "hits": [],
+      "sha256": "fc6b2c9f7fb67e63841500811d56db80a3e5797015a393a93e073a32e728aba6",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/sales-browser-qa-phase5.ts": {
+      "hits": [],
+      "sha256": "5c643f01e1da42600755b6d0e0cef56465216181fe5db4dc2361189606e019b8",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/sales-iphone-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 55,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venue,venueDate(new Date().toISOString(),'Europe/Chisinau'));"
+        },
+        {
+          "line": 57,
+          "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
+        }
+      ],
+      "sha256": "174be79d3a4dfabe11a703776bc5ebbce24a2f2e6b73e9b88d937540246bb744",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/sales-navigation-performance.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 51,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venue,venueDate(new Date().toISOString(),'Europe/Chisinau'));"
+        },
+        {
+          "line": 53,
+          "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
+        }
+      ],
+      "sha256": "99a9dd2a6544b58ad136361de5f358364b9ace0512a4bddc5b66b3877a71cabc",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/sales-observations-browser.ts": {
+      "hits": [
+        {
+          "line": 1,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 45,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venue);"
+        },
+        {
+          "line": 47,
+          "text": "const opened=await send({action:'open_shift',shiftId:'C',name:'C overnight'});assert.equal(opened.status,201,JSON.stringify(await opened.json()));"
+        },
+        {
+          "line": 51,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venue,shifts[0].date);"
+        },
+        {
+          "line": 74,
+          "text": "await send({action:'close_shift',shiftId:'C'});seedOpenWorkday(runtime.sqlite,user.userId,venue,shifts[1].date);await page.goto(base+'/sales-entry?venue='+venue);await page.locator('#sale').waitFor();assert.equal(await page.locator('#shift option[value=C]').count(),0);assert.equal(await page.locator('#shift option[value=D]').count(),1);"
+        }
+      ],
+      "sha256": "ec17fb0c4201ecec5ea955936fe42c4cd9e31473edd9c4b9e853933698753035",
+      "review": "FIX: explicit staffed workday aligned to each existing overnight/current cash date. Positive open201 asserted; real cash close retained."
+    },
+    "scripts/sales-ux2-browser.ts": {
+      "hits": [
+        {
+          "line": 2,
+          "text": "import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';"
+        },
+        {
+          "line": 50,
+          "text": "seedOpenWorkday(runtime.sqlite,user.userId,venue,venueDate(new Date().toISOString(),'Europe/Chisinau'));"
+        },
+        {
+          "line": 52,
+          "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
+        }
+      ],
+      "sha256": "ece19ec5c0b5c76efbb926bac5411aa3577e3686277dab42cd2d9ce0906c8095",
+      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+    },
+    "scripts/sites-env.sh": {
+      "hits": [],
+      "sha256": "df86ebfc27d2f00860036658e933ac0ddd7b5f6879aa5d51218f0863c7e1fb60",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/startup-recovery-browser-qa-v341.cjs": {
+      "hits": [],
+      "sha256": "a7633c0578287e66b09d203b59a7697fb847d51ed39fd0b9194200629b40ea43",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/validate-artifact.sh": {
+      "hits": [],
+      "sha256": "0a8c18500b8e37afa1290be72673483ad7af95338d20f0fe895e5dbeedf826f3",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/venue-timezone-browser.ts": {
+      "hits": [],
+      "sha256": "957fac0dc03f0b91238e84c1512bf7efaa7efa2468af9391ba94197885a0ea5d",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/warehouse-readonly-phase3a7-browser.ts": {
+      "hits": [],
+      "sha256": "c833421e1c5018ac329e4851d7177b6d49d8da795ea1c8aba02aaabc3246e209",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/webkit-health-lifecycle-gate.mjs": {
+      "hits": [],
+      "sha256": "6615aa8db877bc9c91f41e1ac76340c564ed487333e27650437c4aed40e4a0cd",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "scripts/webkit-stable-gate.mjs": {
+      "hits": [],
+      "sha256": "7ed1a9de8544047ae3d31b6c827d1971c3d570ee8665e1f62183edaed71776b0",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/auth-splash-handoff-v423.test.mjs": {
+      "hits": [],
+      "sha256": "8dc9ab98fd96a55ff306d6ac7605726567ef8bc77d350761adefd0bc5d2c8ad2",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/client-release-browser.test.mjs": {
+      "hits": [],
+      "sha256": "4ac0960f5d154ee54edaebd74459bb3523730f7fd5a62dd405e77ffc66450056",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/fixtures/purchase-stock-other-production.json": {
+      "hits": [],
+      "sha256": "3bcb7c287d45f7b5363a9a47430d1b350675de1893f03ace716d008694b0d0bb",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/browser-lifecycle-diagnostics.mjs": {
+      "hits": [],
+      "sha256": "5ee6c22d4a610df8151f1e7d931057d71f1ceba3ee607953aa766e76ea5a01cb",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/cost-trace-runtime.ts": {
+      "hits": [],
+      "sha256": "92db56ba6f74e645f649d87855cc6ad5fdf9028ef05f375377e4ed5ebb9e7151",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/curated-doctor-fixture.ts": {
+      "hits": [],
+      "sha256": "f555404c4eed2da2ebac6c77b7338882140b243f03f5a91e56c5d8ea3c216d56",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/doctor-confirmation.mjs": {
+      "hits": [
+        {
+          "line": 4,
+          "text": "export async function confirmDoctorAction(page,button,{required=true}={}){"
+        }
+      ],
+      "sha256": "ebae782fed80fa61b344207d53573457f21377688784edcef7b03689791227e0",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/evidence-runtime.ts": {
+      "hits": [
+        {
+          "line": 35,
+          "text": "put(\"bd_operational_reports_v1\", [{ venueId, date: new Intl.DateTimeFormat(\"en-CA\", { timeZone: \"Europe/Chisinau\" }).format(new Date(options.now ?? Date.now())), workdayStatus: \"OPEN\", staffing: [{ employeeId: \"evidence-fixture\" }] }]);"
+        },
+        {
+          "line": 36,
+          "text": "await command(\"sales\", { action: \"open_shift\", shiftId: \"evidence-shift\", name: \"Evidence shift\" });"
+        }
+      ],
+      "sha256": "56632ee83478020ffb7b5427e1fd66899b04b20c070423d703630261146b60ab",
+      "review": "EXISTING: scoped OPEN workday, nonempty evidence-fixture team, Chisinau date precedes open_shift; reused by cost/menu trace."
+    },
+    "tests/helpers/health-inputs-fixture.ts": {
+      "hits": [],
+      "sha256": "31f9103c689aaa33e18078526928984b1be7c8437c5abff3b72b5ef65e45129a",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/lifecycle-runtime.ts": {
+      "hits": [],
+      "sha256": "0187e807cb552a5bc4ffb9fbf50edb7b693dda211bc9c66078ea5e61ae36f7dc",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/management-actions-fixture.ts": {
+      "hits": [],
+      "sha256": "9475481e25d5b776e4acbe6e1eac5d3b4e144c0252b85f040529b1a29701a8c2",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/menu-action-readiness.ts": {
+      "hits": [],
+      "sha256": "b2660a39faed83d290fa3de91f3debfac4527c4d02e06ced960be535b2201008",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/menu-analytics-state-qa.ts": {
+      "hits": [],
+      "sha256": "5821827e5c4e0235cbb524cfa551327a26baff122abfdec45078c1f70f568a86",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/menu-import-runtime.ts": {
+      "hits": [],
+      "sha256": "32c1037e34353dedd466c83463dfee850c70606eea24438950fe57143def50ef",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/menu-trace-runtime.ts": {
+      "hits": [],
+      "sha256": "8ed0b383105adddc347a8bb7253be8d5c5ca6057022988d47c43c5a0fb47d82e",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/month-close-fixture.ts": {
+      "hits": [],
+      "sha256": "d9038818c2f90f2da161393f5ec2f2b6c55caef06d3da5389308abbf0984f538",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/opening-runtime.ts": {
+      "hits": [],
+      "sha256": "4910b48ab1ab75f7102201d3e60c5b96fa8262211d6cb8d1cdb1b8f95bade383",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/owner-doctor-mock.mjs": {
+      "hits": [],
+      "sha256": "7d0af374d4b6f76054850c54dc8343e5e232ac3ac077d9c90f5e5eb54692a5bf",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/pos-browser-driver.ts": {
+      "hits": [],
+      "sha256": "894c04db1e5f6de4ae969effb1f3a6a05ba233f545fceef5f858c7aff2f0ae61",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/pos-workday-fixture.ts": {
+      "hits": [
+        {
+          "line": 5,
+          "text": "return {id:`operational-report:${venueId}:${date}`,venueId,date,workdayStatus:'OPEN',staffing};"
+        },
+        {
+          "line": 7,
+          "text": "export function seedOpenWorkday(sqlite:DatabaseSync,accountId:number,venueId:number,date?:string,staffing?:{employeeId:string;hours:number}[]) {"
+        }
+      ],
+      "sha256": "ab26fbddafdb24a297dc9d8d52df4c2df9b5922c12d38ef20523f768b3f022ad",
+      "review": "FIX: optional explicit staffing while preserving defaults; called only by isolated fixtures, no global runtime autoseed."
+    },
+    "tests/helpers/provenance-runtime.ts": {
+      "hits": [],
+      "sha256": "c52bfb8acae9e019b071fde58df1e4eef80c996403d869cbca7cdfae6f71448b",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/recipe-picker-pointer-qa.mjs": {
+      "hits": [],
+      "sha256": "52e88fe07ce72964a4d596beff14d79cbe8b9387898e7572f9791038936c5c15",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/reference-slice-recovery-runtime.mjs": {
+      "hits": [],
+      "sha256": "67a41ca21abf659f03272fb3a8fc000981b402dbd1b3fb6a7060e646c005fefc",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/reference-slice-recovery-ssr.mjs": {
+      "hits": [],
+      "sha256": "1595b4666573e73402d5ff73a5f25d067f92620b38a26bb90a0b02d4c5094ec5",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/revenue-trace-runtime.ts": {
+      "hits": [],
+      "sha256": "ccbc1f3225748d380454d1c6ec7ebedde420ddd9dbb70c6a768a893762479f82",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/sales-event-fixture.ts": {
+      "hits": [],
+      "sha256": "16ef852cb2547c457ed793afe920af55d185ebd3a20ff9d83d93f3dc33d9d07c",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/sales-iphone-trace.ts": {
+      "hits": [],
+      "sha256": "a22bf1c8331dcdec4151c05d2745b14632b21b02178caed56b2d148452c70135",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/sales-navigation-settled.ts": {
+      "hits": [],
+      "sha256": "92e213dfa7efde9a8318528ccd940ab0cab1d467cd99115dab337c71fea6c5bc",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/sales-surface-page.ts": {
+      "hits": [],
+      "sha256": "e486b4869c08aac516d73680bae7e56e866a9835daa2520ed94e2cbed8215d82",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/setup-server.ts": {
+      "hits": [],
+      "sha256": "e2acbf81917f640945bfdcb306f47ff1f8395560d775bd5f8b66171fcbc1e42d",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/store-runtime.ts": {
+      "hits": [],
+      "sha256": "d0048586fdbd4025d8ee77afaf1fef738e8dc4871bb193fd1b3d8fd36b805196",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/helpers/warehouse-readonly-fixture.ts": {
+      "hits": [],
+      "sha256": "f715105f77908d1dbcbdfba9a5355215c232775c73165368fa34573f04dd569e",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/ingestion-d1-failure-runtime.test.mjs": {
+      "hits": [],
+      "sha256": "70e4c7860e320c1a27a4ba405492973f5f5bf3f439dad3300bf21baca9c56e43",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/purchase-reload-runtime.test.mjs": {
+      "hits": [],
+      "sha256": "84673a40ca3bc63b09ac4f8390ff62d2b783e360e2ea590addbe48df35a1c86f",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/request-observability-runtime.test.mjs": {
+      "hits": [],
+      "sha256": "28e017d1bbcd0197eb206e6ec6d228df57d6799e60c1ef08762468835c9d9a0c",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/venue-root-splash-handoff.test.mjs": {
+      "hits": [],
+      "sha256": "b5753006265121788aa255f337ee7b2bf1fc7d5a078946b1dc899e6ce17cf7cc",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    },
+    "tests/warehouse-readonly-client-phase3a7.test.mjs": {
+      "hits": [],
+      "sha256": "093a1d02131201888f4ac2186240b3aa29911e72eea11504fdf70d987b63a518",
+      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+    }
+  },
+  "reviewedAt": "2026-10-13",
+  "baseCommit": "0431b9c624f6a75385b22b9299e1959c2afbf11f",
+  "rootHashes": {
+    ".github/workflows/google-reviews-setup-v400.yml": "66ea2dcf012d40f56293cc683b1f88d576fb91516968554b14270cad788c948e",
+    "package.json": "ef820f478050259325486ea5d7f39b0f6ca660cd6d70db3398f15218f2ed5005"
+  },
+  "counts": {
+    "scripts": 57,
+    "supportFiles": 37
+  },
+  "dynamicResolution": [
+    "webkit-health-lifecycle-gate WEBKIT_LIFECYCLE_SUITES: health-inputs-phase3a9, derived-metrics-phase3a8",
+    "menu-consumption npmArguments: npm run dev on POSIX, node_modules/vite/bin/vite.js on Windows",
+    "sites-env.sh forwards caller argv; webkit-native-trace.sh invokes supplied Playwright executable; parity runner self-spawns widths"
+  ],
+  "findings": {
+    "originalFinance409": {
+      "status": 409,
+      "code": "WORKDAY_REQUIRED",
+      "date": "2026-10-02"
+    },
+    "changedScripts": [
+      "scripts/acquisition-stock-phase3a7-browser.ts",
+      "scripts/finance-inputs-phase3a6-browser.ts",
+      "scripts/operational-day-browser.ts",
+      "scripts/pos1-browser-qa.ts",
+      "scripts/pos1-hardening-browser.ts",
+      "scripts/restricted-manager-regression.mjs",
+      "scripts/sales-browser-qa-phase5.ts",
+      "scripts/sales-iphone-browser.ts",
+      "scripts/sales-navigation-performance.ts",
+      "scripts/sales-observations-browser.ts",
+      "scripts/sales-ux2-browser.ts"
+    ],
+    "removedDependency": "finance-save-refresh-observer.js no longer called by current native workday close flow; prior WIP count58 becomes57",
+    "limitations": "Static audit of the specified remaining gates; not a full CI or all-width browser PASS. Previously completed gates excluded. Product routes, permissions, workflow and package dependencies unchanged."
+  }
+}

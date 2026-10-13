@@ -1,3 +1,4 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
 import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posPane, posPay, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
@@ -41,11 +42,13 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
  const put=(key:string,value:unknown)=>runtime.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(user.userId,key,JSON.stringify(value),new Date().toISOString());
  const get=(key:string)=>JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(user.userId,key)?.data_json||'null'));
  put('bd_assortment_v1',JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1','"venueId":'+venue)));
+ seedOpenWorkday(runtime.sqlite,user.userId,venue);
  const send=(body:object)=>runtime.api.events.POST(runtime.request(user,'/api/sales-events','POST',{venueId:venue,...body}));
- await send({action:'open_shift',shiftId:'C',name:'C overnight'});
+ const opened=await send({action:'open_shift',shiftId:'C',name:'C overnight'});assert.equal(opened.status,201,JSON.stringify(await opened.json()));
  // Legacy parallel shifts remain selectable; new parallel openings are rejected.
  put('bd_finance_revenue',[...get('bd_finance_revenue'),{...get('bd_finance_revenue')[0],id:'D',shiftName:'D current'}]);
  const shifts=get('bd_finance_revenue');shifts[0].date=new Date(Date.now()-86400000).toISOString().slice(0,10);shifts[0].accountingMonth=shifts[0].date.slice(0,7);put('bd_finance_revenue',shifts);
+ seedOpenWorkday(runtime.sqlite,user.userId,venue,shifts[0].date);
  const setup=async(kind:string)=>{const context=await browser.newContext({viewport:{width:profile.width,height:profile.height}});if(kind!=='anonymous')await context.addInitScript(({email,token,venue})=>{if(sessionStorage.getItem('qa_initialized'))return;sessionStorage.setItem('qa_initialized','1');localStorage.setItem('bd_session',email);localStorage.setItem('bd_session_token',token);localStorage.setItem('bd_active_venue_id',String(venue));},{email:user.email,token:kind==='invalid'?'invalid':user.token,venue});return context;};
  for(const kind of ['anonymous','invalid','expired']) for(const suffix of ['', '?venue='+venue]){
   if(kind==='expired')runtime.sqlite.prepare("UPDATE sessions SET expires_at='2000-01-01T00:00:00Z' WHERE account_id=?").run(user.userId);
@@ -68,7 +71,7 @@ try{for(const profile of [{name:'mobile',width:390,height:844},{name:'tablet',wi
   assert.equal(get('bd_sales_events_v1').length,2);assert.equal(get('bd_stock_movements').length,2);assert.equal(get('bd_assortment_v1').stockBalances[0].current,18);assert.equal(get('bd_finance_revenue').find((s:{id:string})=>s.id==='C').revenue,40);
   await page.goto(base+'/sales-import?embedded=1&venue='+venue);await page.locator('#journal-receipts').filter({hasText:'2'}).waitFor();assert.equal(await page.locator('.batch-row').count(),2);assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-journal.png',fullPage:true});
   await page.goto(base+'/finance?venue='+venue);await page.getByRole('heading',{name:/Финанс/}).first().waitFor();assert.equal(await page.locator('body').evaluate(n=>n.scrollWidth<=innerWidth+2),true);await page.screenshot({path:out+'/'+profile.name+'-finance.png',fullPage:true});
-  await send({action:'close_shift',shiftId:'C'});await page.goto(base+'/sales-entry?venue='+venue);await page.locator('#sale').waitFor();assert.equal(await page.locator('#shift option[value=C]').count(),0);assert.equal(await page.locator('#shift option[value=D]').count(),1);
+  await send({action:'close_shift',shiftId:'C'});seedOpenWorkday(runtime.sqlite,user.userId,venue,shifts[1].date);await page.goto(base+'/sales-entry?venue='+venue);await page.locator('#sale').waitFor();assert.equal(await page.locator('#shift option[value=C]').count(),0);assert.equal(await page.locator('#shift option[value=D]').count(),1);
   const closed=await send({action:'post',command:{id:'closed',source:'MANUAL_GRID',shiftId:'C',lines:[{id:'l',menuItemId:'beer',quantity:1}]},previewHash:'old'});assert.equal(closed.status,409);
   failure=true;await page.goto(base+'/cashier?venue='+venue);await page.locator('#notice').filter({hasText:'QA server unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');assert.doesNotMatch(await page.locator('#connection').innerText(),/Нет соединения/);failure=false;
   await page.route('**/api/sales-events*',route=>route.abort('internetdisconnected'));await page.reload();await page.locator('#connection').filter({hasText:'Нет соединения'}).waitFor();assert.equal(new URL(page.url()).pathname,'/cashier');await page.screenshot({path:out+'/'+profile.name+'-network.png'});await page.unroute('**/api/sales-events*');await page.reload();await page.locator('#work:not([hidden])').waitFor();assert.match(await page.locator('#connection').innerText(),/На связи/);

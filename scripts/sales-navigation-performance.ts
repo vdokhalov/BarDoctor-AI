@@ -1,3 +1,5 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
+import {venueDate} from '../lib/bardoctor/venue-time';
 import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { waitForSalesHostReads } from '../tests/helpers/sales-navigation-settled';
@@ -46,6 +48,7 @@ assortment.menuItems.push(...names.map((name,i)=>({...assortment.menuItems[0],id
 assortment.nomenclatureStructure={sections:[{id:'bar',name:'Бар'},{id:'kitchen',name:'Кухня'}],categories:[{id:'drinks',name:'Напитки',parentId:'bar'},{id:'food',name:'Основное меню',parentId:'kitchen'}],subcategories:[{id:'wine',name:'Вино и кофе',parentId:'drinks'},{id:'dishes',name:'Блюда',parentId:'food'}]};
 assortment.stockBalances.forEach((b:{current:number})=>b.current=1000);
 put('bd_assortment_v1',assortment);
+seedOpenWorkday(runtime.sqlite,user.userId,venue,venueDate(new Date().toISOString(),'Europe/Chisinau'));
 const send=(body:object)=>runtime.api.events.POST(runtime.request(user,'/api/sales-events','POST',{venueId:venue,...body}));
 assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);
 for(const [i,source] of ['POS_API','MANUAL_GRID','POS_API'].entries()){

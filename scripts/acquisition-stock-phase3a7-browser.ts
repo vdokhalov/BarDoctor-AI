@@ -1,3 +1,5 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
+import {venueDate} from '../lib/bardoctor/venue-time';
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -62,6 +64,7 @@ try {
   await receive('price-x',20,'2026-10-01');const key=String(get('bd_stock_movements')[0].productKey);
   const count=await send('counts',{action:'create',scope:{type:'all'}}),countId=String((count.inventory as {id:string}).id),items=(count.inventory as {items:{productKey:string;expected:number}[]}).items.map(line=>({productKey:line.productKey,actual:line.expected}));
   await send('counts',{action:'save',id:countId,items});await send('counts',{action:'review',id:countId});await send('counts',{action:'finalize',id:countId});
+  seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime,profile.timezone));
   await send('sales',{action:'open_shift',shiftId:'stock-qa',name:'QA'});
   const command={id:'historical-sale',source:'MANUAL_GRID',shiftId:'stock-qa',lines:[{id:'historical-line',menuItemId:'beer',quantity:1}]},preview=await send('sales',{action:'preview',command});const sale=await send('sales',{action:'post',command,previewHash:preview.previewHash});
   const historicalId=String((sale.event as {id:string}).id),recorded=JSON.stringify((sale.event as {batch:object}).batch);await receive('price-y',40,'2026-10-02');assert.equal(JSON.stringify(get('bd_sales_events_v1').find((e:{id:string})=>e.id===historicalId).batch),recorded);

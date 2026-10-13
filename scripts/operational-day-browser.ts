@@ -1,3 +1,5 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
+import {venueDate} from '../lib/bardoctor/venue-time';
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -10,14 +12,14 @@ import { barDoctorResponse } from "../app/bar-doctor-response";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const fixedTime = process.env.BD_OPERATIONAL_TEST_INSTANT;
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
-const runtime = await lifecycleRuntime({ sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" }, { now: fixedTime });
+const runtime = await lifecycleRuntime({ workdays:"./app/api/workdays/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route" }, { now: fixedTime });
 const pendingHandlers = new Set<Promise<void>>();
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url || "/", "http://localhost"), chunks = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const body = Buffer.concat(chunks), key = url.pathname.match(/^\/api\/store\/([^/]+)$/)?.[1];
-    const routes: Record<string, string> = { "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs" };
+    const routes: Record<string, string> = { "/api/workdays":"workdays", "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs" };
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
@@ -41,12 +43,15 @@ const out = "outputs/operational-day-phase1a"; mkdirSync(out, { recursive: true 
 const results: unknown[] = [];
 const cachedProfile = process.env.BD_OPERATIONAL_CACHED_PROFILE === "1";
 try {
-  for (const profile of [{ name: "mobile", width: 390, height: 844 }, { name: "desktop", width: 1280, height: 800 }]) {
+  for (const profile of [{ name: "mobile", width: 390, height: 844 }, { name: "desktop", width: 1280, height: 800 }].filter(profile=>!process.env.BD_OPERATIONAL_WIDTH||profile.width===Number(process.env.BD_OPERATIONAL_WIDTH))) {
     const user = await runtime.register(profile.name + "@phase1a.test"), venueId = user.activeVenueId;
     runtime.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ name: "Phase 1A " + profile.name, currency: "MDL", timezone: "Europe/Chisinau", workingDays: [0, 1, 2, 3, 4, 5, 6], openTime: "00:00", closeTime: "23:59", areas: ["Бар"] }), user.userId);
     const put = (key: string, value: unknown) => runtime.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(user.userId, key, JSON.stringify(value), new Date().toISOString());
     const get = (key: string) => JSON.parse(String(runtime.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").get(user.userId, key)?.data_json || "null"));
     put("bd_assortment_v1", JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1', '"venueId":' + venueId)));
+    put("bd_employees",[{id:"fixture-team",name:"Explicit zero QA",payrollRuleId:"qa-zero",venueId}]);
+    put("bd_payroll_rules",[{id:"qa-zero",blocks:[{type:"shift_rate",amount:0,enabled:true}]}]);
+    seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime??new Date().toISOString(),'Europe/Chisinau'));
     const send = (body: object) => runtime.api.sales.POST(runtime.request(user, "/api/sales-events", "POST", { venueId, ...body }));
     assert.equal((await send({ action: "open_shift", shiftId: "cash", name: "Cash" })).status, 201);
     const command = { id: "sale", source: "POS_API", shiftId: "cash", lines: [{ id: "line", menuItemId: "beer", quantity: 1 }], payments: [{ id: "payment", method: "CASH", amount: 20 }] };
@@ -83,13 +88,16 @@ try {
         const readiness = await page.evaluate(() => (window as unknown as { __bdCloudReadiness: unknown }).__bdCloudReadiness);
         console.log(JSON.stringify({ profile: profile.name, cachedProfile, readiness }));
       }
-      await page.locator(".bd-shifts-context strong").filter({hasText:"Касса открыта"}).waitFor({timeout:7000});
       await page.locator(".bd-shift-card.operating").click();
-      await page.getByRole("dialog").getByRole("button", { name: "Заполнить операционные данные", exact: true }).click();
-      await page.locator('[data-bd-pos-revenue="readonly"]').waitFor();
-      assert.match(await page.locator('[data-bd-pos-revenue="readonly"]').innerText(), /Продажи BarDoctor · Предварительно/);
+      const openView = page.locator('[data-workday-state="OPEN"]');
+      assert.match(await openView.innerText(), /Продажи · предварительно/);
+      assert.match(await openView.innerText(), /20,00\s*MDL/);
+      await page.locator('[data-workday-state="OPEN"]').getByRole("button", { name: "Заполнить списания и происшествия", exact: true }).click();
+      // Current workday entry opens operations directly at step 3; revenue is
+      // shown by the owning workday screen and remains server-side read-only.
+      await page.getByText("Шаг 3 из 5 · Списания", { exact: true }).waitFor();
       const before = get("bd_finance_revenue");
-      for (let step = 0; step < 4; step++) await page.getByRole("button", { name: "Далее", exact: true }).click();
+      for (let step = 0; step < 2; step++) await page.getByRole("button", { name: "Далее", exact: true }).click();
       const saved = page.waitForResponse(response => response.url().endsWith("/api/shifts/close") && response.request().method() === "POST");
       await page.getByRole("button", { name: "Сохранить изменения", exact: true }).click();
       const response = await saved; assert.equal(response.status(), 201);
@@ -99,15 +107,15 @@ try {
       await page.locator(".bd-shift-card.operating").waitFor();
       await page.screenshot({ path: out + "/" + profile.name + "-operating.png", fullPage: true });
       await send({ action: "close_shift", shiftId: "cash" });
-      // The legacy wizard omits FOT when no staff inputs were recorded. Cash
-      // closure + report existence is not proof of a complete operational day.
+      // Closing cash and saving the operations editor never accrue draft FOT.
+      // The authoritative workday must still be explicitly reviewed and closed.
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown, undefined);
       const incomplete = await (await runtime.api.days.GET(runtime.request(user, "/api/operational-days"))).json() as { days: { status: string; payroll: { amount: number | null } }[] };
-      assert.equal(incomplete.days[0].status, "AWAITING_OPERATIONAL_DATA"); assert.equal(incomplete.days[0].payroll.amount, null);
-      // Explicit synthetic known-zero input completes this separate UI/finality
-      // oracle via the existing real report handler; never guess/backfill zero.
-      const knownZero = await runtime.api.close.POST(runtime.request(user, "/api/shifts/close", "POST", { venueId, sectionsVersion: 1, shiftCloseId: "qa-explicit-known-zero", revenueRecord: { date: businessDate, staffing: [], payrollBreakdown: { total: 0 } }, writeOffItems: [] }));
-      assert.equal(knownZero.status, 201);
+      assert.equal(incomplete.days[0].status, "OPERATING"); assert.equal(incomplete.days[0].payroll.amount, null);
+      // Explicit zero is a fixture rule, confirmed through the owning workday API.
+      const closeWorkday=async(body:object)=>{const response=await runtime.api.workdays.POST(runtime.request(user,"/api/workdays","POST",{venueId,date:businessDate,...body}));assert.equal(response.status,201,JSON.stringify(await response.json()));};
+      await closeWorkday({action:"team",operationId:"qa-zero-team",expectedRevision:get("bd_operational_reports_v1")[0].workdayRevision,staffing:[{employeeId:"fixture-team",hours:8}]});
+      await closeWorkday({action:"close",operationId:"qa-explicit-known-zero",expectedRevision:get("bd_operational_reports_v1")[0].workdayRevision,confirmations:{writeoffs:"none",incidents:"none"},reviewedOperations:{writeoffs:0,incidents:0}});
       await page.reload();
       await page.locator(".bd-shift-card.closed").waitFor({timeout:7000});
       if (cachedProfile) {
@@ -115,9 +123,10 @@ try {
       }
       await page.locator(".bd-shift-card.closed small").filter({ hasText: "Продажи BarDoctor · Итог" }).waitFor();
       await page.locator(".bd-shift-card.closed").click();
-      await page.getByRole("dialog").getByRole("button", { name: "Заполнить операционные данные", exact: true }).click();
-      await page.locator('[data-bd-pos-revenue="readonly"]').waitFor();
-      assert.match(await page.locator('[data-bd-pos-revenue="readonly"]').innerText(), /Продажи BarDoctor · Итог/);
+      const closedView=page.locator('[data-workday-state="CLOSED"]');await closedView.waitFor();
+      assert.match(await closedView.innerText(),/Продажи.*за рабочий день/s);
+      assert.match(await closedView.innerText(),/20,00\s*MDL/);
+      assert.equal(await closedView.getByRole('button',{name:'Заполнить списания и происшествия',exact:true}).count(),0,"closed day is read-only");
       await page.screenshot({ path: out + "/" + profile.name + "-final.png", fullPage: true });
       assert.match(await page.locator(".bd-shift-card.closed").innerText(), /Продажи BarDoctor · Итог/);
       await page.goto(base + "/finance"); await page.locator('[data-bd-finance-dashboard]').waitFor();
@@ -132,7 +141,8 @@ try {
         await page.goto(base+"/shifts");
         const card=page.locator(".bd-shift-card.closed").filter({hasText:label+" · Итог"});
         await card.waitFor(); await card.click();
-        await page.getByRole("dialog").getByText(label+" · Итог",{exact:true}).waitFor();
+        await page.locator('[data-workday-state="CLOSED"]').waitFor();
+        assert.equal(await page.locator('[data-workday-state="CLOSED"]').getByRole('button',{name:'Заполнить списания и происшествия',exact:true}).count(),0);
         await context.unroute("**/api/operational-days");
       }
       await page.goto(base+"/finance");
