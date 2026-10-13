@@ -53,6 +53,8 @@ function runtime(venueId = 1) {
   const sale = r.loadRoute(new URL("../app/api/sales-events/route.ts", import.meta.url), sales);
   r.put("bd_assortment_v1", JSON.parse(JSON.stringify(fixture(), (key, value) => key === "venueId" ? venueId : value)));
   r.put("bd_suppliers", [{ id: "test-supplier", name: "TEST Supplier", venueId, status: "active" }]);
+  // These sale/refund scenarios start with a staffed workday, as live POS requires.
+  r.put("bd_operational_reports_v1", [{venueId,date:new Date().toISOString().slice(0,10),workdayStatus:"OPEN",staffing:[{employeeId:"purchase-fixture"}]}]);
   const send = async (api: typeof confirm, body: Row, status?: number) => {
     const response = await api.POST(new Request("http://localhost/api/test", { method: "POST",
       headers: { "Content-Type": "application/json", "X-Venue-Id": String(venueId) }, body: JSON.stringify({ venueId, ...body }) }));
@@ -165,7 +167,8 @@ test("Phase 7 production identity regression: native structured keys survive rec
     const renamed = r.get("bd_assortment_v1") as ReturnType<typeof fixture>;
     for (const list of [renamed.nomenclature, renamed.stockBalances]) for (const p of list) p.name += " renamed";
     r.put("bd_assortment_v1", renamed);
-    const command = { id: "combo-sale", source: "MANUAL_GRID", lines: [{ id: "combo-line", menuItemId: "combo", quantity: 2 }] };
+    await r.send(r.sale, { action: "open_shift", shiftId: "purchase-fixture", name: "Purchase fixture" });
+    const command = { id: "combo-sale", source: "MANUAL_GRID", shiftId: "purchase-fixture", lines: [{ id: "combo-line", menuItemId: "combo", quantity: 2 }] };
     const quote = await r.send(r.sale, { action: "preview", command });
     assert.equal(quote.event.originalMovements.reduce((n, m) => n + m.costAmount, 0), -60);
     const posted = await r.send(r.sale, { action: "post", command, previewHash: quote.previewHash });

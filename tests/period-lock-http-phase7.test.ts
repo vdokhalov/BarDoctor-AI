@@ -18,7 +18,8 @@ async function rejectWithoutWrites(r: Runtime, key: string, desired: unknown, mo
   const before = r.bytes();
   const original = (await r.get(key)).body.data;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await r.put(key, desired, "TEST rejected mutation", baseData);
+    // Accounting boundaries require the current optimistic-concurrency base.
+    const result = await r.put(key, desired, "TEST rejected mutation", baseData ?? (key === "bd_inventory_snapshots" ? original : undefined));
     assert.equal(result.status, 423);
     assert.equal(result.body.code, "MONTH_LOCKED");
     assert.equal(result.body.monthKey, monthKey);
@@ -316,9 +317,11 @@ for (const key of ["bd_purchase_documents", "bd_finance_revenue", "bd_finance_ga
   test(`${key}: original closed period is protected on date move and deletion`, async () => {
     const r = await storeRuntime();
     try {
-      const original = { ...expense, status: "draft" };
+      const original = key === "bd_inventory_snapshots"
+        ? { id: expense.id, venueId: 901, date: "2026-08-01", currency: "MDL", sections: { bar: 15 }, total: 15, note: "Fixture boundary", status: "confirmed" }
+        : { ...expense, status: "draft" };
       r.seed(closings, [closing("2026-08")]); r.seed(key, [original]);
-      await rejectWithoutWrites(r, key, [{ ...original, date: "2026-09-05" }], "2026-08");
+      await rejectWithoutWrites(r, key, [{ ...original, date: key === "bd_inventory_snapshots" ? "2026-09-01" : "2026-09-05" }], "2026-08");
       await rejectWithoutWrites(r, key, [], "2026-08");
     } finally { r.close(); }
   });
