@@ -5,8 +5,9 @@ import {readFileSync} from 'node:fs';
 
 export const p0Baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
 export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','build','db','drizzle','migrations','.openai','.github','package.json','package-lock.json','vite.config.ts','tsconfig.json','next.config.ts','drizzle.config.ts','postcss.config.mjs','.npmrc','.gitignore','eslint.config.mjs']);
-// User-approved P0 recovery plus isolated Doctor/scroll and scoped390 released-module parity diagnostics + Reports wizard route repair (2026-10-13). No directory exemption.
+// User-approved P0 recovery plus isolated Doctor/scroll and audited 390/820/1280 released-module parity and current-picker harness diagnostics + Reports wizard route repair (2026-10-13). No directory exemption.
 export const p0Paths=Object.freeze([
+ 'scripts/management-cost-phase4a-browser.ts','scripts/management-cost-correction-phase4a-browser.ts','scripts/recheck-parity-ci-snapshots.mjs',
  'scripts/owner-qa-regressions-browser.mjs','scripts/reference-slice-legacy-doctor-browser.mjs',
  'scripts/lib/stable-ui-v485.mjs','scripts/lib/health-request-lifecycle.mjs','scripts/patch-qa-audit-v513.mjs',
  'scripts/lib/released-module-parity.mjs','scripts/recheck-released-parity-390.mjs',

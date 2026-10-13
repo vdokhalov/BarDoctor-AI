@@ -97,7 +97,7 @@ test('query routes require full controls; source-specific transitions do not spr
     const data=fixture();rejects(data,itemFor(path),copy=>copy.candidate[path].before.entries.pop());
   }
   assert.equal(releasedModuleScope('/finance?addExpense=1',captured.v485['/finance'].before,'webkit',390),false);
-  assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'webkit',820),false);
+  assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'webkit',1024),false);
   assert.equal(releasedModuleScope('/shifts',captured.v485['/shifts'].before,'chromium',390),false);
   assert.notEqual(evaluate(captured,itemFor('/sales-entry'),'webkit',1280).verdict,'PASS');
 });
@@ -106,7 +106,7 @@ test('all newly allowed product controls and copy already exist unchanged in pro
   for(const path of ['public/reviews.js','public/opportunities.js','public/supplier-alternatives.js','public/navigation-contract-v247.js','scripts/patch-pos1-hardening.mjs','scripts/patch-operational-day-phase1a.mjs'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',baseline+':'+path],{maxBuffer:16*1024*1024}),path);
   const functions=source=>new Map(parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(node=>node.type==='FunctionDeclaration').map(node=>[node.id.name,source.slice(node.start,node.end)]));
   const before=functions(execFileSync('git',['show',baseline+':public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString()),after=functions(readFileSync('public/assets/index-BQGspy0I.js','utf8'));
-  for(const name of ['bdWarehousePage','bdShiftsPage','bdCashierEntry','bdSalesImportPage','bdSalesPosPage','bdFinanceQuickActionsV160','bdFinanceCanonicalStatusV515','bdMonthlyReasonLinkV515','bdMonthlyPendingReasonsV513']) {
+  for(const name of ['Tle','bdWarehousePage','bdShiftsPage','bdCashierEntry','bdSalesImportPage','bdSalesPosPage','bdFinanceQuickActionsV160','bdFinanceCanonicalStatusV515','bdMonthlyReasonLinkV515','bdMonthlyPendingReasonsV513']) {
     assert.ok(before.has(name),name+' released');assert.equal(after.get(name),before.get(name),name+' unchanged');
   }
   // Copy transformations use the existing normalization, never erase extra errors.

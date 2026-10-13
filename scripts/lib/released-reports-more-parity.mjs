@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-// Narrow v517 expectations for the October owner fixture, WebKit 390 only.
+// Narrow v517 expectations for the October owner fixture, WebKit 390/820/1280 only.
 // These transform historical expectations, never filter candidate controls.
 export const reportDayLabel = '2 окт.Выручка 200,00 MDL · Себестоимость — · ФОТ Неизвестно · Постоянные 3,00 MDLНеизвестно';
 export const reportMasterLabel = 'Мастер закрытия месяца8 последовательных проверок→';
@@ -11,8 +11,9 @@ export function releasedActionLabel(path, label) {
   return label;
 }
 export const normalized = value => value.replace(/[\d.,]+/g, '').trim().replace(/\s+/g, ' ');
+export const releasedViewport = (engine,width) => engine === 'webkit' && [390,820,1280].includes(width);
 export function releasedScope(path, before, engine, width) {
-  return engine === 'webkit' && width === 390 &&
+  return releasedViewport(engine,width) &&
     ((path === '/reports' && before.contract.type === 'report') ||
      (path === '/more' && before.contract.type === 'root'));
 }

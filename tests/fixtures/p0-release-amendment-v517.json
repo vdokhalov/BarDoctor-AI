@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for scoped WebKit390, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -76,15 +76,15 @@
     },
     "scripts/lib/reference-slice-recovery-compare.mjs": {
       "before": "c07025badd6df36dfac836f0a04059174fcb1adcf24d6f7d6bd8999acf36f9cf",
-      "after": "19c9241176b2bc87c9d9692945f5403010c7ac90a004b1442719c344ae1fb419"
+      "after": "57cdc646cd719f618702136f1294414600efc1438c6a27ac9b450fbd3a622974"
     },
     "scripts/lib/released-reports-more-parity.mjs": {
       "before": null,
-      "after": "97e7bcd7031de34c90112dd9fe2cacebd09f2f49b22e6bf7fa7dff9f8b3ae111"
+      "after": "08b3de10cda013ecc8ecf3bbe77c2c2c4f0fd51fe9a83ff87f144788cc19a412"
     },
     "scripts/reference-slice-recovery-parity.mjs": {
       "before": "a070cca32f868afe39cd89fe9fad0e0b5410e3798592de6e32258adfe7486058",
-      "after": "b75a20ba8c68b0f299104158e99384ceaa0e1948d2a8f9900df59f3013e38dce"
+      "after": "701a0a06d503adfac285d665c2815973beb38867b9ffd6c9343029bd42cc08f4"
     },
     "scripts/patch-monthly-return-v516.mjs": {
       "before": "572f17238a44ed37b1be13fd35e125fbcd7e626640ad11534510d4f6fc5e9812",
@@ -92,7 +92,7 @@
     },
     "scripts/lib/released-module-parity.mjs": {
       "before": null,
-      "after": "816700647535ff6c506fb5e2f544e852406ef59fbe048ed6c56aa4314940fc20"
+      "after": "3f5cce9038a01a709df34f38c5ba23b07f879bae8134cb5e65c0bc429a2b6f8d"
     },
     "scripts/recheck-released-parity-390.mjs": {
       "before": null,
@@ -117,6 +117,18 @@
     "scripts/reference-slice-legacy-doctor-browser.mjs": {
       "before": "9e072f4a559bac7a21511d023e3129288e74adfbe1db8fe9e5f57cad881246eb",
       "after": "c414ef4d9471986bfbbd5fab547799f2200ce7544e8f6b6ccab2e406c68d0ef6"
+    },
+    "scripts/management-cost-phase4a-browser.ts": {
+      "before": "0adc5408df43f804c9480cad1de0324b3ef6114aa219efa6f8528fef71c4b635",
+      "after": "93e0a090c59e85b628d35572e9d9a79fe4507abca160de2c551c8b9acda0c91d"
+    },
+    "scripts/management-cost-correction-phase4a-browser.ts": {
+      "before": "0626986a292f14b76ec8c2a44f10eeb231be385e4a50f5a3925cc3097b6f6812",
+      "after": "09bd1b185b0106612da830f358d08feec130ee0f544b03af0b66acfc921bf702"
+    },
+    "scripts/recheck-parity-ci-snapshots.mjs": {
+      "before": null,
+      "after": "d5765144f78467620cdcd74ba6881acd2e998adf3788c26ac3e74b0acc1e2869"
     }
   }
 }

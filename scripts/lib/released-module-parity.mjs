@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import {normalized, reportLinks, releasedEntries, reportMasterLabel, releasedReportAction, assertSalesEntry} from './released-reports-more-parity.mjs';
+import {normalized, reportLinks, releasedEntries, reportMasterLabel, releasedReportAction, assertSalesEntry,releasedViewport} from './released-reports-more-parity.mjs';
 
-// Only the deterministic owner fixture at WebKit390. Source provenance and
+// Only the deterministic owner fixture at WebKit 390/820/1280. Source provenance and
 // independently captured before/after records are pinned by the unit fixtures.
 export const releasedModulePaths = new Set([
   '/finance','/opportunities','/reviews','/warehouse','/month-closing',
@@ -10,7 +10,7 @@ export const releasedModulePaths = new Set([
   '/finance?repairEquipmentId=qa-equipment','/finance?closeShift=1',
   '/shifts?closeShift=1','/reports?closeMonth=1',
 ]);
-export const releasedModuleScope = (path, before, engine, width) => engine === 'webkit' && width === 390 && !!before.contract.type && releasedModulePaths.has(path);
+export const releasedModuleScope = (path, before, engine, width) => releasedViewport(engine,width) && !!before.contract.type && releasedModulePaths.has(path);
 const control = (label, extra = {}) => ({label: normalized(label), tag:'BUTTON', href:null, disabled:false, nav:false, ...extra});
 function position(entries, expected, count=1) {
   const matches=entries.flatMap((entry,index)=>entry.label===expected.label && entry.frame===expected.frame ? [index] : []);
@@ -20,7 +20,7 @@ function position(entries, expected, count=1) {
 }
 function remove(entries, expected) { entries.splice(position(entries,expected),1); }
 const wizardSteps=['Закрыть мастер','Проверка всех смен','Оплаты и остальные расходы','Начальные остатки','Конечные остатки','Списания','ФОТ, налоги и коммунальные услуги','Финальная прибыль','Подтверждение и закрытие периода'];
-export function releasedModuleEntries(path, historical, venue) {
+export function releasedModuleEntries(path, historical, venue, width=390) {
   let entries=structuredClone(historical);
   if(path==='/finance'||path.startsWith('/finance?')) {
     const at=position(entries,control('Продолжить закрытие'),2);
@@ -46,7 +46,7 @@ export function releasedModuleEntries(path, historical, venue) {
     entries.splice(at,0,control('Касса · столы, заказы и оплата'),control('Выбрать сотрудников по должностям',{tag:'SUMMARY'}),control('Без должности /',{tag:'SUMMARY'}),control('Открыть смену',{disabled:true}));
   } else if(path==='/sales-entry'||path==='/sales-import') {
     // DOM order: shared shell controls precede every native iframe control.
-    const nav=[['Главная','/home'],['Смены','/shifts'],['Финансы','/finance'],['Добавить',null],['Команда','/employees'],['Ещё','/more']].map(([label,href])=>control(label,{tag:href?'A':'BUTTON',href,nav:true}));
+    const nav=[['Главная','/home'],['Смены','/shifts'],['Финансы','/finance'],...(width===1280?[['Отзывы','/reviews']]:[]),['Добавить',null],['Команда','/employees'],['Ещё','/more']].map(([label,href])=>control(label,{tag:href?'A':'BUTTON',href,nav:true}));
     if(path==='/sales-import') {
       remove(entries,control('Вернуться в Ещё',{tag:'A',href:'/more',frame:path}));
       nav.unshift(control('Вернуться назад'),control('Переключить заведение'));

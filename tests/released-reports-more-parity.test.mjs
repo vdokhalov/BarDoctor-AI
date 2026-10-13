@@ -27,7 +27,7 @@ test('v517 More requires enabled exact Sales in order, retained controls and mea
   for(const mutation of [b=>b.before.entries.shift(), b=>b.before.entries.reverse(),b=>b.before.entries.pop(),b=>b.before.entries.push(button('Unapproved')),b=>b.before.entries[0].disabled=true,b=>b.before.entries[0].href='/wrong',b=>b.before.entries[0].nav=true,b=>b.before.entries[0].label='Касса',b=>b.before.entries[0].tag='A',b=>delete b.salesEntry,...['visible','destination','reload','venue'].map(key=>b=>b.salesEntry[key]='wrong')]){
     const saved=structuredClone(f.candidate);mutation(f.candidate);assert.equal(f.evaluate().verdict,'FAIL');Object.assign(f.candidate,saved);
   }
-  assert.equal(f.evaluate('webkit',820).verdict,'FAIL');assert.equal(f.evaluate('chromium',390).verdict,'FAIL');
+  assert.equal(f.evaluate('webkit',1024).verdict,'FAIL');assert.equal(f.evaluate('chromium',390).verdict,'FAIL');
 });
 test('Reports keeps every source link, exact month/venue/workday and old controls',()=>{
   const f=fixture('/reports');assert.equal(f.evaluate().verdict,'PASS');
@@ -45,7 +45,7 @@ test('Reports return transformation preserves other contract fields and scope',(
   for(const [key,value] of [['parent','/home'],['parent','/finance?month=2026-09&venue=1'],['parent','/finance?month=2026-10&venue=2'],['title','Wrong'],['type','module'],['bottomNav',false],['shell','fullscreen']]){
     const saved={...f.candidate.before.contract};f.candidate.before.contract[key]=value;assert.equal(f.evaluate().verdict,'FAIL');f.candidate.before.contract=saved;
   }
-  assert.equal(f.evaluate('webkit',1280).verdict,'FAIL');
+  assert.equal(f.evaluate('webkit',1024).verdict,'FAIL');
   for(const path of ['/finance','/finance?addExpense=1','/reports?closeMonth=1','/month-closing'])assert.equal(releasedActionLabel(path,'Продолжить закрытие'),'Продолжить закрытие');
   assert.equal(releasedActionLabel('/reports','Unapproved label'),'Unapproved label');
 });

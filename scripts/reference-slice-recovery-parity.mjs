@@ -5,7 +5,7 @@ import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {chromium,webkit} from 'playwright-core';
 import {baselinePublicRoot,recoveryRuntime} from '../tests/helpers/reference-slice-recovery-runtime.mjs';
-import {releasedActionLabel,reportDayLabel} from './lib/released-reports-more-parity.mjs';
+import {releasedActionLabel,reportDayLabel,releasedViewport} from './lib/released-reports-more-parity.mjs';
 import {installApiReadTracker} from './qa/api-read-tracker.mjs';
 
 const require=createRequire(import.meta.url),{resolveBrowserExecutable}=require('./browser-runtime.cjs');
@@ -134,18 +134,18 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
           else if(item.selector)locator=page.locator(item.selector);
           else if(item.entryScope==='more')locator=page.getByRole('button',{name:new RegExp('^'+escape(item.label))});
           else{
-            const current=await state(),approvedLabel=engine==='webkit'&&width===390&&version==='candidate'?releasedActionLabel(path,item.label):item.label,entry=current.entries.find(e=>normalized(e.label)===normalized(approvedLabel))??(version==='candidate'&&path==='/health'&&item.label==='Открыть поручения'?current.entries.find(e=>e.label==='Открыть поручения →'):null);
+            const current=await state(),approvedLabel=releasedViewport(engine,width)&&version==='candidate'?releasedActionLabel(path,item.label):item.label,entry=current.entries.find(e=>normalized(e.label)===normalized(approvedLabel))??(version==='candidate'&&path==='/health'&&item.label==='Открыть поручения'?current.entries.find(e=>e.label==='Открыть поручения →'):null);
             if(entry){const scope=entry.frame?page.frames().find(f=>new URL(f.url()).pathname===entry.frame):page;locator=scope?.locator('button,a,summary').nth(entry.index);}
           }
           if(item.mobile==='via /more'&&width<1024){record.actions[item.id]={conditional:'v485 desktop-only primary; tested More Reviews entry'};continue;}
           if(!locator||!await locator.count()){
             // The inventory also records source-owned data-dependent entries.
             // A missing control is acceptable only when absent in the identical baseline fixture.
-            assert.ok(!before.entries.some(e=>normalized(e.label)===normalized(engine==='webkit'&&width===390&&version==='candidate'?releasedActionLabel(path,item.label):item.label)),item.id+' originating entry exists but test could not locate it');record.actions[item.id]={absent:true};continue;
+            assert.ok(!before.entries.some(e=>normalized(e.label)===normalized(releasedViewport(engine,width)&&version==='candidate'?releasedActionLabel(path,item.label):item.label)),item.id+' originating entry exists but test could not locate it');record.actions[item.id]={absent:true};continue;
           }
           locator=locator.first();await locator.waitFor({state:'visible'});if(item.entryScope==='legacy-diagnosis'){await locator.click({trial:true});record.actions[item.id]={activation:'PASS (actual run tested in separate isolated legacy diagnosis fixture)',handler:'Uce.A → POST /api/ai/diagnosis'};continue;}
           if(await locator.isDisabled()){record.actions[item.id]={disabled:true};continue;}
-          const actionOrigin=await state(),masterAction=version==='candidate'&&engine==='webkit'&&width===390&&item.id==='context:/reports:Продолжить закрытие',domainBeforeMaster=masterAction?JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all()):null;await locator.click({trial:true});await locator.click();try{await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));}catch(error){if(!String(error).includes('Execution context was destroyed'))throw error;await page.waitForLoadState('domcontentloaded');}await settle();
+          const actionOrigin=await state(),masterAction=version==='candidate'&&releasedViewport(engine,width)&&item.id==='context:/reports:Продолжить закрытие',domainBeforeMaster=masterAction?JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all()):null;await locator.click({trial:true});await locator.click();try{await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));}catch(error){if(!String(error).includes('Execution context was destroyed'))throw error;await page.waitForLoadState('domcontentloaded');}await settle();
           let after=await state();const originalPayrollFailure=version==='v485'&&errors.slice(errorsAtAction).some(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname);if(originalPayrollFailure){const original=after.url;await visit(after.url);after=await state();after.approvedPayrollProbe={original,explicitMonth:'2026-10'};}assert.equal(after.venue,String(r.venueId),item.id+' venue');
           record.actions[item.id]={url:after.url,contract:after.contract,actionOrigin:{url:actionOrigin.url,question:actionOrigin.activeDoctorQuestion},approvedPayrollProbe:after.approvedPayrollProbe??null,baselineDefects:errors.slice(errorsAtAction).filter(error=>error.knownPayroll&&error.path===new URL(after.url,runtime.base).pathname),opened:after.entries.map(e=>({label:e.label,tag:e.tag,href:e.href}))};
           if(item.target&&item.target!==after.url){
@@ -175,7 +175,7 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
           }
           assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[],item.id+' HTTP 500');
         }
-        if(version==='candidate'&&engine==='webkit'&&width===390&&(path==='/more'||remaining&&path==='/warehouse')){
+        if(version==='candidate'&&releasedViewport(engine,width)&&(path==='/more'||remaining&&path==='/warehouse')){
           await visit('/more');const sales=page.getByRole('button',{name:'Продажи',exact:true});
           await sales.waitFor({state:'visible'});assert.equal(await sales.isEnabled(),true);
           await sales.click();await page.waitForURL(url=>url.pathname==='/sales-import');await settle();
