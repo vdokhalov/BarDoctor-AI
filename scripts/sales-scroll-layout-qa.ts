@@ -58,7 +58,7 @@ const imported=await runtime.api.batches.POST(runtime.request(user,'/api/sales-b
 
 
 const engine=process.env.BD_SCROLL_BROWSER==='chromium'?chromium:webkit;
-const browser=await engine.launch(engine===chromium?{executablePath:process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs}:{headless:true});
+const browser=await engine.launch(engine===chromium?{executablePath:process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs}:{headless:true,...(process.env.BD_WEBKIT_EXECUTABLE?{executablePath:process.env.BD_WEBKIT_EXECUTABLE}:{})});
 const results:unknown[]=[];
 const profiles=[{width:390,height:844,top:59,bottom:34,name:'safe'},{width:390,height:844,top:0,bottom:0,name:'plain'},{width:820,height:1000,top:0,bottom:0,name:'tablet'},{width:1280,height:800,top:0,bottom:0,name:'desktop'}].filter(p=>!process.env.BD_SCROLL_PROFILE||p.name===process.env.BD_SCROLL_PROFILE);
 try {
@@ -110,7 +110,7 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
   writeFileSync(out+'/'+id+'.json',JSON.stringify({profile,delay,engine:engine.name(),gesture:cdp?'CDP touch swipe':'native wheel; touch taps',checks,errors},null,2));
   assert.ok(pass,'FIRST GESTURE '+label+' '+id);assert.deepEqual(errors,[]);
  }
- async function stable(label:string){const before=await metrics();await p.waitForTimeout(300);const after=await metrics();checks.push({label,unexpectedScroll:after.scrollTop-before.scrollTop,heightDelta:after.documentHeight-before.documentHeight,observerDelta:((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks)});assert.ok(Math.abs(after.scrollTop-before.scrollTop)<=1,'unexpected scroll '+label);assert.ok(Math.abs(after.documentHeight-before.documentHeight)<=1,'idle layout oscillation '+label);assert.ok((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks<=1,'idle observer loop '+label);}
+ async function stable(label:string){const before=await metrics();await p.waitForTimeout(300);const after=await metrics();writeFileSync(out+'/'+id+'-stable-'+label.replace(/[^a-z0-9]+/gi,'-')+'.json',JSON.stringify({id,label,before,after},null,2));checks.push({label,unexpectedScroll:after.scrollTop-before.scrollTop,heightDelta:after.documentHeight-before.documentHeight,observerDelta:((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks)});assert.ok(Math.abs(after.scrollTop-before.scrollTop)<=1,'unexpected scroll '+label+' '+id);assert.ok(Math.abs(after.documentHeight-before.documentHeight)<=1,'idle layout oscillation '+label);assert.ok((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks<=1,'idle observer loop '+label);}
  async function toTop(){await f().evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));}
  async function readyJournal(){await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();await l('.journal-row').first().waitFor();}
  try {

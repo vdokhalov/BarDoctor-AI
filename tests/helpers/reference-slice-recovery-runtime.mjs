@@ -16,10 +16,10 @@ export function baselinePublicRoot(){
 }
 
 /** Actual unchanged handlers, migrations and embedded documents; all data is local SQLite. */
-export async function recoveryRuntime(root=process.cwd()){
+export async function recoveryRuntime(root=process.cwd(),runtimeOptions={}){
   const routes=readdirSync('app',{recursive:true}).filter(p=>p.endsWith('/route.ts'));
   const definitions=routes.map((p,i)=>({name:'recoveryRoute'+i,path:'/'+p.slice(0,-9),file:'./app/'+p}));
-  const r=await curatedDoctorFixture(Object.fromEntries(definitions.map(d=>[d.name,d.file])));
+  const r=await curatedDoctorFixture(Object.fromEntries(definitions.map(d=>[d.name,d.file])),runtimeOptions);
   r.seed('bd_cases',[{id:'qa-critical',venueId:r.venueId,title:'Проверить критическое происшествие',description:'Isolated recovery fixture',photos:[],files:[],comments:[],history:[],timeline:[],responsible:'QA Бариста',type:'inspection',priority:'critical',status:'open',createdAt:'2026-10-01T12:00:00Z'}]);
   r.seed('bd_events',[{id:'qa-event',venueId:r.venueId,title:'QA событие',text:'Isolated recovery event',description:'QA',type:'incident',category:'operations',priority:'low',status:'open',responsible:'',participantIds:[],voiceNote:null,extraField:'',eventDate:'2026-10-02T12:00:00Z',date:'2026-10-02',createdAt:'2026-10-02T12:00:00Z',photos:[],files:[],comments:[],history:[],timeline:[]}]);
   r.seed('bd_equipment',[{id:'qa-equipment',venueId:r.venueId,name:'QA оборудование',category:'coffee',status:'active',photos:[],history:[],maintenance:[],purchaseDate:'2026-09-01',purchasePrice:100,currency:'MDL'}]);

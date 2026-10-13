@@ -5,13 +5,13 @@ import {readFileSync} from 'node:fs';
 
 export const p0Baseline='691ab51840266c9b6297fda7a84ee2077694a75f';
 export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','build','db','drizzle','migrations','.openai','.github','package.json','package-lock.json','vite.config.ts','tsconfig.json','next.config.ts','drizzle.config.ts','postcss.config.mjs','.npmrc','.gitignore','eslint.config.mjs']);
-// User-approved auth recovery and Finance read lifecycle only. No directory exemption.
+// User-approved P0 recovery plus isolated Doctor/scroll harness diagnostics (2026-10-13). No directory exemption.
 export const p0Paths=Object.freeze([
  '.github/workflows/google-reviews-setup-v400.yml',
  'app/api/auth/bootstrap/route.ts','app/api/auth/login/route.ts','app/api/users/me/route.ts',
  'lib/bardoctor/auth-schema-error.ts','lib/bardoctor/auth-schema.ts','lib/bardoctor/auth.ts','lib/bardoctor/request-observability.ts',
  'public/assets/index-BQGspy0I.js','public/bardoctor-preview-v396.js','public/bardoctor-preview-v397.js','public/bardoctor-preview.js',
- 'scripts/auth-recovery-p0-browser.ts','scripts/fragments/monthly-report-v165.fragment.txt','scripts/patch-finance-canonical-v515.mjs','scripts/patch-production-recovery-v496.mjs','scripts/sales-scroll-layout-qa.ts',
+ 'scripts/owner-uat-v493-browser.mjs','scripts/auth-recovery-p0-browser.ts','scripts/fragments/monthly-report-v165.fragment.txt','scripts/patch-finance-canonical-v515.mjs','scripts/patch-production-recovery-v496.mjs','scripts/sales-scroll-layout-qa.ts',
 ]);
 export const p0Digest=value=>createHash('sha256').update(value).digest('hex');
 const git=(args)=>execFileSync('git',args,{maxBuffer:64*1024*1024});

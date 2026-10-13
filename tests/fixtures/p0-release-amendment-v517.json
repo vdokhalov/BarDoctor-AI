@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 auth recovery and Finance monthly-read lifecycle, 2026-10-13",
+  "scope": "User-approved P0 recovery; isolated Doctor confirm harness and scroll diagnostics, 2026-10-13; no production UI change in this amendment",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -68,7 +68,11 @@
     },
     "scripts/sales-scroll-layout-qa.ts": {
       "before": "97b6cd4328c4c21ec1ab7381ef7874d8f91aea2ab2b05d2e22a8c7994dbe4aee",
-      "after": "e07f6e822e532f4e2f4e52a194361afdd14527cb4ed553406e1533655013237b"
+      "after": "4b15ae7e5382e0434cac905782ccbc25ed10e3feb774b4a2e5d5811864e88018"
+    },
+    "scripts/owner-uat-v493-browser.mjs": {
+      "before": "d11aa37a7442b12315f6159b4a6394097e6205b3fa04bc2356d3b3caf73a3e05",
+      "after": "0cfb47f42559e79818aa0ee14918d8c006430afc319f93afd87a06401a824435"
     }
   }
 }

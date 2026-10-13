@@ -2,8 +2,8 @@ import {closingFixture} from './month-close-fixture';
 import {HEALTH_OPERATIONS_KEYS} from '../../lib/bardoctor/health-operations-inputs';
 import {VENUE_CONTEXT_SOURCES} from '../../lib/bardoctor/venue-context-access';
 export type ManagementReply={data:{businessHealthSnapshot:{managementQueue:Record<string,unknown>[];managementTopActions:Record<string,unknown>[]}};verification:{result:string;target:{path:string};inputRevision:string;resolutionAuthority:string;causalClaim:string}};
-export async function managementActionsFixture(extraRoutes:Record<string,string>={}) {
- const r=await closingFixture({writeoffs:'./app/api/write-offs/route',activeVenue:'./app/api/access/active-venue/route',days:'./app/api/operational-days/route',verifyAction:'./app/api/business-health/verify/route',doctor:'./lib/bardoctor/ai-handlers',closeReport:'./app/api/shifts/close/route',counts:'./app/api/inventory/counts/route',...extraRoutes});
+export async function managementActionsFixture(extraRoutes:Record<string,string>={}, runtimeOptions:Parameters<typeof closingFixture>[1]={}) {
+ const r=await closingFixture({writeoffs:'./app/api/write-offs/route',activeVenue:'./app/api/access/active-venue/route',days:'./app/api/operational-days/route',verifyAction:'./app/api/business-health/verify/route',doctor:'./lib/bardoctor/ai-handlers',closeReport:'./app/api/shifts/close/route',counts:'./app/api/inventory/counts/route',...extraRoutes},runtimeOptions);
  for(const key of new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(),...HEALTH_OPERATIONS_KEYS,'bd_tasks','bd_action_tasks','bd_decisions']))if(!r.sqlite.prepare('SELECT 1 FROM domain_data WHERE account_id=? AND store_key=?').get(r.account,key))r.seed(key,key==='bd_assortment_v1'?{menuItems:[],recipes:[],nomenclature:[],stockBalances:[]}:[]);
  r.seed('bd_finance_expenses',[{id:'qa-rent',venueId:r.venueId,date:'2026-09-02',amount:1000,category:'rent',currency:'MDL'}]);
  const preview=await(await r.get()).json();if(!preview.eligible)throw Error(JSON.stringify(preview));

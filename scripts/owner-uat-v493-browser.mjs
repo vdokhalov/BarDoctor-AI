@@ -2,14 +2,16 @@ import assert from 'node:assert/strict';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {chromium,webkit} from 'playwright-core';
+import {ownerDoctorMock} from '../tests/helpers/owner-doctor-mock.mjs';
 import {recoveryRuntime} from '../tests/helpers/reference-slice-recovery-runtime.mjs';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const engine=process.env.BD_CURATED_BROWSER==='webkit'?'webkit':'chromium';
 const out='outputs/owner-uat-v493/'+engine;mkdirSync(out,{recursive:true});
 const browser=engine==='webkit'?await webkit.launch({headless:true}):await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});
 const results=[];
-try{for(const width of [390,820,1280]){
- const runtime=await recoveryRuntime(),r=runtime.fixture;
+const doctorOnly=process.env.BD_OWNER_UAT_SCOPE==='doctor';
+try{for(const width of doctorOnly?[390]:[390,820,1280]){
+ const model=ownerDoctorMock(),runtime=await recoveryRuntime(process.cwd(),model.runtimeOptions),r=runtime.fixture;
  const context=await browser.newContext({viewport:{width,height:width===390?844:1024},isMobile:width===390,hasTouch:width===390});
  await context.addInitScript({content:'globalThis.__name=fn=>fn;'});
  await context.addInitScript({content:`(()=>{const NativeDate=Date,time=Date.parse('2026-10-03T12:00:00Z');function FixtureDate(...args){if(new.target)return Reflect.construct(NativeDate,args.length?args:[time],new.target);return new NativeDate(time).toString();}FixtureDate.prototype=NativeDate.prototype;Object.setPrototypeOf(FixtureDate,NativeDate);FixtureDate.now=()=>time;globalThis.Date=FixtureDate;})();`});
@@ -30,11 +32,22 @@ try{for(const width of [390,820,1280]){
   await page.getByRole('button',{name:'Открыть AI Doctor',exact:true}).click();await page.waitForURL(u=>u.pathname==='/analysis');
   const run=page.getByRole('button',{name:'Запустить диагностику',exact:true});await run.waitFor();
   let injected=false;await page.route('**/api/ai/diagnosis',route=>{if(!injected){injected=true;return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({success:false,error:'Isolated QA negative control'})});}return route.continue();});
-  await run.click();await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();
+  const confirmRun=async button=>{
+   const dialogPromise=page.waitForEvent('dialog');
+   const clicked=button.click();const dialog=await dialogPromise;
+   assert.equal(dialog.type(),'confirm');assert.match(dialog.message(),/^Платный AI Doctor: один запрос, до 8000 выходных токенов\./);
+   await dialog.accept();await clicked;
+  };
+  const rejected=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/ai/diagnosis'&&response.status()===503);
+  await confirmRun(run);assert.equal((await(await rejected).json()).success,false);assert.equal(injected,true);assert.equal(model.calls.length,0);
+  await page.getByRole('button',{name:'Попробовать снова',exact:true}).waitFor();
   const diagnosed=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/ai/diagnosis'&&response.status()===200);
-  await page.getByRole('button',{name:'Попробовать снова',exact:true}).click();assert.equal((await(await diagnosed).json()).success,true);
+  await confirmRun(page.getByRole('button',{name:'Попробовать снова',exact:true}));assert.equal((await(await diagnosed).json()).success,true);
   await page.locator('[data-bd-ai-result]').waitFor();await settle();await page.reload();await page.locator('[data-bd-ai-result]').waitFor();await settle();
+  assert.equal(model.calls.length,1);assert.equal(model.calls[0].maxTokens,8000);
   await page.screenshot({path:`${out}/${width}-doctor.png`,fullPage:true});
+  if(doctorOnly){assert.deepEqual(errors,[]);const result={engine,width,status:'PASS',scope:'doctor',controlled503Retry:true,actualHandler200:true,mockedModelCalls:model.calls.length,cachedReload:true};results.push(result);console.log(JSON.stringify(result));continue;}
+
   await page.goto(runtime.base+'/health');await page.locator('.bd-health-detail-hero-v332 .bd-home-health-ring').waitFor();await settle();
   assert.ok(await page.locator('.bd-health-impact-v332 button').count()>0);await page.getByRole('button',{name:'AI Doctor',exact:true}).click();await page.waitForURL(u=>u.pathname==='/analysis');await settle();
   await page.goto(runtime.base+'/more');await page.getByRole('button',{name:/AI Doctor/}).click();await page.waitForURL(u=>u.pathname==='/analysis');await settle();
