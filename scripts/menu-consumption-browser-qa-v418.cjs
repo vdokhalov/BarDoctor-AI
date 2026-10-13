@@ -896,7 +896,7 @@ async function assertTechCardActionLayout(page, profile, label) {
 }
 
 async function assertFocusedEditorFieldVisible(page, locator, label) {
-  const audit=await locator.evaluate((input)=>{const editor=input.closest(".bd-menu-position-editor-v400,.bd-tech-card-editor-v354"),field=input.closest(".bd-catalog-field"),caption=field?.querySelector("span,label"),toolbar=editor?.querySelector(".bd-explicit-mobile-toolbar-v439"),ir=input.getBoundingClientRect(),cr=caption?.getBoundingClientRect(),tr=toolbar?.getBoundingClientRect(),bottom=(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight);return{focused:document.activeElement===input,input:{top:ir.top,bottom:ir.bottom},caption:cr?{top:cr.top,bottom:cr.bottom}:null,toolbarBottom:tr?.bottom||0,viewportBottom:bottom,bodyOverflow:getComputedStyle(document.body).overflow}});
+  const audit=await locator.evaluate((input)=>{const editor=input.closest(".bd-menu-position-editor-v400,.bd-tech-card-editor-v354"),field=input.closest(".bd-catalog-field"),caption=field?.querySelector("span,label")||input.closest(".bd-recipe-ingredient-v511")?.querySelector(".bd-recipe-field-title-v511"),toolbar=editor?.querySelector(".bd-explicit-mobile-toolbar-v439"),ir=input.getBoundingClientRect(),cr=caption?.getBoundingClientRect(),tr=toolbar?.getBoundingClientRect(),bottom=(window.visualViewport?.offsetTop||0)+(window.visualViewport?.height||window.innerHeight);return{focused:document.activeElement===input,input:{top:ir.top,bottom:ir.bottom},caption:cr?{top:cr.top,bottom:cr.bottom}:null,toolbarBottom:tr?.bottom||0,viewportBottom:bottom,bodyOverflow:getComputedStyle(document.body).overflow}});
   assert.equal(audit.focused,true,label+": focus preserved");assert.ok(audit.caption&&audit.caption.top>=audit.toolbarBottom-1&&audit.caption.bottom<=audit.viewportBottom,label+": label visible "+JSON.stringify(audit));assert.ok(audit.input.top>=audit.toolbarBottom-1&&audit.input.bottom<=audit.viewportBottom,label+": input visible "+JSON.stringify(audit));assert.equal(audit.bodyOverflow,"hidden",label+": no background scroll");return audit;
 }
 
@@ -1165,11 +1165,13 @@ async function runProfile(browser, baseUrl, profile) {
         await quantityInput.focus();
         await page.waitForTimeout(100);
         audits.push(await assertFocusedEditorFieldVisible(page,quantityInput,profile.name+": tech-card quantity with keyboard"));
-        const ingredientName=recipeEditor.getByLabel("Название",{exact:true}).first();
+        const ingredientLine = recipeEditor.locator(".bd-recipe-ingredient-v511").first();
+        await ingredientLine.locator(".bd-recipe-alias-v511 summary").click();
+        const ingredientName=ingredientLine.getByLabel("Название в рецепте",{exact:true});
         await ingredientName.focus();
         audits.push(await assertFocusedEditorFieldVisible(page,ingredientName,profile.name+": tech-card name with keyboard"));
-        const openTechSearch = recipeEditor.locator("button").filter({ hasText: /Изменить товар|Найти в номенклатуре|Проверить|Показать все/ }).first();
-        if (await openTechSearch.count()) await openTechSearch.click();
+        const openTechSearch = ingredientLine.getByRole("button", { name: /Изменить$/ });
+        await openTechSearch.click();
         const techSearch=recipeEditor.getByLabel("Поиск по всей номенклатуре").first();
         await techSearch.focus();
         audits.push(await assertFocusedEditorFieldVisible(page,techSearch,profile.name+": tech-card search with keyboard"));
@@ -1460,13 +1462,36 @@ async function runProfile(browser, baseUrl, profile) {
     recipeEditor = await openRecipeEditor(page);
     assert.equal(await recipeEditor.getByLabel("Количество на порцию").first().inputValue(), "9");
     assert.equal(catalogFor(state).recipes.filter((recipe) => recipe.menuItemId === espressoMenuId)[0].id, espressoRecipeId);
-    assert.equal(
-      await recipeEditor.getByText("Связь с номенклатурой", { exact: true }).count(),
-      1,
-      "a Recipe must expose Nomenclature only at the ingredient line",
-    );
+    const persistedIngredient = catalogFor(state).recipes.find((recipe) => recipe.id === espressoRecipeId).ingredients[0];
+    const recipeBeforeSearch = clone(catalogFor(state).recipes.find((recipe) => recipe.id === espressoRecipeId));
+    const writesBeforeSearch = state.writes.length;
+    assert.equal(persistedIngredient.nomenclatureItemId, `nom-coffee-${suffix}`);
+    assert.equal(persistedIngredient.purchaseProductKey, `stock:coffee:${suffix}`);
+    const ingredientLine = recipeEditor.locator(".bd-recipe-ingredient-v511");
+    assert.equal(await ingredientLine.count(), 1, "one persisted ingredient must expose one unified picker");
+    assert.equal(await recipeEditor.locator(".bd-menu-nomenclature-picker-v350").count(), 0,
+      "Recipe must not expose a second Menu-to-Nomenclature mapping");
+    const selectedIngredient = ingredientLine.getByRole("button", { name: /Coffee beans.*Изменить$/ });
+    await selectedIngredient.waitFor({ state: "visible" });
+    await selectedIngredient.click();
+    const ingredientSearch = ingredientLine.getByLabel("Поиск по всей номенклатуре");
+    await ingredientSearch.fill("Coffee beans");
+    const selectedResult = ingredientLine.locator(".bd-tech-card-groups-v375 button.selected");
+    assert.equal(await selectedResult.count(), 1, "picker must retain the persisted ingredient selection");
+    assert.match(await selectedResult.innerText(), /Coffee beans[\s\S]*Выбрано/);
+    await ingredientLine.getByRole("button", { name: "Закрыть поиск", exact: true }).click();
+    await selectedIngredient.waitFor({ state: "visible" });
+    assert.equal(await ingredientLine.getByLabel("Количество на порцию").inputValue(), "9");
     audits.push(await assertNoHorizontalOverflow(page, `${profile.name}: same recipe from Tech Cards`));
-    await closeRecipeEditor(recipeEditor);
+    // The editor's input capture also guards search text. Explicitly discard it;
+    // opening/searching/closing the picker must never persist a recipe edit.
+    const discardSearch = page.waitForEvent("dialog").then(async (dialog) => {
+      assert.equal(dialog.message(), "Изменения не сохранены. Выйти без сохранения?");
+      await dialog.accept();
+    });
+    await Promise.all([discardSearch, closeRecipeEditor(recipeEditor)]);
+    assert.equal(state.writes.length, writesBeforeSearch, "ingredient search must not write the catalog");
+    assert.deepEqual(catalogFor(state).recipes.find((recipe) => recipe.id === espressoRecipeId), recipeBeforeSearch);
 
     await openItem(page, baseUrl, "menu", recipeReviewMenuId);
     editor = await openMenuEditor(page);
@@ -1539,7 +1564,7 @@ async function runProfile(browser, baseUrl, profile) {
       "the inactive direct link must not be rendered as a second Recipe mapping",
     );
     assert.equal(
-      await recipeEditor.getByText("Связь с номенклатурой", { exact: true }).count(),
+      await recipeEditor.locator(".bd-recipe-ingredient-v511, .bd-menu-nomenclature-picker-v350").count(),
       0,
       "a new empty Recipe must not contain an implicit Menu-to-Nomenclature link",
     );

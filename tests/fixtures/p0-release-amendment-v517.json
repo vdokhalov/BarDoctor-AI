@@ -217,6 +217,10 @@
     "scripts/patch-sales-navigation-performance.mjs": {
       "before": "7bfbd48df113a523df9eb447b161bfa443b7d2e6b73a5d96c71ec5e597151340",
       "after": "1bd82afdf6dffb0a89f64b3f7e1838ef536ac0983bef5f9467bbaadf1a39e989"
+    },
+    "scripts/menu-consumption-browser-qa-v418.cjs": {
+      "before": "117048a340e4f3c16572e16cca2ffecebb28ea1c9de2a2438f684b920ca4f852",
+      "after": "f612235dc4cde74848ada374ff12221af4cf8c998ca0d87ce7df1bde73f53bbc"
     }
   }
 }

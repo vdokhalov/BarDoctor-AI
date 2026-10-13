@@ -1439,8 +1439,8 @@
     },
     "scripts/menu-consumption-browser-qa-v418.cjs": {
       "hits": [],
-      "sha256": "117048a340e4f3c16572e16cca2ffecebb28ea1c9de2a2438f684b920ca4f852",
-      "review": "NO TARGET ACTION: platform-dependent npm dev server resolved explicitly; canned server routes."
+      "sha256": "f612235dc4cde74848ada374ff12221af4cf8c998ca0d87ce7df1bde73f53bbc",
+      "review": "Unified v511 ingredient picker: persisted exact ID/key, one ingredient mapping, current Изменить action and selected result, quantity after reload; empty Recipe has no ingredient/Menu mapping. Mobile alias and search locators statically aligned. Four-mode cost and stock contracts retained in scoped consumption tests. Keyboard visibility uses the current ingredient title for the unified search field; focus, caption/input viewport bounds and background-scroll assertions retained."
     },
     "scripts/menu-ingestion-phase2-browser.ts": {
       "hits": [],
