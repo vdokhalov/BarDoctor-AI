@@ -148,7 +148,7 @@
     },
     "scripts/pos1-hardening-browser.ts": {
       "before": "1357780ff86a8c33f5667ff256423e1305b3bac3b58db362bf5ac82682172350",
-      "after": "6fda8de52e8f3c8e58050610b95af28065128ce3cac08e86cd39023cc87b1488"
+      "after": "0a351d06d824e901b7e4ca30da37736c942576cceb7892adbd2718cf91673c41"
     },
     "scripts/restricted-manager-regression.mjs": {
       "before": "bf84f1d635b50be07d7a6a696cc1827cf5c3eb02b990ef906f75977c9d8d5850",

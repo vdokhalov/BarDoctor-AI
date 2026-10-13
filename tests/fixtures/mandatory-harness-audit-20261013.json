@@ -1510,8 +1510,8 @@
           "text": "assert.equal((await request({action:\"open_shift\",venueId:venue,shiftId:\"second\",name:\"Second\"})).status,409);"
         }
       ],
-      "sha256": "6fda8de52e8f3c8e58050610b95af28065128ce3cac08e86cd39023cc87b1488",
-      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained."
+      "sha256": "0a351d06d824e901b7e4ca30da37736c942576cceb7892adbd2718cf91673c41",
+      "review": "Current POS flow: rapid item clicks require one explicit quantity dialog and zero prior cart/POST mutation; foreign account/venue require their own open workday; offline reload resumes the persisted payment dialog and selected method. Original post/retry/stock/revenue/account/venue/shift/draft guards retained. Explicit dismiss awaits native close and persisted dialog-draft cleanup before reload/history navigation; no forced click or sleep."
     },
     "scripts/procurement-browser-qa-v168.cjs": {
       "hits": [],
@@ -1904,8 +1904,8 @@
     },
     "tests/helpers/pos-browser-driver.ts": {
       "hits": [],
-      "sha256": "894c04db1e5f6de4ae969effb1f3a6a05ba233f545fceef5f858c7aff2f0ae61",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "374d00e0ee6af8417d02b1f43315674a8b59a49ea355a1982c4f2fb757e0dead",
+      "review": "Uses actual visible Menu/Order tabs instead of stale <=600 viewport threshold; current tablet820 layout also requires pane selection. Retains native clicks and all callers assertions."
     },
     "tests/helpers/pos-workday-fixture.ts": {
       "hits": [
