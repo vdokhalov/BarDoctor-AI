@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
@@ -12,6 +13,7 @@ test('OBS01 real handlers: overnight open cash shift accepts manual preview/post
   const r=await lifecycleRuntime({events:'./app/api/sales-events/route',documents:'./app/api/sales-batches/route'}); t.after(r.close);
   const user=await r.register('obs01@isolated.test');
   const venue=user.activeVenueId;
+  seedOpenWorkday(r.sqlite,user.userId,venue);
   r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'OBS01 QA',currency:'MDL'}),user.userId);
   const fixture=JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1','"venueId":'+venue));
   const put=(key:string,value:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(user.userId,key,JSON.stringify(value),new Date().toISOString());
@@ -46,8 +48,10 @@ test('OBS01 real handlers: overnight open cash shift accepts manual preview/post
   const pos:SalesEventCommand={...command,id:'pos-C',source:'POS_API',payments:[{id:'p',method:'CASH',amount:20}]};
   const p=await (await send({action:'preview',command:pos})).json<Reply>(); assert.equal(p.event.businessDate,event.businessDate);
   assert.equal((await send({action:'post',command:pos,previewHash:p.previewHash})).status,201);
-  const next={...command,id:'manual-D',shiftId:'D'}; const d=await (await send({action:'preview',command:next})).json<Reply>();
-  assert.equal(d.event.businessDate,'2026-09-25'); assert.equal((await send({action:'post',command:next,previewHash:d.previewHash})).status,201);
+  const next={...command,id:'manual-D',shiftId:'D'};
+  const blockedBefore=JSON.stringify(r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all());
+  const wrongDay=await send({action:'preview',command:next});assert.equal(wrongDay.status,409);assert.equal((await wrongDay.json<Reply>()).code,'WORKDAY_REQUIRED');
+  assert.equal(JSON.stringify(r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all()),blockedBefore);
   const stale=await (await send({action:'preview',command:{...command,id:'closed-C'}})).json<Reply>();
   assert.equal((await send({action:'close_shift',shiftId:'C'})).status,201);
   assert.deepEqual((await get()).shifts.filter((s:{closingStatus:string})=>s.closingStatus==='open').map((s:{id:string})=>s.id),['D']);
@@ -55,6 +59,11 @@ test('OBS01 real handlers: overnight open cash shift accepts manual preview/post
     const response=await send({action,command:{...command,id:'closed-C'},previewHash:stale.previewHash});
     assert.equal(response.status,409); assert.equal((await response.json<Reply>()).code,'SALES_EVENT_SHIFT_CLOSED_OR_DATE_MISMATCH');
   }
+  // Explicitly transition the synthetic operational day before posting to the next day's legacy cash.
+  seedOpenWorkday(r.sqlite,user.userId,venue,'2026-09-25');
+  const dResponse=await send({action:'preview',command:next});assert.equal(dResponse.status,200);
+  const d=await dResponse.json<Reply>();assert.equal(d.event.businessDate,'2026-09-25');
+  assert.equal((await send({action:'post',command:next,previewHash:d.previewHash})).status,201);
   const saved=JSON.stringify(read('bd_sales_events_v1'));
   const duplicate=await send({action:'post',command,previewHash:quote.previewHash}); assert.equal(duplicate.status,200); assert.equal((await duplicate.json<Reply>()).duplicate,true);
   assert.equal(JSON.stringify(read('bd_sales_events_v1')),saved); assert.equal(read('bd_stock_movements').length,3);
@@ -65,6 +74,7 @@ test('OBS01 real handlers: overnight open cash shift accepts manual preview/post
 test('OBS01 real auth isolates shift selection, preview and direct POST across accounts and venues',async t=>{
   const r=await lifecycleRuntime({events:'./app/api/sales-events/route'});t.after(r.close);
   const a=await r.register('obs01-a@isolated.test'),b=await r.register('obs01-b@isolated.test');
+  seedOpenWorkday(r.sqlite,a.userId,a.activeVenueId);seedOpenWorkday(r.sqlite,b.userId,b.activeVenueId);
   for(const u of [a,b])r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'QA',currency:'MDL'}),u.userId);
   const send=(u:typeof a,body:object)=>r.api.events.POST(r.request(u,'/api/sales-events','POST',{venueId:u.activeVenueId,...body}));
   assert.equal((await send(a,{action:'open_shift',shiftId:'A-only',name:'Same label'})).status,201);
@@ -101,6 +111,7 @@ test('OBS01 same account venue switching cannot reuse another venue cash shift',
   const second=(await created.json<Reply>()).venue.id;
   const req=(venue:number,body?:object)=>{const request=r.request(user,'/api/sales-events',body?'POST':'GET',body?{venueId:venue,...body}:undefined);request.headers.set('X-Venue-Id',String(venue));return request;};
   for(const [venue,shiftId] of [[user.activeVenueId,'first'],[second,'second']] as const){
+    seedOpenWorkday(r.sqlite,Number(r.sqlite.prepare('SELECT data_account_id FROM venues WHERE id=?').get(venue)!.data_account_id),venue);
     assert.equal((await r.api.events.POST(req(venue,{action:'open_shift',shiftId,name:'Same name'}))).status,201);
   }
   for(const [venue,own,foreign] of [[user.activeVenueId,'first','second'],[second,'second','first']] as const){
@@ -116,6 +127,7 @@ test('OBS01 overnight manual sale still respects the selected shift closed accou
   t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-08-31T23:55:00Z')});
   const r=await lifecycleRuntime({events:'./app/api/sales-events/route'});t.after(r.close);
   const user=await r.register('obs01-month@isolated.test');
+  seedOpenWorkday(r.sqlite,user.userId,user.activeVenueId);
   r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({name:'QA',currency:'MDL'}),user.userId);
   const send=(body:object)=>r.api.events.POST(r.request(user,'/api/sales-events','POST',{venueId:user.activeVenueId,...body}));
   assert.equal((await send({action:'open_shift',shiftId:'month-end',name:'C'})).status,201);

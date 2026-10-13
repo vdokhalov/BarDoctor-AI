@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import { buildAssortmentAnalytics } from "../lib/bardoctor/assortment-analytics";
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -44,6 +45,7 @@ for(const scenario of ["KNOWN","UNKNOWN","ZERO","NONE","MIXED"] as const)test("F
  const r=openingRuntime(new URL("../app/api/sales-events/route.ts",import.meta.url));t.after(r.close);const c=salesEventFixture();r.put("bd_assortment_v1",c.assortment);
  if(scenario==="KNOWN"||scenario==="ZERO")r.put("bd_stock_movements",[{id:"receipt",type:"receipt",venueId:1,productKey:"beer-stock",amount:20,unit:"pcs",costAmount:scenario==="KNOWN"?100:0,costStatus:scenario==="KNOWN"?"KNOWN":"KNOWN_ZERO",currency:"MDL",date:"2026-09-01",sourceDocumentId:"receipt",sourceLineId:"receipt-line"}]);
  const send=(body:unknown)=>r.api.POST(new Request("http://test/api/sales-events",{method:"POST",headers:{"Content-Type":"application/json","X-Venue-Id":"1"},body:JSON.stringify({venueId:1,...body as object})}));
+ seedOpenWorkday(r.sqlite,7,1);
  assert.equal((await send({action:"open_shift",shiftId:"night",name:"Night"})).status,201);
  const ids=scenario==="NONE"?["ticket"]:scenario==="MIXED"?["beer","ticket"]:["beer"];
  const command={id:"cost-test",source:"POS_API",shiftId:"night",lines:ids.map((id,i)=>({id:"line"+i,menuItemId:id,quantity:1})),payments:[{id:"pay",method:"CASH",amount:scenario==="NONE"?0:20}]};

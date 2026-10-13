@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { openingRuntime } from "./helpers/opening-runtime";
@@ -40,7 +41,9 @@ test("Phase 6 actual purchase HTTP receipts update stock and last cost without r
     const movements = r.get("bd_stock_movements");
     await send(confirm, {document: document("receipt-1", 100)});
     assert.deepEqual(r.get("bd_stock_movements"), movements);
-    const command = saleCommand("coffee", 10);
+    seedOpenWorkday(r.sqlite,7,1);
+    await send(sale,{action:"open_shift",shiftId:"purchase-fixture",name:"Fixture"},201);
+    const command = {...saleCommand("coffee", 10),shiftId:"purchase-fixture"};
     const quote = await send(sale, {action: "preview", command});
     assert.equal(quote.event.originalMovements.reduce((sum, m) => sum + (m.costAmount ?? 0), 0), -8);
     const posted = await send(sale, {action: "post", command, previewHash: quote.previewHash});

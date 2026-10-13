@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { salesEventFixture } from './helpers/sales-event-fixture';
@@ -38,7 +39,7 @@ test('quantity validates bounds, precheck/revision/discount locks, and preserves
 });
 test('real handler denies stale precheck race and privileged actions but permits staff quantity changes',async t=>{
  let role='cashier';const r=openingRuntime(new URL('../app/api/pos-orders/route.ts',import.meta.url),{authenticateRequest:async()=>({id:7,venueId:1,actorAccountId:7,role,firstName:'Test',lastName:'Staff',restaurantJson:'{"currency":"MDL"}',permissions:['sales.view','sales.create','sales.post']})});t.after(r.close);
- const {c,p}=await fixture();r.put('bd_assortment_v1',c.assortment);r.put('bd_finance_revenue',c.revenues);r.put(POS_ORDER_STORE_KEY,p.orders);
+ const {c,p}=await fixture();seedOpenWorkday(r.sqlite,7,1,String(c.revenues[0].date));r.put('bd_assortment_v1',c.assortment);r.put('bd_finance_revenue',c.revenues);r.put(POS_ORDER_STORE_KEY,p.orders);
  const send=(body:object)=>r.api.POST(new Request('https://test/api',{method:'POST',body:JSON.stringify({venueId:1,...body})}));
  const initial=await send(cmd(p.order,2));assert.equal(initial.status,201);const order=(await initial.json() as {order:PosOrder}).order;
  const checked=await planPosOrder(c,[order],{action:'precheck',operationId:'race',orderId:order.id,expectedRevision:order.revision});
@@ -53,6 +54,7 @@ test('real handler denies stale precheck race and privileged actions but permits
 test('real membership: waiter quantity edits retain authorization on replay and cannot unlock precheck',async t=>{
  const r=await lifecycleRuntime({sales:'./app/api/sales-events/route',orders:'./app/api/pos-orders/route'});t.after(r.close);
  const owner=await r.register('quantity-owner@isolated.test'),staff=await r.register('quantity-staff@isolated.test'),venue=owner.activeVenueId;
+ seedOpenWorkday(r.sqlite,owner.userId,venue);
  const workspace=r.sqlite.prepare('SELECT workspace_id FROM venues WHERE id=?').get(venue)!.workspace_id!;
  r.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace,staff.userId);
  r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status) VALUES (?,?,'cashier','active')").run(venue,staff.userId);

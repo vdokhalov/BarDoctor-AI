@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -26,6 +27,7 @@ async function fixture(knowledge: 'known' | 'unknown' | 'zero' = 'known') {
   const r = await lifecycleRuntime({ events: './app/api/sales-events/route', batches: './app/api/sales-batches/route',
     importFile: './app/api/sales-batches/import/route', confirm: './app/api/sales/confirm/route' });
   const user = await r.register('chain-' + knowledge + '@isolated.test'), venue = user.activeVenueId;
+  seedOpenWorkday(r.sqlite,user.userId,venue,now.slice(0,10));
   const put = (key: string, data: unknown) => r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at')
     .run(user.userId, key, JSON.stringify(data), now);
   const read = <T = Row[]>(key: string): T => JSON.parse(String(r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(user.userId, key)?.data_json ?? 'null'));
@@ -64,6 +66,12 @@ async function fixture(knowledge: 'known' | 'unknown' | 'zero' = 'known') {
       venueId: venue, accountingCurrency: 'MDL', asOf: now }).total,
   });
   const sale = async (command: SalesEventCommand) => {
+    if (!command.shiftId) {
+      const shiftId = 'accounting-fixture';
+      const opened = await send('events', { action: 'open_shift', shiftId, name: 'Accounting fixture' });
+      assert.ok([200,201].includes(opened.status), JSON.stringify(opened.data));
+      command = { ...command, shiftId };
+    }
     const before = bytes(), preview = await send('events', { action: 'preview', command });
     assert.equal(preview.status, 200, JSON.stringify(preview.data)); assert.equal(bytes(), before, 'Preview writes nothing');
     const body = { action: 'post', command, previewHash: preview.data.previewHash };

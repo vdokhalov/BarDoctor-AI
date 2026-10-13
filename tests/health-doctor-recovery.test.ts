@@ -8,8 +8,26 @@ import {createCurrentCostReader} from '../lib/bardoctor/management-cost-observat
 import {createIngredientReferenceResolver,canonicalIngredientReference} from '../lib/bardoctor/ingredient-reference';
 
 const baseline='ad0378431dfea73ded6e67c176dbfcae7ddf4f42';
-test('request indexes preserve exact baseline analytics and certified costs across mixed sources',async()=>{
- const r=await lifecycleRuntime({analytics:'./lib/bardoctor/assortment-analytics',cost:'./lib/bardoctor/management-cost-observation'}, {plugins:[{name:'baseline',setup(build){build.onLoad({filter:/\/lib\/bardoctor\/.*\.ts$/},args=>({contents:execFileSync('git',['show',baseline+':lib/bardoctor/'+args.path.split('/lib/bardoctor/')[1]],{encoding:'utf8'}),loader:'ts'}));}}]});
+// Preserve the pre-index oracle, with only the already released v511 unit fix.
+// Pin and apply its three exact hunks; never silently move the whole baseline.
+const unitFix='73dc393300d5705e359edab2a2a7851783abe7f4';
+function historicalSource(path:string) {
+ let source=execFileSync('git',['show',baseline+':'+path],{encoding:'utf8'});
+ if(path==='lib/bardoctor/tech-card-ingredient-matching.ts') {
+  const patch=execFileSync('git',['diff',unitFix+'^',unitFix,'--',path],{encoding:'utf8'});
+  const hunks=patch.split(/^@@.*@@.*\n/m).slice(1);assert.equal(hunks.length,3);
+  for(const hunk of hunks) {
+   const lines=hunk.split('\n').filter(line=>/^[ +\-]/.test(line));
+   const before=lines.filter(line=>line[0]!=='+').map(line=>line.slice(1)).join('\n')+'\n';
+   const after=lines.filter(line=>line[0]!=='-').map(line=>line.slice(1)).join('\n')+'\n';
+   assert.equal(source.split(before).length,2,'unique released unit-contract hunk');
+   source=source.replace(before,after);
+  }
+ }
+ return source;
+}
+test('request indexes preserve baseline analytics and certified costs with released v511 unit semantics across mixed sources',async()=>{
+ const r=await lifecycleRuntime({analytics:'./lib/bardoctor/assortment-analytics',cost:'./lib/bardoctor/management-cost-observation'}, {plugins:[{name:'baseline',setup(build){build.onLoad({filter:/\/lib\/bardoctor\/.*\.ts$/},args=>args.path.endsWith('/auth-schema-error.ts')?undefined:({contents:historicalSource('lib/bardoctor/'+args.path.split('/lib/bardoctor/')[1]),loader:'ts'}));}}]});
  const oldAnalytics=r.api.analytics as unknown as {buildAssortmentAnalytics:typeof buildAssortmentAnalytics};
  const oldCost=r.api.cost as unknown as typeof import('../lib/bardoctor/management-cost-observation');
  const memo=createIngredientReconciliationMemo();
