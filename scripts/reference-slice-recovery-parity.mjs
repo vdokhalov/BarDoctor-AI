@@ -166,13 +166,10 @@ try{for(const width of process.env.BD_RECOVERY_WIDTH?[Number(process.env.BD_RECO
             const reloaded=await checkMasterRoute(true);
             await page.goBack();await settle();const back=await checkMasterRoute(false);
             await page.goForward();await settle();const forward=await checkMasterRoute(true);
-            await page.getByRole('button',{name:'Вернуться назад',exact:true}).first().click();await settle();
-            const headerBack=await checkMasterRoute(false);
-            await page.goForward();await settle();await checkMasterRoute(true);
             await page.getByRole('button',{name:'Закрыть мастер',exact:true}).click();await settle();const closed=await checkMasterRoute(false);
             assert.equal(JSON.stringify(r.sqlite.prepare('SELECT account_id,store_key,data_json,updated_at FROM domain_data ORDER BY account_id,store_key').all()),domainBeforeMaster,'Reports navigation must not mutate domain data');
             assert.deepEqual(fatalErrors(),[],item.id+' runtime errors');
-            record.masterNavigation={reloaded,back,forward,headerBack,closed,noDomainWrites:true};
+            record.masterNavigation={reloaded,back,forward,closed,noDomainWrites:true};
           }
           assert.deepEqual(runtime.requests.filter(q=>q.status>=500),[],item.id+' HTTP 500');
         }

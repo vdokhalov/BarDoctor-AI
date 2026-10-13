@@ -84,7 +84,7 @@
     },
     "scripts/reference-slice-recovery-parity.mjs": {
       "before": "a070cca32f868afe39cd89fe9fad0e0b5410e3798592de6e32258adfe7486058",
-      "after": "05e1ce4e68a426b55b06f380106c1ebc91ba58726482787804411b32ee47d632"
+      "after": "f6cd3908688bca2e2f7e0dda98498948757c20077b755e7052325744217daf21"
     },
     "scripts/patch-monthly-return-v516.mjs": {
       "before": "572f17238a44ed37b1be13fd35e125fbcd7e626640ad11534510d4f6fc5e9812",
