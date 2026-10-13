@@ -66,7 +66,9 @@ try {
   assert(await page.getByRole('button',{name:'Войти',exact:true}).isEnabled());
   // Login can first update the SPA URL and then replace the document. Wait for
   // the completed navigation before reading state from its execution context.
-  failure='none';await page.getByRole('button',{name:'Войти',exact:true}).click();await page.waitForURL('**/home',{waitUntil:'networkidle'});
+  failure='none';const loginDocument=await page.evaluate(()=>performance.timeOrigin);await page.getByRole('button',{name:'Войти',exact:true}).click();
+  await page.waitForFunction(previous=>performance.timeOrigin!==previous,loginDocument);
+  await page.waitForURL('**/home',{waitUntil:'networkidle'});
   await page.waitForFunction(()=>(window as unknown as {__bdAuthBootstrapV274?:{state:string}}).__bdAuthBootstrapV274?.state==='ready');
   const token=await page.evaluate(()=>localStorage.getItem('bd_session_token'));assert(token);
   await page.evaluate(()=>localStorage.setItem('p0-draft-sentinel','keep'));
