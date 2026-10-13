@@ -4,9 +4,13 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {parse} from 'acorn';
+import {patchHealthRequestLifecycle} from '../scripts/lib/health-request-lifecycle.mjs';
 import {patchMonthlyReturnV516} from '../scripts/patch-monthly-return-v516.mjs';
 
-const source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
+const live=readFileSync('public/assets/index-BQGspy0I.js','utf8');
+const beforeHealth=execFileSync('git',['show','f929af10:public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString();
+assert.equal(live,patchHealthRequestLifecycle(beforeHealth));
+const source=beforeHealth;
 const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(node=>node.type==='FunctionDeclaration'&&node.id.name==='bdMonthClosingLauncher');
 const launcher=source.slice(node.start,node.end);
 function fixture(path, month='2026-09', venue=7) {
