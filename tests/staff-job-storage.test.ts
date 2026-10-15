@@ -6,12 +6,23 @@ import { lifecycleRuntime } from "./helpers/lifecycle-runtime";
 import { readMemberJob } from "./helpers/staff-job-fixture";
 import { canReadStore, canWriteStore } from "../lib/bardoctor/data-trust";
 import { permissionsFor } from "../lib/bardoctor/access-control";
+import { p0Amendment } from "./helpers/p0-release-amendment.mjs";
 
 const routes = { access: "./app/api/access/route", join: "./app/api/access/join/route", members: "./app/api/access/members/[id]/route" };
 const baseline = "4644a85c2843f0f51935555c4122facc3e1030ad";
 
-test("no DDL or historical migration metadata change; title keys cannot use generic store access", () => {
-  assert.equal(execFileSync("git", ["diff", baseline, "--", "db/schema.ts", "drizzle"], { encoding: "utf8" }), "");
+test("only exact approved PIN migrations are appended; historical schema and title isolation stay protected", () => {
+  const approvedAdditions = [
+    "drizzle/0026_staff_pin_credentials.sql",
+    "drizzle/0027_staff_pin_sessions.sql",
+    "drizzle/0028_staff_pin_revocation.sql",
+    "drizzle/0029_staff_login.sql",
+    "drizzle/0030_staff_login_revocation_epoch.sql",
+    "drizzle/0031_staff_login_attempt_limits.sql",
+  ];
+  const changes = execFileSync("git", ["diff", "--name-status", baseline, "--", "db/schema.ts", "drizzle"], { encoding: "utf8" }).trim().split("\n").sort();
+  assert.deepEqual(changes, approvedAdditions.map(path => "A\t" + path).sort());
+  assert.ok(p0Amendment(), "all additions retain exact reviewed bytes; no untracked boundary files");
   for (const role of ["owner", "manager", "shift_manager", "cashier"] as const) {
     for (const key of ["__bd_staff_job_v1__:12", "__bd_invite_job_v1__:hash"]) {
       const subject = { role, permissions: permissionsFor(role) };
