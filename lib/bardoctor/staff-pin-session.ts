@@ -1,3 +1,4 @@
+import { staffLoginSource } from './staff-login-source';
 import { normalizeStaffLogin } from './staff-login-name';
 import { getD1, getDb } from '../../db';
 import { accounts } from '../../db/schema';
@@ -46,10 +47,7 @@ const dummy={passwordHash:'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',password
 export async function loginStaffPin(request:Request,pin:string,loginValue:unknown){
  if(!posSameOrigin(request))throw Error('PIN_ACCESS_DENIED');
  const login=normalizeStaffLogin(loginValue);
- // Cloudflare supplies this at the trusted ingress. Never accept X-Forwarded-For
- // or a client-selected body field. Missing ingress identity fails closed.
- const source=request.headers.get('cf-connecting-ip');
- if(!source||source.length>64||!/^[0-9a-f:.]+$/i.test(source))throw Error('PIN_SOURCE_UNAVAILABLE');
+ const source=staffLoginSource(request);
  const db=getD1(),now=new Date().toISOString(),window=Math.floor(Date.now()/900000);
  const sourceScope='staff-source:'+await posDigest(source.toLowerCase());
  const loginScope='staff-login:'+await posDigest(login||'invalid-format');

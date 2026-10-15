@@ -35,11 +35,11 @@ fabricated. The existing NOT NULL unique app_email column holds an internal
 non-address identifier `staff:<uuid>`; chatgpt_email is empty. Ordinary email
 lookup filters account_kind=user and cannot authenticate these identities.
 
-Draft migrations 0026–0029 are explicit; authentication performs no DDL. 0026
+Draft migrations 0026–0030 are explicit; authentication performs no DDL. 0026
 stores salted PBKDF2 credentials and issue/reset/revoke audit metadata. 0027/0028
 retain historical, now inactive device/session tables and revocation triggers.
 0029 adds globally unique logins and independent login sessions with monotonic
-revocation triggers. No production migration has been applied.
+revocation triggers. 0030 also advances credential epochs across revoke/restore transitions. No production migration has been applied.
 
 PIN issuance still enforces venue-local PIN uniqueness using an HMAC lookup tag.
 STAFF_PIN_LOOKUP_KEY (at least 32 bytes) remains required for issuance/reset and
@@ -55,7 +55,7 @@ same response and KDF work. A targeted account can still be temporarily throttle
 users behind a shared source also share its budget.
 
 Source identity uses cf-connecting-ip, never body input or X-Forwarded-For, and
-fails closed when absent. The actual hosting ingress must be verified to overwrite
+fails closed when absent. STAFF_PIN_SOURCE_POLICY must be verified-cloudflare in server configuration, otherwise login is disabled before D1 access. This switch is not proof of header provenance. The actual hosting ingress must be verified to overwrite
 and protect this header before release. Synthetic tests inject a trusted source;
 they do not establish production ingress behavior.
 
@@ -89,3 +89,5 @@ configuration and migrations, and the agreed full CI/build/release gates.
 Only the feature branch is synchronized. It is outside workflow push triggers;
 no PR is opened, because pull_request would trigger full CI. PR15/main remain
 unchanged. Checkpoints preserve bundle, patch and synthetic evidence.
+
+See [targeted security review](staff-login-security-review.md) and [production runbook](staff-login-production-runbook.md) for current findings, exact deployment prerequisites and rollback.

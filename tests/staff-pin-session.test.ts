@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
 import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import { salesEventFixture } from './helpers/sales-event-fixture';
-const routes={pin:'./lib/bardoctor/staff-pin-credentials',pos:'./lib/bardoctor/staff-pin-session',members:'./lib/bardoctor/staff-pin-members',session:'./app/api/staff-pin/session/route',sales:'./app/api/sales-events/route'};
-async function setup(){
- const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_LOOKUP_KEY:'synthetic-only-never-production-secret'}});
+const routes={memberRoute:'./app/api/staff-pin/members/route',orders:'./app/api/pos-orders/route',pin:'./lib/bardoctor/staff-pin-credentials',pos:'./lib/bardoctor/staff-pin-session',members:'./lib/bardoctor/staff-pin-members',session:'./app/api/staff-pin/session/route',sales:'./app/api/sales-events/route'};
+async function setup(sourcePolicy: string|undefined='verified-cloudflare'){
+ const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_SOURCE_POLICY:sourcePolicy,STAFF_PIN_LOOKUP_KEY:'synthetic-only-never-production-secret'}});
  const owner=await r.register('owner@isolated.test'),actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
  const members=r.api.members as unknown as typeof import('../lib/bardoctor/staff-pin-members'),pins=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
  const a=await members.createPinStaff(actor,'Anna','waiter','  Anna  '),b=await members.createPinStaff(actor,'Boris','barista','boris');
@@ -68,6 +68,10 @@ test('real payment author is server-derived; stale actor and in-flight reset can
  for(const action of ['open_shift','close_shift','reverse'])assert.equal((await send({action,shiftId:'shift'})).status,403);
  const preview=await(await send({action:'preview',command})).json();assert.equal((await send({action:'post',command,previewHash:preview.previewHash})).status,201);
  const events=()=>JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(events()[0].actor.accountId,a.actorId);
+ const stored=events()[0];assert.ok(stored.batch,'fixture includes internal cost-bearing batch');
+ const safe=await r.api.sales.GET(request('','','192.0.2.1',token,'/api/sales-events','GET'));
+ assert.equal(safe.status,200);assert.doesNotMatch(await safe.text(),/totalTheoreticalCost|originalMovements|recipeSnapshot|salary|payroll|staffing|openingFloat|closingReport/);
+ const report=await r.api.sales.GET(request('','','192.0.2.1',token,'/api/sales-events?reportShiftId=shift','GET'));assert.equal(report.status,403);
  const next={...command,id:'blocked'},p=await(await send({action:'preview',command:next})).json();r.beforeNextDomainWrite(async()=>{await pins.revokeStaffPin(actor,a.membershipId);});
  assert.ok([401,403].includes((await send({action:'post',command:next,previewHash:p.previewHash})).status));assert.equal(events().length,1);
 });
@@ -86,4 +90,74 @@ test('only venue owner/manager can change globally unique login; change revokes 
  assert.equal((await r.api.session.POST(request('anna',pin.pin))).status,401);
  assert.ok(await enter('renamed',pin.pin));
  assert.equal(r.sqlite.prepare('SELECT login FROM staff_logins WHERE membership_id=?').get(b.membershipId)?.login,'boris');
+});
+
+test('security review: in-flight login cannot cross revoke-restore transitions',async t=>{
+ for(const transition of ['login','workspace-member','venue','workspace'])await t.test(transition,async()=>{
+  const {r,a,owner,request}=await setup();try{
+   r.beforeNextBatch(()=>r.beforeNextBatch(()=>{
+    if(transition==='login'){
+     r.sqlite.prepare("UPDATE staff_logins SET login='temporary' WHERE membership_id=?").run(a.membershipId);
+     r.sqlite.prepare("UPDATE staff_logins SET login='anna' WHERE membership_id=?").run(a.membershipId);
+    }else{
+     const venue=r.sqlite.prepare('SELECT workspace_id FROM venues WHERE id=?').get(owner.activeVenueId)!;
+     const [table,where,id]=transition==='workspace-member'?['workspace_memberships','account_id',a.actorId]:transition==='venue'?['venues','id',owner.activeVenueId]:['workspaces','id',venue.workspace_id];
+     r.sqlite.prepare(`UPDATE ${table} SET status='disabled' WHERE ${where}=?`).run(id);
+     r.sqlite.prepare(`UPDATE ${table} SET status='active' WHERE ${where}=?`).run(id);
+    }
+   }));
+   assert.equal((await r.api.session.POST(request())).status,401,'pre-revocation credential snapshot must not mint a session after restoration');
+   assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_login_sessions').get()?.n,0);
+  }finally{r.close();}
+ });
+});
+
+test('security review: source policy fails closed; canonical IP budgets ignore client forwarding headers',async t=>{
+ const disabled=await setup('');try{assert.equal((await disabled.r.api.session.POST(disabled.request())).status,503);assert.equal(disabled.r.sqlite.prepare('SELECT count(*) n FROM staff_pos_attempts').get()?.n,0);}finally{disabled.r.close();}
+ const {r,request}=await setup();t.after(r.close);
+ for(const source of ['.',':','abc','1.2.3.999','1.2.3.4, 5.6.7.8'])assert.equal((await r.api.session.POST(request('unknown','bad',source))).status,503);
+ const spellings=['2001:db8::1','2001:0DB8:0:0:0:0:0:1'];
+ for(let i=0;i<51;i++){
+  const req=request('unknown'+i,'bad',spellings[i%2]);req.headers.set('x-forwarded-for','198.51.100.'+i);req.headers.set('x-real-ip','192.0.2.'+i);
+  assert.equal((await r.api.session.POST(req)).status,i<50?401:429);
+ }
+ assert.equal(r.sqlite.prepare("SELECT count(*) n FROM staff_pos_attempts WHERE scope LIKE 'staff-source:%'").get()?.n,1);
+});
+
+test('security review: public enumeration, manager authority and cross-venue boundaries',async t=>{
+ const {r,owner,actor,members,pins,a,pin,request,enter}=await setup();t.after(r.close);
+ const other=await r.register('other-review@isolated.test'),foreign=await r.api.auth.authenticateRequest(r.request(other,'/api/access'));assert.ok(foreign);
+ await assert.rejects(members.createPinStaff(foreign,'Conflict','cashier','ANNA'),/UNIQUE/);
+ await assert.rejects(pins.issueStaffPin(foreign,a.membershipId),/ACCESS_DENIED/);
+ await assert.rejects(pins.revokeStaffPin(foreign,a.membershipId),/ACCESS_DENIED/);
+ await assert.rejects(members.setStaffLogin(foreign,a.membershipId,'foreign'),/ACCESS_DENIED/);
+ const employee=await r.register('employee-review@isolated.test');
+ const workspace=r.sqlite.prepare('SELECT workspace_id FROM venues WHERE id=?').get(owner.activeVenueId)!.workspace_id;
+ r.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES (?,?,'member','active')").run(workspace,employee.userId);
+ const membership=Number(r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role,status) VALUES (?,?,'shift_manager','active')").run(owner.activeVenueId,employee.userId).lastInsertRowid);
+ const managerRequest=r.request(employee,'/api/staff-pin/members');managerRequest.headers.set('x-venue-id',String(owner.activeVenueId));
+ for(const role of ['shift_manager','cashier']){
+  r.sqlite.prepare('UPDATE venue_memberships SET role=? WHERE id=?').run(role,membership);
+  await assert.rejects(pins.issueStaffPin({...actor,role},a.membershipId),/ACCESS_DENIED/);
+  await assert.rejects(pins.revokeStaffPin({...actor,role},a.membershipId),/ACCESS_DENIED/);
+  assert.equal((await r.api.memberRoute.GET(managerRequest)).status,403);
+ }
+ r.sqlite.prepare("UPDATE venue_memberships SET role='manager' WHERE id=?").run(membership);
+ const manager=await r.api.auth.authenticateRequest(managerRequest);assert.equal(manager?.role,'manager');
+ const fresh=await pins.issueStaffPin(manager!,a.membershipId);
+ const token=await enter('anna',fresh.pin);
+ assert.equal((await r.api.memberRoute.GET(request('','','192.0.2.1','', '/api/staff-pin/members','GET'))).status,403);
+ assert.equal((await r.api.memberRoute.GET(request('','','192.0.2.1',token,'/api/staff-pin/members','GET'))).status,403);
+ for(const login of ['anna','unknown-review']){
+  const responses=[];
+  for(let i=0;i<6;i++){const response=await r.api.session.POST(request(login,'bad','198.51.100.'+(i+1)));responses.push([response.status,await response.json()]);}
+  assert.deepEqual(responses.map(x=>x[0]),[401,401,401,401,401,429]);
+  if(login==='anna')r.sqlite.prepare('DELETE FROM staff_pos_attempts').run();
+ }
+ const cross=request('','','192.0.2.1',token,'/api/pos-orders','GET');cross.headers.set('x-venue-id',String(other.activeVenueId));
+ assert.equal((await r.api.orders.GET(cross)).status,401);
+ const body=request('','','192.0.2.1',token,'/api/sales-events');body.headers.set('x-pos-actor',String(a.actorId));
+ assert.equal((await r.api.sales.POST(new Request(body,{body:JSON.stringify({action:'preview',venueId:other.activeVenueId})}))).status,409);
+ await pins.revokeStaffPin(manager!,a.membershipId);
+ assert.equal((await r.api.session.GET(request('','','192.0.2.1',token,'/api/staff-pin/session','GET'))).status,401);
 });

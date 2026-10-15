@@ -22,7 +22,7 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     format: "esm", platform: "neutral", conditions: ["workerd", "worker", "browser"], external: ["cloudflare:workers", "node:*"] });
   let outbound = 0;
   const mf = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"],
-    bindings:{STAFF_PIN_LOOKUP_KEY:"synthetic-native-worker-only-key"}, d1Databases: { DB: "isolated-staff-pin-session" }, outboundService: () => { outbound++; return new Response(null, { status: 502 }); } });
+    bindings:{STAFF_PIN_SOURCE_POLICY:'verified-cloudflare',STAFF_PIN_LOOKUP_KEY:"synthetic-native-worker-only-key"}, d1Databases: { DB: "isolated-staff-pin-session" }, outboundService: () => { outbound++; return new Response(null, { status: 502 }); } });
   try {
     const db = await mf.getD1Database("DB"), schema = new DatabaseSync(":memory:");
     try {
@@ -43,6 +43,16 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     assert.deepEqual(raced.map(x=>x.status),[200,200]);
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_login_sessions').first()).n,2);
     for(const result of raced)assert.ok((await call({action:'session'},'bd_pos_session='+result.body.token)).body.session);
+    for(const [table,where,id,column,temporary,restored] of [
+      ['staff_logins','membership_id',member.membershipId,'login','temporary','worker-staff'],
+      ['workspace_memberships','account_id',member.actorId,'status','disabled','active'],
+      ['venues','id',1,'status','disabled','active'],['workspaces','id',1,'status','disabled','active']]){
+      const before=await db.prepare('SELECT revision FROM staff_pin_credentials WHERE membership_id=?').bind(member.membershipId).first();
+      await db.batch([db.prepare(`UPDATE ${table} SET ${column}=? WHERE ${where}=?`).bind(temporary,id),db.prepare(`UPDATE ${table} SET ${column}=? WHERE ${where}=?`).bind(restored,id)]);
+      const after=await db.prepare('SELECT revision FROM staff_pin_credentials WHERE membership_id=?').bind(member.membershipId).first();
+      assert.ok(after.revision>before.revision,table+' advances epoch across restore');
+    }
+    for(const result of raced)assert.equal((await call({action:'session'},'bd_pos_session='+result.body.token)).body.session,null);
     const unknown=await call({action:'login',login:'missing',pin:'000000'}),wrong=await call({action:'login',login:'worker-staff',pin:'bad'});assert.equal(unknown.body.error,wrong.body.error);
     const attacks=await Promise.all(Array.from({length:8},(_,i)=>call({action:'login',login:'worker-staff',pin:'bad',source:'192.0.2.'+(i+2)})));
     assert.equal(attacks.filter(x=>x.body.error==='PIN_INVALID').length,4);assert.equal(attacks.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,4);
