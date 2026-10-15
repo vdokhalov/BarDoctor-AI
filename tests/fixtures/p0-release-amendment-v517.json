@@ -160,7 +160,7 @@
     },
     "scripts/sales-iphone-browser.ts": {
       "before": "9113dde8f9ca2b7defb708ee2abd026a461de4eaae0fa500752d9c418f9139c2",
-      "after": "5f5d5515ed6f7ca77b0bdf8d42da227f9273e2b5cca4df6c08c49d5901671afb"
+      "after": "4ce76c124e5d20debc579c08f3cb3c330011dab94402817d2c4f17a0ac0d054b"
     },
     "scripts/sales-navigation-performance.ts": {
       "before": "4103ca4106282f51e7be25d988d646e81d8e0936d34b2a0473d92ba5618282b9",

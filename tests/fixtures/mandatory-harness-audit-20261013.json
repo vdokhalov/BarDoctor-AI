@@ -1698,8 +1698,8 @@
           "text": "assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);"
         }
       ],
-      "sha256": "5f5d5515ed6f7ca77b0bdf8d42da227f9273e2b5cca4df6c08c49d5901671afb",
-      "review": "FIX: isolated scoped OPEN workday with nonempty team before API/UI cash opening; date matches fixture venue timezone; existing negative assertions retained. Optional BD_WEBKIT_EXECUTABLE matches navigation harness; default CI browser launch and every test assertion remain unchanged. Existing portable WebKit runtime verified with actual GLES dlopen."
+      "sha256": "4ce76c124e5d20debc579c08f3cb3c330011dab94402817d2c4f17a0ac0d054b",
+      "review": "QA-only outgoing Cashier icon lifecycle classification. Preserve raw failures; classify only same-origin GET integration SVG image requests pending before physical Back, cancelled within handoff, with proven pagehide. All HTTP/API/new-document failures remain fatal. No wait before first tap, duplicate-navigation/venue/readiness/feedback assertions unchanged. Thirteen rejection controls plus positive case."
     },
     "scripts/sales-navigation-performance.ts": {
       "hits": [
@@ -1953,8 +1953,8 @@
     },
     "tests/helpers/sales-iphone-trace.ts": {
       "hits": [],
-      "sha256": "a22bf1c8331dcdec4151c05d2745b14632b21b02178caed56b2d148452c70135",
-      "review": "SUPPORT/NO TARGET ACTION: inspected for diagnosis launch, cash opening and transitive delegation; no unconfirmed UI diagnosis or unseeded cash opening callsite found."
+      "sha256": "6fbe3e4e7baf3527b5a71e2e031563237fa2bb3d96f577277b6677510ca388f9",
+      "review": "QA-only outgoing Cashier icon lifecycle classification. Preserve raw failures; classify only same-origin GET integration SVG image requests pending before physical Back, cancelled within handoff, with proven pagehide. All HTTP/API/new-document failures remain fatal. No wait before first tap, duplicate-navigation/venue/readiness/feedback assertions unchanged. Thirteen rejection controls plus positive case."
     },
     "tests/helpers/sales-navigation-settled.ts": {
       "hits": [],

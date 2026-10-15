@@ -1,0 +1,143 @@
+{
+  "baseCommit": "a87fd557358bed3c100b0120a3c8c3ca3bd50d11",
+  "failedCiRun": 38451174342,
+  "artifactId": 11844415572,
+  "artifactTraceSha256": "de33e62d4eb35f8f8c97e46a00918a5ac2c74bdff0d01de6659616629e77b54f",
+  "cause": "Seven outgoing Cashier SVG requests cancelled by WebKit on first Back tap; duplicate-tap handoff and destination readiness succeeded. Raw networkErrors assertion treated outgoing document cancellation as destination failure.",
+  "ciFailures": [
+    {
+      "at": 1791920857687,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/clock-3.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857688,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/grid-2x2.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857688,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/plus.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857688,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/activity.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857689,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/clipboard-list.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857689,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/circle-check.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    },
+    {
+      "at": 1791920857690,
+      "kind": "requestfailed",
+      "detail": {
+        "url": "http://127.0.0.1:38215/integration-icons/settings-2.svg",
+        "error": {
+          "errorText": "Load request cancelled"
+        }
+      }
+    }
+  ],
+  "fix": "Classify only same-origin GET integration-icons SVG images captured pending before native Back, cancelled within its handoff window, with proven old-document pagehide. Retain raw failures, HTTP/API failures, new-document failures, immediate native taps, exactly-one-navigation, feedback, venue and destination readiness.",
+  "verification": {
+    "delayedWebKit600ms": [
+      {
+        "width": 390,
+        "height": 844,
+        "top": 59,
+        "bottom": 34,
+        "name": "iphone-0",
+        "browser": "webkit",
+        "delay": 600,
+        "rapidTap": true,
+        "venue": "Atelier",
+        "pass": true
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "top": 59,
+        "bottom": 34,
+        "name": "iphone-1",
+        "browser": "webkit",
+        "delay": 600,
+        "rapidTap": true,
+        "venue": "Atelier",
+        "pass": true
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "top": 59,
+        "bottom": 34,
+        "name": "iphone-2",
+        "browser": "webkit",
+        "delay": 600,
+        "rapidTap": true,
+        "venue": "Atelier",
+        "pass": true
+      }
+    ],
+    "classifierTests": 14,
+    "nativeBrowserControls": [
+      "outgoing icon cancellation accepted",
+      "API cancellation rejected",
+      "destination HTTP503 rejected"
+    ],
+    "releaseGuards": 3,
+    "lint": "PASS",
+    "types": "PASS"
+  },
+  "unchanged": "No product, API, business-data, credential, environment or workflow changes. New exact candidate still requires mandatory gates.",
+  "evidenceSha256": {
+    "lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-lint.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "negative-controls.log": "a358184e8c1170db8f75832d514b1100979ac4cd29d212cf94720382b6a8d194",
+    "delayed.log": "b2b6db40e0306929df91b9e61b4dfdff28528a1cee2632d1485a4a55ec5832b6",
+    "release-guard.log": "c0e48d6ed4e7a3a90dd6430289b8acb9a63571b0a92531a8866e353fec24e280",
+    "types.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native-negative-controls.log": "b39f76c50f7af08a5aba5632bd468add9b0b8e7e546bb5f38128d535e00d16d9",
+    "delayed/results.json": "b55a349f1d9eec311249eb931f1c99041aefc6fbdd747fdcfdad122568cc349c",
+    "delayed/iphone-0-trace.json": "4d725cdfe531c815aa6073fcfe8fdad4230615098cb26103b2f9b2f9fb066f9b",
+    "delayed/iphone-1-trace.json": "371e3456ce3068a96b7a4e3d316fb5a4443e141441ea6fc6efd4826669ac0672",
+    "delayed/iphone-2-trace.json": "81372cc66dfce190437f7cce27da82f89042ee22f445bacb4817f0e1927b8110"
+  }
+}
