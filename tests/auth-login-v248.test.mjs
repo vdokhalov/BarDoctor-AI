@@ -11,7 +11,7 @@ test("login has a bounded request and always releases its loading state", async 
   const bundle = await readFile(bundleUrl, "utf8");
   assert.match(bundle, /bdAuthLoginVersionV248="auth-login-v248"/);
   assert.match(bundle, /new AbortController/);
-  assert.match(bundle, /setTimeout\(\(\)=>n\.abort\(\),15e3\)/);
+  assert.match(bundle, /setTimeout\(\(\)=>n\.abort\(new DOMException\("Login timed out","TimeoutError"\)\),15e3\)/);
   assert.match(bundle, /credentials:"include",cache:"no-store"/);
   assert.match(bundle, /finally\{clearTimeout\(r\)\}/);
 

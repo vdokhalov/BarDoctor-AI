@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { lifecycleRuntime } from "./helpers/lifecycle-runtime";
@@ -211,6 +212,7 @@ test("confirmed menu preserves existing recipe and POS consumption, stock units 
     assert.equal((await r.confirm(checked.body.draft)).response.status, 201);
     assert.deepEqual(r.get().recipes, before.recipes); assert.deepEqual(r.get().nomenclature, before.nomenclature);
     const sendSale = (body: object) => r.api.sales.POST(r.request(r.user, "/api/sales-events", "POST", { venueId: r.venueId, ...body }));
+    seedOpenWorkday(r.sqlite,r.user.userId,r.venueId);
     const opened = await sendSale({ action: "open_shift", shiftId: "cash", name: "Cash" }); assert.equal(opened.status, 201, JSON.stringify(await opened.clone().json()));
     const command = { id: "phase2-sale", source: "POS_API", shiftId: "cash", lines: [{ id: "line", menuItemId: existing.id, quantity: 1 }], payments: [{ id: "pay", method: "CASH", amount: 25 }] };
     const quote = await sendSale({ action: "preview", command }); assert.equal(quote.status, 200, JSON.stringify(await quote.clone().json()));

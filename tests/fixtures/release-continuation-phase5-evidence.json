@@ -1,0 +1,60 @@
+{
+  "baseCommit": "03c2beea290faae3663a5ba14bd72c762d0f7b25",
+  "scope": "Continuation only; no successful predecessor steps repeated. Phase5 harness cash-shift prerequisite repair only. Product bytes unchanged.",
+  "diagnosis": "Manual sale intentionally hidden without open cash shift. Harness now opens it through real UI, selects its persisted ID and measures write counts from after that prerequisite transaction.",
+  "checkedScriptSha256": "fe7b92f2d80cce989575ecfe016f501b20977c33fdd58679594f6d2acb3e6fc7",
+  "passedSteps": [
+    {
+      "job": "verify-browser",
+      "step": 13,
+      "name": "General tech card real server SQLite mobile desktop",
+      "attempt": 1
+    },
+    {
+      "job": "verify-browser",
+      "step": 14,
+      "name": "First venue setup registration wizard real server SQLite mobile desktop",
+      "attempt": 1
+    },
+    {
+      "job": "verify-browser",
+      "step": 16,
+      "name": "Account and venue lifecycle real server SQLite mobile desktop",
+      "attempt": 1
+    },
+    {
+      "job": "verify-browser",
+      "step": 17,
+      "name": "Phase 4 purchase units mobile and desktop QA",
+      "attempt": 1
+    },
+    {
+      "job": "verify-browser",
+      "step": 18,
+      "name": "Phase 5 opening stock and CSV mobile desktop persisted HTTP QA",
+      "attempt": 1
+    },
+    {
+      "job": "verify-browser",
+      "step": 19,
+      "name": "Phase 5 sales mobile desktop persisted HTTP QA",
+      "attempt": 3
+    },
+    {
+      "job": "verify-browser",
+      "step": 20,
+      "name": "POS-1 cashier real sales handler SQLite mobile desktop QA",
+      "attempt": 1
+    }
+  ],
+  "phase5Evidence": [
+    "Phase 5 sales 390x844: HTTP/SQLite units/cancel/post/lost-response/reload/retry/reverse/shifts/venue PASS",
+    "Phase 5 sales 1280x720: HTTP/SQLite units/cancel/post/lost-response/reload/retry/reverse/shifts/venue PASS"
+  ],
+  "checks": {
+    "releaseGuards": 3,
+    "lint": "PASS",
+    "types": "PASS"
+  },
+  "remaining": "Continue runner status.json from the next unpassed step; no final CI or publication yet."
+}

@@ -52,9 +52,11 @@ test("page and Home share canonical server snapshot and keep saved data during r
     readFile(new URL("../app/api/market/route.ts", import.meta.url), "utf8"),
   ]);
   assert.match(page, /shared\.readSnapshot\(\)/);
-  assert.match(page, /if\(r\.analysis&&r\.stale\)refresh\(true\)/);
+  assert.doesNotMatch(page, /if\(r\.analysis&&r\.stale\)refresh\(true\)/);
+  assert.match(page, /if\(state\.refreshing\|\|automatic\)return/);
+  assert.match(page, /if\(!window\.confirm\("Платный анализ рынка:/);
   assert.match(page, /catch\{state\.refreshFailed=true\}/);
-  assert.match(page, /Предыдущие результаты остаются доступными/);
+  assert.match(page, /Показаны последние данные · обновление временно недоступно/);
   assert.match(home, /bdCompetitorMarketClientV329/);
   assert.match(home, /fetch\("\/api\/market"\)/);
   assert.match(client, /bd_market_server_snapshot_v329:/);

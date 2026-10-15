@@ -1,0 +1,434 @@
+{
+  "baseCommit": "03c2beea290faae3663a5ba14bd72c762d0f7b25",
+  "productFix": "4b8120d05545cbb86eaf46daa7f3f63ab309a0a6",
+  "scope": "All 19 previously skipped browser steps plus both mandatory Sales navigation steps completed locally. Product/workflow bytes unchanged after 4b8120d0. Only owning QA prerequisites, current UI actions, consent fixtures and portable WebKit launch aligned.",
+  "completedAt": "2026-10-13T18:55:59.830411+00:00",
+  "passedSteps": [
+    {
+      "job": "verify-browser",
+      "step": 13,
+      "name": "General tech card real server SQLite mobile desktop",
+      "attempt": 1,
+      "started": "2026-10-13T18:16:45.738123+00:00",
+      "finished": "2026-10-13T18:17:08.065484+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 14,
+      "name": "First venue setup registration wizard real server SQLite mobile desktop",
+      "attempt": 1,
+      "started": "2026-10-13T18:17:08.065782+00:00",
+      "finished": "2026-10-13T18:18:35.031572+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 16,
+      "name": "Account and venue lifecycle real server SQLite mobile desktop",
+      "attempt": 1,
+      "started": "2026-10-13T18:18:35.031920+00:00",
+      "finished": "2026-10-13T18:18:40.643502+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 17,
+      "name": "Phase 4 purchase units mobile and desktop QA",
+      "attempt": 1,
+      "started": "2026-10-13T18:18:40.643877+00:00",
+      "finished": "2026-10-13T18:19:02.201870+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 18,
+      "name": "Phase 5 opening stock and CSV mobile desktop persisted HTTP QA",
+      "attempt": 1,
+      "started": "2026-10-13T18:19:02.202222+00:00",
+      "finished": "2026-10-13T18:19:04.741925+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 19,
+      "name": "Phase 5 sales mobile desktop persisted HTTP QA",
+      "attempt": 3,
+      "started": "2026-10-13T18:22:07.821492+00:00",
+      "finished": "2026-10-13T18:22:11.351053+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 20,
+      "name": "POS-1 cashier real sales handler SQLite mobile desktop QA",
+      "attempt": 1,
+      "started": "2026-10-13T18:22:11.351519+00:00",
+      "finished": "2026-10-13T18:22:17.659261+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 21,
+      "name": "POS-1 hardening navigation drafts journal and retries mobile tablet desktop",
+      "attempt": 6,
+      "started": "2026-10-13T18:28:56.621075+00:00",
+      "finished": "2026-10-13T18:30:17.657180+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 22,
+      "name": "Sales UX step 2 journal checkout import mobile tablet desktop",
+      "attempt": 1,
+      "started": "2026-10-13T18:30:17.657782+00:00",
+      "finished": "2026-10-13T18:30:31.540588+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 23,
+      "name": "Sales iPhone safe areas touch navigation and single shift regression",
+      "attempt": 1,
+      "started": "2026-10-13T18:30:31.541012+00:00",
+      "finished": "2026-10-13T18:32:06.451747+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 24,
+      "name": "Venue timezone settings and Sales date mobile tablet desktop",
+      "attempt": 2,
+      "started": "2026-10-13T18:33:07.763310+00:00",
+      "finished": "2026-10-13T18:33:14.507800+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 25,
+      "name": "Accounting report reversal guard mobile tablet desktop",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:14.508276+00:00",
+      "finished": "2026-10-13T18:33:16.744734+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 26,
+      "name": "Sales v454 overnight shifts and cashier auth network browser regression",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:16.745222+00:00",
+      "finished": "2026-10-13T18:33:33.924960+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 27,
+      "name": "Startup recovery browser QA",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:33.925415+00:00",
+      "finished": "2026-10-13T18:33:44.423462+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 28,
+      "name": "Anonymous mobile desktop startup handoff",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:44.423937+00:00",
+      "finished": "2026-10-13T18:33:49.041171+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 29,
+      "name": "Existing venue root startup without reload",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:49.041665+00:00",
+      "finished": "2026-10-13T18:33:56.155155+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 30,
+      "name": "Purchase direct load and reload runtime",
+      "attempt": 1,
+      "started": "2026-10-13T18:33:56.155711+00:00",
+      "finished": "2026-10-13T18:34:13.179903+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 31,
+      "name": "Mobile and desktop navigation QA",
+      "attempt": 2,
+      "started": "2026-10-13T18:37:56.296238+00:00",
+      "finished": "2026-10-13T18:42:09.188936+00:00"
+    },
+    {
+      "job": "verify-browser",
+      "step": 32,
+      "name": "Home reviews viewport QA",
+      "attempt": 1,
+      "started": "2026-10-13T18:42:09.189627+00:00",
+      "finished": "2026-10-13T18:42:44.950748+00:00"
+    },
+    {
+      "job": "sales-navigation",
+      "step": 18,
+      "name": "Measured navigation and embedded auth failures",
+      "attempt": 4,
+      "started": "2026-10-13T18:53:57.694347+00:00",
+      "finished": "2026-10-13T18:54:43.952007+00:00"
+    },
+    {
+      "job": "sales-navigation",
+      "step": 19,
+      "name": "WebKit iPhone repeated pending Back navigation",
+      "attempt": 1,
+      "started": "2026-10-13T18:54:43.952704+00:00",
+      "finished": "2026-10-13T18:55:59.830411+00:00"
+    }
+  ],
+  "navigationMatrix": [
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 0,
+      "duration": 99.2998046875
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 100,
+      "duration": 350
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 300,
+      "duration": 1198.199951171875
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 600,
+      "duration": 1466.300048828125
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 600,
+      "duration": 1464.900146484375
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 600,
+      "duration": 1466
+    },
+    {
+      "browser": "chromium",
+      "width": 390,
+      "delay": 1200,
+      "duration": 1384.800048828125
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 0,
+      "duration": 123
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 100,
+      "duration": 355
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 300,
+      "duration": 1187
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 600,
+      "duration": 1473
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 600,
+      "duration": 1477
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 600,
+      "duration": 1478
+    },
+    {
+      "browser": "webkit",
+      "width": 390,
+      "delay": 1200,
+      "duration": 1441
+    },
+    {
+      "browser": "chromium",
+      "width": 820,
+      "delay": 0,
+      "duration": 116
+    },
+    {
+      "browser": "webkit",
+      "width": 820,
+      "delay": 0,
+      "duration": 244
+    },
+    {
+      "browser": "chromium",
+      "width": 1280,
+      "delay": 0,
+      "duration": 133
+    },
+    {
+      "browser": "webkit",
+      "width": 1280,
+      "delay": 0,
+      "duration": 180
+    }
+  ],
+  "embeddedAuthFailureGuards": [
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "chromium",
+      "width": 390
+    },
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "webkit",
+      "width": 390
+    },
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "chromium",
+      "width": 820
+    },
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "webkit",
+      "width": 820
+    },
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "chromium",
+      "width": 1280
+    },
+    {
+      "embeddedAuth401": true,
+      "embedded503NotLogin": true,
+      "embeddedNetworkNotLogin": true,
+      "browser": "webkit",
+      "width": 1280
+    }
+  ],
+  "webkitIphoneBack": [
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-0",
+      "browser": "webkit",
+      "delay": 0,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-1",
+      "browser": "webkit",
+      "delay": 0,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-2",
+      "browser": "webkit",
+      "delay": 0,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-0",
+      "browser": "webkit",
+      "delay": 600,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-1",
+      "browser": "webkit",
+      "delay": 600,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "top": 59,
+      "bottom": 34,
+      "name": "iphone-2",
+      "browser": "webkit",
+      "delay": 600,
+      "rapidTap": true,
+      "venue": "Atelier",
+      "pass": true
+    }
+  ],
+  "navigationResume": [
+    {
+      "command": "BD_PERF_LABEL=continuation-03c2 BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts",
+      "log": "sales-navigation-18-attempt1.log",
+      "result": "PASS all seven Chromium390 delay cases; following WebKit launch failed dependency lookup before any browser scenario"
+    },
+    {
+      "command": "BD_PERF_LABEL=continuation-03c2 BD_PERF_BROWSER=webkit BD_PERF_DELAYS=0,100,300,600,600,600,1200 node --import tsx scripts/sales-navigation-performance.ts",
+      "log": "sales-navigation-18-attempt3.log",
+      "result": "PASS all seven WebKit390 delay cases; next Chromium820 case exposed stale simultaneous-pane expectation"
+    }
+  ],
+  "runtime": {
+    "webkitExecutable": "/workspace/bardoctor-browsers/webkit-2370/pw_run.sh",
+    "GLESPath": "/workspace/bardoctor-webkit-libs/root/usr/lib/x86_64-linux-gnu/libGLESv2.so.2.1.0",
+    "GLESSha256": "a705c66de30ca4e883120c70acae0f1011d7c3f97605eef331e03493beae3812",
+    "actualDlopen": "PASS",
+    "dependencyDiagnosis": "Playwright missingDLOPENLibraries uses ldconfig -p only. Existing bundled library loads with runtime path; use script-supported explicit WebKit executable. No system or package changes."
+  },
+  "finalSourceDigests": {
+    "scripts/sales-navigation-performance.ts": "1d43526ff37bc3397d91c7b98e5cca49eafb1f298c42b2ba49c8d0d186886eb3",
+    "scripts/sales-iphone-browser.ts": "5f5d5515ed6f7ca77b0bdf8d42da227f9273e2b5cca4df6c08c49d5901671afb"
+  },
+  "checks": {
+    "releaseGuards": "3 PASS",
+    "types": "PASS",
+    "lint": "PASS",
+    "diffCheck": "PASS"
+  },
+  "releaseGate": "Local continuation PASS; a single exact-final-head mandatory GitHub CI is still required. No merge, deployment or production business-data changes performed."
+}

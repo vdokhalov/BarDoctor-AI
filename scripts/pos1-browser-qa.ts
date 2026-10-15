@@ -1,3 +1,4 @@
+import {openWorkdayFixture} from '../tests/helpers/pos-workday-fixture';
 import { posAddItem } from "../tests/helpers/pos-browser-driver";
 import { posOpenShift, posPane, posPay, posNewQuick, posReceiptList } from "../tests/helpers/pos-browser-driver";
 import { salesSurfacePage } from '../tests/helpers/sales-surface-page';
@@ -15,6 +16,7 @@ const {resolveBrowserExecutable,chromiumArgs}=require("./browser-runtime.cjs");
 const fixture=openingRuntime(new URL("../app/api/sales-events/route.ts",import.meta.url),sales);
 const orders=fixture.loadRoute(new URL("../app/api/pos-orders/route.ts",import.meta.url));
 fixture.setCurrency("PMR_RUB");
+    fixture.put("bd_operational_reports_v1",[openWorkdayFixture(1)]);
 fixture.put("bd_assortment_v1",{
   menuItems:[
     {id:"vodka40",name:"TEST VODKA 40",venueId:1,active:true,department:"bar",category:"Vodka",type:"composite",consumptionMode:"RECIPE",salePrice:30,currency:"PMR_RUB"},

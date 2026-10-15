@@ -1,3 +1,5 @@
+import {captureDocumentIdentity,assertDocumentIdentity} from '../tests/helpers/document-identity.mjs';
+import {waitForImportData} from '../tests/helpers/import-data-ready.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFileSync,existsSync,mkdirSync,writeFileSync } from 'node:fs';
@@ -10,6 +12,7 @@ import { GET as cashier } from '../app/cashier/route';
 import { GET as manual } from '../app/sales-entry/route';
 import { GET as journal } from '../app/sales-import/route';
 import { barDoctorResponse } from '../app/bar-doctor-response';
+import { armScrollCompletion, waitForScrollCompletion, assertIdleScroll } from '../tests/helpers/scroll-gesture-settled.mjs';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const label=process.env.BD_SCROLL_LABEL||'before';const out='outputs/scroll-stability/'+label;mkdirSync(out,{recursive:true});
 const runtime=await lifecycleRuntime({health:'./app/api/business-health/route',products:'./app/api/inventory/products/route',events:'./app/api/sales-events/route',batches:'./app/api/sales-batches/route',usersMe:'./app/api/users/me/route',restaurantMe:'./app/api/restaurants/me/route',store:'./app/api/store/route',storeKey:'./app/api/store/[key]/route',overview:'./app/api/assortment/overview/route',posOrders:'./app/api/pos-orders/route',posDiscounts:'./app/api/pos-discounts/route',posOverview:'./app/api/pos-overview/route'});
@@ -43,6 +46,9 @@ assortment.menuItems.push(...names.map((name,i)=>({...assortment.menuItems[0],id
 assortment.nomenclatureStructure={sections:[{id:'bar',name:'Бар'},{id:'kitchen',name:'Кухня'}],categories:[{id:'drinks',name:'Напитки',parentId:'bar'},{id:'food',name:'Основное меню',parentId:'kitchen'}],subcategories:[{id:'wine',name:'Вино и кофе',parentId:'drinks'},{id:'dishes',name:'Блюда',parentId:'food'}]};
 assortment.stockBalances.forEach((b:{current:number})=>b.current=1000);
 put('bd_assortment_v1',assortment);
+// Seed the required open workday in this isolated fixture before live POS
+// commands. The real handler still enforces its workday and staffing gates.
+put('bd_operational_reports_v1',[{venueId:venue,date:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Chisinau'}).format(new Date()),workdayStatus:'OPEN',staffing:[{employeeId:'scroll-fixture'}]}]);
 const send=(body:object)=>runtime.api.events.POST(runtime.request(user,'/api/sales-events','POST',{venueId:venue,...body}));
 assert.equal((await send({action:'open_shift',shiftId:'ux2-open',name:'Вечер · основной зал'})).status,201);
 for(const [i,source] of Array.from({length:30},()=> 'POS_API').entries()){
@@ -55,7 +61,7 @@ const imported=await runtime.api.batches.POST(runtime.request(user,'/api/sales-b
 
 
 const engine=process.env.BD_SCROLL_BROWSER==='chromium'?chromium:webkit;
-const browser=await engine.launch(engine===chromium?{executablePath:process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs}:{headless:true});
+const browser=await engine.launch(engine===chromium?{executablePath:process.env.BD_QA_BROWSER||await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs}:{headless:true,...(process.env.BD_WEBKIT_EXECUTABLE?{executablePath:process.env.BD_WEBKIT_EXECUTABLE}:{})});
 const results:unknown[]=[];
 const profiles=[{width:390,height:844,top:59,bottom:34,name:'safe'},{width:390,height:844,top:0,bottom:0,name:'plain'},{width:820,height:1000,top:0,bottom:0,name:'tablet'},{width:1280,height:800,top:0,bottom:0,name:'desktop'}].filter(p=>!process.env.BD_SCROLL_PROFILE||p.name===process.env.BD_SCROLL_PROFILE);
 try {
@@ -65,7 +71,7 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  // WebKit exposes native taps but no swipe API; mobile WebKit rejects mouse.wheel.
  // Use responsive touch-enabled WebKit with native wheel, and label it accurately.
  const c=await browser.newContext({viewport:{width,height},hasTouch:true,isMobile:engine===chromium&&width===390});
- await c.addInitScript({content:'window.__name=(value)=>value;'});await c.addInitScript({path:resolve('scripts/qa/sales-scroll-probe.js')});
+ await c.addInitScript({content:'window.__name=(value)=>value;Object.defineProperty(document,"__qaDocumentIdentity",{value:crypto.randomUUID()});'});await c.addInitScript({path:resolve('scripts/qa/sales-scroll-probe.js')});
  await c.addInitScript(({email,token,venue,top,bottom})=>{
   localStorage.bd_session=email;localStorage.bd_session_token=token;localStorage.bd_active_venue_id=String(venue);
   localStorage.setItem('bd_venue_context__'+email,JSON.stringify({activeVenueId:venue,venues:[{id:venue,name:'Atelier',role:'owner'},{id:999999,name:'QA other',role:'owner'}]}));
@@ -83,7 +89,7 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  const metrics=()=>f().evaluate(()=>{
   const owner=(window as unknown as {__scrollQAOwner?:Element}).__scrollQAOwner||document.querySelector('dialog[open] .editor-body')||document.scrollingElement!;
   const describe=(e:Element|null)=>{if(!e)return null;const s=getComputedStyle(e),r=e.getBoundingClientRect();return {tag:e.tagName,id:e.id,class:e.className,rect:{x:r.x,y:r.y,width:r.width,height:r.height},font:{size:s.fontSize,line:s.lineHeight,family:s.fontFamily,padding:s.padding,box:s.boxSizing,display:s.display,clamp:s.webkitLineClamp},overflowAnchor:s.overflowAnchor,overflow:[s.overflowX,s.overflowY],pointer:s.pointerEvents,touch:s.touchAction,position:s.position,scrollTop:e.scrollTop,scrollHeight:e.scrollHeight,clientHeight:e.clientHeight}};
-  return {blocks:[...document.querySelectorAll('.journal-command,.journal-primary,#pos-drafts,.journal-resume,.primary-action,.sales-navigation,#import-entry,#import-quality,.quality-impact,.section-heading,#notice,#venue-timezone-label')].map(describe),safe:{top:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bd-safe-top')),bottom:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bd-safe-bottom'))},url:location.href,scrollTop:owner.scrollTop,range:owner.scrollHeight-owner.clientHeight,owner:describe(owner),active:describe(document.activeElement),hit:describe(document.elementFromPoint(innerWidth/2,innerHeight*.5)),viewport:visualViewport?.height,documentHeight:document.documentElement.scrollHeight,documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth,iframeHeight:frameElement?.getBoundingClientRect().height,header:describe(document.querySelector('.pos-top,.sales-topbar,header')),checkout:describe(document.querySelector('.cart-foot,.pos-cart-foot')),nested:[...document.querySelectorAll('#quality-list,.lines,.pos-cart-lines,.editor-body')].map(describe),pending:document.getElementById('sales-navigation-status')?.textContent,overlays:[...document.querySelectorAll('dialog[open],[aria-modal=true],.bd-venue-sheet')].map(describe),fixed:[...document.querySelectorAll('body *')].filter(e=>getComputedStyle(e).position==='fixed'&&e.getBoundingClientRect().height>0).map(describe),probe:(window as unknown as {__scrollQA:unknown}).__scrollQA};
+  return {blocks:[...document.querySelectorAll('.journal-command,.journal-primary,#pos-drafts,.journal-resume,.primary-action,.sales-navigation,#import-entry,#import-quality,.quality-impact,.section-heading,#notice,#venue-timezone-label')].map(describe),safe:{top:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bd-safe-top')),bottom:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bd-safe-bottom'))},url:location.href,documentTimeOrigin:performance.timeOrigin,documentIdentity:(document as unknown as {__qaDocumentIdentity:string}).__qaDocumentIdentity,scrollTop:owner.scrollTop,range:owner.scrollHeight-owner.clientHeight,owner:describe(owner),active:describe(document.activeElement),hit:describe(document.elementFromPoint(innerWidth/2,innerHeight*.5)),viewport:visualViewport?.height,documentHeight:document.documentElement.scrollHeight,documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth,iframeHeight:frameElement?.getBoundingClientRect().height,header:describe(document.querySelector('.pos-top,.sales-topbar,header')),checkout:describe(document.querySelector('.cart-foot,.pos-cart-foot')),nested:[...document.querySelectorAll('#quality-list,.lines,.pos-cart-lines,.editor-body')].map(describe),pending:document.getElementById('sales-navigation-status')?.textContent,overlays:[...document.querySelectorAll('dialog[open],[aria-modal=true],.bd-venue-sheet')].map(describe),fixed:[...document.querySelectorAll('body *')].filter(e=>getComputedStyle(e).position==='fixed'&&e.getBoundingClientRect().height>0).map(describe),probe:(window as unknown as {__scrollQA:unknown}).__scrollQA};
  });
  const checks:unknown[]=[];
  async function gesture(label:string,delta=240){
@@ -97,20 +103,32 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
   },{x:width/2,y});
   const before=await metrics();assert.ok(before.documentWidth<=before.viewportWidth+2,'horizontal overflow '+label);if(before.range<2){checks.push({label,result:'NO_SCROLL_RANGE',before});await f().evaluate(()=>delete (window as unknown as {__scrollQAOwner?:Element}).__scrollQAOwner);return;}
   if(delta>0&&before.scrollTop>=before.range-2)delta=-Math.min(240,before.scrollTop);
-  const started=Date.now();if(cdp){const x=Math.round(width/2),startY=Math.round(y),distance=Math.max(-180,Math.min(180,delta));await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:startY}]});for(let step=1;step<=12;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:Math.round(startY-distance*step/12)}]});await p.waitForTimeout(16);}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}else{await p.mouse.move(width/2,y);await p.mouse.wheel(0,delta);}
+  const documentHandle=await captureDocumentIdentity(f());await f().evaluate(armScrollCompletion);const started=Date.now();if(cdp){const x=Math.round(width/2),startY=Math.round(y),distance=Math.max(-180,Math.min(180,delta));await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y:startY}]});for(let step=1;step<=12;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x,y:Math.round(startY-distance*step/12)}]});await p.waitForTimeout(16);}await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});}else{await p.mouse.move(width/2,y);await p.mouse.wheel(0,delta);}
   // One gesture only. Wait for its compositor result, never issue a retry gesture.
   await f().waitForFunction(start=>Math.abs(((window as unknown as {__scrollQAOwner:Element}).__scrollQAOwner.scrollTop)-start)>1,before.scrollTop,{timeout:1500}).catch(()=>{});
-  const responseMs=Date.now()-started;await p.waitForTimeout(250);const after=await metrics();const pass=Math.abs(after.scrollTop-before.scrollTop)>1;
+  const responseMs=Date.now()-started;const completion=await waitForScrollCompletion(f());const after=await metrics();const pass=Math.abs(after.scrollTop-before.scrollTop)>1;const documentCheck=await assertDocumentIdentity(f(),documentHandle,label);assert.equal(after.documentIdentity,before.documentIdentity,'independent document token '+label);writeFileSync(out+'/'+id+'-identity.json',JSON.stringify({label,before,after,documentCheck},null,2));
   await f().evaluate(()=>delete (window as unknown as {__scrollQAOwner?:Element}).__scrollQAOwner);
   const parent=await p.evaluate(()=>({url:location.href,scrollTop:document.scrollingElement?.scrollTop,probe:(window as unknown as {__scrollQA:unknown}).__scrollQA,hit:document.elementFromPoint(innerWidth/2,innerHeight*.52)?.outerHTML.slice(0,500)}));
-  checks.push({label,result:pass?'PASS':'FAIL',responseMs,delta:after.scrollTop-before.scrollTop,before,after,parent});
+  checks.push({label,result:pass?'PASS':'FAIL',responseMs,completion,documentCheck,delta:after.scrollTop-before.scrollTop,before,after,parent});
   writeFileSync(out+'/'+id+'.json',JSON.stringify({profile,delay,engine:engine.name(),gesture:cdp?'CDP touch swipe':'native wheel; touch taps',checks,errors},null,2));
   assert.ok(pass,'FIRST GESTURE '+label+' '+id);assert.deepEqual(errors,[]);
  }
- async function stable(label:string){const before=await metrics();await p.waitForTimeout(300);const after=await metrics();checks.push({label,unexpectedScroll:after.scrollTop-before.scrollTop,heightDelta:after.documentHeight-before.documentHeight,observerDelta:((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks)});assert.ok(Math.abs(after.scrollTop-before.scrollTop)<=1,'unexpected scroll '+label);assert.ok(Math.abs(after.documentHeight-before.documentHeight)<=1,'idle layout oscillation '+label);assert.ok((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks<=1,'idle observer loop '+label);}
+ async function stable(label:string){const before=await metrics();await p.waitForTimeout(300);const after=await metrics();writeFileSync(out+'/'+id+'-stable-'+label.replace(/[^a-z0-9]+/gi,'-')+'.json',JSON.stringify({id,label,before,after},null,2));checks.push({label,unexpectedScroll:after.scrollTop-before.scrollTop,heightDelta:after.documentHeight-before.documentHeight,observerDelta:((after.probe as {observerCallbacks:number}).observerCallbacks-(before.probe as {observerCallbacks:number}).observerCallbacks)});assertIdleScroll(before,after,label+' '+id);}
+ async function importReadyAndIdle(release=()=>{}){
+  const before=await metrics();release();await waitForImportData(f());const ready=await metrics();
+  // Data may add rows; loading must not move the current reading position or entry.
+  assert.ok(Math.abs(ready.scrollTop-before.scrollTop)<=1,'Import loading moved scroll');
+  const entry=(m:typeof before)=>m.blocks.find(b=>b?.id==='import-entry')!;
+  assert.ok(Math.abs(entry(ready).rect.y-entry(before).rect.y)<=1,'Import loading moved entry');
+  checks.push({label:'Import data completion',before,ready});
+  await stable('import idle');
+ }
  async function toTop(){await f().evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));}
  async function readyJournal(){await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();await l('.journal-row').first().waitFor();}
  try {
+ if(process.env.BD_SCROLL_IMPORT_ONLY==='1'){
+  holdSalesReads();await p.goto(base+'/sales-import?venue='+venue+'&view=import');await l('#import-entry:not([hidden])').waitFor();await gesture('J import first');await gesture('J import repeated');await importReadyAndIdle(releaseReads);assert.deepEqual(errors,[]);results.push({id,scope:'import-only',pass:true,checks:checks.length});console.log(id+' IMPORT PASS '+checks.length);continue;
+ }
  if(process.env.BD_SCROLL_CLEAN_IMPORT==='1'){
   apiDelay=1200;holdSalesReads();await p.goto(base+'/sales-import?venue='+venue+'&view=import');await l('#import-entry').waitFor();await gesture('clean Import during load',120);
   const before=await l('#import-metrics').boundingBox(),start=await metrics();releaseReads();await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();const after=await l('#import-metrics').boundingBox(),end=await metrics();
@@ -118,15 +136,20 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
   checks.push({label:'clean Import completion',before,after,start,end});await gesture('clean Import after data');await p.screenshot({path:out+'/'+id+'-clean-import.png'});results.push({id,cleanImport:true,pass:true,checks:checks.length});assert.deepEqual(errors,[]);console.log(id+' CLEAN PASS');continue;
  }
  await p.goto(base+'/sales-import?venue='+venue);await readyJournal();assert.deepEqual((await metrics()).safe,{top,bottom},'simulated insets actually applied');await gesture('A journal first');await gesture('A journal repeated');await stable('journal idle');await p.screenshot({path:out+'/'+id+'-journal.png'});
- await toTop();await l('#open-cashier').tap();await l('#work:not([hidden])').waitFor();await l('[data-add="menu-0"]').waitFor({state:'attached'});if(width===390)await l('.mobile-tabs [data-pane="menu"]').tap();await gesture('B cashier menu first');await toTop();if(width===390)assert.ok(await l('#menu-search').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('#menu-search').focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('#menu-search').blur();await p.setViewportSize({width,height});await gesture('keyboard search restored');if(width===390){await p.setViewportSize({width:height,height:width});await p.setViewportSize({width,height});await gesture('orientation restored');}await toTop();
+ await toTop();await l('#open-cashier').tap();await l('#work:not([hidden])').waitFor();await l('[data-add="menu-0"]').waitFor({state:'attached'});if(await l('div.mobile-tabs').isVisible())await l('.mobile-tabs [data-pane="menu"]').tap();await gesture('B cashier menu first');await toTop();if(width===390)assert.ok(await l('#menu-search').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('#menu-search').focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('#menu-search').blur();await p.setViewportSize({width,height});await gesture('keyboard search restored');if(width===390){await p.setViewportSize({width:height,height:width});await p.setViewportSize({width,height});await gesture('orientation restored');}await toTop();
  for(const count of [0,1,5,13]){
-  const current=await l('.line').count();for(let i=current;i<count;i++)await l('[data-add="menu-'+i+'"]').tap();
-  if(width===390)await l('.mobile-tabs [data-pane="order"]').tap();
+  const current=await l('.line').count();for(let i=current;i<count;i++){
+   // Embedded POS can use its compact layout even on a tablet outer viewport.
+   if(await l('div.mobile-tabs').isVisible())await l('.mobile-tabs [data-pane="menu"]').tap();
+   await l('[data-add="menu-'+i+'"]').tap();
+   await l('dialog [name="quantity"]').fill('1');await l('#dialog-submit').tap();await l('dialog').waitFor({state:'hidden'});
+  }
+  if(await l('div.mobile-tabs').isVisible())await l('.mobile-tabs [data-pane="order"]').tap();
   const first=await metrics();await p.waitForTimeout(180);const settled=await metrics();checks.push({label:'cart-'+count,heightDelta:settled.documentHeight-first.documentHeight});assert.ok(Math.abs(settled.documentHeight-first.documentHeight)<=1,'checkout reservation changes after first frame');
   await gesture('C/D order '+count);await stable('order '+count);
   if(width===390){await toTop();await l('.mobile-tabs [data-pane="menu"]').tap();await gesture('E menu '+count);await toTop();}
  }
- if(width===390)await l('.mobile-tabs [data-pane="order"]').tap();await l('.line').last().scrollIntoViewIfNeeded();const last=await l('.line').last().boundingBox(),foot=await l('.cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last item uncovered');await p.screenshot({path:out+'/'+id+'-checkout.png'});
+ if(await l('div.mobile-tabs').isVisible())await l('.mobile-tabs [data-pane="order"]').tap();await l('.line').last().evaluate(element=>element.scrollIntoView({block:'nearest',behavior:'instant'}));const last=await l('.line').last().boundingBox(),foot=await l('.cart-foot').boundingBox();assert.ok(last&&foot&&last.y+last.height<=foot.y+1,'last item uncovered');await p.screenshot({path:out+'/'+id+'-checkout.png'});
  if(width===390)assert.ok(await l('#quick-comment').evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('#quick-comment').fill('QA comment');await p.setViewportSize({width,height:Math.max(440,height-300)});await l('#quick-comment').blur();await p.setViewportSize({width,height});await gesture('keyboard comment restored');
  await toTop();await l('[data-action="create-order"]').tap();await l('dialog[open]').waitFor();await l('.dialog-head [data-action="dismiss"]').tap();assert.equal(await l('dialog[open]').count(),0,'order dialog closes');assert.equal(await f().evaluate(()=>document.body.classList.contains('bd-transient-layer-open-v247')),false,'closed dropdown releases scroll lock before first gesture');await gesture('order dialog closed');
  await toTop();await p.goBack();await readyJournal();await gesture('F cashier journal');assert.ok(requests.some(r=>r.path==='/api/pos-orders'&&r.status===200),'new POS orders read uses real handler');assert.ok(requests.filter(r=>r.path.startsWith('/api/pos-')).every(r=>r.status===200),'POS reads succeed without fixture fallbacks');
@@ -134,8 +157,20 @@ for(const profile of profiles)for(const delay of (process.env.BD_SCROLL_DELAYS||
  await toTop();await l('#manual-nav').tap();await l('#sale:not([hidden])').waitFor();await gesture('H manual first');for(let i=0;i<8;i++)await l('#add-line').tap();await gesture('H manual long');
  await l('[data-menu]').first().selectOption('menu-0');await l('[data-quantity]').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('[data-quantity]').first().blur();await p.setViewportSize({width,height});await gesture('keyboard manual restored');
  await toTop();await l('header>a').tap();await readyJournal();await gesture('I manual journal');
- await toTop();await l('[data-sales-view="import"]').tap();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');await gesture('J import repeated');await stable('import idle');await p.screenshot({path:out+'/'+id+'-import.png'});
- await toTop();await l('#quality-list [data-batch]').first().tap();await l('.mapping-select select').first().waitFor();if(width===390)assert.ok(await l('.mapping-select select').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('.mapping-select select').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('.mapping-select select').first().blur();await p.setViewportSize({width,height});await gesture('keyboard import mapping restored');await l('#editor-close').tap();await toTop();await l('[data-sales-view="journal"]').tap();await l('.journal-row').filter({hasText:'POS'}).last().tap();await l('.pos-event-summary').waitFor();await gesture('K document');await p.screenshot({path:out+'/'+id+'-document.png'});await l('#editor-close').tap();await gesture('K close first');
+ await toTop();const importPreviousDocument=await captureDocumentIdentity(f());await l('[data-sales-view="import"]').tap();
+ // Query-only panel switches retain the child document. Require both URLs and
+ // the destination pane to be ready, then prove the real DOM document survives
+ // the first gesture; a host echo that reloads the iframe must fail.
+ await p.waitForURL(url=>url.searchParams.get('view')==='import');
+ const importUrl=new URL(p.url());importUrl.searchParams.set('embedded','1');importUrl.searchParams.sort();
+ await f().waitForURL(url=>{url.searchParams.sort();return url.href===importUrl.href;},{waitUntil:'domcontentloaded'});
+ await l('#import-entry:not([hidden])').waitFor();if(process.env.BD_SCROLL_BASELINE_IMPORT==='1')await f().evaluate(()=>{const list=document.getElementById('quality-list')!;list.style.maxHeight='420px';list.style.overflowY='auto';});await gesture('J import first');checks.push({label:'Journal to Import document retained',documentCheck:await assertDocumentIdentity(f(),importPreviousDocument,id+' Journal to Import')});await gesture('J import repeated');await importReadyAndIdle();await p.screenshot({path:out+'/'+id+'-import.png'});
+ await toTop();await l('#quality-list [data-batch]').first().tap();await l('.mapping-select select').first().waitFor();if(width===390)assert.ok(await l('.mapping-select select').first().evaluate(e=>parseFloat(getComputedStyle(e).fontSize)>=16));await l('.mapping-select select').first().focus();await p.setViewportSize({width,height:Math.max(440,height-300)});await l('.mapping-select select').first().blur();await p.setViewportSize({width,height});await gesture('keyboard import mapping restored');await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await toTop();const journalPreviousDocument=await captureDocumentIdentity(f());await l('[data-sales-view="journal"]').tap();
+ await p.waitForURL(url=>!url.searchParams.has('view')||url.searchParams.get('view')==='journal');
+ const journalUrl=new URL(p.url());journalUrl.searchParams.set('embedded','1');journalUrl.searchParams.sort();
+ await f().waitForURL(url=>{url.searchParams.sort();return url.href===journalUrl.href;},{waitUntil:'domcontentloaded'});await readyJournal();
+ checks.push({label:'Import to Journal document retained',documentCheck:await assertDocumentIdentity(f(),journalPreviousDocument,id+' Import to Journal')});
+ await l('.journal-row').filter({hasText:'POS'}).last().tap();await l('.pos-event-summary').waitFor();await gesture('K document');await p.screenshot({path:out+'/'+id+'-document.png'});await l('#editor-close').tap();await l('#editor-dialog').waitFor({state:'hidden'});await gesture('K close first');
  await toTop();await l('a[href="/sales-entry?view=shifts"]').tap();await l('.cash-shift').first().waitFor();await p.goBack();await readyJournal();await gesture('L history back');await p.goForward();await l('.cash-shift').first().waitFor();await gesture('L history forward');
  // Delay read completion while a user has already started scrolling Import.
  apiDelay=1200;holdSalesReads();await p.goto(base+'/sales-import?venue='+venue+'&view=import');await l('#import-entry').waitFor();await gesture('late data first',120);const lateBefore=await metrics();releaseReads();await l('#journal-venue').filter({hasText:'Atelier'}).waitFor();const lateAfter=await metrics();checks.push({label:'late-data',before:lateBefore,after:lateAfter,unexpectedScroll:lateAfter.scrollTop-lateBefore.scrollTop});assert.ok(Math.abs(lateAfter.scrollTop-lateBefore.scrollTop)<=1,'late API must preserve user scroll position');if(width===390){const beforeAction=lateBefore.blocks.find(b=>b?.class==='journal-primary')!,afterAction=lateAfter.blocks.find(b=>b?.class==='journal-primary')!;assert.ok(Math.abs(afterAction.rect.height-beforeAction.rect.height)<=1,'draft action footprint must stay stable');assert.equal(await l('.journal-resume-label').first().evaluate(e=>getComputedStyle(e).webkitLineClamp),'2');}await gesture('late data next');

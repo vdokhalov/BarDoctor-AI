@@ -3,6 +3,22 @@
   'use strict';
   if (window.bdSalesNavigation) return;
   let pending = false, timer, active;
+  const tapDocument = {}; let lastTouch;
+  // A second physical tap can land on a different control after the Sales iframe
+  // is replaced. Carry only its position/time across that one document handoff.
+  document.addEventListener('pointerdown', event => {
+    lastTouch = event.pointerType === 'touch' ? {x:event.screenX,y:event.screenY,at:Date.now()} : null;
+  }, true);
+  function consumeHandoffTap(event) {
+    if (!event.detail || !lastTouch) return false;
+    try {
+      const tap = window.top.__bdSalesTapHandoff;
+      if (!tap || tap.source === tapDocument) return false;
+      delete window.top.__bdSalesTapHandoff;
+      return Date.now()-tap.at <= 350 && Date.now()-lastTouch.at <= 350
+        && Math.hypot(lastTouch.x-tap.x,lastTouch.y-tap.y) <= 24;
+    } catch { return false; }
+  }
   const message = (text) => {
     let node = document.getElementById('sales-navigation-status');
     if (!node) {
@@ -27,7 +43,7 @@
     url.searchParams.delete('embedded');
     return url.pathname + url.search + url.hash;
   }
-  function navigate(value, control) {
+  function navigate(value, control, event) {
     if (pending) return;
     const target = href(value); if (!target) return;
     if (window.bdStandaloneNavigation && !window.bdStandaloneNavigation.confirmDiscard()) return;
@@ -40,19 +56,25 @@
     // Reuse the host inside Sales. Other modules hydrate their domain stores on document startup.
     // Retain that boundary so a just-posted sale is visible in Warehouse/Finance.
     const salesRoute = ['/sales-import','/sales-entry','/cashier'].includes(new URL(target, location.href).pathname);
-    if (salesRoute && typeof window.top.bdNavigate === 'function') window.top.bdNavigate(target);
+    if (salesRoute && typeof window.top.bdNavigate === 'function') {
+      if (event?.detail && lastTouch && Date.now()-lastTouch.at <= 350) {
+        window.top.__bdSalesTapHandoff = {...lastTouch,source:tapDocument};
+      }
+      window.top.bdNavigate(target);
+    }
     else (window.top === window.self ? window : window.top).location.assign(target);
   }
   window.bdSalesNavigation = { navigate, href };
   // Registered before the legacy iframe bridge. Stop it from issuing a second action.
   document.addEventListener('click', event => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+    if (consumeHandoffTap(event)) { event.preventDefault(); event.stopImmediatePropagation(); return; }
     const control = event.target.closest?.('a[href], [data-open-route]');
     if (!control || control.matches('[download],[target="_blank"]')) return;
     const value = control.dataset.openRoute || control.getAttribute('href');
     if (!value || value.startsWith('#') || !href(value)) return;
     event.preventDefault(); event.stopImmediatePropagation();
-    navigate(value, control);
+    navigate(value, control, event);
   }, true);
   window.addEventListener('pageshow', reset);
   window.addEventListener('popstate', reset);

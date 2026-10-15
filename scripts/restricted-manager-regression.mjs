@@ -1,3 +1,4 @@
+import {confirmDoctorAction} from '../tests/helpers/doctor-confirmation.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdirSync,writeFileSync} from 'node:fs';
@@ -7,11 +8,12 @@ import {restrictedManagerRuntime} from './qa/restricted-manager-runtime.mjs';
 const require=createRequire(import.meta.url),{resolveBrowserExecutable,chromiumArgs}=require('./browser-runtime.cjs');
 const r=await restrictedManagerRuntime(),browser=await chromium.launch({executablePath:await resolveBrowserExecutable(chromium.executablePath()),headless:true,args:chromiumArgs});
 const results=[],out='outputs/restricted-manager-403/'+(process.env.BD_QA_NEGATIVE_ONLY?'negative-controls':'regression');mkdirSync(out,{recursive:true});
-const expectedRestricted=new Set(['/api/store/bd_finance_expenses','/api/business-health','/api/ai/diagnosis','/api/recommendations/check','/api/ai/curated']);
+const expectedRestricted=new Set(['/api/store/bd_finance_expenses','/api/business-health','/api/ai/diagnosis','/api/recommendations/check','/api/ai/curated','/api/month-close']);
 function acceptance(role,requests,errors){
  assert.deepEqual(errors,[],role+' browser errors');
  for(const req of requests.filter(req=>req.status>=400)){
   assert.ok(role==='manager'&&req.status===403&&req.body?.code==='ACCESS_DENIED'&&expectedRestricted.has(req.path),`${role}: unexpected ${req.status} ${req.path}`);
+  if(req.path==='/api/month-close'){assert.equal(req.method,'GET');assert.deepEqual(req.body,{ok:false,code:'ACCESS_DENIED'});}
   if(req.path==='/api/ai/curated')assert.equal(req.body.availability,'RESTRICTED','Curated denial must retain the authoritative source restriction contract');
   assert.ok(!req.body.data);assert.ok(!JSON.stringify(req.body).includes('FINANCE PRIVATE SENTINEL'));
  }
@@ -22,6 +24,9 @@ for(const bad of [{status:403,body:{code:'ACCESS_DENIED'}},{status:401,body:{cod
  if(bad.status!==403)assert.throws(()=>acceptance('manager',[{path:'/api/store/bd_finance_expenses',...bad}],[]));
 }
 assert.throws(()=>acceptance('manager',[],['uncaught error']));
+// Only the authoritative read denial is expected for the restricted manager.
+for(const role of ['owner','permitted'])assert.throws(()=>acceptance(role,[{path:'/api/month-close',method:'GET',status:403,body:{ok:false,code:'ACCESS_DENIED'}}],[]));
+for(const bad of [{method:'POST'},{status:401},{status:500},{body:{ok:false,code:'OTHER_DENIAL'}},{body:{ok:false,code:'ACCESS_DENIED',data:{private:true}}}])assert.throws(()=>acceptance('manager',[{path:'/api/month-close',method:'GET',status:403,body:{ok:false,code:'ACCESS_DENIED'},...bad}],[]));
 // The new read endpoint adds one exact expected denial, never a blanket AI exception.
 for(const role of ['owner','permitted'])assert.throws(()=>acceptance(role,[{path:'/api/ai/curated',status:403,body:{code:'ACCESS_DENIED',availability:'RESTRICTED'}}],[]));
 for(const [status,body] of [[401,{code:'UNAUTHORIZED'}],[500,{code:'ACCESS_DENIED',availability:'RESTRICTED'}],[403,{code:'OTHER_DENIAL',availability:'RESTRICTED'}],[403,{code:'ACCESS_DENIED'}],[403,{code:'ACCESS_DENIED',availability:'RESTRICTED',data:{private:true}}]])assert.throws(()=>acceptance('manager',[{path:'/api/ai/curated',status,body}],[]));
@@ -47,7 +52,7 @@ async function call(page,path,method='GET',body,venueId){
  },{path,method,body,venueId});
 }
 try{
- if(!process.env.BD_QA_NEGATIVE_ONLY)for(const width of [1280,390])for(const role of ['manager','permitted','owner']){
+ if(!process.env.BD_QA_NEGATIVE_ONLY)for(const width of [1280,390].filter(width=>!process.env.BD_RESTRICTED_WIDTH||width===Number(process.env.BD_RESTRICTED_WIDTH)))for(const role of ['manager','permitted','owner'].filter(role=>!process.env.BD_RESTRICTED_ROLE||role===process.env.BD_RESTRICTED_ROLE)){
   const context=await browser.newContext({viewport:{width,height:844},isMobile:width===390,hasTouch:width===390}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   await page.exposeBinding('__qaUnhandled',(_,message)=>errors.push('unhandledrejection: '+message));
@@ -71,7 +76,7 @@ try{
      assert.equal(await page.locator('[data-curated-venue] [role="alert"]').count(),0);
      assert.equal(r.network.slice(pathStart).filter(req=>req.path==='/api/ai/curated').length,0,'Question list must not issue a hidden answer request');
      assert.equal(await page.locator('[data-curated-question]').count(),0,'Legacy Doctor has no curated panel');
-     await page.getByRole('button',{name:'Запустить диагностику',exact:true}).click();await settled(page);
+     await confirmDoctorAction(page,page.getByRole('button',{name:'Запустить диагностику',exact:true}));await settled(page);
      const denied=r.network.slice(pathStart).filter(req=>req.path==='/api/ai/diagnosis');
      assert.ok(denied.length>0,'Legacy diagnosis must exercise the server permission boundary');
      for(const req of denied){assert.equal(req.status,403);assert.equal(req.body?.code,'ACCESS_DENIED');assert.equal(req.body?.availability,'RESTRICTED');assert.ok(!req.body?.data);}
@@ -135,4 +140,4 @@ try{
   results.push({negativeControl:{status,code},strictAcceptanceRejected:true,pageErrors:errors});r.inject(null);await context.close();
  }
  results.push({foreignVenue:'PASS',strictUnexpected401403500:'PASS',strictPageerror:'PASS'});writeFileSync(out+'/results.json',JSON.stringify(results,null,2));
-}finally{await browser.close();await r.close();}
+}finally{writeFileSync(out+'/requests.json',JSON.stringify(r.network,null,2));await browser.close();await r.close();}

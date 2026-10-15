@@ -47,12 +47,10 @@ try{
  await home.locator('.bd-cost-signal').first().click();await page.getByRole('button',{name:'Открыть техкарту',exact:true}).click();
  const dialog=page.locator('[role="dialog"]').last();await dialog.waitFor();
  await dialog.getByRole('button',{name:/Добавить ингредиент/}).click();
- await dialog.getByPlaceholder('Ингредиент или готовый товар').fill(fixture.ingredientName);
- await dialog.locator('select').first().selectOption({label:'шт.'});
- await dialog.locator('button').filter({hasText:/Изменить товар|Найти в номенклатуре/}).first().click();
- await dialog.getByLabel('Поиск по всей номенклатуре').fill(fixture.ingredientName);
+ const ingredient=dialog.locator('.bd-catalog-ingredient').last();
+ await ingredient.getByLabel('Поиск по всей номенклатуре',{exact:true}).fill(fixture.ingredientName);
  await capture('search-create-entry');
- await dialog.getByRole('button',{name:/Создать новую позицию/}).click();
+ await ingredient.getByRole('button',{name:/Создать новую позицию/}).click();
  const quick=page.getByRole('dialog',{name:'Быстрое создание номенклатуры'});await quick.waitFor();
  await quick.getByRole('button',{name:'Создать и добавить',exact:true}).waitFor();
  await page.waitForFunction(()=>{const q=document.querySelector('.bd-quick-create-sheet-v336');return !!q&&!(q.querySelector('footer button.primary') as HTMLButtonElement)?.disabled;});

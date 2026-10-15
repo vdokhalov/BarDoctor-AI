@@ -9,8 +9,9 @@ export async function posAddItem(page: Page, selector: string, method: "click" |
 
 /** Real recovered POS controls; no response stubs or synthetic success states. */
 export async function posPane(page: Page, order = true) {
-  if ((page.viewportSize()?.width ?? 1280) <= 600) {
-    await page.locator(`.mobile-tabs [data-pane="${order ? "order" : "menu"}"]`).first().click();
+  const tab = page.locator(`.mobile-tabs [data-pane="${order ? "order" : "menu"}"]`).first();
+  if (await tab.isVisible()) {
+    await tab.click();
   }
 }
 

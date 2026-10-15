@@ -1,0 +1,388 @@
+{
+  "schemaVersion": 2,
+  "suite": "derived-metrics-phase3a8",
+  "width": 390,
+  "browser": "webkit",
+  "events": [
+    {
+      "at": 1791905974746,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/reports",
+      "to": "/finance",
+      "method": "replaceState"
+    },
+    {
+      "at": 1791905974748,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/finance",
+      "to": "/reports",
+      "method": "pushState"
+    },
+    {
+      "at": 1791905974937,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/reports",
+      "to": "/reports?venue=1",
+      "method": "replaceState"
+    },
+    {
+      "at": 1791905975531,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/reports?venue=1",
+      "to": "/reports?venue=1&month=2026-10",
+      "method": "replaceState"
+    },
+    {
+      "at": 1791905975532,
+      "type": "request-start",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:1",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905975559,
+      "type": "month-reader-dispose",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:1",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905975561,
+      "type": "request-abort",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:1",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "currentRoute": "/reports?venue=1&month=2026-10",
+      "aborted": true,
+      "reason": "AbortError"
+    },
+    {
+      "at": 1791905975562,
+      "type": "request-start",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:2",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905975612,
+      "type": "request-rejected",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:1",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "errorName": "AbortError",
+      "aborted": true
+    },
+    {
+      "at": 1791905975711,
+      "type": "request-result",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:2",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905975914,
+      "type": "month-reader-dispose",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:2",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905975924,
+      "type": "request-start",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:3",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905975968,
+      "type": "request-result",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:3",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905976622,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/reports?venue=1&month=2026-10",
+      "to": "/reports?venue=1&month=2026-10",
+      "method": "pushState"
+    },
+    {
+      "at": 1791905976624,
+      "type": "request-start",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:4",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905976674,
+      "type": "request-result",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:4",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905976986,
+      "type": "navigation",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "event": "popstate",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905979334,
+      "type": "route-change",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "from": "/reports?venue=1&month=2026-10",
+      "to": "/reports?venue=1&month=2026-10",
+      "method": "pushState"
+    },
+    {
+      "at": 1791905979341,
+      "type": "request-start",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:5",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905979398,
+      "type": "request-result",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:5",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905979425,
+      "type": "navigation",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "event": "popstate",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981035,
+      "type": "navigation",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "event": "beforeunload",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981047,
+      "type": "navigation",
+      "documentId": "6dc50105-1112-4f8a-8aad-d109b0696a36",
+      "event": "pagehide",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981792,
+      "type": "request-start",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:1",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981801,
+      "type": "month-reader-dispose",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:1",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981804,
+      "type": "request-abort",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:1",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "currentRoute": "/reports?venue=1&month=2026-10",
+      "aborted": true,
+      "reason": "AbortError"
+    },
+    {
+      "at": 1791905981813,
+      "type": "request-start",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:2",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905981881,
+      "type": "request-rejected",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:1",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "errorName": "AbortError",
+      "aborted": true
+    },
+    {
+      "at": 1791905981933,
+      "type": "request-result",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:2",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-10",
+      "venueId": "1",
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905982942,
+      "type": "request-start",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:3",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": null,
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905982961,
+      "type": "request-result",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:3",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": null,
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 200
+    },
+    {
+      "at": 1791905983590,
+      "type": "request-start",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:4",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": null,
+      "route": "/reports?venue=1&month=2026-10"
+    },
+    {
+      "at": 1791905983622,
+      "type": "request-result",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:4",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "path": "/api/month-close",
+      "method": "GET",
+      "monthKey": "2026-09",
+      "venueId": null,
+      "route": "/reports?venue=1&month=2026-10",
+      "status": 401
+    }
+  ],
+  "pageErrors": [],
+  "consoleErrors": [],
+  "failedRequests": [
+    {
+      "at": 1791905975561,
+      "path": "/api/month-close",
+      "error": "Load request cancelled",
+      "requestId": "6dc50105-1112-4f8a-8aad-d109b0696a36:1",
+      "method": "GET"
+    },
+    {
+      "at": 1791905981802,
+      "path": "/api/month-close",
+      "error": "Load request cancelled",
+      "requestId": "221b541e-1448-455e-9ba3-c1f83d77eaff:1",
+      "method": "GET"
+    }
+  ],
+  "completion": {
+    "at": 1791905983624,
+    "assertions": "PASS",
+    "state": {
+      "type": "state",
+      "at": 1791905983630,
+      "origin": "http://127.0.0.1:39995",
+      "documentId": "221b541e-1448-455e-9ba3-c1f83d77eaff",
+      "auth": {
+        "email": true,
+        "token": true,
+        "marker": true
+      },
+      "cookie": true
+    }
+  }
+}

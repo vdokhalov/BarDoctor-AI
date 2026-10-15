@@ -2,9 +2,11 @@ import {readFileSync} from 'node:fs';
 import {parse} from 'acorn';
 import {wireHomeWorkday} from './home-workday-wiring.mjs';
 import {repairOwnerUatV493} from './owner-uat-v493.mjs';
+import {patchDiagnosisBudget} from '../patch-ai-explicit-budget-v513.mjs';
 
 /** Restore only the three owner-selected presentation functions, never domain/API code. */
 export function restoreStableUiV485(source, repair = true){
+ const preserveDiagnosisBudget=source.includes('/* AI explicit budget v513 */');
  const fixture=JSON.parse(readFileSync(new URL('../fixtures/stable-ui-v485.json',import.meta.url),'utf8'));
  // The only retained addition is correction confirmation after an explicit
  // checkedAction return. It has no priority queue or Doctor-question controls.
@@ -14,5 +16,6 @@ export function restoreStableUiV485(source, repair = true){
  const nodes=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.filter(node=>node.type==='FunctionDeclaration'&&(Object.hasOwn(fixture.functions,node.id.name)||retired.has(node.id.name)));
  if(nodes.filter(node=>Object.hasOwn(fixture.functions,node.id.name)).length!==3)throw Error('Exactly three stable UI anchors required');
  for(const node of nodes.sort((a,b)=>b.start-a.start))source=source.slice(0,node.start)+(fixture.functions[node.id.name]??'')+source.slice(node.end);
- return repair ? wireHomeWorkday(repairOwnerUatV493(source)) : source;
+ source=repair ? wireHomeWorkday(repairOwnerUatV493(source)) : source;
+ return preserveDiagnosisBudget ? patchDiagnosisBudget(source) : source;
 }

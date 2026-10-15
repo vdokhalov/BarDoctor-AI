@@ -29,7 +29,7 @@ test("recipe editor exposes confidence-aware matching states", () => {
 
 test("manual choice is persisted as a confirmed user alias", () => {
   assert.ok(bundle.includes('linkSource:"manual"'));
-  assert.ok(bundle.includes("linkConfirmedByUser:!0"));
+  assert.match(bundle, /linkConfirmedByUser:(?:true|!0)/);
   assert.ok(bundle.includes('matchEvidence:["подтверждено пользователем"]'));
   assert.ok(bundle.includes("bdCatMatchingProductsV258"));
   assert.ok(bundle.includes("nomenclature:bdCatArray(t.nomenclature)"));

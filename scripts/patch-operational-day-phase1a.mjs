@@ -34,6 +34,9 @@ fn('bdShiftsPage',s=>{
  s=replace(s,'i.jsxs("section",{className:"bd-shifts-context "+contextModel.tone','false&&i.jsxs("section",{className:"bd-shifts-context "+contextModel.tone');
  s=replace(s,'onClick:()=>setViewing(item),children:[i.jsxs("div",{className:"bd-shift-card-head"','onClick:()=>{if(item.row?.workdayStatus){window.dispatchEvent(new CustomEvent("bd:workday-select",{detail:{date:item.date}}));window.scrollTo({top:0,behavior:"smooth"})}else setViewing(item)},children:[i.jsxs("div",{className:"bd-shift-card-head"');
 
+ // An early legacy card can be opened before authoritative workday reads finish.
+ // Reconcile only that viewed date; retain genuine legacy-day dialogs.
+ if(!s.includes('bdShiftDays.find(day=>day.businessDate===viewing.date'))s=replace(s,'selectedIndex=months.findIndex(row=>row.year===selected.year&&row.month===selected.month);','selectedIndex=months.findIndex(row=>row.year===selected.year&&row.month===selected.month);\nS.useEffect(()=>{if(!viewing)return;const day=bdShiftDays.find(day=>day.businessDate===viewing.date&&day.report?.workdayStatus);if(day){setViewing(null);window.dispatchEvent(new CustomEvent("bd:workday-select",{detail:{date:day.businessDate}}))}},[bdShiftDays,viewing]);');
  s=replace(s,'const[,navigate]=bt(),','const bdConsumedShiftLink=S.useRef(null);\nconst[,navigate]=bt(),');
  s=replace(s,'const linkedShift=params.get("shift");if(linkedShift){','const linkedShift=params.get("shift"),linkKey=params.get("venue")+":"+linkedShift;if(!linkedShift)bdConsumedShiftLink.current=null;if(linkedShift){if(bdConsumedShiftLink.current===linkKey)return;');
  s=replace(s,'if(linkedItem){setViewing(linkedItem)','if(linkedItem){bdConsumedShiftLink.current=linkKey;setViewing(linkedItem)');

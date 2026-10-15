@@ -5,7 +5,7 @@ import type { BrowserContext, Page } from "playwright-core";
 /** Passive test-only observations. Values of tokens/cookies are never recorded. */
 export function webkitLifecycleEvidence(suite: string, width: number) {
   const events: Record<string, unknown>[] = [], pageErrors: { at: number; message: string }[] = [];
-  const consoleErrors: { at: number; message: string }[] = [], failedRequests: { at: number; path: string; error: string | null }[] = [];
+  const consoleErrors: { at: number; message: string }[] = [], failedRequests: { at: number; path: string; error: string | null; requestId?: string; method?: string }[] = [];
   let completion: Record<string, unknown> | undefined, failure: Record<string, unknown> | undefined, after: Record<string, unknown> | undefined;
   function flush() { if (enabled) writeFileSync(process.env.BD_WEBKIT_EVIDENCE!, JSON.stringify({ schemaVersion: 2, suite, width, browser, events, pageErrors, consoleErrors, failedRequests, completion, after, failure }, null, 2)); }
   let deniedVenue: string | undefined;
@@ -33,7 +33,7 @@ export function webkitLifecycleEvidence(suite: string, width: number) {
       context.on("page", page => {
         page.on("pageerror", error => { pageErrors.push({ at: Date.now(), message: error.message }); flush(); });
         page.on("console", message => { if (message.type() === "error") { consoleErrors.push({ at: Date.now(), message: message.text() }); flush(); } });
-        page.on("requestfailed", request => { failedRequests.push({ at: Date.now(), path: new URL(request.url()).pathname, error: request.failure()?.errorText ?? null }); flush(); });
+        page.on("requestfailed", request => { failedRequests.push({ at: Date.now(), path: new URL(request.url()).pathname, error: request.failure()?.errorText ?? null, requestId: request.headers()["x-bd-qa-request-id"], method: request.method() }); flush(); });
         page.on("response", response => events.push({ type: "http-response", at: Date.now(), path: new URL(response.url()).pathname, status: response.status(), expectedScopeDenial: response.status() === 401 && deniedVenue !== undefined && response.request().headers()["x-venue-id"] === deniedVenue }));
       });
     },

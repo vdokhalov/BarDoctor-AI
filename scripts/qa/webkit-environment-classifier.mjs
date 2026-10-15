@@ -83,6 +83,35 @@ function expectedResponse(event, evidence) {
   return evidence.completion?.assertions === "PASS" && [401, 409].includes(event.status)
     && evidence.events.filter(reply => reply.type === "http-response" && reply.path === path && reply.status === event.status).length === 1;
 }
+// A specific preview read may be disposed when its React owner is replaced.
+// Require the request identity, owning cleanup, native AbortSignal, rejected
+// promise and a successful replacement of the identical month/venue scope.
+export function provenMonthReadReplacement(failure, evidence) {
+  if (evidence.suite !== "derived-metrics-phase3a8" || evidence.completion?.assertions !== "PASS"
+    || failure.path !== "/api/month-close" || failure.method !== "GET"
+    || failure.error !== "Load request cancelled" || !failure.requestId) return false;
+  const events = evidence.events;
+  const same = event => event.requestId === failure.requestId && event.path === failure.path && event.method === "GET";
+  const starts = events.filter(event => event.type === "request-start" && same(event));
+  if (starts.length !== 1) return false;
+  const start = starts[0];
+  if (!start.documentId || !start.monthKey || !start.venueId || !start.route?.startsWith("/reports")) return false;
+  const dispose = events.find(event => event.type === "month-reader-dispose" && same(event) && event.documentId === start.documentId && event.at >= start.at);
+  const abort = events.find(event => event.type === "request-abort" && same(event) && event.documentId === start.documentId && event.aborted === true && event.reason === "AbortError" && event.currentRoute === start.route && event.at >= dispose?.at);
+  const rejected = events.find(event => event.type === "request-rejected" && same(event) && event.documentId === start.documentId && event.aborted === true && event.errorName === "AbortError" && event.at >= abort?.at);
+  // Binding and protocol observers use separate queues; ordering is strict
+  // within the browser chain, with a bounded cross-observer delivery window.
+  if (!dispose || !abort || !rejected || Math.abs(failure.at-abort.at)>1000 || rejected.at-abort.at>1000) return false;
+  if (events.some(event => event.type === "request-result" && same(event))) return false;
+  if (events.some(event => event.documentId === start.documentId && event.at >= start.at && event.at <= rejected.at
+    && (event.type === "navigation" || event.type === "route-change" && event.from !== event.to))) return false;
+  return events.some(next => next.type === "request-start" && next.requestId !== start.requestId && next.documentId === start.documentId
+    && next.path === start.path && next.method === start.method && next.monthKey === start.monthKey && next.venueId === start.venueId && next.route === start.route
+    && next.at >= abort.at && next.at-abort.at<=1000
+    && !(evidence.failedRequests??[]).some(item=>item.requestId===next.requestId)
+    && events.some(result=>result.type === "request-result" && result.requestId === next.requestId && result.documentId === next.documentId && result.status === 200 && result.at >= next.at && result.at <= evidence.completion.at));
+}
+
 function independentError(evidence, { crash, loss, teardown } = {}) {
   const events = evidence.events, failures = evidence.failedRequests ?? [];
   if (evidence.pageErrors?.length) return "Application JavaScript/page exception observed";
@@ -96,7 +125,7 @@ function independentError(evidence, { crash, loss, teardown } = {}) {
   const runtimeRequest = event => crash && event.at >= crash.at && (loss && (["/api/business-health", "/api/operational-days", "/api/store/bd_assortment_v1"].includes(event.path) || fixturePath(event.path, evidence.suite) && events.some(reply => reply.type === "http-response" && reply.path === event.path && reply.status === 404 && reply.at < crash.at)) && internalError(event)
     || teardown && event.at >= teardown.at && ["WebKit encountered an internal error", "Load request cancelled", "Target page, context or browser has been closed"].includes(event.error));
   for (const event of failures) {
-    if (fixturePath(event.path, evidence.suite) && event.error === "Load request cancelled" || runtimeRequest(event)) continue;
+    if (fixturePath(event.path, evidence.suite) && event.error === "Load request cancelled" || runtimeRequest(event) || provenMonthReadReplacement(event,evidence)) continue;
     return "Unexplained network failure observed";
   }
   for (const event of evidence.consoleErrors ?? []) {

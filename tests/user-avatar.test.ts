@@ -5,11 +5,16 @@ import test from "node:test";
 test("user avatar is an account-scoped server-authoritative field", () => {
   const schema = fs.readFileSync("db/schema.ts", "utf8");
   const auth = fs.readFileSync("lib/bardoctor/auth.ts", "utf8");
+  const authSchema = fs.readFileSync("lib/bardoctor/auth-schema.ts", "utf8");
   const me = fs.readFileSync("app/api/users/me/route.ts", "utf8");
   const migration = fs.readFileSync("drizzle/0024_add_user_avatar.sql", "utf8");
 
   assert.match(schema, /avatarId:\s*text\("avatar_id"\)/);
-  assert.match(auth, /ALTER TABLE accounts ADD COLUMN avatar_id text/);
+  // Deployment migrations own avatar DDL; authentication only checks the
+  // required column and fails closed when the deployed schema is incompatible.
+  assert.doesNotMatch(auth + authSchema, /ALTER TABLE|DROP INDEX/);
+  assert.match(authSchema, /a\.avatar_id/);
+  assert.match(authSchema, /WHERE 0/);
   assert.match(auth, /avatarId:\s*account\.avatarId/);
   assert.match(me, /avatarId:\s*account\.avatarId/);
   assert.match(migration, /ALTER TABLE `accounts` ADD `avatar_id` text/);

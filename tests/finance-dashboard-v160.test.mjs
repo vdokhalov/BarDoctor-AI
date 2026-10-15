@@ -43,7 +43,9 @@ test("Finance dashboard exposes the three existing financial levels as one resul
   assert.match(finance, /Чистая прибыль/);
   assert.match(finance, /чистая прибыль/);
   assert.match(finance, /ещё не рассчитана/);
-  assert.match(finance, /Нужны конечные остатки/);
+  assert.match(finance, /Итог не подтверждён — причины проверки показаны ниже/);
+  assert.match(finance, /bdFinanceCanonicalStatusV515/);
+  assert.doesNotMatch(finance, /Нужны конечные остатки/);
   assert.match(finance, /Продолжить закрытие/);
   assert.match(page, /bdMonthClosingLauncher/);
   assert.match(finance, /cashResult\?\?/);

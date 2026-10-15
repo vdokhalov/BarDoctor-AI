@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
@@ -28,7 +29,9 @@ test("sales UX separates journal, import sources and mobile-safe manual entry", 
   assert.match(styles, /position:sticky/);
   assert.doesNotMatch(styles, /overflow-x/);
   const shellStyles = await read("public/sales-consumption-v275.css");
-  assert.match(shellStyles, /body\[data-bd-route="\/sales-import"\] > bd-app-header \{ display: none; \}/);
+  assert.doesNotMatch(shellStyles, /body\[data-bd-route="\/sales-import"\] > bd-app-header \{ display: none; \}/);
+  const bundle=await read("public/assets/index-BQGspy0I.js");
+  assert.match(bundle, /function bdSalesPosPage\(\)[\s\S]*?showBottomNav:!0[\s\S]*?data-bd-sales-surface/);
 });
 
 test("warehouse and shift patch exposes sales entry, filters and movement lineage", async () => {
@@ -38,12 +41,12 @@ test("warehouse and shift patch exposes sales entry, filters and movement lineag
   ]);
   for (const marker of [
     "sales-batch-ledger-v275",
-    'sales:"Продажи"',
     "bdWarehouseMovementFilterV275",
     'children:"Документ продаж"',
     'children:"Продажи смены"',
-    'height:"100dvh"',
   ]) assert.ok(bundle.includes(marker), `bundle missing ${marker}`);
+  assertCanonicalSalesEntry(bundle);
+  assert.match(bundle, /height:"calc\(100dvh - var\(--bd-header-total,64px\) - 78px - env\(safe-area-inset-bottom,0px\)\)"/);
   assert.match(patcher, /sale_consumption/);
   assert.match(patcher, /sale_reversal/);
   assert.match(patcher, /Закупки/);

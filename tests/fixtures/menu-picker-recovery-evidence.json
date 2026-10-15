@@ -1,0 +1,1530 @@
+{
+  "baseCommit": "4b8120d05545cbb86eaf46daa7f3f63ab309a0a6",
+  "scope": "QA only: current unified v511 ingredient picker; no product, calculation, workflow or release-gate changes",
+  "scriptSha256": "f612235dc4cde74848ada374ff12221af4cf8c998ca0d87ce7df1bde73f53bbc",
+  "staticAudit": {
+    "obsoleteIngredientLabelReferences": 0,
+    "obsoleteIngredientActionRegexReferences": 0,
+    "legacyIngredientNameLocatorReferences": 0,
+    "menuNameLocators": "Retained: they belong to the Menu editor, not ingredient alias fields."
+  },
+  "browser": {
+    "ok": true,
+    "outputDir": "/workspace/checkpoint/menu-picker-recovery/browser",
+    "baseUrl": "http://127.0.0.1:4178",
+    "pickerPointerChecks": {
+      "cssSha256": "e4df67bdc5876dd660748fbfb2e314f4019bb572346c4ca55d13ea6ccadf3a90",
+      "results": [
+        {
+          "input": "mouse",
+          "viewport": "390x844",
+          "clicks": 1,
+          "focusTransferKeepsFooterHidden": true,
+          "footerRestoredAfterPickerClose": true
+        },
+        {
+          "input": "touch",
+          "viewport": "390x844",
+          "clicks": 1,
+          "focusTransferKeepsFooterHidden": true,
+          "footerRestoredAfterPickerClose": true
+        }
+      ]
+    },
+    "results": [
+      {
+        "name": "desktop-1280x720",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "writes": 7,
+        "reads": 297,
+        "authoritativeReadbacks": [
+          {
+            "readsBefore": 21,
+            "readsAfter": 24,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 27,
+            "readsAfter": 30,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 33,
+            "readsAfter": 36,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 42,
+            "readsAfter": 45,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 51,
+            "readsAfter": 54,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 60,
+            "readsAfter": 63,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 6,
+            "readsAfter": 9,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_802"
+          }
+        ],
+        "venueSwitches": [
+          {
+            "from": 801,
+            "to": 802
+          },
+          {
+            "from": 802,
+            "to": 801
+          }
+        ],
+        "switchedRecipeId": "recipe:draft:28e31941-6e60-4e6a-82b9-062d3046440a:0",
+        "audits": [
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 300,
+                "right": 980,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "profile": "desktop-1280x720",
+            "label": "desktop-1280x720: long editor",
+            "mobile": false,
+            "viewportHeight": 720,
+            "editor": {
+              "top": 32,
+              "bottom": 688
+            },
+            "scroll": {
+              "top": 122.578125,
+              "bottom": 612,
+              "clientHeight": 489,
+              "scrollHeight": 862,
+              "scrollTop": 373
+            },
+            "actions": {
+              "top": 612,
+              "bottom": 688
+            },
+            "toolbar": {
+              "top": 0,
+              "bottom": 0,
+              "visible": false
+            },
+            "status": {
+              "top": 526.15625,
+              "bottom": 593.90625
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": true,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 300,
+                "right": 980,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 300,
+                "right": 980,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "mobile-390x844",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "writes": 7,
+        "reads": 297,
+        "authoritativeReadbacks": [
+          {
+            "readsBefore": 21,
+            "readsAfter": 24,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 27,
+            "readsAfter": 30,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 33,
+            "readsAfter": 36,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 42,
+            "readsAfter": 45,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 51,
+            "readsAfter": 54,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 60,
+            "readsAfter": 63,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 6,
+            "readsAfter": 9,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_802"
+          }
+        ],
+        "venueSwitches": [
+          {
+            "from": 801,
+            "to": 802
+          },
+          {
+            "from": 802,
+            "to": 801
+          }
+        ],
+        "switchedRecipeId": "recipe:draft:6b531e17-7808-4f44-ab36-69e4bac00c38:0",
+        "audits": [
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: long editor",
+            "mobile": true,
+            "viewportHeight": 844,
+            "editor": {
+              "top": 0,
+              "bottom": 844
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 844,
+              "clientHeight": 783,
+              "scrollHeight": 1318,
+              "scrollTop": 535
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 751.9375,
+              "bottom": 819.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 1318,
+              "scrollTop": 949
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 337.9375,
+              "bottom": 405.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "android-412x915",
+        "viewport": {
+          "width": 412,
+          "height": 915
+        },
+        "writes": 7,
+        "reads": 297,
+        "authoritativeReadbacks": [
+          {
+            "readsBefore": 21,
+            "readsAfter": 24,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 27,
+            "readsAfter": 30,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 33,
+            "readsAfter": 36,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 42,
+            "readsAfter": 45,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 51,
+            "readsAfter": 54,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 60,
+            "readsAfter": 63,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_801"
+          },
+          {
+            "readsBefore": 6,
+            "readsAfter": 9,
+            "cacheKey": "bd_assortment_v1_cache__menu-consumption-v418-qa@bardoctor.local__venue_802"
+          }
+        ],
+        "venueSwitches": [
+          {
+            "from": 801,
+            "to": 802
+          },
+          {
+            "from": 802,
+            "to": 801
+          }
+        ],
+        "switchedRecipeId": "recipe:draft:0044d4b7-0439-43ec-8d35-c225b8a01b23:0",
+        "audits": [
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: long editor",
+            "mobile": true,
+            "viewportHeight": 915,
+            "editor": {
+              "top": 0,
+              "bottom": 915
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 915,
+              "clientHeight": 854,
+              "scrollHeight": 1294,
+              "scrollTop": 440
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 822.9375,
+              "bottom": 890.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 1294,
+              "scrollTop": 925
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 337.9375,
+              "bottom": 405.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "editorActions": {
+    "ok": true,
+    "outputDir": "/workspace/checkpoint/menu-picker-recovery/actions",
+    "baseUrl": "http://127.0.0.1:4178",
+    "pickerPointerChecks": {
+      "cssSha256": "e4df67bdc5876dd660748fbfb2e314f4019bb572346c4ca55d13ea6ccadf3a90",
+      "results": [
+        {
+          "input": "mouse",
+          "viewport": "390x844",
+          "clicks": 1,
+          "focusTransferKeepsFooterHidden": true,
+          "footerRestoredAfterPickerClose": true
+        },
+        {
+          "input": "touch",
+          "viewport": "390x844",
+          "clicks": 1,
+          "focusTransferKeepsFooterHidden": true,
+          "footerRestoredAfterPickerClose": true
+        }
+      ]
+    },
+    "results": [
+      {
+        "profile": "desktop-1280x720",
+        "viewport": {
+          "width": 1280,
+          "height": 720
+        },
+        "audits": [
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 300,
+                "right": 980,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "profile": "desktop-1280x720",
+            "label": "desktop-1280x720: long editor",
+            "mobile": false,
+            "viewportHeight": 720,
+            "editor": {
+              "top": 32,
+              "bottom": 688
+            },
+            "scroll": {
+              "top": 122.578125,
+              "bottom": 612,
+              "clientHeight": 489,
+              "scrollHeight": 862,
+              "scrollTop": 373
+            },
+            "actions": {
+              "top": 612,
+              "bottom": 688
+            },
+            "toolbar": {
+              "top": 0,
+              "bottom": 0,
+              "visible": false
+            },
+            "status": {
+              "top": 526.15625,
+              "bottom": 593.90625
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": true,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 1280,
+            "rootScrollWidth": 1280,
+            "bodyScrollWidth": 1280,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 600,
+                "right": 1280,
+                "clientWidth": 680,
+                "scrollWidth": 680
+              }
+            ]
+          },
+          {
+            "profile": "desktop-1280x720",
+            "label": "desktop-1280x720: long tech-card editor",
+            "mobile": false,
+            "viewportHeight": 720,
+            "editor": {
+              "top": 0,
+              "bottom": 720
+            },
+            "scroll": {
+              "top": 95.390625,
+              "bottom": 601,
+              "clientHeight": 506,
+              "scrollHeight": 627,
+              "scrollTop": 121
+            },
+            "actions": {
+              "top": 601,
+              "bottom": 720
+            },
+            "toolbar": {
+              "top": 0,
+              "bottom": 0,
+              "visible": false
+            },
+            "last": {
+              "top": 543.859375,
+              "bottom": 583.359375
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "draftVisible": 1,
+            "moreVisible": 0,
+            "desktopVisible": true,
+            "bodyOverflow": "hidden"
+          }
+        ],
+        "writes": 2
+      },
+      {
+        "profile": "mobile-390x844",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "audits": [
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: long editor",
+            "mobile": true,
+            "viewportHeight": 844,
+            "editor": {
+              "top": 0,
+              "bottom": 844
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 844,
+              "clientHeight": 783,
+              "scrollHeight": 1306,
+              "scrollTop": 523
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 752.4375,
+              "bottom": 820.1875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 1318,
+              "scrollTop": 949
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 337.9375,
+              "bottom": 405.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 202.546875,
+              "bottom": 248.546875
+            },
+            "caption": {
+              "top": 180.796875,
+              "bottom": 196.546875
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 244.921875,
+              "bottom": 290.921875
+            },
+            "caption": {
+              "top": 223.171875,
+              "bottom": 238.921875
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 390,
+            "rootScrollWidth": 390,
+            "bodyScrollWidth": 390,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 390,
+                "clientWidth": 390,
+                "scrollWidth": 390
+              }
+            ]
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: long tech-card editor",
+            "mobile": true,
+            "viewportHeight": 844,
+            "editor": {
+              "top": 0,
+              "bottom": 844
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 844,
+              "clientHeight": 783,
+              "scrollHeight": 831,
+              "scrollTop": 48
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "last": {
+              "top": 750.953125,
+              "bottom": 820.453125
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "draftVisible": 0,
+            "moreVisible": 1,
+            "desktopVisible": false,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "mobile-390x844",
+            "label": "mobile-390x844: tech-card keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 831,
+              "scrollTop": 462
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "last": {
+              "top": 336.953125,
+              "bottom": 406.453125
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "draftVisible": 0,
+            "moreVisible": 1,
+            "desktopVisible": false,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 244.390625,
+              "bottom": 290.390625
+            },
+            "caption": {
+              "top": 222.640625,
+              "bottom": 238.390625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 240.390625,
+              "bottom": 286.390625
+            },
+            "caption": {
+              "top": 218.640625,
+              "bottom": 234.390625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 152.640625,
+              "bottom": 200.640625
+            },
+            "caption": {
+              "top": 110.140625,
+              "bottom": 129.640625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          }
+        ],
+        "writes": 2
+      },
+      {
+        "profile": "android-412x915",
+        "viewport": {
+          "width": 412,
+          "height": 915
+        },
+        "audits": [
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-menu-position-editor-v400",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: long editor",
+            "mobile": true,
+            "viewportHeight": 915,
+            "editor": {
+              "top": 0,
+              "bottom": 915
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 915,
+              "clientHeight": 854,
+              "scrollHeight": 1282,
+              "scrollTop": 428
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 823.4375,
+              "bottom": 891.1875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 1294,
+              "scrollTop": 925
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "status": {
+              "top": 337.9375,
+              "bottom": 405.6875
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "desktopVisible": false,
+            "moreVisible": 0,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 202.546875,
+              "bottom": 248.546875
+            },
+            "caption": {
+              "top": 180.796875,
+              "bottom": 196.546875
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 244.921875,
+              "bottom": 290.921875
+            },
+            "caption": {
+              "top": 223.171875,
+              "bottom": 238.921875
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "viewportWidth": 412,
+            "rootScrollWidth": 412,
+            "bodyScrollWidth": 412,
+            "surfaces": [
+              {
+                "className": "bd-catalog-sheet bd-tech-card-editor-v354",
+                "left": 0,
+                "right": 412,
+                "clientWidth": 412,
+                "scrollWidth": 412
+              }
+            ]
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: long tech-card editor",
+            "mobile": true,
+            "viewportHeight": 915,
+            "editor": {
+              "top": 0,
+              "bottom": 915
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 915,
+              "clientHeight": 854,
+              "scrollHeight": 854,
+              "scrollTop": 0
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "last": {
+              "top": 798.953125,
+              "bottom": 868.453125
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "draftVisible": 0,
+            "moreVisible": 1,
+            "desktopVisible": false,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "profile": "android-412x915",
+            "label": "android-412x915: tech-card keyboard viewport",
+            "mobile": true,
+            "viewportHeight": 430,
+            "editor": {
+              "top": 0,
+              "bottom": 430
+            },
+            "scroll": {
+              "top": 61,
+              "bottom": 430,
+              "clientHeight": 369,
+              "scrollHeight": 831,
+              "scrollTop": 462
+            },
+            "actions": {
+              "top": 0,
+              "bottom": 61
+            },
+            "toolbar": {
+              "top": 8,
+              "bottom": 52,
+              "visible": true
+            },
+            "last": {
+              "top": 336.953125,
+              "bottom": 406.453125
+            },
+            "cancelVisible": 1,
+            "saveVisible": 1,
+            "draftVisible": 0,
+            "moreVisible": 1,
+            "desktopVisible": false,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 244.390625,
+              "bottom": 290.390625
+            },
+            "caption": {
+              "top": 222.640625,
+              "bottom": 238.390625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 240.390625,
+              "bottom": 286.390625
+            },
+            "caption": {
+              "top": 218.640625,
+              "bottom": 234.390625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          },
+          {
+            "focused": true,
+            "input": {
+              "top": 152.640625,
+              "bottom": 200.640625
+            },
+            "caption": {
+              "top": 110.140625,
+              "bottom": 129.640625
+            },
+            "toolbarBottom": 52,
+            "viewportBottom": 430,
+            "bodyOverflow": "hidden"
+          }
+        ],
+        "writes": 2
+      }
+    ]
+  },
+  "unitContracts": {
+    "command": "node --import tsx --test tests/menu-consumption-phase3.test.ts tests/menu-consumption-sot-v418.test.mjs",
+    "pass": 45,
+    "fail": 0,
+    "coverage": [
+      "exact ingredient ID and key",
+      "all four consumption modes",
+      "persisted recipe quantity and snapshots",
+      "exact theoretical costs",
+      "warehouse balance deltas and movement counts",
+      "immutable historical consumption",
+      "venue isolation and conflicting-reference rejection"
+    ]
+  },
+  "checks": {
+    "releaseGuards": "3 PASS",
+    "typescript": "PASS",
+    "eslint": "PASS",
+    "diffCheck": "PASS"
+  },
+  "diagnosticAttempts": [
+    {
+      "scenario": "main",
+      "result": "Search input triggers existing dirty guard; explicitly assert discard confirmation and unchanged persisted recipe/write count."
+    },
+    {
+      "scenario": "editorActions",
+      "result": "Unified search uses ingredient heading instead of former field-wrapper caption; focus, heading/input viewport bounds and scroll lock still required."
+    }
+  ],
+  "remainingReleaseVerification": {
+    "sourceRun": "https://github.com/vdokhalov/BarDoctor-AI/actions/runs/38435771661",
+    "sourceHead": "a621a80eece7d5c7a97aa476356acd667102f9aa",
+    "productFix": "4b8120d05545cbb86eaf46daa7f3f63ab309a0a6",
+    "remainingUnverifiedMandatorySteps": [
+      {
+        "job": "sales-navigation",
+        "step": 18,
+        "name": "Measured navigation and embedded auth failures",
+        "priorConclusion": "failure"
+      },
+      {
+        "job": "sales-navigation",
+        "step": 19,
+        "name": "WebKit iPhone repeated pending Back navigation",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 13,
+        "name": "General tech card real server SQLite mobile desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 14,
+        "name": "First venue setup registration wizard real server SQLite mobile desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 16,
+        "name": "Account and venue lifecycle real server SQLite mobile desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 17,
+        "name": "Phase 4 purchase units mobile and desktop QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 18,
+        "name": "Phase 5 opening stock and CSV mobile desktop persisted HTTP QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 19,
+        "name": "Phase 5 sales mobile desktop persisted HTTP QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 20,
+        "name": "POS-1 cashier real sales handler SQLite mobile desktop QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 21,
+        "name": "POS-1 hardening navigation drafts journal and retries mobile tablet desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 22,
+        "name": "Sales UX step 2 journal checkout import mobile tablet desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 23,
+        "name": "Sales iPhone safe areas touch navigation and single shift regression",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 24,
+        "name": "Venue timezone settings and Sales date mobile tablet desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 25,
+        "name": "Accounting report reversal guard mobile tablet desktop",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 26,
+        "name": "Sales v454 overnight shifts and cashier auth network browser regression",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 27,
+        "name": "Startup recovery browser QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 28,
+        "name": "Anonymous mobile desktop startup handoff",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 29,
+        "name": "Existing venue root startup without reload",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 30,
+        "name": "Purchase direct load and reload runtime",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 31,
+        "name": "Mobile and desktop navigation QA",
+        "priorConclusion": "skipped"
+      },
+      {
+        "job": "verify-browser",
+        "step": 32,
+        "name": "Home reviews viewport QA",
+        "priorConclusion": "skipped"
+      }
+    ],
+    "executionPlan": [
+      "Run only these unverified browser/navigation steps as a continuation batch, retaining their existing profiles and assertions; do not restart successful core/auth/parity jobs to discover another locator.",
+      "If a harness mismatch occurs, diagnose against the current UI, fix only the owning harness, retain all product invariants and resume from that failing step. Report real product failures before expanding.",
+      "Once this continuation passes, use one combined exact-HEAD mandatory CI run before release. Previous a621 PASS evidence is contextual, not a PASS for the final commit. No release while any mandatory gate fails or remains skipped."
+    ],
+    "currentAuthorization": "Targeted menu-consumption checks and durable checkpoint only; broader continuation and final CI not started in this task."
+  },
+  "publication": "Blocked until every mandatory release gate passes on the combined final commit."
+}

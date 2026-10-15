@@ -1,3 +1,4 @@
+import { authSchemaFailureResponse } from "../../../../lib/bardoctor/auth-schema-error";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { accounts } from "../../../../db/schema";
@@ -12,6 +13,14 @@ import { venueIdentityFromJson } from "../../../../lib/bardoctor/venue-identity"
 import { ownedLifecycleVenues } from "../../../../lib/bardoctor/account-lifecycle";
 
 export async function GET(request: Request): Promise<Response> {
+  try { return await getUser(request); } catch (error) {
+    const failure = authSchemaFailureResponse(error);
+    if (failure) return failure;
+    throw error;
+  }
+}
+
+async function getUser(request: Request): Promise<Response> {
   const [account, actor] = await Promise.all([
     authenticateIdentityRequest(request),
     authenticateRequest(request),

@@ -1,0 +1,409 @@
+{
+  "parent": "a621a80eece7d5c7a97aa476356acd667102f9aa",
+  "scope": "Chromium390; I/J/M/N and B2 only; no full suite rerun",
+  "ciFailure": {
+    "run": 38435771661,
+    "artifact": 11835461581,
+    "scenario": "N Document → Journal",
+    "delay": 100,
+    "cause": "Query echo reloads iframe after document opens in previous document"
+  },
+  "localBefore": {
+    "delay": 100,
+    "result": "FAIL at J: pending iframe reload discarded immediate action; same document replacement mechanism"
+  },
+  "final": {
+    "journal-final": [
+      {
+        "name": "I Journal → Import",
+        "delay": 100,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 33,
+        "T0": 0,
+        "feedbackMs": 17,
+        "T1": 2,
+        "T2": 3,
+        "T3": null,
+        "T4": 17,
+        "T5": null,
+        "T6": null,
+        "T7": 17,
+        "T8": 17,
+        "automationWaitMs": 33,
+        "api": [],
+        "documents": [],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914254359,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914254360.8,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254361.5,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "method": "replaceState",
+            "target": "/sales-import?venue=1&embedded=1&view=import"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254362.2,
+            "frame": "/sales-import?venue=1",
+            "top": true,
+            "method": "replaceState",
+            "target": "/sales-import?venue=1&view=import"
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914254392
+          }
+        ]
+      },
+      {
+        "name": "J Import → Journal",
+        "delay": 100,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 32.300048828125,
+        "T0": 0,
+        "feedbackMs": 18,
+        "T1": 2,
+        "T2": 2,
+        "T3": null,
+        "T4": 18,
+        "T5": null,
+        "T6": null,
+        "T7": 18,
+        "T8": 18,
+        "automationWaitMs": 32,
+        "api": [],
+        "documents": [],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914254458.7,
+            "frame": "/sales-import?venue=1&embedded=1&view=import",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914254460.3,
+            "frame": "/sales-import?venue=1&embedded=1&view=import",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254460.8,
+            "frame": "/sales-import?venue=1&embedded=1&view=import",
+            "top": false,
+            "method": "replaceState",
+            "target": "/sales-import?venue=1&embedded=1"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254461.2,
+            "frame": "/sales-import?venue=1&view=import",
+            "top": true,
+            "method": "replaceState",
+            "target": "/sales-import?venue=1"
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914254491
+          }
+        ]
+      },
+      {
+        "name": "M Journal → Document",
+        "delay": 100,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 36,
+        "T0": 0,
+        "feedbackMs": 16,
+        "T1": 1,
+        "T2": 12,
+        "T3": null,
+        "T4": 16,
+        "T5": null,
+        "T6": null,
+        "T7": 16,
+        "T8": 16,
+        "automationWaitMs": 36,
+        "api": [],
+        "documents": [],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914254559,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914254560.3,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "BUTTON"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254571.1,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "method": "pushState",
+            "target": "/sales-import?venue=1&embedded=1"
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914254595
+          }
+        ]
+      },
+      {
+        "name": "N Document → Journal",
+        "delay": 100,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 16.199951171875,
+        "T0": 0,
+        "feedbackMs": null,
+        "T1": 1,
+        "T2": null,
+        "T3": null,
+        "T4": null,
+        "T5": null,
+        "T6": null,
+        "T7": null,
+        "T8": 16,
+        "automationWaitMs": 16,
+        "api": [],
+        "documents": [],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914254675.8,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "editor-close"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914254677.1,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "editor-close"
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914254692
+          }
+        ]
+      },
+      {
+        "name": "B2 rapid/double tap → Cashier",
+        "delay": 100,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 499.300048828125,
+        "T0": 0,
+        "feedbackMs": 4,
+        "T1": 1,
+        "T2": 2,
+        "T3": 112,
+        "T4": 124,
+        "T5": 246,
+        "T6": 360,
+        "T7": 377,
+        "T8": 377,
+        "automationWaitMs": 499,
+        "api": [
+          "/api/sales-events",
+          "/api/pos-orders"
+        ],
+        "documents": [
+          {
+            "path": "/cashier",
+            "top": false
+          }
+        ],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914254992.7,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "open-cashier"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914254993.8,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "open-cashier"
+          },
+          {
+            "kind": "T2:bridge",
+            "at": 1791914254994.5,
+            "frame": "/sales-import?venue=1",
+            "top": true,
+            "target": "/cashier?venue=1"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914254994.7998,
+            "frame": "/sales-import?venue=1",
+            "top": true,
+            "method": "pushState",
+            "target": "/cashier?venue=1"
+          },
+          {
+            "kind": "request",
+            "at": 1791914255004,
+            "path": "/cashier",
+            "method": "GET",
+            "type": "document",
+            "top": false
+          },
+          {
+            "kind": "T4:dom",
+            "at": 1791914255239.8,
+            "frame": "/cashier?venue=1&embedded=1",
+            "top": false,
+            "navigation": {
+              "start": 1791914255003.6,
+              "response": 1791914255105.1,
+              "committed": 1791914255116.5
+            }
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914255492
+          }
+        ]
+      }
+    ],
+    "b2-after-journal-fix": [
+      {
+        "name": "B2 rapid/double tap → Cashier",
+        "delay": 0,
+        "width": 390,
+        "browser": "chromium",
+        "duration": 182.5,
+        "T0": 0,
+        "feedbackMs": 6,
+        "T1": 3,
+        "T2": 4,
+        "T3": 18,
+        "T4": 29,
+        "T5": 71,
+        "T6": 86,
+        "T7": 107,
+        "T8": 107,
+        "automationWaitMs": 183,
+        "api": [
+          "/api/sales-events",
+          "/api/pos-orders"
+        ],
+        "documents": [
+          {
+            "path": "/cashier",
+            "top": false
+          }
+        ],
+        "trace": [
+          {
+            "kind": "T0:pointer",
+            "at": 1791914294007.5,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "open-cashier"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914294010.0999,
+            "frame": "/sales-import?venue=1&embedded=1",
+            "top": false,
+            "control": "open-cashier"
+          },
+          {
+            "kind": "T2:bridge",
+            "at": 1791914294011,
+            "frame": "/sales-import?venue=1",
+            "top": true,
+            "target": "/cashier?venue=1"
+          },
+          {
+            "kind": "T2:history",
+            "at": 1791914294011.5,
+            "frame": "/sales-import?venue=1",
+            "top": true,
+            "method": "pushState",
+            "target": "/cashier?venue=1"
+          },
+          {
+            "kind": "request",
+            "at": 1791914294024,
+            "path": "/cashier",
+            "method": "GET",
+            "type": "document",
+            "top": false
+          },
+          {
+            "kind": "T0:pointer",
+            "at": 1791914294070.5,
+            "frame": "/cashier?venue=1&embedded=1",
+            "top": false,
+            "control": "HEADER"
+          },
+          {
+            "kind": "T1:click",
+            "at": 1791914294072.5,
+            "frame": "/cashier?venue=1&embedded=1",
+            "top": false,
+            "control": "HEADER"
+          },
+          {
+            "kind": "T4:dom",
+            "at": 1791914294079.9,
+            "frame": "/cashier?venue=1&embedded=1",
+            "top": false,
+            "navigation": {
+              "start": 1791914294023.0999,
+              "response": 1791914294025,
+              "committed": 1791914294036.7
+            }
+          },
+          {
+            "kind": "T8:interactive",
+            "at": 1791914294190
+          }
+        ]
+      }
+    ]
+  },
+  "checks": {
+    "sameDocumentRetained": true,
+    "savedDocumentReopenedUnchanged": true,
+    "postedSalesAndBatchesUnchanged": true,
+    "externalQueryReturn": true,
+    "unit": 26,
+    "releaseGuards": 3,
+    "typecheck": "PASS",
+    "eslint": "PASS"
+  }
+}

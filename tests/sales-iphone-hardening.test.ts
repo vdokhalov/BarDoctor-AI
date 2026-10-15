@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
@@ -9,6 +10,7 @@ test('POS single-open cash shift: concurrent real handlers, retry, close and ven
  const r=await lifecycleRuntime({events:'./app/api/sales-events/route'});t.after(r.close);
  const a=await r.register('single-a@isolated.test'),b=await r.register('single-b@isolated.test');
  for(const u of [a,b])r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:'MDL',timezone:'Europe/Chisinau'}),u.userId);
+ seedOpenWorkday(r.sqlite,a.userId,a.activeVenueId);seedOpenWorkday(r.sqlite,b.userId,b.activeVenueId);
  const send=(u:typeof a,shiftId:string,action='open_shift')=>r.api.events.POST(r.request(u,'/api/sales-events','POST',{action,venueId:u.activeVenueId,shiftId,name:shiftId}));
  const responses=await Promise.all([send(a,'A'),send(a,'B')]);assert.deepEqual(responses.map(r=>r.status).sort(),[201,409]);
  const bodies=await Promise.all(responses.map(async r=>await r.json() as {ok:boolean;code:string}));assert.equal(bodies.find(r=>!r.ok)?.code,'SALES_EVENT_SHIFT_ALREADY_OPEN');

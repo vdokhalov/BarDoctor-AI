@@ -1192,7 +1192,8 @@ test("build contains the BarDoctor shell, local APIs, and D1 migrations", async 
   assert.match(mainBundle, /label:"Смена"/);
   assert.match(mainBundle, /label:"Отчёт за смену"/);
   assert.match(mainBundle, /Закрыть смену/);
-  assert.match(mainBundle, /Проверить смену/);
+  assert.match(mainBundle, /actionLabel:'Открыть Смены',actionHref:'\/shifts\?workday='/);
+  assert.match(mainBundle, /onClick:\(\)=>t\(e\.actionHref\)[\s\S]*?children:e\.actionLabel/);
   assert.match(mainBundle, /data-bd-home-money":"result-v151/);
   assert.match(mainBundle, /Финансовый результат/);
   assert.match(mainBundle, /Закупки \+ начисления/);

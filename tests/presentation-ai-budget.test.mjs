@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {parse} from 'acorn';import {restoreStableUiV485} from '../scripts/lib/stable-ui-v485.mjs';
+const source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
+const doctor=s=>{const n=parse(s,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='Uce');return s.slice(n.start,n.end);};
+test('normal repeated presentation restore is byte-for-byte lossless',()=>{assert.equal(restoreStableUiV485(source),source);assert.equal(restoreStableUiV485(restoreStableUiV485(source)),source);});
+test('restore-only preparation preserves exact paid-AI confirmation and zero retry budget',()=>{const restored=doctor(restoreStableUiV485(source,false));const current=doctor(source);const budget=s=>s.match(/\/\* AI explicit budget v513 \*\/[\s\S]*?const k=0,O=5e3/)[0];assert.equal(budget(restored),budget(current));assert.doesNotMatch(restored,/const k=5,O=5e3/);assert.match(restored,/if\(!window.confirm\(/);});

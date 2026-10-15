@@ -1,3 +1,4 @@
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import test from "node:test";
 import assert from "node:assert/strict";
 import { openingRuntime } from "./helpers/opening-runtime";
@@ -7,6 +8,8 @@ import { salesEventFixture, saleCommand } from "./helpers/sales-event-fixture";
 function runtime() {
   const r = openingRuntime(new URL("../app/api/sales-events/route.ts", import.meta.url), sales);
   r.put("bd_assortment_v1", salesEventFixture().assortment);
+  seedOpenWorkday(r.sqlite,7,1);
+  r.put("bd_finance_revenue", sales.planSalesShift({...salesEventFixture(),now:new Date().toISOString()}, "open_shift", "api-fixture", "API fixture"));
   const send = (body: object, venue = 1) => r.api.POST(new Request("http://localhost/api/sales-events", {
     method:"POST", headers:{"Content-Type":"application/json", "X-Venue-Id":String(venue)}, body:JSON.stringify({venueId:venue,...body}),
   }));
@@ -16,7 +19,7 @@ function runtime() {
 test("sales HTTP persists converted litres atomically, retries and reverses once", async () => {
   const r = runtime();
   try {
-    const command = saleCommand("whisky", 2);
+    const command = {...saleCommand("whisky", 2),shiftId:"api-fixture"};
     const preview = await r.send({action:"preview",command});
     assert.equal(preview.status,200);
     const quote = await preview.json() as {previewHash:string};
@@ -42,9 +45,9 @@ test("sales HTTP concurrent CAS retry preserves intervening stock and rolls back
   for (const failure of [false,true]) {
     const r = runtime();
     try {
-      const command = saleCommand("whisky",2);
+      const command = {...saleCommand("whisky",2),shiftId:"api-fixture"};
       const quote = await (await r.send({action:"preview",command})).json() as {previewHash:string};
-      const before = r.get("bd_assortment_v1");
+      const before = r.get("bd_assortment_v1"), revenueBefore = r.get("bd_finance_revenue");
       if (failure) r.failAt(3);
       else r.beforeBatch(() => {
         const updated = r.get("bd_assortment_v1") as {stockBalances:{current:number}[]};
@@ -57,7 +60,7 @@ test("sales HTTP concurrent CAS retry preserves intervening stock and rolls back
         assert.deepEqual(r.get("bd_assortment_v1"),before);
         assert.equal(r.get(sales.SALES_EVENT_STORE_KEY),null);
         assert.equal(r.get("bd_stock_movements"),null);
-        assert.equal(r.get("bd_finance_revenue"),null);
+        assert.deepEqual(r.get("bd_finance_revenue"),revenueBefore);
         assert.equal(r.sqlite.prepare("SELECT count(*) AS n FROM audit_log").get()?.n,0);
       } else {
         assert.equal((await post()).status,201);
@@ -72,7 +75,7 @@ test("sales HTTP concurrent CAS retry preserves intervening stock and rolls back
 test("sales HTTP rejects stale prices, permissions and foreign venue before writes", async () => {
   const r = runtime();
   try {
-    const command = saleCommand("whisky",2);
+    const command = {...saleCommand("whisky",2),shiftId:"api-fixture"};
     const quote = await (await r.send({action:"preview",command})).json() as {previewHash:string};
     const assortment = r.get("bd_assortment_v1") as {menuItems:{salePrice:number}[]};
     assortment.menuItems[1].salePrice=100;r.put("bd_assortment_v1",assortment);

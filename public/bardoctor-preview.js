@@ -1949,7 +1949,7 @@
     window.addEventListener("pagehide", cancelDocumentV496, { once: true });
     var resultPair = await Promise.race([
       (async function () { var response = await fetch("/api/auth/bootstrap", { method: "POST", headers: headers, signal: controller.signal }); return { response: response, result: await response.json() }; })(),
-      new Promise(function (_, reject) { timer = setTimeout(function () { controller.abort(); reject(new DOMException("Bootstrap timed out", "TimeoutError")); }, 30000); })
+      new Promise(function (_, reject) { timer = setTimeout(function () { var timeout = new DOMException("Bootstrap timed out", "TimeoutError"); controller.abort(timeout); reject(timeout); }, 30000); })
     ]).finally(function () { clearTimeout(timer); });
     var response = resultPair.response, result = resultPair.result;
     if (!activeDocumentV496) return;

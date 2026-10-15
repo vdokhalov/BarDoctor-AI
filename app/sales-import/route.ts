@@ -12,7 +12,7 @@ const HTML = `<!doctype html>
   <link rel="stylesheet" href="/sales-import.css?v=sales-ux1">
   <link rel="stylesheet" href="/modern-polish.css?v=20260811-modern-v87">
   <link rel="stylesheet" href="/venue-switcher.css?v=20260826-venue-identity-v297">
-  ${canonicalUserShellAssets()}<link rel="stylesheet" href="/sales-navigation.css?v=sales-scroll-stability"><script src="/sales-navigation.js?v=sales-scroll-stability" defer></script>
+  ${canonicalUserShellAssets()}<link rel="stylesheet" href="/sales-navigation.css?v=sales-scroll-stability"><script src="/sales-navigation.js?v=sales-tap-handoff-1" defer></script>
   <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
   <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
   <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>

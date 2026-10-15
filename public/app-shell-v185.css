@@ -331,6 +331,25 @@ main[data-bd-app-main] > iframe {
   min-height: 360px;
 }
 
+/* Sales occupies the space between the shared header and bottom navigation.
+   Match the navigation's actual 76px + native inset, not a second safe-area
+   reservation. The header row also has a one-pixel bottom border. */
+@media (max-width: 899px) {
+  [data-bd-app-shell]:has(iframe[data-bd-sales-surface]) {
+    min-height: 0;
+    height: calc(100dvh - var(--bd-header-total) - 1px);
+  }
+  main[data-bd-app-main]:has(> iframe[data-bd-sales-surface]) {
+    min-height: 0;
+    overflow: hidden;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+  main[data-bd-app-main] > iframe[data-bd-sales-surface] {
+    min-height: 0;
+    height: calc(100dvh - var(--bd-header-total) - 1px - 76px - env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
 @media (min-width: 900px) {
   body:has(#bd-canonical-bottom-nav),
   body:has(nav[data-bd-bottom-nav]) { --bd-desktop-navigation-width: 240px; }

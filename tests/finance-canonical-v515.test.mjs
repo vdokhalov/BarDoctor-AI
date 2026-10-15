@@ -42,3 +42,10 @@ test('canonical figures do not depend on local rows and unknown profit never cla
   const reason=context.bdFinanceFinalReasonV160({operatingResult:null,inventoryMismatch:true,openingInventory:0,closingInventory:3483},true);
   assert.match(reason,/Итог не подтверждён/);assert.doesNotMatch(reason,/Остатки не сходятся|Нужны.*остатки/);
 });
+test('equivalent freshly allocated Finance inputs do not restart reads; changed inputs do',()=>{
+ const expression=output.slice(output.indexOf('bdFinanceRevisionV515=')+'bdFinanceRevisionV515='.length,output.indexOf(',bdFinanceVerifiedV515='));
+ const inputs=()=>({S:{useMemo:fn=>fn()},profile:{venueId:1},revenue:[{amount:10}],expenses:[],financeSnapshots:[],financeSettings:{currency:'MDL'},gapReasons:[]});
+ const first=vm.runInNewContext(expression,inputs()),second=vm.runInNewContext(expression,inputs());
+ assert.equal(typeof first,'string');assert.equal(first,second);
+ const changed=inputs();changed.revenue[0].amount=11;assert.notEqual(vm.runInNewContext(expression,changed),first);
+});

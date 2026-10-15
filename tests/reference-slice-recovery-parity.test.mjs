@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {compareRecoveryParity} from '../scripts/lib/reference-slice-recovery-compare.mjs';
 const item={id:'entry:finance',kind:'entry',from:'/finance'};
 const state=()=>({before:{url:'/finance',venue:'1',contract:{path:'/finance',url:'/finance'},entries:[{label:'Зарплаты',tag:'BUTTON'}],frames:[]},actions:{'entry:finance':{url:'/salaries?month=2026-10',contract:{path:'/salaries',url:'/salaries?month=2026-10'}}},baselineDefects:[]});
-const evaluate=candidate=>compareRecoveryParity({items:[item]},{v485:{'/finance':state()},candidate:{'/finance':candidate}},'chromium',1280)[0];
+const evaluate=candidate=>compareRecoveryParity({items:[item]},{capture:{engine:'chromium',width:1280},v485:{'/finance':state()},candidate:{'/finance':candidate}},'chromium',1280)[0];
 test('existing route does not excuse a missing visible Finance capability',()=>{const value=state();value.before.entries=[];assert.equal(evaluate(value).verdict,'FAIL');});
 test('owner-approved More Doctor entry cannot excuse removal of an existing More control',()=>{
  const item={id:'entry:more',kind:'entry',from:'/more'};
  const a=state();a.before.url='/more';a.before.contract={path:'/more',url:'/more'};a.actions={};
  const b=structuredClone(a);b.before.entries.unshift({label:'AI Doctor',tag:'BUTTON',nav:false,disabled:false,href:null},{label:'Состояние бизнеса',tag:'BUTTON',nav:false,disabled:false,href:null});
- const compare=()=>compareRecoveryParity({items:[item]},{v485:{'/more':a},candidate:{'/more':b}},'chromium',390)[0].verdict;
+ const compare=()=>compareRecoveryParity({items:[item]},{capture:{engine:'chromium',width:390},v485:{'/more':a},candidate:{'/more':b}},'chromium',390)[0].verdict;
  assert.equal(compare(),'PASS');b.before.entries.pop();assert.equal(compare(),'FAIL');
 });
 test('More exception does not hide disabled or renamed Doctor controls',()=>{
@@ -46,7 +46,7 @@ test('query serialization order is harmless but a different parent route blocks 
 test('answer-first refresh preserves the question and does not navigate',()=>{
  const refresh={id:'context:/analysis:Обновить ответ',kind:'entry',from:'/analysis'},make=url=>({before:{...state().before,url:'/analysis',surface:'doctor',contract:{path:'/analysis',url:'/analysis'}},actions:{[refresh.id]:{url,contract:{path:'/analysis',url,parent:'/home'},actionOrigin:{url,question:'attention'}}},baselineDefects:[]});
  const a=make('/analysis?venue=1'),b=make('/analysis?doctorQuestion=attention&venueId=1&venue=1&returnTo=health');
- const check=()=>compareRecoveryParity({items:[refresh]},{v485:{'/analysis':a},candidate:{'/analysis':b}},'chromium',390)[0].verdict;
+ const check=()=>compareRecoveryParity({items:[refresh]},{capture:{engine:'chromium',width:390},v485:{'/analysis':a},candidate:{'/analysis':b}},'chromium',390)[0].verdict;
  assert.equal(check(),'PASS');b.actions[refresh.id].url='/home';assert.equal(check(),'FAIL');
  b.actions[refresh.id].url=b.actions[refresh.id].actionOrigin.url;b.actions[refresh.id].actionOrigin.question='next';assert.equal(check(),'FAIL');
 });

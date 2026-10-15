@@ -287,6 +287,8 @@ async function createRun(browser, profile, label, options = {}) {
     bootstrapDelayMs: options.bootstrapDelayMs || 0,
     bootstrapReady: false,
     homeReviewResponses: [],
+    reviewReplyConsents: [],
+    reviewReplyRequests: [],
   };
   const context = await browser.newContext({
     ...profile.descriptor,
@@ -384,7 +386,10 @@ async function createRun(browser, profile, label, options = {}) {
     }
     if (url.pathname === "/api/review-layer" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: reviewQaFixtures() }));
     if (url.pathname === "/api/reviews/sources" && method === "GET") return route.fulfill(jsonResponse({ ok: true, data: { providers: [{ id: "google", configured: true, status: "connected", locationName: "Mobile QA A", lastSyncedAt: "2026-09-02T09:15:00.000Z", lastSyncError: null }] } }));
-    if (url.pathname === "/api/reviews/reply" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { draft: "Спасибо за честный отзыв. Мы проверим скорость обслуживания и уровень музыки." } }));
+    if (url.pathname === "/api/reviews/reply" && method === "POST") {
+      state.reviewReplyRequests.push(request.postDataJSON());
+      return route.fulfill(jsonResponse({ ok: true, data: { draft: "Спасибо за честный отзыв. Мы проверим скорость обслуживания и уровень музыки." } }));
+    }
     if (url.pathname === "/api/reviews/doctor-summary" && method === "POST") return route.fulfill(jsonResponse({ ok: true, data: { recommendations: ["Проверьте скорость обслуживания в часы пик."] } }));
     if (url.pathname === "/api/migrate") return route.fulfill(jsonResponse({ ok: true, imported: [], skipped: [] }));
     if (url.pathname === "/api/access/active-venue" && method === "POST") {
@@ -613,6 +618,14 @@ async function createRun(browser, profile, label, options = {}) {
     if (url.pathname.startsWith("/api/")) transportResponses.push({ path: url.pathname, failure: request.failure()?.errorText });
   });
   page.on("dialog", async (dialog) => {
+    if (label === "home-reviews" && state.reviewReplyConsents.length) {
+      assert.equal(dialog.type(), "confirm");
+      assert.equal(dialog.message(), "Подготовить ответ через платный AI? Текст отзыва и контекст заведения будут отправлены AI-провайдеру. Денежный потолок не установлен.");
+      const accept = state.reviewReplyConsents.shift();
+      if (accept) await dialog.accept();
+      else await dialog.dismiss();
+      return;
+    }
     issues.push({ type: "native-dialog", message: dialog.message() });
     await dialog.dismiss();
   });
@@ -1227,9 +1240,18 @@ async function homeReviewsFlow(browser, profile) {
   assert.equal(await allItems.count(), 7, `${profile.name}: review search is incorrect`);
   const first = allItems.first();
   assert.match(await first.textContent(), /Google.*Показать перевод Google/s);
+  state.reviewReplyConsents.push(false);
+  await first.getByRole("button", { name: "Подготовить ответ", exact: true }).click();
+  assert.equal(state.reviewReplyConsents.length, 0, "reply preparation requires explicit consent");
+  assert.equal(state.reviewReplyRequests.length, 0, "declining must not request an AI reply");
+  assert.equal(await reviewFrame.locator("#review-reply-dialog").isVisible(), false);
+  state.reviewReplyConsents.push(true);
   await first.getByRole("button", { name: "Подготовить ответ", exact: true }).click();
   const dialog = reviewFrame.locator("#review-reply-dialog");
   await dialog.waitFor({ state: "visible" });
+  assert.equal(state.reviewReplyConsents.length, 0);
+  assert.equal(state.reviewReplyRequests.length, 1, "one accepted request reaches only the local fixture");
+  assert.match(state.reviewReplyRequests[0].review.text, /We waited too long/);
   assert.match(await dialog.textContent(), /Anna.*We waited too long.*Черновик не публикуется автоматически.*Спасибо за честный отзыв/s);
   assert.equal(await dialog.getByRole("button", { name: /Опубликовать/ }).count(), 0, `${profile.name}: reply dialog exposes automatic publishing`);
   await dialog.locator(".dialog-actions").getByRole("button", { name: "Закрыть", exact: true }).click();

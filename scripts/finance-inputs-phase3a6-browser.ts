@@ -1,3 +1,5 @@
+import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
+import {venueDate} from '../lib/bardoctor/venue-time';
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -11,14 +13,14 @@ import { waitForSalesHostReads } from "../tests/helpers/sales-navigation-settled
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const fixedTime = "2026-10-02T12:00:00Z";
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
-const runtime = await lifecycleRuntime({ sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route", health: "./app/api/business-health/route", context: "./lib/bardoctor/venue-ai-context", expenses: "./app/api/expenses/route" }, { now: fixedTime });
+const runtime = await lifecycleRuntime({ monthClose:"./app/api/month-close/route", workdays:"./app/api/workdays/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route", health: "./app/api/business-health/route", context: "./lib/bardoctor/venue-ai-context", expenses: "./app/api/expenses/route" }, { now: fixedTime });
 const pendingHandlers = new Set<Promise<void>>();
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url || "/", "http://localhost"), chunks = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     const body = Buffer.concat(chunks), key = url.pathname.match(/^\/api\/store\/([^/]+)$/)?.[1];
-    const routes: Record<string, string> = { "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs", "/api/business-health": "health", "/api/expenses": "expenses" };
+    const routes: Record<string, string> = { "/api/month-close":"monthClose", "/api/workdays":"workdays", "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs", "/api/business-health": "health", "/api/expenses": "expenses" };
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
@@ -42,7 +44,7 @@ const browser = await engine.launch({ ...(engine === chromium ? { executablePath
 const out = "outputs/finance-inputs-phase3a6/" + (engine === webkit ? "webkit" : "chromium"); mkdirSync(out, { recursive: true });
 const results: unknown[] = [];
 try {
-  for (const viewport of [{ name: "mobile", width: 390, height: 844 }, { name: "tablet", width: 820, height: 1000 }, { name: "desktop", width: 1280, height: 800 }]) {
+  for (const viewport of [{ name: "mobile", width: 390, height: 844 }, { name: "tablet", width: 820, height: 1000 }, { name: "desktop", width: 1280, height: 800 }].filter(viewport=>!process.env.BD_FINANCE_WIDTH||viewport.width===Number(process.env.BD_FINANCE_WIDTH))) {
     const user = await runtime.register(viewport.name + "@phase3a6.isolated.test"), venueId = user.activeVenueId;
     const profile = { name: "Phase3a6 isolated " + viewport.name, currency: "MDL", timezone: "Europe/Chisinau", workingDays: [0, 1, 2, 3, 4, 5, 6], openTime: "00:00", closeTime: "23:59", areas: ["Бар"] };
     runtime.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify(profile), user.userId);
@@ -50,23 +52,32 @@ try {
     const get = (key: string) => JSON.parse(String(runtime.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").get(user.userId, key)?.data_json || "null"));
     put("bd_assortment_v1", JSON.parse(JSON.stringify(salesEventFixture().assortment).replaceAll('"venueId":1', '"venueId":' + venueId)));
     put("bd_employees", [{ id: "qa", name: "QA employee", position: "bartender", department: "Бар", status: "active", payrollRuleId: "qa-rule" }]);
-    put("bd_payroll_rules", [{ id: "qa-rule", name: "Current QA rule", active: true, blocks: [{ id: "rate", type: "shift_rate", amount: 999, enabled: true }] }]);
+    put("bd_payroll_rules", [{ id: "qa-rule", name: "Current QA rule", active: true, blocks: [{ id: "rate", type: "shift_rate", amount: 90, enabled: true }] }]);
+    seedOpenWorkday(runtime.sqlite,user.userId,venueId,venueDate(fixedTime,profile.timezone),[{employeeId:'qa',hours:8}]);
     const send = (body: object) => runtime.api.sales.POST(runtime.request(user, "/api/sales-events", "POST", { venueId, ...body }));
     for (const [shiftId, quantity] of [["A", 5], ["B", 10]] as const) {
-      assert.equal((await send({ action: "open_shift", shiftId, name: shiftId })).status, 201);
+      const opened=await send({ action: "open_shift", shiftId, name: shiftId });assert.equal(opened.status,201,JSON.stringify(await opened.json()));
       const command = { id: "sale-" + shiftId, source: "POS_API", shiftId, lines: [{ id: "line-" + shiftId, menuItemId: "beer", quantity }], payments: [{ id: "payment-" + shiftId, method: "CASH", amount: quantity * 20 }] };
       const preview = await (await send({ action: "preview", command })).json() as { previewHash: string };
       assert.equal((await send({ action: "post", command, previewHash: preview.previewHash })).status, 201);
       assert.equal((await send({ action: "post", command, previewHash: preview.previewHash })).status, 200);
       assert.equal((await send({ action: "close_shift", shiftId })).status, 201);
     }
-    assert.equal((await send({ action: "open_shift", shiftId: "C", name: "C" })).status, 201);
+    const opened=await send({ action: "open_shift", shiftId: "C", name: "C" });assert.equal(opened.status,201,JSON.stringify(await opened.json()));
     const days = async () => (await (await runtime.api.days.GET(runtime.request(user, "/api/operational-days"))).json()) as { days: { businessDate: string; status: string; revenue: { amount: number; status: string }; payroll: { amount: number } }[] };
     const day = (await days()).days[0], date = day.businessDate;
     assert.equal(day.revenue.amount, 300); assert.equal(day.status, "OPERATING");
     const closeBody = { venueId, sectionsVersion: 1, shiftCloseId: "qa-report", revenueRecord: { date, staffing: [{ employeeId: "qa", hours: 8 }], payrollBreakdown: { total: 90, employees: [{ employeeId: "qa", employeeName: "QA employee", total: 90, flags: [], occurrences: [{ ruleName: "Recorded QA", formula: "Записанный ФОТ", amount: 90 }] }] }, guests: 8 }, writeOffItems: [] };
-    assert.equal((await runtime.api.close.POST(runtime.request(user, "/api/shifts/close", "POST", closeBody))).status, 201);
+    const savedReport=await runtime.api.close.POST(runtime.request(user, "/api/shifts/close", "POST", closeBody));assert.equal(savedReport.status,201,JSON.stringify(await savedReport.json()));
     assert.equal((await runtime.api.close.POST(runtime.request(user, "/api/shifts/close", "POST", closeBody))).status, 200);
+    assert.equal((await days()).days[0].payroll.amount,null,"OPEN workday payroll must remain unknown");
+    assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown,undefined,"legacy report cannot write OPEN workday payroll");
+    assert.equal((await send({action:"close_shift",shiftId:"C"})).status,201);
+    const workday=async(body:object)=>{const response=await runtime.api.workdays.POST(runtime.request(user,"/api/workdays","POST",{venueId,date,...body}));const data=await response.json();assert.equal(response.status,201,JSON.stringify(data));return data;};
+    await workday({action:"team",operationId:"qa-team",expectedRevision:get("bd_operational_reports_v1")[0].workdayRevision,staffing:[{employeeId:"qa",hours:8}]});
+    await workday({action:"close",operationId:"qa-day-close",expectedRevision:get("bd_operational_reports_v1")[0].workdayRevision,confirmations:{writeoffs:"none",incidents:"none"},reviewedOperations:{writeoffs:0,incidents:0}});
+    assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total,90);
+    put("bd_payroll_rules",[{id:"qa-rule",name:"Changed after closure",active:true,blocks:[{id:"rate",type:"shift_rate",amount:999,enabled:true}]}]);
     const auth = await runtime.api.auth.authenticateRequest(runtime.request(user, "/api/auth/bootstrap")); assert.ok(auth);
     const contextApi = runtime.api.context as unknown as typeof import("../lib/bardoctor/venue-ai-context");
     const canonical = await contextApi.loadVenueAIContext(auth, "diagnosis");
@@ -101,7 +112,7 @@ try {
     const navigate = async (path: string) => { if (await page.locator("#root").count()) await settle(); await page.goto(base + path); await page.waitForLoadState("networkidle"); };
     await page.clock.setFixedTime(new Date(fixedTime));
     try {
-      await navigate("/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.operating").first().waitFor();
+      await navigate("/shifts?month=" + date.slice(0, 7)); await page.locator(".bd-shift-card.closed").first().waitFor();
       await settle();
       // Deterministic negative control: the actual store notification schedules
       // a Health refresh before its fetch starts. Header-only readiness must
@@ -112,7 +123,7 @@ try {
       });
       assert.equal(deferredReady, false, "scheduled Health refresh is not an accepted canonical state");
       await settle();
-      await page.screenshot({ path: out + "/" + viewport.name + "-open-day.png", fullPage: true });
+      await page.screenshot({ path: out + "/" + viewport.name + "-closed-day.png", fullPage: true });
       await navigate("/finance?month=" + date.slice(0, 7)); await page.locator("[data-bd-finance-dashboard]").waitFor();
       await page.waitForFunction(() => Boolean((window as unknown as { __bdFinanceAcceptance?: unknown }).__bdFinanceAcceptance));
       const report = await page.evaluate(({ profile, month, venueId }) => (window as unknown as { __bdFinanceAcceptance: { report: (profile: object, month: string, venueId: number) => Promise<Record<string, unknown>> } }).__bdFinanceAcceptance.report(profile, month, venueId), { profile, month: date.slice(0, 7), venueId });
@@ -126,28 +137,23 @@ try {
       await settle(); await page.reload(); await page.waitForLoadState("networkidle"); await page.locator(".bd-payroll-summary-v164").waitFor(); await page.waitForFunction(() => document.querySelector(".bd-payroll-summary-metric-v164.violet strong")?.textContent?.includes("90")); assert.match(await page.locator(".bd-payroll-summary-v164").innerText(), /90/);
       assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90);
       await navigate("/shifts?month=" + date.slice(0, 7));
-      await page.locator(".bd-shift-card.operating").first().click();
-      await page.getByRole("dialog").getByRole("button", { name: "Заполнить операционные данные", exact: true }).click();
-      await page.getByRole("button", { name: "Далее", exact: true }).click();
-      await page.getByText("ФОТ смены · сохранённый", { exact: true }).waitFor();
-      for (let step = 0; step < 3; step++) await page.getByRole("button", { name: "Далее", exact: true }).click();
-      // Closing the editor does not drain bdShiftCloseApiV272's two scheduled
-      // store-notification batches. Register before save, then observe all six
-      // real notifications before a test-forced replacement of this document.
-      await page.evaluate(readFileSync("scripts/qa/finance-save-refresh-observer.js", "utf8"));
-      await page.getByRole("button", { name: "Сохранить изменения", exact: true }).click();
-      await page.getByRole("button", { name: "Сохранить изменения", exact: true }).waitFor({ state: "detached" });
-      await page.waitForFunction(() => (window as unknown as { __bdFinanceSaveRefresh?: { pending: string[] } }).__bdFinanceSaveRefresh?.pending.length === 0);
-      await page.waitForLoadState("networkidle");
-      await settle();
-      assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total, 90, "editor preserves recorded payroll after rule changes");
-      assert.equal((await send({ action: "close_shift", shiftId: "C" })).status, 201);
+      await page.locator(".bd-shift-card.closed").first().click();
+      const closedView=page.locator('[data-workday-state="CLOSED"]');await closedView.waitFor();
+      await closedView.getByText("ФОТ за день",{exact:true}).waitFor();assert.match(await closedView.innerText(),/90,00\s*MDL/);
+      assert.equal(await closedView.getByRole('button',{name:'Закрыть рабочий день',exact:true}).count(),0,"closed day is read-only");
+      // The retired payroll editor is not an alternate authority for closed days.
+      const protectedSave=await runtime.api.close.POST(runtime.request(user,"/api/shifts/close","POST",{...closeBody,shiftCloseId:"qa-preserve-payroll",revenueRecord:{...closeBody.revenueRecord,payrollBreakdown:{total:999}}}));
+      assert.equal(protectedSave.status,201,JSON.stringify(await protectedSave.json()));
+      assert.equal(get("bd_operational_reports_v1")[0].payrollBreakdown.total,90,"operations save cannot replace recorded payroll after rule changes");
+      await settle();await page.reload();await page.waitForLoadState("networkidle");await closedView.waitFor();await settle();
+      assert.match(await closedView.innerText(),/90,00\s*MDL/,"closed report retains recorded payroll after reload");
+      const blocked=await send({action:"open_shift",shiftId:"after-close",name:"Forbidden"});assert.equal(blocked.status,409);assert.equal((await blocked.json() as {code:string}).code,"WORKDAY_CLOSED");
       const completed = (await days()).days[0]; assert.equal(completed.status, "COMPLETE"); assert.equal(completed.revenue.status, "FINAL"); assert.equal(completed.payroll.amount, 90);
       await navigate("/reports?month=" + date.slice(0, 7)); await page.getByText("Начисленный ФОТ", { exact: true }).waitFor();
       await page.screenshot({ path: out + "/" + viewport.name + "-report.png", fullPage: true });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), "no horizontal viewport overflow");
       assert.deepEqual(errors, []); assert.equal(get("bd_finance_revenue").length, 3); assert.equal(get("bd_sales_events_v1").length, 2);
-      results.push({ ...viewport, venueId, businessDate: date, daily: 300, recordedPayroll: 90, preliminaryResult: 210, finalRevenue: true, dayComplete: true, duplicateSale: false, isolated: true, errors });
+      results.push({ ...viewport, venueId, businessDate: date, daily: 300, recordedPayroll: 90, recordedResult: 210, openPayrollUnknown: true, finalRevenue: true, dayComplete: true, duplicateSale: false, isolated: true, errors });
     } catch (error) {
       console.error(JSON.stringify({ errors, errorEvents, failedRequests, fetchTrace: fetchTrace.slice(-30), url: page.url() }));
       writeFileSync(out + "/failure-network.json", JSON.stringify({ errors, errorEvents, failedRequests, fetchTrace }, null, 2));

@@ -1,3 +1,4 @@
+import { assertCanonicalSalesEntry } from './helpers/canonical-sales-entry.mjs';
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import vm from "node:vm";
@@ -96,10 +97,10 @@ test("warehouse v242 retains every action, tab and compact hierarchy workflow", 
   const start = bundle.indexOf("function bdWarehousePage");
   const end = bundle.indexOf("function bdRecurringSettingsEditor", start);
   const warehouse = bundle.slice(start, end);
+  assertCanonicalSalesEntry(bundle);
   for (const label of [
     "Провести инвентаризацию",
     "Сканировать ведомость",
-    "Импортировать продажи",
     "Добавить покупку",
     "Остатки",
     "Движения",
