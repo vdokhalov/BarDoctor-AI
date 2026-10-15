@@ -11,7 +11,7 @@ test('v517 amendment pins exact files, baseline and bytes; rejects additional or
  const wrong=structuredClone(manifest);wrong.baseline='HEAD';assert.throws(()=>p0Amendment({manifest:wrong}));
  const digest=structuredClone(manifest);digest.files[p0Paths[0]].after='0'.repeat(64);assert.throws(()=>p0Amendment({manifest:digest}));
  const before=structuredClone(manifest);before.files[p0Paths[0]].before='0'.repeat(64);assert.throws(()=>p0Amendment({manifest:before}));
- for(const path of [p0Paths[0],'lib/bardoctor/auth.ts','lib/bardoctor/operational-day.ts','db/schema.ts','worker/index.ts','build/sites-vite-plugin.ts','.openai/hosting.json','package.json','package-lock.json']){
+ for(const path of [p0Paths[0],'public/app-shell-v185.css','scripts/sales-shell-geometry-browser.ts','lib/bardoctor/auth.ts','lib/bardoctor/operational-day.ts','db/schema.ts','worker/index.ts','build/sites-vite-plugin.ts','.openai/hosting.json','package.json','package-lock.json']){
   assert.throws(()=>p0Amendment({read:(name:string)=>name===path?Buffer.concat([readFileSync(name),Buffer.from('\n// unreviewed')]):readFileSync(name)}),path);
  }
  const paths=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','--',...p0Roots],{encoding:'utf8'}).trim().split('\n');
