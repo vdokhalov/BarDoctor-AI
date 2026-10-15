@@ -1,11 +1,12 @@
 (() => {
   "use strict";
+  const pinMode=document.body.dataset.pinMode==="true";
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
   const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:new URLSearchParams(location.search).get("view")==="orders"?"orders":"cashier",unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,dialogDraft=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
-  const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
+  const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_pos_identity"),localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
   const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
   const amount=value=>value==null?"—":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(value);
@@ -35,7 +36,8 @@
     if(state.frozen)throw Error("Обновите кассу перед продолжением.");
     if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Аккаунт или заведение изменились. Обновите кассу.");throw Error("Контекст изменился");}
     const headers={"Content-Type":"application/json"};const email=localStorage.getItem("bd_session"),token=localStorage.getItem("bd_session_token");
-    if(email&&token){headers["X-Session-Email"]=email;headers["X-Session-Token"]=token;}if(initialVenue)headers["X-Venue-Id"]=initialVenue;
+    if(pinMode&&state.data)headers["X-POS-Actor"]=String(state.data.actor.accountId);
+    if(!pinMode&&email&&token){headers["X-Session-Email"]=email;headers["X-Session-Token"]=token;}if(initialVenue)headers["X-Venue-Id"]=initialVenue;
     let response;
     try { response=await fetch(path,{method:body?"POST":"GET",headers,cache:"no-store",...(body?{body:JSON.stringify({...body,venueId:state.data.venueId})}:{}),signal:AbortSignal.timeout(20000)}); }
     catch { assertCurrentLoad(generation);const error=Error("Нет связи. Запрос сохранён, если операция уже начата.");error.uncertain=true;error.network=true;throw error; }
@@ -46,7 +48,7 @@
       if(response.status===401){
         // Match the shared expired-session contract; retain venue-scoped drafts.
         for(const key of ["bd_session","bd_session_token","bd_session_userid"])localStorage.removeItem(key);
-        location.replace("/login");
+        location.replace(pinMode?"/staff-login":"/login");
       }
     }
     let data,malformed=false;try{data=await response.json();if(!data||typeof data!=="object"||Array.isArray(data)){data={};malformed=true;}}catch{data={};malformed=true;}
@@ -339,6 +341,8 @@
   },"Сохранить");}
   async function handleAction(action){
     if(action==="dismiss"){$("dialog").close();return;}
+    if(action==="identity"&&pinMode){dialog("Сотрудник",`<p>${esc(state.data.actor.name)}</p><p>Черновики сохранятся отдельно для этого сотрудника.</p><button type="button" data-action="pin-logout">Выйти / сменить сотрудника</button>`,null);return;}
+    if(action==="pin-logout"&&pinMode){saveLocal();const response=await fetch("/api/staff-pin/session",{method:"DELETE"});if(!response.ok)throw Error("Выход не подтверждён. Повторите при восстановлении связи.");localStorage.setItem("bd_pos_identity",crypto.randomUUID());clearSensitive("Сессия завершена");location.replace("/staff-login");return;}
     if(action==="identity"){dialog("Аккаунт",`<p>${esc(state.data.actor.name)} · ${esc(labels[state.data.actor.jobTitle||state.data.actor.role])}</p><p>${esc(state.data.venueName)}</p><a href="/team-access">Мои заведения и доступ</a><p class="footnote">При смене заведения касса обновит контекст. Незавершённые запросы сохранятся.</p>`,null);return;}
     if(action==="quick"){state.orderId=null;document.body.dataset.pane="order";render();return;}
     if(action==="create-order"||action==="save-quick"){await createOrder(action==="save-quick");return;}
@@ -450,7 +454,7 @@
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
     if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report);await reload();});
   });
-  window.addEventListener("storage",event=>{if(["bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():"",state.data?shiftSelectionKey():""].includes(event.key))clearSensitive("Аккаунт, заведение, смена или черновик изменились в другой вкладке. Обновите кассу.");});
+  window.addEventListener("storage",event=>{if(["bd_pos_identity","bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():"",state.data?shiftSelectionKey():""].includes(event.key))clearSensitive("Аккаунт, заведение, смена или черновик изменились в другой вкладке. Обновите кассу.");});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
   window.addEventListener("pagehide",()=>refreshController?.stop());
   window.addEventListener("pageshow",event=>{if(event.persisted&&!state.frozen){refreshController?.start();void refreshController?.refresh(true);}});

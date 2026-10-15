@@ -1,93 +1,92 @@
-# Personal staff PIN access — implementation checkpoint
+# Personal staff PIN — local implementation candidate
 
-Base: e339cc993ccb18941c472a732fab1a82966f16b1 (published v520).
-Branch: feat/staff-pin-pos-20261015. No publication authorized.
+Base e339cc99 (v520). Feature branch feat/staff-pin-pos-20261015.
+Development and synthetic validation authorized; publication is not authorized.
 
-## Confirmed boundaries
+## User flow and security boundary
 
-Owner and manager may issue, reset and revoke a personal PIN for a linear POS
-member. shift_manager and cashier may not. Waiter, bartender and barista remain
-job titles of cashier. Existing managerial login, sections and permissions stay
-unchanged. PIN uniqueness is venue-scoped. PIN is not an invite code.
+An owner or manager signs in normally on the device and explicitly enables the
+cashier for the selected venue at /staff-access. This finishes that managerial
+session on the device. Employees then use only their personal permanent PIN,
+without email or selecting a name. /staff-login exposes no employee directory.
+An approved device is required; the PIN is never a global short password.
 
-Reuse existing accounts, venue memberships and invitations. This checkpoint
-issues credentials for existing active cashier memberships; it creates no
-accounts and no fake email addresses. Existing onboarding still requires a real
-account. Email-free employee onboarding is not implemented or implied.
+A successful PIN login opens only the cashier. Secure/HttpOnly/SameSite cookies
+persist across reopenings for up to 30 days (also bounded by device expiry).
+Explicit logout requires PIN again; a manager can revoke the device remotely.
+This is not an indefinite or irrevocable session. Reauthorization is required
+when the device grant expires. No production key or PIN has been created.
 
-## Pending product decision — do not implement activation until answered
+Owner and manager may create staff, issue/reset/revoke PINs and manage devices.
+shift_manager and cashier cannot. Existing management privileges, invitations,
+ordinary login, shift management, discounts and cancellation rules remain intact.
+Waiter, bartender and barista remain job titles of the cashier access role.
 
-PIN-only login without selecting a name requires an approved, venue-bound device.
-Choose either (recommended) ordinary owner/manager login on that device followed
-by explicit authorization, or a short-lived single-use activation link. There
-must be no global public short-code login or public employee directory.
-Question was sent before dependent implementation. No answer received yet.
+## Identity and storage
 
-## Completed independent foundation
+Staff have their own accounts row, venue membership and workspace membership.
+They have account_kind=staff, no password and owns_venue=false. No email address
+is requested or fabricated. For compatibility with the existing NOT NULL unique
+app_email storage column, staff use an internal non-address identifier
+`staff:<uuid>`; chatgpt_email is empty. This is an explicit storage compatibility
+choice, not an email identity. Normal email lookup filters account_kind=user and
+cannot authenticate these identities. Staff IDs never inherit the owner's actor.
+Existing memberships with real accounts can also receive a personal PIN.
 
-Explicit additive migration 0026 creates PIN credentials and a secret-free audit
-log. No runtime DDL. An atomic unique constraint binds venue and lookup tag.
-PINs are generated with rejection sampling, six decimal digits including leading
-zeroes; stored as independently salted PBKDF2 hashes using the existing Worker
-compatible password primitive. Venue-scoped lookup tags use HMAC with a separate
-STAFF_PIN_LOOKUP_KEY binding; missing configuration fails closed. No production
-key or credential has been created. Key provisioning/rotation must be planned
-before a future deployment, including resetting lookup tags on rotation.
+Explicit migrations 0026 and 0027 create credential/audit/device/session/counter
+tables. Authentication never performs DDL. PIN hashes use random per-record salt
+and the existing Worker-compatible PBKDF2 primitive. A venue-scoped HMAC lookup
+tag enforces PIN uniqueness atomically. STAFF_PIN_LOOKUP_KEY is a required new
+server binding (at least 32 bytes); missing configuration fails closed. It has
+NOT been provisioned in production. Rotation requires a deliberate credential
+reissue strategy, not silently changing the binding.
 
-Issue/reset/revoke recheck both issuing and target memberships inside the write
-transaction. Revocation increments the credential revision. No HTTP route or
-login consumes this service yet: revision enforcement and session invalidation
-are NOT implemented at this checkpoint. This is not a shippable PIN login.
+Five failed/in-flight attempts per device and 50 per venue per 15-minute window
+are reserved atomically before hashing; a successful login subtracts only its
+own reservation, never clears concurrent failures. Counters are shared in D1.
 
-## Remaining implementation
+Every PIN session is fixed to its venue, device, membership and credential
+revision. Expiry, reset, revocation, membership disablement and role promotion
+invalidate it. POS writes recheck the session and revision inside the same
+transaction as the business write. A stale page's actor header cannot turn its
+pending operation into the next employee's sale. The server determines authors.
 
-1. Approved device lifecycle: random bearer held in Secure/HttpOnly/SameSite
-   cookie, hashed server-side, fixed venue, expiry and owner/manager revocation;
-   explicit CSRF/origin checks. Never leave managerial credentials in POS mode.
-2. Atomic attempt limits shared across Workers, both per approved device and
-   venue; generic failures; reserve attempts before expensive hashing; bounded
-   cooldown without clearing a concurrent failure's counter on success.
-3. Short POS sessions tied to actor membership, venue, device and PIN revision.
-   Reset/revoke/device removal and membership changes invalidate them; recheck
-   session/revision inside the same POS write transaction, including in-flight
-   requests. A cashier later promoted to management must not gain management
-   access from an old PIN session.
-4. Server-side route/API allowlist, no active-venue switching, no management or
-   identity-management routes from PIN sessions. Direct URL navigation returns
-   POS landing or denial; localStorage is never authorization. Ordinary manager
-   sessions keep their existing behavior.
-5. Cashier-only UI plus explicit lock/switch. Persist old actor+venue+shift drafts
-   before clearing views and requests; reject stale completions and cross-tab
-   identity changes. Never replay another actor's uncertain payment or switch a
-   pending operation's author. Server derives sale/order/payment authors.
-6. Explicit management operations: issue/reset/revoke, display issued secret
-   once, never place it in logs/URLs or retained client storage. PIN management
-   must not grant manager broader access.manage rights.
+Worker routing and scoped auth independently block non-POS APIs. Direct HTML
+routes return the cashier/login. PIN-mode cashier omits navigation to other
+sections. Logout/switch preserves actor+venue+shift durable drafts, clears the
+current screen, and invalidates other tabs via an identity-change marker.
+Management PIN operations display a newly issued secret once and do not persist
+it in browser storage, URLs or audit entries.
 
-## Risk-based validation (one pass per changed boundary)
+## Completed scoped evidence
 
-Foundation: 5 isolated real-handler/SQLite tests PASS on 2026-10-15. Includes
-owner/manager vs admin/staff, cross-venue/management targets, stale-authority
-interleaving, transactional rollback, uniqueness constraint, independent salts,
-venue-specific tags and missing-key failure. No external services used.
+- Credential foundation: 5 tests PASS.
+- Auth/PIN/access-control/P0 auth recovery: 26 tests PASS.
+- POS payment/revocation/history/dialog recovery: 19 tests PASS. Includes real
+  handler sale author derivation and revocation between auth and transaction.
+- Native Worker/Miniflare D1: 1 test PASS (transactions, audit, cookie session
+  revocation, concurrent attempt budget); no outbound calls.
+- WebKit 390: manager device approval, PIN-only login, automatic reopen, forbidden
+  API 403 and forbidden page redirect, Anna -> Boris with separate durable draft
+  comments, revoked PIN -> login, and return to ordinary management login PASS.
+- Exact release guards: 4 tests PASS, retaining negative mutation controls and
+  immutable historical manifests. New files are pinned individually.
+- Browser JS syntax and git diff whitespace checks PASS.
 
-Next: device activation expiry/replay/concurrent use; no unauthorized directory;
-parallel guessing and cross-device/venue counter behavior; PIN reset/revoke vs
-login/payment races; disabled membership/workspace/device and expired session;
-forged venue/actor payloads; allowlisted vs direct forbidden API/routes; ordinary
-owner/manager regression and staff privilege limits. Include SQLite transaction
-and existing D1-runtime harness coverage for new SQL behavior.
+Counts overlap between focused runs and must not be summed as unique tests.
+A harness import issue was fixed by moving cookie-only utilities out of the
+Cloudflare-dependent session module; its subsequent browser run passed.
 
-Browser: synthetic A -> B -> A on one device, cross-tab switch, failed network
-payment/reload, only cashier sections, direct links, correct author and separate
-saved drafts. Reuse existing POS fixtures. No full suite during development.
-Full CI is NOT RUN and must be separately assessed before publication; the CSS
-exception does not apply. Release byte guards must be explicitly reviewed and
-updated for the completed change; they are not weakened to accept this draft.
+Full application CI and full production build are NOT RUN. This auth/data change
+is classified full by the existing CI policy; the CSS exception does not apply.
+No physical-device verification, production migration or deployment was done.
+Before publication: review this security-sensitive candidate, provision the
+required server binding through the approved secret workflow, assess/apply the
+explicit migrations, and agree the full CI/release gate. Do not publish merely
+because scoped development checks passed.
 
-## Synchronization
+## Synchronization and checkpoints
 
-Push only the new feature branch, which is absent from the workflow push branch
-allowlist, and do not open a PR yet (pull_request would run full CI). No push to
-PR15's branch, main merge or Sites publication. Keep checkpoints with commits,
-patches, plan and test evidence. Device decision remains the next blocker.
+Only the feature branch is pushed. It is outside workflow push triggers. No PR
+is opened yet because pull_request would start full CI. PR15 and main remain
+unchanged. Checkpoints contain an incremental bundle, patch and scoped evidence.

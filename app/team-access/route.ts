@@ -40,6 +40,7 @@ const TEAM_ACCESS_HTML = `<!doctype html>
           <div class="section-title"><div><p>РОЛИ</p><h2>Уровни доступа</h2></div></div>
           <div id="role-cards" class="role-grid"></div>
         </section>
+        <p><a href="/staff-access">Персональные PIN сотрудников</a></p>
         <section id="invite-section" class="access-card hidden">
           <div class="card-title"><div><p>ПРИГЛАШЕНИЕ</p><h2>Добавить участника</h2></div></div>
           <p class="help">Создайте одноразовый код. Пароль сотрудника вам не показывается и не передаётся.</p>

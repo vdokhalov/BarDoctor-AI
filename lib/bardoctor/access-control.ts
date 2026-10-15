@@ -201,6 +201,7 @@ const ROLE_DEFAULTS: Record<Exclude<AccessRole, "owner">, PermissionKey[]> = {
 };
 
 export type AuthenticatedAccount = Account & {
+  posSession?: {tokenHash:string;deviceHash:string};
   jobTitle?: StaffJobTitle | null;
   actorAccountId: number;
   venueId: number;

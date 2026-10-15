@@ -1,3 +1,4 @@
+import { hasPosSession, authenticatePosRequest } from './staff-pin-session';
 import { ensureAuthSchema } from "./auth-schema";
 export { ensureAuthSchema } from "./auth-schema";
 import { membershipWithJobTitle } from "./staff-job-storage";
@@ -263,6 +264,7 @@ export async function revokeOtherAuthenticatedSessions(
 }
 
 export async function authenticateIdentityRequest(request: Request): Promise<Account | null> {
+  if(hasPosSession(request))return null;
   const account = (await observedAwait("auth.identity", () => sessionForRequest(request)))?.account ?? null;
   observedScope(Boolean(account));
   return account;
@@ -406,6 +408,7 @@ async function authenticateScopedRequest(
   request: Request,
   readOnly: boolean,
 ): Promise<AuthenticatedAccount | null> {
+  if(hasPosSession(request))return authenticatePosRequest(request);
   const identitySession = await observedAwait("auth.identity", () => sessionForRequest(request, readOnly));
   observedScope(Boolean(identitySession));
   if (!identitySession) return null;

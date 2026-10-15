@@ -28,7 +28,7 @@
     },
     "lib/bardoctor/auth.ts": {
       "before": "15cbf6e1d0288bc65888a5a029656d57b57f0ebb597120b1de3855a08aa8ef3e",
-      "after": "b2c0b1cb4b99696488ae0291b1f7916002f4162f1e37f8b39c4b0784d56d62de"
+      "after": "c279cdf5fc31b253f9039c403f3af232f65db5f9403b36426f25dcd2a803d585"
     },
     "lib/bardoctor/request-observability.ts": {
       "before": "488a9c0c2db72f1735d9e8a7bf825b46bea1df7e950b23b8e2585099e752fb57",
@@ -200,7 +200,7 @@
     },
     "app/cashier/route.ts": {
       "before": "fd3efbcd75038175e3eaa62155d2531c297c481851ed5ebc58bda1e9d31852bc",
-      "after": "71574cc10cb2d790018076400a462c5b6e45e23f9e426d3c0ba345cf2b827895"
+      "after": "c39cb1128282df249aba732d4cceab9c471df4c0426b2264357aa2f95a9e8c8b"
     },
     "app/sales-entry/route.ts": {
       "before": "9fb08d70a5f23e30325cbc2843747bbfb07012ba427de3fc81a7a60f8c4ada31",
@@ -253,6 +253,90 @@
     "public/cashier.css": {
       "before": "3033793f93de4bca5ac34d965082b8277ac84de7290b227143e2d1f0ca7dd3a6",
       "after": "7d4fc594f6cd7b1555599846439b686a00b6eee031d434698b8599c148edf6a1"
+    },
+    "app/api/staff-pin/device/route.ts": {
+      "before": null,
+      "after": "c3df100c608bb59b86dc6e4667e784f88fa1487d940fe6aeda6837a3808a3b56"
+    },
+    "app/api/staff-pin/members/route.ts": {
+      "before": null,
+      "after": "8f94e0633ab4d40be06173f3f6e9dab05c6726a90ca136d2863202bcef0113ed"
+    },
+    "app/api/staff-pin/session/route.ts": {
+      "before": null,
+      "after": "3406a83e2709374a96ccb4f443e522777433cd9cf763b8922422649eb94674e7"
+    },
+    "app/staff-access/route.ts": {
+      "before": null,
+      "after": "cf162eb1064f950fdfffb2cca3edb65d40bfdf81dcfb49a137d2607f4475db0d"
+    },
+    "app/staff-login/route.ts": {
+      "before": null,
+      "after": "64c3cd1e4c3cd0066da647c73958e83c6cf20d5ebcfa8025c5fd5ec2aeb7ab86"
+    },
+    "app/team-access/route.ts": {
+      "before": "9ce12a0fbea67245e3143841d4ecce2945b143d950a48b462ce6b9a77a10481b",
+      "after": "e353ff51f5ed8bb694998291e49d078c04450596d59388664783476d09d0dbf9"
+    },
+    "drizzle/0026_staff_pin_credentials.sql": {
+      "before": null,
+      "after": "0375f94058a6571ee59da67097b2f5c136552c54652c9d83c36f5cea8d2dba13"
+    },
+    "drizzle/0027_staff_pin_sessions.sql": {
+      "before": null,
+      "after": "3af521e4a4da815c13b8a911a516c8ff10a9a415819ff4d0078b30f7556f431e"
+    },
+    "lib/bardoctor/access-control.ts": {
+      "before": "bb63a193974cebda9b0b0ffa89ae4f4673e559409598ea25023a0a2e5048e5e4",
+      "after": "c516528728cc2b0cfb7e99bbb722899fa83ad676545fbdab85066b4f4a878069"
+    },
+    "lib/bardoctor/pos-auth-guard.ts": {
+      "before": "95a1c94ed1c54b75e3132bab46518af487c5c98aaa75531958224364b8ec4657",
+      "after": "cfe448101e2e1479a679b8ec4f90042edf0e45363306e115e101e225982897c5"
+    },
+    "lib/bardoctor/staff-pin-cookie.ts": {
+      "before": null,
+      "after": "c5e83b711c1bb62e6b1679dcf64ac3b197e9054cd52fb431c69ec1c94e826c2a"
+    },
+    "lib/bardoctor/staff-pin-credentials.ts": {
+      "before": null,
+      "after": "efd8e6667774337658a3d272a3e9b3bb66006fd0f6b3b63ddcb655bc49ff810d"
+    },
+    "lib/bardoctor/staff-pin-crypto.ts": {
+      "before": null,
+      "after": "8665d1b3bc7ea16e4a8c6730dd73c2f935279aefa3726394d97aa28a293acebb"
+    },
+    "lib/bardoctor/staff-pin-gateway.ts": {
+      "before": null,
+      "after": "453ba5237004412e4067d45a6e31da0a049dd038130a5bd3c16018378fa70b15"
+    },
+    "lib/bardoctor/staff-pin-members.ts": {
+      "before": null,
+      "after": "e10d95228b5f710e27dc1f31ff4bd1023b2a5721d0003bdcd83530b7f50cd14b"
+    },
+    "lib/bardoctor/staff-pin-session.ts": {
+      "before": null,
+      "after": "fae2a7f24e926645896f4e8003e19ec82ce0096a383a0d5dff5ccdde51a967b8"
+    },
+    "public/cashier.js": {
+      "before": "5d54c4791301c6c997f924edb5e6bb890ca4885ab4885b9aea2f032ba53b789b",
+      "after": "5a631aacbe0e043add30d64a03b66f737a34c86796e3df05c19a35d67815cc4f"
+    },
+    "public/staff-access.js": {
+      "before": null,
+      "after": "c9caf243755c8173cbd9aed037774778c936e21552bd5cb37dc80f10d26c6c68"
+    },
+    "public/staff-login.js": {
+      "before": null,
+      "after": "4d6c27a634acc9297ef593b017ef9385adba14c4f60f8249993448d130c5062e"
+    },
+    "scripts/staff-pin-browser.ts": {
+      "before": null,
+      "after": "c3d958171e932ce9f7727c53407b033f9f807c0f634f5d0dc550037265dab5c8"
+    },
+    "worker/index.ts": {
+      "before": "12d769c15d214679cb26ff38d64d2719f50f79ee97a09fb67dc4b13a7be1206f",
+      "after": "8adf8d8e119fee8a4d2911a5ae78203f0a04e718657e095bed74b7c87f9f1ae6"
     }
   }
 }
