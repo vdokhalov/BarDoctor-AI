@@ -55,14 +55,20 @@ export async function loginStaffPin(request:Request,pin:string){
  if(!posSameOrigin(request))throw Error('PIN_ACCESS_DENIED');
  const deviceToken=posCookie(request,POS_DEVICE_COOKIE);if(!deviceToken)throw Error('PIN_DEVICE_REQUIRED');
  const db=getD1(),now=new Date().toISOString(),deviceHash=await posDigest(deviceToken);
- const device=await db.prepare(`SELECT id,venue_id FROM staff_pos_devices WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?`).bind(deviceHash,now).first<{id:string;venue_id:number}>();
+ const device=await db.prepare(`SELECT id,venue_id,login_generation FROM staff_pos_devices WHERE token_hash=? AND revoked_at IS NULL AND expires_at>?`).bind(deviceHash,now).first<{id:string;venue_id:number;login_generation:number}>();
  if(!device)throw Error('PIN_DEVICE_REQUIRED');
  // Reserve every attempt atomically before lookup/hash. Success does not reset a
  // concurrent attacker's counter. Shared venue budget limits distributed devices.
  const window=Math.floor(Date.now()/900000);
- const counts=await db.batch([['device:'+device.id,5],['venue:'+device.venue_id,50]].map(([scope])=>db.prepare(`INSERT INTO staff_pos_attempts(scope,window_start,attempts) VALUES (?,?,1)
- ON CONFLICT(scope) DO UPDATE SET attempts=CASE WHEN window_start=excluded.window_start THEN attempts+1 ELSE 1 END,window_start=excluded.window_start RETURNING attempts`).bind(scope,window)));
- if(Number((counts[0].results[0] as {attempts:number}).attempts)>5||Number((counts[1].results[0] as {attempts:number}).attempts)>50)throw Error('PIN_RATE_LIMIT');
+ const counts=await db.batch([
+  db.prepare(`INSERT INTO staff_pos_attempts(scope,window_start,attempts) VALUES (?,?,1)
+   ON CONFLICT(scope) DO UPDATE SET attempts=CASE WHEN window_start=excluded.window_start THEN attempts+1 ELSE 1 END,window_start=excluded.window_start
+   WHERE window_start<>excluded.window_start OR attempts<5 RETURNING attempts`).bind('device:'+device.id,window),
+  db.prepare(`INSERT INTO staff_pos_attempts(scope,window_start,attempts) SELECT ?,?,1 WHERE changes()=1
+   ON CONFLICT(scope) DO UPDATE SET attempts=CASE WHEN window_start=excluded.window_start THEN attempts+1 ELSE 1 END,window_start=excluded.window_start
+   WHERE window_start<>excluded.window_start OR attempts<50 RETURNING attempts`).bind('venue:'+device.venue_id,window),
+ ]);
+ if(!counts[0].results.length||!counts[1].results.length)throw Error('PIN_RATE_LIMIT');
  if(!/^\d{6}$/.test(pin))throw Error('PIN_INVALID');
  const tag=await pinLookupTag(device.venue_id,pin);
  const credential=await db.prepare(`SELECT p.*,m.account_id FROM staff_pin_credentials p JOIN venue_memberships m ON m.id=p.membership_id WHERE p.venue_id=? AND p.lookup_tag=? AND p.revoked_at IS NULL AND m.status='active' AND m.role='cashier'`)
@@ -70,19 +76,20 @@ export async function loginStaffPin(request:Request,pin:string){
  if(!credential||!await verifyStaffPin(pin,{passwordHash:credential.password_hash,passwordSalt:credential.password_salt,passwordIterations:credential.password_iterations}))throw Error('PIN_INVALID');
  const token=posToken(),tokenHash=await posDigest(token),expiry=new Date(Date.now()+POS_LIFETIME_SECONDS*1000).toISOString();
  // Membership/device/PIN revision must still be valid when the session is inserted.
- const inserted=await db.prepare(`INSERT INTO staff_pos_sessions(token_hash,device_id,membership_id,pin_revision,expires_at)
+ const committed=await db.batch([db.prepare(`INSERT INTO staff_pos_sessions(token_hash,device_id,membership_id,pin_revision,expires_at)
  SELECT ?,d.id,p.membership_id,p.revision,? FROM staff_pos_devices d
  JOIN staff_pin_credentials p ON p.venue_id=d.venue_id JOIN venue_memberships m ON m.id=p.membership_id
  JOIN venues v ON v.id=m.venue_id JOIN workspaces w ON w.id=v.workspace_id
  JOIN workspace_memberships wm ON wm.workspace_id=w.id AND wm.account_id=m.account_id
- WHERE d.id=? AND d.revoked_at IS NULL AND d.expires_at>? AND p.membership_id=? AND p.revision=? AND p.revoked_at IS NULL
+ WHERE d.id=? AND d.login_generation=? AND d.revoked_at IS NULL AND d.expires_at>? AND p.membership_id=? AND p.revision=? AND p.revoked_at IS NULL
  AND m.role='cashier' AND m.status='active' AND wm.status='active' AND v.status='active' AND w.status='active' RETURNING token_hash`)
- .bind(tokenHash,expiry,device.id,now,credential.membership_id,credential.revision).first();
- if(!inserted)throw Error('PIN_INVALID');
- // One active employee per physical browser grant. Concurrent logins invalidate
- // each other rather than leaving two identities active on a shared terminal.
- await db.prepare('DELETE FROM staff_pos_sessions WHERE device_id=? AND token_hash<>?').bind(device.id,tokenHash).run();
- // Release only this successful reservation, never reset other failed attempts.
- await db.batch(['device:'+device.id,'venue:'+device.venue_id].map(scope=>db.prepare('UPDATE staff_pos_attempts SET attempts=attempts-1 WHERE scope=? AND window_start=? AND attempts>0').bind(scope,window)));
+ .bind(tokenHash,expiry,device.id,device.login_generation,now,credential.membership_id,credential.revision),
+ db.prepare(`UPDATE staff_pos_devices SET login_generation=login_generation+1 WHERE id=? AND EXISTS (SELECT 1 FROM staff_pos_sessions WHERE token_hash=?)`).bind(device.id,tokenHash),
+ db.prepare(`DELETE FROM staff_pos_sessions WHERE device_id=? AND token_hash<>? AND EXISTS (SELECT 1 FROM staff_pos_sessions WHERE token_hash=?)`).bind(device.id,tokenHash,tokenHash),
+ ...['device:'+device.id,'venue:'+device.venue_id].map(scope=>db.prepare(`UPDATE staff_pos_attempts SET attempts=attempts-1 WHERE scope=? AND window_start=? AND attempts>0 AND EXISTS (SELECT 1 FROM staff_pos_sessions WHERE token_hash=?)`).bind(scope,window,tokenHash)),
+ ]);
+ // Concurrent attempts observing the same generation have exactly one winner.
+ // The loser never deletes the winner and never receives a replacement cookie.
+ if(!committed[0].results.length)throw Error('PIN_LOGIN_CONFLICT');
  return {token,venueId:device.venue_id,expiresAt:expiry};
 }

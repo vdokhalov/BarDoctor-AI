@@ -44,12 +44,23 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     const login=await call({action:'login',pin:issued.pin},cookie);assert.equal(login.status,200);
     const sessionCookie=cookie+'; bd_pos_session='+login.body.token;
     assert.ok((await call({action:'session'},sessionCookie)).body.session);
+    const raced=await Promise.all([call({action:'login',pin:issued.pin},cookie),call({action:'login',pin:issued.pin},cookie)]);
+    assert.ok(raced.some(x=>x.status===200));
+    assert.equal((await db.prepare('SELECT count(*) n FROM staff_pos_sessions').first()).n,1);
+    const valid=[];for(const result of raced.filter(x=>x.status===200))valid.push((await call({action:'session'},cookie+'; bd_pos_session='+result.body.token)).body.session);
+    assert.equal(valid.filter(Boolean).length,1,'exactly one returned session survives');
+    await db.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").bind(member.membershipId).run();
+    await db.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").bind(member.membershipId).run();
+    assert.equal((await db.prepare('SELECT count(*) n FROM staff_pos_sessions').first()).n,0);
+    assert.ok((await db.prepare('SELECT revoked_at FROM staff_pin_credentials WHERE membership_id=?').bind(member.membershipId).first()).revoked_at);
     await call({action:'revoke',id:member.membershipId});
     assert.equal((await call({action:'session'},sessionCookie)).body.session,null);
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_pin_audit').first()).n,2);
     const attempts=await Promise.all(Array.from({length:8},()=>call({action:'login',pin:'bad'},cookie)));
     assert.equal(attempts.filter(x=>x.body.error==='PIN_INVALID').length,5);
     assert.equal(attempts.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,3);
+    for(let i=0;i<60;i++)await call({action:'login',pin:'bad'},cookie);
+    assert.equal((await db.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope='venue:1'").first()).attempts<=7,true,'blocked requests do not spend venue budget');
     assert.equal(outbound, 0);
   } finally { await mf.dispose(); }
 });

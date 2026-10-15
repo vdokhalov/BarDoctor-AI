@@ -1,3 +1,17 @@
+> SUPERSEDED UX DECISION: owner explicitly removed device activation. The next
+> candidate must accept one globally unique high-entropy staff code on any device,
+> with no email, device approval or separate venue selection. Recommended format:
+> BD-XXXX-XXXX-XXXX-XXXX (16 random base32 characters, 80 bits), pending format
+> response. Existing device-based code below is transitional, NOT release-ready.
+> No production configuration, migrations or credentials are authorized.
+>
+> Independent review corrections: blocked devices no longer charge venue budget;
+> generation-CAS session insertion/replacement is atomic; migration 0028 makes
+> membership revocation monotonic. Ten scoped session tests passed. These checks
+> do NOT validate the newly requested device-free UX. The extended browser test
+> stopped on a duplicate locator before completion; its selector was corrected,
+> but it was not rerun after the UX decision. A->B->A/payment remains unverified.
+
 # Personal staff PIN — local implementation candidate
 
 Base e339cc99 (v520). Feature branch feat/staff-pin-pos-20261015.

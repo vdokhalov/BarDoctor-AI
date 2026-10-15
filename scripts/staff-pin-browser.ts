@@ -1,3 +1,4 @@
+import { salesEventFixture } from '../tests/helpers/sales-event-fixture';
 import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
 import assert from "node:assert/strict";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -58,6 +59,8 @@ try{
  const pinA=await pins.issueStaffPin(actor,a.membershipId),pinB=await pins.issueStaffPin(actor,b.membershipId);
  runtime.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"name":"Synthetic PIN venue","currency":"MDL","timezone":"UTC"}',owner.userId);
  seedOpenWorkday(runtime.sqlite,owner.userId,owner.activeVenueId,new Date().toISOString().slice(0,10));
+ runtime.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(owner.userId,'bd_assortment_v1',JSON.stringify(salesEventFixture().assortment));
+ const opened=await runtime.api.sales.POST(runtime.request(owner,'/api/sales-events','POST',{action:'open_shift',shiftId:'browser-pin-shift',name:'Synthetic PIN',venueId:owner.activeVenueId}));assert.equal(opened.status,201);
  const context=await browser.newContext({...devices['iPhone 13'],viewport:{width:390,height:844}});
  await context.addInitScript({content:'window.__name=(value)=>value;'});
  const page=await context.newPage();await page.goto(base+'/staff-access');
@@ -70,15 +73,30 @@ try{
  await page.goto(base+'/');await page.waitForURL('**/cashier?embedded=1');await page.locator('#employee-name').filter({hasText:'Anna'}).waitFor();
  const forbidden=await page.evaluate(async()=>({api:(await fetch('/api/access')).status}));assert.equal(forbidden.api,403);
  await page.goto(base+'/finance');await page.waitForURL('**/cashier?embedded=1');
- // Distinct durable workspaces are preserved through a real browser switch.
  const keyA='bd_pos_workspace_v2:'+a.actorId+':'+owner.activeVenueId,keyB='bd_pos_workspace_v2:'+b.actorId+':'+owner.activeVenueId;
- await page.evaluate(({keyA,keyB})=>{localStorage.setItem(keyA,JSON.stringify({quick:{id:'anna-draft',lines:[],comment:'Anna only'},pending:null,byShift:{}}));localStorage.setItem(keyB,JSON.stringify({quick:{id:'boris-draft',lines:[],comment:'Boris only'},pending:null,byShift:{}}));},{keyA,keyB});
- await page.reload();await page.locator('#employee-name').filter({hasText:'Anna'}).waitFor();
- await page.locator('#identity-button').click();await page.getByRole('button',{name:'Выйти / сменить сотрудника',exact:true}).click();await page.waitForURL('**/staff-login');
- await page.locator('#pin').fill(pinB.pin);await page.getByRole('button',{name:'Войти',exact:true}).click();await page.waitForURL('**/cashier?embedded=1');await page.locator('#employee-name').filter({hasText:'Boris'}).waitFor();
- const saved=await page.evaluate(({keyA,keyB})=>[JSON.parse(localStorage.getItem(keyA)!),JSON.parse(localStorage.getItem(keyB)!)],{keyA,keyB});assert.equal(saved[0].quick.comment,'Anna only');assert.equal(saved[1].quick.comment,'Boris only');
- await pins.revokeStaffPin(actor,b.membershipId);await page.reload();await page.waitForURL('**/staff-login');
+ async function addItem(id:string){await page.locator('[data-pane="menu"]').first().click();await page.locator('[data-add="'+id+'"]').click();await page.locator('#dialog-submit').click();await page.locator('#dialog').waitFor({state:'hidden'});await page.locator('[data-pane="order"]').click();}
+ async function logout(){await page.locator('#identity-button').click();await page.getByRole('button',{name:'Выйти / сменить сотрудника',exact:true}).click();await page.waitForURL('**/staff-login');}
+ async function login(pin:string,name:string){await page.locator('#pin').fill(pin);await page.getByRole('button',{name:'Войти',exact:true}).click();await page.waitForURL('**/cashier?embedded=1');await page.locator('#employee-name').filter({hasText:name}).waitFor();}
+ await addItem('beer');
+ let lost=false;
+ await page.route('**/api/sales-events',async route=>{const request=route.request();const body=request.method()==='POST'?request.postDataJSON():null;if(!lost&&body?.action==='post'){const response=await route.fetch();assert.equal(response.status(),201);lost=true;await route.abort('failed');}else await route.continue();});
+ await page.locator('#pay').click();await page.locator('#dialog-submit').click();await page.waitForFunction(()=>!!document.querySelector('#dialog-error')?.textContent);assert.equal(lost,true);
+ await page.locator('#dialog [data-action="dismiss"]').first().click();
+ const pendingA=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!).pending,keyA);assert.ok(pendingA);assert.equal(pendingA.body.command.lines[0].menuItemId,'beer');
+ const second=await context.newPage();await second.goto(base+'/cashier?embedded=1');await second.locator('#employee-name').filter({hasText:'Anna'}).waitFor();
+ await logout();await second.locator('#work').waitFor({state:'hidden'});await login(pinB.pin,'Boris');assert.equal(await page.locator('#recovery').isVisible(),false);
+ await addItem('whisky');
+ const saved=await page.evaluate(({keyA,keyB})=>[JSON.parse(localStorage.getItem(keyA)!),JSON.parse(localStorage.getItem(keyB)!)],{keyA,keyB});assert.deepEqual(saved[0].pending,pendingA);assert.equal(saved[1].quick.lines[0].menuItemId,'whisky');assert.equal(saved[1].pending,null);
+ await logout();await login(pinA.pin,'Anna');await page.locator('#retry').waitFor();
+ assert.deepEqual(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!).pending,keyA),pendingA);
+ await page.locator('#retry').click();await page.locator('#recovery').waitFor({state:'hidden'});
+ const events=JSON.parse(String(runtime.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));
+ assert.equal(events.length,1);assert.equal(events[0].actor.accountId,a.actorId);assert.equal(events[0].id,pendingA.body.command.id);
+ assert.equal(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!).pending,keyA),null);
+ assert.equal(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)!).quick.lines[0].menuItemId,keyB),'whisky');
+ await second.close();
+ await pins.revokeStaffPin(actor,a.membershipId);await page.reload();await page.waitForURL('**/staff-login');
  await page.getByRole('button',{name:'Вход руководителя',exact:true}).click();await page.waitForURL('**/login');
- writeFileSync(out+'/result.json',JSON.stringify({status:'PASS',activation:'owner ordinary session -> venue device',login:'PIN only, cookie HttpOnly',reopen:'Anna restored',directApi:403,directPage:'cashier redirect',switch:'Anna -> Boris',drafts:'separate preserved comments',revoke:'login required',managerExit:'ordinary login available'},null,2));
+ writeFileSync(out+'/result.json',JSON.stringify({status:'PASS',activation:'owner ordinary session -> venue device',login:'PIN only, cookie HttpOnly',reopen:'Anna restored',directApi:403,directPage:'cashier redirect',switch:'Anna -> Boris -> Anna',drafts:'real Beer pending payment / Boris Whisky preserved',payment:'server committed, response lost, same ID retry, exactly one sale authored by Anna',secondTab:'old Anna tab frozen on switch',revoke:'login required',managerExit:'ordinary login available'},null,2));
  await context.close();
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}

@@ -101,3 +101,29 @@ test('real POS payment derives author from PIN session; restrictions and in-flig
  const denied=await send({action:'post',command:next,previewHash:nextPreview.previewHash});assert.ok([401,403].includes(denied.status));
  const after=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(after.length,1);
 });
+test('exhausted device cannot spend venue budget or block another device',async t=>{
+ const {r,pos,req,issued,actor}=await setup();t.after(r.close);
+ for(let i=0;i<51;i++)await assert.rejects(pos.loginStaffPin(req(),'bad'));
+ assert.equal(r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'venue:%'").get()?.attempts,5);
+ const device=await pos.authorizePosDevice(actor),other=new Request('https://isolated.test/api/staff-pin/session',{method:'POST',headers:{origin:'https://isolated.test',cookie:'bd_pos_device='+device.token}});
+ assert.ok((await pos.loginStaffPin(other,issued.pin)).token);
+});
+test('disable then enable cannot revive the old cookie or PIN',async t=>{
+ const {r,pos,req,issued,service,actor}=await setup();t.after(r.close);
+ const login=await pos.loginStaffPin(req(),issued.pin),request=req('/api/pos-orders','GET',null,login.token);
+ r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(issued.membershipId);
+ r.sqlite.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").run(issued.membershipId);
+ assert.equal(await pos.validPosSession(request),null);await assert.rejects(pos.loginStaffPin(req(),issued.pin),/PIN_INVALID/);
+ const fresh=await service.issueStaffPin(actor,issued.membershipId);assert.ok((await pos.loginStaffPin(req(),fresh.pin)).token);
+ assert.equal(await pos.validPosSession(request),null);
+});
+test('two overlapping logins have one committed winner; loser cannot erase or replace its cookie',async t=>{
+ const {r,req,pos}=await setup();t.after(r.close);
+ const responses=await Promise.all([r.api.session.POST(req()),r.api.session.POST(req())]);
+ assert.deepEqual(responses.map(x=>x.status).sort(),[200,409]);
+ const winner=responses.find(x=>x.status===200)!,loser=responses.find(x=>x.status===409)!;
+ assert.equal(loser.headers.get('set-cookie'),null);
+ const token=winner.headers.get('set-cookie')!.split(';')[0].split('=')[1];
+ assert.ok(await pos.validPosSession(req('/api/pos-orders','GET',null,token)));
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_pos_sessions').get()?.n,1);
+});

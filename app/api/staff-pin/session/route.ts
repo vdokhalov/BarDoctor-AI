@@ -14,6 +14,7 @@ export async function POST(request:Request){
   return Response.json({ok:true,venueId:result.venueId,expiresAt:result.expiresAt,landing:'/cashier?embedded=1'},{headers:{'Cache-Control':'no-store','Set-Cookie':posSetCookie(POS_SESSION_COOKIE,result.token,request)}});
  }catch(error){
   const code=error instanceof Error?error.message:'';
+  if(code==='PIN_LOGIN_CONFLICT')return failure(409,'Вход изменился в другой вкладке. Обновите страницу.');
   if(code==='PIN_RATE_LIMIT')return failure(429,'Слишком много попыток. Повторите позже.');
   if(code==='PIN_DEVICE_REQUIRED')return failure(403,'Попросите владельца или управляющего разрешить кассу на этом устройстве.');
   if(code==='PIN_INVALID')return failure(401,'PIN недействителен или доступ отключён.');
