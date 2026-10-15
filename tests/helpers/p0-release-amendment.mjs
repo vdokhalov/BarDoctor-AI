@@ -13,8 +13,10 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Preserve child-owned Sales document across query echo; real external navigation stays active.
 // Owner-approved v519 Sales mobile gap fix and strict geometry assertion (2026-10-15).
 // Pin both files exactly; later CSS/harness edits remain forbidden.
+// Owner-approved conservative CI routing (2026-10-15); exact CI bytes remain pinned.
 export const p0Paths=Object.freeze([
  'scripts/patch-sales-navigation-performance.mjs',
+ 'scripts/ci-change-scope.mjs','scripts/ci-required-gates.mjs',
  'public/app-shell-v185.css','scripts/sales-shell-geometry-browser.ts',
  'scripts/recheck-chromium-parity-ci-snapshots.mjs',
  'public/sales-navigation.js','app/cashier/route.ts','app/sales-entry/route.ts','app/sales-import/route.ts',
