@@ -32,7 +32,87 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.scope.outputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Classifier and aggregate negative controls
+        run: node --test tests/ci-change-scope.test.mjs
+      - id: scope
+        name: Classify complete diff with the base revision classifier
+        env:
+          SCOPE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SCOPE_HEAD: ${{ github.sha }}
+        run: |
+          if [[ "$SCOPE_BASE" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$SCOPE_BASE:scripts/ci-change-scope.mjs" 2>/dev/null; then
+            git show "$SCOPE_BASE:scripts/ci-change-scope.mjs" > "$RUNNER_TEMP/bd-ci-scope.mjs"
+            node "$RUNNER_TEMP/bd-ci-scope.mjs"
+          else
+            echo 'Base classifier unavailable: require full CI'
+            echo 'mode=full' >> "$GITHUB_OUTPUT"
+          fi
+
+  sales-presentation:
+    needs: changes
+    if: needs.changes.outputs.mode == 'sales-css'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm run install:ci
+      - name: Keep release byte boundaries and Sales contracts
+        run: |
+          node --import tsx --test tests/pos-release-amendment.test.ts tests/business-dates-guard.test.ts
+          node --test tests/visual-layout-regression-v279.test.mjs tests/navigation-contract-v247.test.mjs tests/sales-navigation-performance.test.mjs
+      - name: Install Chromium and WebKit
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium webkit
+      - name: Build pinned upstream libsoup fix for WebKit network heap corruption
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y meson ninja-build libglib2.0-dev libnghttp2-dev libsqlite3-dev libpsl-dev libbrotli-dev glib-networking
+          bash scripts/qa/build-webkit-libsoup.sh "$RUNNER_TEMP/bd-webkit-libsoup"
+      - name: Journal and manual-entry compatibility, geometry and navigation
+        run: |
+          node --import tsx scripts/sales-shell-geometry-browser.ts
+          node --import tsx scripts/sales-iphone-browser.ts
+          for browser in chromium webkit; do
+            for width in 390 820 1280; do
+              BD_PERF_BROWSER=$browser BD_PERF_WIDTH=$width BD_PERF_DELAYS=0 BD_PERF_LABEL=scoped node --import tsx scripts/sales-navigation-performance.ts
+            done
+            for profile in safe tablet desktop; do
+              BD_SCROLL_BROWSER=$browser BD_SCROLL_PROFILE=$profile BD_SCROLL_DELAYS=0 BD_SCROLL_LABEL=scoped node --import tsx scripts/sales-scroll-layout-qa.ts
+            done
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sales-presentation-evidence
+          path: |
+            outputs/sales-shell-geometry
+            outputs/sales-iphone-hardening
+            outputs/sales-navigation-performance/scoped
+            outputs/scroll-stability/scoped*
+            outputs/webkit-runtime
+
   auth-recovery-p0:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -68,6 +148,8 @@ jobs:
           path: outputs/auth-recovery-p0
 
   verify-core:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
@@ -233,7 +315,8 @@ jobs:
           if-no-files-found: error
 
   verify-browser:
-    needs: verify-core
+    needs: [changes, verify-core]
+    if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -331,6 +414,8 @@ jobs:
           path: outputs/sales-iphone-hardening
 
   sales-navigation:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
@@ -418,6 +503,8 @@ jobs:
             outputs/menu-origin-trace/webkit
 
   sales-scroll-layout:
+    needs: changes
+    if: needs.changes.outputs.mode == 'full'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
@@ -457,12 +544,15 @@ jobs:
 
   verify:
     if: always()
-    needs: [auth-recovery-p0, verify-core, verify-browser, sales-navigation, sales-scroll-layout]
+    needs: [changes, sales-presentation, auth-recovery-p0, verify-core, verify-browser, sales-navigation, sales-scroll-layout]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Require every application and browser gate
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+      - name: Require every selected gate; never accept failed or cancelled work
         env:
           REQUIRED_RESULTS: ${{ toJSON(needs) }}
-        run: |
-          node -e 'const jobs = JSON.parse(process.env.REQUIRED_RESULTS); for (const [name, job] of Object.entries(jobs)) { console.log(name + ": " + job.result); if (job.result !== "success") process.exitCode = 1; }'
+        run: node scripts/ci-required-gates.mjs
