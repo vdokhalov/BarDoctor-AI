@@ -14,7 +14,7 @@ export async function POST(request:Request){
   return Response.json({ok:true,venueId:result.venueId,expiresAt:result.expiresAt,landing:'/cashier?embedded=1'},{headers:{'Cache-Control':'no-store','Set-Cookie':posSetCookie(POS_SESSION_COOKIE,result.token,request)}});
  }catch(error){
   const code=error instanceof Error?error.message:'';
-  if(code==='PIN_RATE_LIMIT')return failure(429,'Слишком много попыток. Подождите 15 минут. Если вход не восстановился, попросите владельца или управляющего выдать новый PIN.');
+  if(code==='PIN_RATE_LIMIT')return failure(429,'Слишком много попыток. Повторите через 15 минут.');
   if(code==='PIN_INVALID')return failure(401,'Неверный логин или PIN.');
   return failure(503,'Вход временно недоступен.');
  }

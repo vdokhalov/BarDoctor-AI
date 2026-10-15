@@ -116,8 +116,42 @@ not a migration or a synthetic test against real business records.
   keep staff login disabled and escalate to the platform; no ad-hoc production SQL
   endpoint or alternate database credentials.
 
-Release blockers: acceptance of the bounded six-digit guessing/targeted-lockout tradeoff; final build/emitted checks and
+Release blockers: resolution of the permanent six-digit PIN risk under automatic throttling; final build/emitted checks and
 mandatory full CI; hosted migration inventory/ledger confirmation; separately
 approved runtime provisioning and release. No release PASS yet.
 
 Current design and residual risk: [IP-independent admission](staff-login-account-limits.md). No new required source/IP runtime setting.
+
+
+## Preparation findings (2026-10-15)
+
+The owner rejected the lifetime hard stop. Current admission is five/window and
+two concurrent leases, automatically recovering with the same PIN. No new schema
+migration is introduced for this behavior. See staff-login-account-limits.md for quantified
+remaining risk; this is not a security release approval.
+
+Local Wrangler/D1 migration test reconstructed v520 schema from committed SQL,
+seeded ONLY synthetic business/membership/session/job records, and applied exact
+packaged 0026–0031. All original rows and schema objects were preserved; nine new
+tables were empty; foreign_key_check was empty and integrity_check was ok.
+A second `wrangler d1 migrations apply --local` was a data/schema no-op with six
+ledger records. This verifies the official local Wrangler mechanism, not the
+inaccessible Sites deployment executor. The starter's raw `d1 execute --file`
+command must NOT blindly replay already-applied CREATE/ALTER statements.
+
+The packaged Drizzle journal still ends at 0020; 0021–0031 are raw SQL files outside
+that journal. A stock Drizzle journal-based migrator would not discover them.
+Sites' skill says it applies hosted migrations before uploading the Worker, but
+its discovery/ledger details are not exposed here. Confirm that deployment consumes
+the packaged raw SQL files with an applied ledger before production; do not claim
+local Wrangler PASS establishes Sites idempotency, nor rewrite historical metadata
+without knowing the platform mechanism.
+
+Secret installation is supported by native Sites update_environment_variables:
+set only STAFF_PIN_LOOKUP_KEY, is_secret=true, preserve other entries. It accepts
+a value, not a native generate-secret request. After separate authorization, generate
+>=32 cryptographically random bytes in transient execution memory and pass directly
+to the native call without printing, chat disclosure, source, environment file or
+checkpoint storage. Never fetch/display existing secret values. The native tool
+explicitly requires deploying a saved version after an environment change to apply
+the new revision. This investigation generated or set no secret.

@@ -54,7 +54,7 @@ export async function loginStaffPin(request:Request,pin:string,loginValue:unknow
  const credential=login?await db.prepare(`SELECT p.*,m.account_id FROM staff_logins l JOIN staff_pin_credentials p ON p.membership_id=l.membership_id JOIN venue_memberships m ON m.id=p.membership_id WHERE l.login=? AND p.revoked_at IS NULL AND m.status='active' AND m.role='cashier'`)
  .bind(login).first<{membership_id:number;venue_id:number;revision:number;password_hash:string;password_salt:string;password_iterations:number}>():null;
  // Salted hash identifies this PIN generation independently of mutable username
- // and authorization revision. Rename/re-enable cannot grant another guess budget.
+ // and authorization revision. Rename/re-enable cannot grant another current-window guess budget.
  const credentialScope=credential?'credential:'+credential.membership_id+':'+await posDigest(credential.password_hash):null;
  const lease=posToken(),leaseExpiry=at+30000;
  // An optional source check runs first; a failed reservation never reaches
@@ -71,8 +71,8 @@ export async function loginStaffPin(request:Request,pin:string,loginValue:unknow
   ...(credentialScope?[db.prepare('INSERT INTO staff_login_limits(scope,window_start) VALUES (?,?) ON CONFLICT(scope) DO NOTHING').bind(credentialScope,window)]:[]),
   db.prepare(`INSERT INTO staff_login_leases(id,login_scope,credential_scope,expires_at)
    SELECT ?,?,?,? WHERE
-   EXISTS (SELECT 1 FROM staff_login_limits WHERE scope=? AND attempts<10 AND (window_start<>? OR window_attempts<5))
-   AND (? IS NULL OR EXISTS (SELECT 1 FROM staff_login_limits WHERE scope=? AND attempts<10 AND (window_start<>? OR window_attempts<5)))
+   EXISTS (SELECT 1 FROM staff_login_limits WHERE scope=? AND (window_start<>? OR window_attempts<5))
+   AND (? IS NULL OR EXISTS (SELECT 1 FROM staff_login_limits WHERE scope=? AND (window_start<>? OR window_attempts<5)))
    AND (? IS NULL OR EXISTS (SELECT 1 FROM staff_pin_credentials p JOIN staff_logins l ON l.membership_id=p.membership_id
     WHERE p.membership_id=? AND p.revision=? AND p.password_hash=? AND p.revoked_at IS NULL AND l.login=?))
    AND (SELECT count(*) FROM staff_login_leases WHERE login_scope=?)<2

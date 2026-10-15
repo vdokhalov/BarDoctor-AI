@@ -162,29 +162,29 @@ test('security review: public enumeration, manager authority and cross-venue bou
  assert.equal((await r.api.session.GET(request('','','192.0.2.1',token,'/api/staff-pin/session','GET'))).status,401);
 });
 
-test('IP-independent limits: ten lifetime guesses, rename/restore cannot refill, only new PIN recovers',async t=>{
- const {r,request,enter,pins,members,actor,a,pin,other}=await setup();t.after(r.close);
- for(let round=0;round<2;round++){
+test('IP-independent limits: temporary lock recovers automatically with unchanged PIN beyond ten failures',async t=>{
+ const {r,request,enter,members,actor,a,pin,other}=await setup();t.after(r.close);
+ const original=r.sqlite.prepare('SELECT password_hash FROM staff_pin_credentials WHERE membership_id=?').get(a.membershipId)?.password_hash;
+ let login='anna';
+ for(let round=0;round<3;round++){
   for(let i=0;i<5;i++){
-   const req=request(i%2?'ANNA':' anna ','bad','203.0.113.'+(round*5+i));req.headers.set('x-forwarded-for',crypto.randomUUID());req.headers.delete('cf-connecting-ip');
+   const req=request(i%2?login.toUpperCase():' '+login+' ','bad','203.0.113.'+(round*5+i));req.headers.set('x-forwarded-for',crypto.randomUUID());req.headers.delete('cf-connecting-ip');
    assert.equal((await r.api.session.POST(req)).status,401);
   }
-  assert.equal((await r.api.session.POST(request())).status,429);
+  assert.equal((await r.api.session.POST(request(login,pin.pin))).status,429);
+  if(round===0){
+   await members.setStaffLogin(actor,a.membershipId,'renamed');login='renamed';
+   assert.equal((await r.api.session.POST(request(login,pin.pin))).status,429,'rename cannot bypass the current credential window');
+  }
+  assert.ok(await enter('boris',other.pin),'colleague is not blocked');
+  const before=r.sqlite.prepare('SELECT scope,window_start,window_attempts FROM staff_login_limits ORDER BY scope').all();
+  assert.equal((await r.api.session.POST(request(login,pin.pin))).status,429);
+  assert.deepEqual(r.sqlite.prepare('SELECT scope,window_start,window_attempts FROM staff_login_limits ORDER BY scope').all(),before,'blocked requests do not extend the delay');
+  // Advance the persisted fixture window; no PIN reset/unlock/owner action.
   r.sqlite.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+  assert.ok(await enter(login,pin.pin),'same correct PIN works in the next window');
  }
- assert.equal((await r.api.session.POST(request())).status,429,'lifetime limit survives new time window');
- await members.setStaffLogin(actor,a.membershipId,'renamed');
- assert.equal((await r.api.session.POST(request('renamed',pin.pin))).status,429,'credential budget survives rename');
- assert.ok(await enter('boris',other.pin),'another employee remains available');
- await assert.rejects(pins.issueStaffPin({...actor,role:'shift_manager'},a.membershipId),/ACCESS_DENIED/);
- assert.equal((await r.api.session.POST(request('renamed',pin.pin))).status,429);
- const fresh=await pins.issueStaffPin(actor,a.membershipId);
- assert.equal((await r.api.session.POST(request('renamed','bad'))).status,401);
- assert.ok(await enter('renamed',fresh.pin),'reset creates a new generation and clears login lock');
- const limits=r.sqlite.prepare("SELECT attempts FROM staff_login_limits WHERE scope LIKE 'credential:%'").all();
- assert.ok(limits.some(x=>x.attempts===1),'successful login refunds only itself, not prior failures');
- await pins.revokeStaffPin(actor,a.membershipId);
- assert.equal((await r.api.session.POST(request('renamed',fresh.pin))).status,401);
+ assert.equal(r.sqlite.prepare('SELECT password_hash FROM staff_pin_credentials WHERE membership_id=?').get(a.membershipId)?.password_hash,original);
 });
 test('IP-independent limits: parallel admission, expired lease and reset in-flight are fail closed',async t=>{
  const {r,request,pins,actor,a,enter}=await setup();t.after(r.close);
@@ -208,7 +208,7 @@ test('IP-independent limits: unknown login follows same lockout and new staff ca
   assert.equal((await r.api.session.POST(request('future','bad'))).status,429);
   r.sqlite.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
  }
- assert.equal((await r.api.session.POST(request('future','bad'))).status,429);
+ assert.equal((await r.api.session.POST(request('future','bad'))).status,401,'unknown login also recovers in a new window after ten failures');
  const future=await members.createPinStaff(actor,'Future','cashier','future'),pin=await pins.issueStaffPin(actor,future.membershipId);
  assert.ok(await enter('future',pin.pin));
 });

@@ -65,6 +65,15 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     await db.prepare("DELETE FROM staff_login_leases WHERE id='held-1'").run();
     assert.equal((await call({action:'login',login:'worker-staff',pin:'bad'})).body.error,'PIN_INVALID');
     await db.prepare("DELETE FROM staff_login_leases WHERE id='held-2'").run();
+    // Automatic recovery does not require reset, owner access, or a source IP.
+    for(let round=0;round<3;round++){
+      await db.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+      for(let i=0;i<5;i++)assert.equal((await call({action:'login',login:'worker-staff',pin:'bad'})).body.error,'PIN_INVALID');
+      assert.equal((await call({action:'login',login:'worker-staff',pin:issued.pin})).body.error,'PIN_RATE_LIMIT');
+    }
+    await db.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+    const recovered=await call({action:'login',login:'worker-staff',pin:issued.pin});assert.equal(recovered.status,200);
+    assert.ok((await call({action:'session'},'bd_pos_session='+recovered.body.token)).body.session);
     await db.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").bind(member.membershipId).run();
     await db.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").bind(member.membershipId).run();
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_login_sessions').first()).n,0);

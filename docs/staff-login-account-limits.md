@@ -1,110 +1,73 @@
-# IP-independent PIN admission
+# IP-independent, automatically recovering PIN admission
 
-Supersedes the ingress release blocker in the cf7fa4fb security review. The
-platform's IP-header provenance is still unproven; it is no longer needed to
-allow authentication. No production action was performed.
+Current owner decision: no lifetime attempt budget, forced PIN change or manual
+unlock. This supersedes the lifetime-cap design at 1f1b607d. Incorrect PIN never
+authenticates; a correct PIN is temporarily throttled while its window is full,
+then works again without owner intervention. Production remains unchanged.
 
-## Mandatory account controls
+## Actual controls
 
-D1 atomically admits at most two active verification leases per normalized login
-AND per credential generation. Each lease expires after 30 seconds. A crashed
-request remains charged as a failed attempt; expiration frees concurrency only.
-The final session INSERT requires the same live lease and credential revision.
+D1 atomically reserves at most five failed/in-flight checks per 15-minute fixed
+window for BOTH normalized login and credential generation. Two concurrent
+30-second verification leases are the maximum for each scope. A failed/crashed
+request stays charged for that window; lease expiry frees concurrency, not its
+window budget. Final session creation checks the lease and credential revision.
 
-Every admitted verification reserves BOTH counters before PBKDF2:
+A new window automatically allows attempts with the SAME PIN. There is no
+attempts<10 condition and no lifetime hard stop. The existing attempts column is
+accounting only, not an admission condition. Blocked requests cannot extend the
+window or renew a lease. Success refunds only itself, never other failures.
+Rename cannot bypass a current credential window; authorization revision changes
+do not alter the salted-hash generation key. Existing revocation/actor/venue/POS
+write checks remain. Reset/revoke stays available for genuine credential changes,
+but it is not a prerequisite for recovering from errors.
 
-- At most five failed/in-flight attempts per 15-minute fixed window. Requests
-  denied by a limit do not extend the window, increment counts or renew leases.
-- At most ten failed/in-flight attempts over the lifetime of that PIN generation.
-  A new time window, rename, disable/enable or authorization revision change does
-  not reset this limit. The credential scope includes membership and a digest of
-  the salted credential hash, rather than the mutable authorization revision.
-- A successful login refunds only its own reservations; prior failures remain.
-  Success does not provide an attacker another ten guesses. Independent sessions,
-  permanent revocation, actor binding and transaction-time POS checks are retained.
+No IP header grants admission. Unverified CF-Connecting-IP, X-Real-IP and
+X-Forwarded-For are ignored. Optional verified source throttling remains additive
+(50/source/window) and disabled by default. No whole-venue attempt budget exists.
+Unknown logins have matching window/concurrency rules, dummy PBKDF2 and generic
+errors. Creating a staff login or first PIN cannot inherit anonymous pre-lockout.
+The displayed throttle message says to retry after 15 minutes, not contact a manager.
 
-There is no venue-wide attempt budget. Client CF-Connecting-IP, X-Real-IP and
-X-Forwarded-For are ignored unless an operator has separately enabled the verified
-source policy. Changing or omitting those headers cannot alter mandatory account
-admission. If enabled, the existing 50/source/15-minute throttle is additional:
-it can only deny, never grant or replenish a login/credential budget. It is NOT
-needed or recommended for the initial release without platform evidence.
+## Residual risk — not sufficient for security release approval
 
-The old five/15-minute limit is retained and strengthened, not removed for tests.
-Two leases can finish while other requests are still arriving, so a concurrent
-HTTP batch may admit more than two in total; no more than two may be in flight at
-once. Native D1 tests use two held leases to test this deterministically, as well
-as the total window budget.
+A permanent six-digit PIN has one million possibilities. Five checks per 15-minute
+window permit up to 480/day. Over 365 days a targeted attacker can test 175,200
+distinct candidates: approximately 17.5% of the space. Parallelism and distributed
+IP changes cannot exceed the account budget, but do not need to: the budget
+replenishes indefinitely. These estimates assume a fixed uniformly random PIN
+and no other intervening controls; venue uniqueness slightly changes its space.
 
-## Recovery and unknown logins
+Therefore this implementation satisfies the requested recovery behavior, but this
+review does NOT endorse a permanent six-digit PIN as sufficient standalone public
+authentication under these limits. Minimal alternative without manual recovery:
+keep login + auto-throttle, replace the six-digit secret with a substantially longer
+random password (e.g. 12 random base32 characters, 60 bits). A passkey is another
+option, with larger UX scope. No format change was made without owner approval.
+A short-lived six-digit code can also limit accumulation but requires a delivery/
+renewal design, so it is not silently substituted here.
 
-After a temporary throttle, wait for the current 15-minute window to finish.
-After ten failures, waiting alone cannot unlock the same PIN. Owner/manager uses
-existing Reset PIN: SQL refuses to reissue the current PIN, generates a new one,
-advances revision, clears that login's lock and pending leases, and audits the
-issuance. No unlock-old-PIN endpoint exists. Admin/shift_manager and cashier cannot
-recover access. Revoke does not replenish a PIN's lifetime budget. Reset before
-admission rejects stale credential snapshots without charging the new login.
+Targeted temporary lockout remains possible, and the attacker can repeat it after
+each window. Existing sessions are not revoked just because wrong PINs arrive.
+Other staff have separate budgets. Across arbitrary fresh usernames, attackers
+can still consume D1 storage/KDF resources: this is not application-wide DDoS
+protection. Platform abuse/capacity controls remain necessary. No unverified
+header or global venue lock is being presented as a solution to these limitations.
 
-Unknown logins use the same window, lifetime and concurrency rules, dummy PBKDF2,
-and public error text. Malformed names have a separate non-login namespace.
-The rate-limit message is identical for temporary and lifetime exhaustion and
-instructs the user to request a new PIN if waiting does not help. No public lock
-status or employee directory is exposed. Creating a new employee/first PIN clears
-anonymous pre-lockout of that login. Rename clears the destination login lock but
-retains the PIN-generation budget, so rename cannot become a brute-force bypass.
+## Evidence and production scope
 
-Admission rows are persistent: do not routinely erase them to free storage, as
-that would replenish guesses. Old credential rows are removed only on genuine
-PIN replacement. Unknown-name traffic can create persistent small rows and invoke
-KDF work for fresh names. This design bounds guesses against an employee, NOT
-aggregate DDoS/resource consumption across arbitrary names; platform abuse controls
-and capacity monitoring still apply. No shared application lockout of an entire
-venue was introduced to conceal this limitation.
+Focused session/credential tests include >10 failures across three windows with
+the same PIN succeeding after automatic recovery, unchanged credential hash,
+non-extension by blocked requests, rename/IP bypass denial and colleague access.
+Native Worker/D1 independently checks window recovery and deterministic two-lease
+concurrency with missing IP headers. Existing reset/revoke, cost projection,
+account/venue and stale-login checks remain. Counts/results are in checkpoint.
 
-## Sufficiency and residual risk
+No schema change is needed for removal of the lifetime admission condition.
+Pending migrations remain exactly 0026–0031, unchanged. Required runtime secret:
+STAFF_PIN_LOOKUP_KEY (>=32 random bytes, secret=true) for issuance/reset uniqueness.
+No source setting is required; leave STAFF_PIN_SOURCE_POLICY absent.
 
-A replenishing five/15-minute throttle allows up to 480 guesses/day against the
-same permanent PIN. The new hard stop prevents that accumulation, even across
-many addresses. Ten guesses against a uniformly random six-digit PIN have roughly
-0.001% success probability per issuance; venue PIN uniqueness slightly changes the
-sample space. Risks accumulate across employees and repeated credential issuances.
-This is a bounded online guessing policy, not proof of absolute security or a new
-release PASS. Offline database compromise is a separate low-entropy-secret risk;
-existing salted PBKDF2 is retained, not represented as strong-password entropy.
-
-An attacker knowing a login can lock that employee out. They cannot lock colleagues
-through a shared venue counter, invalidate existing sessions merely by submitting
-bad PINs, or recover the blocked employee without owner/manager authority. A reset
-can itself be attacked again. If repeated manual recovery or the remaining guessing
-risk is unacceptable, the minimal product alternative is username + a longer
-random password (or passkey), not silently unlocking/recycling the six-digit PIN.
-The present design removes the unverified-IP dependency while making this tradeoff
-explicit for the release decision.
-
-## Scoped evidence
-
-20 session/credential tests PASS, including earlier revocation/authorization/cost
-projection guards, plus a separate forced-RNG-repeat test: reset cannot reissue
-the same PIN, clear its budget or emit an issuance audit. Three focused account-limit tests were rerun after the final
-stale-reservation and invalid-name namespace changes. Native Worker/D1 PASS:
-missing IP, parallel sessions, shared window budget, deterministic concurrency,
-revocation epochs and zero outbound calls. Exact-byte release guards are recorded
-in checkpoint. No broad CI/build/browser suite was run for this revision.
-
-## Production delta
-
-Required runtime secret: STAFF_PIN_LOOKUP_KEY, >=32 random bytes, secret=true, for
-PIN issuance/reset uniqueness. No new external/API credentials and no required
-IP/source setting. Leave STAFF_PIN_SOURCE_POLICY absent; it is optional only after
-independent ingress verification. Removing this setting no longer disables login.
-
-Schema: 0026 credentials/audit; 0027 historical device/session tables + optional
-source counters; 0028 credential revocation triggers; 0029 logins/new sessions;
-0030 revoke/restore epochs; NEW 0031 login/credential limits, leases, indexes and
-recovery triggers. Apply only through the approved Sites release migration flow,
-never in auth requests. These files were applied only to disposable synthetic DBs.
-
-See staff-login-production-runbook.md for build/CI, packaging and rollback. The
-remaining release gates are final exact build/emitted checks, unchanged mandatory
-full CI, hosted migration-ledger/package confirmation and publication approval.
+See staff-login-production-runbook.md for migration discovery, secret setting,
+CI/build, release and rollback. Owner decision on remaining six-digit risk is
+still unresolved; tests passing do not mean release PASS.

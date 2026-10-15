@@ -48,11 +48,10 @@ selected by username, without needing this lookup key. Rotation of the issuance
 key requires a deliberate credential reissue strategy.
 
 Before hashing, D1 atomically reserves per normalized login AND per credential
-at most five failed/in-flight attempts per 15-minute window, ten over the PIN
-lifetime, and two concurrent 30-second leases. Successful login refunds only its
+at most five failed/in-flight attempts per 15-minute window and two concurrent
+30-second leases. There is no lifetime cap or manual-unlock requirement. Successful login refunds only its
 own reservation. Expired/crashed work stays charged. Rename or authorization
-epoch changes cannot replenish the PIN budget. Owner/manager recovers through a
-new PIN, never by unlocking the old one. There is no shared venue counter.
+epoch changes cannot replenish the current-window PIN budget. The same correct PIN works again automatically after the window ends. There is no shared venue counter.
 
 IP is not required and no unverified IP header controls admission. Optional
 STAFF_PIN_SOURCE_POLICY=verified-cloudflare enables only an additional source
