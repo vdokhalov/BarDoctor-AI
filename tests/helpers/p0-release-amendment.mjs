@@ -16,6 +16,7 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-approved conservative CI routing (2026-10-15); exact CI bytes remain pinned.
 export const p0Paths=Object.freeze([
  'scripts/patch-sales-navigation-performance.mjs',
+ 'scripts/cashier-presentation-browser.ts',
  'scripts/ci-change-scope.mjs','scripts/ci-required-gates.mjs',
  'public/app-shell-v185.css','scripts/sales-shell-geometry-browser.ts',
  'scripts/recheck-chromium-parity-ci-snapshots.mjs',

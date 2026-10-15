@@ -5,7 +5,9 @@ import {pathToFileURL} from 'node:url';
 import {createHash} from 'node:crypto';
 const require=createRequire(process.cwd()+'/package.json');
 const postcss=require('postcss');
-const localCss='public/sales-journal.css';
+const localStyles=new Set(['public/sales-journal.css','public/cashier.css']);
+const embeddedInset='@media(max-width:600px){html[data-bd-embedded="true"] body{padding-top:0}}';
+const insetComment='/* The shared host already accounts for the mobile top safe area. */';
 const properties=new Set(['color','background-color','border-color','border-top-color','border-bottom-color','font-size','font-weight','line-height','letter-spacing','padding','padding-top','padding-right','padding-bottom','padding-left','margin','margin-top','margin-right','margin-bottom','margin-left','gap','row-gap','column-gap','border-radius','max-width','min-width','width','min-height','max-height','height']);
 
 // Only existing declaration values may change. New selectors, at-rules,
@@ -28,9 +30,16 @@ function presentationValuesOnly(before,after){
   }
   try{return compare(postcss.parse(before),postcss.parse(after))&&changed;}catch{return false;}
 }
+function cashierInsetOnly(before,after){
+  // One reviewed additive rule; every other byte must remain unchanged.
+  const addition='\n'+insetComment+'\n'+embeddedInset+'\n';
+  const at=after.indexOf(addition);
+  return at>=0 && after.indexOf(addition,at+1)<0 && after.slice(0,at)+after.slice(at+addition.length)===before;
+}
 export function classifyChanges(changes){
-  const c=changes.find(c=>c.path===localCss);
-  if(!c||changes.length>2)return {mode:'full',reason:'empty, mixed or multiple-file diff'};
+  const c=changes.find(c=>localStyles.has(c.path));
+  if(!c||changes.filter(c=>localStyles.has(c.path)).length!==1||changes.length>2)return {mode:'full',reason:'empty, mixed or multiple-file diff'};
+  const localCss=c.path;
   if(changes.length===2){
     const companion=changes.find(item=>item!==c);
     if(companion.path!=='tests/fixtures/p0-release-amendment-v517.json'||companion.status!=='M'||companion.oldMode!=='100644'||companion.newMode!=='100644')return {mode:'full',reason:'unclassified companion file'};
@@ -43,7 +52,7 @@ export function classifyChanges(changes){
     }catch{return {mode:'full',reason:'release manifest change is not exactly the local CSS digest'};}
   }
   if(c.path!==localCss||c.status!=='M'||c.oldMode!=='100644'||c.newMode!=='100644')return {mode:'full',reason:'path, operation or file mode is outside the reviewed local CSS boundary'};
-  return presentationValuesOnly(c.before,c.after)?{mode:'sales-css',reason:'existing presentation values only; journal and manual-entry consumers'}:{mode:'full',reason:'CSS structure or unclassified value changed'};
+  return (presentationValuesOnly(c.before,c.after)||(localCss==='public/cashier.css'&&cashierInsetOnly(c.before,c.after)))?{mode:'sales-css',reason:'existing presentation values only; journal and manual-entry consumers'}:{mode:'full',reason:'CSS structure or unclassified value changed'};
 }
 export function classifyRange(base,head){
   const git=args=>execFileSync('git',args,{encoding:'utf8',maxBuffer:64*1024*1024});
@@ -54,7 +63,7 @@ export function classifyRange(base,head){
     const changes=[];
     for(let i=0;i<raw.length-1;i+=2){
       const [oldMode,newMode,,,status]=raw[i].slice(1).split(' '),path=raw[i+1];
-      const read=status==='M'&&[localCss,'tests/fixtures/p0-release-amendment-v517.json'].includes(path);
+      const read=status==='M'&&(localStyles.has(path)||path==='tests/fixtures/p0-release-amendment-v517.json');
       changes.push({path,status,oldMode,newMode,before:read?git(['show',base+':'+path]):'',after:read?git(['show',head+':'+path]):''});
     }
     return classifyChanges(changes);

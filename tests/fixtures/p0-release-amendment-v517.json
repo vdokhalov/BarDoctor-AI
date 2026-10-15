@@ -4,7 +4,7 @@
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
-      "after": "8c8d51553a418e9a51bb373c6b995e6701950d421960d30b4a0577b98183cb27"
+      "after": "5a440a7a5b142127b1c22b63a74ebb457f600d6e68a8bbb4444948243d4fe09b"
     },
     "app/api/auth/bootstrap/route.ts": {
       "before": "f01ec62d4b0749c57d68dd3268e9fb6a4dba3c29eb6f4d799370859d6457ffff",
@@ -240,11 +240,15 @@
     },
     "scripts/ci-change-scope.mjs": {
       "before": null,
-      "after": "30239114b0f871f273b076587d52072dde3dc9a00168753e0eff5bf217dbff3a"
+      "after": "863ace08b813028d96fdc41880bafd19535b919712df0b680caac25b6abdaaff"
     },
     "scripts/ci-required-gates.mjs": {
       "before": null,
       "after": "3743157c50b6a57caaeb7c93faac17593b448d46b2ae64e722c1682f47faa4b1"
+    },
+    "scripts/cashier-presentation-browser.ts": {
+      "before": null,
+      "after": "71eb1537b10ce943a6bbd2f618b3512e4aaf9a60ec1c8320afe3d738dadafb42"
     }
   }
 }

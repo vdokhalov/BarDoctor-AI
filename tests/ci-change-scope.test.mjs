@@ -53,3 +53,27 @@ test('aggregate rejects failed, cancelled, missing or skipped selected gates',()
  }
  assert.throws(()=>assertRequiredGates(results('unknown')));
 });
+const cashier={...css,path:'public/cashier.css'};
+const inset='\n/* The shared host already accounts for the mobile top safe area. */\n@media(max-width:600px){html[data-bd-embedded="true"] body{padding-top:0}}\n';
+test('cashier allows existing presentation values and only the reviewed embedded inset addition',()=>{
+ assert.equal(classifyChanges([cashier]).mode,'sales-css');
+ const change={...cashier,after:cashier.before+inset};
+ assert.equal(classifyChanges([change]).mode,'sales-css');
+ for(const after of [change.after.replace('600px','601px'),change.after.replace('padding-top:0','padding-top:10px'),change.after.replace('html[data-bd-embedded="true"] body','body'),change.after+inset,change.after+'body{display:none}',change.after.replace('color:red','color:blue')])assert.equal(classifyChanges([{...change,after}]).mode,'full',after);
+ for(const path of ['app/cashier/route.ts','public/cashier.js','public/sales-journal.css','lib/bardoctor/auth.ts','db/schema.ts','unknown.txt'])assert.equal(classifyChanges([change,{...css,path}]).mode,'full',path);
+ for(const status of ['A','D','R100','T'])assert.equal(classifyChanges([{...change,status}]).mode,'full');
+ assert.equal(classifyChanges([{...change,newMode:'120000'}]).mode,'full');
+});
+test('cashier manifest updates must bind exact bytes and cannot grant new approvals',()=>{
+ const hash=s=>createHash('sha256').update(s).digest('hex');
+ const before={baseline:'fixed',files:{[cashier.path]:{before:'historical',after:hash(cashier.before)}}};
+ const after=structuredClone(before);after.files[cashier.path].after=hash(cashier.after);
+ const companion={...css,path:'tests/fixtures/p0-release-amendment-v517.json',before:JSON.stringify(before),after:JSON.stringify(after)};
+ assert.equal(classifyChanges([cashier,companion]).mode,'sales-css');
+ for(const mutated of [{...after,baseline:'HEAD'},{...after,files:{...after.files,'app/cashier/route.ts':{after:'x'}}},{...after,files:{[cashier.path]:{before:'changed',after:hash(cashier.after)}}}])assert.equal(classifyChanges([cashier,{...companion,after:JSON.stringify(mutated)}]).mode,'full');
+ assert.equal(classifyChanges([cashier,{...companion,before:'{"files":{}}'}]).mode,'full');
+});
+test('aggregate never accepts fabricated success for unselected full gates or missing evidence',()=>{
+ for(const name of fullGates){const jobs=results('sales-css');jobs[name].result='success';assert.throws(()=>assertRequiredGates(jobs));}
+ const missing=results('sales-css');delete missing['sales-presentation'];assert.throws(()=>assertRequiredGates(missing));
+});

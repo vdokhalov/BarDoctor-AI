@@ -89,6 +89,7 @@ jobs:
           bash scripts/qa/build-webkit-libsoup.sh "$RUNNER_TEMP/bd-webkit-libsoup"
       - name: Journal and manual-entry compatibility, geometry and navigation
         run: |
+          node --import tsx scripts/cashier-presentation-browser.ts
           node --import tsx scripts/sales-shell-geometry-browser.ts
           node --import tsx scripts/sales-iphone-browser.ts
           for browser in chromium webkit; do
@@ -104,6 +105,7 @@ jobs:
         with:
           name: sales-presentation-evidence
           path: |
+            outputs/cashier-presentation
             outputs/sales-shell-geometry
             outputs/sales-iphone-hardening
             outputs/sales-navigation-performance/scoped
