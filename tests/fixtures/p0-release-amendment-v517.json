@@ -248,7 +248,7 @@
     },
     "scripts/cashier-presentation-browser.ts": {
       "before": null,
-      "after": "71eb1537b10ce943a6bbd2f618b3512e4aaf9a60ec1c8320afe3d738dadafb42"
+      "after": "f0b409d3b5ed770938016cf1171b4fbe7dcded16abce7e4aa865d1f2268379d4"
     },
     "public/cashier.css": {
       "before": "3033793f93de4bca5ac34d965082b8277ac84de7290b227143e2d1f0ca7dd3a6",
@@ -328,7 +328,7 @@
     },
     "scripts/staff-pin-browser.ts": {
       "before": null,
-      "after": "5381f2436bcb2780a56dbb4474c8864d7fd408216ad40d24eb07c49e3b740899"
+      "after": "5288b90093e61102ec258a6bc1a33093cf8612d0f9239bc30a697d0ae6fe22cd"
     },
     "worker/index.ts": {
       "before": "12d769c15d214679cb26ff38d64d2719f50f79ee97a09fb67dc4b13a7be1206f",
