@@ -10,7 +10,7 @@ function fixture(status: number, body: string, changedIdentity = false) {
   const stored=new Map(['bd_session','bd_session_token','bd_session_userid','bd_pos_workspace_v2:1:1'].map(key=>[key,'synthetic']));
   const state = { frozen: false, data: { venueId: 1 } };
   let identity = 'original', frozenAtParse = false;
-  const context = vm.createContext({ state, Error, AbortSignal, loadGeneration: 0,
+  const context = vm.createContext({ pinMode: false, state, Error, AbortSignal, loadGeneration: 0,
     identity: () => identity, initialIdentity: 'original', selectedVenue: () => '1', initialVenue: '1',
     localStorage: { getItem: (key:string) => stored.get(key)??null, removeItem: (key:string) => {removed.push(key);stored.delete(key);} }, $: () => ({}),
     clearSensitive: (message: string) => { state.frozen = true; cleared.push(message); },
