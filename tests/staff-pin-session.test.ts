@@ -66,13 +66,20 @@ test('real payment author is server-derived; stale actor and in-flight reset can
  const command={id:'login-sale',source:'POS_API',shiftId:'shift',payments:[{id:'p',method:'CASH',amount:20}],lines:[{id:'l',menuItemId:'beer',quantity:1}],actor:{accountId:owner.userId}};
  assert.equal((await send({action:'preview',command},owner.userId)).status,401);
  for(const action of ['open_shift','close_shift','reverse'])assert.equal((await send({action,shiftId:'shift'})).status,403);
- const preview=await(await send({action:'preview',command})).json();assert.equal((await send({action:'post',command,previewHash:preview.previewHash})).status,201);
+ const preview: unknown=await(await send({action:'preview',command})).json();
+ assert.ok(preview && typeof preview === 'object' && 'previewHash' in preview);
+ assert.ok(typeof preview.previewHash === 'string' && preview.previewHash.length > 0);
+ assert.equal((await send({action:'post',command,previewHash:preview.previewHash})).status,201);
  const events=()=>JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(events()[0].actor.accountId,a.actorId);
  const stored=events()[0];assert.ok(stored.batch,'fixture includes internal cost-bearing batch');
  const safe=await r.api.sales.GET(request('','','192.0.2.1',token,'/api/sales-events','GET'));
  assert.equal(safe.status,200);assert.doesNotMatch(await safe.text(),/totalTheoreticalCost|originalMovements|recipeSnapshot|salary|payroll|staffing|openingFloat|closingReport/);
  const report=await r.api.sales.GET(request('','','192.0.2.1',token,'/api/sales-events?reportShiftId=shift','GET'));assert.equal(report.status,403);
- const next={...command,id:'blocked'},p=await(await send({action:'preview',command:next})).json();r.beforeNextDomainWrite(async()=>{await pins.revokeStaffPin(actor,a.membershipId);});
+ const next={...command,id:'blocked'};
+ const p: unknown=await(await send({action:'preview',command:next})).json();
+ assert.ok(p && typeof p === 'object' && 'previewHash' in p);
+ assert.ok(typeof p.previewHash === 'string' && p.previewHash.length > 0);
+ r.beforeNextDomainWrite(async()=>{await pins.revokeStaffPin(actor,a.membershipId);});
  assert.ok([401,403].includes((await send({action:'post',command:next,previewHash:p.previewHash})).status));assert.equal(events().length,1);
 });
 

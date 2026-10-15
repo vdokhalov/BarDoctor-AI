@@ -26,7 +26,13 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
-    const request=new Request(url,{method:req.method,headers:{...req.headers,'cf-connecting-ip':'127.0.0.1'} as HeadersInit,...(body.length?{body}:{})});
+    const headers = new Headers();
+    for (const [name, value] of Object.entries(req.headers)) {
+      if (Array.isArray(value)) for (const item of value) headers.append(name, item);
+      else if (value !== undefined) headers.set(name, value);
+    }
+    headers.set('cf-connecting-ip', '127.0.0.1');
+    const request=new Request(url,{method:req.method,headers,...(body.length?{body}:{})});
     const gate=await (runtime.api.gateway as unknown as typeof import('../lib/bardoctor/staff-pin-gateway')).staffPinGateway(request);
     if(gate)response=gate;
     else if(url.pathname==='/staff-login'||url.pathname==='/login'&&!url.searchParams.has('management'))response=staffLoginPage();

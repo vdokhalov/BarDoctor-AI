@@ -51,8 +51,17 @@ await context.addInitScript(({owner,venueId})=>{localStorage.setItem('bd_session
 await context.addInitScript({content:'window.__name=(value)=>value;'});const page=await context.newPage();const results=[];
 for(const [width,height] of [[390,844],[600,844],[601,844],[820,1000],[1280,800]]){
  await page.setViewportSize({width,height});await page.goto(base+'/cashier?venue='+venueId);await page.waitForLoadState('networkidle');const frame=await(await page.locator('iframe[data-bd-sales-surface]').elementHandle())!.contentFrame();assert.ok(frame);await frame.getByText('Кассовая смена закрыта',{exact:true}).waitFor();
- const child=await frame.evaluate(()=>({embedded:document.documentElement.dataset.bdEmbedded,padding:getComputedStyle(document.body).paddingTop,sidebarTop:document.querySelector('.sidebar').getBoundingClientRect().top}));assert.equal(child.embedded,'true');assert.equal(child.padding,'0px');
- const geometry=await page.evaluate(()=>{const f=document.querySelector('iframe[data-bd-sales-surface]').getBoundingClientRect(),n=document.querySelector('nav[data-bd-bottom-nav]').getBoundingClientRect(),h=document.querySelector('body>bd-app-header').getBoundingClientRect();return{iframeTop:f.top,headerBottom:h.bottom,gap:n.top-f.bottom}});assert.ok(Math.abs(geometry.iframeTop-geometry.headerBottom)<=1,'top edge '+width);if(width<900)assert.ok(Math.abs(geometry.gap)<=1,'bottom seam '+width);if(width<=600)assert.equal(child.sidebarTop,0);if(width===390)await page.screenshot({path:out+'/mobile-after.png'});
+ const child=await frame.evaluate(()=>{
+  const sidebar=document.querySelector('.sidebar');
+  if(!sidebar)throw new Error('Cashier sidebar missing');
+  return {embedded:document.documentElement.dataset.bdEmbedded,padding:getComputedStyle(document.body).paddingTop,sidebarTop:sidebar.getBoundingClientRect().top};
+ });assert.equal(child.embedded,'true');assert.equal(child.padding,'0px');
+ const geometry=await page.evaluate(()=>{
+  const iframe=document.querySelector('iframe[data-bd-sales-surface]'),nav=document.querySelector('nav[data-bd-bottom-nav]'),header=document.querySelector('body>bd-app-header');
+  if(!iframe||!nav||!header)throw new Error('Cashier iframe, bottom navigation or header missing');
+  const f=iframe.getBoundingClientRect(),n=nav.getBoundingClientRect(),h=header.getBoundingClientRect();
+  return{iframeTop:f.top,headerBottom:h.bottom,gap:n.top-f.bottom};
+ });assert.ok(Math.abs(geometry.iframeTop-geometry.headerBottom)<=1,'top edge '+width);if(width<900)assert.ok(Math.abs(geometry.gap)<=1,'bottom seam '+width);if(width<=600)assert.equal(child.sidebarTop,0);if(width===390)await page.screenshot({path:out+'/mobile-after.png'});
  results.push({mode:'embedded',width,height,child,geometry});
  if(width===390){await page.setViewportSize({width:390,height:500});await frame.evaluate(()=>window.scrollTo(0,9999));await frame.waitForFunction(()=>scrollY>0);const scrollY=await frame.evaluate(()=>window.scrollY);await page.setViewportSize({width:390,height:844});await frame.locator('#sales-journal').tap();await page.waitForURL(u=>u.pathname==='/sales-import');await page.frameLocator('iframe[data-bd-sales-surface]').locator('.sales-navigation').waitFor();results.push({scrollY,back:'PASS'});}
 }

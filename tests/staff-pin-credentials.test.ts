@@ -9,7 +9,12 @@ async function setup(){
  async function member(name:string,role:string){
   const user=await r.register(name+'@isolated.test');
   const response=await r.api.access.POST(r.request(owner,'/api/access','POST',{role,...(role==='cashier'?{jobTitle:'waiter'}:{})}));
-  assert.equal(response.status,201);const invite=(await response.json()).invite;
+  assert.equal(response.status,201);
+  const payload: unknown = await response.json();
+  assert.ok(payload && typeof payload === 'object' && 'invite' in payload);
+  const invite = payload.invite;
+  assert.ok(invite && typeof invite === 'object' && 'code' in invite);
+  assert.ok(typeof invite.code === 'string' && invite.code.length > 0);
   assert.equal((await r.api.join.POST(r.request(user,'/api/access/join','POST',{code:invite.code}))).status,200);
   const req=new Request(r.request(user,'/api/pos-orders'),{headers:{...Object.fromEntries(r.request(user,'/api/pos-orders').headers),'X-Venue-Id':String(owner.activeVenueId)}});
   const actor=await r.api.auth.authenticateRequest(req);assert.ok(actor);return actor;
