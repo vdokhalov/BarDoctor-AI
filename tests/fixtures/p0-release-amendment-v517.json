@@ -272,7 +272,7 @@
     },
     "app/team-access/route.ts": {
       "before": "9ce12a0fbea67245e3143841d4ecce2945b143d950a48b462ce6b9a77a10481b",
-      "after": "e353ff51f5ed8bb694998291e49d078c04450596d59388664783476d09d0dbf9"
+      "after": "35b5bb41b75b204c3b132bb8a6904e5cd179316953654e713e50ad9fa42c4c89"
     },
     "drizzle/0026_staff_pin_credentials.sql": {
       "before": null,
@@ -369,6 +369,14 @@
     "drizzle/0031_staff_login_attempt_limits.sql": {
       "before": null,
       "after": "545f694804546bbaefb76a8ccb84d7b71b61205a75bdd5556479716bf1696cf4"
+    },
+    "public/team-access.js": {
+      "before": "6419eee1ce6ad06abfe95f9d1f0f8f174ff54daaffebfd5e7d7068fc06942644",
+      "after": "f8ef6e234f3ae0e65e3e10b7a4fb069d2a8b7707af8e82067fc6c3c90569a9bc"
+    },
+    "scripts/staff-pin-navigation-browser.ts": {
+      "before": null,
+      "after": "1d5195a5ee278c6a3257a3006cd0efe827fd72737d405263425d1f70b7fd1f07"
     }
   }
 }

@@ -1,5 +1,21 @@
 (function () {
   "use strict";
+  // Register before the shell's iframe load bridge: PIN management is a server page.
+  document.addEventListener("click", function (event) {
+    var link = event.target && event.target.closest ? event.target.closest("a[data-staff-pin-page]") : null;
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    var destination = new URL(link.href, window.location.href);
+    if (destination.origin !== window.location.origin || destination.pathname !== "/staff-access") return;
+    var host = window;
+    try {
+      if (window.parent !== window && window.parent.location.origin === window.location.origin) host = window.parent;
+    } catch (_) { /* A cross-origin host must not be navigated. */ }
+    var venue = new URL(host.location.href).searchParams.get("venue") || localStorage.getItem("bd_active_venue_id");
+    if (venue) destination.searchParams.set("venue", venue);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    host.location.assign(destination.pathname + destination.search + destination.hash);
+  }, true);
   var ROLE_LABELS = { owner: "Владелец", manager: "Управляющий", shift_manager: "Администратор заведения", cashier: "Сотрудник кассы" };
   var JOB_LABELS = { cashier: "Кассир", waiter: "Официант", barista: "Бариста", bartender: "Бармен" };
   var ACCESS_CHOICES = ["manager", "shift_manager", "cashier", "waiter", "barista", "bartender"];

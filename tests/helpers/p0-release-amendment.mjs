@@ -15,7 +15,9 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Pin both files exactly; later CSS/harness edits remain forbidden.
 // Owner-approved conservative CI routing (2026-10-15); exact CI bytes remain pinned.
 // Owner-authorized staff PIN development (2026-10-15), exact bytes only; not publication approval.
+// Owner-approved PIN server-page navigation repair and focused real-shell regression.
 export const p0Paths=Object.freeze([
+ 'public/team-access.js','scripts/staff-pin-navigation-browser.ts',
  'drizzle/0031_staff_login_attempt_limits.sql',
  'drizzle/0030_staff_login_revocation_epoch.sql',
  'lib/bardoctor/staff-login-source.ts',
