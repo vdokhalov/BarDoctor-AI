@@ -18,6 +18,7 @@ export const p0Paths=Object.freeze([
  'scripts/patch-sales-navigation-performance.mjs',
  'scripts/cashier-presentation-browser.ts',
  'scripts/ci-change-scope.mjs','scripts/ci-required-gates.mjs',
+ 'public/cashier.css',
  'public/app-shell-v185.css','scripts/sales-shell-geometry-browser.ts',
  'scripts/recheck-chromium-parity-ci-snapshots.mjs',
  'public/sales-navigation.js','app/cashier/route.ts','app/sales-entry/route.ts','app/sales-import/route.ts',

@@ -249,6 +249,10 @@
     "scripts/cashier-presentation-browser.ts": {
       "before": null,
       "after": "71eb1537b10ce943a6bbd2f618b3512e4aaf9a60ec1c8320afe3d738dadafb42"
+    },
+    "public/cashier.css": {
+      "before": "3033793f93de4bca5ac34d965082b8277ac84de7290b227143e2d1f0ca7dd3a6",
+      "after": "7d4fc594f6cd7b1555599846439b686a00b6eee031d434698b8599c148edf6a1"
     }
   }
 }
