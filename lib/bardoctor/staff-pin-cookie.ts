@@ -1,4 +1,4 @@
-export const POS_DEVICE_COOKIE='bd_pos_device', POS_SESSION_COOKIE='bd_pos_session';
+export const POS_SESSION_COOKIE='bd_pos_session';
 export const POS_LIFETIME_SECONDS=30*24*60*60;
 export function posCookie(request:Request,name:string){
  const entry=(request.headers.get('cookie')||'').split(';').map(s=>s.trim()).find(s=>s.startsWith(name+'='));

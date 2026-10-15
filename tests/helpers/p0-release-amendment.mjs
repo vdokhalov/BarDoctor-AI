@@ -16,7 +16,13 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-approved conservative CI routing (2026-10-15); exact CI bytes remain pinned.
 // Owner-authorized staff PIN development (2026-10-15), exact bytes only; not publication approval.
 export const p0Paths=Object.freeze([
- 'app/api/staff-pin/device/route.ts','app/api/staff-pin/members/route.ts','app/api/staff-pin/session/route.ts','app/staff-access/route.ts','app/staff-login/route.ts','app/team-access/route.ts','drizzle/0026_staff_pin_credentials.sql','drizzle/0027_staff_pin_sessions.sql','lib/bardoctor/access-control.ts','lib/bardoctor/pos-auth-guard.ts','lib/bardoctor/staff-pin-cookie.ts','lib/bardoctor/staff-pin-credentials.ts','lib/bardoctor/staff-pin-crypto.ts','lib/bardoctor/staff-pin-gateway.ts','lib/bardoctor/staff-pin-members.ts','lib/bardoctor/staff-pin-session.ts','public/cashier.js','public/staff-access.js','public/staff-login.js','scripts/staff-pin-browser.ts','worker/index.ts',
+ 'public/staff-login-entry.js',
+ 'lib/bardoctor/staff-login-name.ts',
+ 'drizzle/0029_staff_login.sql',
+ 'drizzle/0028_staff_pin_revocation.sql',
+ 'app/bar-doctor-response.ts',
+ 'app/login/route.ts',
+ 'app/api/staff-pin/members/route.ts','app/api/staff-pin/session/route.ts','app/staff-access/route.ts','app/staff-login/route.ts','app/team-access/route.ts','drizzle/0026_staff_pin_credentials.sql','drizzle/0027_staff_pin_sessions.sql','lib/bardoctor/access-control.ts','lib/bardoctor/pos-auth-guard.ts','lib/bardoctor/staff-pin-cookie.ts','lib/bardoctor/staff-pin-credentials.ts','lib/bardoctor/staff-pin-crypto.ts','lib/bardoctor/staff-pin-gateway.ts','lib/bardoctor/staff-pin-members.ts','lib/bardoctor/staff-pin-session.ts','public/cashier.js','public/staff-access.js','public/staff-login.js','scripts/staff-pin-browser.ts','worker/index.ts',
  'scripts/patch-sales-navigation-performance.mjs',
  'scripts/cashier-presentation-browser.ts',
  'scripts/ci-change-scope.mjs','scripts/ci-required-gates.mjs',

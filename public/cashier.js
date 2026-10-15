@@ -48,7 +48,7 @@
       if(response.status===401){
         // Match the shared expired-session contract; retain venue-scoped drafts.
         for(const key of ["bd_session","bd_session_token","bd_session_userid"])localStorage.removeItem(key);
-        location.replace(pinMode?"/staff-login":"/login");
+        location.replace(pinMode?"/login":"/login");
       }
     }
     let data,malformed=false;try{data=await response.json();if(!data||typeof data!=="object"||Array.isArray(data)){data={};malformed=true;}}catch{data={};malformed=true;}
@@ -342,7 +342,7 @@
   async function handleAction(action){
     if(action==="dismiss"){$("dialog").close();return;}
     if(action==="identity"&&pinMode){dialog("Сотрудник",`<p>${esc(state.data.actor.name)}</p><p>Черновики сохранятся отдельно для этого сотрудника.</p><button type="button" data-action="pin-logout">Выйти / сменить сотрудника</button>`,null);return;}
-    if(action==="pin-logout"&&pinMode){saveLocal();const response=await fetch("/api/staff-pin/session",{method:"DELETE"});if(!response.ok)throw Error("Выход не подтверждён. Повторите при восстановлении связи.");localStorage.setItem("bd_pos_identity",crypto.randomUUID());clearSensitive("Сессия завершена");location.replace("/staff-login");return;}
+    if(action==="pin-logout"&&pinMode){saveLocal();const response=await fetch("/api/staff-pin/session",{method:"DELETE"});if(!response.ok)throw Error("Выход не подтверждён. Повторите при восстановлении связи.");localStorage.setItem("bd_pos_identity",crypto.randomUUID());clearSensitive("Сессия завершена");location.replace("/login");return;}
     if(action==="identity"){dialog("Аккаунт",`<p>${esc(state.data.actor.name)} · ${esc(labels[state.data.actor.jobTitle||state.data.actor.role])}</p><p>${esc(state.data.venueName)}</p><a href="/team-access">Мои заведения и доступ</a><p class="footnote">При смене заведения касса обновит контекст. Незавершённые запросы сохранятся.</p>`,null);return;}
     if(action==="quick"){state.orderId=null;document.body.dataset.pane="order";render();return;}
     if(action==="create-order"||action==="save-quick"){await createOrder(action==="save-quick");return;}

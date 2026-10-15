@@ -13,5 +13,5 @@ export function posMembershipGuard(db: D1Database, account: AuthenticatedAccount
       AND vm.role=? AND vm.permissions_json IS ? AND ${MEMBER_JOB_TITLE_SQL} IS ?
       AND vm.status='active' AND v.status='active' AND wm.status='active' AND w.status='active' ${pinGuard}
     )`).bind(account.id,now,account.membershipId,account.actorAccountId,account.venueId,account.id,
-      account.role,account.membershipPermissionsJson??null,account.membershipJobTitle??null,...(account.posSession?[account.posSession.tokenHash,account.posSession.deviceHash,now,now]:[]));
+      account.role,account.membershipPermissionsJson??null,account.membershipJobTitle??null,...(account.posSession?[account.posSession.tokenHash,now]:[]));
 }

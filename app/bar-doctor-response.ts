@@ -347,6 +347,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/server-migration-discovery-v262.js?v=20260824-controlled-migration-v262" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
+    <script src="/staff-login-entry.js?v=staff-login-1" defer></script>
   </head>
   <body>
     <div class="bd-static-startup-v201 bd-unified-splash-v394" data-bd-static-startup="v201" data-bd-stable-splash="v394" data-bd-single-splash="v395" data-bd-native-continuity="v396" data-bd-native-fullscreen-raster="v398" data-bd-shell-first-startup="v397" role="status" aria-label="BarDoctor загружается">

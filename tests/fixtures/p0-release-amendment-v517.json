@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -254,25 +254,21 @@
       "before": "3033793f93de4bca5ac34d965082b8277ac84de7290b227143e2d1f0ca7dd3a6",
       "after": "7d4fc594f6cd7b1555599846439b686a00b6eee031d434698b8599c148edf6a1"
     },
-    "app/api/staff-pin/device/route.ts": {
-      "before": null,
-      "after": "c3df100c608bb59b86dc6e4667e784f88fa1487d940fe6aeda6837a3808a3b56"
-    },
     "app/api/staff-pin/members/route.ts": {
       "before": null,
-      "after": "8f94e0633ab4d40be06173f3f6e9dab05c6726a90ca136d2863202bcef0113ed"
+      "after": "f1783cf02903a19fc4425052a540bcde646d1ba2a7868f38df78e3baab261e6d"
     },
     "app/api/staff-pin/session/route.ts": {
       "before": null,
-      "after": "3406a83e2709374a96ccb4f443e522777433cd9cf763b8922422649eb94674e7"
+      "after": "0f9bbc4ba6000e0a164ad784a16a48cf4cf29bddd54b637c341d8b71b62a9816"
     },
     "app/staff-access/route.ts": {
       "before": null,
-      "after": "cf162eb1064f950fdfffb2cca3edb65d40bfdf81dcfb49a137d2607f4475db0d"
+      "after": "8ebdcaba47f93a84aee8f587b7c0d59222105bd74b2f747c7abc9c37f961af72"
     },
     "app/staff-login/route.ts": {
       "before": null,
-      "after": "64c3cd1e4c3cd0066da647c73958e83c6cf20d5ebcfa8025c5fd5ec2aeb7ab86"
+      "after": "0f9a5f48965882fd8e812cc71d407197b2b39cfd467ec3e984541d7080ba2b0b"
     },
     "app/team-access/route.ts": {
       "before": "9ce12a0fbea67245e3143841d4ecce2945b143d950a48b462ce6b9a77a10481b",
@@ -288,15 +284,15 @@
     },
     "lib/bardoctor/access-control.ts": {
       "before": "bb63a193974cebda9b0b0ffa89ae4f4673e559409598ea25023a0a2e5048e5e4",
-      "after": "c516528728cc2b0cfb7e99bbb722899fa83ad676545fbdab85066b4f4a878069"
+      "after": "10e61456e4cfc5469d2f57c3cee8934caad49900f7747cf0d91606166b27ab25"
     },
     "lib/bardoctor/pos-auth-guard.ts": {
       "before": "95a1c94ed1c54b75e3132bab46518af487c5c98aaa75531958224364b8ec4657",
-      "after": "cfe448101e2e1479a679b8ec4f90042edf0e45363306e115e101e225982897c5"
+      "after": "a12f7850e31ecaee7597699f00f5831187e4f2ccc0276b85b2fdce7dc78695bc"
     },
     "lib/bardoctor/staff-pin-cookie.ts": {
       "before": null,
-      "after": "c5e83b711c1bb62e6b1679dcf64ac3b197e9054cd52fb431c69ec1c94e826c2a"
+      "after": "993e24486f42180980679b3687e54a70a6ab161ef983238e75c3842830982a57"
     },
     "lib/bardoctor/staff-pin-credentials.ts": {
       "before": null,
@@ -308,35 +304,59 @@
     },
     "lib/bardoctor/staff-pin-gateway.ts": {
       "before": null,
-      "after": "453ba5237004412e4067d45a6e31da0a049dd038130a5bd3c16018378fa70b15"
+      "after": "6243f60d2e24ee34cb09110265616c244bbc036affc54c03095911745ff04eb9"
     },
     "lib/bardoctor/staff-pin-members.ts": {
       "before": null,
-      "after": "e10d95228b5f710e27dc1f31ff4bd1023b2a5721d0003bdcd83530b7f50cd14b"
+      "after": "fbdbfe3a18b8343f1d357efd434d433df1c84daf381ce9383ff6bf2eb24ac7a1"
     },
     "lib/bardoctor/staff-pin-session.ts": {
       "before": null,
-      "after": "fae2a7f24e926645896f4e8003e19ec82ce0096a383a0d5dff5ccdde51a967b8"
+      "after": "b3e7ca78e238afeacda2652bb6051989a178ed7229231583585a9cc3d902bf46"
     },
     "public/cashier.js": {
       "before": "5d54c4791301c6c997f924edb5e6bb890ca4885ab4885b9aea2f032ba53b789b",
-      "after": "5a631aacbe0e043add30d64a03b66f737a34c86796e3df05c19a35d67815cc4f"
+      "after": "9a23e26a063f360731c4acca31607b5cbc10af8c1ee278d1268ca8fbd7faebfa"
     },
     "public/staff-access.js": {
       "before": null,
-      "after": "c9caf243755c8173cbd9aed037774778c936e21552bd5cb37dc80f10d26c6c68"
+      "after": "89bdbb5745fc3cc009c420e0e53500f9a4e1cd8de7cebd65b5708e05d9d2e6e2"
     },
     "public/staff-login.js": {
       "before": null,
-      "after": "4d6c27a634acc9297ef593b017ef9385adba14c4f60f8249993448d130c5062e"
+      "after": "2c3a10c5a281df5f19a6e4e6bb7751e08d2230eacca753d8e77ec3b25073684a"
     },
     "scripts/staff-pin-browser.ts": {
       "before": null,
-      "after": "c3d958171e932ce9f7727c53407b033f9f807c0f634f5d0dc550037265dab5c8"
+      "after": "5381f2436bcb2780a56dbb4474c8864d7fd408216ad40d24eb07c49e3b740899"
     },
     "worker/index.ts": {
       "before": "12d769c15d214679cb26ff38d64d2719f50f79ee97a09fb67dc4b13a7be1206f",
       "after": "8adf8d8e119fee8a4d2911a5ae78203f0a04e718657e095bed74b7c87f9f1ae6"
+    },
+    "app/login/route.ts": {
+      "before": null,
+      "after": "6d1a11f33e2430c1f37be19b72b0b01f3d0b02d82c022fb282886f3013477efb"
+    },
+    "app/bar-doctor-response.ts": {
+      "before": "8253f8be1bd1fb3ef3371dde5463a9681ff6c78529f6a45e2bfe47a3a66c766e",
+      "after": "f4b5d1f787b59485ca80b189b6bc65fae0df602a998c52ab342efc3d05f17202"
+    },
+    "drizzle/0028_staff_pin_revocation.sql": {
+      "before": null,
+      "after": "5feacbb4975b5cae83f3ab8331319f0b2b97e6a312594ca0501eb45c40cdec16"
+    },
+    "drizzle/0029_staff_login.sql": {
+      "before": null,
+      "after": "6da96d3ee64afc4cc73653765d9bb8fe8d7dd956e8e6bef051e6c6d2810840d5"
+    },
+    "lib/bardoctor/staff-login-name.ts": {
+      "before": null,
+      "after": "f450e393db20ae0903898025174e6ebb4d780bfabe1c3e050409ef1453442a03"
+    },
+    "public/staff-login-entry.js": {
+      "before": null,
+      "after": "adbf05d7c2102f3bca1ed212725a8365c9eac2e2ab0b30742da270fafa9c575f"
     }
   }
 }

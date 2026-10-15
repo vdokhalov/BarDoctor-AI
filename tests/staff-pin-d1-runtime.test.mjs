@@ -9,14 +9,13 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
   const entry = `
     import {createPinStaff} from './lib/bardoctor/staff-pin-members';
     import {issueStaffPin,revokeStaffPin} from './lib/bardoctor/staff-pin-credentials';
-    import {authorizePosDevice,loginStaffPin,validPosSession} from './lib/bardoctor/staff-pin-session';
+    import {loginStaffPin,validPosSession} from './lib/bardoctor/staff-pin-session';
     const actor={role:'owner',venueId:1,actorAccountId:1,membershipId:1};
     export default {async fetch(request){const body=await request.json();try{
-      if(body.action==='member')return Response.json(await createPinStaff(actor,'Synthetic','waiter'));
+      if(body.action==='member')return Response.json(await createPinStaff(actor,'Synthetic','waiter','worker-staff'));
       if(body.action==='issue')return Response.json(await issueStaffPin(actor,body.id));
       if(body.action==='revoke')return Response.json(await revokeStaffPin(actor,body.id));
-      if(body.action==='device')return Response.json(await authorizePosDevice(actor));
-      if(body.action==='login')return Response.json(await loginStaffPin(request,body.pin));
+      if(body.action==='login')return Response.json(await loginStaffPin(request,body.pin,body.login));
       return Response.json({session:await validPosSession(request)});
     }catch(error){return Response.json({error:error.message},{status:400});}}};`;
   const bundle = await build({ stdin: { contents: entry, loader: "ts", resolveDir: process.cwd() }, tsconfigRaw: {}, bundle: true, write: false,
@@ -36,31 +35,22 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     await db.prepare("INSERT INTO venues(id,data_account_id,workspace_id,created_by_account_id) VALUES (1,1,1,1)").run();
     await db.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES(1,1,'owner','active')").run();
     await db.prepare("INSERT INTO venue_memberships(id,venue_id,account_id,role,status) VALUES(1,1,1,'owner','active')").run();
-    const call = async (body,cookie='') => { const response=await mf.dispatchFetch('http://localhost/api/staff-pin/session',{method:'POST',headers:{origin:'http://localhost',cookie},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
+    const call = async (body,cookie='') => { const response=await mf.dispatchFetch('http://localhost/api/staff-pin/session',{method:'POST',headers:{origin:'http://localhost',cookie,'cf-connecting-ip':body.source||'192.0.2.1'},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
     const member=(await call({action:'member'})).body;assert.ok(member.membershipId);
     const issued=(await call({action:'issue',id:member.membershipId})).body;assert.match(issued.pin,/^\d{6}$/);
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_pin_audit').first()).n,1);
-    const device=(await call({action:'device'})).body,cookie='bd_pos_device='+device.token;
-    const login=await call({action:'login',pin:issued.pin},cookie);assert.equal(login.status,200);
-    const sessionCookie=cookie+'; bd_pos_session='+login.body.token;
-    assert.ok((await call({action:'session'},sessionCookie)).body.session);
-    const raced=await Promise.all([call({action:'login',pin:issued.pin},cookie),call({action:'login',pin:issued.pin},cookie)]);
-    assert.ok(raced.some(x=>x.status===200));
-    assert.equal((await db.prepare('SELECT count(*) n FROM staff_pos_sessions').first()).n,1);
-    const valid=[];for(const result of raced.filter(x=>x.status===200))valid.push((await call({action:'session'},cookie+'; bd_pos_session='+result.body.token)).body.session);
-    assert.equal(valid.filter(Boolean).length,1,'exactly one returned session survives');
+    const raced=await Promise.all([call({action:'login',login:'WORKER-STAFF',pin:issued.pin}),call({action:'login',login:'worker-staff',pin:issued.pin})]);
+    assert.deepEqual(raced.map(x=>x.status),[200,200]);
+    assert.equal((await db.prepare('SELECT count(*) n FROM staff_login_sessions').first()).n,2);
+    for(const result of raced)assert.ok((await call({action:'session'},'bd_pos_session='+result.body.token)).body.session);
+    const unknown=await call({action:'login',login:'missing',pin:'000000'}),wrong=await call({action:'login',login:'worker-staff',pin:'bad'});assert.equal(unknown.body.error,wrong.body.error);
+    const attacks=await Promise.all(Array.from({length:8},(_,i)=>call({action:'login',login:'worker-staff',pin:'bad',source:'192.0.2.'+(i+2)})));
+    assert.equal(attacks.filter(x=>x.body.error==='PIN_INVALID').length,4);assert.equal(attacks.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,4);
     await db.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").bind(member.membershipId).run();
     await db.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").bind(member.membershipId).run();
-    assert.equal((await db.prepare('SELECT count(*) n FROM staff_pos_sessions').first()).n,0);
+    assert.equal((await db.prepare('SELECT count(*) n FROM staff_login_sessions').first()).n,0);
+    for(const result of raced)assert.equal((await call({action:'session'},'bd_pos_session='+result.body.token)).body.session,null);
     assert.ok((await db.prepare('SELECT revoked_at FROM staff_pin_credentials WHERE membership_id=?').bind(member.membershipId).first()).revoked_at);
-    await call({action:'revoke',id:member.membershipId});
-    assert.equal((await call({action:'session'},sessionCookie)).body.session,null);
-    assert.equal((await db.prepare('SELECT count(*) n FROM staff_pin_audit').first()).n,2);
-    const attempts=await Promise.all(Array.from({length:8},()=>call({action:'login',pin:'bad'},cookie)));
-    assert.equal(attempts.filter(x=>x.body.error==='PIN_INVALID').length,5);
-    assert.equal(attempts.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,3);
-    for(let i=0;i<60;i++)await call({action:'login',pin:'bad'},cookie);
-    assert.equal((await db.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope='venue:1'").first()).attempts<=7,true,'blocked requests do not spend venue budget');
     assert.equal(outbound, 0);
   } finally { await mf.dispose(); }
 });

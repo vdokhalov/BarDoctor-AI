@@ -8,22 +8,20 @@ export async function GET(request:Request){
 }
 export async function POST(request:Request){
  if(!posSameOrigin(request))return failure(403,'Доступ запрещён');
- const body=await readJsonRequest<{pin?:unknown}>(request,{maxBytes:1024});if(!body.ok)return body.response;
+ const body=await readJsonRequest<{pin?:unknown;login?:unknown}>(request,{maxBytes:1024});if(!body.ok)return body.response;
  try{
-  const result=await loginStaffPin(request,typeof body.data.pin==='string'?body.data.pin:'');
+  const result=await loginStaffPin(request,typeof body.data.pin==='string'?body.data.pin:'',body.data.login);
   return Response.json({ok:true,venueId:result.venueId,expiresAt:result.expiresAt,landing:'/cashier?embedded=1'},{headers:{'Cache-Control':'no-store','Set-Cookie':posSetCookie(POS_SESSION_COOKIE,result.token,request)}});
  }catch(error){
   const code=error instanceof Error?error.message:'';
-  if(code==='PIN_LOGIN_CONFLICT')return failure(409,'Вход изменился в другой вкладке. Обновите страницу.');
   if(code==='PIN_RATE_LIMIT')return failure(429,'Слишком много попыток. Повторите позже.');
-  if(code==='PIN_DEVICE_REQUIRED')return failure(403,'Попросите владельца или управляющего разрешить кассу на этом устройстве.');
-  if(code==='PIN_INVALID')return failure(401,'PIN недействителен или доступ отключён.');
+  if(code==='PIN_INVALID')return failure(401,'Неверный логин или PIN.');
   return failure(503,'Вход временно недоступен.');
  }
 }
 export async function DELETE(request:Request){
  if(!posSameOrigin(request))return failure(403,'Доступ запрещён');
  const token=posCookie(request,POS_SESSION_COOKIE);
- if(token)await getD1().prepare('DELETE FROM staff_pos_sessions WHERE token_hash=?').bind(await posDigest(token)).run();
+ if(token)await getD1().prepare('DELETE FROM staff_login_sessions WHERE token_hash=?').bind(await posDigest(token)).run();
  return Response.json({ok:true},{headers:{'Cache-Control':'no-store','Set-Cookie':posSetCookie(POS_SESSION_COOKIE,'',request,0)}});
 }

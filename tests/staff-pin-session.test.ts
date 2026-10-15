@@ -1,129 +1,89 @@
 import test from 'node:test';
-import { seedOpenWorkday } from './helpers/pos-workday-fixture';
-import { salesEventFixture } from './helpers/sales-event-fixture';
 import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
-const routes={sales:'./app/api/sales-events/route',orders:'./app/api/pos-orders/route',pin:'./lib/bardoctor/staff-pin-credentials',pos:'./lib/bardoctor/staff-pin-session',session:'./app/api/staff-pin/session/route',device:'./app/api/staff-pin/device/route',access:'./app/api/access/route',join:'./app/api/access/join/route',guard:'./lib/bardoctor/pos-auth-guard',database:'./db'};
+import { seedOpenWorkday } from './helpers/pos-workday-fixture';
+import { salesEventFixture } from './helpers/sales-event-fixture';
+const routes={pin:'./lib/bardoctor/staff-pin-credentials',pos:'./lib/bardoctor/staff-pin-session',members:'./lib/bardoctor/staff-pin-members',session:'./app/api/staff-pin/session/route',sales:'./app/api/sales-events/route'};
 async function setup(){
- const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_LOOKUP_KEY:'synthetic-fixture-only-not-production-key'}});
- const owner=await r.register('session-owner@isolated.test'),staff=await r.register('session-staff@isolated.test');
- const invite=await(await r.api.access.POST(r.request(owner,'/api/access','POST',{role:'cashier',jobTitle:'waiter'}))).json();
- await r.api.join.POST(r.request(staff,'/api/access/join','POST',{code:invite.invite.code}));
- const actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
- const member=r.sqlite.prepare("SELECT id FROM venue_memberships WHERE account_id=? AND venue_id=?").get(staff.userId,owner.activeVenueId)!;
- const service=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials');
- const pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
- const issued=await service.issueStaffPin(actor,Number(member.id)),device=await pos.authorizePosDevice(actor);
- function req(path='/api/staff-pin/session',method='POST',data:unknown={pin:issued.pin},session=''){
-  return new Request('https://isolated.test'+path,{method,headers:{origin:'https://isolated.test',cookie:'bd_pos_device='+device.token+(session?'; bd_pos_session='+session:''),'Content-Type':'application/json'},...(method==='GET'?{}:{body:JSON.stringify(data)})});
+ const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_LOOKUP_KEY:'synthetic-only-never-production-secret'}});
+ const owner=await r.register('owner@isolated.test'),actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
+ const members=r.api.members as unknown as typeof import('../lib/bardoctor/staff-pin-members'),pins=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
+ const a=await members.createPinStaff(actor,'Anna','waiter','  Anna  '),b=await members.createPinStaff(actor,'Boris','barista','boris');
+ const pin=await pins.issueStaffPin(actor,a.membershipId),other=await pins.issueStaffPin(actor,b.membershipId);
+ function request(login='anna',secret=pin.pin,source='192.0.2.1',token='',path='/api/staff-pin/session',method='POST'){
+  return new Request('https://isolated.test'+path,{method,headers:{origin:'https://isolated.test','cf-connecting-ip':source,'Content-Type':'application/json',cookie:token?'bd_pos_session='+token:''},...(method==='GET'?{}:{body:JSON.stringify({login,pin:secret})})});
  }
- return {r,owner,staff,actor,service,pos,issued,device,req};
+ async function enter(login='anna',secret=pin.pin,source='192.0.2.1') {const response=await r.api.session.POST(request(login,secret,source));assert.equal(response.status,200);assert.match(response.headers.get('set-cookie')!,/HttpOnly; SameSite=Strict; Max-Age=2592000; Secure/);return response.headers.get('set-cookie')!.split(';')[0].split('=')[1];}
+ return {r,owner,actor,members,pins,pos,a,b,pin,other,request,enter};
 }
-test('persistent cookie authenticates only POS, binds venue and ignores forged identity; logout revokes',async t=>{
- const {r,req,staff,owner}=await setup();t.after(r.close);
- const response=await r.api.session.POST(req());assert.equal(response.status,200);
- const set=response.headers.get('set-cookie')!;assert.match(set,/HttpOnly/);assert.match(set,/SameSite=Strict/);assert.match(set,/Secure/);assert.match(set,/Max-Age=2592000/);
- const token=set.split(';')[0].split('=')[1];
- const actor=await r.api.auth.authenticateRequest(req('/api/pos-orders','GET',null,token));assert.equal(actor?.actorAccountId,staff.userId);assert.equal(actor?.venueId,owner.activeVenueId);
- for(const path of ['/api/access','/api/store','/api/auth/bootstrap','/api/venues','/api/users/me'])assert.equal(await r.api.auth.authenticateRequest(req(path,'GET',null,token)),null,path);
- assert.equal(await r.api.auth.authenticateIdentityRequest(req('/api/users/me','GET',null,token)),null);
- const forged=req('/api/pos-orders','GET',null,token);forged.headers.set('x-venue-id','999');assert.equal(await r.api.auth.authenticateRequest(forged),null);
- assert.equal((await r.api.session.GET(req('/api/staff-pin/session','GET',null,token))).status,200);
- assert.equal((await r.api.session.DELETE(req('/api/staff-pin/session','DELETE',{},token))).status,200);
- assert.equal(await r.api.auth.authenticateRequest(req('/api/pos-orders','GET',null,token)),null);
+test('global normalized login is unique; staff needs no email or approved device; source/venue/role bound',async t=>{
+ const {r,members,actor,a,owner,enter,request}=await setup();t.after(r.close);
+ const before=r.sqlite.prepare('SELECT count(*) n FROM accounts').get()?.n;
+ await assert.rejects(members.createPinStaff(actor,'duplicate','cashier','ANNA'),/UNIQUE/);
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM accounts').get()?.n,before,'duplicate rolls account and memberships back');
+ await assert.rejects(members.createPinStaff(actor,'bad','cashier','a@b'),/INVALID_LOGIN/);
+ const token=await enter('ANNA');const req=request('','','192.0.2.1',token,'/api/pos-orders','GET');
+ const identity=await r.api.auth.authenticateRequest(req);assert.equal(identity?.actorAccountId,a.actorId);assert.equal(identity?.venueId,owner.activeVenueId);
+ assert.equal(await r.api.auth.findAccountByAppEmail('staff:'+a.actorId),null);
+ for(const path of ['/api/access','/api/store','/api/evidence/resolve','/api/pos-overview','/api/users/me'])assert.equal(await r.api.auth.authenticateRequest(request('','','192.0.2.1',token,path,'GET')),null,path);
+ req.headers.set('x-venue-id','999');assert.equal(await r.api.auth.authenticateRequest(req),null);
+ assert.equal(await r.api.auth.authenticateIdentityRequest(request('','','192.0.2.1',token,'/api/users/me','GET')),null);
 });
-test('reset, revoked membership/device and role promotion invalidate persisted sessions',async t=>{
- const {r,pos,req,service,issued,actor,device}=await setup();t.after(r.close);
- const session=await pos.loginStaffPin(req(),issued.pin);
- await service.issueStaffPin(actor,issued.membershipId);assert.equal(await pos.validPosSession(req('/api/pos-orders','GET',null,session.token)),null);
- const current=await service.issueStaffPin(actor,issued.membershipId),next=await pos.loginStaffPin(req(),current.pin);
- r.sqlite.prepare("UPDATE venue_memberships SET role='manager' WHERE id=?").run(issued.membershipId);
- assert.equal(await pos.validPosSession(req('/api/pos-orders','GET',null,next.token)),null);
- r.sqlite.prepare("UPDATE venue_memberships SET role='cashier' WHERE id=?").run(issued.membershipId);
- r.sqlite.prepare("UPDATE staff_pos_devices SET revoked_at='now' WHERE id=?").run(device.id);
- assert.equal(await pos.validPosSession(req('/api/pos-orders','GET',null,next.token)),null);
+test('unknown login and wrong PIN have equal errors; atomic account/source limits do not block venue',async t=>{
+ const {r,pin,other,request,enter}=await setup();t.after(r.close);
+ const wrong=pin.pin==='000000'?'000001':'000000';
+ const known=await r.api.session.POST(request('anna',wrong)),unknown=await r.api.session.POST(request('nobody',wrong));assert.equal(known.status,unknown.status);assert.deepEqual(await known.json(),await unknown.json());
+ const responses=await Promise.all(Array.from({length:8},(_,i)=>r.api.session.POST(request('anna',wrong,'192.0.2.'+(i+2)))));
+ assert.equal(responses.filter(x=>x.status===401).length,4);assert.equal(responses.filter(x=>x.status===429).length,4);
+ assert.ok(await enter('boris',other.pin,'198.51.100.1'));
+ for(let i=0;i<55;i++)await r.api.session.POST(request('unknown'+i,wrong,'203.0.113.1'));
+ const before=r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'staff-login:%'").all();
+ assert.equal((await r.api.session.POST(request('boris',other.pin,'203.0.113.1'))).status,429);
+ assert.deepEqual(r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'staff-login:%'").all(),before);
+ assert.ok(await enter('boris',other.pin,'198.51.100.2'));
 });
-test('parallel guesses reserve shared attempts before verification; no device or cross-origin cannot login',async t=>{
- const {r,req}=await setup();t.after(r.close);
- const results=await Promise.all(Array.from({length:9},()=>r.api.session.POST(req('/api/staff-pin/session','POST',{pin:'bad'}))));
- assert.equal(results.filter(x=>x.status===401).length,5);assert.equal(results.filter(x=>x.status===429).length,4);
- const noDevice=req();noDevice.headers.delete('cookie');assert.equal((await r.api.session.POST(noDevice)).status,403);
- const cross=req();cross.headers.set('origin','https://attacker.test');assert.equal((await r.api.session.POST(cross)).status,403);
+test('parallel logins remain valid independently; explicit logout, reset and disable-enable revoke permanently',async t=>{
+ const {r,enter,request,pos,pins,actor,a,pin}=await setup();t.after(r.close);
+ const [first,second]=await Promise.all([enter(),enter()]);assert.notEqual(first,second);
+ const req=(token:string)=>request('','','192.0.2.1',token,'/api/pos-orders','GET');
+ assert.ok(await pos.validPosSession(req(first)));assert.ok(await pos.validPosSession(req(second)));
+ assert.equal((await r.api.session.DELETE(request('','','192.0.2.1',first,'/api/staff-pin/session','DELETE'))).status,200);
+ assert.equal(await pos.validPosSession(req(first)),null);assert.ok(await pos.validPosSession(req(second)));
+ await pins.issueStaffPin(actor,a.membershipId);assert.equal(await pos.validPosSession(req(second)),null);
+ const fresh=await pins.issueStaffPin(actor,a.membershipId),third=await enter('anna',fresh.pin);
+ r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(a.membershipId);r.sqlite.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").run(a.membershipId);
+ assert.equal(await pos.validPosSession(req(third)),null);assert.equal((await r.api.session.POST(request('anna',fresh.pin))).status,401);
+ const cross=request('anna',pin.pin);cross.headers.set('origin','https://foreign.test');assert.equal((await r.api.session.POST(cross)).status,403);
+ const missing=request();missing.headers.delete('cf-connecting-ip');assert.equal((await r.api.session.POST(missing)).status,503);
 });
-test('in-flight POS transaction guard rejects session revoked after authentication',async t=>{
- const {r,pos,req,issued,service,actor}=await setup();t.after(r.close);
- const session=await pos.loginStaffPin(req(),issued.pin),authenticated=await r.api.auth.authenticateRequest(req('/api/pos-orders','GET',null,session.token));assert.ok(authenticated);
- await service.revokeStaffPin(actor,issued.membershipId);
- const guard=r.api.guard as unknown as typeof import('../lib/bardoctor/pos-auth-guard');
- const database=r.api.database as unknown as typeof import('../db');
- await assert.rejects(database.getD1().batch([guard.posMembershipGuard(database.getD1(),authenticated,new Date().toISOString())]));
-});
-test('successful logins release only their own reservations; stale actor cannot write after switching',async t=>{
- const {r,pos,req,issued,staff}=await setup();t.after(r.close);
- let session;
- for(let i=0;i<7;i++)session=await pos.loginStaffPin(req(),issued.pin);
- assert.equal(r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'device:%'").get()?.attempts,0);
- const post=req('/api/pos-orders','POST',{action:'create'},session!.token);
- assert.equal(await r.api.auth.authenticateRequest(post),null);
- post.headers.set('x-pos-actor',String(staff.userId));assert.ok(await r.api.auth.authenticateRequest(post));
- post.headers.set('x-pos-actor','999');assert.equal(await r.api.auth.authenticateRequest(post),null);
-});
-test('staff identity has no email/password login and receives a distinct actor account',async t=>{
- const r=await lifecycleRuntime({...routes,members:'./lib/bardoctor/staff-pin-members'},{bindings:{STAFF_PIN_LOOKUP_KEY:'synthetic-fixture-only-not-production-key'}});t.after(r.close);
- const owner=await r.register('identity-owner@isolated.test'),actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
- const members=r.api.members as unknown as typeof import('../lib/bardoctor/staff-pin-members');
- const a=await members.createPinStaff(actor,'Анна','waiter'),b=await members.createPinStaff(actor,'Борис','barista');assert.notEqual(a.actorId,b.actorId);
- const stored=r.sqlite.prepare('SELECT * FROM accounts WHERE id=?').get(a.actorId)!;assert.equal(stored.account_kind,'staff');assert.equal(stored.password_hash,null);assert.equal(stored.chatgpt_email,'');assert.match(String(stored.app_email),/^staff:[0-9a-f-]+$/);assert.ok(!String(stored.app_email).includes('@'));
- assert.equal(await r.api.auth.findAccountByAppEmail(String(stored.app_email)),null);
- const service=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
- const pin=await service.issueStaffPin(actor,a.membershipId),device=await pos.authorizePosDevice(actor);
- const request=new Request('https://isolated.test/api/staff-pin/session',{method:'POST',headers:{origin:'https://isolated.test',cookie:'bd_pos_device='+device.token}});
- const session=await pos.loginStaffPin(request,pin.pin);
- const apiRequest=new Request('https://isolated.test/api/pos-orders',{headers:{cookie:'bd_pos_device='+device.token+'; bd_pos_session='+session.token}});
- const staff=await r.api.auth.authenticateRequest(apiRequest);assert.equal(staff?.actorAccountId,a.actorId);assert.equal(staff?.jobTitle,'waiter');assert.equal(staff?.role,'cashier');
-});
-test('real POS payment derives author from PIN session; restrictions and in-flight revocation remain enforced',async t=>{
- const {r,pos,req,issued,staff,owner,actor,service}=await setup();t.after(r.close);
- seedOpenWorkday(r.sqlite,owner.userId,owner.activeVenueId);
- r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"currency":"MDL"}',owner.userId);
+test('real payment author is server-derived; stale actor and in-flight reset cannot post',async t=>{
+ const {r,owner,a,actor,pins,enter,request}=await setup();t.after(r.close);
+ seedOpenWorkday(r.sqlite,owner.userId,owner.activeVenueId);r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"currency":"MDL"}',owner.userId);
  r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(owner.userId,'bd_assortment_v1',JSON.stringify(salesEventFixture().assortment));
- const opened=await r.api.sales.POST(r.request(owner,'/api/sales-events','POST',{action:'open_shift',shiftId:'pin-shift',name:'Synthetic',venueId:owner.activeVenueId}));assert.equal(opened.status,201);
- const session=await pos.loginStaffPin(req(),issued.pin);
- const send=(body:object)=>{const request=req('/api/sales-events','POST',{venueId:owner.activeVenueId,...body},session.token);request.headers.set('x-pos-actor',String(staff.userId));return r.api.sales.POST(request);};
- for(const action of ['open_shift','close_shift','reverse'])assert.equal((await send({action,shiftId:'pin-shift'})).status,403);
- const command={id:'pin-payment',source:'POS_API',shiftId:'pin-shift',payments:[{id:'p',method:'CASH',amount:20}],lines:[{id:'l',menuItemId:'beer',quantity:1}],actor:{accountId:owner.userId,name:'forged'}};
- const preview=await(await send({action:'preview',command})).json();assert.ok(preview.previewHash);
- const posted=await send({action:'post',command,previewHash:preview.previewHash,actorAccountId:owner.userId});assert.equal(posted.status,201);
- const stored=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));
- assert.equal(stored[0].actor.accountId,staff.userId);
- const next={...command,id:'pin-revoked-payment'},nextPreview=await(await send({action:'preview',command:next})).json();
- r.beforeNextDomainWrite(async()=>{await service.revokeStaffPin(actor,issued.membershipId);});
- const denied=await send({action:'post',command:next,previewHash:nextPreview.previewHash});assert.ok([401,403].includes(denied.status));
- const after=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(after.length,1);
+ assert.equal((await r.api.sales.POST(r.request(owner,'/api/sales-events','POST',{action:'open_shift',shiftId:'shift',name:'Synthetic',venueId:owner.activeVenueId}))).status,201);
+ const token=await enter();
+ const send=(body:object,author=a.actorId)=>{const req=request('','','192.0.2.1',token,'/api/sales-events');req.headers.set('x-pos-actor',String(author));return r.api.sales.POST(new Request(req,{body:JSON.stringify({venueId:owner.activeVenueId,...body})}));};
+ const command={id:'login-sale',source:'POS_API',shiftId:'shift',payments:[{id:'p',method:'CASH',amount:20}],lines:[{id:'l',menuItemId:'beer',quantity:1}],actor:{accountId:owner.userId}};
+ assert.equal((await send({action:'preview',command},owner.userId)).status,401);
+ for(const action of ['open_shift','close_shift','reverse'])assert.equal((await send({action,shiftId:'shift'})).status,403);
+ const preview=await(await send({action:'preview',command})).json();assert.equal((await send({action:'post',command,previewHash:preview.previewHash})).status,201);
+ const events=()=>JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(owner.userId)!.data_json));assert.equal(events()[0].actor.accountId,a.actorId);
+ const next={...command,id:'blocked'},p=await(await send({action:'preview',command:next})).json();r.beforeNextDomainWrite(async()=>{await pins.revokeStaffPin(actor,a.membershipId);});
+ assert.ok([401,403].includes((await send({action:'post',command:next,previewHash:p.previewHash})).status));assert.equal(events().length,1);
 });
-test('exhausted device cannot spend venue budget or block another device',async t=>{
- const {r,pos,req,issued,actor}=await setup();t.after(r.close);
- for(let i=0;i<51;i++)await assert.rejects(pos.loginStaffPin(req(),'bad'));
- assert.equal(r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'venue:%'").get()?.attempts,5);
- const device=await pos.authorizePosDevice(actor),other=new Request('https://isolated.test/api/staff-pin/session',{method:'POST',headers:{origin:'https://isolated.test',cookie:'bd_pos_device='+device.token}});
- assert.ok((await pos.loginStaffPin(other,issued.pin)).token);
-});
-test('disable then enable cannot revive the old cookie or PIN',async t=>{
- const {r,pos,req,issued,service,actor}=await setup();t.after(r.close);
- const login=await pos.loginStaffPin(req(),issued.pin),request=req('/api/pos-orders','GET',null,login.token);
- r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(issued.membershipId);
- r.sqlite.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").run(issued.membershipId);
- assert.equal(await pos.validPosSession(request),null);await assert.rejects(pos.loginStaffPin(req(),issued.pin),/PIN_INVALID/);
- const fresh=await service.issueStaffPin(actor,issued.membershipId);assert.ok((await pos.loginStaffPin(req(),fresh.pin)).token);
- assert.equal(await pos.validPosSession(request),null);
-});
-test('two overlapping logins have one committed winner; loser cannot erase or replace its cookie',async t=>{
- const {r,req,pos}=await setup();t.after(r.close);
- const responses=await Promise.all([r.api.session.POST(req()),r.api.session.POST(req())]);
- assert.deepEqual(responses.map(x=>x.status).sort(),[200,409]);
- const winner=responses.find(x=>x.status===200)!,loser=responses.find(x=>x.status===409)!;
- assert.equal(loser.headers.get('set-cookie'),null);
- const token=winner.headers.get('set-cookie')!.split(';')[0].split('=')[1];
- assert.ok(await pos.validPosSession(req('/api/pos-orders','GET',null,token)));
- assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_pos_sessions').get()?.n,1);
+
+test('only venue owner/manager can change globally unique login; change revokes existing sessions',async t=>{
+ const {r,members,actor,a,b,pin,enter,request,pos}=await setup();t.after(r.close);
+ const token=await enter();
+ await assert.rejects(members.setStaffLogin({...actor,role:'shift_manager'},a.membershipId,'renamed'),/ACCESS_DENIED/);
+ await assert.rejects(members.setStaffLogin({...actor,role:'cashier'},a.membershipId,'renamed'),/ACCESS_DENIED/);
+ await assert.rejects(members.setStaffLogin({...actor,venueId:999},a.membershipId,'renamed'),/ACCESS_DENIED/);
+ await assert.rejects(members.setStaffLogin(actor,a.membershipId,' BORIS '),/UNIQUE/);
+ await assert.rejects(members.setStaffLogin(actor,a.membershipId,'bad@email'),/INVALID_LOGIN/);
+ assert.ok(await pos.validPosSession(request('','','192.0.2.1',token,'/api/pos-orders','GET')));
+ assert.equal((await members.setStaffLogin(actor,a.membershipId,' RENAMED ')).login,'renamed');
+ assert.equal(await pos.validPosSession(request('','','192.0.2.1',token,'/api/pos-orders','GET')),null);
+ assert.equal((await r.api.session.POST(request('anna',pin.pin))).status,401);
+ assert.ok(await enter('renamed',pin.pin));
+ assert.equal(r.sqlite.prepare('SELECT login FROM staff_logins WHERE membership_id=?').get(b.membershipId)?.login,'boris');
 });
