@@ -35,7 +35,7 @@ fabricated. The existing NOT NULL unique app_email column holds an internal
 non-address identifier `staff:<uuid>`; chatgpt_email is empty. Ordinary email
 lookup filters account_kind=user and cannot authenticate these identities.
 
-Draft migrations 0026–0030 are explicit; authentication performs no DDL. 0026
+Draft migrations 0026–0031 are explicit; authentication performs no DDL. 0026
 stores salted PBKDF2 credentials and issue/reset/revoke audit metadata. 0027/0028
 retain historical, now inactive device/session tables and revocation triggers.
 0029 adds globally unique logins and independent login sessions with monotonic
@@ -47,17 +47,18 @@ has NOT been provisioned in production. Login verifies the salted credential
 selected by username, without needing this lookup key. Rotation of the issuance
 key requires a deliberate credential reissue strategy.
 
-Before hashing, D1 atomically reserves at most 50 failed/in-flight attempts per
-source and five per normalized login per 15-minute window. A blocked source
-cannot charge another login's budget; there is no venue-wide counter. Successful
-login refunds only its own reservations. Unknown logins and wrong PINs get the
-same response and KDF work. A targeted account can still be temporarily throttled;
-users behind a shared source also share its budget.
+Before hashing, D1 atomically reserves per normalized login AND per credential
+at most five failed/in-flight attempts per 15-minute window, ten over the PIN
+lifetime, and two concurrent 30-second leases. Successful login refunds only its
+own reservation. Expired/crashed work stays charged. Rename or authorization
+epoch changes cannot replenish the PIN budget. Owner/manager recovers through a
+new PIN, never by unlocking the old one. There is no shared venue counter.
 
-Source identity uses cf-connecting-ip, never body input or X-Forwarded-For, and
-fails closed when absent. STAFF_PIN_SOURCE_POLICY must be verified-cloudflare in server configuration, otherwise login is disabled before D1 access. This switch is not proof of header provenance. The actual hosting ingress must be verified to overwrite
-and protect this header before release. Synthetic tests inject a trusted source;
-they do not establish production ingress behavior.
+IP is not required and no unverified IP header controls admission. Optional
+STAFF_PIN_SOURCE_POLICY=verified-cloudflare enables only an additional source
+throttle after ingress provenance is independently confirmed. Leave it absent
+for the account-bound design. Unknown logins receive matching error/limit behavior.
+See staff-login-account-limits.md for DoS, resource and six-digit guessing tradeoffs.
 
 Scoped auth and Worker routing independently deny non-POS APIs. POS writes check
 session validity again in the business transaction. The server derives sale
@@ -83,7 +84,7 @@ are separated by actor, venue and shift. Switching identity freezes other tabs.
 Full application CI and full production build were not run. This auth/data
 change remains full under the unchanged CI policy. There is no release PASS,
 physical-device result, production credential, migration or deployment.
-Before release: security review, trusted ingress verification, approved secret
+Before release: review the account-limit tradeoffs, approved secret
 configuration and migrations, and the agreed full CI/build/release gates.
 
 Only the feature branch is synchronized. It is outside workflow push triggers;
@@ -91,3 +92,5 @@ no PR is opened, because pull_request would trigger full CI. PR15/main remain
 unchanged. Checkpoints preserve bundle, patch and synthetic evidence.
 
 See [targeted security review](staff-login-security-review.md) and [production runbook](staff-login-production-runbook.md) for current findings, exact deployment prerequisites and rollback.
+
+Current security design: [IP-independent admission](staff-login-account-limits.md).

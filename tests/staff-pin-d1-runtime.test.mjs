@@ -22,7 +22,7 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     format: "esm", platform: "neutral", conditions: ["workerd", "worker", "browser"], external: ["cloudflare:workers", "node:*"] });
   let outbound = 0;
   const mf = new Miniflare({ modules: true, script: bundle.outputFiles[0].text, compatibilityDate: "2026-05-15", compatibilityFlags: ["nodejs_compat"],
-    bindings:{STAFF_PIN_SOURCE_POLICY:'verified-cloudflare',STAFF_PIN_LOOKUP_KEY:"synthetic-native-worker-only-key"}, d1Databases: { DB: "isolated-staff-pin-session" }, outboundService: () => { outbound++; return new Response(null, { status: 502 }); } });
+    bindings:{STAFF_PIN_LOOKUP_KEY:"synthetic-native-worker-only-key"}, d1Databases: { DB: "isolated-staff-pin-session" }, outboundService: () => { outbound++; return new Response(null, { status: 502 }); } });
   try {
     const db = await mf.getD1Database("DB"), schema = new DatabaseSync(":memory:");
     try {
@@ -35,7 +35,7 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     await db.prepare("INSERT INTO venues(id,data_account_id,workspace_id,created_by_account_id) VALUES (1,1,1,1)").run();
     await db.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES(1,1,'owner','active')").run();
     await db.prepare("INSERT INTO venue_memberships(id,venue_id,account_id,role,status) VALUES(1,1,1,'owner','active')").run();
-    const call = async (body,cookie='') => { const response=await mf.dispatchFetch('http://localhost/api/staff-pin/session',{method:'POST',headers:{origin:'http://localhost',cookie,'cf-connecting-ip':body.source||'192.0.2.1'},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
+    const call = async (body,cookie='') => { const response=await mf.dispatchFetch('http://localhost/api/staff-pin/session',{method:'POST',headers:{origin:'http://localhost',cookie,...(body.source?{'cf-connecting-ip':body.source}:{})},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
     const member=(await call({action:'member'})).body;assert.ok(member.membershipId);
     const issued=(await call({action:'issue',id:member.membershipId})).body;assert.match(issued.pin,/^\d{6}$/);
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_pin_audit').first()).n,1);
@@ -55,7 +55,16 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     for(const result of raced)assert.equal((await call({action:'session'},'bd_pos_session='+result.body.token)).body.session,null);
     const unknown=await call({action:'login',login:'missing',pin:'000000'}),wrong=await call({action:'login',login:'worker-staff',pin:'bad'});assert.equal(unknown.body.error,wrong.body.error);
     const attacks=await Promise.all(Array.from({length:8},(_,i)=>call({action:'login',login:'worker-staff',pin:'bad',source:'192.0.2.'+(i+2)})));
-    assert.equal(attacks.filter(x=>x.body.error==='PIN_INVALID').length,4);assert.equal(attacks.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,4);
+    const admitted=attacks.filter(x=>x.body.error==='PIN_INVALID').length;assert.ok(admitted>=2&&admitted<=4);assert.equal(attacks.filter(x=>x.body.error==='PIN_RATE_LIMIT').length,8-admitted);
+    assert.equal((await db.prepare("SELECT attempts FROM staff_login_limits WHERE scope='login:worker-staff'").first()).attempts,1+admitted);
+    await db.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+    const credentialScope=(await db.prepare("SELECT scope FROM staff_login_limits WHERE scope LIKE 'credential:%'").first()).scope;
+    await db.batch(['held-1','held-2'].map(id=>db.prepare('INSERT INTO staff_login_leases(id,login_scope,credential_scope,expires_at) VALUES (?,?,?,?)').bind(id,'login:worker-staff',credentialScope,Date.now()+30000)));
+    const held=await Promise.all(Array.from({length:8},()=>call({action:'login',login:'worker-staff',pin:'bad'})));
+    assert.ok(held.every(x=>x.body.error==='PIN_RATE_LIMIT'),'two active leases block all additional KDF work');
+    await db.prepare("DELETE FROM staff_login_leases WHERE id='held-1'").run();
+    assert.equal((await call({action:'login',login:'worker-staff',pin:'bad'})).body.error,'PIN_INVALID');
+    await db.prepare("DELETE FROM staff_login_leases WHERE id='held-2'").run();
     await db.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").bind(member.membershipId).run();
     await db.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").bind(member.membershipId).run();
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_login_sessions').first()).n,0);

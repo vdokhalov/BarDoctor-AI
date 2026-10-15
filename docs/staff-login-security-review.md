@@ -1,5 +1,9 @@
 # Targeted security review — staff login candidate
 
+Historical cf7fa4fb review. The IP dependency and ingress release blocker below
+are superseded by [mandatory account limits](staff-login-account-limits.md).
+The reproduced revocation finding and its fix remain valid.
+
 Reviewed 689b27b192d7019038cdee2cf75ddddebb148228 on 2026-10-15.
 This is a separate adversarial review pass, not an external audit or release PASS.
 Only synthetic local tests were used. No production requests, business rows,

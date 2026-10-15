@@ -25,6 +25,7 @@ Apply schema in this order, once, via Sites deployment migration mechanism:
 | 0028_staff_pin_revocation.sql | historical device generation; membership credential epoch/revocation and historical session triggers |
 | 0029_staff_login.sql | unique usernames, new login sessions, session-delete triggers, counter cleanup index |
 | 0030_staff_login_revocation_epoch.sql | monotonic epoch for username/workspace-member/venue/workspace transitions |
+| 0031_staff_login_attempt_limits.sql | persistent login/credential budgets, concurrency leases, reset/new-name recovery triggers and indexes |
 
 All are additive, schema-only; no staff, PINs or business records are seeded.
 Keep 0027/0028 dependencies: removing historical tables would break later SQL.
@@ -41,7 +42,7 @@ Runtime configuration, through native Sites update_environment_variables only:
 | Key | Kind | Value / prerequisite |
 | --- | --- | --- |
 | STAFF_PIN_LOOKUP_KEY | secret, is_secret=true | generate >=32 random bytes through approved secure workflow; used for issuance/reset uniqueness, not login verification |
-| STAFF_PIN_SOURCE_POLICY | nonsecret unless platform requires all secrets | exact `verified-cloudflare`, ONLY after the ingress evidence in the security review is satisfied |
+| STAFF_PIN_SOURCE_POLICY | OPTIONAL, leave absent | enables only an additional source throttle after independent verification; not required for account-bound admission |
 
 No new OpenAI/API/provider credential is needed. Never print a secret, commit it,
 put it in hosting.json/browser assets, or request plaintext in chat. Preserve
@@ -57,7 +58,7 @@ Technical minimum for this auth change (planned, not a substitute for CI policy)
 
 1. Locked dependencies, then ONE exact final `npm run build` (existing verified
    build, including pre/post build behavior). Check resulting /login and session
-   routes, Worker node:net compatibility, copied 0026–0030 SQL and exact source
+   routes, Worker node:net compatibility, copied 0026–0031 SQL and exact source
    provenance. No hand-built partial bundle for publication.
 2. `node --import tsx --test tests/staff-pin-session.test.ts tests/staff-pin-credentials.test.ts tests/access-control.test.ts tests/auth-schema-recovery-p0.test.ts tests/auth-bootstrap-state.test.ts tests/account-lifecycle.test.ts tests/pos-security-recovery.test.ts tests/cashier-dialog-recovery.test.ts`
 3. `node --test tests/staff-pin-d1-runtime.test.mjs` and
@@ -67,7 +68,7 @@ Technical minimum for this auth change (planned, not a substitute for CI policy)
    `node --import tsx scripts/staff-pin-browser.ts`. Verify management return,
    A->B->A, uncertain payment retry, second tab and revoke on final code.
    The staff harness uses actual handlers, not a built platform ingress, so an
-   isolated hosted ingress test remains separately mandatory.
+   account-bound admission requires no hosted IP proof. Hosted ingress testing is mandatory only before enabling the optional source policy.
 
 The CURRENT unchanged policy classifies this as full. Release requires successful
 changes, auth-recovery-p0, verify-core, verify-browser, sales-navigation,
@@ -78,7 +79,7 @@ waiver of any required gate. No full workflow/build was launched in this review.
 
 ## Application sequence after separate authorization
 
-Resolve ingress contract first; keep policy unset until resolved. Confirm current
+Use mandatory account-bound limits and leave the optional source policy unset. Confirm current
 live version and migration ledger/backups with platform-supported operations.
 Build/test exact source; use Sites source helper to push/package the reviewed
 commit, preserving project identity. Save the archive-backed version, then use
@@ -92,9 +93,9 @@ not a migration or a synthetic test against real business records.
 
 ## Rollback / disable
 
-- To stop NEW PIN logins, remove STAFF_PIN_SOURCE_POLICY using native runtime
-  settings and apply according to the platform's instructions. This alone does
-  NOT invalidate already issued sessions.
+- Removing STAFF_PIN_SOURCE_POLICY does NOT disable login; it only removes an
+  optional extra source throttle. Account-bound protections always remain active.
+  To stop staff access use the complete rollback or approved revocation below.
 - For a complete application rollback, redeploy the saved v520 archive-backed
   version through Sites after resolving its actual saved version ID. Do not
   fabricate an ID. Old application does not authenticate bd_pos_session; managers
@@ -115,6 +116,8 @@ not a migration or a synthetic test against real business records.
   keep staff login disabled and escalate to the platform; no ad-hoc production SQL
   endpoint or alternate database credentials.
 
-Release blockers: authoritative ingress evidence; final build/emitted checks and
+Release blockers: acceptance of the bounded six-digit guessing/targeted-lockout tradeoff; final build/emitted checks and
 mandatory full CI; hosted migration inventory/ledger confirmation; separately
 approved runtime provisioning and release. No release PASS yet.
+
+Current design and residual risk: [IP-independent admission](staff-login-account-limits.md). No new required source/IP runtime setting.

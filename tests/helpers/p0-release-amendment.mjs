@@ -16,6 +16,7 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-approved conservative CI routing (2026-10-15); exact CI bytes remain pinned.
 // Owner-authorized staff PIN development (2026-10-15), exact bytes only; not publication approval.
 export const p0Paths=Object.freeze([
+ 'drizzle/0031_staff_login_attempt_limits.sql',
  'drizzle/0030_staff_login_revocation_epoch.sql',
  'lib/bardoctor/staff-login-source.ts',
  'public/staff-login-entry.js',

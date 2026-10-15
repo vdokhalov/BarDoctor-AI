@@ -36,13 +36,20 @@ export async function issueStaffPin(actor: AuthenticatedAccount, membershipId: n
             password_hash=excluded.password_hash,password_salt=excluded.password_salt,password_iterations=excluded.password_iterations,
             revision=staff_pin_credentials.revision+1,revoked_at=NULL,
             updated_by_account_id=excluded.updated_by_account_id,updated_at=excluded.updated_at
+          WHERE staff_pin_credentials.lookup_tag<>excluded.lookup_tag
           RETURNING revision`).bind(actor.venueId,tag,record.passwordHash,record.passwordSalt,record.passwordIterations,actor.actorAccountId,now,...managerParams(actor,membershipId)),
         db.prepare(`INSERT INTO staff_pin_audit(venue_id,membership_id,actor_account_id,action,revision,created_at)
           SELECT venue_id,membership_id,?,'issue_or_reset',revision,? FROM staff_pin_credentials WHERE membership_id=? AND changes()=1`)
           .bind(actor.actorAccountId,now,membershipId),
       ]);
       const row=rows[0].results?.[0] as {revision:number}|undefined;
-      if(!row)throw Error('PIN_ACCESS_DENIED');
+      if(!row){
+        // A reset must not reissue the current PIN, including concurrent resets.
+        // A skipped upsert emits no audit and does not clear any attempt budget.
+        const same=await db.prepare('SELECT 1 FROM staff_pin_credentials WHERE membership_id=? AND lookup_tag=?').bind(membershipId,tag).first();
+        if(same)continue;
+        throw Error('PIN_ACCESS_DENIED');
+      }
       return {pin,membershipId,venueId:actor.venueId,revision:row.revision};
     }catch(error){
       // Only retry the exact venue/PIN uniqueness conflict; all other failures stay closed.

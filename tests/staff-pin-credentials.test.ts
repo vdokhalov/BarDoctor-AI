@@ -68,3 +68,18 @@ test('lookup fails closed without a configured server key; no public default',as
  const crypto=r.api.pinCrypto as unknown as typeof import('../lib/bardoctor/staff-pin-crypto');
  await assert.rejects(crypto.pinLookupTag(1,'012345'),/PIN_NOT_CONFIGURED/);
 });
+test('reset never reissues current PIN or clears its budget when RNG repeats it',async t=>{
+ const {r,actor,member,pin}=await setup();t.after(r.close);
+ const staff=await member('pin-repeat','cashier'),issued=await pin.issueStaffPin(actor,staff.membershipId);
+ const scope='credential:'+staff.membershipId+':synthetic';
+ r.sqlite.prepare('INSERT INTO staff_login_limits(scope,attempts,window_start,window_attempts) VALUES (?,10,0,5)').run(scope);
+ const original=globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+ t.mock.method(globalThis.crypto,'getRandomValues',(array:Uint8Array|Uint32Array)=>{
+  if(array instanceof Uint32Array&&array.length===1){array[0]=Number(issued.pin);return array;}
+  return original(array);
+ });
+ await assert.rejects(pin.issueStaffPin(actor,staff.membershipId),/PIN_ISSUE_RETRY/);
+ assert.equal(r.sqlite.prepare('SELECT revision FROM staff_pin_credentials WHERE membership_id=?').get(staff.membershipId)?.revision,1);
+ assert.equal(r.sqlite.prepare('SELECT attempts FROM staff_login_limits WHERE scope=?').get(scope)?.attempts,10);
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_pin_audit').get()?.n,1);
+});

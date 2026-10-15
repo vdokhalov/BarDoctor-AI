@@ -4,7 +4,7 @@ import { lifecycleRuntime } from './helpers/lifecycle-runtime';
 import { seedOpenWorkday } from './helpers/pos-workday-fixture';
 import { salesEventFixture } from './helpers/sales-event-fixture';
 const routes={memberRoute:'./app/api/staff-pin/members/route',orders:'./app/api/pos-orders/route',pin:'./lib/bardoctor/staff-pin-credentials',pos:'./lib/bardoctor/staff-pin-session',members:'./lib/bardoctor/staff-pin-members',session:'./app/api/staff-pin/session/route',sales:'./app/api/sales-events/route'};
-async function setup(sourcePolicy: string|undefined='verified-cloudflare'){
+async function setup(sourcePolicy: string|undefined=''){
  const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_SOURCE_POLICY:sourcePolicy,STAFF_PIN_LOOKUP_KEY:'synthetic-only-never-production-secret'}});
  const owner=await r.register('owner@isolated.test'),actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
  const members=r.api.members as unknown as typeof import('../lib/bardoctor/staff-pin-members'),pins=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
@@ -30,16 +30,16 @@ test('global normalized login is unique; staff needs no email or approved device
  assert.equal(await r.api.auth.authenticateIdentityRequest(request('','','192.0.2.1',token,'/api/users/me','GET')),null);
 });
 test('unknown login and wrong PIN have equal errors; atomic account/source limits do not block venue',async t=>{
- const {r,pin,other,request,enter}=await setup();t.after(r.close);
+ const {r,pin,other,request,enter}=await setup('verified-cloudflare');t.after(r.close);
  const wrong=pin.pin==='000000'?'000001':'000000';
  const known=await r.api.session.POST(request('anna',wrong)),unknown=await r.api.session.POST(request('nobody',wrong));assert.equal(known.status,unknown.status);assert.deepEqual(await known.json(),await unknown.json());
  const responses=await Promise.all(Array.from({length:8},(_,i)=>r.api.session.POST(request('anna',wrong,'192.0.2.'+(i+2)))));
- assert.equal(responses.filter(x=>x.status===401).length,4);assert.equal(responses.filter(x=>x.status===429).length,4);
+ assert.equal(responses.filter(x=>x.status===401).length,2);assert.equal(responses.filter(x=>x.status===429).length,6);
  assert.ok(await enter('boris',other.pin,'198.51.100.1'));
  for(let i=0;i<55;i++)await r.api.session.POST(request('unknown'+i,wrong,'203.0.113.1'));
- const before=r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'staff-login:%'").all();
+ const before=r.sqlite.prepare("SELECT * FROM staff_login_limits").all();
  assert.equal((await r.api.session.POST(request('boris',other.pin,'203.0.113.1'))).status,429);
- assert.deepEqual(r.sqlite.prepare("SELECT attempts FROM staff_pos_attempts WHERE scope LIKE 'staff-login:%'").all(),before);
+ assert.deepEqual(r.sqlite.prepare("SELECT * FROM staff_login_limits").all(),before);
  assert.ok(await enter('boris',other.pin,'198.51.100.2'));
 });
 test('parallel logins remain valid independently; explicit logout, reset and disable-enable revoke permanently',async t=>{
@@ -54,7 +54,7 @@ test('parallel logins remain valid independently; explicit logout, reset and dis
  r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(a.membershipId);r.sqlite.prepare("UPDATE venue_memberships SET status='active' WHERE id=?").run(a.membershipId);
  assert.equal(await pos.validPosSession(req(third)),null);assert.equal((await r.api.session.POST(request('anna',fresh.pin))).status,401);
  const cross=request('anna',pin.pin);cross.headers.set('origin','https://foreign.test');assert.equal((await r.api.session.POST(cross)).status,403);
- const missing=request();missing.headers.delete('cf-connecting-ip');assert.equal((await r.api.session.POST(missing)).status,503);
+ const missing=request('boris');missing.headers.delete('cf-connecting-ip');assert.equal((await r.api.session.POST(missing)).status,401,'missing source is not an admission failure');
 });
 test('real payment author is server-derived; stale actor and in-flight reset cannot post',async t=>{
  const {r,owner,a,actor,pins,enter,request}=await setup();t.after(r.close);
@@ -112,9 +112,9 @@ test('security review: in-flight login cannot cross revoke-restore transitions',
  });
 });
 
-test('security review: source policy fails closed; canonical IP budgets ignore client forwarding headers',async t=>{
- const disabled=await setup('');try{assert.equal((await disabled.r.api.session.POST(disabled.request())).status,503);assert.equal(disabled.r.sqlite.prepare('SELECT count(*) n FROM staff_pos_attempts').get()?.n,0);}finally{disabled.r.close();}
- const {r,request}=await setup();t.after(r.close);
+test('security review: optional source policy only adds limits; canonical IP budgets ignore forwarding headers',async t=>{
+ const disabled=await setup('');try{const req=disabled.request();req.headers.delete('cf-connecting-ip');assert.equal((await disabled.r.api.session.POST(req)).status,200);assert.equal(disabled.r.sqlite.prepare('SELECT count(*) n FROM staff_pos_attempts').get()?.n,0);}finally{disabled.r.close();}
+ const {r,request}=await setup('verified-cloudflare');t.after(r.close);
  for(const source of ['.',':','abc','1.2.3.999','1.2.3.4, 5.6.7.8'])assert.equal((await r.api.session.POST(request('unknown','bad',source))).status,503);
  const spellings=['2001:db8::1','2001:0DB8:0:0:0:0:0:1'];
  for(let i=0;i<51;i++){
@@ -160,4 +160,55 @@ test('security review: public enumeration, manager authority and cross-venue bou
  assert.equal((await r.api.sales.POST(new Request(body,{body:JSON.stringify({action:'preview',venueId:other.activeVenueId})}))).status,409);
  await pins.revokeStaffPin(manager!,a.membershipId);
  assert.equal((await r.api.session.GET(request('','','192.0.2.1',token,'/api/staff-pin/session','GET'))).status,401);
+});
+
+test('IP-independent limits: ten lifetime guesses, rename/restore cannot refill, only new PIN recovers',async t=>{
+ const {r,request,enter,pins,members,actor,a,pin,other}=await setup();t.after(r.close);
+ for(let round=0;round<2;round++){
+  for(let i=0;i<5;i++){
+   const req=request(i%2?'ANNA':' anna ','bad','203.0.113.'+(round*5+i));req.headers.set('x-forwarded-for',crypto.randomUUID());req.headers.delete('cf-connecting-ip');
+   assert.equal((await r.api.session.POST(req)).status,401);
+  }
+  assert.equal((await r.api.session.POST(request())).status,429);
+  r.sqlite.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+ }
+ assert.equal((await r.api.session.POST(request())).status,429,'lifetime limit survives new time window');
+ await members.setStaffLogin(actor,a.membershipId,'renamed');
+ assert.equal((await r.api.session.POST(request('renamed',pin.pin))).status,429,'credential budget survives rename');
+ assert.ok(await enter('boris',other.pin),'another employee remains available');
+ await assert.rejects(pins.issueStaffPin({...actor,role:'shift_manager'},a.membershipId),/ACCESS_DENIED/);
+ assert.equal((await r.api.session.POST(request('renamed',pin.pin))).status,429);
+ const fresh=await pins.issueStaffPin(actor,a.membershipId);
+ assert.equal((await r.api.session.POST(request('renamed','bad'))).status,401);
+ assert.ok(await enter('renamed',fresh.pin),'reset creates a new generation and clears login lock');
+ const limits=r.sqlite.prepare("SELECT attempts FROM staff_login_limits WHERE scope LIKE 'credential:%'").all();
+ assert.ok(limits.some(x=>x.attempts===1),'successful login refunds only itself, not prior failures');
+ await pins.revokeStaffPin(actor,a.membershipId);
+ assert.equal((await r.api.session.POST(request('renamed',fresh.pin))).status,401);
+});
+test('IP-independent limits: parallel admission, expired lease and reset in-flight are fail closed',async t=>{
+ const {r,request,pins,actor,a,enter}=await setup();t.after(r.close);
+ const responses=await Promise.all(Array.from({length:12},(_,i)=>r.api.session.POST(request('anna','bad','192.0.2.'+i))));
+ assert.equal(responses.filter(x=>x.status===401).length,2);assert.equal(responses.filter(x=>x.status===429).length,10);
+ assert.equal(r.sqlite.prepare("SELECT attempts FROM staff_login_limits WHERE scope='login:anna'").get()?.attempts,2);
+ r.beforeNextBatch(()=>r.beforeNextBatch(()=>{r.sqlite.prepare('UPDATE staff_login_leases SET expires_at=0').run();}));
+ assert.equal((await r.api.session.POST(request())).status,401,'expired work cannot mint a session');
+ r.beforeNextBatch(()=>r.beforeNextBatch(async()=>{await pins.issueStaffPin(actor,a.membershipId);}));
+ assert.equal((await r.api.session.POST(request())).status,401,'reset invalidates pending lease and credential snapshot');
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_login_leases').get()?.n,0);
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_login_sessions').get()?.n,0);
+ r.beforeNextBatch(async()=>{await pins.issueStaffPin(actor,a.membershipId);});
+ assert.equal((await r.api.session.POST(request())).status,429,'stale credential snapshot cannot reserve against the replacement PIN');
+ assert.equal(r.sqlite.prepare("SELECT attempts FROM staff_login_limits WHERE scope='login:anna'").get()?.attempts,0);
+});
+test('IP-independent limits: unknown login follows same lockout and new staff cannot inherit pre-lockout',async t=>{
+ const {r,request,members,pins,actor,enter}=await setup();t.after(r.close);
+ for(let round=0;round<2;round++){
+  for(let i=0;i<5;i++)assert.equal((await r.api.session.POST(request('future','bad'))).status,401);
+  assert.equal((await r.api.session.POST(request('future','bad'))).status,429);
+  r.sqlite.prepare('UPDATE staff_login_limits SET window_start=window_start-1').run();
+ }
+ assert.equal((await r.api.session.POST(request('future','bad'))).status,429);
+ const future=await members.createPinStaff(actor,'Future','cashier','future'),pin=await pins.issueStaffPin(actor,future.membershipId);
+ assert.ok(await enter('future',pin.pin));
 });
