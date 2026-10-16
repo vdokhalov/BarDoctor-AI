@@ -6,7 +6,7 @@ import { salesEventFixture } from "./helpers/sales-event-fixture";
 import { operationalDay, OPERATIONAL_REPORT_STORE_KEY, REVENUE_SOURCES } from "../lib/bardoctor/operational-day";
 
 async function fixture() {
-  const r = await lifecycleRuntime({ sales: "./app/api/sales-events/route", close: "./app/api/shifts/close/route", days: "./app/api/operational-days/route" });
+  const r = await lifecycleRuntime({ database:"./db", journal:"./lib/bardoctor/sales-event-storage", sales: "./app/api/sales-events/route", close: "./app/api/shifts/close/route", days: "./app/api/operational-days/route" });
   const user = await r.register("phase1a@isolated.test"), venueId = user.activeVenueId;
   seedOpenWorkday(r.sqlite,user.userId,venueId,new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Chisinau"}).format(new Date()));
   r.sqlite.prepare("UPDATE accounts SET restaurant_json=? WHERE id=?").run(JSON.stringify({ name: "Phase 1A", currency: "MDL", timezone: "Europe/Chisinau" }), user.userId);
@@ -146,4 +146,26 @@ test("source contract classifies facts conservatively, never invents hybrid or r
     assert.equal(day.revenue.source, expected); assert.equal(day.revenue.amount, 75); assert.equal(day.revenue.status, "FINAL");
   }
   assert.equal(revenues[0].revenue, 75);
+});
+
+test("normalized report: incident-only save preserves open workday team, draft payroll, sales and stock; retry is idempotent", async () => {
+ const r=await fixture();try{
+  assert.equal((await r.send({action:'open_shift',shiftId:'cash',name:'Test'})).status,201);assert.equal((await r.sale('normalized-one')).status,201);
+  assert.equal((await r.send({action:'close_shift',shiftId:'cash'})).status,201);
+  const date=(await r.days())[0].businessDate;
+  const reports=r.get(OPERATIONAL_REPORT_STORE_KEY);Object.assign(reports[0],{staffing:[{employeeId:'elena',personalSales:2255},{employeeId:'maria',personalSales:2237},{employeeId:'ivan',hours:8}],workdayPayrollDraft:{status:'COMPLETE',payrollBreakdown:{total:975}},shiftVenueSales:7001});r.put(OPERATIONAL_REPORT_STORE_KEY,reports);
+  const db=(r.api.database as unknown as typeof import('../db')).getD1(),journal=r.api.journal as unknown as typeof import('../lib/bardoctor/sales-event-storage');const scope={accountId:r.user.userId,venueId:r.venueId};
+  await journal.copyLegacySalesEvents(db,scope);await journal.activateSalesEvents(db,scope);assert.equal(r.get('bd_sales_events_v1').format,'bardoctor-sales-events-v1');
+  const before=r.get(OPERATIONAL_REPORT_STORE_KEY)[0],sales=r.get('bd_sales_events_v1'),revenues=r.get('bd_finance_revenue'),stock=r.get('bd_stock_movements');
+  const body={shiftCloseId:'incident-normalized',revenueRecord:{date,staffing:before.staffing},writeOffItems:[],incidents:[{title:'Жалоба гостя',description:'Тестовое описание',responsible:'QA Алина'}]};
+  const response=await r.closeReport(body);assert.equal(response.status,201,JSON.stringify(await response.clone().json()));const after=r.get(OPERATIONAL_REPORT_STORE_KEY)[0];
+  for(const key of ['staffing','workdayPayrollDraft','payrollBreakdown','workdayStatus','shiftVenueSales'])assert.deepEqual(after[key],before[key],key);
+  assert.equal(after.workdayStatus,'OPEN');assert.equal(after.payrollBreakdown,undefined);assert.equal(r.get('bd_cases').length,1);assert.equal(r.get('bd_cases')[0].title,'Жалоба гостя');assert.deepEqual(r.get('bd_inventory_writeoffs')??[],[]);
+  assert.deepEqual(r.get('bd_sales_events_v1'),sales);assert.deepEqual(r.get('bd_finance_revenue'),revenues);assert.deepEqual(r.get('bd_stock_movements'),stock);
+  const retry=await r.closeReport(body);assert.equal(retry.status,200);assert.equal((await retry.json() as {idempotent:boolean}).idempotent,true);assert.equal(r.get('bd_cases').length,1);
+  r.beforeNextBatch(()=>{const concurrent=r.get(OPERATIONAL_REPORT_STORE_KEY);concurrent[0].staffing[2].hours=9;r.put(OPERATIONAL_REPORT_STORE_KEY,concurrent);});
+  const raced=await r.closeReport({...body,shiftCloseId:'concurrent-team'});assert.equal(raced.status,422);assert.equal((await raced.json() as {code:string}).code,'WORKDAY_TEAM_PROTECTED');assert.equal(r.get(OPERATIONAL_REPORT_STORE_KEY)[0].staffing[2].hours,9);assert.equal(r.get('bd_cases').length,1);
+  r.put('bd_month_closings',[{monthKey:date.slice(0,7),status:'closed',venueId:r.venueId}]);const lockedBefore=r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all();const locked=await r.closeReport({...body,shiftCloseId:'locked'});assert.equal(locked.status,423);assert.equal((await locked.json() as {code:string}).code,'MONTH_LOCKED');assert.deepEqual(r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all(),lockedBefore);
+  r.put('bd_month_closings',[]);r.sqlite.prepare('UPDATE sales_event_journals SET revision=999 WHERE account_id=?').run(r.user.userId);const corruptBefore=r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all();const corrupt=await r.closeReport({...body,shiftCloseId:'corrupt'});assert.equal(corrupt.status,409);assert.equal((await corrupt.json() as {code:string}).code,'SHIFT_STORE_NEEDS_REVIEW');assert.deepEqual(r.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all(),corruptBefore);
+ }finally{r.close();}
 });

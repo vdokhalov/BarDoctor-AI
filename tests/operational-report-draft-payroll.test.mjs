@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {runInNewContext} from 'node:vm';
+import {parse} from 'acorn';
+const source=readFileSync('public/assets/index-BQGspy0I.js','utf8');
+const wizard=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='PAe');
+const text=source.slice(wizard.start,wizard.end);
+test('open report shows preliminary saved draft; closed report shows final; outgoing payroll stays unchanged',()=>{
+ const expression=text.match(/payrollTotal=(.*?),newWriteoffs=/)[1];
+ const amount=(report,final)=>runInNewContext(expression,{bdDay:{report},ce:{payrollBreakdown:final},bdFinanceInputsPhase3a6:{finiteBusinessNumber:v=>v==null?null:Number(v)}});
+ assert.equal(amount({workdayStatus:'OPEN',workdayPayrollDraft:{payrollBreakdown:{total:975}}},undefined),975);
+ assert.equal(amount({workdayStatus:'OPEN',workdayPayrollDraft:{payrollBreakdown:{totalPayroll:975}}},{total:1000}),975);
+ assert.equal(amount({workdayStatus:'OPEN'},undefined),null);
+ assert.equal(amount({workdayStatus:'CLOSED',workdayPayrollDraft:{payrollBreakdown:{total:975}}},{total:1000}),1000);
+ assert.equal(amount({}, {total:1100}),1100);
+ assert.match(text,/children:bdDay\?\.report\?\.workdayStatus==="OPEN"\?"ФОТ · предварительный":"ФОТ"/);
+ const build=wizard.body.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='buildRevenueRecord');
+ const payload=runInNewContext('('+source.slice(build.start,build.end)+')()',{_:false,v:'',N:'',f:'2026-10-16',Z:7001,R:31,ce:{staffing:[{employeeId:'ivan',hours:8}],shiftDepartmentSales:{},payrollBreakdown:undefined},bdDay:{report:{workdayStatus:'OPEN',workdayPayrollDraft:{payrollBreakdown:{total:975}}}}});
+ assert.equal(payload.payrollBreakdown,undefined);assert.equal(payload.staffing[0].hours,8);assert.ok(!Object.hasOwn(payload,'workdayPayrollDraft'));
+ const patch=readFileSync('scripts/patch-operational-day-phase1a.mjs','utf8');assert.ok(patch.includes(expression));assert.ok(patch.includes('ФОТ · предварительный'));
+});

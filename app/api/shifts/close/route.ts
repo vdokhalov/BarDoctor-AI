@@ -106,7 +106,8 @@ async function postOnce(request: Request): Promise<Response> {
   try {
     for (const snapshot of casSnapshots) {
       if (snapshot.dataJson == null) continue;
-      const value = snapshot.key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(database,account.id,snapshot.dataJson) : JSON.parse(snapshot.dataJson);
+      const value = snapshot.key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(database,account.id,snapshot.dataJson)
+        : snapshot.key==="bd_sales_events_v1" ? await readSalesEvents(database,account.id,snapshot.dataJson) : JSON.parse(snapshot.dataJson);
       if (snapshot.key === ASSORTMENT_STORE_KEY) { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assortment"); }
       else if (snapshot.key !== MONTH_CLOSING_STORE_KEY && (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row)))) throw new Error("Invalid store");
     }
