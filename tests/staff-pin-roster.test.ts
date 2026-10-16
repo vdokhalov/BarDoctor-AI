@@ -25,7 +25,7 @@ test('only active venue roster entries can acquire access; repeated and concurre
  const issued=await pin.issueStaffPin(actor,a.membershipId);assert.match(issued.pin,/^\d{6}$/);
  const again=await members.createPinStaff(actor,'active','waiter','different.login');assert.equal(again.login,'test.user');
  assert.equal(r.sqlite.prepare('SELECT revision FROM staff_pin_credentials WHERE membership_id=?').get(a.membershipId)!.revision,1);
- const view=await (await r.api.route.GET(r.request((await r.register('irrelevant@isolated.test')),'/api/staff-pin/members'))).json();assert.equal(view.members.length,0);
+ const view=await (await r.api.route.GET(r.request((await r.register('irrelevant@isolated.test')),'/api/staff-pin/members'))).json() as {members: unknown[]};assert.equal(view.members.length,0);
 });
 test('legacy unlinked access is retained; explicit same-venue link preserves identity and PIN; duplicate/relink denied',async t=>{
  const {r,actor,owner,members,pin,seed,post}=await setup();t.after(r.close);seed('one');seed('two');
@@ -36,7 +36,7 @@ test('legacy unlinked access is retained; explicit same-venue link preserves ide
  const before=r.sqlite.prepare('SELECT * FROM staff_pin_credentials WHERE membership_id=?').get(a.membershipId);
  await assert.rejects(pin.issueStaffPin(actor,a.membershipId),/ACCESS_DENIED/);
  await assert.rejects(members.setStaffLogin(actor,a.membershipId,'changed'),/ACCESS_DENIED/);
- const listing=await (await r.api.route.GET(r.request(owner,'/api/staff-pin/members'))).json();assert.equal(listing.members[0].employee_active,false);assert.equal(listing.members[0].pin_active,1);
+ const listing=await (await r.api.route.GET(r.request(owner,'/api/staff-pin/members'))).json() as {members: {employee_active:boolean;pin_active:number}[]};assert.equal(listing.members[0].employee_active,false);assert.equal(listing.members[0].pin_active,1);
  assert.equal((await post({action:'link',membershipId:a.membershipId,employeeId:'missing'})).status,400);
  assert.equal((await post({action:'link',membershipId:a.membershipId,employeeId:'one'})).status,200);
  assert.deepEqual(r.sqlite.prepare('SELECT * FROM staff_pin_credentials WHERE membership_id=?').get(a.membershipId),before);
@@ -62,10 +62,10 @@ test('transaction rechecks roster and issuer; cross-venue/role/POS requests fail
  const foreignOwner=await r.register('foreign@isolated.test'),foreign=await r.api.auth.authenticateRequest(r.request(foreignOwner,'/api/access'));assert.ok(foreign);
  await assert.rejects(members.linkPinStaff(foreign,a.membershipId,'one'),/INVALID_MEMBER/);
  await assert.rejects(pin.issueStaffPin(foreign,a.membershipId),/ACCESS_DENIED/);
- r.beforeNextBatch(()=>r.sqlite.prepare("UPDATE domain_data SET data_json='[]' WHERE account_id=? AND store_key='bd_employees'").run(actor.id));
+ r.beforeNextBatch(()=>{r.sqlite.prepare("UPDATE domain_data SET data_json='[]' WHERE account_id=? AND store_key='bd_employees'").run(actor.id);});
  await assert.rejects(pin.issueStaffPin(actor,a.membershipId),/ACCESS_DENIED/);
  assert.equal(r.sqlite.prepare('SELECT count(*) n FROM staff_pin_audit').get()!.n,0);
- seed('late');r.beforeNextBatch(()=>r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(actor.membershipId));
+ seed('late');r.beforeNextBatch(()=>{r.sqlite.prepare("UPDATE venue_memberships SET status='disabled' WHERE id=?").run(actor.membershipId);});
  await assert.rejects(members.createPinStaff(actor,'late','waiter','late.user'),/INVALID_MEMBER/);
  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM venue_memberships WHERE employee_id='late'").get()!.n,0);
 });
