@@ -23,7 +23,13 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Approved manual storage migration gate; full/UI routing unchanged (2026-10-16).
 // Approved QA3389 owner-only migration UI (2026-10-16).
 // Approved normalized report validation and preliminary payroll release (2026-10-16).
+// Approved document-only warehouse reader and scoped publication (2026-10-16).
 export const p0Paths=Object.freeze([
+ "lib/bardoctor/client/warehouse-document.tsx",
+ "package.json",
+ "scripts/build-verified.sh",
+ "scripts/patch-warehouse-document.mjs",
+
  "scripts/patch-finance-inputs-phase3a6.mjs",
  "app/settings/journal-migration/route.ts",
  "public/journal-migration.css",

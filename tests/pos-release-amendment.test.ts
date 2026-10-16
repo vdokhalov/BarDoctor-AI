@@ -18,8 +18,11 @@ test('v517 amendment pins exact files, baseline and bytes; rejects additional or
  assert.throws(()=>p0Amendment({paths:[...paths,'app/api/unapproved/route.ts']}));
  assert.throws(()=>p0Amendment({paths:paths.filter(path=>path!=='lib/bardoctor/auth.ts')}));
 });
-test('v517 aggregate scripts retain every gate and dependency entry byte-for-byte',()=>{
- for(const path of ['package.json','package-lock.json'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',p0Baseline+':'+path],{maxBuffer:8*1024*1024}));
+test('v517 scripts and dependencies retain all bytes except the exact approved warehouse prebuild restore',()=>{
+ const baselinePackage=execFileSync('git',['show',p0Baseline+':package.json'],{encoding:'utf8',maxBuffer:8*1024*1024});
+ const approvedPackage=baselinePackage.replace('"prebuild": "','"prebuild": "node scripts/patch-warehouse-document.mjs --restore && ');
+ assert.equal(readFileSync('package.json','utf8'),approvedPackage);
+ assert.deepEqual(readFileSync('package-lock.json'),execFileSync('git',['show',p0Baseline+':package-lock.json'],{maxBuffer:8*1024*1024}));
 });
 test('historical approval implementations and manifests remain immutable',()=>{
  for(const path of ['tests/helpers/pos-release-amendment.mjs','tests/helpers/health-doctor-recovery-guard.mjs','tests/helpers/business-dates-guard.mjs','tests/fixtures/pos-release-amendment.json','tests/fixtures/health-doctor-recovery-approved-files.json'])assert.deepEqual(readFileSync(path),execFileSync('git',['show',p0Baseline+':'+path]));

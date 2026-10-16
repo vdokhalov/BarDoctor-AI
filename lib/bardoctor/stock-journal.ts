@@ -44,11 +44,12 @@ async function hydrate(row:{position?:number;payload_json:string;snapshot_hash:s
  return value;
 }
 /** Keyset pagination: no OFFSET scan, and no unbounded HTTP history response. */
-export async function journalPage(db:D1Database,scope:JournalScope,after:number|null=null,limit=100,expectedRevision?:number){
+export async function journalPage(db:D1Database,scope:JournalScope,after:number|null=null,limit=100,expectedRevision?:number,sourceDocumentId?:string){
  if(!Number.isSafeInteger(limit)||limit<1||limit>500||after!==null&&!Number.isSafeInteger(after))fail();
  const j=await journalState(db,scope);if(!j||j.state!=='active'&&j.state!=='verified')fail();
  if(expectedRevision!==undefined&&j.revision!==expectedRevision)throw new StoreWriteConflictError();
- const rows=await db.prepare(`SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash WHERE m.account_id=? ${after===null?'':'AND m.position>?'} ORDER BY m.position LIMIT ?`).bind(scope.accountId,...(after===null?[]:[after]),limit+1).all<{position:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}>();
+ if(sourceDocumentId!==undefined&&(!sourceDocumentId.trim()||sourceDocumentId.length>240))fail();
+ const rows=await db.prepare(`SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash WHERE m.account_id=? ${sourceDocumentId===undefined?'':'AND (m.source_document_id=? OR m.sales_batch_id=?)'} ${after===null?'':'AND m.position>?'} ORDER BY m.position LIMIT ?`).bind(scope.accountId,...(sourceDocumentId===undefined?[]:[sourceDocumentId,sourceDocumentId]),...(after===null?[]:[after]),limit+1).all<{position:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}>();
  const current=await journalState(db,scope);if(!current||current.revision!==j.revision||current.state!==j.state)throw new StoreWriteConflictError();
  const items=rows.results.slice(0,limit);return {revision:j.revision,items:await Promise.all(items.map(hydrate)),next:rows.results.length>limit?items.at(-1)!.position:null};
 }

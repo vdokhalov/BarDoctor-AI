@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "d6d731bafd1d0697025d9d0da6e6a89caa82e9cb2ca9e7002d5d5dfd69d63619"
+      "after": "348829a6b287bfd2459a8fc3e0f273301211d671475231d313f525f288d1ed76"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -556,7 +556,7 @@
     },
     "app/api/inventory/movements/route.ts": {
       "before": null,
-      "after": "80296bd25085b012d0d25c864b7a582dfb92a9f56ef1c641c73b887b8da5de41"
+      "after": "a2ec7a4352a6923759b4c39a6ab6be712bd1ee9010f9b15f66ed81c39208fe1e"
     },
     "drizzle/0032_stock_journal.sql": {
       "before": null,
@@ -564,7 +564,7 @@
     },
     "lib/bardoctor/stock-journal.ts": {
       "before": null,
-      "after": "a4879dad113bd60f8a192ca189f71161bf5f25a157c4b9d0f4bb3500098f614c"
+      "after": "0eae97a5a02125c4ac49026a582419af873236459390f09befd885fefa5d22ec"
     },
     "lib/bardoctor/stock-storage.ts": {
       "before": null,
@@ -641,6 +641,22 @@
     "scripts/patch-finance-inputs-phase3a6.mjs": {
       "before": "bd62db18b2ce97e18085e9bf8f931b040920bdefeb631b8fe238798730dff028",
       "after": "7c77b2ca059ed394c63c42705f7847fb56603847dbe7112a367fef1b8d03a685"
+    },
+    "lib/bardoctor/client/warehouse-document.tsx": {
+      "before": null,
+      "after": "9b9826e8632f07c9e39bfe588205d5144d46bd9d3bfd7ba5151daae111b4a7aa"
+    },
+    "package.json": {
+      "before": "ef820f478050259325486ea5d7f39b0f6ca660cd6d70db3398f15218f2ed5005",
+      "after": "6496a46e2a5ee3ae3b81e5f29e18adf73f5aa9659f87694b7e9632e44a57bf46"
+    },
+    "scripts/build-verified.sh": {
+      "before": "39591fbe86f1a7ea60977d3676e2956b436908e4724f9ac9fe8ae3437a1582d4",
+      "after": "ddb7ee075f7b1fc78803a02ddce36743d2d6c40f4878223a26781309879bcaf9"
+    },
+    "scripts/patch-warehouse-document.mjs": {
+      "before": null,
+      "after": "799474da9bedbb3e96522a84ecd588aa9c4fc034fc038b61ffde71733e29ee05"
     }
   }
 }
