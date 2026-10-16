@@ -256,7 +256,7 @@
     },
     "app/api/staff-pin/members/route.ts": {
       "before": null,
-      "after": "f1783cf02903a19fc4425052a540bcde646d1ba2a7868f38df78e3baab261e6d"
+      "after": "98aaf38a1d269494309423e300d2e0f75c3617387ad0189afb26c6b1b696a34c"
     },
     "app/api/staff-pin/session/route.ts": {
       "before": null,
@@ -264,7 +264,7 @@
     },
     "app/staff-access/route.ts": {
       "before": null,
-      "after": "8ebdcaba47f93a84aee8f587b7c0d59222105bd74b2f747c7abc9c37f961af72"
+      "after": "53a1e26663f94059d5faa7bbf5361f7a36ab25438ee529a15d893ad358e67be3"
     },
     "app/staff-login/route.ts": {
       "before": null,
@@ -296,7 +296,7 @@
     },
     "lib/bardoctor/staff-pin-credentials.ts": {
       "before": null,
-      "after": "da292b10a63270612c7beef51d4c8ff46066bf76ef752a108cb04604016b72a8"
+      "after": "740ef45517d89968847b2ead6c81dce96a14f21b0bea21e22a158ee8a0a7b007"
     },
     "lib/bardoctor/staff-pin-crypto.ts": {
       "before": null,
@@ -308,7 +308,7 @@
     },
     "lib/bardoctor/staff-pin-members.ts": {
       "before": null,
-      "after": "fbdbfe3a18b8343f1d357efd434d433df1c84daf381ce9383ff6bf2eb24ac7a1"
+      "after": "6f73bd3d538918c25c5ab5d61d88e0f7c422cd03431105ff09f2e5f98921d567"
     },
     "lib/bardoctor/staff-pin-session.ts": {
       "before": null,
@@ -320,7 +320,7 @@
     },
     "public/staff-access.js": {
       "before": null,
-      "after": "89bdbb5745fc3cc009c420e0e53500f9a4e1cd8de7cebd65b5708e05d9d2e6e2"
+      "after": "6c43b1a13e1b2302bcffde0dafded9f0de9ba5e5b5ad3258948c807c13b93f7f"
     },
     "public/staff-login.js": {
       "before": null,
@@ -328,7 +328,7 @@
     },
     "scripts/staff-pin-browser.ts": {
       "before": null,
-      "after": "5288b90093e61102ec258a6bc1a33093cf8612d0f9239bc30a697d0ae6fe22cd"
+      "after": "f940142618c0e205f97b42deb1e2877c4c70526d34e29c116698e7051ed0946f"
     },
     "worker/index.ts": {
       "before": "12d769c15d214679cb26ff38d64d2719f50f79ee97a09fb67dc4b13a7be1206f",
@@ -376,7 +376,11 @@
     },
     "scripts/staff-pin-navigation-browser.ts": {
       "before": null,
-      "after": "1d5195a5ee278c6a3257a3006cd0efe827fd72737d405263425d1f70b7fd1f07"
+      "after": "759fb451e2a9d3c96e906b72b598b05035f2588b54a26ecc0afbd40e5ccd9b26"
+    },
+    "app/api/access/members/[id]/route.ts": {
+      "before": "7587a094d7e62c497291c257555c543feddf5ead3449247a530fb3ba2b6beeb0",
+      "after": "ed6b216cb7137c2863bef6761b054cbaf8b4fb992bc893ce6e87fb2b04d83ffc"
     }
   }
 }

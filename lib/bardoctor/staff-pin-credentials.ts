@@ -1,3 +1,4 @@
+import { linkedActiveEmployee } from './staff-pin-members';
 import { getD1 } from '../../db';
 import type { AuthenticatedAccount } from './access-control';
 import { generateStaffPin, hashStaffPin, pinLookupTag } from './staff-pin-crypto';
@@ -15,7 +16,7 @@ const authorizedTarget = `SELECT target.id FROM venue_memberships target
  AND aw.status='active' AND tw.status='active' AND v.status='active' AND w.status='active'`;
 
 function assertManager(actor: AuthenticatedAccount, membershipId: number) {
-  if (!['owner','manager'].includes(actor.role)) throw Error('PIN_ACCESS_DENIED');
+  if (!['owner','manager'].includes(actor.role)||actor.posSession) throw Error('PIN_ACCESS_DENIED');
   if (!Number.isSafeInteger(membershipId) || membershipId<=0) throw Error('PIN_INVALID_MEMBER');
 }
 const managerParams=(actor:AuthenticatedAccount,membershipId:number)=>[membershipId,actor.venueId,actor.membershipId,actor.actorAccountId];
@@ -31,7 +32,7 @@ export async function issueStaffPin(actor: AuthenticatedAccount, membershipId: n
         db.prepare(`INSERT INTO staff_pin_credentials
           (membership_id,venue_id,lookup_tag,password_hash,password_salt,password_iterations,updated_by_account_id,updated_at)
           SELECT target.id,?,?,?,?,?,?,? FROM venue_memberships target
-          WHERE target.id IN (${authorizedTarget} AND target.status='active')
+          WHERE target.id IN (${authorizedTarget} AND target.status='active' AND ${linkedActiveEmployee})
           ON CONFLICT(membership_id) DO UPDATE SET lookup_tag=excluded.lookup_tag,
             password_hash=excluded.password_hash,password_salt=excluded.password_salt,password_iterations=excluded.password_iterations,
             revision=staff_pin_credentials.revision+1,revoked_at=NULL,

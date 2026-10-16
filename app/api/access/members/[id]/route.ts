@@ -83,6 +83,10 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
     : typeof body.employeeId === "string" && body.employeeId.trim()
       ? body.employeeId.trim().slice(0, 120)
       : null;
+  // PIN identities are linked through the roster-aware endpoint, never an arbitrary ID.
+  if ((nextRole === 'cashier' || target.membership.role === 'cashier') && employeeId !== target.membership.employeeId) {
+    return Response.json({ok:false,error:'Свяжите сотрудника в разделе персональных PIN.'},{status:400});
+  }
   const updatedAt = new Date().toISOString();
   const db = getD1();
   await db.batch([

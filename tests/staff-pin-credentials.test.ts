@@ -1,3 +1,4 @@
+import { seedRosterEmployee } from './helpers/staff-roster-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
@@ -17,7 +18,9 @@ async function setup(){
   assert.ok(typeof invite.code === 'string' && invite.code.length > 0);
   assert.equal((await r.api.join.POST(r.request(user,'/api/access/join','POST',{code:invite.code}))).status,200);
   const req=new Request(r.request(user,'/api/pos-orders'),{headers:{...Object.fromEntries(r.request(user,'/api/pos-orders').headers),'X-Venue-Id':String(owner.activeVenueId)}});
-  const actor=await r.api.auth.authenticateRequest(req);assert.ok(actor);return actor;
+  const actor=await r.api.auth.authenticateRequest(req);assert.ok(actor);
+  if(role==='cashier'){seedRosterEmployee(r.sqlite,owner.userId,owner.activeVenueId,name);r.sqlite.prepare('UPDATE venue_memberships SET employee_id=? WHERE id=?').run(name,actor.membershipId);}
+  return actor;
  }
  const actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
  return {r,owner,actor,member,pin:r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),crypto:r.api.pinCrypto as unknown as typeof import('../lib/bardoctor/staff-pin-crypto')};

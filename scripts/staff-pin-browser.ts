@@ -1,3 +1,4 @@
+import {seedRosterEmployee} from '../tests/helpers/staff-roster-fixture';
 import { salesEventFixture } from '../tests/helpers/sales-event-fixture';
 import {seedOpenWorkday} from '../tests/helpers/pos-workday-fixture';
 import assert from "node:assert/strict";
@@ -61,6 +62,7 @@ try{
  const actor=await runtime.api.auth.authenticateRequest(runtime.request(owner,'/api/access'));assert.ok(actor);
  const members=runtime.api.memberService as unknown as typeof import('../lib/bardoctor/staff-pin-members');
  const pins=runtime.api.pinService as unknown as typeof import('../lib/bardoctor/staff-pin-credentials');
+ for(const id of ['Anna','Boris'])seedRosterEmployee(runtime.sqlite,actor.id,actor.venueId,id);
  const a=await members.createPinStaff(actor,'Anna','waiter','anna'),b=await members.createPinStaff(actor,'Boris','barista','boris');
  const pinA=await pins.issueStaffPin(actor,a.membershipId),pinB=await pins.issueStaffPin(actor,b.membershipId);
  runtime.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"name":"Synthetic PIN venue","currency":"MDL","timezone":"UTC"}',owner.userId);

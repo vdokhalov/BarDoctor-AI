@@ -1,3 +1,4 @@
+import { seedRosterEmployee } from './helpers/staff-roster-fixture';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lifecycleRuntime } from './helpers/lifecycle-runtime';
@@ -8,6 +9,7 @@ async function setup(sourcePolicy: string|undefined=''){
  const r=await lifecycleRuntime(routes,{bindings:{STAFF_PIN_SOURCE_POLICY:sourcePolicy,STAFF_PIN_LOOKUP_KEY:'synthetic-only-never-production-secret'}});
  const owner=await r.register('owner@isolated.test'),actor=await r.api.auth.authenticateRequest(r.request(owner,'/api/access'));assert.ok(actor);
  const members=r.api.members as unknown as typeof import('../lib/bardoctor/staff-pin-members'),pins=r.api.pin as unknown as typeof import('../lib/bardoctor/staff-pin-credentials'),pos=r.api.pos as unknown as typeof import('../lib/bardoctor/staff-pin-session');
+ for(const id of ['Anna','Boris','duplicate','bad','Future'])seedRosterEmployee(r.sqlite,actor.id,actor.venueId,id);
  const a=await members.createPinStaff(actor,'Anna','waiter','  Anna  '),b=await members.createPinStaff(actor,'Boris','barista','boris');
  const pin=await pins.issueStaffPin(actor,a.membershipId),other=await pins.issueStaffPin(actor,b.membershipId);
  function request(login='anna',secret=pin.pin,source='192.0.2.1',token='',path='/api/staff-pin/session',method='POST'){
@@ -134,6 +136,7 @@ test('security review: optional source policy only adds limits; canonical IP bud
 test('security review: public enumeration, manager authority and cross-venue boundaries',async t=>{
  const {r,owner,actor,members,pins,a,pin,request,enter}=await setup();t.after(r.close);
  const other=await r.register('other-review@isolated.test'),foreign=await r.api.auth.authenticateRequest(r.request(other,'/api/access'));assert.ok(foreign);
+ seedRosterEmployee(r.sqlite,foreign.id,foreign.venueId,'Conflict');
  await assert.rejects(members.createPinStaff(foreign,'Conflict','cashier','ANNA'),/UNIQUE/);
  await assert.rejects(pins.issueStaffPin(foreign,a.membershipId),/ACCESS_DENIED/);
  await assert.rejects(pins.revokeStaffPin(foreign,a.membershipId),/ACCESS_DENIED/);

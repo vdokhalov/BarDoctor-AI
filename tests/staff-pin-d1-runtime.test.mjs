@@ -35,8 +35,11 @@ test("native Worker/D1 PIN transaction, session revocation and parallel attempt 
     await db.prepare("INSERT INTO venues(id,data_account_id,workspace_id,created_by_account_id) VALUES (1,1,1,1)").run();
     await db.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role,status) VALUES(1,1,'owner','active')").run();
     await db.prepare("INSERT INTO venue_memberships(id,venue_id,account_id,role,status) VALUES(1,1,1,'owner','active')").run();
+    await db.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (1,'bd_employees',?)").bind(JSON.stringify([{id:'Synthetic',name:'Synthetic',status:'active',venueId:1}])).run();
     const call = async (body,cookie='') => { const response=await mf.dispatchFetch('http://localhost/api/staff-pin/session',{method:'POST',headers:{origin:'http://localhost',cookie,...(body.source?{'cf-connecting-ip':body.source}:{})},body:JSON.stringify(body)});return {status:response.status,body:await response.json()};};
-    const member=(await call({action:'member'})).body;assert.ok(member.membershipId);
+    const created=await Promise.all([call({action:'member'}),call({action:'member'})]);
+    const member=created[0].body;assert.ok(member.membershipId);assert.equal(created[1].body.membershipId,member.membershipId);
+    assert.equal((await db.prepare("SELECT count(*) n FROM venue_memberships WHERE employee_id='Synthetic'").first()).n,1);
     const issued=(await call({action:'issue',id:member.membershipId})).body;assert.match(issued.pin,/^\d{6}$/);
     assert.equal((await db.prepare('SELECT count(*) n FROM staff_pin_audit').first()).n,1);
     const raced=await Promise.all([call({action:'login',login:'WORKER-STAFF',pin:issued.pin}),call({action:'login',login:'worker-staff',pin:issued.pin})]);
