@@ -123,6 +123,9 @@ export async function buildImmutableVenueExport(input: {
   venue: { id: number; name?: string | null; workspaceId?: number | null; dataAccountId?: number | null };
   serverStores: Partial<Record<AuthoritativeStoreKey, AuthoritativeStoreInput>>;
   legacyCandidates?: Partial<Record<AuthoritativeStoreKey, unknown>>;
+  salesBatches?: unknown[];
+  writeOffDocuments?: unknown[];
+  relatedStores?: Record<string,unknown>;
   exportedAt?: string;
   sourceVersion?: string;
   sourceCommit?: string;
@@ -201,6 +204,8 @@ export async function buildImmutableVenueExport(input: {
     assortment,
     purchaseDocuments: purchases,
     stockMovements: movements,
+    salesBatches: input.salesBatches,
+    writeOffDocuments: input.writeOffDocuments,
     inventorySnapshots: snapshots,
     venueId: input.venue.id,
   });
@@ -245,6 +250,7 @@ export async function buildImmutableVenueExport(input: {
       validJson: !input.serverStores[key]?.parseError,
     }])),
     stores: Object.fromEntries(AUTHORITATIVE_STORE_KEYS.map((key) => [key, stores[key].data])),
+    ...(input.relatedStores ? {relatedStores:input.relatedStores}:{}),
     counts,
     invariants,
     audit,

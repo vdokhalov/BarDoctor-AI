@@ -1,3 +1,4 @@
+import {readSaleStock} from "../../../../lib/bardoctor/stock-storage";
 import { authenticatedEvidenceContext } from "../../../../lib/bardoctor/evidence-resolver";
 import { businessRecord, scopedBusinessRows } from "../../../../lib/bardoctor/business-day-rows";
 import { getD1 } from "../../../../db";
@@ -38,7 +39,7 @@ export async function GET(request: Request): Promise<Response> {
     profile = null;
   }
   const warehouseId = new URL(request.url).searchParams.get("warehouseId");
-  const movementData = json(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const movementData = (await readSaleStock(getD1(),account.id,stores.get(STOCK_MOVEMENT_STORE_KEY),businessRecord(json(stores.get(ASSORTMENT_STORE_KEY))),new Date().toISOString())).movements;
   const scope = { venueId: context.venueId, workspaceId: context.workspaceId, dataAccountId: account.id };
   const assortment = businessRecord(json(stores.get(ASSORTMENT_STORE_KEY)));
   const warehouses = scopedBusinessRows(Array.isArray(json(stores.get("bd_warehouses"))) ? json(stores.get("bd_warehouses")) as unknown[] : [], scope);

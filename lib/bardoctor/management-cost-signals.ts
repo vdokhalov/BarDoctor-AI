@@ -5,7 +5,7 @@ import { hasPermission, isAccessRole, permissionPayload } from "./access-control
 import { authenticatedEvidenceContext } from "./evidence-resolver";
 import { canReadVenueSource } from "./venue-context-access";
 import { runStoreCasBatch, storeSnapshots, withStoreCasRetries } from "./store-cas";
-import { canonicalItemId, COST_SOURCE_KEYS, costRevision, observeCurrentCost, parseCostSources, record } from "./management-cost-observation";
+import { canonicalItemId, COST_SOURCE_KEYS, costRevision, observeCurrentCost, readCostSources, record } from "./management-cost-observation";
 import { COST_WHY, type CostEpisodeV1, type CostScope, type CostStateV1 } from "./management-cost-contracts";
 
 export const COST_STATE_PREFIX = "__bd_p4a_cost_state_v1__:";
@@ -142,7 +142,7 @@ export async function managementCostRequest(request: Request, signalId?: string)
       if (body.menuItemId) return await withStoreCasRetries(request, () => transition(context, String(body.menuItemId), null, "VIEW_REEVALUATION"));
       const read = await snapshot(context, []);
       if (!read) return fail("ACCESS_DENIED", 403);
-      const parsed = parseCostSources(read.snapshots, scope);
+      const parsed = (await readCostSources(read.snapshots, scope));
       if (parsed.reasons.length) return json({ ok: true, coverage: "UNAVAILABLE", reasons: parsed.reasons, items: [], nextCursor: null });
       let cursor: { venueId: number; phase: string; after: string } = { venueId: scope.venueId, phase: "menu", after: "" };
       if (body.cursor) { try { cursor = JSON.parse(String(body.cursor)); } catch { return fail("INVALID_CURSOR", 400); } }
@@ -169,7 +169,7 @@ export async function managementCostRequest(request: Request, signalId?: string)
     const read = await snapshot(context, keys);
     if (!read) return fail("ACCESS_DENIED", 403);
     const items: unknown[] = [];
-    for (const key of keys) { const e = parseStored<CostEpisodeV1>(read.snapshots.find(row => row.key === key)?.dataJson ?? null); if (e && sameScope(e.scope, scope) && (stateFilter === "all" || stateFilter === "active" && e.condition === "ACTIVE" || stateFilter === "verified" && e.condition === "VERIFIED_RESOLVED")) items.push(await project(e, String((parseCostSources(read.snapshots, scope).assortment.menuItems as Record<string,unknown>[] | undefined)?.find(item => item.id === e.menuItemId)?.name ?? e.menuItemId))); }
-    return json({ ok: true, contractVersion: 1, scope, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: parseCostSources(read.snapshots, scope).reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
+    for (const key of keys) { const e = parseStored<CostEpisodeV1>(read.snapshots.find(row => row.key === key)?.dataJson ?? null); if (e && sameScope(e.scope, scope) && (stateFilter === "all" || stateFilter === "active" && e.condition === "ACTIVE" || stateFilter === "verified" && e.condition === "VERIFIED_RESOLVED")) items.push(await project(e, String(((await readCostSources(read.snapshots, scope)).assortment.menuItems as Record<string,unknown>[] | undefined)?.find(item => item.id === e.menuItemId)?.name ?? e.menuItemId))); }
+    return json({ ok: true, contractVersion: 1, scope, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: (await readCostSources(read.snapshots, scope)).reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
   } catch { return fail("CANNOT_VERIFY", 503); }
 }

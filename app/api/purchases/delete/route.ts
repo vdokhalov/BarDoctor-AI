@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
@@ -142,7 +143,7 @@ async function deleteOnce(request: Request): Promise<Response> {
       { status: 409 },
     );
   }
-  const activeStockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY)).filter((movement) => {
+  const activeStockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY))).filter((movement) => {
     const value = record(movement);
     return value.sourceDocumentId === documentId
       && value.type === "receipt"

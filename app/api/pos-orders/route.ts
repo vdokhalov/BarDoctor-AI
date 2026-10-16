@@ -1,3 +1,4 @@
+import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
 import { OPERATIONAL_REPORT_STORE_KEY } from "../../../lib/bardoctor/operational-day";
 import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
@@ -16,7 +17,7 @@ import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountView
 
 const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
-async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
+async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, keys);
   const read = (key: string, fallback: unknown): unknown => { const data = snapshots.find(snapshot => snapshot.key === key)?.dataJson; return data == null ? fallback : JSON.parse(data); };
   const rows = (key: string) => { const value = read(key, []); if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW"); return value; };
@@ -24,18 +25,20 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW");
   const events = rows(SALES_EVENT_STORE_KEY);
   if (events.some(event => !event.id || !event.fingerprint || !event.batch || !Array.isArray(event.originalMovements) || !Array.isArray(event.prices) || !["POSTED", "REVERSED"].includes(event.status))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW");
+  const now = new Date().toISOString();
+  const stock = await readSaleStock(db,account.id,snapshots.find(s=>s.key==="bd_stock_movements")?.dataJson,assortment as Record<string,unknown>,now,documentId?[documentId]:[]);
   const context: PosOrderContext = { ...venueTimeFromJson(account.restaurantJson), venueId: account.venueId,
-    currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now: new Date().toISOString(),
+    currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now,
     actor: { accountId: account.actorAccountId, name: [account.firstName, account.lastName].filter(Boolean).join(" "), role: account.role, ...(account.jobTitle ? { jobTitle: account.jobTitle } : {}) },
     discountRules: parsePosDiscountRules(rows(POS_DISCOUNT_STORE_KEY)),
-    assortment: assortment as Record<string, unknown>, movements: rows("bd_stock_movements"), events, revenues: rows("bd_finance_revenue"),
+    assortment: assortment as Record<string, unknown>, movements: stock.movements, events, revenues: rows("bd_finance_revenue"),
     mappings: rows("bd_sales_mappings"), warehouseRoutes: rows("bd_sales_warehouse_routes"), warehouses: rows("bd_warehouses"), closedMonths: closedMonthsFromStore(read("bd_month_closings", null)),
   };
-  return { db, snapshots, context, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+  return { db, snapshots, context, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
-  if (error instanceof Error && /^(POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
+  if (error instanceof Error && /^(STOCK_JOURNAL_|POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
       POS_ORDER_CANCELLATION_HAS_PAYMENT: "У счёта есть признаки оплаты. Отмена неоплаченного счёта недоступна; возвраты рассматриваются отдельно.",
       POS_ORDER_SHIFT_NEEDS_REVIEW: "Исходная кассовая смена не определена однозначно. Ничего не изменено.",
@@ -81,15 +84,19 @@ async function command(request: Request): Promise<Response> {
     || ["split", "cancel_item", "cancel_order", "cancel_precheck", "apply_discount", "remove_discount"].includes(body.action) && !canManagePosPrivilegedAction(account)) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
   if (body.venueId !== account.venueId) return reply({ ok: false, code: "VENUE_CHANGED" }, 409);
   try {
-    const { db, snapshots, context, orders, workdays } = await load(account);
+    const { db, snapshots, context, orders, workdays, stockRevision } = await load(account);
     const plan = await planPosOrder(context, orders, body);
     const result = { ok: true, duplicate: plan.duplicate, order: plan.order, orders: posOrderViews(context, plan.orders), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
     if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);
     const updates: [string, unknown][] = [[POS_ORDER_STORE_KEY, plan.orders]];
     if (plan.salesPlan) updates.push(["bd_assortment_v1", plan.salesPlan.assortment], ["bd_stock_movements", plan.salesPlan.movements], [SALES_EVENT_STORE_KEY, plan.salesPlan.events], ["bd_finance_revenue", plan.salesPlan.revenues]);
-    const statements = updates.map(([key, value]) => db.prepare(`INSERT INTO domain_data (account_id,store_key,data_json,updated_at) VALUES (?,?,?,?)
-      ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`).bind(account.id, key, JSON.stringify(value), context.now));
+    const statements:D1PreparedStatement[]=[];
+    for(const [key,value] of updates){
+      statements.push(...(key==='bd_stock_movements'&&stockRevision!==null
+        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,context.movements,value as any[])
+        :await stockStoreStatements(db,account.id,key,value,context.now)));
+    }
     const shift = context.revenues.find(row => row.id === plan.order.shiftId && row.venueId === context.venueId);
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(account.id, POS_ORDER_STORE_KEY, body.action, plan.order.id, `Стол ${plan.order.tableNumber}`, String(shift?.date ?? "").slice(0, 7),

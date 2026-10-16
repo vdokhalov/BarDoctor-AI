@@ -1,3 +1,4 @@
+import {readStockHistory} from "../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../db";
 import {
   authenticateIdentityRequest,
@@ -56,7 +57,7 @@ export async function GET(request: Request): Promise<Response> {
     venueId: KOLN_VENUE_ID,
     purchases: parse(stores.get(PURCHASE_STORE_KEY), []),
     suppliers: parse(stores.get(SUPPLIER_STORE_KEY), []),
-    stockMovements: parse(stores.get(STOCK_MOVEMENT_STORE_KEY), []),
+    stockMovements: await readStockHistory(getD1(),KOLN_DATA_ACCOUNT_ID,stores.get(STOCK_MOVEMENT_STORE_KEY)),
     serverAssortmentExists: stores.has(ASSORTMENT_STORE_KEY),
     sourceStorePresence: {
       purchases: stores.has(PURCHASE_STORE_KEY),

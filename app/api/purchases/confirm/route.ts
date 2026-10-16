@@ -1,3 +1,5 @@
+import {inheritStockHistory} from "../../../../lib/bardoctor/stock-retention";
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { preparePurchaseConversions } from "../../../../lib/bardoctor/purchase-conversion";
@@ -278,7 +280,7 @@ async function postOnce(request: Request): Promise<Response> {
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  let stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   // Return persisted results before checking today's nomenclature/templates.
   // A retry must not reinterpret an already committed receipt or run repairs.
   const persistedDuplicate = documents.find((item) => {
@@ -308,7 +310,7 @@ async function postOnce(request: Request): Promise<Response> {
   expenses = ledgerMigration.expenses;
   const inventoryRepair = consolidateInventoryDuplicates({ assortment, stockMovements, now });
   assortment = inventoryRepair.assortment;
-  stockMovements = inventoryRepair.stockMovements;
+  stockMovements = inheritStockHistory(stockMovements,inventoryRepair.stockMovements);
 
   if (
     document.documentType !== "price_list"
@@ -532,7 +534,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   const nextAssortment = inventory?.assortment ?? assortment;
   const nextStockMovements = inventory
-    ? retainStockMovements([...inventory.movements, ...stockMovements], nextAssortment)
+    ? retainStockMovements([...inventory.movements, ...stockMovements], nextAssortment, stockMovements)
     : stockMovements;
   documents.unshift(confirmedDocument);
 
@@ -610,7 +612,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   if (inventory && (inventory.summary.postedLines > 0 || inventoryRepair.summary.changed)) {
     statements.push(
-      upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextStockMovements, now),
+      ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextStockMovements, now),
       audit(database, {
         accountId: account.id,
         storeKey: STOCK_MOVEMENT_STORE_KEY,

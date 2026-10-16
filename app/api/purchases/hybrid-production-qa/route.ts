@@ -1,3 +1,4 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
 import { buildAssortmentMigrationPreview } from "../../../../lib/bardoctor/assortment-migration-preview";
@@ -566,7 +567,7 @@ export async function GET(request: Request): Promise<Response> {
   const assortment = parse(rows.get("bd_assortment_v1"), {});
   const purchases = array(parse(rows.get("bd_purchase_documents"), [])) as PurchaseDocument[];
   const suppliers = array(parse(rows.get("bd_suppliers"), [])).map(record);
-  const stockMovements = array(parse(rows.get("bd_stock_movements"), []));
+  const stockMovements = await readStockHistory(getD1(),account.id,rows.get("bd_stock_movements"));
   const standaloneMappings = array(parse(rows.get("bd_invoice_supplier_mappings_v2"), [])) as SupplierItemMapping[];
   const candidates = nomenclatureCandidates(assortment, VENUE_ID);
   const selection = selectProductionHybridDocuments(purchases, VENUE_ID);

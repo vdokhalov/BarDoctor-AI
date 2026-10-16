@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -104,7 +105,7 @@ async function postOnce(request: Request): Promise<Response> {
   try {
     for (const snapshot of casSnapshots) {
       if (snapshot.dataJson == null) continue;
-      const value = JSON.parse(snapshot.dataJson);
+      const value = snapshot.key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(database,account.id,snapshot.dataJson) : JSON.parse(snapshot.dataJson);
       if (snapshot.key === ASSORTMENT_STORE_KEY) { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid assortment"); }
       else if (snapshot.key !== MONTH_CLOSING_STORE_KEY && (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row)))) throw new Error("Invalid store");
     }
@@ -113,7 +114,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   const stores = {
     revenues: array(read(REVENUE_STORE_KEY, [])), writeOffs: array(read(WRITE_OFF_STORE_KEY, [])),
-    assortment: record(read(ASSORTMENT_STORE_KEY, {})), stockMovements: array(read(STOCK_MOVEMENT_STORE_KEY, [])),
+    assortment: record(read(ASSORTMENT_STORE_KEY, {})), stockMovements: await readStockHistory(database,account.id,casSnapshots.find(s=>s.key===STOCK_MOVEMENT_STORE_KEY)?.dataJson),
     expenses: array(read(EXPENSE_STORE_KEY, [])), closedMonths: closedMonthsFromStore(read(MONTH_CLOSING_STORE_KEY, null)),
     reports: array(read(OPERATIONAL_REPORT_STORE_KEY, [])), incidents: array(read("bd_cases", [])),
     events: array(read("bd_sales_events_v1", [])), documents: array(read("bd_sales_documents", [])),
@@ -175,7 +176,7 @@ async function postOnce(request: Request): Promise<Response> {
     ...(result.sections.revenue.status === "SAVED" ? [upsertStore(database, account.id, REVENUE_STORE_KEY, result.revenues, now)] : []),
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.writeOffs, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, result.expenses, now),
     upsertStore(database, account.id, OPERATIONAL_REPORT_STORE_KEY, result.reports, now),
     ...(Array.isArray(body.incidents) && body.incidents.length ? [upsertStore(database, account.id, "bd_cases", result.incidents, now)] : []),

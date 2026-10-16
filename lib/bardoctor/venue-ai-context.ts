@@ -1,3 +1,4 @@
+import {readStockHistory} from "./stock-storage";
 import { derivedInputBelongs } from "./derived-input-scope";
 import { contextProvenance } from "./context-provenance";
 import { bindCanonicalContext, scopedSource, type CanonicalInputs, type MetricEvidenceMap } from "./canonical-input-evidence";
@@ -1267,7 +1268,7 @@ export async function loadVenueAIContext(
   request: JsonRecord = {},
   external?: VenueAIContextSources["external"],
 ): Promise<VenueAIContext> {
-  const { getDb } = await import("../../db");
+  const { getDb, getD1 } = await import("../../db");
   const keys = [...new Set(Object.values(VENUE_CONTEXT_SOURCES).flat())].filter(key => canReadVenueSource(account, key));
   const rows = keys.length ? await getDb()
     .select({ storeKey: domainData.storeKey, dataJson: domainData.dataJson, updatedAt: domainData.updatedAt })
@@ -1278,9 +1279,10 @@ export async function loadVenueAIContext(
   const stores = new Map<string, StoredVenueValue>();
   for (const row of rows) {
     try {
-      stores.set(row.storeKey, { data: JSON.parse(row.dataJson) as unknown, updatedAt: row.updatedAt });
+      stores.set(row.storeKey, { data: row.storeKey==="bd_stock_movements"?await readStockHistory(getD1(),account.id,row.dataJson,{rows:10000,bytes:2000000}):JSON.parse(row.dataJson) as unknown, updatedAt: row.updatedAt });
     } catch {
-      // A damaged optional store must not prevent the remaining context from being used.
+      // Missing or oversized optional evidence stays explicitly unavailable.
+      stores.set(row.storeKey,{data:null,sourceState:"PARTIAL",updatedAt:row.updatedAt});
     }
   }
   const reviewStore = stores.get("bd_guest_reviews");
@@ -1295,7 +1297,7 @@ export async function loadVenueAIContext(
     accountProfile = {};
   }
   const scope = venueBoundary?.workspaceId != null ? { venueId: account.venueId, workspaceId: venueBoundary.workspaceId, dataAccountId: account.id } : null;
-  if (scope) for (const stored of stores.values()) { stored.sourceState = derivedInputBelongs(stored.data, scope) ? "AVAILABLE" : "PARTIAL"; stored.data = scopedSource(stored.data, scope); }
+  if (scope) for (const stored of stores.values()) { stored.sourceState = stored.sourceState!=="PARTIAL" && derivedInputBelongs(stored.data, scope) ? "AVAILABLE" : "PARTIAL"; stored.data = scopedSource(stored.data, scope); }
   const context = buildVenueAIContextFromSources(purpose, {
     access: account,
     workspaceId: venueBoundary?.workspaceId ?? undefined,

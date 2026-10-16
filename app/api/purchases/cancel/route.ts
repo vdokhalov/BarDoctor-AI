@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -169,7 +170,7 @@ async function postOnce(request: Request): Promise<Response> {
       documents,
       expenses,
       assortment: json(stores.get(ASSORTMENT_STORE_KEY), {}),
-      stockMovements: array(stores.get(STOCK_MOVEMENT_STORE_KEY)),
+      stockMovements: (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY))),
     });
   }
   if (document.status !== "confirmed") {
@@ -209,7 +210,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
 
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   const inventory = purchaseAffectsInventory(document)
     ? removePurchaseFromInventory({ assortment, document, stockMovements, now })
     : {
@@ -259,7 +260,7 @@ async function postOnce(request: Request): Promise<Response> {
   const statements: D1PreparedStatement[] = [
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, inventory.movements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, inventory.movements, now),
     auditUpdate(database, {
       accountId: account.id,
       storeKey: PURCHASE_STORE_KEY,

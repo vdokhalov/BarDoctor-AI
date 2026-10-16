@@ -1,3 +1,4 @@
+import {readSaleStock,stockJournalMarker} from "./stock-storage";
 import { createIngredientReconciliationMemo, type IngredientReconciliationMemo } from "./tech-card-reconciliation";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
 import { boundSource } from "./canonical-input-evidence";
@@ -50,9 +51,21 @@ export function parseCostSources(snapshots: StoreSnapshot[], scope: CostScope) {
   return { sources, reasons: [...new Set(reasons)], assortment: record(sources.bd_assortment_v1) };
 }
 
+export async function readCostSources(snapshots:StoreSnapshot[],scope:CostScope){
+  let costSnapshots=snapshots;
+  const movement=snapshots.find(s=>s.key==='bd_stock_movements');
+  if(movement?.dataJson){try{if(stockJournalMarker(JSON.parse(movement.dataJson))){
+    const {getD1}=await import('../../db');
+    const assortment=record(JSON.parse(snapshots.find(s=>s.key==='bd_assortment_v1')?.dataJson??'{}'));
+    const stock=await readSaleStock(getD1(),scope.dataAccountId,movement.dataJson,assortment,new Date().toISOString());
+    costSnapshots=snapshots.map(s=>s===movement?{...s,dataJson:JSON.stringify(stock.movements)}:s);
+  }}catch{/* Invalid or unavailable evidence remains SOURCE_INVALID below. */}}
+  return parseCostSources(costSnapshots, scope);
+}
+
 type CostReadInput = { scope: CostScope; snapshots: StoreSnapshot[]; profileJson: string | null; menuItemId: string; now: string };
 async function prepareCurrentCostRead({scope, snapshots, profileJson}: Omit<CostReadInput, "menuItemId">) {
-  const parsed = parseCostSources(snapshots, scope), reasons = [...parsed.reasons];
+  const parsed=await readCostSources(snapshots,scope),reasons=[...parsed.reasons];
   let profile: Record<string, unknown> = {};
   try { profile = record(JSON.parse(profileJson ?? "null")); } catch { reasons.push("SOURCE_INVALID"); }
   const currency = typeof profile.currency === "string" && /^[A-Z]{3}$/.test(profile.currency) ? profile.currency : null;

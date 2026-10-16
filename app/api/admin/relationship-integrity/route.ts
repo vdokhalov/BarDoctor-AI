@@ -1,5 +1,6 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { inArray } from "drizzle-orm";
-import { getDb } from "../../../../db";
+import { getDb, getD1 } from "../../../../db";
 import { domainData, venues as venueTable } from "../../../../db/schema";
 import { auditDataIntegrity } from "../../../../lib/bardoctor/data-integrity-audit";
 import {
@@ -36,13 +37,13 @@ export async function GET(request: Request): Promise<Response> {
   ]);
   const stores = new Map(storeRows.map((row) => [`${row.accountId}:${row.key}`, row.json]));
   const generatedAt = new Date();
-  const venues = venueRows.map((venue) => {
+  const venues = await Promise.all(venueRows.map(async (venue) => {
     const store = (key: typeof STORE_KEYS[number], fallback: unknown) =>
       parsed(stores.get(`${venue.accountId}:${key}`), fallback);
     const report = auditDataIntegrity({
       assortment: store("bd_assortment_v1", {}),
       purchaseDocuments: list(store("bd_purchase_documents", [])),
-      stockMovements: list(store("bd_stock_movements", [])),
+      stockMovements: await readStockHistory(getD1(),venue.accountId,stores.get(`${venue.accountId}:bd_stock_movements`)),
       writeOffDocuments: list(store("bd_inventory_writeoffs", [])),
       salesBatches: list(store("bd_sales_batches", [])),
       venueId: venue.id,
@@ -55,7 +56,7 @@ export async function GET(request: Request): Promise<Response> {
       affectedRecords: report.reconciliation.affectedRecords,
       writesPerformed: report.reconciliation.writesPerformed,
     };
-  });
+  }));
 
   return Response.json({
     ok: true,

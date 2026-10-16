@@ -1,3 +1,4 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
@@ -67,7 +68,7 @@ export async function GET(request: Request): Promise<Response> {
     documents: ledger.documents,
     suppliers: values(stores.get("bd_suppliers")),
     expenses: ledger.expenses,
-    stockMovements: values(stores.get("bd_stock_movements")),
+    stockMovements: await readStockHistory(getD1(),account.id,stores.get("bd_stock_movements")),
     supplierAlternatives: parsed(stores.get("bd_supplier_alternatives_v1"), null),
     assortment: parsed(stores.get("bd_assortment_v1"), {}),
     period,

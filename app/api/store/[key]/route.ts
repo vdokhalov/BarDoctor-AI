@@ -1,3 +1,5 @@
+import {getD1} from "../../../../db";
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
 import { writeAccountingBoundaries } from "../../../../lib/bardoctor/accounting-boundary-write";
 import { canReadSavedDiagnosis, restrictedVenueContext } from "../../../../lib/bardoctor/venue-context-access";
@@ -105,7 +107,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
     .where(and(eq(domainData.accountId, account.id), eq(domainData.storeKey, key)))
     .limit(1);
 
-  const data = row ? JSON.parse(row.dataJson) : null;
+  const data = row ? key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(getD1(),account.id,row.dataJson) : JSON.parse(row.dataJson) : null;
   return Response.json({
     ok: true,
     data: key === "bd_finance_revenue" ? workdayPersonnelView(data,canReadManagementWorkday(account)) : data,

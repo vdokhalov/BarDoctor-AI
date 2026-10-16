@@ -183,5 +183,5 @@ export async function confirmOpeningStock(command: { id: string; inputs: Opening
   assortment.updatedAt = context.now;
   // Do not discard idempotency/history to make room. Keep the Worker workload bounded.
   if (new TextEncoder().encode(JSON.stringify([...context.documents, document])).length > 4_000_000) throw new Error("OPENING_CAPACITY_REVIEW");
-  return { duplicate: false, document, assortment, movements: retainStockMovements(movements, assortment), documents: [...context.documents, document] };
+  return { duplicate: false, document, assortment, movements: retainStockMovements(movements, assortment, context.movements), documents: [...context.documents, document] };
 }

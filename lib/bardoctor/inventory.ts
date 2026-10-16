@@ -3622,7 +3622,7 @@ export function revisePurchaseInInventory(input: {
     return {
       ok: true,
       assortment: parts.root,
-      movements: retainStockMovements([...movementHistory, ...nextMovements], parts.root) as StockMovement[],
+      movements: retainStockMovements([...movementHistory, ...nextMovements], parts.root, input.stockMovements) as StockMovement[],
       summary: {
         postedLines: previousReceipts.length,
         movementCount: previousReceipts.length,
@@ -3723,7 +3723,7 @@ export function revisePurchaseInInventory(input: {
     ...cancelledPreviousReceipts,
     ...movementHistory,
     ...retained,
-  ], reapplied.assortment) as StockMovement[];
+  ], reapplied.assortment, input.stockMovements) as StockMovement[];
   const finalParts = assortmentParts(reapplied.assortment);
   for (const balance of finalParts.balances) {
     if (!affectedKeys.has(text(balance.productKey ?? balance.key, "", 300))) continue;

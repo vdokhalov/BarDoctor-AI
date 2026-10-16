@@ -1,3 +1,4 @@
+import {readStockHistory} from "./stock-storage";
 import { bindCanonicalContext } from "./canonical-input-evidence";
 import { runtimeEnv } from "./runtime-env";
 import { getD1 } from "../../db";
@@ -53,7 +54,7 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
     source.revision = await revision("OPERATIONAL_REPORT", key, { present, dataJson: snapshot?.dataJson ?? null, updatedAt: source.updatedAt });
     if (snapshot?.dataJson != null) {
       try {
-        const raw: unknown = JSON.parse(snapshot.dataJson);
+        const raw: unknown = key==="bd_stock_movements" ? await readStockHistory(database,account.id,snapshot.dataJson,{rows:MAX_HEALTH_ROWS,bytes:MAX_HEALTH_SOURCE_BYTES}) : JSON.parse(snapshot.dataJson);
         const arrays = object(raw) ? Object.values(raw).filter(Array.isArray) : [raw];
         const valid = key === "bd_assortment_v1" ? object(raw) && Array.isArray(raw.stockBalances) : Array.isArray(raw) || !HEALTH_OPERATIONS_KEYS.includes(key) && object(raw);
         if (!valid || arrays.some(value => Array.isArray(value) && (value.length > MAX_HEALTH_ROWS || value.some(child => !object(child))))) source.state = "PARTIAL";

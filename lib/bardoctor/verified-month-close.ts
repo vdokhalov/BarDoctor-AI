@@ -1,3 +1,4 @@
+import {readStockHistory} from "./stock-storage";
 import { derivedInputBelongs } from "./derived-input-scope";
 import { normalizeLegacyPayrollEntries } from "./payroll-entry-scope";
 import { monthCloseReasonDetails } from "./month-close-diagnostics";
@@ -85,7 +86,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   const snapshots = storeSnapshots(loaded, KEYS);
   let stores: Record<string, Row[]>;
   let profile: Row;
-  try { profile = row(JSON.parse(profileRow.data_json ?? "{}")); stores = Object.fromEntries(snapshots.map(value => { const data = JSON.parse(value.dataJson ?? "[]"); if (!Array.isArray(data)) throw new Error("invalid store"); return [value.key, array(data)]; })); } catch { return response({ ok: false, code: "MONTH_INPUTS_NEED_REVIEW" }, 422); }
+  try { profile = row(JSON.parse(profileRow.data_json ?? "{}")); stores = Object.fromEntries(await Promise.all(snapshots.map(async value => { const data = value.key==="bd_stock_movements"?await readStockHistory(database,account.id,value.dataJson):JSON.parse(value.dataJson ?? "[]"); if (!Array.isArray(data)) throw new Error("invalid store"); return [value.key, array(data)]; }))); } catch { return response({ ok: false, code: "MONTH_INPUTS_NEED_REVIEW" }, 422); }
   const closings = stores.bd_month_closings.filter(value => derivedInputBelongs(value, { venueId, workspaceId, dataAccountId: account.id }));
   if (closings.filter(value => value.monthKey === monthKey).length > 1) return response({ ok: false, code: "AMBIGUOUS_MONTH_CLOSING" }, 422);
   const closing = closings.find(value => value.monthKey === monthKey && (value.venueId == null || value.venueId === "primary" || Number(value.venueId) === venueId));

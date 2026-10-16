@@ -1363,7 +1363,7 @@ export function postSalesBatch(input: {
     batch: completed,
     batches: replaceSalesBatchInFullCollection(input.batches, completed),
     assortment,
-    stockMovements: retainStockMovements([...newMovements, ...currentMovements], assortment),
+    stockMovements: retainStockMovements([...newMovements, ...currentMovements], assortment, input.stockMovements),
     postedNow: postedLines.size,
   };
 }
@@ -1479,7 +1479,7 @@ export function reverseSalesBatch(input: {
     batch: finalBatch,
     batches: replaceSalesBatchInFullCollection(input.batches, finalBatch),
     assortment,
-    stockMovements: retainStockMovements([...reversals, ...currentMovements], assortment),
+    stockMovements: retainStockMovements([...reversals, ...currentMovements], assortment, input.stockMovements),
   };
 }
 

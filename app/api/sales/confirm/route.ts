@@ -1,3 +1,4 @@
+import {readStockHistory,readSaleStock,stockStoreStatements,stockMovementResponse} from "../../../../lib/bardoctor/stock-storage";
 import { venueTimeFromJson, venueDate } from "../../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -97,13 +98,13 @@ async function postOnce(request: Request): Promise<Response> {
   const mappings = array(stores.get(SALES_MAPPING_STORE_KEY));
   const routes = array(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY));
   const assortment = parse(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const stockMovements = (await readSaleStock(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY),record(assortment),document.date)).movements;
   const warehouses = array(stores.get(WAREHOUSE_STORE_KEY));
   const revenues = array(stores.get(REVENUE_STORE_KEY));
   const closed = closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null));
   if (closed.has(document.date.slice(0, 7))) return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${document.date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
   const duplicateDocument = documents.find((value) => record(value).id === document.id);
-  if (duplicateDocument) return Response.json({ ok: true, duplicate: true, document: duplicateDocument, documents, assortment, stockMovements });
+  if (duplicateDocument) return Response.json({ ok: true, duplicate: true, document: duplicateDocument, documents, assortment, ...stockMovementResponse(stockMovements,stockMovements,false) });
 
   const actor = {
     accountId: account.actorAccountId,
@@ -158,7 +159,7 @@ async function postOnce(request: Request): Promise<Response> {
     upsertStore(database, account.id, SALES_DOCUMENT_STORE_KEY, nextDocuments, now),
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, posted.batches, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, posted.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, posted.stockMovements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, posted.stockMovements, now),
     upsertStore(database, account.id, REVENUE_STORE_KEY, revenue.revenues, now),
     database.prepare(`
       INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key, before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
@@ -176,7 +177,7 @@ async function postOnce(request: Request): Promise<Response> {
     salesBatch: posted.batch,
     batches: posted.batches,
     assortment: posted.assortment,
-    stockMovements: posted.stockMovements,
+    ...stockMovementResponse(stockMovements,posted.stockMovements),
     revenues: revenue.revenues,
     revenueRecord: revenue.revenueRecord,
     inventorySummary: { postedLines: posted.batch.postedLineCount, movementCount: posted.batch.movementIds.length, unresolvedLines: [] },

@@ -1,5 +1,8 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
+import {salesEventDocuments} from "../../../../lib/bardoctor/sales-events";
+import {readStoreSnapshots,storeSnapshots,StoreWriteConflictError,withStoreCasRetries} from "../../../../lib/bardoctor/store-cas";
 import { and, eq, inArray } from "drizzle-orm";
-import { getDb } from "../../../../db";
+import { getDb, getD1 } from "../../../../db";
 import { domainData, venues } from "../../../../db/schema";
 import {
   AUTHORITATIVE_STORE_KEYS,
@@ -18,7 +21,7 @@ async function createExport(
   const [venue] = await db.select().from(venues).where(eq(venues.id, account.venueId)).limit(1);
   const rows = await db.select().from(domainData).where(and(
     eq(domainData.accountId, account.id),
-    inArray(domainData.storeKey, [...AUTHORITATIVE_STORE_KEYS]),
+    inArray(domainData.storeKey, [...AUTHORITATIVE_STORE_KEYS,"bd_sales_batches","bd_sales_events_v1","bd_inventory_writeoffs"]),
   ));
   const serverStores: Partial<Record<AuthoritativeStoreKey, AuthoritativeStoreInput>> = {};
   for (const row of rows) {
@@ -26,8 +29,9 @@ async function createExport(
     let data: unknown;
     let parseError = false;
     try {
-      data = JSON.parse(row.dataJson);
-    } catch {
+      data = row.storeKey==="bd_stock_movements" ? await readStockHistory(getD1(),account.id,row.dataJson) : JSON.parse(row.dataJson);
+    } catch (error) {
+      if(row.storeKey==="bd_stock_movements" && !(error instanceof SyntaxError))throw error;
       data = null;
       parseError = true;
     }
@@ -38,6 +42,11 @@ async function createExport(
       parseError,
     };
   }
+  const relatedKeys=["bd_sales_batches","bd_sales_events_v1","bd_inventory_writeoffs"];
+  const relatedStores=Object.fromEntries(relatedKeys.map(key=>{const row=rows.find(row=>row.storeKey===key);const value=row?JSON.parse(row.dataJson):[];if(!Array.isArray(value))throw Error('EXPORT_SOURCE_NEEDS_REVIEW');return [key,value];}));
+  const original=storeSnapshots(rows.map(row=>({store_key:row.storeKey,data_json:row.dataJson,updated_at:row.updatedAt})),[...AUTHORITATIVE_STORE_KEYS,...relatedKeys]);
+  const current=await readStoreSnapshots(getD1(),account.id,original.map(row=>row.key));
+  if(JSON.stringify(original)!==JSON.stringify(current))throw new StoreWriteConflictError();
   const profile = account.restaurantJson ? JSON.parse(account.restaurantJson) as Record<string, unknown> : {};
   return buildImmutableVenueExport({
     venue: {
@@ -48,6 +57,9 @@ async function createExport(
     },
     serverStores,
     legacyCandidates,
+    relatedStores,
+    salesBatches:[...relatedStores.bd_sales_batches,...salesEventDocuments(relatedStores.bd_sales_events_v1,account.venueId)],
+    writeOffDocuments:relatedStores.bd_inventory_writeoffs,
   });
 }
 
@@ -55,7 +67,8 @@ function forbidden() {
   return Response.json({ ok: false, code: "OWNER_ONLY", error: "Полный data-integrity export доступен владельцу." }, { status: 403 });
 }
 
-export async function GET(request: Request): Promise<Response> {
+export async function GET(request: Request): Promise<Response> { return withStoreCasRetries(request,getExport); }
+async function getExport(request:Request):Promise<Response> {
   const account = await authenticateRequest(request);
   if (!account) return unauthorized();
   if (account.role !== "owner") return forbidden();

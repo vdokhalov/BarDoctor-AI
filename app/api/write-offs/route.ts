@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -75,7 +76,7 @@ async function readStores(database: D1Database, accountId: number) {
   return {
     documents: array(parse(stores.get(WRITE_OFF_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
-    movements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    movements: (await readStockHistory(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY))),
     expenses: array(parse(stores.get(EXPENSE_STORE_KEY), [])),
     closedMonths: closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null)),
   };
@@ -233,7 +234,7 @@ async function postOnce(request: Request): Promise<Response> {
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-      upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+      ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
       auditStatement({ database, accountId: account.id, action: "write_off.cancelled", document: result.document, before: existing, actorName: currentActor.name, actorRole: currentActor.role, reason: `Проведение отменено; создано обратных движений: ${result.document.reversalMovementIds?.length ?? 0}`, now }),
     ], now);
@@ -263,7 +264,7 @@ async function postOnce(request: Request): Promise<Response> {
   await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, WRITE_OFF_STORE_KEY, result.documents, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
     auditStatement({ database, accountId: account.id, action: "write_off.posted", document: result.document, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Списание проведено атомарно; движений: ${result.document.movementIds.length}; причина: ${result.document.reasonCode}`, now }),
   ], now);

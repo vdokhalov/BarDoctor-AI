@@ -1,3 +1,5 @@
+import {inheritStockHistory} from "../../../../lib/bardoctor/stock-retention";
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../../../db";
 import { preparePurchaseConversions } from "../../../../lib/bardoctor/purchase-conversion";
 import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
@@ -202,7 +204,7 @@ async function postOnce(request: Request): Promise<Response> {
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  let stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  let stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   const conversion = preparePurchaseConversions({ ...document, venueId: account.venueId }, body.document, assortment);
   if (!conversion.ok) return Response.json(conversion, { status: 422 });
   document = conversion.document;
@@ -216,7 +218,7 @@ async function postOnce(request: Request): Promise<Response> {
   expenses = ledgerMigration.expenses;
   const inventoryRepair = consolidateInventoryDuplicates({ assortment, stockMovements, now });
   assortment = inventoryRepair.assortment;
-  stockMovements = inventoryRepair.stockMovements;
+  stockMovements = inheritStockHistory(stockMovements,inventoryRepair.stockMovements);
   const documentIndex = documents.findIndex((value) => record(value)?.id === document.id);
   const previousDocument = documentIndex >= 0 ? record(documents[documentIndex]) : null;
   if (!previousDocument || !["confirmed", "cancelled"].includes(String(previousDocument.status))) {
@@ -409,7 +411,7 @@ async function postOnce(request: Request): Promise<Response> {
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     upsertStore(database, account.id, SUPPLIER_STORE_KEY, suppliers, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, inventory.movements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, inventory.movements, now),
     auditUpdate(database, {
       accountId: account.id,
       storeKey: PURCHASE_STORE_KEY,

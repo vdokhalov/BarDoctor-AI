@@ -16,7 +16,11 @@ export class StockEvidenceCapacityError extends Error {
 /** Pin current facts before filling the optional recent-history window. If all
  * capacity is required, refuse the new command; never silently lose its basis.
  * Bounded output, no writes and no fabricated anchors. */
-export function retainStockMovements<T>(values: T[], assortment?: unknown): T[] {
+const normalizedHistories = new WeakSet<object>();
+export function markNormalizedStockHistory<T>(values:T[]):T[]{normalizedHistories.add(values);return values;}
+export function isNormalizedStockHistory(values:unknown):boolean{return !!values&&typeof values==='object'&&normalizedHistories.has(values);}
+export function retainStockMovements<T>(values: T[], assortment?: unknown, sourceHistory?:unknown): T[] {
+  if(isNormalizedStockHistory(sourceHistory))return markNormalizedStockHistory(values);
   const encoder = new TextEncoder();
   const sizes = values.map(value => encoder.encode(JSON.stringify(value)).byteLength + 1);
   if (values.length <= MAX_STOCK_MOVEMENTS && sizes.reduce((sum, size) => sum + size, 2) <= MAX_STOCK_MOVEMENT_BYTES) return values;
@@ -84,3 +88,5 @@ export function stockCapacityResponse(error: unknown): Response | null {
   return Response.json({ ok: false, code: error.code, retryable: false,
     error: "Недостаточно места для сохранения обязательной истории склада. Операция не выполнена; существующие данные сохранены." }, { status: 409 });
 }
+
+export function inheritStockHistory<T>(source:unknown,values:T[]):T[]{return isNormalizedStockHistory(source)?markNormalizedStockHistory(values):values;}

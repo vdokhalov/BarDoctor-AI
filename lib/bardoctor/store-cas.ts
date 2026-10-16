@@ -111,6 +111,8 @@ export async function withStoreCasRetries(
     } catch (error) {
       const capacity = stockCapacityResponse(error);
       if (capacity) return capacity;
+      const journalCode=error instanceof Error ? error.message.match(/\bSTOCK_JOURNAL_[A-Z_]+\b/)?.[0] : null;
+      if(journalCode)return Response.json({ok:false,code:journalCode,retryable:false,error:"История склада требует проверки. Операция не выполнена; существующие данные сохранены."},{status:409});
       if (!(error instanceof StoreWriteConflictError)) throw error;
     }
   }

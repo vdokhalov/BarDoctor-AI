@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { manualReferencePrice } from "../../../../lib/bardoctor/manual-reference-price";
@@ -157,7 +158,7 @@ async function postOnce(request: Request): Promise<Response> {
   const casSnapshots = await readStoreSnapshots(database, account.id, [ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, PURCHASE_STORE_KEY]);
   const stores = new Map(casSnapshots.filter(row => row.dataJson !== null).map(row => [row.key, row.dataJson!]));
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   const purchaseDocuments = array(stores.get(PURCHASE_STORE_KEY));
   const now = new Date().toISOString();
   const actorName = [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;
@@ -251,7 +252,7 @@ async function postOnce(request: Request): Promise<Response> {
       }),
     ];
     if (consolidated.summary.changed) {
-      statements.push(upsertStore(
+      statements.push(...await stockStoreStatements(
         database,
         account.id,
         STOCK_MOVEMENT_STORE_KEY,
@@ -330,7 +331,7 @@ async function postOnce(request: Request): Promise<Response> {
         }),
       ];
       if (consolidated.summary.changed || reconciled.summary.changed || amountRepair.summary.changed) {
-        statements.push(upsertStore(
+        statements.push(...await stockStoreStatements(
           database,
           account.id,
           STOCK_MOVEMENT_STORE_KEY,

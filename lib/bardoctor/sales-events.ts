@@ -1,3 +1,4 @@
+import {inheritStockHistory} from "./stock-retention";
 import { validatePosDiscountSnapshot, allocatePosDiscount, posDiscountCents, type PosDiscountSnapshot } from "./pos-discounts";
 import { canonicalVenueTimezone, venueDate, venueClock } from "./venue-time";
 import { createOrUpdateSalesBatch, postSalesBatch, reverseSalesBatch, SALES_SOURCES, type SalesBatch, type SalesSource } from "./sales-consumption";
@@ -158,7 +159,7 @@ export function planReverseSalesEvent(c: SalesEventContext, eventId: string) {
   if (event.currency !== c.currency) fail("CURRENCY_CHANGED");
   // Durable event originals make reversal independent of ledger retention.
   const currentIds = new Set(c.movements.map(m => m.id));
-  const movements = [...c.movements,...event.originalMovements.filter(m => !currentIds.has(m.id))];
+  const movements = inheritStockHistory(c.movements, [...c.movements,...event.originalMovements.filter(m => !currentIds.has(m.id))]);
   const reversed = reverseSalesBatch({ batches:[event.batch], batchId:event.id, assortment:c.assortment,
     stockMovements:movements, venueId:c.venueId, actor:c.actor, now:c.now });
   if (!reversed.ok) fail("REVERSAL_NEEDS_REVIEW");

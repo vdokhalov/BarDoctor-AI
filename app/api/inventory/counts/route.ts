@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -207,7 +208,7 @@ async function readStores(database: D1Database, accountId: number) {
     inventoryJson: stores.get(INVENTORY_COUNT_STORE_KEY),
     assortment: json(stores.get(ASSORTMENT_STORE_KEY), {}),
     assortmentExists: stores.has(ASSORTMENT_STORE_KEY),
-    movements: array(stores.get(STOCK_MOVEMENT_STORE_KEY)),
+    movements: (await readStockHistory(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY))),
     closedMonths: closedMonthsFromStore(json(stores.get(MONTH_CLOSING_STORE_KEY), null)),
   };
 }
@@ -668,11 +669,11 @@ async function postOnce(request: Request): Promise<Response> {
   completed.summary = inventoryCountSummary(completed);
   completed.differenceTotal = completed.summary.calculatedDifferenceValue;
   snapshots[index] = completed;
-  const nextMovements = retainStockMovements([...result.movements, ...stores.movements], result.assortment);
+  const nextMovements = retainStockMovements([...result.movements, ...stores.movements], result.assortment, stores.movements);
   await runStoreCasBatch(database, account.id, casSnapshots, [
     upsertStore(database, account.id, INVENTORY_COUNT_STORE_KEY, snapshots, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
     auditStatement({
       database,
       accountId: account.id,

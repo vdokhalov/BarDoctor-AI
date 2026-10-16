@@ -1,3 +1,4 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { authenticatedEvidenceContext } from "../../../../lib/bardoctor/evidence-resolver";
 import { canReadVenueSource } from "../../../../lib/bardoctor/venue-context-access";
 import { getD1 } from "../../../../db";
@@ -70,7 +71,7 @@ export async function GET(request: Request): Promise<Response> {
   const analytics = buildAssortmentAnalytics({
     assortment: reconciliation.assortment,
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
-    stockMovements: values(stores.get("bd_stock_movements")),
+    stockMovements: await readStockHistory(getD1(),account.id,stores.get("bd_stock_movements")),
     salesEvents: values(stores.get("bd_sales_events_v1")),
     salesDocuments: values(stores.get("bd_sales_documents")),
     salesBatches: values(stores.get("bd_sales_batches")),

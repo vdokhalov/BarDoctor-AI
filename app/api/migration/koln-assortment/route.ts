@@ -1,3 +1,4 @@
+import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { eq } from "drizzle-orm";
 import { getD1, getDb } from "../../../../db";
 import { auditLog, venueMigrationExports, venueMigrationOperations } from "../../../../db/schema";
@@ -67,12 +68,12 @@ function manifest(rows: Map<string, StoreRow>) {
     } : { exists: false }];
   }));
 }
-function previewFrom(rows: Map<string, StoreRow>) {
+async function previewFrom(rows: Map<string, StoreRow>) {
   return buildAssortmentMigrationPreview({
     venueId: VENUE_ID,
     purchases: parse(rows.get(PURCHASE_STORE_KEY)?.data_json, []),
     suppliers: parse(rows.get(SUPPLIER_STORE_KEY)?.data_json, []),
-    stockMovements: parse(rows.get(STOCK_MOVEMENT_STORE_KEY)?.data_json, []),
+    stockMovements: await readStockHistory(getD1(),DATA_ACCOUNT_ID,rows.get(STOCK_MOVEMENT_STORE_KEY)?.data_json),
     serverAssortmentExists: rows.has(ASSORTMENT_STORE_KEY),
     sourceStorePresence: {
       purchases: rows.has(PURCHASE_STORE_KEY), suppliers: rows.has(SUPPLIER_STORE_KEY),
@@ -91,7 +92,7 @@ function publicResult(operation: typeof venueMigrationOperations.$inferSelect) {
 export async function GET(request: Request): Promise<Response> {
   if (!await owner(request)) return unauthorized();
   const rows = await stores();
-  return Response.json({ ok: true, preview: previewFrom(rows) }, { headers: { "Cache-Control": "private, no-store" } });
+  return Response.json({ ok: true, preview: await previewFrom(rows) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -108,7 +109,7 @@ export async function POST(request: Request): Promise<Response> {
     const beforeRows = await stores();
     const missing = [PURCHASE_STORE_KEY, SUPPLIER_STORE_KEY, STOCK_MOVEMENT_STORE_KEY].filter((key) => !beforeRows.has(key));
     if (missing.length) return Response.json({ ok: false, code: "SOURCE_STORE_MISSING", missing }, { status: 409 });
-    const preview = previewFrom(beforeRows);
+    const preview = await previewFrom(beforeRows);
     if (!preview.proposal.safePositions || preview.duplicates.identifierConflicts.length) {
       return Response.json({ ok: false, code: "NO_SAFE_MIGRATION_SET", preview }, { status: 409 });
     }
@@ -206,7 +207,7 @@ export async function POST(request: Request): Promise<Response> {
     if (currentChecksum !== operation.beforeChecksum) {
       return Response.json({ ok: false, code: "ASSORTMENT_CHANGED_AFTER_PREPARE" }, { status: 409 });
     }
-    const preview = previewFrom(beforeRows);
+    const preview = await previewFrom(beforeRows);
     const reconciliation = buildKolnAssortmentReconciliation({
       venueId: VENUE_ID, existingAssortment: parse(currentAssortmentJson, {}), preview,
       operationId: operation.operationId, now: operation.createdAt,

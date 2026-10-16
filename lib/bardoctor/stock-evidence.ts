@@ -1,3 +1,5 @@
+import {journalSelect} from "./stock-journal";
+import {stockJournalMarker} from "./stock-storage";
 import { purchaseFileVisible } from "./purchase-file-scope";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../db";
@@ -24,6 +26,13 @@ const reference = (c: Context, kind: EvidenceReference["kind"], id: string, part
 /** Closed, parameterized JSON selectors return bounded records, not entire
  * purchase/count/file histories. They never choose an account from a reference. */
 async function select(c: Context, key: string, path: string, field: string, id: string, limit = 2): Promise<Row[]> {
+  if(key==='bd_stock_movements'){
+    const row=await getD1().prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').bind(c.account.id,key).first<{data_json:string}>();
+    if(row&&stockJournalMarker(JSON.parse(row.data_json))){
+      if(path!=='$'||!['id','productKey','sourceDocumentId'].includes(field))throw Error('STOCK_JOURNAL_SELECTOR_INVALID');
+      return journalSelect(getD1(),{accountId:c.account.id,venueId:c.venueId},field as 'id'|'productKey'|'sourceDocumentId',id,limit);
+    }
+  }
   const result = await getD1().prepare(`SELECT j.value AS record_json FROM domain_data d,
     json_each(CASE WHEN json_valid(d.data_json) THEN d.data_json ELSE '[]' END, ?) j
     WHERE d.account_id=? AND d.store_key=? AND j.type='object'

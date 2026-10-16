@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { retainStockMovements } from "../../../../lib/bardoctor/stock-retention";
 import { getD1 } from "../../../../db";
 import { purchaseVenueScopeIssue } from "../../../../lib/bardoctor/purchase-venue-scope";
@@ -219,7 +220,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
 
   const assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = array(stores.get(STOCK_MOVEMENT_STORE_KEY));
+  const stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   const conversion = preparePurchaseConversions(repostDocument, previous, assortment, true);
   if (!conversion.ok) return Response.json(conversion, { status: 422 });
   repostDocument = conversion.document;
@@ -245,7 +246,7 @@ async function postOnce(request: Request): Promise<Response> {
   }
   const nextAssortment = inventory?.assortment ?? assortment;
   const nextMovements = inventory
-    ? retainStockMovements([...inventory.movements, ...stockMovements], inventory.assortment)
+    ? retainStockMovements([...inventory.movements, ...stockMovements], inventory.assortment, stockMovements)
     : stockMovements;
   expenses = expenses.map((expense) => isPurchasePayment(expense, documentId)
     ? {
@@ -274,7 +275,7 @@ async function postOnce(request: Request): Promise<Response> {
     upsertStore(database, account.id, PURCHASE_STORE_KEY, documents, now),
     upsertStore(database, account.id, EXPENSE_STORE_KEY, expenses, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, nextAssortment, now),
-    upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
+    ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
     auditUpdate(database, {
       accountId: account.id,
       storeKey: PURCHASE_STORE_KEY,

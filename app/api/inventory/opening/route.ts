@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { getD1 } from "../../../../db";
 import { authenticateRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -31,7 +32,7 @@ async function load(account: { id: number; venueId: number; restaurantJson: stri
     if (value !== undefined && (!Array.isArray(value) || value.some(v => !v || typeof v !== "object" || Array.isArray(v)))) throw new Error("OPENING_STORE_NEEDS_REVIEW");
   }
   const assortment = materializeMenuTaxonomy(original, defaultNomenclatureStructure());
-  const movements = json(snapshots, STOCK_MOVEMENT_STORE_KEY, []);
+  const movements = await readStockHistory(getD1(),account.id,snapshots.find(s=>s.key===STOCK_MOVEMENT_STORE_KEY)?.dataJson);
   const documents = json(snapshots, OPENING_STOCK_STORE_KEY, []);
   if (!Array.isArray(movements) || !Array.isArray(documents)) throw new Error("OPENING_STORE_NEEDS_REVIEW");
   if (movements.some(v => !v || typeof v !== "object" || Array.isArray(v))
@@ -102,8 +103,8 @@ async function command(request: Request): Promise<Response> {
     if (closedMonthsFromStore(json(snapshots, "bd_month_closings", null)).has(context.now.slice(0, 7))) return reply({ ok: false, code: "MONTH_LOCKED" }, 409);
     const db = getD1();
     const updates = [[ASSORTMENT_STORE_KEY, result.assortment], [STOCK_MOVEMENT_STORE_KEY, result.movements], [OPENING_STOCK_STORE_KEY, result.documents]] as const;
-    const statements = updates.map(([key, value]) => db.prepare(`INSERT INTO domain_data (account_id, store_key, data_json, updated_at) VALUES (?, ?, ?, ?)
-      ON CONFLICT(account_id, store_key) DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at`).bind(account.id, key, JSON.stringify(value), context.now));
+    const statements:D1PreparedStatement[]=[];
+    for(const [key,value] of updates)statements.push(...await stockStoreStatements(db,account.id,key,value,context.now));
     statements.push(db.prepare(`INSERT INTO audit_log (account_id, store_key, action, entity_id, entity_label, month_key, before_json, after_json, changed_fields_json, actor_name, actor_role, reason, created_at)
       VALUES (?, ?, 'create', ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`).bind(account.id, OPENING_STOCK_STORE_KEY, body.id, "Начальные остатки / номенклатура", context.now.slice(0, 7), JSON.stringify(result.document), '["items"]', [account.firstName, account.lastName].filter(Boolean).join(" "), account.role, "Подтверждённый ввод начальных данных", context.now));
     await runStoreCasBatch(db, account.id, snapshots, statements, context.now);

@@ -1,5 +1,6 @@
+import {readStockHistory} from "./stock-storage";
 import { eq, inArray } from "drizzle-orm";
-import { getDb } from "../../db";
+import { getDb, getD1 } from "../../db";
 import {
   accounts,
   domainData,
@@ -71,7 +72,7 @@ export async function readPlatformPersistenceInventory(
     let data: unknown;
     let parseError = false;
     try {
-      data = JSON.parse(row.dataJson);
+      data = row.storeKey==="bd_stock_movements"?await readStockHistory(getD1(),row.accountId,row.dataJson):JSON.parse(row.dataJson);
     } catch {
       data = null;
       parseError = true;

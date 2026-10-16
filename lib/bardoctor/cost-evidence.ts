@@ -1,3 +1,6 @@
+import {stockJournalMarker} from "./stock-storage";
+import {journalSelect,journalState} from "./stock-journal";
+import {StoreWriteConflictError} from "./store-cas";
 import { isStockEvidenceKind, bindStockEvidenceReference, readReceiptAcquisition } from "./stock-evidence";
 import { getD1 } from "../../db";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
@@ -74,7 +77,19 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
   try {
     const read = (key: string) => JSON.parse(snapshots.find(s => s.key === key)?.dataJson ?? "null") as unknown;
     const array = (v: unknown): Row[] => { if (v === null || v === undefined) return []; if (!Array.isArray(v) || v.some(r => !obj(r))) throw new Error("COST_STORE_NEEDS_REVIEW"); return v as Row[]; };
-    events = array(read("bd_sales_events_v1")); movements = array(read("bd_stock_movements"));
+    events = array(read("bd_sales_events_v1"));
+    const stock=read("bd_stock_movements");
+    if(stockJournalMarker(stock)){
+      const scope={accountId:context.account.id,venueId:context.venueId};
+      if(warehouseKind){
+        movements=await journalSelect(getD1(),scope,'id',reference.id,2);
+        if(movements.length===1){const selected=movements[0],batchId=txt(selected.salesBatchId),documentId=txt(selected.sourceDocumentId);
+          if(batchId||documentId)movements=await journalSelect(getD1(),scope,batchId?'salesBatchId':'sourceDocumentId',(batchId||documentId)!,20001);
+        }
+      }else if(!nomenclatureKind)movements=await journalSelect(getD1(),scope,'salesBatchId',reference.id,20001);
+      if(movements.length>20000)throw Error('COST_STORE_NEEDS_REVIEW');
+      if((await journalState(getD1(),scope))?.revision!==stock.revision)throw new StoreWriteConflictError();
+    }else movements=array(stock);
     const assortment = read("bd_assortment_v1");
     if (assortment !== null && !obj(assortment)) throw new Error("COST_STORE_NEEDS_REVIEW");
     menu = array(obj(assortment)?.menuItems); nomenclature = array(obj(assortment)?.nomenclature);

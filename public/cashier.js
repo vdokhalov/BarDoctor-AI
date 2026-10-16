@@ -102,7 +102,7 @@
   }
   function accept(value) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;syncQuickShift();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
   async function reload(){accept(await load());}
-  function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
+  function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":error.code==="STOCK_EVIDENCE_CAPACITY_REACHED"?"История склада заполнена":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
     if(state.busy||navigationLoading||state.frozen||refreshController?.state().running)return;
     state.busy=true;setBusy();

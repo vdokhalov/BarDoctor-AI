@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling; owner-authorized normalized stock journal, resumable migration, lifecycle/reader/export integration and local scoped validation (2026-10-16); no push, publication or production cutover",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -316,7 +316,7 @@
     },
     "public/cashier.js": {
       "before": "5d54c4791301c6c997f924edb5e6bb890ca4885ab4885b9aea2f032ba53b789b",
-      "after": "9a23e26a063f360731c4acca31607b5cbc10af8c1ee278d1268ca8fbd7faebfa"
+      "after": "605895eb0d17dec84afbafebbe867cde6952573d004aad4cfcbd263d4ef854da"
     },
     "public/staff-access.js": {
       "before": null,
@@ -381,6 +381,194 @@
     "app/api/access/members/[id]/route.ts": {
       "before": "7587a094d7e62c497291c257555c543feddf5ead3449247a530fb3ba2b6beeb0",
       "after": "ed6b216cb7137c2863bef6761b054cbaf8b4fb992bc893ce6e87fb2b04d83ffc"
+    },
+    "app/api/admin/relationship-integrity/route.ts": {
+      "before": "9c19008a2fe46b3a7f4e537645e49ce5cc6f8802932818bba811078239a543c9",
+      "after": "155422035411a4d3e44aebf7cf31fd0e5c88f8db31f18f3b2966f1771de71e5a"
+    },
+    "app/api/assortment/overview/route.ts": {
+      "before": "0a156ab16733e2ceb9ba87fc8873bf0ffe92def92660fc10c35a718b298d35a3",
+      "after": "0fd2305e7c2373ef96b3180b46b9e70eee391b69aab9f6b2d167a4bc4e26620d"
+    },
+    "app/api/data-integrity/export/route.ts": {
+      "before": "64a052eabf207e63c1ad8f5c61546bd2b52925d95bc0bb077b66c500847fb3dd",
+      "after": "1c269be0a301e0cf3934d9f537f4137fbdae2aae08c6e59902ba5a463320d8a4"
+    },
+    "app/api/inventory/counts/route.ts": {
+      "before": "5d68304e340c913733bb223379307444b220ea32a21a89bfdf5b2edf6e293013",
+      "after": "bd1298ff475da6e9727befa4d582b8aba4a405f7872b9fea4f0b1b09617ba673"
+    },
+    "app/api/inventory/opening/route.ts": {
+      "before": "da23deabd8239ab4e39433ae73f42eaba252171e0c08c6a2311c9b4a5e3674e5",
+      "after": "2eece19894ddcf1a2e948b4373a60a8fb7ce3d16f813dfc4dddf18172dbef412"
+    },
+    "app/api/inventory/products/route.ts": {
+      "before": "9bf27bab4cc6d66af8b647967dbb23c061b0f7635a2d36dc4d5b7774aa38dd98",
+      "after": "037c7c547faede57bbf869b9c66bd9ab6f53386e2b37d590bb1acff4f149074d"
+    },
+    "app/api/inventory/valuation/route.ts": {
+      "before": "e9452d83604925eddb30854c4f45d56a9e66edf88953336e126a0e11aef2f425",
+      "after": "55bb31c8ef1e2fc673f95e408963a408d033cb6ef8dc36ba2cf85e4c551ac56f"
+    },
+    "app/api/migration/koln-assortment/route.ts": {
+      "before": "be89237a2129ed4fcb239502826fede88957c1ac4f3299bf5afe27f30a95b93b",
+      "after": "919ee7252680a5ee1c8fcddc48ae19bd3a9283f0ee93fd25106fe1f132a25d2c"
+    },
+    "app/api/migration/koln-currency-relabel/route.ts": {
+      "before": "5dbf06d7c238b21a9ea4c5a694de44b26a63395f3627c9d57f4ff73a3a9699c7",
+      "after": "d322c609123aa47b66a855b1b2f7a1754cd130be25447d85998a11b6125e7dda"
+    },
+    "app/api/pos-orders/route.ts": {
+      "before": "0afeb8233dc4bcbc25ee95b7172371e88d65f88f34b0e6bc6824fb66e1679d99",
+      "after": "3193bb933657bb233f126434ecd40c48d07f42fba4f051077fc36f6d66342df5"
+    },
+    "app/api/procurement/overview/route.ts": {
+      "before": "f1756ca5ddb081832333f7289afeaec4713f7585a3dfc499e856e0b2364d0aaa",
+      "after": "64e900d823e5cd67554868ce3ee202b6d7a48bfc5fec9ab0b862325ee1631d66"
+    },
+    "app/api/purchases/cancel/route.ts": {
+      "before": "196f988b2f38e6888404e76f66c5105b65f71275201d5fa3c94b725436e74cd7",
+      "after": "399aff197e8e213d701816db6627cf1627cab976834085ffed85ede0f5925ea1"
+    },
+    "app/api/purchases/confirm/route.ts": {
+      "before": "54bdd5dc7867f876acbf5f9040b2a8c7d5843290b321f98665c71eabf834b6b2",
+      "after": "33ad6ab2472c863cbbde65887efc106041ad8c13c12bcfca566245643c45a219"
+    },
+    "app/api/purchases/delete/route.ts": {
+      "before": "2394e4d8fc83b9bae71e652856932f2445bb8fc6860965e5b2048c7b7d3d3bc3",
+      "after": "e12b0396a3287a39da241146d36557c6977fcebdc6245798a07a39e6d5531490"
+    },
+    "app/api/purchases/hybrid-production-qa/route.ts": {
+      "before": "5cecf46755f99482d6c013913a603c5e159fa70b112200f07703d267ef74095b",
+      "after": "c01d5aeffc6bd9acdcbc329e509384e23dd3de78a570e3ddaf1221dff9ac082f"
+    },
+    "app/api/purchases/repost/route.ts": {
+      "before": "a6a0d9bea1ae72c91b10fa197f56c10ddd9738987dc3bb57555d8a701a46a85e",
+      "after": "123d37170691d33dd99c777af51fcd09b16e53e9313a2614931a4fade9cda8a8"
+    },
+    "app/api/purchases/update/route.ts": {
+      "before": "3cb678ec804912993456bd2fb89305594e4ef400467c693b0f41beaace03be61",
+      "after": "64557de23e9fdb9b0d9d3f6a78747377112932c951721e5a733a447c8f594a12"
+    },
+    "app/api/sales-batches/import/route.ts": {
+      "before": "a428802714816c010cacf62e83cc2caa5de799e199f4f5cfaaaadc273e9d69dc",
+      "after": "0989e9514fe896bbb80275b7f4358b3602180a9f4abb2a9693170639e50c4660"
+    },
+    "app/api/sales-batches/route.ts": {
+      "before": "9f031e2d9a34193fca4aaabdfd8377d6ee2d6cb1a1198aee0d6cb113ee56af42",
+      "after": "c26be1e69d029ff81bbe4d86e19ff3ca5edcaa54f584088992a2b98969de59af"
+    },
+    "app/api/sales-events/route.ts": {
+      "before": "b3e1db2693037263766a86724700b75cd75f0f32ad32d6c0c2b2e5cb57a112bc",
+      "after": "9fc5737173e0d6c589664da1a0312794ec2d9200394d016d79b1f3bf6f2cbdfd"
+    },
+    "app/api/sales/confirm/route.ts": {
+      "before": "e6558a5d45fa92a13a62c9a4335ad55d22e5a74f310269041c2a0669c03b3c81",
+      "after": "392103311f62036c85d9a175f5348931a9c809a4248458598925b0428902e7b4"
+    },
+    "app/api/shifts/close/route.ts": {
+      "before": "0ce4940977f9b706170ebe19634792517b177384901affe4ec87a74dca486fc7",
+      "after": "cafa7d61712f6bd8bb53f984d0ab919c9fb273bde8e70607f73cd748e7bc1033"
+    },
+    "app/api/store/[key]/route.ts": {
+      "before": "b1971d6c06a2bcdd973e1f60ba74c6d33bb57f46c6a2c8857c4e34a347a75b64",
+      "after": "5f86cd6b013fd770abcc697db0b001156239e1b4bfd4f007370729796082be45"
+    },
+    "app/api/store/route.ts": {
+      "before": "8ca73d4412337fcbe4eb8dc175abcf23b85fb2c5fcf51fc3271f792857dcdfa8",
+      "after": "e21b8ba73bc8cd67d6e462eaef5eeb7109af5739f9f4539803aac9835b8e2e5b"
+    },
+    "app/api/write-offs/route.ts": {
+      "before": "c9afc60f01b5041d0634d465d643a16e9720bdccd13d480cda52a448cd7cfb77",
+      "after": "3261e8cabe3c5d22c479c12a75cd18813ddfa671e0d728c1acb7698f9d81b395"
+    },
+    "app/migration-preview/route.ts": {
+      "before": "9ee6eccebd00db5ac2f4117ca32edd955b1d73733c4ccb362dfb7256178447a5",
+      "after": "dd12608b781b18efae3a7a9a282efda5c2a2866883ab0371119083700da71098"
+    },
+    "lib/bardoctor/authoritative-persistence.ts": {
+      "before": "89cb4a9c8b95fdf50e1bea9bd34b9ca6466db5cbccd9ee37b2d584e88db6c716",
+      "after": "7e83d1d71514baacb4f243b2f77d8781b485476f543bde89568724ea8f0ecf24"
+    },
+    "lib/bardoctor/canonical-health-inputs.ts": {
+      "before": "676314b7bc3cd9ba6d1a64f3aa04b61e0cbe7eacbd16d212f9c9173a277c77ac",
+      "after": "84aa73f68f088e3159e59ccd90b7208f5b70bcbadeba1cf6d9c6aa00256a841b"
+    },
+    "lib/bardoctor/cost-evidence.ts": {
+      "before": "d82b3c2447e01be4f3f8ff27389668cd6441927415d9487f0f18b97fcff5abe7",
+      "after": "f583d6a42949a16406face24329b53effe6835a7b431bf8f640ec0db2c53107c"
+    },
+    "lib/bardoctor/integrations/domain-writer.ts": {
+      "before": "7bb8a853b146701b7c74875c3a6f7278c1be7d795ae551f5f572f3eadb5a2219",
+      "after": "9cf92c1176cabb091adb482e63ddfe63911d876f6ded03a689a649c39185e4f1"
+    },
+    "lib/bardoctor/inventory.ts": {
+      "before": "81e9c49dc4deee46b775ba009a35d2098dee4d1390937b0eef1c56d65d2bf3f8",
+      "after": "c3b5ea71e0126ac3cc72697b1cf554e431fe07c423287d2404fd2cfc701a173d"
+    },
+    "lib/bardoctor/management-cost-observation.ts": {
+      "before": "1fb16bffbf5800306285e24dd608da62050d45fd55318984f61b13070b4180a2",
+      "after": "6cc2c8eb32f2b1c7be663f1998d6e036869cad17c68ee528a725ff7accb4f4a1"
+    },
+    "lib/bardoctor/management-cost-signals.ts": {
+      "before": "68ff8141a58e91a2e675957d060b6156083913ed14ab94cb0f2779aecc5550cc",
+      "after": "3f8a1bc4979095ddee555946f307d6a9aae28d2767bf253be37d50f97e279566"
+    },
+    "lib/bardoctor/opening-stock.ts": {
+      "before": "cbbaa1c8cd443bc0032fa68cfb9e9632c1d808f16e4826464f134bc4afe333bd",
+      "after": "a83d4c6ba79bc4e5685ecc1ad1942ab344336497029b816c38661c88b06ad834"
+    },
+    "lib/bardoctor/platform-persistence-service.ts": {
+      "before": "4ed173694473363b1c520abc6af486259f986910124285c683d504acf6b31746",
+      "after": "a293f87abd0a553563514aaa924db1d39b20ebf4f8d524ea754c2d62d05facad"
+    },
+    "lib/bardoctor/sales-consumption.ts": {
+      "before": "dfbf9c1013feaac0951f0f049039258fcd1ba2d290343f8ba5847c3111e03f3c",
+      "after": "31ae60b3199484a42eed165be82c619dc08c3bcbccb8df67d1acbbac3a423728"
+    },
+    "lib/bardoctor/sales-events.ts": {
+      "before": "56ad51d9cec0aa75b8d1cac42c19a4d3b6f6dd10bba9d8a1223fa2f43a0c283a",
+      "after": "db2caa8ac3a30ceb03b574a7cd535c841ecf6d7e32031b7bd5e16856128161a3"
+    },
+    "lib/bardoctor/stock-evidence.ts": {
+      "before": "b7e1e6b176f9e3445d8c2a338f99839621c4b38e362de8152bbef9bb4a892d6c",
+      "after": "9400138172d419247211365da9ca5e67b799eb7bffa84c8203069ca3f812da69"
+    },
+    "lib/bardoctor/stock-retention.ts": {
+      "before": "1e626936ef8274095c8f1abc5ba693f103e09ee55208cd3fb56ae81874879c80",
+      "after": "93dc1c875582bc49368168464a7f06e1ae53a39256dc2649fcda0ccc1da253b4"
+    },
+    "lib/bardoctor/store-cas.ts": {
+      "before": "0de09d3496247a96f897faf956f27c6b09a4b5d43e50b1250e25985ee4a3fa6b",
+      "after": "13552707e73bfb013a153bb4f40899cb8812a1e9c52b5222476315b6014420a8"
+    },
+    "lib/bardoctor/venue-ai-context.ts": {
+      "before": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a",
+      "after": "01a42813f28e7c116e50fd99a916016ea789b21a26b03fbeeab355aec995cee9"
+    },
+    "lib/bardoctor/verified-month-close.ts": {
+      "before": "eb39d1f48210f912af776bb8ac515cd5a4901f667601cfded4be8a8be30cf5c8",
+      "after": "7b9f276ac393bdaa42821646b43363a5710723f60e2585a980c962f23712b457"
+    },
+    "lib/bardoctor/write-offs.ts": {
+      "before": "927b45d7938137afb6dc62e98ee2e2ddd1176e425db537320bd13fe1ca399d1f",
+      "after": "1ec994f6d9dcc240e1821ffa53da146c1f95f923f8b701e6a37f95fe53724f4e"
+    },
+    "app/api/inventory/movements/route.ts": {
+      "before": null,
+      "after": "80296bd25085b012d0d25c864b7a582dfb92a9f56ef1c641c73b887b8da5de41"
+    },
+    "drizzle/0032_stock_journal.sql": {
+      "before": null,
+      "after": "b5607362eb8e2c22d4c701a5bdf56a8ffd9081d97823a4512b1e4a4cf88ad1f9"
+    },
+    "lib/bardoctor/stock-journal.ts": {
+      "before": null,
+      "after": "095f97b122594a9f00a9f8a3ebba458e106b6f32dd81f35a1f2bea375a615b08"
+    },
+    "lib/bardoctor/stock-storage.ts": {
+      "before": null,
+      "after": "032004ab630f34e0f03996f3a3743ec575e6c985b28928576dcf0266dd5adc5d"
     }
   }
 }

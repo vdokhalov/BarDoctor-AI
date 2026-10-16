@@ -1,3 +1,4 @@
+import {readStockHistory,readSaleStock,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import * as XLSX from "xlsx";
 import { venueTimeFromJson, venueDate } from "../../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../../db";
@@ -82,7 +83,7 @@ async function readStores(database: D1Database, accountId: number) {
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
     warehouses: array(parse(stores.get(WAREHOUSE_STORE_KEY), [])),
-    stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    stockMovements: (await readStockHistory(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY))),
     snapshots: storeSnapshots(result.results ?? [], keys),
   };
 }

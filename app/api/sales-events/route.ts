@@ -1,3 +1,4 @@
+import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
 import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { posDiscountCents } from "../../../lib/bardoctor/pos-discounts";
@@ -21,7 +22,7 @@ import { menuTaxonomyPresentation, canonicalTaxonomyForAssortment } from "../../
 
 const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY,OPERATIONAL_REPORT_STORE_KEY];
 const reply = (data: unknown,status=200) => Response.json(data,{ status,headers:{ "Cache-Control":"private, no-store" } });
-async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>) {
+async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string) {
   const db = getD1(), snapshots = await readStoreSnapshots(db,account.id,keys);
   const read = (key:string,fallback:unknown): unknown => { const raw = snapshots.find(s => s.key === key)?.dataJson; return raw == null ? fallback : JSON.parse(raw); };
   const rows = (key:string) => { const value=read(key,[]); if (!Array.isArray(value) || value.some(v => !v || typeof v !== "object" || Array.isArray(v))) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW"); return value; };
@@ -29,15 +30,17 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
   const events = rows(SALES_EVENT_STORE_KEY);
   if (events.some(e => !e.id || !e.fingerprint || !e.batch || !Array.isArray(e.originalMovements) || !Array.isArray(e.prices) || !["POSTED","REVERSED"].includes(e.status))) throw new Error("SALES_EVENT_STORE_NEEDS_REVIEW");
-  const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now:new Date().toISOString(),
+  const now = new Date().toISOString();
+  const stock = await readSaleStock(db,account.id,snapshots.find(s=>s.key===keys[1])?.dataJson,assortment as Record<string,unknown>,now,documentId?[documentId]:[]);
+  const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now,
     actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role, ...(account.jobTitle ? { jobTitle:account.jobTitle } : {}) },
-    assortment:assortment as Record<string,unknown>,movements:rows(keys[1]),events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
-  return { db,snapshots,context, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+    assortment:assortment as Record<string,unknown>,movements:stock.movements,events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
+  return { db,snapshots,context,stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error:unknown) {
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
-  if (error instanceof Error && /^(SALES_EVENT_|POS_ORDER_|POS_CASH_|POS_SHIFT_|POS_DISCOUNT_)/.test(error.message)) {
+  if (error instanceof Error && /^(STOCK_JOURNAL_|SALES_EVENT_|POS_ORDER_|POS_CASH_|POS_SHIFT_|POS_DISCOUNT_)/.test(error.message)) {
     const messages: Record<string,string> = {
       SALES_EVENT_SHIFT_ALREADY_OPEN: "В заведении уже есть открытая кассовая смена. Перейдите в неё или сначала закройте её.",
       SALES_EVENT_SHIFT_NOT_FOUND: "Открытая смена не найдена. Выберите другую смену.",
@@ -88,7 +91,7 @@ async function command(request:Request):Promise<Response> {
   if (pricingKeys.some(key => Object.hasOwn(body,key) || body.command && Object.hasOwn(body.command,key))
     || body.command?.lines?.some(line=>pricingKeys.some(key=>Object.hasOwn(line,key)))) return reply({ok:false,code:"SALES_EVENT_DISCOUNT_REQUIRES_ORDER"},422);
   try {
-    const {db,snapshots,context:c,orders,workdays} = await load(account);
+    const {db,snapshots,context:c,orders,workdays,stockRevision} = await load(account,body.action==="reverse"?body.eventId:undefined);
     let updates: [string,unknown][], result:unknown;
     let accountingMonth = venueDate(c.now, c.timezone).slice(0,7);
     if (body.action === "preview" || body.action === "post") {
@@ -139,8 +142,12 @@ async function command(request:Request):Promise<Response> {
       accountingMonth=String(revenues.find(row=>row.id===body.shiftId)?.date).slice(0,7);
       updates=[[keys[3],revenues]];
     }
-    const statements=updates.map(([key,value]) => db.prepare(`INSERT INTO domain_data (account_id,store_key,data_json,updated_at) VALUES (?,?,?,?)
-      ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`).bind(account.id,key,JSON.stringify(value),c.now));
+    const statements:D1PreparedStatement[]=[];
+    for(const [key,value] of updates){
+      statements.push(...(key==='bd_stock_movements'&&stockRevision!==null
+        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,c.movements,value as any[])
+        :await stockStoreStatements(db,account.id,key,value,c.now)));
+    }
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",accountingMonth,JSON.stringify(result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
     statements.unshift(posMembershipGuard(db,account,c.now));

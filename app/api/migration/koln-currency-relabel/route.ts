@@ -1,3 +1,4 @@
+import {stockJournalMarker} from "../../../../lib/bardoctor/stock-storage";
 import { env } from "cloudflare:workers";
 import { getD1 } from "../../../../db";
 import {
@@ -89,6 +90,7 @@ async function readState(): Promise<RawState> {
   `).bind(KOLN_DATA_ACCOUNT_ID).all<StoreRow>();
   const rows = storesResult.results ?? [];
   const stores = Object.fromEntries(rows.map((row) => [row.store_key, row]));
+  if(stockJournalMarker(parse(stores.bd_stock_movements?.data_json,null)))throw Error('NORMALIZED_JOURNAL_REQUIRES_SEPARATE_CURRENCY_MIGRATION');
   const missing = KOLN_CURRENCY_STORE_KEYS.filter((key) => !stores[key]);
   if (missing.length) throw new Error(`KOLN_STORE_MISSING:${missing.join(",")}`);
   const untouchedManifest = Object.fromEntries(await Promise.all(rows

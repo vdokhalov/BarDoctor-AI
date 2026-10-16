@@ -1,3 +1,4 @@
+import {readStockHistory,readSaleStock,stockStoreStatements,stockMovementResponse} from "../../../lib/bardoctor/stock-storage";
 import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
@@ -62,7 +63,7 @@ function upsertStore(database: D1Database, accountId: number, key: string, value
   `).bind(accountId, key, JSON.stringify(value), now);
 }
 
-async function readStores(database: D1Database, accountId: number) {
+async function readStores(database: D1Database, accountId: number, batchId?:string, asOf?:string) {
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
     WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -80,6 +81,9 @@ async function readStores(database: D1Database, accountId: number) {
     SALES_DOCUMENT_STORE_KEY,
   ).all<StoreRow>();
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
+  const batches=array(parse(stores.get(SALES_BATCH_STORE_KEY), []));
+  const date=asOf || String(record(batches.find(value=>record(value).id===batchId)).businessDate || new Date().toISOString());
+  const stock=await readSaleStock(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY),record(parse(stores.get(ASSORTMENT_STORE_KEY),{})),date,batchId?[batchId]:[]);
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
     events: array(parse(stores.get(SALES_EVENT_STORE_KEY), [])),
@@ -87,7 +91,7 @@ async function readStores(database: D1Database, accountId: number) {
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
     assortment: record(parse(stores.get(ASSORTMENT_STORE_KEY), {})),
-    stockMovements: array(parse(stores.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    stockMovements: stock.movements,
     warehouses: array(parse(stores.get(WAREHOUSE_STORE_KEY), [])),
     shifts: array(parse(stores.get(REVENUE_STORE_KEY), [])),
     closedMonths: closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null)),
@@ -280,8 +284,11 @@ async function postOnce(request: Request): Promise<Response> {
     ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, WAREHOUSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY, REVENUE_STORE_KEY, SALES_DOCUMENT_STORE_KEY,
   ]);
-  const stores = await readStores(database, account.id);
   const now = new Date().toISOString();
+  const selectedBatchId=text(body.id??body.batchId);
+  const requestedDate=text(record(body.draft??body.document).businessDate??body.businessDate);
+  const costDate=action==='reverse'?now:requestedDate||(!selectedBatchId?venueDate(now,venueTimeFromJson(account.restaurantJson).timezone):undefined);
+  const stores = await readStores(database, account.id,selectedBatchId,costDate);
   const currentActor = actor(account);
 
   if (action === "map") {
@@ -413,10 +420,10 @@ async function postOnce(request: Request): Promise<Response> {
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-      upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+      ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: result.batch.status === "POSTED" ? "sales_batch.posted" : "sales_batch.partially_posted", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано immutable SALE_CONSUMPTION движений: ${result.batch.movementIds.length}; отражено строк: ${result.batch.postedLineCount}/${result.batch.lines.length}`, now }),
     ], now);
-    return Response.json({ ok: true, idempotent: false, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, postedNow: result.postedNow, stockChanged: result.stockChanged }, { status: 201 });
+    return Response.json({ ok: true, idempotent: false, batch: result.batch, batches: result.batches, assortment: result.assortment, ...stockMovementResponse(stores.stockMovements,result.stockMovements), postedNow: result.postedNow, stockChanged: result.stockChanged }, { status: 201 });
   }
 
   if (action === "reverse") {
@@ -441,10 +448,10 @@ async function postOnce(request: Request): Promise<Response> {
     await runStoreCasBatch(database, account.id, casSnapshots, [
       upsertStore(database, account.id, SALES_BATCH_STORE_KEY, result.batches, now),
       upsertStore(database, account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-      upsertStore(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+      ...await stockStoreStatements(database, account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
       auditStatement({ database, accountId: account.id, action: "sales_batch.reversed", batch: result.batch, before, actorName: currentActor.name, actorRole: currentActor.role, reason: `Создано SALE_REVERSAL движений: ${result.batch.reversalMovementIds.length}; исходные движения не удалены`, now }),
     ], now);
-    return Response.json({ ok: true, batch: result.batch, batches: result.batches, assortment: result.assortment, stockMovements: result.stockMovements, stockChanged: result.stockChanged });
+    return Response.json({ ok: true, batch: result.batch, batches: result.batches, assortment: result.assortment, ...stockMovementResponse(stores.stockMovements,result.stockMovements), stockChanged: result.stockChanged });
   }
 
   if (action === "cancel") {

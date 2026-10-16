@@ -1,3 +1,4 @@
+import {readStockHistory,stockStoreStatements} from "../stock-storage";
 import { captureAcceptedWrite, type AcceptedRecord } from "./accepted-write";
 import { canonicalInputScope } from "../canonical-input-evidence";
 import { retainStockMovements } from "../stock-retention";
@@ -477,7 +478,7 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   balance.stockExternalSystem = input.envelope.externalSystem;
   balance.stockExternalId = input.envelope.externalId;
   balance.stockMeasuredAt = date;
-  const stockMovements = array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), []));
+  const stockMovements = await readStockHistory(database,input.account.id,loaded.get(STOCK_MOVEMENT_STORE_KEY));
   const inventory = applyInventoryCount({
     assortment,
     stockMovements,
@@ -525,11 +526,11 @@ async function writeStockBalance(input: WriterInput): Promise<BusinessWriteResul
   const movements = retainStockMovements([
     ...inventory.movements,
     ...stockMovements,
-  ], inventory.assortment);
+  ], inventory.assortment, stockMovements);
   const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: INVENTORY_SNAPSHOT_STORE_KEY, id: input.internalId, data: snapshot }, { selector: ASSORTMENT_STORE_KEY, data: inventory.assortment }, { selector: STOCK_MOVEMENT_STORE_KEY, data: movements }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, inventory.assortment, now),
-    upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, movements, now),
+    ...await stockStoreStatements(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, movements, now),
     upsertStore(database, input.account.id, INVENTORY_SNAPSHOT_STORE_KEY, snapshots, now),
     auditStatement(database, {
       account: input.account,
@@ -569,7 +570,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
   const result = postWriteOffDocument({
     documents: array(parse(loaded.get(WRITE_OFF_STORE_KEY), [])),
     assortment: record(parse(loaded.get(ASSORTMENT_STORE_KEY), {})),
-    stockMovements: array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), [])),
+    stockMovements: await readStockHistory(database,input.account.id,loaded.get(STOCK_MOVEMENT_STORE_KEY)),
     venueId: input.account.venueId,
     draft: {
       id: input.internalId,
@@ -605,7 +606,7 @@ async function writeCanonicalWriteOff(input: WriterInput): Promise<BusinessWrite
   const acceptedWrite = await captureAcceptedWrite(input.account, [{ selector: WRITE_OFF_STORE_KEY, id: result.document.id, data: result.document }, { selector: ASSORTMENT_STORE_KEY, data: result.assortment }, { selector: STOCK_MOVEMENT_STORE_KEY, data: result.stockMovements }, { selector: EXPENSE_STORE_KEY, data: expenses }], now);
   await runStoreCasBatch(database, input.account.id, casSnapshots, [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, result.assortment, now),
-    upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
+    ...await stockStoreStatements(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, result.stockMovements, now),
     upsertStore(database, input.account.id, WRITE_OFF_STORE_KEY, result.documents, now),
     upsertStore(database, input.account.id, EXPENSE_STORE_KEY, expenses, now),
     auditStatement(database, {
@@ -722,11 +723,11 @@ async function writeReturnDocument(input: WriterInput): Promise<BusinessWriteRes
   };
   if (existingIndex >= 0) documents[existingIndex] = document;
   else documents.unshift(document);
-  const oldMovements = array(parse(loaded.get(STOCK_MOVEMENT_STORE_KEY), []));
-  const nextMovements = retainStockMovements([...movements, ...oldMovements], assortment);
+  const oldMovements = await readStockHistory(database,input.account.id,loaded.get(STOCK_MOVEMENT_STORE_KEY));
+  const nextMovements = retainStockMovements([...movements, ...oldMovements], assortment, oldMovements);
   const statements = [
     upsertStore(database, input.account.id, ASSORTMENT_STORE_KEY, assortment, now),
-    upsertStore(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
+    ...await stockStoreStatements(database, input.account.id, STOCK_MOVEMENT_STORE_KEY, nextMovements, now),
     upsertStore(database, input.account.id, documentStoreKey, documents, now),
     auditStatement(database, {
       account: input.account,
