@@ -21,7 +21,13 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-authorized local sales event normalization and review fixes (2026-10-16); no publication.
 // Authorized local QA3389 migration runner, no production execution (2026-10-16).
 // Approved manual storage migration gate; full/UI routing unchanged (2026-10-16).
+// Approved QA3389 owner-only migration UI (2026-10-16).
 export const p0Paths=Object.freeze([
+ "app/settings/journal-migration/route.ts",
+ "public/journal-migration.css",
+ "public/journal-migration.js",
+ "public/account-lifecycle.js",
+
  "scripts/ci-storage-migration-scope.mjs",
  "app/api/migration/journals/route.ts",
  "drizzle/0034_journal_migration_runner.sql",

@@ -621,6 +621,22 @@
     "scripts/ci-storage-migration-scope.mjs": {
       "before": null,
       "after": "91406638b00899f2bf46639c28269d65960dba277f6fb6268a3e563cef6aef8b"
+    },
+    "app/settings/journal-migration/route.ts": {
+      "before": null,
+      "after": "32d82f9722a850d0e276e3085cce54cda04d59b12f81ddadeddb760fa6e8cfc0"
+    },
+    "public/journal-migration.css": {
+      "before": null,
+      "after": "90d8b59bea8556562d6b948038e0bbb8ebca9a0b64babae285fdc1600648b4bd"
+    },
+    "public/journal-migration.js": {
+      "before": null,
+      "after": "6b5544992da5959c120dcf6414aef6342dbbab6a4cb2c46d89463de791778d16"
+    },
+    "public/account-lifecycle.js": {
+      "before": "04a3fe66d6a2eeb4c12b170ceacfe6233c42e1c72cf126230f050c5c7d15b7fc",
+      "after": "82371a30836c28516de049c144437bd8614ab25d65c28dfc273fa143b9134efa"
     }
   }
 }

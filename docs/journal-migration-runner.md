@@ -1,6 +1,6 @@
 # QA3389 controlled journal migration runner
 
-Local implementation only. Do not execute against production, push or publish without authorization. This runner supersedes the earlier missing-runner limitation; it does not authorize a rollout.
+Execution requires explicit rollout authorization. This runner supersedes the earlier missing-runner limitation; it does not authorize a rollout.
 
 ## Exact boundary
 
@@ -30,3 +30,9 @@ After COMPLETE and new normalized sales, **never restore the old JSON or old run
 ## Local evidence
 
 Tests cover transactional failure at each persisted step, process interruption immediately after each activation before progress recording, idempotent resume, mixed-state pause, rejection of abort after activation, stale/corrupt/missing backup, source drift, failed backup durability, abort+refresh, owner/venue restrictions, other-venue independence, abort racing activation, and stale concurrent refresh racing recreated staging. Native Miniflare Worker/D1/R2 exercises the same runner with real SQL triggers and private R2 readback. Production has not been touched.
+
+## Owner UI
+
+Select QA3389, then Settings → Venues and account → «Перенос журналов QA3389» (`/settings/journal-migration`). The server denies the page to unauthenticated users, other venues and non-owner roles; every API operation independently repeats live owner authorization. The page uses the existing application session and requires the selected local venue to remain3389. No credentials are exported.
+
+Confirm the checkbox and choose «Создать резервную копию». Record the visible run ID, backup key and SHA-256. «Продолжить перенос — один шаг» executes one bounded server operation; repeat with the same run until COMPLETE. After a lost response, only «Обновить статус» remains available until server state is recovered. Abort is available only before either journal is active; refresh backup requires ABORTED and a new confirmation. Reload resumes the server's existing run. QA readiness requires COMPLETE, paused=0 and both journals active.

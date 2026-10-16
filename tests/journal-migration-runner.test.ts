@@ -4,7 +4,7 @@ import {salesEventFixture,saleCommand} from './helpers/sales-event-fixture';
 import {planSalesEvent} from '../lib/bardoctor/sales-events';
 async function setup(){
  const objects=new Map<string,string>();const bucket={async put(k:string,v:string){objects.set(k,v);},async get(k:string){const v=objects.get(k);return v===undefined?null:{async text(){return v;}};}};
- const r=await lifecycleRuntime({runner:'./lib/bardoctor/journal-migration-runner',route:'./app/api/migration/journals/route',database:'./db',stock:'./lib/bardoctor/stock-journal',events:'./lib/bardoctor/sales-event-storage'},{bindings:{BUCKET:bucket}});
+ const r=await lifecycleRuntime({page:'./app/settings/journal-migration/route',runner:'./lib/bardoctor/journal-migration-runner',route:'./app/api/migration/journals/route',database:'./db',stock:'./lib/bardoctor/stock-journal',events:'./lib/bardoctor/sales-event-storage'},{bindings:{BUCKET:bucket}});
  const owner=await r.register('runner@isolated.test');const old=owner.activeVenueId;r.sqlite.exec('PRAGMA foreign_keys=OFF');for(const table of ['venue_memberships','sessions'])r.sqlite.prepare(`UPDATE ${table} SET ${table==='sessions'?'active_venue_id':'venue_id'}=3389 WHERE ${table==='sessions'?'active_venue_id':'venue_id'}=?`).run(old);r.sqlite.prepare('UPDATE venues SET id=3389 WHERE id=?').run(old);r.sqlite.exec('PRAGMA foreign_keys=ON');owner.activeVenueId=3389;
  const scope={accountId:owner.userId,venueId:3389,actorId:owner.userId};const db=(r.api.database as unknown as typeof import('../db')).getD1(),api=r.api.runner as unknown as typeof import('../lib/bardoctor/journal-migration-runner');
  const fixture=salesEventFixture(),plan=await planSalesEvent(fixture,saleCommand('whisky',1));const event=JSON.parse(JSON.stringify(plan.event).replaceAll('"venueId":1','"venueId":3389'));
@@ -94,4 +94,14 @@ test('failed backup readback never creates a run; corruption after first cutover
  const other=await s.r.register('unpaused-venue@isolated.test');s.r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES(?,'unaffected','[]')").run(other.userId);
  const response=await s.r.api.route.GET(s.r.request(s.owner,'/api/migration/journals'));assert.equal(response.status,200,'operator read-only auth works during pause');
  while((await s.status()).run!.phase!=='COMPLETE')await s.step();assert.equal((await s.status()).run!.paused,0);
+});
+
+test('migration page server denies direct links outside live QA3389 owner membership',async t=>{
+ const s=await setup();t.after(s.r.close);const page=s.r.api.page;
+ assert.equal((await page.GET(new Request('https://isolated.test/settings/journal-migration'))).status,401);
+ const cookieRequest=new Request('https://isolated.test/settings/journal-migration',{headers:{cookie:'bd_server_session='+encodeURIComponent(s.owner.token)}});assert.equal((await page.GET(cookieRequest)).status,200);
+ const ownerResponse=await page.GET(s.r.request(s.owner,'/settings/journal-migration'));assert.equal(ownerResponse.status,200);assert.match(await ownerResponse.text(),/Создать резервную копию/);assert.equal((await s.status()).run,null);
+ const other=await s.r.register('other-page@isolated.test');assert.equal((await page.GET(s.r.request(other,'/settings/journal-migration'))).status,403);
+ for(const role of ['shift_manager','cashier','employee']){s.r.sqlite.prepare("UPDATE venue_memberships SET role=? WHERE account_id=? AND venue_id=3389").run(role,s.scope.actorId);const response=await page.GET(s.r.request(s.owner,'/settings/journal-migration'));assert.ok([401,403].includes(response.status));assert.doesNotMatch(await response.text(),/id="controls"/);}
+ s.r.sqlite.prepare("UPDATE venue_memberships SET role='owner',status='revoked' WHERE account_id=? AND venue_id=3389").run(s.scope.actorId);assert.notEqual((await page.GET(s.r.request(s.owner,'/settings/journal-migration'))).status,200);
 });

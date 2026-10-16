@@ -1,0 +1,13 @@
+import {authenticateReadOnlyRequest} from '../../../lib/bardoctor/auth';
+import {getD1} from '../../../db';
+import {migrationStatus} from '../../../lib/bardoctor/journal-migration-runner';
+export const MIGRATION_HTML = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Перенос журналов QA3389 — BarDoctor</title><link rel="stylesheet" href="/account-lifecycle.css"><link rel="stylesheet" href="/journal-migration.css"><script src="/journal-migration.js" defer></script></head><body><main class="lifecycle" id="migration"><header><a href="/settings/lifecycle">← Заведения и аккаунт</a><span>BARDOCTOR</span></header><h1>Перенос журналов QA3389</h1><p>Служебная операция владельца тестового заведения 3389.</p><p id="notice" role="status" aria-live="polite">Проверяем доступ и состояние…</p><button id="status" type="button">Обновить статус</button><section id="controls" hidden><h2>Состояние переноса</h2><dl id="details"></dl><p id="readiness" role="status"></p><p>При потере ответа обновите статус и продолжите тот же запуск. После активации журналов восстановление старого JSON недопустимо. Во время паузы продажи недоступны.</p><label id="confirmation-label"><input id="confirmation" type="checkbox"> Подтверждаю создание резервной копии и перенос только QA3389</label><div class="actions"><button id="prepare" type="button" disabled>Создать резервную копию</button><button id="step" type="button" disabled>Продолжить перенос — один шаг</button><button id="abort" type="button" disabled>Отменить перенос</button><button id="refresh" type="button" disabled>Обновить резервную копию</button></div><h2>Журнал выполнения</h2><ol id="log"></ol></section></main></body></html>`;
+export async function GET(request:Request):Promise<Response>{
+ const headers={'Cache-Control':'private, no-store','Vary':'Cookie, X-Session-Email, X-Session-Token, X-Venue-Id'};
+ const account=await authenticateReadOnlyRequest(request);
+ if(!account)return new Response('Необходима авторизация владельца.',{status:401,headers});
+ if(account.venueId!==3389||account.role!=='owner')return new Response('Служебный экран недоступен.',{status:403,headers});
+ try{await migrationStatus(getD1(),{accountId:account.id,venueId:account.venueId,actorId:account.actorAccountId});}
+ catch(e){if(/JOURNAL_MIGRATION_(OWNER_REQUIRED|SCOPE_FORBIDDEN)/.test(String(e)))return new Response('Служебный экран недоступен.',{status:403,headers});throw e;}
+ return new Response(MIGRATION_HTML,{headers:{...headers,'Content-Type':'text/html; charset=utf-8'}});
+}
