@@ -1,10 +1,10 @@
 {
   "baseline": "84bb207a374af35dfc6cd152776a9821f6c13a1d",
-  "reviewedHead": "4803c52deaab5d4c009d5ec903b209d3a6c3b93d",
+  "reviewedHead": "b5eabbd02fadce02091deb6595998751b9fa40cc",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "5a440a7a5b142127b1c22b63a74ebb457f600d6e68a8bbb4444948243d4fe09b",
-      "after": "ccd6f442ebceb52535ef8cd3542497c3835b8ee1224aae70720d062d2375b5a5"
+      "after": "378a8e738fb5a6a495542d32e7bec3825e5bc7ecf83d374436dd8907d35ca7d2"
     },
     "app/api/admin/relationship-integrity/route.ts": {
       "before": "9c19008a2fe46b3a7f4e537645e49ce5cc6f8802932818bba811078239a543c9",
@@ -108,7 +108,7 @@
     },
     "app/api/shifts/close/route.ts": {
       "before": "0ce4940977f9b706170ebe19634792517b177384901affe4ec87a74dca486fc7",
-      "after": "c05d2170934a18072d537df24a849d215257749b78fe355b0ed355e968f74012"
+      "after": "a86c6accf541d284921c8bc4216a163f7c83f524473b0f303f374d3adf9ee0f1"
     },
     "app/api/store/[key]/route.ts": {
       "before": "b1971d6c06a2bcdd973e1f60ba74c6d33bb57f46c6a2c8857c4e34a347a75b64",
@@ -262,6 +262,10 @@
       "before": "04a3fe66d6a2eeb4c12b170ceacfe6233c42e1c72cf126230f050c5c7d15b7fc",
       "after": "82371a30836c28516de049c144437bd8614ab25d65c28dfc273fa143b9134efa"
     },
+    "public/assets/index-BQGspy0I.js": {
+      "before": "626e82bb8d1956e8eda905ff084e318f7958b4ae05cfed5418404ed204a6eb2d",
+      "after": "d6d731bafd1d0697025d9d0da6e6a89caa82e9cb2ca9e7002d5d5dfd69d63619"
+    },
     "public/cashier.js": {
       "before": "9a23e26a063f360731c4acca31607b5cbc10af8c1ee278d1268ca8fbd7faebfa",
       "after": "605895eb0d17dec84afbafebbe867cde6952573d004aad4cfcbd263d4ef854da"
@@ -280,7 +284,15 @@
     },
     "scripts/ci-storage-migration-scope.mjs": {
       "before": null,
-      "after": "91406638b00899f2bf46639c28269d65960dba277f6fb6268a3e563cef6aef8b"
+      "after": "3b46d6889be0ff50f3db18f1047fc6e81923da485f8a9788da9b5849725fd729"
+    },
+    "scripts/patch-finance-inputs-phase3a6.mjs": {
+      "before": "bd62db18b2ce97e18085e9bf8f931b040920bdefeb631b8fe238798730dff028",
+      "after": "7c77b2ca059ed394c63c42705f7847fb56603847dbe7112a367fef1b8d03a685"
+    },
+    "scripts/patch-operational-day-phase1a.mjs": {
+      "before": "8f233f97ce7a62bdb2b7decc1bbecad6b25b3c2b6e3a230668ef8b2aa38302e9",
+      "after": "1ddb5334c5549f0d74187bdc351281e0383ac41f3e98e2dd067756ba9752ee3e"
     },
     "tests/ci-change-scope.test.mjs": {
       "before": "e03a029c2e18e480f130e0c73996c2346c442214345a8187fb4003f378a1f4b4",
@@ -292,11 +304,11 @@
     },
     "tests/fixtures/p0-release-amendment-v517.json": {
       "before": "bc40c532f15ce1de1d905105295908ecaa54090f7c413a62d55847b0695146e4",
-      "after": "f09f49a5c343bdaae83f3d6403cb927910039a1064abd7ed5158ac7485dbf0fd"
+      "after": "dd127ef4198d6734a9954a436e317316c67150ee2d271f0f12946bf51ef847c4"
     },
     "tests/fixtures/storage-migration-scope.json": {
       "before": null,
-      "after": "66db63cb024d734bcf7bc1109a93ace4fa7fb651e1e7f26add182c78e43aa2a1"
+      "after": "0250981ae68a5a56079bc447555bf6fc4baeebe9614ef45796990370b603e9a6"
     },
     "tests/helpers/opening-runtime.ts": {
       "before": "4910b48ab1ab75f7102201d3e60c5b96fa8262211d6cb8d1cdb1b8f95bade383",
@@ -321,6 +333,14 @@
     "tests/journal-migration-ui.test.mjs": {
       "before": null,
       "after": "260d181c1658dea1cc464a0a4079d37d8c613611141628db472e7b35c8f1334a"
+    },
+    "tests/operational-day-phase1a.test.ts": {
+      "before": "bb3942c87cb7d9a81994d1c7dcecece9c7d2b76988efc3fbfe6d9932bef2c614",
+      "after": "1a393d3bb4be4707d167d9d736e4dcf6ae0529d835e5aa6d63617238daf58d60"
+    },
+    "tests/operational-report-draft-payroll.test.mjs": {
+      "before": null,
+      "after": "c5214e9242144616c569a1b5e67eb2e76a24f123322b6691c3739bf4e3faa335"
     },
     "tests/purchase-conversion-history-phase4.test.ts": {
       "before": "0395937925448718feb3375a59ca72fdc42b7f0a45e86246a59993de631e0e25",

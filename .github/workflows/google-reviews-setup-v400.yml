@@ -103,6 +103,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+      - name: Report draft payroll emitted contract
+        run: node --test tests/operational-report-draft-payroll.test.mjs
 
   sales-presentation:
     needs: changes

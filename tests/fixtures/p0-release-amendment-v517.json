@@ -4,7 +4,7 @@
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
-      "after": "378a8e738fb5a6a495542d32e7bec3825e5bc7ecf83d374436dd8907d35ca7d2"
+      "after": "f60dfe617f00592bc4e47574a78c79190a65d7bdfe5dc8bcdf5f6fd452751bef"
     },
     "app/api/auth/bootstrap/route.ts": {
       "before": "f01ec62d4b0749c57d68dd3268e9fb6a4dba3c29eb6f4d799370859d6457ffff",
@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "626e82bb8d1956e8eda905ff084e318f7958b4ae05cfed5418404ed204a6eb2d"
+      "after": "d6d731bafd1d0697025d9d0da6e6a89caa82e9cb2ca9e7002d5d5dfd69d63619"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -180,7 +180,7 @@
     },
     "scripts/patch-operational-day-phase1a.mjs": {
       "before": "0d9210b6506d925d99184cbdc4825beaf4c71793f5089a338d5e6e6bf7fffdb5",
-      "after": "8f233f97ce7a62bdb2b7decc1bbecad6b25b3c2b6e3a230668ef8b2aa38302e9"
+      "after": "1ddb5334c5549f0d74187bdc351281e0383ac41f3e98e2dd067756ba9752ee3e"
     },
     "scripts/qa/webkit-environment-classifier.mjs": {
       "before": "c6c27022f0ad7e329f5399aac968162a51ff43ce51924b7ecc9053b91043abde",
@@ -468,7 +468,7 @@
     },
     "app/api/shifts/close/route.ts": {
       "before": "0ce4940977f9b706170ebe19634792517b177384901affe4ec87a74dca486fc7",
-      "after": "c05d2170934a18072d537df24a849d215257749b78fe355b0ed355e968f74012"
+      "after": "a86c6accf541d284921c8bc4216a163f7c83f524473b0f303f374d3adf9ee0f1"
     },
     "app/api/store/[key]/route.ts": {
       "before": "b1971d6c06a2bcdd973e1f60ba74c6d33bb57f46c6a2c8857c4e34a347a75b64",
@@ -620,7 +620,7 @@
     },
     "scripts/ci-storage-migration-scope.mjs": {
       "before": null,
-      "after": "3b46d6889be0ff50f3db18f1047fc6e81923da485f8a9788da9b5849725fd729"
+      "after": "acc52b962f9fe849a63085c50e649f31b004439f5180677878d675d09c98344d"
     },
     "app/settings/journal-migration/route.ts": {
       "before": null,
@@ -637,6 +637,10 @@
     "public/account-lifecycle.js": {
       "before": "04a3fe66d6a2eeb4c12b170ceacfe6233c42e1c72cf126230f050c5c7d15b7fc",
       "after": "82371a30836c28516de049c144437bd8614ab25d65c28dfc273fa143b9134efa"
+    },
+    "scripts/patch-finance-inputs-phase3a6.mjs": {
+      "before": "bd62db18b2ce97e18085e9bf8f931b040920bdefeb631b8fe238798730dff028",
+      "after": "7c77b2ca059ed394c63c42705f7847fb56603847dbe7112a367fef1b8d03a685"
     }
   }
 }
