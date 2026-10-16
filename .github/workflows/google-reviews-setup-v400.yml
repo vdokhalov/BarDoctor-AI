@@ -96,6 +96,8 @@ jobs:
       - name: Storage migration and affected consumers
         run: |
           node --import tsx --test tests/journal-migration-runner.test.ts tests/stock-journal.test.ts tests/stock-journal-regressions.test.ts tests/stock-journal-lifecycle.test.ts tests/sales-event-journal.test.ts tests/sales-events-phase5.test.ts tests/sales-events-api-phase5.test.ts tests/sales-workday-gate.test.ts tests/pos-live-overview.test.ts tests/operational-day-phase1a.test.ts tests/inventory-counts-api.test.ts tests/valuation-api.test.ts tests/purchase-conversion-history-phase4.test.ts tests/purchase-venue-scope-phase4.test.ts tests/account-lifecycle.test.ts tests/evidence-resolver-phase3a1.test.ts tests/stock-evidence-rca-phase3a7.test.ts tests/data-integrity-audit.test.ts tests/venue-ai-context.test.ts tests/management-cost-phase4a.test.ts tests/management-cost-correction-phase4a.test.ts tests/platform-persistence-audit.test.ts tests/opening-stock-phase5.test.ts tests/domain-writer-venue-isolation.test.ts tests/sales-consumption.test.ts tests/write-offs.test.ts
+      - name: QA3389 owner controls and mobile navigation
+        run: node --test tests/journal-migration-ui.test.mjs
       - name: Native D1 and R2 durability and interruption recovery
         run: node --test tests/journal-migration-runner-d1.test.mjs tests/stock-journal-d1.test.mjs tests/sales-event-journal-d1.test.mjs
       - run: npm run typecheck

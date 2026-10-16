@@ -4,7 +4,7 @@ import {appendFileSync,readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 export const baseline='84bb207a374af35dfc6cd152776a9821f6c13a1d';
-export const reviewedHead='eef571fc7e9d8303f024f6415ec520c876187d29';
+export const reviewedHead='4803c52deaab5d4c009d5ec903b209d3a6c3b93d';
 export const branch='refs/heads/feat/staff-pin-pos-20261015';
 // Only this explicitly reviewed CI policy amendment may accompany the frozen product diff.
 export const policyPaths=['.github/workflows/google-reviews-setup-v400.yml','scripts/ci-required-gates.mjs','scripts/ci-storage-migration-scope.mjs','tests/ci-change-scope.test.mjs','tests/ci-storage-migration-scope.test.mjs','tests/fixtures/storage-migration-scope.json','tests/fixtures/p0-release-amendment-v517.json','tests/helpers/p0-release-amendment.mjs'];

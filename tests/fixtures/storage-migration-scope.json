@@ -1,7 +1,11 @@
 {
   "baseline": "84bb207a374af35dfc6cd152776a9821f6c13a1d",
-  "reviewedHead": "eef571fc7e9d8303f024f6415ec520c876187d29",
+  "reviewedHead": "4803c52deaab5d4c009d5ec903b209d3a6c3b93d",
   "files": {
+    ".github/workflows/google-reviews-setup-v400.yml": {
+      "before": "5a440a7a5b142127b1c22b63a74ebb457f600d6e68a8bbb4444948243d4fe09b",
+      "after": "ccd6f442ebceb52535ef8cd3542497c3835b8ee1224aae70720d062d2375b5a5"
+    },
     "app/api/admin/relationship-integrity/route.ts": {
       "before": "9c19008a2fe46b3a7f4e537645e49ce5cc6f8802932818bba811078239a543c9",
       "after": "155422035411a4d3e44aebf7cf31fd0e5c88f8db31f18f3b2966f1771de71e5a"
@@ -126,9 +130,13 @@
       "before": "9ee6eccebd00db5ac2f4117ca32edd955b1d73733c4ccb362dfb7256178447a5",
       "after": "dd12608b781b18efae3a7a9a282efda5c2a2866883ab0371119083700da71098"
     },
+    "app/settings/journal-migration/route.ts": {
+      "before": null,
+      "after": "32d82f9722a850d0e276e3085cce54cda04d59b12f81ddadeddb760fa6e8cfc0"
+    },
     "docs/journal-migration-runner.md": {
       "before": null,
-      "after": "2e20c7f66ea58dc1294f846b2619773a17f0adab6b09fd2ca199b388568a94a1"
+      "after": "4755db0165bcfb803705124a1dcbcaaf5d2988dcd6e6eb80cb25fc72814c5e45"
     },
     "docs/sales-event-journal-migration.md": {
       "before": null,
@@ -250,13 +258,45 @@
       "before": "927b45d7938137afb6dc62e98ee2e2ddd1176e425db537320bd13fe1ca399d1f",
       "after": "1ec994f6d9dcc240e1821ffa53da146c1f95f923f8b701e6a37f95fe53724f4e"
     },
+    "public/account-lifecycle.js": {
+      "before": "04a3fe66d6a2eeb4c12b170ceacfe6233c42e1c72cf126230f050c5c7d15b7fc",
+      "after": "82371a30836c28516de049c144437bd8614ab25d65c28dfc273fa143b9134efa"
+    },
     "public/cashier.js": {
       "before": "9a23e26a063f360731c4acca31607b5cbc10af8c1ee278d1268ca8fbd7faebfa",
       "after": "605895eb0d17dec84afbafebbe867cde6952573d004aad4cfcbd263d4ef854da"
     },
+    "public/journal-migration.css": {
+      "before": null,
+      "after": "90d8b59bea8556562d6b948038e0bbb8ebca9a0b64babae285fdc1600648b4bd"
+    },
+    "public/journal-migration.js": {
+      "before": null,
+      "after": "6b5544992da5959c120dcf6414aef6342dbbab6a4cb2c46d89463de791778d16"
+    },
+    "scripts/ci-required-gates.mjs": {
+      "before": "3743157c50b6a57caaeb7c93faac17593b448d46b2ae64e722c1682f47faa4b1",
+      "after": "3e88a4c328ef34b54552654a329af2921c3b88d75a7ead4602b077608bd2d890"
+    },
+    "scripts/ci-storage-migration-scope.mjs": {
+      "before": null,
+      "after": "91406638b00899f2bf46639c28269d65960dba277f6fb6268a3e563cef6aef8b"
+    },
+    "tests/ci-change-scope.test.mjs": {
+      "before": "e03a029c2e18e480f130e0c73996c2346c442214345a8187fb4003f378a1f4b4",
+      "after": "d08831cf0a1456ccd74a9a96e817a6029b4bc47c771cb7a13e713475d3fbb6a6"
+    },
+    "tests/ci-storage-migration-scope.test.mjs": {
+      "before": null,
+      "after": "33e8f1c99c77732c992ade8c2d8414d67e83db2dfbc4c0623ccd645cee5f2fbd"
+    },
     "tests/fixtures/p0-release-amendment-v517.json": {
       "before": "bc40c532f15ce1de1d905105295908ecaa54090f7c413a62d55847b0695146e4",
-      "after": "cce4119145162f54b89f8001eb59ffd5ee8f1762e2bd9f33dfc0c3ee5d9a6bf5"
+      "after": "f09f49a5c343bdaae83f3d6403cb927910039a1064abd7ed5158ac7485dbf0fd"
+    },
+    "tests/fixtures/storage-migration-scope.json": {
+      "before": null,
+      "after": "66db63cb024d734bcf7bc1109a93ace4fa7fb651e1e7f26add182c78e43aa2a1"
     },
     "tests/helpers/opening-runtime.ts": {
       "before": "4910b48ab1ab75f7102201d3e60c5b96fa8262211d6cb8d1cdb1b8f95bade383",
@@ -264,7 +304,7 @@
     },
     "tests/helpers/p0-release-amendment.mjs": {
       "before": "b1e209476e5045f0dfcb07104ff7f268584ad96e0670a6fcc91a80cb1d1bde3f",
-      "after": "2c6d2689464a70738c27024a13a55ce7862ce1469e8203bd25684605dcbd79ee"
+      "after": "6e7b86794cb35c2daf43d9ab0c0aee211e5e6195032f2d84d2774dd5d2648247"
     },
     "tests/helpers/staff-roster-fixture.ts": {
       "before": "d0226733ca39d56a64f59d11ae7597eff585a564116a354b3ff679ccdb150514",
@@ -276,7 +316,11 @@
     },
     "tests/journal-migration-runner.test.ts": {
       "before": null,
-      "after": "e5000dbc59a58b4e3ecb912fad0eee00e2301741b4a3759ca447b9325e11c911"
+      "after": "5d28275230ba12d16b959e6c497f5d94f48f0e48655fe3a3509713797a43d54a"
+    },
+    "tests/journal-migration-ui.test.mjs": {
+      "before": null,
+      "after": "260d181c1658dea1cc464a0a4079d37d8c613611141628db472e7b35c8f1334a"
     },
     "tests/purchase-conversion-history-phase4.test.ts": {
       "before": "0395937925448718feb3375a59ca72fdc42b7f0a45e86246a59993de631e0e25",
