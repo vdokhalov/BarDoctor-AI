@@ -18,7 +18,18 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-approved PIN server-page navigation repair and focused real-shell regression.
 // Owner-approved active-roster PIN linkage and scoped QA (2026-10-16), no data backfill.
 // Owner-authorized local stock journal integration (2026-10-16); exact bytes, no publication or production cutover.
+// Owner-authorized local sales event normalization and review fixes (2026-10-16); no publication.
 export const p0Paths=Object.freeze([
+ "app/api/operational-days/route.ts",
+ "app/api/pos-overview/route.ts",
+ "app/api/workdays/route.ts",
+ "drizzle/0033_sales_event_journal.sql",
+ "lib/bardoctor/daily-revenue.ts",
+ "lib/bardoctor/evidence-resolver.ts",
+ "lib/bardoctor/pos-orders.ts",
+ "lib/bardoctor/sales-event-history.ts",
+ "lib/bardoctor/sales-event-storage.ts",
+
  "app/api/admin/relationship-integrity/route.ts",
  "app/api/assortment/overview/route.ts",
  "app/api/data-integrity/export/route.ts",

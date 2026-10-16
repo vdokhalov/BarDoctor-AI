@@ -1,3 +1,4 @@
+import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import { authenticatedEvidenceContext } from "../../../lib/bardoctor/evidence-resolver";
 import { scopedBusinessRows } from "../../../lib/bardoctor/business-day-rows";
 import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
@@ -17,7 +18,8 @@ export async function GET(request: Request) {
   const management = canReadManagementWorkday(account);
   if (management) keys.push("bd_employees", "bd_payroll_rules");
   const snapshots = await readStoreSnapshots(getD1(), account.id, keys);
-  const read = (key: string): unknown[] => { const data = JSON.parse(snapshots.find(item => item.key === key)?.dataJson ?? "[]"); if (!Array.isArray(data) || data.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("OPERATIONAL_DAY_STORE_INVALID"); return data; };
+  const events=await readSalesEvents(getD1(),account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson);
+  const read = (key: string): unknown[] => { const data = key==='bd_sales_events_v1'?events:JSON.parse(snapshots.find(item => item.key === key)?.dataJson ?? "[]"); if (!Array.isArray(data) || data.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("OPERATIONAL_DAY_STORE_INVALID"); return data; };
   try { keys.forEach(read); } catch { return Response.json({ ok: false, code: "OPERATIONAL_DAY_STORE_NEEDS_REVIEW", error: "Данные рабочего дня требуют проверки" }, { status: 409 }); }
   const asOf = new Date().toISOString();
   const days = operationalDays({ venueId: account.venueId, workspaceId: context.workspaceId, dataAccountId: account.id, currency: accountingCurrencyFromRestaurantJson(account.restaurantJson), asOf, revenues: read(keys[0]), events: read(keys[1]), documents: read(keys[2]), reports: read(keys[3]), writeOffs: read(keys[4]), incidents: read(keys[5]) });

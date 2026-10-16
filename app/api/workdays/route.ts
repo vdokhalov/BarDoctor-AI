@@ -1,3 +1,4 @@
+import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import { authenticatedEvidenceContext } from "../../../lib/bardoctor/evidence-resolver";
 import { unauthorized } from "../../../lib/bardoctor/auth";
 import { getD1 } from "../../../db";
@@ -23,6 +24,7 @@ async function load(request:Request){
  const db=getD1(),snapshots=await readStoreSnapshots(db,account.id,keys),scope={venueId:account.venueId,workspaceId:context.workspaceId,dataAccountId:account.id};
  try{
   const raw=Object.fromEntries(keys.map(key=>[key,JSON.parse(snapshots.find(s=>s.key===key)?.dataJson??(key==="bd_month_closings"?"null":"[]"))]));
+  raw.bd_sales_events_v1=await readSalesEvents(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson);
   for(const key of keys.filter(k=>k!=="bd_month_closings"))if(!Array.isArray(raw[key])||raw[key].some((r:unknown)=>!r||typeof r!=="object"||Array.isArray(r)))throw Error("Invalid store");
   const rows=(key:string)=>scopedBusinessRows(raw[key],scope);
   const profile=record(JSON.parse(account.restaurantJson||"{}"));

@@ -1,3 +1,4 @@
+import {readSaleEvent,readOrderPaymentFacts,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
 import { OPERATIONAL_REPORT_STORE_KEY } from "../../../lib/bardoctor/operational-day";
@@ -17,13 +18,15 @@ import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountView
 
 const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
-async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string) {
+async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, keys);
   const read = (key: string, fallback: unknown): unknown => { const data = snapshots.find(snapshot => snapshot.key === key)?.dataJson; return data == null ? fallback : JSON.parse(data); };
   const rows = (key: string) => { const value = read(key, []); if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW"); return value; };
   const assortment = read("bd_assortment_v1", {});
   if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW");
-  const events = rows(SALES_EVENT_STORE_KEY);
+  const eventRaw=snapshots.find(s=>s.key===SALES_EVENT_STORE_KEY)?.dataJson;
+  const selected=selector?await readSaleEvent(db,account.id,eventRaw,selector,String(rows(POS_ORDER_STORE_KEY).find(row=>`pos-order:${row.id}`===selector.externalId)?.shiftId??'')):{events:await readOrderPaymentFacts(db,account.id,eventRaw,rows(POS_ORDER_STORE_KEY).map(row=>String(row.id))),revision:null};
+  const events=selected.events;
   if (events.some(event => !event.id || !event.fingerprint || !event.batch || !Array.isArray(event.originalMovements) || !Array.isArray(event.prices) || !["POSTED", "REVERSED"].includes(event.status))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW");
   const now = new Date().toISOString();
   const stock = await readSaleStock(db,account.id,snapshots.find(s=>s.key==="bd_stock_movements")?.dataJson,assortment as Record<string,unknown>,now,documentId?[documentId]:[]);
@@ -34,7 +37,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
     assortment: assortment as Record<string, unknown>, movements: stock.movements, events, revenues: rows("bd_finance_revenue"),
     mappings: rows("bd_sales_mappings"), warehouseRoutes: rows("bd_sales_warehouse_routes"), warehouses: rows("bd_warehouses"), closedMonths: closedMonthsFromStore(read("bd_month_closings", null)),
   };
-  return { db, snapshots, context, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+  return { db, snapshots, context, eventRevision:selected.revision, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
@@ -84,7 +87,7 @@ async function command(request: Request): Promise<Response> {
     || ["split", "cancel_item", "cancel_order", "cancel_precheck", "apply_discount", "remove_discount"].includes(body.action) && !canManagePosPrivilegedAction(account)) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
   if (body.venueId !== account.venueId) return reply({ ok: false, code: "VENUE_CHANGED" }, 409);
   try {
-    const { db, snapshots, context, orders, workdays, stockRevision } = await load(account);
+    const { db, snapshots, context, orders, workdays, stockRevision, eventRevision } = await load(account,undefined,{externalId:`pos-order:${body.orderId}`,source:"POS_API"});
     const plan = await planPosOrder(context, orders, body);
     const result = { ok: true, duplicate: plan.duplicate, order: plan.order, orders: posOrderViews(context, plan.orders), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
     if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
@@ -93,7 +96,9 @@ async function command(request: Request): Promise<Response> {
     if (plan.salesPlan) updates.push(["bd_assortment_v1", plan.salesPlan.assortment], ["bd_stock_movements", plan.salesPlan.movements], [SALES_EVENT_STORE_KEY, plan.salesPlan.events], ["bd_finance_revenue", plan.salesPlan.revenues]);
     const statements:D1PreparedStatement[]=[];
     for(const [key,value] of updates){
-      statements.push(...(key==='bd_stock_movements'&&stockRevision!==null
+      statements.push(...(key===SALES_EVENT_STORE_KEY&&eventRevision!==null
+        ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,context.events,value as any[])
+        :key==='bd_stock_movements'&&stockRevision!==null
         ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,context.movements,value as any[])
         :await stockStoreStatements(db,account.id,key,value,context.now)));
     }

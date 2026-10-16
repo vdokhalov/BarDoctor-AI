@@ -1,3 +1,4 @@
+import {readSalesEvents} from './sales-event-storage';
 import {stockJournalMarker} from "./stock-storage";
 import {journalSelect,journalState} from "./stock-journal";
 import {StoreWriteConflictError} from "./store-cas";
@@ -77,7 +78,7 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
   try {
     const read = (key: string) => JSON.parse(snapshots.find(s => s.key === key)?.dataJson ?? "null") as unknown;
     const array = (v: unknown): Row[] => { if (v === null || v === undefined) return []; if (!Array.isArray(v) || v.some(r => !obj(r))) throw new Error("COST_STORE_NEEDS_REVIEW"); return v as Row[]; };
-    events = array(read("bd_sales_events_v1"));
+    events = array(await readSalesEvents(getD1(),context.account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson));
     const stock=read("bd_stock_movements");
     if(stockJournalMarker(stock)){
       const scope={accountId:context.account.id,venueId:context.venueId};

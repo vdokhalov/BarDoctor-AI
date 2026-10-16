@@ -1,3 +1,4 @@
+import {readSalesEvents} from './sales-event-storage';
 import {readStockHistory} from "./stock-storage";
 import { derivedInputBelongs } from "./derived-input-scope";
 import { contextProvenance } from "./context-provenance";
@@ -1279,7 +1280,7 @@ export async function loadVenueAIContext(
   const stores = new Map<string, StoredVenueValue>();
   for (const row of rows) {
     try {
-      stores.set(row.storeKey, { data: row.storeKey==="bd_stock_movements"?await readStockHistory(getD1(),account.id,row.dataJson,{rows:10000,bytes:2000000}):JSON.parse(row.dataJson) as unknown, updatedAt: row.updatedAt });
+      stores.set(row.storeKey, { data: row.storeKey==='bd_sales_events_v1'?await readSalesEvents(getD1(),account.id,row.dataJson,undefined,{rows:10000,bytes:2000000}):row.storeKey==="bd_stock_movements"?await readStockHistory(getD1(),account.id,row.dataJson,{rows:10000,bytes:2000000}):JSON.parse(row.dataJson) as unknown, updatedAt: row.updatedAt });
     } catch {
       // Missing or oversized optional evidence stays explicitly unavailable.
       stores.set(row.storeKey,{data:null,sourceState:"PARTIAL",updatedAt:row.updatedAt});

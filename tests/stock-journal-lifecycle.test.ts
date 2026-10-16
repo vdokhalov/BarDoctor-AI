@@ -5,16 +5,17 @@ import {salesEventFixture,saleCommand} from './helpers/sales-event-fixture';
 import {seedOpenWorkday} from './helpers/pos-workday-fixture';
 import {planSalesShift} from '../lib/bardoctor/sales-events';
 async function setup(snapshot?:any){
- const r=await lifecycleRuntime({sales:'./app/api/sales-events/route',pos:'./app/api/pos-orders/route',journal:'./lib/bardoctor/stock-journal',database:'./db',exportData:'./app/api/data-integrity/export/route',writeoffs:'./app/api/write-offs/route',history:'./app/api/inventory/movements/route',evidence:'./app/api/evidence/resolve/route'});
+ const r=await lifecycleRuntime({sales:'./app/api/sales-events/route',pos:'./app/api/pos-orders/route',journal:'./lib/bardoctor/stock-journal',eventStorage:'./lib/bardoctor/sales-event-storage',database:'./db',exportData:'./app/api/data-integrity/export/route',writeoffs:'./app/api/write-offs/route',history:'./app/api/inventory/movements/route',evidence:'./app/api/evidence/resolve/route'});
  const owner=await r.register('stock-sales@isolated.test'),scope={accountId:owner.userId,venueId:owner.activeVenueId};
  if(snapshot){r.sqlite.exec('PRAGMA foreign_keys=OFF');r.sqlite.prepare('UPDATE venues SET id=? WHERE id=?').run(snapshot.venue.id,scope.venueId);r.sqlite.prepare('UPDATE venue_memberships SET venue_id=? WHERE venue_id=?').run(snapshot.venue.id,scope.venueId);r.sqlite.prepare('UPDATE sessions SET active_venue_id=? WHERE active_venue_id=?').run(snapshot.venue.id,scope.venueId);r.sqlite.exec('PRAGMA foreign_keys=ON');scope.venueId=snapshot.venue.id;}
  const db=(r.api.database as any).getD1() as D1Database,journal=r.api.journal as any;
  const put=(key:string,value:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(owner.userId,key,JSON.stringify(value));
- const get=(key:string)=>JSON.parse(String(r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(owner.userId,key)?.data_json??'null'));
+ const get=(key:string)=>{const parsed=JSON.parse(String(r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(owner.userId,key)?.data_json??'null'));if(key==='bd_sales_events_v1'&&parsed?.format==='bardoctor-sales-events-v1')return r.sqlite.prepare('SELECT event_id,version FROM sales_event_records WHERE account_id=? ORDER BY position').all(owner.userId).map(row=>JSON.parse(r.sqlite.prepare('SELECT payload FROM sales_event_chunks WHERE account_id=? AND event_id=? AND version=? ORDER BY ordinal').all(owner.userId,row.event_id,row.version).map(part=>part.payload).join('')));return parsed;};
  r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:snapshot?'PMR_RUB':'MDL'}),owner.userId);
  if(snapshot)for(const [key,value] of Object.entries(snapshot.stores))put(key,value);
  put('bd_assortment_v1',snapshot?.stores.bd_assortment_v1??salesEventFixture().assortment);put('bd_finance_revenue',planSalesShift({...salesEventFixture(),venueId:scope.venueId,currency:snapshot?'PMR_RUB':'MDL',now:new Date().toISOString()},'open_shift','journal-shift','Journal test'));seedOpenWorkday(r.sqlite,owner.userId,scope.venueId);
  put('bd_stock_movements',snapshot?.stores.bd_stock_movements??[]);while((await journal.copyLegacyJournal(db,scope)).state!=='verified'){}await journal.activateJournal(db,scope);
+ if(process.env.BD_TEST_SALES_EVENTS==='1'){const eventStorage=r.api.eventStorage as any;await eventStorage.copyLegacySalesEvents(db,scope);await eventStorage.activateSalesEvents(db,scope);}
  const send=(body:object)=>{const req=r.request(owner,'/api/sales-events','POST',{venueId:scope.venueId,...body});req.headers.set('Origin','https://isolated.test');return r.api.sales.POST(req);};
  return {r,owner,scope,db,journal,put,get,send};
 }
@@ -26,7 +27,7 @@ test('normalized sale exceeds old capacity, uses targeted reads, atomically roll
  const preview=await send({action:'preview',command});assert.equal(preview.status,200,await preview.clone().text());const quote=await preview.json() as {previewHash:string};
  const before=get('bd_assortment_v1'),marker=get('bd_stock_movements'),finance=get('bd_finance_revenue');
  r.failDatabase();await assert.rejects(send({action:'post',command,previewHash:quote.previewHash}),/injected/);
- assert.deepEqual(get('bd_assortment_v1'),before);assert.deepEqual(get('bd_stock_movements'),marker);assert.deepEqual(get('bd_finance_revenue'),finance);assert.equal(get('bd_sales_events_v1'),null);
+ assert.deepEqual(get('bd_assortment_v1'),before);assert.deepEqual(get('bd_stock_movements'),marker);assert.deepEqual(get('bd_finance_revenue'),finance);assert.deepEqual(get('bd_sales_events_v1'),process.env.BD_TEST_SALES_EVENTS==='1'?[]:null);
  const posted=await send({action:'post',command,previewHash:quote.previewHash});assert.equal(posted.status,201,await posted.clone().text());const result=await posted.json() as {event:{id:string}};
  assert.equal(get('bd_assortment_v1').stockBalances[1].current,1.9);
  assert.equal((await send({action:'post',command,previewHash:quote.previewHash})).status,200);

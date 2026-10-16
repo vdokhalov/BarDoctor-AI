@@ -1,3 +1,4 @@
+import {readSalesEvents} from './sales-event-storage';
 import { getD1 } from "../../db";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
 import { readStoreSnapshots } from "./store-cas";
@@ -31,11 +32,11 @@ export async function readDailyRevenue(context: RevenueEvidenceContext, referenc
   const snapshots = await readStoreSnapshots(getD1(), context.account.id, keys);
   let collections: Row[][];
   try {
-    collections = keys.map(key => {
-      const value: unknown = JSON.parse(snapshots.find(s => s.key === key)?.dataJson ?? "[]");
+    collections = await Promise.all(keys.map(async key => {
+      const value: unknown = key==='bd_sales_events_v1'?await readSalesEvents(getD1(),context.account.id,snapshots.find(s=>s.key===key)?.dataJson,{date:reference.id}):JSON.parse(snapshots.find(s => s.key === key)?.dataJson ?? "[]");
       if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("REVENUE_STORE_NEEDS_REVIEW");
       return value as Row[];
-    });
+    }));
   } catch (error) {
     if (error instanceof SyntaxError || error instanceof Error && error.message === "REVENUE_STORE_NEEDS_REVIEW") return unavailable(["RECORD_NEEDS_REVIEW"]);
     throw error;

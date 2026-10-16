@@ -1,3 +1,4 @@
+import {paidOrderIds} from './sales-event-history';
 import { posWorkdayGate } from "./pos-workday-gate";
 import { capturePosDiscount, posDiscountCents, validatePosDiscountSnapshot, type PosDiscountRule, type PosDiscountSnapshot, type PosDiscountTotals } from "./pos-discounts";
 import { canManagePosPrivilegedAction, type AccessRole } from "./access-control";
@@ -67,7 +68,7 @@ function validAccountShift(c: SalesEventContext, shift: Record<string, unknown>)
     && new Date(date).toISOString().slice(0,10)===date;
 }
 function cancellationIndex(c:SalesEventContext){
-  const shifts=new Map<string,Record<string,unknown>[]>(),paidOrders=new Set<string>();
+  const shifts=new Map<string,Record<string,unknown>[]>(),paidOrders=new Set<string>(paidOrderIds(c.events));
   for(const row of c.revenues.filter(row=>row.venueId===c.venueId)){const id=String(row.id);shifts.set(id,[...(shifts.get(id)||[]),row]);}
   for(const event of c.events.filter(event=>event.venueId===c.venueId)){if(typeof event.orderId==="string")paidOrders.add(event.orderId);if(typeof event.externalId==="string"&&event.externalId.startsWith("pos-order:"))paidOrders.add(event.externalId.slice(10));}
   return {shifts,paidOrders,openCash:c.revenues.filter(row=>row.venueId===c.venueId&&row.closingStatus==="open").length};

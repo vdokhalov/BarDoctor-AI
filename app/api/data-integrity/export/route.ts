@@ -1,3 +1,4 @@
+import {readSalesEvents} from '../../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import {salesEventDocuments} from "../../../../lib/bardoctor/sales-events";
 import {readStoreSnapshots,storeSnapshots,StoreWriteConflictError,withStoreCasRetries} from "../../../../lib/bardoctor/store-cas";
@@ -43,7 +44,7 @@ async function createExport(
     };
   }
   const relatedKeys=["bd_sales_batches","bd_sales_events_v1","bd_inventory_writeoffs"];
-  const relatedStores=Object.fromEntries(relatedKeys.map(key=>{const row=rows.find(row=>row.storeKey===key);const value=row?JSON.parse(row.dataJson):[];if(!Array.isArray(value))throw Error('EXPORT_SOURCE_NEEDS_REVIEW');return [key,value];}));
+  const relatedStores=Object.fromEntries(await Promise.all(relatedKeys.map(async key=>{const row=rows.find(row=>row.storeKey===key);const value=key==='bd_sales_events_v1'?await readSalesEvents(getD1(),account.id,row?.dataJson):row?JSON.parse(row.dataJson):[];if(!Array.isArray(value))throw Error('EXPORT_SOURCE_NEEDS_REVIEW');return [key,value];})));
   const original=storeSnapshots(rows.map(row=>({store_key:row.storeKey,data_json:row.dataJson,updated_at:row.updatedAt})),[...AUTHORITATIVE_STORE_KEYS,...relatedKeys]);
   const current=await readStoreSnapshots(getD1(),account.id,original.map(row=>row.key));
   if(JSON.stringify(original)!==JSON.stringify(current))throw new StoreWriteConflictError();

@@ -1,3 +1,4 @@
+import {isNormalizedSalesEventHistory,salesEventTotal} from './sales-event-history';
 import {inheritStockHistory} from "./stock-retention";
 import { validatePosDiscountSnapshot, allocatePosDiscount, posDiscountCents, type PosDiscountSnapshot } from "./pos-discounts";
 import { canonicalVenueTimezone, venueDate, venueClock } from "./venue-time";
@@ -53,7 +54,8 @@ function shift(c: SalesEventContext, shiftId: string, date?: string) {
   if (value.revenueSource !== EVENT_REVENUE_SOURCE || value.currency !== c.currency || !/^\d{4}-\d{2}-\d{2}$/.test(String(value.date))) fail("SHIFT_NEEDS_REVIEW");
   return value;
 }
-function capacity(events: SalesEvent[]) {
+function capacity(events: SalesEvent[], source: SalesEvent[]) {
+  if(isNormalizedSalesEventHistory(source))return;
   if (new TextEncoder().encode(JSON.stringify(events)).byteLength > 4_000_000) fail("HISTORY_CAPACITY_REQUIRES_REVIEW");
 }
 function project(c: SalesEventContext, events: SalesEvent[], rowId: string, date: string): Row[] {
@@ -62,9 +64,16 @@ function project(c: SalesEventContext, events: SalesEvent[], rowId: string, date
   if (matching.length > 1) fail("REVENUE_NEEDS_REVIEW");
   if (!matching.length && c.events.some(e => e.venueId === c.venueId && e.revenueRowId === rowId)) fail("REVENUE_NEEDS_REVIEW");
   const active = events.filter(e => e.venueId === c.venueId && e.revenueRowId === rowId && e.status === "POSTED");
+  const partial=isNormalizedSalesEventHistory(c.events);
+  if(partial){const total=salesEventTotal(c.events);if(!total||total.id!==rowId||total.currency!==null&&total.currency!==c.currency||total.cents!==Math.round(Number(matching[0]?.revenue??0)*100)||total.receipts!==Number(matching[0]?.receipts??0))fail('REVENUE_NEEDS_REVIEW');}
+  const previous=c.events.filter(e=>e.venueId===c.venueId&&e.revenueRowId===rowId&&e.status==='POSTED');
+  if(partial&&matching[0]&&(!Number.isFinite(matching[0].revenue)||!Number.isSafeInteger(matching[0].receipts)))fail('REVENUE_NEEDS_REVIEW');
+  const amount=active.reduce((sum,e)=>sum+Math.round(e.revenue*100),0)-(partial?previous.reduce((sum,e)=>sum+Math.round(e.revenue*100),0):0)+(partial?Math.round(Number(matching[0]?.revenue??0)*100):0);
+  const count=active.length-(partial?previous.length:0)+(partial?Number(matching[0]?.receipts??0):0);
+  if(!Number.isSafeInteger(amount)||!Number.isSafeInteger(count)||count<0||amount<0)fail('REVENUE_NEEDS_REVIEW');
   const row = { ...(matching[0] ?? {}), id: rowId, venueId: c.venueId, date, accountingMonth: date.slice(0,7),
     shiftName: matching[0]?.shiftName ?? "Продажи без смены", revenueSource: EVENT_REVENUE_SOURCE, currency: c.currency,
-    revenue: Math.round(active.reduce((sum,e) => sum + e.revenue,0)*100)/100, receipts: active.length,
+    revenue: amount/100, receipts: count,
     createdAt: matching[0]?.createdAt ?? c.now, updatedAt: c.now };
   return [...c.revenues.filter(r => !(r.id === rowId && r.venueId === c.venueId)), row];
 }
@@ -141,7 +150,7 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
     revenueRowId:command.shiftId ?? `sales-events:${c.venueId}:${date}`, currency:c.currency,
     revenue, grossAmount: grossCents / 100, discountAmount, netAmount: revenue, ...(discount ? { discount: structuredClone(discount) } : {}), prices, actor:c.actor, ...(isPos ? {payments:command.payments,comment:command.comment?.trim() ?? ""} : {}), batch:posted.batch,
     originalMovements:posted.stockMovements.filter(m => m.salesBatchId === eventId && m.venueId === c.venueId) };
-  const events = [...c.events,event]; capacity(events);
+  const events = [...c.events,event]; capacity(events,c.events);
   const previewHash = await digest({ date, timezone, currency:c.currency, prices, grossAmount: grossCents / 100, discountAmount, netAmount: revenue, ...(discount ? { discount } : {}), shiftId:command.shiftId,
     ...(isPos ? {payments:command.payments,comment:command.comment ?? ""} : {}),
     recipes:posted.batch.lines.map(l => { const snapshot = l.recipeSnapshot!; return { ...snapshot, capturedAt:undefined }; }) });
@@ -164,7 +173,7 @@ export function planReverseSalesEvent(c: SalesEventContext, eventId: string) {
     stockMovements:movements, venueId:c.venueId, actor:c.actor, now:c.now });
   if (!reversed.ok) fail("REVERSAL_NEEDS_REVIEW");
   const next: SalesEvent = { ...event,status:"REVERSED",reversedAt:c.now };
-  const events = c.events.map(e => e.id === event.id ? next : e); capacity(events);
+  const events = c.events.map(e => e.id === event.id ? next : e); capacity(events,c.events);
   return { duplicate:false,event:next,events,assortment:reversed.assortment,movements:reversed.stockMovements,
     revenues:project(c,events,event.revenueRowId,event.businessDate) };
 }

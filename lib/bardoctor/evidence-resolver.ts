@@ -1,3 +1,4 @@
+import {readSalesEvents} from './sales-event-storage';
 import { canReadPosSaleHistory } from "./pos-orders";
 import { resolveProvenanceEvidence } from "./provenance-evidence";
 import { isStockEvidenceKind, resolveStockEvidence } from "./stock-evidence";
@@ -74,13 +75,13 @@ function result(outcome: "unavailable" | "restricted" | "changed" | "unsupported
 }
 
 type Loaded = { snapshot: StoreSnapshot; records: Row[] };
-function loadedStores(snapshots: StoreSnapshot[]): Map<string, Loaded> {
-  return new Map(snapshots.map(snapshot => {
-    const value: unknown = JSON.parse(snapshot.dataJson ?? "null");
+async function loadedStores(snapshots: StoreSnapshot[],accountId:number): Promise<Map<string, Loaded>> {
+  return new Map(await Promise.all(snapshots.map(async snapshot => {
+    const value: unknown = snapshot.key==='bd_sales_events_v1'?await readSalesEvents(getD1(),accountId,snapshot.dataJson):JSON.parse(snapshot.dataJson ?? "null");
     const container = snapshot.key === "bd_assortment_v1" ? object(value)?.menuItems : value;
     if (value !== null && (!Array.isArray(container) || container.some(v => !object(v)))) throw new Error("EVIDENCE_STORE_NEEDS_REVIEW");
-    return [snapshot.key, { snapshot, records: rows(container) }];
-  }));
+    return [snapshot.key, { snapshot, records: rows(container) }] as const;
+  })));
 }
 function uniqueRecord(stores: Map<string, Loaded>, kind: SupportedKind, id: string, scope: EvidenceScope): Row | null {
   const adapter = adapters[kind];
@@ -141,7 +142,7 @@ async function resolveInContext(context: Context, reference: EvidenceReference, 
   if (["CASH_SHIFT", "FINANCE_REVENUE"].includes(kind)) keys.push("bd_sales_documents");
   if (kind === "MENU_INGESTION_DRAFT" && hasPermission(context.account, "inventory.view")) keys.push(adapters.MENU_ITEM.key);
   let stores: Map<string, Loaded>;
-  try { stores = loadedStores(await readStoreSnapshots(getD1(), context.account.id, keys)); }
+  try { stores = await loadedStores(await readStoreSnapshots(getD1(), context.account.id, keys),context.account.id); }
   catch (error) {
     if (error instanceof SyntaxError || error instanceof Error && error.message === "EVIDENCE_STORE_NEEDS_REVIEW") return result("unavailable", asOf, ["RECORD_NEEDS_REVIEW"]);
     throw error;

@@ -1,3 +1,4 @@
+import {readSalesEvents} from './sales-event-storage';
 import {journalSelect} from "./stock-journal";
 import {stockJournalMarker} from "./stock-storage";
 import { purchaseFileVisible } from "./purchase-file-scope";
@@ -26,6 +27,10 @@ const reference = (c: Context, kind: EvidenceReference["kind"], id: string, part
 /** Closed, parameterized JSON selectors return bounded records, not entire
  * purchase/count/file histories. They never choose an account from a reference. */
 async function select(c: Context, key: string, path: string, field: string, id: string, limit = 2): Promise<Row[]> {
+  if(key==='bd_sales_events_v1'&&path==='$'&&field==='id'){
+   const row=await getD1().prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').bind(c.account.id,key).first<{data_json:string}>();
+   return (await readSalesEvents(getD1(),c.account.id,row?.data_json,{id})).filter(event=>event.id===id).slice(0,limit);
+  }
   if(key==='bd_stock_movements'){
     const row=await getD1().prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').bind(c.account.id,key).first<{data_json:string}>();
     if(row&&stockJournalMarker(JSON.parse(row.data_json))){

@@ -1,3 +1,4 @@
+import {readSalesEvents} from '../../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
 import { getD1 } from "../../../../db";
@@ -117,7 +118,7 @@ async function postOnce(request: Request): Promise<Response> {
     assortment: record(read(ASSORTMENT_STORE_KEY, {})), stockMovements: await readStockHistory(database,account.id,casSnapshots.find(s=>s.key===STOCK_MOVEMENT_STORE_KEY)?.dataJson),
     expenses: array(read(EXPENSE_STORE_KEY, [])), closedMonths: closedMonthsFromStore(read(MONTH_CLOSING_STORE_KEY, null)),
     reports: array(read(OPERATIONAL_REPORT_STORE_KEY, [])), incidents: array(read("bd_cases", [])),
-    events: array(read("bd_sales_events_v1", [])), documents: array(read("bd_sales_documents", [])),
+    events: await readSalesEvents(database,account.id,casSnapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson), documents: array(read("bd_sales_documents", [])),
   };
   if (Array.isArray(body.incidents) && body.incidents.length && !hasPermission(account, "incidents.manage")) return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для сохранения происшествий" }, { status: 403 });
   const date = text(record(body.revenueRecord).date, "", 10);

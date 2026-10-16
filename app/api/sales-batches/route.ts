@@ -1,3 +1,4 @@
+import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory,readSaleStock,stockStoreStatements,stockMovementResponse} from "../../../lib/bardoctor/stock-storage";
 import { venueTimeFromJson, venueDate } from "../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../db";
@@ -86,7 +87,7 @@ async function readStores(database: D1Database, accountId: number, batchId?:stri
   const stock=await readSaleStock(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY),record(parse(stores.get(ASSORTMENT_STORE_KEY),{})),date,batchId?[batchId]:[],now);
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
-    events: array(parse(stores.get(SALES_EVENT_STORE_KEY), [])),
+    events: await readSalesEvents(database,accountId,stores.get(SALES_EVENT_STORE_KEY)),
     documents: array(parse(stores.get(SALES_DOCUMENT_STORE_KEY), [])),
     mappings: array(parse(stores.get(SALES_MAPPING_STORE_KEY), [])),
     warehouseRoutes: array(parse(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY), [])),
