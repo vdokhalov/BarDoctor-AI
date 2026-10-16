@@ -18,5 +18,5 @@ test('open report shows preliminary saved draft; closed report shows final; outg
  const build=wizard.body.body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='buildRevenueRecord');
  const payload=runInNewContext('('+source.slice(build.start,build.end)+')()',{_:false,v:'',N:'',f:'2026-10-16',Z:7001,R:31,ce:{staffing:[{employeeId:'ivan',hours:8}],shiftDepartmentSales:{},payrollBreakdown:undefined},bdDay:{report:{workdayStatus:'OPEN',workdayPayrollDraft:{payrollBreakdown:{total:975}}}}});
  assert.equal(payload.payrollBreakdown,undefined);assert.equal(payload.staffing[0].hours,8);assert.ok(!Object.hasOwn(payload,'workdayPayrollDraft'));
- const patch=readFileSync('scripts/patch-operational-day-phase1a.mjs','utf8');assert.ok(patch.includes(expression));assert.ok(patch.includes('ФОТ · предварительный'));
+ const patch=readFileSync('scripts/patch-operational-day-phase1a.mjs','utf8');assert.ok(readFileSync('scripts/patch-finance-inputs-phase3a6.mjs','utf8').includes(expression));assert.ok(patch.includes('ФОТ · предварительный'));
 });

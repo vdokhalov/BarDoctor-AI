@@ -101,7 +101,6 @@ fn('PAe',s=>{
  s=replace(s,'c===1&&i.jsxs("div",','c===1&&bdDay?.report?.workdayStatus&&i.jsx("p",{children:"Команда, часы и ФОТ сохраняются в рабочей смене. Здесь заполните списания и происшествия."}),c===1&&!bdDay?.report?.workdayStatus&&i.jsxs("div",');
  s=replace(s,'children:"После закрытия обновятся"','children:bdDay?.report?.workdayStatus?"Операционные данные":"После закрытия обновятся"');
  s=replace(s,'children:"Финансы, зарплаты, показатели команды, предупреждения и контекст AI-анализа."','children:bdDay?.report?.workdayStatus?"Списания и происшествия сохранятся в текущем рабочем дне. Закрытие и подтверждение ФОТ — на экране Смены.":"Финансы, зарплаты, показатели команды, предупреждения и контекст AI-анализа."');
- s=replace(s,'payrollTotal=bdFinanceInputsPhase3a6.finiteBusinessNumber(ce.payrollBreakdown?.total??ce.payrollBreakdown?.totalPayroll)','payrollTotal=bdFinanceInputsPhase3a6.finiteBusinessNumber(bdDay?.report?.workdayStatus==="OPEN"?(bdDay.report.workdayPayrollDraft?.payrollBreakdown?.total??bdDay.report.workdayPayrollDraft?.payrollBreakdown?.totalPayroll):(ce.payrollBreakdown?.total??ce.payrollBreakdown?.totalPayroll))');
  s=replace(s,'children:"ФОТ"','children:bdDay?.report?.workdayStatus==="OPEN"?"ФОТ · предварительный":"ФОТ"');
  return s;
 });

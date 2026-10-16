@@ -27,7 +27,11 @@ const rewrites = [
   ['Начисления по сменам берутся из правил оплаты сотрудников. Премии прибавляются;', 'Для сохранённых отчётов используется записанный ФОТ. Расчёт по текущим правилам — оценка для смен без записанного ФОТ. Премии прибавляются;'],
   ['l=t&&e.revenue>0?Math.round(e.payroll/e.revenue*1e3)/10:null', 'l=t&&e.revenue>0&&e.payroll!=null?Math.round(e.payroll/e.revenue*1e3)/10:null'],
 ];
+const recordedPayrollExpression = 'payrollTotal=bdFinanceInputsPhase3a6.finiteBusinessNumber(ce.payrollBreakdown?.total??ce.payrollBreakdown?.totalPayroll)';
+const draftPayrollExpression = 'payrollTotal=bdFinanceInputsPhase3a6.finiteBusinessNumber(bdDay?.report?.workdayStatus==="OPEN"?(bdDay.report.workdayPayrollDraft?.payrollBreakdown?.total??bdDay.report.workdayPayrollDraft?.payrollBreakdown?.totalPayroll):(ce.payrollBreakdown?.total??ce.payrollBreakdown?.totalPayroll))';
 const restore = value => {
+  // Restore this presentation extension before matching the retained Finance anchors.
+  value = value.replace(draftPayrollExpression, recordedPayrollExpression);
   const from = value.indexOf(start);
   if (from < 0) return value;
   const to = value.indexOf(end, from);
@@ -45,6 +49,7 @@ for (const [before, after] of rewrites) {
   if (!source.includes(before)) throw new Error('Phase3a6 copy anchor missing: ' + before.slice(0, 60));
   source = source.replace(before, after);
 }
+source = source.replace(recordedPayrollExpression, draftPayrollExpression);
 // Compile the exact server read helpers for the existing client, rather than
 // maintaining a second financial calculation. No storage writes in this block.
 const modules = new Map();
