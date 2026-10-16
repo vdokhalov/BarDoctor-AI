@@ -20,7 +20,9 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-authorized local stock journal integration (2026-10-16); exact bytes, no publication or production cutover.
 // Owner-authorized local sales event normalization and review fixes (2026-10-16); no publication.
 // Authorized local QA3389 migration runner, no production execution (2026-10-16).
+// Approved manual storage migration gate; full/UI routing unchanged (2026-10-16).
 export const p0Paths=Object.freeze([
+ "scripts/ci-storage-migration-scope.mjs",
  "app/api/migration/journals/route.ts",
  "drizzle/0034_journal_migration_runner.sql",
  "lib/bardoctor/journal-migration-runner.ts",

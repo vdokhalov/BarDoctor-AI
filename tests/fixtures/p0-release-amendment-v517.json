@@ -4,7 +4,7 @@
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
-      "after": "5a440a7a5b142127b1c22b63a74ebb457f600d6e68a8bbb4444948243d4fe09b"
+      "after": "ccd6f442ebceb52535ef8cd3542497c3835b8ee1224aae70720d062d2375b5a5"
     },
     "app/api/auth/bootstrap/route.ts": {
       "before": "f01ec62d4b0749c57d68dd3268e9fb6a4dba3c29eb6f4d799370859d6457ffff",
@@ -244,7 +244,7 @@
     },
     "scripts/ci-required-gates.mjs": {
       "before": null,
-      "after": "3743157c50b6a57caaeb7c93faac17593b448d46b2ae64e722c1682f47faa4b1"
+      "after": "3e88a4c328ef34b54552654a329af2921c3b88d75a7ead4602b077608bd2d890"
     },
     "scripts/cashier-presentation-browser.ts": {
       "before": null,
@@ -617,6 +617,10 @@
     "lib/bardoctor/journal-migration-runner.ts": {
       "before": null,
       "after": "7f069fd08b93412de28a604273c0ff7eb776f1228a6a19a83fe4f2fae666d190"
+    },
+    "scripts/ci-storage-migration-scope.mjs": {
+      "before": null,
+      "after": "91406638b00899f2bf46639c28269d65960dba277f6fb6268a3e563cef6aef8b"
     }
   }
 }

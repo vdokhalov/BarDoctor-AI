@@ -1,0 +1,322 @@
+{
+  "baseline": "84bb207a374af35dfc6cd152776a9821f6c13a1d",
+  "reviewedHead": "eef571fc7e9d8303f024f6415ec520c876187d29",
+  "files": {
+    "app/api/admin/relationship-integrity/route.ts": {
+      "before": "9c19008a2fe46b3a7f4e537645e49ce5cc6f8802932818bba811078239a543c9",
+      "after": "155422035411a4d3e44aebf7cf31fd0e5c88f8db31f18f3b2966f1771de71e5a"
+    },
+    "app/api/assortment/overview/route.ts": {
+      "before": "0a156ab16733e2ceb9ba87fc8873bf0ffe92def92660fc10c35a718b298d35a3",
+      "after": "9f59aefadc982cf6f117888cb4f6ac170bee833bcea6acb8dca479bf7122fd26"
+    },
+    "app/api/data-integrity/export/route.ts": {
+      "before": "64a052eabf207e63c1ad8f5c61546bd2b52925d95bc0bb077b66c500847fb3dd",
+      "after": "5d4d182360a7cfdd699f9d616c3e2da462ff768900a0c4f85ecdf55fd1f79daf"
+    },
+    "app/api/inventory/counts/route.ts": {
+      "before": "5d68304e340c913733bb223379307444b220ea32a21a89bfdf5b2edf6e293013",
+      "after": "bd1298ff475da6e9727befa4d582b8aba4a405f7872b9fea4f0b1b09617ba673"
+    },
+    "app/api/inventory/movements/route.ts": {
+      "before": null,
+      "after": "80296bd25085b012d0d25c864b7a582dfb92a9f56ef1c641c73b887b8da5de41"
+    },
+    "app/api/inventory/opening/route.ts": {
+      "before": "da23deabd8239ab4e39433ae73f42eaba252171e0c08c6a2311c9b4a5e3674e5",
+      "after": "2eece19894ddcf1a2e948b4373a60a8fb7ce3d16f813dfc4dddf18172dbef412"
+    },
+    "app/api/inventory/products/route.ts": {
+      "before": "9bf27bab4cc6d66af8b647967dbb23c061b0f7635a2d36dc4d5b7774aa38dd98",
+      "after": "037c7c547faede57bbf869b9c66bd9ab6f53386e2b37d590bb1acff4f149074d"
+    },
+    "app/api/inventory/valuation/route.ts": {
+      "before": "e9452d83604925eddb30854c4f45d56a9e66edf88953336e126a0e11aef2f425",
+      "after": "55bb31c8ef1e2fc673f95e408963a408d033cb6ef8dc36ba2cf85e4c551ac56f"
+    },
+    "app/api/migration/journals/route.ts": {
+      "before": null,
+      "after": "dc477ba3b2ff09b8aaedcae6766f55f384a7e954d731453ea9e00e0c8ebc21e9"
+    },
+    "app/api/migration/koln-assortment/route.ts": {
+      "before": "be89237a2129ed4fcb239502826fede88957c1ac4f3299bf5afe27f30a95b93b",
+      "after": "919ee7252680a5ee1c8fcddc48ae19bd3a9283f0ee93fd25106fe1f132a25d2c"
+    },
+    "app/api/migration/koln-currency-relabel/route.ts": {
+      "before": "5dbf06d7c238b21a9ea4c5a694de44b26a63395f3627c9d57f4ff73a3a9699c7",
+      "after": "d322c609123aa47b66a855b1b2f7a1754cd130be25447d85998a11b6125e7dda"
+    },
+    "app/api/operational-days/route.ts": {
+      "before": "c33b6c024ae9ba030a4c738adcfaca301459573b4ee2d437a99e367ecdf89338",
+      "after": "7c48047076dc2413bc218f6e53f021330fed67838afa2b06dfd75fb266bd736b"
+    },
+    "app/api/pos-orders/route.ts": {
+      "before": "0afeb8233dc4bcbc25ee95b7172371e88d65f88f34b0e6bc6824fb66e1679d99",
+      "after": "a78f86a1d4f9bd142be5c578d084c8b595efce1c18c1a3389751a67200339538"
+    },
+    "app/api/pos-overview/route.ts": {
+      "before": "0817f6355049389c611e8aead77b93d5fd8d8a5095df469ce8142de325578c9c",
+      "after": "38a41d33b6fb54c722ec0289d39a166e161a2bf8f33323ae94a18e3b500f6e6e"
+    },
+    "app/api/procurement/overview/route.ts": {
+      "before": "f1756ca5ddb081832333f7289afeaec4713f7585a3dfc499e856e0b2364d0aaa",
+      "after": "64e900d823e5cd67554868ce3ee202b6d7a48bfc5fec9ab0b862325ee1631d66"
+    },
+    "app/api/purchases/cancel/route.ts": {
+      "before": "196f988b2f38e6888404e76f66c5105b65f71275201d5fa3c94b725436e74cd7",
+      "after": "399aff197e8e213d701816db6627cf1627cab976834085ffed85ede0f5925ea1"
+    },
+    "app/api/purchases/confirm/route.ts": {
+      "before": "54bdd5dc7867f876acbf5f9040b2a8c7d5843290b321f98665c71eabf834b6b2",
+      "after": "622c280c63c3e21618317a43b3a49495b5b6623fe3ec60c08b0e30cc86d3d54c"
+    },
+    "app/api/purchases/delete/route.ts": {
+      "before": "2394e4d8fc83b9bae71e652856932f2445bb8fc6860965e5b2048c7b7d3d3bc3",
+      "after": "e12b0396a3287a39da241146d36557c6977fcebdc6245798a07a39e6d5531490"
+    },
+    "app/api/purchases/hybrid-production-qa/route.ts": {
+      "before": "5cecf46755f99482d6c013913a603c5e159fa70b112200f07703d267ef74095b",
+      "after": "c01d5aeffc6bd9acdcbc329e509384e23dd3de78a570e3ddaf1221dff9ac082f"
+    },
+    "app/api/purchases/repost/route.ts": {
+      "before": "a6a0d9bea1ae72c91b10fa197f56c10ddd9738987dc3bb57555d8a701a46a85e",
+      "after": "123d37170691d33dd99c777af51fcd09b16e53e9313a2614931a4fade9cda8a8"
+    },
+    "app/api/purchases/update/route.ts": {
+      "before": "3cb678ec804912993456bd2fb89305594e4ef400467c693b0f41beaace03be61",
+      "after": "b887f6185690b344e9e7e67c55537f55b7ea1b27261fa2745d9eb0fffed2aae9"
+    },
+    "app/api/sales-batches/import/route.ts": {
+      "before": "a428802714816c010cacf62e83cc2caa5de799e199f4f5cfaaaadc273e9d69dc",
+      "after": "0989e9514fe896bbb80275b7f4358b3602180a9f4abb2a9693170639e50c4660"
+    },
+    "app/api/sales-batches/route.ts": {
+      "before": "9f031e2d9a34193fca4aaabdfd8377d6ee2d6cb1a1198aee0d6cb113ee56af42",
+      "after": "edb55e9a3655c3b4a742654d649edf43cf763166e7191abef47742b4c13db2c4"
+    },
+    "app/api/sales-events/route.ts": {
+      "before": "b3e1db2693037263766a86724700b75cd75f0f32ad32d6c0c2b2e5cb57a112bc",
+      "after": "2c5b305df38288638b53cccc23f26174193c5e0fc4c8f50b43524f9c97bd55c8"
+    },
+    "app/api/sales/confirm/route.ts": {
+      "before": "e6558a5d45fa92a13a62c9a4335ad55d22e5a74f310269041c2a0669c03b3c81",
+      "after": "7e73c94571546851c98cdfd5f297c639e280a11182b3a0110c2c37211dc1ea35"
+    },
+    "app/api/shifts/close/route.ts": {
+      "before": "0ce4940977f9b706170ebe19634792517b177384901affe4ec87a74dca486fc7",
+      "after": "c05d2170934a18072d537df24a849d215257749b78fe355b0ed355e968f74012"
+    },
+    "app/api/store/[key]/route.ts": {
+      "before": "b1971d6c06a2bcdd973e1f60ba74c6d33bb57f46c6a2c8857c4e34a347a75b64",
+      "after": "5f86cd6b013fd770abcc697db0b001156239e1b4bfd4f007370729796082be45"
+    },
+    "app/api/store/route.ts": {
+      "before": "8ca73d4412337fcbe4eb8dc175abcf23b85fb2c5fcf51fc3271f792857dcdfa8",
+      "after": "e21b8ba73bc8cd67d6e462eaef5eeb7109af5739f9f4539803aac9835b8e2e5b"
+    },
+    "app/api/workdays/route.ts": {
+      "before": "c3deb06320dcfd67d397cb0c3cc847a0967ecaca21f3e93489d04836390b7531",
+      "after": "1852b7eb74b21e4e0ef3adf93e0000d898383fb9fdff8511dc6f58d181466cc8"
+    },
+    "app/api/write-offs/route.ts": {
+      "before": "c9afc60f01b5041d0634d465d643a16e9720bdccd13d480cda52a448cd7cfb77",
+      "after": "3261e8cabe3c5d22c479c12a75cd18813ddfa671e0d728c1acb7698f9d81b395"
+    },
+    "app/migration-preview/route.ts": {
+      "before": "9ee6eccebd00db5ac2f4117ca32edd955b1d73733c4ccb362dfb7256178447a5",
+      "after": "dd12608b781b18efae3a7a9a282efda5c2a2866883ab0371119083700da71098"
+    },
+    "docs/journal-migration-runner.md": {
+      "before": null,
+      "after": "2e20c7f66ea58dc1294f846b2619773a17f0adab6b09fd2ca199b388568a94a1"
+    },
+    "docs/sales-event-journal-migration.md": {
+      "before": null,
+      "after": "9b487a19faa04d6e0706130df034044eb126977132fec3feb503d8948f9c2a6c"
+    },
+    "docs/stock-journal-migration.md": {
+      "before": null,
+      "after": "03a1a7a500ad8d56a701c62038273989a4e2c16a86b29cd8f9c94f21b5dd8507"
+    },
+    "drizzle/0032_stock_journal.sql": {
+      "before": null,
+      "after": "b5607362eb8e2c22d4c701a5bdf56a8ffd9081d97823a4512b1e4a4cf88ad1f9"
+    },
+    "drizzle/0033_sales_event_journal.sql": {
+      "before": null,
+      "after": "8a9f809d6f70c249a8a00176201bc6abd3f38aebad380d381c47fc2dc67f6cdf"
+    },
+    "drizzle/0034_journal_migration_runner.sql": {
+      "before": null,
+      "after": "3ba27224f1568e5de92f23c24149405a98c7310936c26650b0b88f7e13fc2eb1"
+    },
+    "lib/bardoctor/authoritative-persistence.ts": {
+      "before": "89cb4a9c8b95fdf50e1bea9bd34b9ca6466db5cbccd9ee37b2d584e88db6c716",
+      "after": "7e83d1d71514baacb4f243b2f77d8781b485476f543bde89568724ea8f0ecf24"
+    },
+    "lib/bardoctor/canonical-health-inputs.ts": {
+      "before": "676314b7bc3cd9ba6d1a64f3aa04b61e0cbe7eacbd16d212f9c9173a277c77ac",
+      "after": "64e54ce479d358dcf8469cc0f4052a9aca71781687798cb3e712d3935384fd76"
+    },
+    "lib/bardoctor/cost-evidence.ts": {
+      "before": "d82b3c2447e01be4f3f8ff27389668cd6441927415d9487f0f18b97fcff5abe7",
+      "after": "d286d63357a836685365da5380d53707225ec4d64ae7fc48b9a8061cf3179a90"
+    },
+    "lib/bardoctor/daily-revenue.ts": {
+      "before": "39473ba2585d55a7148da6d8eb0609e2d7d13985f97fa0be6896bbc25d91dca1",
+      "after": "6d691e5ee0b0ea0b3ef89aa5581ab2c81b3b175e703ee4a616a1b8d8060cca16"
+    },
+    "lib/bardoctor/evidence-resolver.ts": {
+      "before": "a9827aa68bd816df45e8d0922e41d360820f0db9a76ae3a9cf7c0ae44200abf4",
+      "after": "88b17bd0a1e6a7cbd08c878a94f8ba78987e371a443feff50d9a7247d0f1af3d"
+    },
+    "lib/bardoctor/integrations/domain-writer.ts": {
+      "before": "7bb8a853b146701b7c74875c3a6f7278c1be7d795ae551f5f572f3eadb5a2219",
+      "after": "9cf92c1176cabb091adb482e63ddfe63911d876f6ded03a689a649c39185e4f1"
+    },
+    "lib/bardoctor/inventory.ts": {
+      "before": "81e9c49dc4deee46b775ba009a35d2098dee4d1390937b0eef1c56d65d2bf3f8",
+      "after": "c3b5ea71e0126ac3cc72697b1cf554e431fe07c423287d2404fd2cfc701a173d"
+    },
+    "lib/bardoctor/journal-migration-runner.ts": {
+      "before": null,
+      "after": "7f069fd08b93412de28a604273c0ff7eb776f1228a6a19a83fe4f2fae666d190"
+    },
+    "lib/bardoctor/management-cost-observation.ts": {
+      "before": "1fb16bffbf5800306285e24dd608da62050d45fd55318984f61b13070b4180a2",
+      "after": "6cc2c8eb32f2b1c7be663f1998d6e036869cad17c68ee528a725ff7accb4f4a1"
+    },
+    "lib/bardoctor/management-cost-signals.ts": {
+      "before": "68ff8141a58e91a2e675957d060b6156083913ed14ab94cb0f2779aecc5550cc",
+      "after": "3f8a1bc4979095ddee555946f307d6a9aae28d2767bf253be37d50f97e279566"
+    },
+    "lib/bardoctor/opening-stock.ts": {
+      "before": "cbbaa1c8cd443bc0032fa68cfb9e9632c1d808f16e4826464f134bc4afe333bd",
+      "after": "a83d4c6ba79bc4e5685ecc1ad1942ab344336497029b816c38661c88b06ad834"
+    },
+    "lib/bardoctor/platform-persistence-service.ts": {
+      "before": "4ed173694473363b1c520abc6af486259f986910124285c683d504acf6b31746",
+      "after": "a293f87abd0a553563514aaa924db1d39b20ebf4f8d524ea754c2d62d05facad"
+    },
+    "lib/bardoctor/pos-orders.ts": {
+      "before": "2505a1d5cab079e3e71fe450a149782857d89f2d7ee55b3dc3ba238df9623736",
+      "after": "fa74f21507eb61441de8766ca12afa7880b20c8fce25dca1bd83d6c6d82dcbee"
+    },
+    "lib/bardoctor/sales-consumption.ts": {
+      "before": "dfbf9c1013feaac0951f0f049039258fcd1ba2d290343f8ba5847c3111e03f3c",
+      "after": "31ae60b3199484a42eed165be82c619dc08c3bcbccb8df67d1acbbac3a423728"
+    },
+    "lib/bardoctor/sales-event-history.ts": {
+      "before": null,
+      "after": "6181718fcf39bfd298309aa16203d4278d4602c39b77d572f93cc5dbd0c93182"
+    },
+    "lib/bardoctor/sales-event-storage.ts": {
+      "before": null,
+      "after": "0b1332b46b66b1d41cb627295685f0e54e39d842e99628b4f80a680bf80fee35"
+    },
+    "lib/bardoctor/sales-events.ts": {
+      "before": "56ad51d9cec0aa75b8d1cac42c19a4d3b6f6dd10bba9d8a1223fa2f43a0c283a",
+      "after": "46c7659795e497cf4f1bbf27ae8bf0c7d4107d7a08b807e49bc89d6553b58180"
+    },
+    "lib/bardoctor/stock-evidence.ts": {
+      "before": "b7e1e6b176f9e3445d8c2a338f99839621c4b38e362de8152bbef9bb4a892d6c",
+      "after": "bc37885a1dbcec5ecac1a13480595c7d8c9dee69eaf133a19dccd0baf285c303"
+    },
+    "lib/bardoctor/stock-journal.ts": {
+      "before": null,
+      "after": "a4879dad113bd60f8a192ca189f71161bf5f25a157c4b9d0f4bb3500098f614c"
+    },
+    "lib/bardoctor/stock-retention.ts": {
+      "before": "1e626936ef8274095c8f1abc5ba693f103e09ee55208cd3fb56ae81874879c80",
+      "after": "93dc1c875582bc49368168464a7f06e1ae53a39256dc2649fcda0ccc1da253b4"
+    },
+    "lib/bardoctor/stock-storage.ts": {
+      "before": null,
+      "after": "f42349a61c29582cbfb4da79f2e46ef73b998c10dc26e2932ef1c22b47685981"
+    },
+    "lib/bardoctor/store-cas.ts": {
+      "before": "0de09d3496247a96f897faf956f27c6b09a4b5d43e50b1250e25985ee4a3fa6b",
+      "after": "903949d57868d38af0d8e04ce2f46b34221f4a2bfa1337dd6f4e4b489f8f6660"
+    },
+    "lib/bardoctor/venue-ai-context.ts": {
+      "before": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a",
+      "after": "c68454365a1c4c2cfebc111f92d02c3e69a3b079a97924a96f8cdcf93d607369"
+    },
+    "lib/bardoctor/verified-month-close.ts": {
+      "before": "eb39d1f48210f912af776bb8ac515cd5a4901f667601cfded4be8a8be30cf5c8",
+      "after": "e9275952d45b46bc3c5c15cceab6701c69dffde15dbe64ba17665fcb8b6f996a"
+    },
+    "lib/bardoctor/write-offs.ts": {
+      "before": "927b45d7938137afb6dc62e98ee2e2ddd1176e425db537320bd13fe1ca399d1f",
+      "after": "1ec994f6d9dcc240e1821ffa53da146c1f95f923f8b701e6a37f95fe53724f4e"
+    },
+    "public/cashier.js": {
+      "before": "9a23e26a063f360731c4acca31607b5cbc10af8c1ee278d1268ca8fbd7faebfa",
+      "after": "605895eb0d17dec84afbafebbe867cde6952573d004aad4cfcbd263d4ef854da"
+    },
+    "tests/fixtures/p0-release-amendment-v517.json": {
+      "before": "bc40c532f15ce1de1d905105295908ecaa54090f7c413a62d55847b0695146e4",
+      "after": "cce4119145162f54b89f8001eb59ffd5ee8f1762e2bd9f33dfc0c3ee5d9a6bf5"
+    },
+    "tests/helpers/opening-runtime.ts": {
+      "before": "4910b48ab1ab75f7102201d3e60c5b96fa8262211d6cb8d1cdb1b8f95bade383",
+      "after": "fcb486dd20914ecaf3471d24d7d46a488a80a90ab784055aaca9a2e43011f3e3"
+    },
+    "tests/helpers/p0-release-amendment.mjs": {
+      "before": "b1e209476e5045f0dfcb07104ff7f268584ad96e0670a6fcc91a80cb1d1bde3f",
+      "after": "2c6d2689464a70738c27024a13a55ce7862ce1469e8203bd25684605dcbd79ee"
+    },
+    "tests/helpers/staff-roster-fixture.ts": {
+      "before": "d0226733ca39d56a64f59d11ae7597eff585a564116a354b3ff679ccdb150514",
+      "after": "4423615754a360e4a3e40f55be2e376484d75d2a5ee66da66210fcd0aa92d6fb"
+    },
+    "tests/journal-migration-runner-d1.test.mjs": {
+      "before": null,
+      "after": "4416cfd0dceb733624425f7c0891e20dde58c7126c77e0909d263fa9044addbf"
+    },
+    "tests/journal-migration-runner.test.ts": {
+      "before": null,
+      "after": "e5000dbc59a58b4e3ecb912fad0eee00e2301741b4a3759ca447b9325e11c911"
+    },
+    "tests/purchase-conversion-history-phase4.test.ts": {
+      "before": "0395937925448718feb3375a59ca72fdc42b7f0a45e86246a59993de631e0e25",
+      "after": "afd176d41511bcd7b623ed0e3accb794f200cd8d8796b8794b5195bc3dd4353b"
+    },
+    "tests/purchase-venue-scope-phase4.test.ts": {
+      "before": "a0e4795b7eb3814d75524bd1804c26404dac17b5b6d59da04d0241d74098ee1c",
+      "after": "10d220bf56ae155024626945aef20b08b8bc90940a3282672f08155312caef5f"
+    },
+    "tests/sales-event-journal-d1.test.mjs": {
+      "before": null,
+      "after": "fc480c28b29cb51f3a261047eac46b8f3b738c69f9d6cb80ea3b000a64935dff"
+    },
+    "tests/sales-event-journal.test.ts": {
+      "before": null,
+      "after": "aa55d86319b906a106bc52a7bbb72fb3989afddee79a8bce01b45ea607182ff6"
+    },
+    "tests/staff-job-storage.test.ts": {
+      "before": "35ce9564fe8e36f64fed9da59951f3713e1c4ff6385ab85aa8e29e7d6fe5caf1",
+      "after": "ac9c97fe957cc90046d1e933a6eee7d8de57ce2d5a2a42c3404fca5f2d3309a0"
+    },
+    "tests/staff-pin-roster.test.ts": {
+      "before": "45033863cd525dc80275be4e8d931e2b673032c9f495d6f138925654fe0bbaa5",
+      "after": "06d5ba86900dec480076fe885cdef582d782d5ecbc1a82269fe3ac8ae2077f94"
+    },
+    "tests/stock-journal-d1.test.mjs": {
+      "before": null,
+      "after": "d30621766107ce01340d90103c409a582ec43615a5f2d8dd31bfac5f498cf229"
+    },
+    "tests/stock-journal-lifecycle.test.ts": {
+      "before": null,
+      "after": "f207783b5692aa3e5d9aed6fff67ac7dfd046f0de88fc6ef7b514a42e65929ee"
+    },
+    "tests/stock-journal-regressions.test.ts": {
+      "before": null,
+      "after": "dabe171eef630975f1395d637c92caedbbcde0a42859ebfe6c88da63b3cef937"
+    },
+    "tests/stock-journal.test.ts": {
+      "before": null,
+      "after": "1e8f1de56ca24e61c0c6be38559cd87aba2b3b8dc6bf8c3de5897b2d65a1a242"
+    }
+  }
+}

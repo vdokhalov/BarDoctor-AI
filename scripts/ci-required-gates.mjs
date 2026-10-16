@@ -3,9 +3,9 @@ export const fullGates=['auth-recovery-p0','verify-core','verify-browser','sales
 export function assertRequiredGates(jobs){
   if(jobs.changes?.result!=='success')throw Error('classification must succeed');
   const mode=jobs.changes.outputs?.mode;
-  if(!['full','sales-css'].includes(mode))throw Error('unknown classification');
-  for(const name of [...fullGates,'sales-presentation']){
-    const selected=mode==='full'?fullGates.includes(name):name==='sales-presentation';
+  if(!['full','sales-css','storage-migration'].includes(mode))throw Error('unknown classification');
+  for(const name of [...fullGates,'sales-presentation','storage-migration']){
+    const selected=mode==='full'?fullGates.includes(name):name===(mode==='sales-css'?'sales-presentation':'storage-migration');
     const expected=selected?'success':'skipped';
     if(jobs[name]?.result!==expected)throw Error(name+' must be '+expected+', got '+jobs[name]?.result);
   }

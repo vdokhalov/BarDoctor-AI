@@ -43,7 +43,7 @@ test('real Git diff parsing and absent revisions fail closed',()=>{
   writeFileSync(dir+'/unknown.txt','mixed');git('add','.');git('commit','-qm','unknown');assert.equal(classifyRange(base,git('rev-parse','HEAD')).mode,'full');
  }finally{process.chdir(cwd);rmSync(dir,{recursive:true,force:true});}
 });
-function results(mode){return Object.fromEntries([['changes',{result:'success',outputs:{mode}}],...fullGates.map(n=>[n,{result:mode==='full'?'success':'skipped'}]),['sales-presentation',{result:mode==='full'?'skipped':'success'}]]);}
+function results(mode){return Object.fromEntries([['changes',{result:'success',outputs:{mode}}],...fullGates.map(n=>[n,{result:mode==='full'?'success':'skipped'}]),['sales-presentation',{result:mode==='full'?'skipped':'success'}],['storage-migration',{result:'skipped'}]]);}
 test('aggregate rejects failed, cancelled, missing or skipped selected gates',()=>{
  for(const mode of ['full','sales-css']){
   assert.doesNotThrow(()=>assertRequiredGates(results(mode)));

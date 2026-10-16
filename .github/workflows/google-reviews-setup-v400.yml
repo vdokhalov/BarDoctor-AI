@@ -23,6 +23,13 @@ on:
       - fix/google-oauth-source-errors-v406-2026-09-03
       - fix/google-oauth-token-diagnostics-v407-2026-09-03
   workflow_dispatch:
+    inputs:
+      release_scope:
+        description: Explicit release gate selection
+        required: true
+        default: full
+        type: choice
+        options: [full, storage-migration]
 
 permissions:
   contents: read
@@ -47,13 +54,18 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - name: Classifier and aggregate negative controls
-        run: node --test tests/ci-change-scope.test.mjs
+        run: node --test tests/ci-change-scope.test.mjs tests/ci-storage-migration-scope.test.mjs
       - id: scope
         name: Classify complete diff with the base revision classifier
         env:
           SCOPE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
           SCOPE_HEAD: ${{ github.sha }}
+          RELEASE_SCOPE: ${{ inputs.release_scope }}
         run: |
+          if [[ "$RELEASE_SCOPE" == "storage-migration" ]]; then
+            node scripts/ci-storage-migration-scope.mjs
+            exit 0
+          fi
           if [[ "$SCOPE_BASE" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$SCOPE_BASE:scripts/ci-change-scope.mjs" 2>/dev/null; then
             git show "$SCOPE_BASE:scripts/ci-change-scope.mjs" > "$RUNNER_TEMP/bd-ci-scope.mjs"
             node "$RUNNER_TEMP/bd-ci-scope.mjs"
@@ -61,6 +73,34 @@ jobs:
             echo 'Base classifier unavailable: require full CI'
             echo 'mode=full' >> "$GITHUB_OUTPUT"
           fi
+
+  storage-migration:
+    needs: changes
+    if: needs.changes.outputs.mode == 'storage-migration'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: npm
+      - run: npm run install:ci
+      - name: Exact source and strict gate controls
+        run: |
+          node scripts/ci-storage-migration-scope.mjs
+          node --test tests/ci-change-scope.test.mjs tests/ci-storage-migration-scope.test.mjs
+          node --import tsx --test tests/pos-release-amendment.test.ts tests/business-dates-guard.test.ts tests/staff-job-storage.test.ts
+      - name: Storage migration and affected consumers
+        run: |
+          node --import tsx --test tests/journal-migration-runner.test.ts tests/stock-journal.test.ts tests/stock-journal-regressions.test.ts tests/stock-journal-lifecycle.test.ts tests/sales-event-journal.test.ts tests/sales-events-phase5.test.ts tests/sales-events-api-phase5.test.ts tests/sales-workday-gate.test.ts tests/pos-live-overview.test.ts tests/operational-day-phase1a.test.ts tests/inventory-counts-api.test.ts tests/valuation-api.test.ts tests/purchase-conversion-history-phase4.test.ts tests/purchase-venue-scope-phase4.test.ts tests/account-lifecycle.test.ts tests/evidence-resolver-phase3a1.test.ts tests/stock-evidence-rca-phase3a7.test.ts tests/data-integrity-audit.test.ts tests/venue-ai-context.test.ts tests/management-cost-phase4a.test.ts tests/management-cost-correction-phase4a.test.ts tests/platform-persistence-audit.test.ts tests/opening-stock-phase5.test.ts tests/domain-writer-venue-isolation.test.ts tests/sales-consumption.test.ts tests/write-offs.test.ts
+      - name: Native D1 and R2 durability and interruption recovery
+        run: node --test tests/journal-migration-runner-d1.test.mjs tests/stock-journal-d1.test.mjs tests/sales-event-journal-d1.test.mjs
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
 
   sales-presentation:
     needs: changes
@@ -546,7 +586,7 @@ jobs:
 
   verify:
     if: always()
-    needs: [changes, sales-presentation, auth-recovery-p0, verify-core, verify-browser, sales-navigation, sales-scroll-layout]
+    needs: [changes, storage-migration, sales-presentation, auth-recovery-p0, verify-core, verify-browser, sales-navigation, sales-scroll-layout]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
