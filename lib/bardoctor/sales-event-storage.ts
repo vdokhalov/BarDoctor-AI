@@ -98,7 +98,7 @@ export async function copyLegacySalesEvents(db:D1Database,scope:JournalScope,lim
  }
  return (await salesEventState(db,scope))!;
 }
-export async function activateSalesEvents(db:D1Database,scope:JournalScope){
+export async function activateSalesEvents(db:D1Database,scope:JournalScope,extraGuards:D1PreparedStatement[]=[]){
  const state=await salesEventState(db,scope);if(state?.state==='active')return;if(!state||state.state!=='verified')fail();
  const source=await db.prepare('SELECT data_json,updated_at FROM domain_data WHERE account_id=? AND store_key=?').bind(scope.accountId,KEY).first<{data_json:string;updated_at:string}>();if(await hash(source?.data_json??'[]')!==state.source_hash)throw new StoreWriteConflictError();
  const revenue=await db.prepare('SELECT data_json,updated_at FROM domain_data WHERE account_id=? AND store_key=?').bind(scope.accountId,'bd_finance_revenue').first<{data_json:string;updated_at:string}>();
@@ -107,13 +107,13 @@ export async function activateSalesEvents(db:D1Database,scope:JournalScope){
  for(const event of JSON.parse(source?.data_json??'[]') as SalesEvent[]){validate(event,scope);const total=totals.get(event.revenueRowId)??{cents:0,count:0,currency:event.currency};if(total.currency!==event.currency)fail();if(event.status==='POSTED'){total.cents+=Math.round(event.revenue*100);total.count++;}totals.set(event.revenueRowId,total);}
  for(const row of revenues)if(row.venueId===scope.venueId&&row.revenueSource==='sales_events_v1'&&!totals.has(row.id)&&(row.revenue!==0||row.receipts!==0))throw Error('SALES_EVENT_REVENUE_NEEDS_REVIEW');
  for(const [id,total] of totals){const rows=revenues.filter((row:any)=>row.id===id&&row.venueId===scope.venueId);if(rows.length!==1||rows[0].revenueSource!=='sales_events_v1'||rows[0].currency!==total.currency||Math.round(rows[0].revenue*100)!==total.cents||rows[0].receipts!==total.count)throw Error('SALES_EVENT_REVENUE_NEEDS_REVIEW');}
- await db.batch([storeCasGuard(db,scope.accountId,[{key:KEY,dataJson:source?.data_json??null,updatedAt:source?.updated_at??null},{key:'bd_finance_revenue',dataJson:revenue?.data_json??null,updatedAt:revenue?.updated_at??null}],new Date().toISOString()),guard(db,scope,state.revision,'verified'),db.prepare("UPDATE sales_event_journals SET state='active' WHERE account_id=?").bind(scope.accountId),db.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').bind(scope.accountId,KEY,JSON.stringify({format:SALES_EVENT_FORMAT,revision:state.revision}))]);
+ await db.batch([...extraGuards,storeCasGuard(db,scope.accountId,[{key:KEY,dataJson:source?.data_json??null,updatedAt:source?.updated_at??null},{key:'bd_finance_revenue',dataJson:revenue?.data_json??null,updatedAt:revenue?.updated_at??null}],new Date().toISOString()),guard(db,scope,state.revision,'verified'),db.prepare("UPDATE sales_event_journals SET state='active' WHERE account_id=?").bind(scope.accountId),db.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').bind(scope.accountId,KEY,JSON.stringify({format:SALES_EVENT_FORMAT,revision:state.revision}))]);
 }
 
 /** Restart only unactivated staging; legacy source remains untouched. */
-export async function restartLegacySalesEvents(db:D1Database,scope:JournalScope){
+export async function restartLegacySalesEvents(db:D1Database,scope:JournalScope,extraGuards:D1PreparedStatement[]=[]){
  const state=await salesEventState(db,scope);if(!state)return;if(state.state==='active')fail();
- await db.batch([guard(db,scope,state.revision,state.state,state.copied_count),
+ await db.batch([...extraGuards,guard(db,scope,state.revision,state.state,state.copied_count),
  db.prepare('DELETE FROM sales_event_reversals WHERE account_id=?').bind(scope.accountId),
  db.prepare('DELETE FROM sales_event_chunks WHERE account_id=?').bind(scope.accountId),
  db.prepare('DELETE FROM sales_event_totals WHERE account_id=?').bind(scope.accountId),

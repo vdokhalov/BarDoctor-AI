@@ -540,7 +540,7 @@
     },
     "lib/bardoctor/store-cas.ts": {
       "before": "0de09d3496247a96f897faf956f27c6b09a4b5d43e50b1250e25985ee4a3fa6b",
-      "after": "13552707e73bfb013a153bb4f40899cb8812a1e9c52b5222476315b6014420a8"
+      "after": "903949d57868d38af0d8e04ce2f46b34221f4a2bfa1337dd6f4e4b489f8f6660"
     },
     "lib/bardoctor/venue-ai-context.ts": {
       "before": "2584cde31a567cf25b86059f02015b0e1f650f97c0fe08117306e58385ae694a",
@@ -564,7 +564,7 @@
     },
     "lib/bardoctor/stock-journal.ts": {
       "before": null,
-      "after": "10f75fcb60cdf0799ed70e32716d1648679e63936e4eb6889e5894b05b60d22f"
+      "after": "a4879dad113bd60f8a192ca189f71161bf5f25a157c4b9d0f4bb3500098f614c"
     },
     "lib/bardoctor/stock-storage.ts": {
       "before": null,
@@ -604,7 +604,19 @@
     },
     "lib/bardoctor/sales-event-storage.ts": {
       "before": null,
-      "after": "ac5629b442149eafda65780d65b738a2e0982e5017e43f4fa37d2918fc837816"
+      "after": "14fd1e70f5e09dc03945332979eb996dc2f3f409102b8c4abca737536e2a82b4"
+    },
+    "app/api/migration/journals/route.ts": {
+      "before": null,
+      "after": "dc477ba3b2ff09b8aaedcae6766f55f384a7e954d731453ea9e00e0c8ebc21e9"
+    },
+    "drizzle/0034_journal_migration_runner.sql": {
+      "before": null,
+      "after": "3ba27224f1568e5de92f23c24149405a98c7310936c26650b0b88f7e13fc2eb1"
+    },
+    "lib/bardoctor/journal-migration-runner.ts": {
+      "before": null,
+      "after": "b578835b747a2b7cf1bab92df32eecf92a371b685df42a916e14abc594240e45"
     }
   }
 }

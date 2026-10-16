@@ -83,10 +83,10 @@ export async function copyLegacyJournal(db:D1Database,scope:JournalScope,limit=2
 }
 /** Cutover is separate and must not be wired into a release until all consumers
  * support normalized storage. Kept local for migration/transaction verification. */
-export async function activateJournal(db:D1Database,scope:JournalScope){
+export async function activateJournal(db:D1Database,scope:JournalScope,extraGuards:D1PreparedStatement[]=[]){
  const j=await journalState(db,scope);if(!j)fail();if(j.state==='active')return;
  if(j.state!=='verified')fail();const source=await db.prepare('SELECT data_json,updated_at FROM domain_data WHERE account_id=? AND store_key=?').bind(scope.accountId,KEY).first<{data_json:string;updated_at:string}>();if(!source||await sha(source.data_json)!==j.source_hash)throw new StoreWriteConflictError();
- await checkedBatch(db,[storeCasGuard(db,scope.accountId,[{key:KEY,dataJson:source.data_json,updatedAt:source.updated_at}],new Date().toISOString()),journalGuard(db,scope,j.revision,'verified'),db.prepare("UPDATE stock_journals SET state='active' WHERE account_id=? AND venue_id=?").bind(scope.accountId,scope.venueId),db.prepare('UPDATE domain_data SET data_json=?,updated_at=? WHERE account_id=? AND store_key=?').bind(JSON.stringify({format:JOURNAL_FORMAT,revision:j.revision}),new Date().toISOString(),scope.accountId,KEY)]);
+ await checkedBatch(db,[...extraGuards,storeCasGuard(db,scope.accountId,[{key:KEY,dataJson:source.data_json,updatedAt:source.updated_at}],new Date().toISOString()),journalGuard(db,scope,j.revision,'verified'),db.prepare("UPDATE stock_journals SET state='active' WHERE account_id=? AND venue_id=?").bind(scope.accountId,scope.venueId),db.prepare('UPDATE domain_data SET data_json=?,updated_at=? WHERE account_id=? AND store_key=?').bind(JSON.stringify({format:JOURNAL_FORMAT,revision:j.revision}),new Date().toISOString(),scope.accountId,KEY)]);
 }
 /** Append a bounded delta within the caller's sale/balance/revenue transaction. */
 export async function appendJournalStatements(db:D1Database,scope:JournalScope,revision:number,movements:unknown[]){
@@ -157,9 +157,9 @@ export async function journalSelect(db:D1Database,scope:JournalScope,field:'id'|
 }
 /** Discard only unactivated staging after a changing legacy source. Canonical
  * legacy data is untouched. An active journal can never be reset by this API. */
-export async function restartLegacyJournal(db:D1Database,scope:JournalScope){
+export async function restartLegacyJournal(db:D1Database,scope:JournalScope,extraGuards:D1PreparedStatement[]=[]){
  const j=await journalState(db,scope);if(!j)return;if(j.state==='active')fail();
- await checkedBatch(db,[journalGuard(db,scope,j.revision,j.state,j.copied_count),
+ await checkedBatch(db,[...extraGuards,journalGuard(db,scope,j.revision,j.state,j.copied_count),
  db.prepare('DELETE FROM stock_journal_movements WHERE account_id=?').bind(scope.accountId),
  db.prepare('DELETE FROM stock_recipe_snapshots WHERE account_id=?').bind(scope.accountId),
  db.prepare('DELETE FROM stock_journals WHERE account_id=? AND venue_id=?').bind(scope.accountId,scope.venueId)]);
