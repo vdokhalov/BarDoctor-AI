@@ -4,6 +4,9 @@ import {storeCasGuard,StoreWriteConflictError,type StoreSnapshot} from './store-
 const KEY='bd_stock_movements';
 export const JOURNAL_FORMAT='bardoctor-stock-journal-v1';
 type Row=Record<string,unknown>;
+// Internal identity only: never add fields to exported legacy evidence.
+const positions=new WeakMap<object,number>();
+export function journalPosition(row:object){const position=positions.get(row);if(position===undefined)fail();return position;}
 export type JournalScope={accountId:number;venueId:number};
 type Journal={account_id:number;venue_id:number;state:'copying'|'verified'|'active';source_hash:string;source_count:number;copied_count:number;revision:number;next_position:number};
 const object=(x:unknown):x is Row=>!!x&&typeof x==='object'&&!Array.isArray(x);
@@ -34,9 +37,10 @@ async function movementStatements(db:D1Database,scope:JournalScope,value:unknown
  statements.push(db.prepare(`INSERT INTO stock_journal_movements(account_id,position,movement_id,idempotency_key,product_key,warehouse_id,kind,effective_date,created_at,source_document_id,source_line_id,sales_batch_id,status,reversed_at,payload_json,snapshot_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ${update?'ON CONFLICT(account_id,position) DO UPDATE SET movement_id=excluded.movement_id,idempotency_key=excluded.idempotency_key,product_key=excluded.product_key,warehouse_id=excluded.warehouse_id,kind=excluded.kind,effective_date=excluded.effective_date,created_at=excluded.created_at,source_document_id=excluded.source_document_id,source_line_id=excluded.source_line_id,sales_batch_id=excluded.sales_batch_id,status=excluded.status,reversed_at=excluded.reversed_at,payload_json=excluded.payload_json,snapshot_hash=excluded.snapshot_hash':''}`).bind(scope.accountId,position,text(value.id),text(value.idempotencyKey),text(value.productKey),String(value.warehouseId??'').trim(),text(value.type),effectiveDate(value.businessDate??value.date),text(value.createdAt),text(value.sourceDocumentId),text(value.sourceLineId),text(value.salesBatchId),text(value.status),value.reversedAt?'reversed':null,JSON.stringify(payload),hash));
  return statements;
 }
-async function hydrate(row:{payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}):Promise<Row>{
+async function hydrate(row:{position?:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}):Promise<Row>{
  const value=JSON.parse(row.payload_json);if(!object(value))fail();
  if(row.snapshot_hash!==null){if(row.snapshot_json===null||Object.hasOwn(value,'recipeSnapshot')||await sha(row.snapshot_json)!==row.snapshot_hash)fail();value.recipeSnapshot=JSON.parse(row.snapshot_json);}
+ if(row.position!==undefined)positions.set(value,row.position);
  return value;
 }
 /** Keyset pagination: no OFFSET scan, and no unbounded HTTP history response. */
@@ -108,7 +112,7 @@ export async function journalReceiptFacts(db:D1Database,scope:JournalScope,produ
  AND product_key IN (${productKeys.map(()=>'?').join(',')})
  AND (status IS NULL OR status!='cancelled') AND reversed_at IS NULL
  AND effective_date IS NOT NULL ${date?'AND effective_date<=?':''}
- ) SELECT m.payload_json,m.snapshot_hash,s.snapshot_json FROM candidates m
+ ) SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json FROM candidates m
  LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash
  WHERE m.receipt_rank=1 ORDER BY m.position LIMIT 501`).bind(scope.accountId,...productKeys,...(date?[date]:[])).all<{payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}>();
  if(rows.results.length>500)throw Error('STOCK_JOURNAL_RECEIPT_FACTS_LIMIT');
@@ -148,7 +152,7 @@ export async function journalSelect(db:D1Database,scope:JournalScope,field:'id'|
  if(!Number.isSafeInteger(limit)||limit<1||limit>20001)fail();
  const j=await journalState(db,scope);if(!j||j.state!=='active')fail();
  const column={id:'m.movement_id',productKey:'m.product_key',sourceDocumentId:'m.source_document_id',salesBatchId:'m.sales_batch_id'}[field];
- const rows=await db.prepare(`SELECT m.payload_json,m.snapshot_hash,s.snapshot_json FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash WHERE m.account_id=? AND ${column}=? ORDER BY m.position LIMIT ?`).bind(scope.accountId,value,limit).all<{payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}>();
+ const rows=await db.prepare(`SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash WHERE m.account_id=? AND ${column}=? ORDER BY m.position LIMIT ?`).bind(scope.accountId,value,limit).all<{payload_json:string;snapshot_hash:string|null;snapshot_json:string|null}>();
  const current=await journalState(db,scope);if(!current||current.revision!==j.revision)throw new StoreWriteConflictError();return Promise.all(rows.results.map(hydrate));
 }
 /** Discard only unactivated staging after a changing legacy source. Canonical

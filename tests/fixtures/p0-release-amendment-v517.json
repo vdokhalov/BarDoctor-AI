@@ -456,7 +456,7 @@
     },
     "app/api/sales-batches/route.ts": {
       "before": "9f031e2d9a34193fca4aaabdfd8377d6ee2d6cb1a1198aee0d6cb113ee56af42",
-      "after": "c26be1e69d029ff81bbe4d86e19ff3ca5edcaa54f584088992a2b98969de59af"
+      "after": "cf28790ada5461103a9f021bbb3c882c14345c0e9c3c613b251b1ba60d0932b5"
     },
     "app/api/sales-events/route.ts": {
       "before": "b3e1db2693037263766a86724700b75cd75f0f32ad32d6c0c2b2e5cb57a112bc",
@@ -464,7 +464,7 @@
     },
     "app/api/sales/confirm/route.ts": {
       "before": "e6558a5d45fa92a13a62c9a4335ad55d22e5a74f310269041c2a0669c03b3c81",
-      "after": "392103311f62036c85d9a175f5348931a9c809a4248458598925b0428902e7b4"
+      "after": "7e73c94571546851c98cdfd5f297c639e280a11182b3a0110c2c37211dc1ea35"
     },
     "app/api/shifts/close/route.ts": {
       "before": "0ce4940977f9b706170ebe19634792517b177384901affe4ec87a74dca486fc7",
@@ -564,11 +564,11 @@
     },
     "lib/bardoctor/stock-journal.ts": {
       "before": null,
-      "after": "095f97b122594a9f00a9f8a3ebba458e106b6f32dd81f35a1f2bea375a615b08"
+      "after": "10f75fcb60cdf0799ed70e32716d1648679e63936e4eb6889e5894b05b60d22f"
     },
     "lib/bardoctor/stock-storage.ts": {
       "before": null,
-      "after": "032004ab630f34e0f03996f3a3743ec575e6c985b28928576dcf0266dd5adc5d"
+      "after": "11103ed767fcf33350353b8c08feb8d6e7d3e05414222ab0bb37e33cdb00d1b7"
     }
   }
 }

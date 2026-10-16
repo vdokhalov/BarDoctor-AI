@@ -1,5 +1,5 @@
 /** Explicit compatibility boundary. Raw CAS snapshots are never decoded or changed. */
-import {journalState,journalPage,appendJournalStatements,updateJournalStatements,JOURNAL_FORMAT,type JournalScope} from './stock-journal';
+import {journalState,journalPage,journalPosition,appendJournalStatements,updateJournalStatements,JOURNAL_FORMAT,type JournalScope} from './stock-journal';
 import {markNormalizedStockHistory,isNormalizedStockHistory} from './stock-retention';
 import {StoreWriteConflictError} from './store-cas';
 const saleRevisions=new WeakMap<object,number>();
@@ -31,28 +31,32 @@ export async function stockStoreStatements(db:D1Database,accountId:number,key:st
 }
 /** Hot-path output contains only receipt facts and a bounded command delta. */
 export async function saleStockStatements(db:D1Database,scope:JournalScope,revision:number,before:any[],after:any[]){
- const old=new Map(before.map(row=>[row.id,JSON.stringify(row)]));
+ const old=new Map(before.filter(row=>typeof row.id==='string'&&row.id).map(row=>[row.id,JSON.stringify(row)]));
+ const unidentified=new Set(before.filter(row=>typeof row.id!=='string'||!row.id).map(row=>JSON.stringify(row)));
  for(const row of after)if(old.has(row.id)&&old.get(row.id)!==JSON.stringify(row))throw Error('STOCK_JOURNAL_SALE_HISTORY_CHANGED');
- const additions=after.filter(row=>!old.has(row.id));
+ const additions=after.filter(row=>typeof row.id==='string'&&row.id?!old.has(row.id):!unidentified.has(JSON.stringify(row)));
+ if(additions.some(row=>typeof row.id!=='string'||!row.id))throw Error('STOCK_JOURNAL_SALE_HISTORY_CHANGED');
  const state=await journalState(db,scope);if(!state||state.revision!==revision)throw new StoreWriteConflictError();
  return appendJournalStatements(db,scope,revision,additions);
 }
 /** A sale reads latest receipt candidates for catalog products, never consumption history. */
-export async function readSaleStock(db:D1Database,accountId:number,raw:string|null|undefined,assortment:Record<string,unknown>,asOf:string,documents:string[]=[]){
+export async function readSaleStock(db:D1Database,accountId:number,raw:string|null|undefined,assortment:Record<string,unknown>,asOf:string,documents:string[]=[],valuationAsOf:string=asOf){
  const value=raw==null?[]:JSON.parse(raw);if(Array.isArray(value))return {movements:value,revision:null};
  if(!stockJournalMarker(value))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
  const {journalReceiptFacts,journalSelect}=await import('./stock-journal');const scope=await stockScope(db,accountId);
  const keys=[...new Set(['nomenclature','stockBalances'].flatMap(key=>Array.isArray(assortment[key])?(assortment[key] as any[]).map(row=>String(row.productKey??row.key??row.id??'')).filter(Boolean):[]))];
  const facts:any[]=[];
- for(let i=0;i<keys.length;i+=50)facts.push(...await journalReceiptFacts(db,scope,keys.slice(i,i+50),asOf,value.revision));
+ for(const date of new Set([asOf.slice(0,10),valuationAsOf.slice(0,10)]))
+  for(let i=0;i<keys.length;i+=50)facts.push(...await journalReceiptFacts(db,scope,keys.slice(i,i+50),date,value.revision));
  for(const id of documents){const rows=await journalSelect(db,scope,'salesBatchId',id,20001);if(rows.length>20000)throw Error('STOCK_JOURNAL_DOCUMENT_LIMIT');facts.push(...rows);}
  const current=await journalState(db,scope);if(!current||current.revision!==value.revision)throw new StoreWriteConflictError();
- const movements=markNormalizedStockHistory([...new Map(facts.map(row=>[row.id,row])).values()]);saleRevisions.set(movements,value.revision);return {movements,revision:value.revision};
+ const movements=markNormalizedStockHistory([...new Map(facts.map(row=>[journalPosition(row),row])).entries()].sort(([a],[b])=>a-b).map(([,row])=>row));saleRevisions.set(movements,value.revision);return {movements,revision:value.revision};
 }
 
 /** Partial sale facts must never masquerade as a complete legacy history array. */
 export function stockMovementResponse(before:any[],after:any[],changed=true){
  if(!isNormalizedStockHistory(before))return {stockMovements:after};
- const old=new Map(before.map(row=>[row.id,JSON.stringify(row)]));
- return {stockMovementDelta:{upserts:after.filter(row=>old.get(row.id)!==JSON.stringify(row)),revision:(saleRevisions.get(before)??0)+(changed?1:0),historyComplete:false,historyEndpoint:'/api/inventory/movements'}};
+ const old=new Map(before.filter(row=>typeof row.id==='string'&&row.id).map(row=>[row.id,JSON.stringify(row)]));
+ const unidentified=new Set(before.filter(row=>typeof row.id!=='string'||!row.id).map(row=>JSON.stringify(row)));
+ return {stockMovementDelta:{upserts:after.filter(row=>typeof row.id==='string'&&row.id?old.get(row.id)!==JSON.stringify(row):!unidentified.has(JSON.stringify(row))),revision:(saleRevisions.get(before)??0)+(changed?1:0),historyComplete:false,historyEndpoint:'/api/inventory/movements'}};
 }

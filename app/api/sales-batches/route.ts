@@ -63,7 +63,7 @@ function upsertStore(database: D1Database, accountId: number, key: string, value
   `).bind(accountId, key, JSON.stringify(value), now);
 }
 
-async function readStores(database: D1Database, accountId: number, batchId?:string, asOf?:string) {
+async function readStores(database: D1Database, accountId: number, batchId?:string, asOf?:string, now=new Date().toISOString()) {
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
     WHERE account_id = ? AND store_key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -83,7 +83,7 @@ async function readStores(database: D1Database, accountId: number, batchId?:stri
   const stores = new Map((result.results ?? []).map((row) => [row.store_key, row.data_json]));
   const batches=array(parse(stores.get(SALES_BATCH_STORE_KEY), []));
   const date=asOf || String(record(batches.find(value=>record(value).id===batchId)).businessDate || new Date().toISOString());
-  const stock=await readSaleStock(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY),record(parse(stores.get(ASSORTMENT_STORE_KEY),{})),date,batchId?[batchId]:[]);
+  const stock=await readSaleStock(database,accountId,stores.get(STOCK_MOVEMENT_STORE_KEY),record(parse(stores.get(ASSORTMENT_STORE_KEY),{})),date,batchId?[batchId]:[],now);
   return {
     batches: array(parse(stores.get(SALES_BATCH_STORE_KEY), [])),
     events: array(parse(stores.get(SALES_EVENT_STORE_KEY), [])),
@@ -288,7 +288,7 @@ async function postOnce(request: Request): Promise<Response> {
   const selectedBatchId=text(body.id??body.batchId);
   const requestedDate=text(record(body.draft??body.document).businessDate??body.businessDate);
   const costDate=action==='reverse'?now:requestedDate||(!selectedBatchId?venueDate(now,venueTimeFromJson(account.restaurantJson).timezone):undefined);
-  const stores = await readStores(database, account.id,selectedBatchId,costDate);
+  const stores = await readStores(database, account.id,selectedBatchId,costDate,now);
   const currentActor = actor(account);
 
   if (action === "map") {

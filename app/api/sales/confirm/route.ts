@@ -98,7 +98,7 @@ async function postOnce(request: Request): Promise<Response> {
   const mappings = array(stores.get(SALES_MAPPING_STORE_KEY));
   const routes = array(stores.get(SALES_WAREHOUSE_ROUTE_STORE_KEY));
   const assortment = parse(stores.get(ASSORTMENT_STORE_KEY), {});
-  const stockMovements = (await readSaleStock(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY),record(assortment),document.date)).movements;
+  const stockMovements = (await readSaleStock(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY),record(assortment),document.date,[],now)).movements;
   const warehouses = array(stores.get(WAREHOUSE_STORE_KEY));
   const revenues = array(stores.get(REVENUE_STORE_KEY));
   const closed = closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null));
