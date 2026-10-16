@@ -97,9 +97,9 @@ async function command(request: Request): Promise<Response> {
     const statements:D1PreparedStatement[]=[];
     for(const [key,value] of updates){
       statements.push(...(key===SALES_EVENT_STORE_KEY&&eventRevision!==null
-        ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,context.events,value as any[])
+        ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,context.events,value as typeof context.events)
         :key==='bd_stock_movements'&&stockRevision!==null
-        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,context.movements,value as any[])
+        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,context.movements,value as typeof context.movements)
         :await stockStoreStatements(db,account.id,key,value,context.now)));
     }
     const shift = context.revenues.find(row => row.id === plan.order.shiftId && row.venueId === context.venueId);

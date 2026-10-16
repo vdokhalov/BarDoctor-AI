@@ -149,13 +149,13 @@ async function command(request:Request):Promise<Response> {
     const statements:D1PreparedStatement[]=[];
     for(const [key,value] of updates){
       statements.push(...(key===SALES_EVENT_STORE_KEY&&eventRevision!==null
-        ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,c.events,value as any[])
+        ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,c.events,value as typeof c.events)
         :key==='bd_stock_movements'&&stockRevision!==null
-        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,c.movements,value as any[])
+        ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,c.movements,value as typeof c.movements)
         :await stockStoreStatements(db,account.id,key,value,c.now)));
     }
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
-      VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",accountingMonth,JSON.stringify(eventRevision!==null?{action:body.action,eventId:(result as any).event?.id,status:(result as any).event?.status,revenue:(result as any).event?.revenue,revision:eventRevision+1}:result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
+      VALUES (?,?,?,?,?,?,NULL,?,?,?,?,?,?)`).bind(account.id,SALES_EVENT_STORE_KEY,body.action,body.command?.id ?? body.eventId ?? body.shiftId,"Продажи и смены",accountingMonth,JSON.stringify(eventRevision!==null?{action:body.action,eventId:(result as {event?: {id:string;status:string;revenue:number}}).event?.id,status:(result as {event?: {id:string;status:string;revenue:number}}).event?.status,revenue:(result as {event?: {id:string;status:string;revenue:number}}).event?.revenue,revision:eventRevision+1}:result),'["status","revenue","movements"]',c.actor.name,c.actor.role,"Подтверждённая операция",c.now));
     statements.unshift(posMembershipGuard(db,account,c.now));
     await runStoreCasBatch(db,account.id,snapshots,statements,c.now);
     return reply(result,201);

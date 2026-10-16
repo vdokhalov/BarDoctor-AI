@@ -1,3 +1,4 @@
+import type {SalesEvent} from './sales-events';
 /** QA3389 only. Operator steps are bounded; pausing never expires implicitly. */
 import {copyLegacyJournal,activateJournal,journalState,journalPage,restartLegacyJournal} from './stock-journal';
 import {copyLegacySalesEvents,activateSalesEvents,salesEventState,salesEventPage,restartLegacySalesEvents} from './sales-event-storage';
@@ -54,10 +55,10 @@ async function verify(db:D1Database,scope:Scope,backup:Backup){
  if(stableSalesValue(restored)!==stableSalesValue(backup.source))fail('SOURCE_CHANGED');
  // Verify the canonical incremental totals before opening writes.
  const totals=(await db.prepare('SELECT revenue_row_id,currency,cents,receipts FROM sales_event_totals WHERE account_id=? ORDER BY revenue_row_id').bind(scope.accountId).all<{revenue_row_id:string;currency:string;cents:number;receipts:number}>()).results;
- const projected=new Map<string,{currency:string;cents:number;receipts:number}>();for(const e of sales as any[]){const p=projected.get(e.revenueRowId)??{currency:e.currency,cents:0,receipts:0};if(p.currency!==e.currency)fail('REVENUE_MISMATCH');if(e.status==='POSTED'){p.cents+=Math.round(e.revenue*100);p.receipts++;}projected.set(e.revenueRowId,p);}
+ const projected=new Map<string,{currency:string;cents:number;receipts:number}>();for(const e of sales as SalesEvent[]){const p=projected.get(e.revenueRowId)??{currency:e.currency,cents:0,receipts:0};if(p.currency!==e.currency)fail('REVENUE_MISMATCH');if(e.status==='POSTED'){p.cents+=Math.round(e.revenue*100);p.receipts++;}projected.set(e.revenueRowId,p);}
  if(totals.length!==projected.size||totals.some(t=>stableSalesValue({currency:t.currency,cents:t.cents,receipts:t.receipts})!==stableSalesValue(projected.get(t.revenue_row_id))))fail('REVENUE_MISMATCH');
  const revenues=JSON.parse(backup.required.bd_finance_revenue??'[]');if(!Array.isArray(revenues))fail('REVENUE_MISMATCH');
- for(const [id,t] of projected){const rows=revenues.filter((r:any)=>r.id===id&&r.venueId===scope.venueId);if(rows.length!==1||rows[0].revenueSource!=='sales_events_v1'||rows[0].currency!==t.currency||Math.round(rows[0].revenue*100)!==t.cents||rows[0].receipts!==t.receipts)fail('REVENUE_MISMATCH');}
+ for(const [id,t] of projected){const rows=revenues.filter((r:{id:unknown;venueId:unknown})=>r.id===id&&r.venueId===scope.venueId);if(rows.length!==1||rows[0].revenueSource!=='sales_events_v1'||rows[0].currency!==t.currency||Math.round(rows[0].revenue*100)!==t.cents||rows[0].receipts!==t.receipts)fail('REVENUE_MISMATCH');}
  for(const row of revenues)if(row.venueId===scope.venueId&&row.revenueSource==='sales_events_v1'&&!projected.has(row.id)&&(row.revenue!==0||row.receipts!==0))fail('REVENUE_MISMATCH');
  return current;
 }

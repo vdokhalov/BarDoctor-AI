@@ -280,7 +280,7 @@ async function postOnce(request: Request): Promise<Response> {
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  let stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
+  let stockMovements: Record<string,unknown>[] = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   // Return persisted results before checking today's nomenclature/templates.
   // A retry must not reinterpret an already committed receipt or run repairs.
   const persistedDuplicate = documents.find((item) => {

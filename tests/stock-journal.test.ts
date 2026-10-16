@@ -4,7 +4,7 @@ const exportPath=process.env.BD_STOCK_EXPORT;
 async function setup(values:unknown[]){
  const r=await lifecycleRuntime({journal:'./lib/bardoctor/stock-journal',database:'./db'});const owner=await r.register('journal@isolated.test');
  const scope={accountId:owner.userId,venueId:owner.activeVenueId};
- const db=(r.api.database as any).getD1() as D1Database,journal=r.api.journal as unknown as typeof import('../lib/bardoctor/stock-journal');
+ const db=(r.api.database as unknown as typeof import('../db')).getD1() as D1Database,journal=r.api.journal as unknown as typeof import('../lib/bardoctor/stock-journal');
  r.sqlite.prepare("INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,'bd_stock_movements',?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json").run(scope.accountId,JSON.stringify(values));
  return {r,scope,db,journal};
 }

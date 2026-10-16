@@ -1,3 +1,4 @@
+import type {StockMovement} from './inventory';
 /** Explicit compatibility boundary. Raw CAS snapshots are never decoded or changed. */
 import {journalState,journalPage,journalPosition,appendJournalStatements,updateJournalStatements,JOURNAL_FORMAT,type JournalScope} from './stock-journal';
 import {markNormalizedStockHistory,isNormalizedStockHistory} from './stock-retention';
@@ -12,13 +13,13 @@ export async function stockScope(db:D1Database,accountId:number):Promise<Journal
  if(!venue)throw Error('STOCK_JOURNAL_NEEDS_REVIEW');return {accountId,venueId:venue.id};
 }
 /** Full reads are explicit for reconciliation/export; live sales use receipt and document queries. */
-export async function readStockHistory(db:D1Database,accountId:number,raw:string|null|undefined,limits:{rows?:number;bytes?:number}={}):Promise<any[]>{
+export async function readStockHistory(db:D1Database,accountId:number,raw:string|null|undefined,limits:{rows?:number;bytes?:number}={}):Promise<StockMovement[]>{
  const value=raw==null?[]:JSON.parse(raw);
  if(Array.isArray(value))return value;
  if(!stockJournalMarker(value)||!Number.isSafeInteger(value.revision))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
- const scope=await stockScope(db,accountId),items:any[]=[];let cursor:number|null=null,bytes=2;
+ const scope=await stockScope(db,accountId),items:Record<string,unknown>[]=[];let cursor:number|null=null,bytes=2;
  do{const page=await journalPage(db,scope,cursor,500,value.revision);items.push(...page.items);bytes+=new TextEncoder().encode(JSON.stringify(page.items)).length;if(items.length>(limits.rows??Infinity)||bytes>(limits.bytes??Infinity))throw Error("STOCK_JOURNAL_READ_LIMIT");cursor=page.next;}while(cursor!==null);
- return markNormalizedStockHistory(items);
+ return markNormalizedStockHistory(items) as StockMovement[];
 }
 /** Only actual changed rows are written; historical omissions never delete evidence. */
 export async function stockStoreStatements(db:D1Database,accountId:number,key:string,value:unknown,now:string):Promise<D1PreparedStatement[]>{
@@ -30,7 +31,7 @@ export async function stockStoreStatements(db:D1Database,accountId:number,key:st
  return updateJournalStatements(db,await stockScope(db,accountId),stored.revision,value);
 }
 /** Hot-path output contains only receipt facts and a bounded command delta. */
-export async function saleStockStatements(db:D1Database,scope:JournalScope,revision:number,before:any[],after:any[]){
+export async function saleStockStatements(db:D1Database,scope:JournalScope,revision:number,before:Record<string,unknown>[],after:Record<string,unknown>[]){
  const old=new Map(before.filter(row=>typeof row.id==='string'&&row.id).map(row=>[row.id,JSON.stringify(row)]));
  const unidentified=new Set(before.filter(row=>typeof row.id!=='string'||!row.id).map(row=>JSON.stringify(row)));
  for(const row of after)if(old.has(row.id)&&old.get(row.id)!==JSON.stringify(row))throw Error('STOCK_JOURNAL_SALE_HISTORY_CHANGED');
@@ -44,17 +45,17 @@ export async function readSaleStock(db:D1Database,accountId:number,raw:string|nu
  const value=raw==null?[]:JSON.parse(raw);if(Array.isArray(value))return {movements:value,revision:null};
  if(!stockJournalMarker(value))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
  const {journalReceiptFacts,journalSelect}=await import('./stock-journal');const scope=await stockScope(db,accountId);
- const keys=[...new Set(['nomenclature','stockBalances'].flatMap(key=>Array.isArray(assortment[key])?(assortment[key] as any[]).map(row=>String(row.productKey??row.key??row.id??'')).filter(Boolean):[]))];
- const facts:any[]=[];
+ const keys=[...new Set(['nomenclature','stockBalances'].flatMap(key=>Array.isArray(assortment[key])?(assortment[key] as Record<string,unknown>[]).map(row=>String(row.productKey??row.key??row.id??'')).filter(Boolean):[]))];
+ const facts:Record<string,unknown>[]=[];
  for(const date of new Set([asOf.slice(0,10),valuationAsOf.slice(0,10)]))
   for(let i=0;i<keys.length;i+=50)facts.push(...await journalReceiptFacts(db,scope,keys.slice(i,i+50),date,value.revision));
  for(const id of documents){const rows=await journalSelect(db,scope,'salesBatchId',id,20001);if(rows.length>20000)throw Error('STOCK_JOURNAL_DOCUMENT_LIMIT');facts.push(...rows);}
  const current=await journalState(db,scope);if(!current||current.revision!==value.revision)throw new StoreWriteConflictError();
- const movements=markNormalizedStockHistory([...new Map(facts.map(row=>[journalPosition(row),row])).entries()].sort(([a],[b])=>a-b).map(([,row])=>row));saleRevisions.set(movements,value.revision);return {movements,revision:value.revision};
+ const movements=markNormalizedStockHistory([...new Map(facts.map(row=>[journalPosition(row),row])).entries()].sort(([a],[b])=>a-b).map(([,row])=>row));saleRevisions.set(movements,value.revision);return {movements:movements as StockMovement[],revision:value.revision};
 }
 
 /** Partial sale facts must never masquerade as a complete legacy history array. */
-export function stockMovementResponse(before:any[],after:any[],changed=true){
+export function stockMovementResponse(before:Record<string,unknown>[],after:Record<string,unknown>[],changed=true){
  if(!isNormalizedStockHistory(before))return {stockMovements:after};
  const old=new Map(before.filter(row=>typeof row.id==='string'&&row.id).map(row=>[row.id,JSON.stringify(row)]));
  const unidentified=new Set(before.filter(row=>typeof row.id!=='string'||!row.id).map(row=>JSON.stringify(row)));

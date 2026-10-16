@@ -204,7 +204,7 @@ async function postOnce(request: Request): Promise<Response> {
   const suppliers = array(stores.get(SUPPLIER_STORE_KEY));
   let expenses = array(stores.get(EXPENSE_STORE_KEY));
   let assortment = json(stores.get(ASSORTMENT_STORE_KEY), {});
-  let stockMovements = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
+  let stockMovements: Record<string,unknown>[] = (await readStockHistory(database,account.id,stores.get(STOCK_MOVEMENT_STORE_KEY)));
   const conversion = preparePurchaseConversions({ ...document, venueId: account.venueId }, body.document, assortment);
   if (!conversion.ok) return Response.json(conversion, { status: 422 });
   document = conversion.document;
