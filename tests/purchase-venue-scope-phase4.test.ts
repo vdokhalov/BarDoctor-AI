@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { stripTypeScriptTypes } from "node:module";
+import { readStockHistory, stockStoreStatements } from "../lib/bardoctor/stock-storage";
 import * as inventory from "../lib/bardoctor/inventory";
 import * as purchases from "../lib/bardoctor/purchases";
 import { resolveCostBasis } from "../lib/bardoctor/cost-basis";
@@ -111,6 +112,7 @@ for (const action of ["confirm", "update", "repost"]) {
       let consolidations = 0;
       let reads = 0;
       const dependencies = {
+        readStockHistory, stockStoreStatements,
         ...inventory, ...purchases, purchaseVenueScopeIssue,
         INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots",
         INVOICE_MAPPING_STORE_KEY: "bd_invoice_mappings",
@@ -164,6 +166,7 @@ for (const action of ["confirm", "update"]) {
     let mutations = 0;
     const forbidden = () => { mutations++; throw new Error("Conversion must reject before mutations"); };
     const dependencies = { ...inventory, ...purchases, purchaseVenueScopeIssue, preparePurchaseConversions,
+      readStockHistory, stockStoreStatements,
       INVENTORY_SNAPSHOT_STORE_KEY: "bd_inventory_snapshots", INVOICE_MAPPING_STORE_KEY: "bd_invoice_mappings",
       authenticateRequest: async () => ({ id: 1, venueId: 1, role: "owner" }), hasPermission: () => true,
       accountingCurrencyFromRestaurantJson: () => "RUB", readStoreSnapshots: async () => [],
