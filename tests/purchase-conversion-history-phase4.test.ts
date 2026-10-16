@@ -1,4 +1,5 @@
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../lib/bardoctor/store-cas";
+import { readStockHistory, stockStoreStatements } from "../lib/bardoctor/stock-storage";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -128,6 +129,7 @@ test("repair HTTP command returns controlled review before any database write or
   const dependencies = {
     ...inventory,
     readStoreSnapshots, runStoreCasBatch, withStoreCasRetries,
+    readStockHistory, stockStoreStatements,
     PURCHASE_STORE_KEY: "bd_purchase_documents",
     authenticateRequest: async () => ({ id: 1, venueId: 1, role: "owner", appEmail: "test@example.test" }),
     hasPermission: () => true,
