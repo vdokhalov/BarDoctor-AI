@@ -19,6 +19,7 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+node "${script_dir}/patch-splash-v529.mjs" --restore
 node "${script_dir}/patch-warehouse-document.mjs" --restore
 node "${script_dir}/patch-curated-doctor-phase4c.mjs" --restore
 node "${script_dir}/patch-management-actions-phase4b.mjs" --restore
@@ -120,6 +121,7 @@ node "${script_dir}/patch-management-cost-phase4a.mjs"
 node "${script_dir}/patch-management-actions-phase4b.mjs"
 node "${script_dir}/patch-curated-doctor-phase4c.mjs"
 node "${script_dir}/patch-warehouse-document.mjs"
+node "${script_dir}/patch-splash-v529.mjs"
 node "${script_dir}/prepare-versioned-client-asset-v379.mjs"
 timeout \
   --signal=TERM \
@@ -128,6 +130,7 @@ timeout \
   "${vinext}" build
 
 node "${script_dir}/restore-canonical-client-asset-name-v379.mjs"
+node "${script_dir}/patch-splash-v529.mjs" --restore
 node "${script_dir}/patch-warehouse-document.mjs" --restore
 node "${script_dir}/patch-curated-doctor-phase4c.mjs" --restore
 node "${script_dir}/patch-management-actions-phase4b.mjs" --restore
@@ -265,6 +268,7 @@ node "${script_dir}/patch-recipe-ingredient-v511.mjs"
 node "${script_dir}/patch-qa-audit-v513.mjs"
 node "${script_dir}/patch-warehouse-document.mjs"
 node "${script_dir}/finalize-versioned-client-asset-v385.mjs"
+node "${script_dir}/patch-splash-v529.mjs"
 node "${script_dir}/verify-versioned-client-asset-v379.mjs"
 node "${script_dir}/verify-monthly-navigation-artifact-v518.mjs"
 "${script_dir}/validate-artifact.sh"

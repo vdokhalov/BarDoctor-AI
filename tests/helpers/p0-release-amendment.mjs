@@ -24,7 +24,24 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Approved QA3389 owner-only migration UI (2026-10-16).
 // Approved normalized report validation and preliminary payroll release (2026-10-16).
 // Approved document-only warehouse reader and scoped publication (2026-10-16).
+// Owner-approved selected splash presentation only; save without publication (2026-10-17).
 export const p0Paths=Object.freeze([
+ "public/app.html",
+ "scripts/patch-splash-v529.mjs",
+ "scripts/capture-splash-v529.mjs",
+ "public/icons/bardoctor-launch-320x568-2x-v529.png",
+ "public/icons/bardoctor-launch-375x667-2x-v529.png",
+ "public/icons/bardoctor-launch-375x812-3x-v529.png",
+ "public/icons/bardoctor-launch-390x844-3x-v529.png",
+ "public/icons/bardoctor-launch-393x852-3x-v529.png",
+ "public/icons/bardoctor-launch-402x874-3x-v529.png",
+ "public/icons/bardoctor-launch-414x736-3x-v529.png",
+ "public/icons/bardoctor-launch-414x896-2x-v529.png",
+ "public/icons/bardoctor-launch-414x896-3x-v529.png",
+ "public/icons/bardoctor-launch-428x926-3x-v529.png",
+ "public/icons/bardoctor-launch-430x932-3x-v529.png",
+ "public/icons/bardoctor-launch-440x956-3x-v529.png",
+ "public/icons/bardoctor-splash-reference-v529.png",
  "lib/bardoctor/client/warehouse-document.tsx",
  "package.json",
  "scripts/build-verified.sh",

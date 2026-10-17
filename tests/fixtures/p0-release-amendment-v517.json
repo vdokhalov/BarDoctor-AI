@@ -340,7 +340,7 @@
     },
     "app/bar-doctor-response.ts": {
       "before": "8253f8be1bd1fb3ef3371dde5463a9681ff6c78529f6a45e2bfe47a3a66c766e",
-      "after": "f4b5d1f787b59485ca80b189b6bc65fae0df602a998c52ab342efc3d05f17202"
+      "after": "85805e4c0592a1113a698cb9ff052e59f4a86e161e1bb6cbe99252d7e361d3c5"
     },
     "drizzle/0028_staff_pin_revocation.sql": {
       "before": null,
@@ -648,15 +648,79 @@
     },
     "package.json": {
       "before": "ef820f478050259325486ea5d7f39b0f6ca660cd6d70db3398f15218f2ed5005",
-      "after": "6496a46e2a5ee3ae3b81e5f29e18adf73f5aa9659f87694b7e9632e44a57bf46"
+      "after": "c072d7b030ca44951901a80e468a568988d7c042bafb872909a76a392a62d9ca"
     },
     "scripts/build-verified.sh": {
       "before": "39591fbe86f1a7ea60977d3676e2956b436908e4724f9ac9fe8ae3437a1582d4",
-      "after": "ddb7ee075f7b1fc78803a02ddce36743d2d6c40f4878223a26781309879bcaf9"
+      "after": "84d8ce7d60675c65cf96e163320201f0930e6636247cbf5e8f6e191fdeaac8d6"
     },
     "scripts/patch-warehouse-document.mjs": {
       "before": null,
       "after": "e571506fda1c8548521c62c84b81d0e755827de4101494bf85ce7440e7d64f9f"
+    },
+    "scripts/patch-splash-v529.mjs": {
+      "before": null,
+      "after": "0088105c8f8f96762917be6f50efd54b85704aa5d89742271f0e45803c619ded"
+    },
+    "scripts/capture-splash-v529.mjs": {
+      "before": null,
+      "after": "b1115c72e2215863d602a3af0c4b73a0f1fb81fd1b07b61a30c55824d95b8f31"
+    },
+    "public/icons/bardoctor-launch-320x568-2x-v529.png": {
+      "before": null,
+      "after": "aad685687301e4c7881496a788c0317f408125bfe5c7aca3a359e5946ef2fd83"
+    },
+    "public/icons/bardoctor-launch-375x667-2x-v529.png": {
+      "before": null,
+      "after": "6f40357e518057bb92ca9eeb545d56f27bf6d6fec293d1a842e50ac4f1edfa59"
+    },
+    "public/icons/bardoctor-launch-375x812-3x-v529.png": {
+      "before": null,
+      "after": "de9a1c9337846e289d4e17e71c5ddfc8abe52468f3c31156b3acdd0b4f3604be"
+    },
+    "public/icons/bardoctor-launch-390x844-3x-v529.png": {
+      "before": null,
+      "after": "6f3f2281f725ccbc409065c060aa0f8c9a0b6ff9f7a5649ac95f718f78b3f876"
+    },
+    "public/icons/bardoctor-launch-393x852-3x-v529.png": {
+      "before": null,
+      "after": "f9d845a8d199d46846be5305867565884f93c7e838895db370bbf7c41d4bcfdb"
+    },
+    "public/icons/bardoctor-launch-402x874-3x-v529.png": {
+      "before": null,
+      "after": "38f3df9dbe41a0a675721e3bd37e6ac6ef8964171586910331d760bc784c6bb8"
+    },
+    "public/icons/bardoctor-launch-414x736-3x-v529.png": {
+      "before": null,
+      "after": "381a259b2bcfb4beeafe330f37f7b24d5d57c60fbfdbce993f66324afc893f86"
+    },
+    "public/icons/bardoctor-launch-414x896-2x-v529.png": {
+      "before": null,
+      "after": "870f596027c83fc584a2226c92bfe7960cef3ff12e472165f19f8c2ecfa619cc"
+    },
+    "public/icons/bardoctor-launch-414x896-3x-v529.png": {
+      "before": null,
+      "after": "9cd561d84f62cd62398d891faedabe3118da9265616b5a223e6ebbffd584fa44"
+    },
+    "public/icons/bardoctor-launch-428x926-3x-v529.png": {
+      "before": null,
+      "after": "ac5595003a4c746b1103846f48a6306a512da6023357161cba5fb52ef9af419d"
+    },
+    "public/icons/bardoctor-launch-430x932-3x-v529.png": {
+      "before": null,
+      "after": "16399135ae59db8804470bd5853ce5b071b12cbdd3fc1381bd495b3afd6543f7"
+    },
+    "public/icons/bardoctor-launch-440x956-3x-v529.png": {
+      "before": null,
+      "after": "bab2b6eaeb590826c77560f01c10f89983e85b2673387c4bb9721ded2ea954d9"
+    },
+    "public/icons/bardoctor-splash-reference-v529.png": {
+      "before": null,
+      "after": "edf13fdecba6ddbe78f879d1c8c3fdd9c3b0c9a0d7f01e5513a47cec9a23f5e8"
+    },
+    "public/app.html": {
+      "before": "a7116916269940c4f4f96f54ad40f2ad836d9b0a5c1ab45def0c38fc4887f7f7",
+      "after": "22ce2dae63892bd1f6141070ddb956a863f82c244b3edb8c5cadb5584acb7a14"
     }
   }
 }

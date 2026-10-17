@@ -88,3 +88,17 @@ final result: passed
 - P3: physical iPhone, physical Android, and real on-screen-keyboard validation remain outside this local environment and are reported as unverified.
 
 final result: passed
+
+# Splash v529 design QA
+
+Selected source: Library libfile_f5a7adc22dec819180235c8ed1e3fa09, exec-dadd5421-5e54-49c0-b9b8-f3f77738588f.png (853×1844). Materialized and visually inspected before edits. Supplied artwork is retained verbatim; no regenerated logo or substituted lettering.
+
+Local browser visual comparison: source and final screenshots inspected at 853×1844 and mobile 320×568 / 390×844. Cobalt background, original gradient mark, white BarDoctor and receipt–chart–glass artwork retained; no visible slogan. Fixed an antialiased seam between image layers by overlapping their background edges. Short mobile screens crop background margins, preserving logo and complete lower symbols. Wide screens center the portrait artwork on cobalt.
+
+Motion: brand fade 550ms, lower illustration reveal 850ms, no loop. Reduced-motion and standalone use the complete still. Existing pending flag/removal owns lifetime; no animation event, timeout, auth or business-data changes. Accessible loading status retained.
+
+Scoped browser checks: splash at 320×568,390×844,430×932,1280×720; reduced motion; no overflow; pending flag removal hides immediately. Existing real-client Home/root session handoff and anonymous/login interaction tests passed at mobile and desktop. Production owner browser was not accessed. Native iOS launch behavior is not device-verified; 12 matching raster assets were generated locally.
+
+final result: passed
+
+This is local visual/functional verification under the explicitly requested scoped workflow, not production verification. Save-only; release approval pending.

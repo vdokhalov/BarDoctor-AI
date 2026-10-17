@@ -18,9 +18,9 @@ test('v517 amendment pins exact files, baseline and bytes; rejects additional or
  assert.throws(()=>p0Amendment({paths:[...paths,'app/api/unapproved/route.ts']}));
  assert.throws(()=>p0Amendment({paths:paths.filter(path=>path!=='lib/bardoctor/auth.ts')}));
 });
-test('v517 scripts and dependencies retain all bytes except the exact approved warehouse prebuild restore',()=>{
+test('v517 scripts and dependencies retain all bytes except the exact approved warehouse and splash prebuild restores',()=>{
  const baselinePackage=execFileSync('git',['show',p0Baseline+':package.json'],{encoding:'utf8',maxBuffer:8*1024*1024});
- const approvedPackage=baselinePackage.replace('"prebuild": "','"prebuild": "node scripts/patch-warehouse-document.mjs --restore && ');
+ const approvedPackage=baselinePackage.replace('"prebuild": "','"prebuild": "node scripts/patch-splash-v529.mjs --restore && node scripts/patch-warehouse-document.mjs --restore && ');
  assert.equal(readFileSync('package.json','utf8'),approvedPackage);
  assert.deepEqual(readFileSync('package-lock.json'),execFileSync('git',['show',p0Baseline+':package-lock.json'],{maxBuffer:8*1024*1024}));
 });

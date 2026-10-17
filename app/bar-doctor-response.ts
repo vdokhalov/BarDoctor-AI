@@ -6,36 +6,36 @@ const BAR_DOCTOR_HTML = `<!doctype html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-320x568-2x-v394.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-375x667-2x-v394.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x736-3x-v394.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-375x812-3x-v394.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x896-2x-v394.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x896-3x-v394.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-390x844-3x-v394.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-428x926-3x-v394.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-393x852-3x-v394.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-430x932-3x-v394.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-402x874-3x-v394.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
-    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-440x956-3x-v394.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-320x568-2x-v529.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-375x667-2x-v529.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x736-3x-v529.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-375x812-3x-v529.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x896-2x-v529.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-414x896-3x-v529.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-390x844-3x-v529.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-428x926-3x-v529.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-393x852-3x-v529.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-430x932-3x-v529.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-402x874-3x-v529.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/icons/bardoctor-launch-440x956-3x-v529.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <script>
       (function () {
         var path = window.location.pathname;
         if (path.length > 1 && path.endsWith("/")) path = path.slice(0, -1);
         /* bd-native-continuity-v396 */
         var bdLaunchImagesV396 = {
-          "320x568x2": "/icons/bardoctor-launch-320x568-2x-v394.png",
-          "375x667x2": "/icons/bardoctor-launch-375x667-2x-v394.png",
-          "414x736x3": "/icons/bardoctor-launch-414x736-3x-v394.png",
-          "375x812x3": "/icons/bardoctor-launch-375x812-3x-v394.png",
-          "414x896x2": "/icons/bardoctor-launch-414x896-2x-v394.png",
-          "414x896x3": "/icons/bardoctor-launch-414x896-3x-v394.png",
-          "390x844x3": "/icons/bardoctor-launch-390x844-3x-v394.png",
-          "428x926x3": "/icons/bardoctor-launch-428x926-3x-v394.png",
-          "393x852x3": "/icons/bardoctor-launch-393x852-3x-v394.png",
-          "430x932x3": "/icons/bardoctor-launch-430x932-3x-v394.png",
-          "402x874x3": "/icons/bardoctor-launch-402x874-3x-v394.png",
-          "440x956x3": "/icons/bardoctor-launch-440x956-3x-v394.png"
+          "320x568x2": "/icons/bardoctor-launch-320x568-2x-v529.png",
+          "375x667x2": "/icons/bardoctor-launch-375x667-2x-v529.png",
+          "414x736x3": "/icons/bardoctor-launch-414x736-3x-v529.png",
+          "375x812x3": "/icons/bardoctor-launch-375x812-3x-v529.png",
+          "414x896x2": "/icons/bardoctor-launch-414x896-2x-v529.png",
+          "414x896x3": "/icons/bardoctor-launch-414x896-3x-v529.png",
+          "390x844x3": "/icons/bardoctor-launch-390x844-3x-v529.png",
+          "428x926x3": "/icons/bardoctor-launch-428x926-3x-v529.png",
+          "393x852x3": "/icons/bardoctor-launch-393x852-3x-v529.png",
+          "430x932x3": "/icons/bardoctor-launch-430x932-3x-v529.png",
+          "402x874x3": "/icons/bardoctor-launch-402x874-3x-v529.png",
+          "440x956x3": "/icons/bardoctor-launch-440x956-3x-v529.png"
         };
         var bdLaunchKeyV396 = [Math.round(screen.width), Math.round(screen.height), Math.round(devicePixelRatio || 1)].join("x");
         var bdLaunchImageV396 = bdLaunchImagesV396[bdLaunchKeyV396];
@@ -166,84 +166,84 @@ const BAR_DOCTOR_HTML = `<!doctype html>
       @media (device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-320x568-2x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-320x568-2x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-375x667-2x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-375x667-2x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-414x736-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-414x736-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-375x812-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-375x812-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-414x896-2x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-414x896-2x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-414x896-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-414x896-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-390x844-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-390x844-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-428x926-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-428x926-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-393x852-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-393x852-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-430x932-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-430x932-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-402x874-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-402x874-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
       @media (device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait) {
         .bd-unified-splash-v394 {
           padding: 0;
-          background: #070911 url("/icons/bardoctor-launch-440x956-3x-v394.png") center / 100% 100% no-repeat;
+          background: #070911 url("/icons/bardoctor-launch-440x956-3x-v529.png") center / 100% 100% no-repeat;
         }
         .bd-unified-splash-content-v394 { visibility: hidden; }
       }
@@ -348,9 +348,27 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
     <script src="/staff-login-entry.js?v=staff-login-1" defer></script>
-  </head>
+  <!-- splash-v529:head --><link rel="preload" as="image" href="/icons/bardoctor-splash-reference-v529.png" /><style>
+html[data-bd-startup-pending="v201"],html[data-bd-startup-pending="v201"] body,html[data-bd-startup-pending="v201"] #root {background:#0733aa !important;}
+html .bd-static-startup-v201.bd-unified-splash-v394 {background:#0733aa !important;padding:0 !important;}
+html .bd-unified-splash-content-v394 {display:none !important;visibility:hidden !important;}
+html .bd-unified-splash-tagline-v394 {display:none !important;}
+.bd-splash-art-v529 {position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+.bd-splash-art-stage-v529 {position:absolute;left:50%;top:50%;width:max(100vw,calc(100dvh * 853 / 1844));height:max(100dvh,calc(100vw * 1844 / 853));transform:translate(-50%,-50%);}
+.bd-splash-art-stage-v529 img {position:absolute;inset:0;width:100%;height:100%;display:block;}
+.bd-splash-static-v529 {clip-path:polygon(0 0,100% 0,100% 30.1%,0 30.1%,0 51.9%,100% 51.9%,100% 61.1%,0 61.1%,0 84.9%,100% 84.9%,100% 100%,0 100%);}
+.bd-splash-brand-v529 {clip-path:inset(30% 0 48%);animation:bd-splash-brand-v529 550ms ease-out both;}
+.bd-splash-line-v529 {clip-path:inset(61% 0 15%);animation:bd-splash-line-v529 850ms ease-out both;}
+@keyframes bd-splash-brand-v529 {from {opacity:0;}to {opacity:1;}}
+@keyframes bd-splash-line-v529 {from {clip-path:inset(61% 100% 15% 0);}to {clip-path:inset(61% 0 15% 0);}}
+@media (min-aspect-ratio:3/4) {.bd-splash-art-stage-v529 {width:calc(100dvh * 853 / 1844);height:100dvh;}}
+@media (prefers-reduced-motion:reduce) {.bd-splash-art-stage-v529 img {animation:none;}}
+/* Native iOS starts with the same complete still: do not replay an entrance over it. */
+@media (display-mode:standalone) {.bd-splash-art-stage-v529 img {animation:none;}}
+</style><!-- /splash-v529:head -->
+</head>
   <body>
-    <div class="bd-static-startup-v201 bd-unified-splash-v394" data-bd-static-startup="v201" data-bd-stable-splash="v394" data-bd-single-splash="v395" data-bd-native-continuity="v396" data-bd-native-fullscreen-raster="v398" data-bd-shell-first-startup="v397" role="status" aria-label="BarDoctor загружается">
+    <div class="bd-static-startup-v201 bd-unified-splash-v394" data-bd-static-startup="v201" data-bd-stable-splash="v394" data-bd-single-splash="v395" data-bd-native-continuity="v396" data-bd-native-fullscreen-raster="v398" data-bd-shell-first-startup="v397" role="status" aria-label="BarDoctor загружается"><!-- splash-v529:art --><div class="bd-splash-art-v529" aria-hidden="true"><div class="bd-splash-art-stage-v529"><img class="bd-splash-static-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-brand-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-line-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /></div></div><!-- /splash-v529:art -->
       <div class="bd-unified-splash-content-v394">
         <img class="bd-unified-splash-mark-v394" src="/icons/bardoctor-mark-v159.svg" alt="" width="100" height="100" aria-hidden="true" />
         <h1 class="bd-unified-splash-brand-v394">BarDoctor</h1>

@@ -1,0 +1,24 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {createRequire} from 'node:module';import {chromium} from 'playwright-core';import {execFileSync} from 'node:child_process';
+const {resolveBrowserExecutable,chromiumArgs}=createRequire(import.meta.url)('../scripts/browser-runtime.cjs');
+test('splash is accessible, responsive, static under reduced motion and never gates handoff on animation',async()=>{
+ const browser=await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});
+ try{for(const [width,height,reducedMotion] of [[320,568,'reduce'],[390,844,'no-preference'],[430,932,'reduce'],[1280,720,'reduce']]){
+  const page=await browser.newPage({viewport:{width,height},reducedMotion});
+  await page.route('**/*',route=>{const u=new URL(route.request().url());assert.equal(u.origin,'http://splash.test');if(u.pathname==='/')return route.fulfill({body:readFileSync('public/app.html'),contentType:'text/html'});if(u.pathname==='/icons/bardoctor-splash-reference-v529.png')return route.fulfill({body:readFileSync('public'+u.pathname),contentType:'image/png'});return route.fulfill({body:'',contentType:u.pathname.endsWith('.js')?'text/javascript':'text/css'});});
+  await page.goto('http://splash.test/');await page.locator('.bd-splash-art-v529 img').first().evaluate(img=>img.decode());
+  assert.equal(await page.getByRole('status',{name:'BarDoctor загружается'}).count(),1);
+  assert.ok(await page.locator('.bd-unified-splash-tagline-v394').isHidden());
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
+  const animations=await page.locator('.bd-splash-art-stage-v529').evaluate(el=>el.getAnimations({subtree:true}).map(a=>({duration:a.effect.getTiming().duration,iterations:a.effect.getTiming().iterations})));
+  if(reducedMotion==='reduce')assert.deepEqual(animations,[]);else assert.ok(animations.every(a=>a.duration<=850&&a.iterations===1));
+  // The existing pending attribute owns visibility; animation has no completion callback.
+  await page.evaluate(()=>document.documentElement.removeAttribute('data-bd-startup-pending'));
+  assert.ok(await page.locator('[data-bd-static-startup]').isHidden());await page.close();
+ }}finally{await browser.close();}
+});
+test('splash patch roundtrips only its owned markup and launch references',()=>{
+ const files=['public/app.html','app/bar-doctor-response.ts'];const before=files.map(f=>readFileSync(f,'utf8'));
+ execFileSync(process.execPath,['scripts/patch-splash-v529.mjs','--restore']);execFileSync(process.execPath,['scripts/patch-splash-v529.mjs']);
+ files.forEach((file,i)=>assert.equal(readFileSync(file,'utf8'),before[i]));
+ const patch=readFileSync('scripts/patch-splash-v529.mjs','utf8');assert.doesNotMatch(patch,/setTimeout|animationend|localStorage|\/api\//);
+});
