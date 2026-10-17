@@ -102,3 +102,7 @@ Scoped browser checks: splash at 320×568,390×844,430×932,1280×720; reduced m
 final result: passed
 
 This is local visual/functional verification under the explicitly requested scoped workflow, not production verification. Save-only; release approval pending.
+
+## Standalone HTML motion correction (v530)
+
+Removed the display-mode:standalone animation override. Native iOS launch PNGs remain static; HTML now animates normally in standalone, while prefers-reduced-motion still disables motion. No artwork, timings, readiness, or auth changes. Scoped regression projects the standalone CSS media condition to screen in the local fixture because Chromium CDP does not emulate display-mode. It checks both animations exist (not a vacuous empty-array check), reduced-motion disables them, and readiness hides the splash immediately. This is a local CSS-condition simulation, not physical iPhone verification.

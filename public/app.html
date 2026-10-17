@@ -358,8 +358,7 @@ html .bd-unified-splash-tagline-v394 {display:none !important;}
 @keyframes bd-splash-line-v529 {from {clip-path:inset(61% 100% 15% 0);}to {clip-path:inset(61% 0 15% 0);}}
 @media (min-aspect-ratio:3/4) {.bd-splash-art-stage-v529 {width:calc(100dvh * 853 / 1844);height:100dvh;}}
 @media (prefers-reduced-motion:reduce) {.bd-splash-art-stage-v529 img {animation:none;}}
-/* Native iOS starts with the same complete still: do not replay an entrance over it. */
-@media (display-mode:standalone) {.bd-splash-art-stage-v529 img {animation:none;}}
+/* Native launch rasters are static; HTML motion is independent of display mode. */
 </style><!-- /splash-v529:head -->
 </head>
   <body>

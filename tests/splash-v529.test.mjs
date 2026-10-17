@@ -2,15 +2,17 @@ import test from 'node:test';import assert from 'node:assert/strict';import {rea
 const {resolveBrowserExecutable,chromiumArgs}=createRequire(import.meta.url)('../scripts/browser-runtime.cjs');
 test('splash is accessible, responsive, static under reduced motion and never gates handoff on animation',async()=>{
  const browser=await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});
- try{for(const [width,height,reducedMotion] of [[320,568,'reduce'],[390,844,'no-preference'],[430,932,'reduce'],[1280,720,'reduce']]){
+ // Chromium CDP cannot emulate display-mode; project that CSS condition to screen
+ // in the fixture only. This makes a standalone-only animation override observable.
+ try{for(const [width,height,reducedMotion,standalone] of [[320,568,'reduce',false],[390,844,'no-preference',false],[430,932,'reduce',false],[1280,720,'reduce',false],[390,844,'no-preference',true],[390,844,'reduce',true]]){
   const page=await browser.newPage({viewport:{width,height},reducedMotion});
-  await page.route('**/*',route=>{const u=new URL(route.request().url());assert.equal(u.origin,'http://splash.test');if(u.pathname==='/')return route.fulfill({body:readFileSync('public/app.html'),contentType:'text/html'});if(u.pathname==='/icons/bardoctor-splash-reference-v529.png')return route.fulfill({body:readFileSync('public'+u.pathname),contentType:'image/png'});return route.fulfill({body:'',contentType:u.pathname.endsWith('.js')?'text/javascript':'text/css'});});
+  await page.route('**/*',route=>{const u=new URL(route.request().url());assert.equal(u.origin,'http://splash.test');if(u.pathname==='/')return route.fulfill({body:standalone?readFileSync('public/app.html','utf8').replaceAll('@media (display-mode:standalone)','@media screen'):readFileSync('public/app.html'),contentType:'text/html'});if(u.pathname==='/icons/bardoctor-splash-reference-v529.png')return route.fulfill({body:readFileSync('public'+u.pathname),contentType:'image/png'});return route.fulfill({body:'',contentType:u.pathname.endsWith('.js')?'text/javascript':'text/css'});});
   await page.goto('http://splash.test/');await page.locator('.bd-splash-art-v529 img').first().evaluate(img=>img.decode());
   assert.equal(await page.getByRole('status',{name:'BarDoctor загружается'}).count(),1);
   assert.ok(await page.locator('.bd-unified-splash-tagline-v394').isHidden());
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
   const animations=await page.locator('.bd-splash-art-stage-v529').evaluate(el=>el.getAnimations({subtree:true}).map(a=>({duration:a.effect.getTiming().duration,iterations:a.effect.getTiming().iterations})));
-  if(reducedMotion==='reduce')assert.deepEqual(animations,[]);else assert.ok(animations.every(a=>a.duration<=850&&a.iterations===1));
+  if(reducedMotion==='reduce')assert.deepEqual(animations,[]);else {assert.equal(animations.length,2,'brand and lower illustration animate in browser and standalone');assert.ok(animations.every(a=>a.duration<=850&&a.iterations===1));}
   // The existing pending attribute owns visibility; animation has no completion callback.
   await page.evaluate(()=>document.documentElement.removeAttribute('data-bd-startup-pending'));
   assert.ok(await page.locator('[data-bd-static-startup]').isHidden());await page.close();

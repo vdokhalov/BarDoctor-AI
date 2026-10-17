@@ -15,8 +15,7 @@ html .bd-unified-splash-tagline-v394 {display:none !important;}
 @keyframes bd-splash-line-v529 {from {clip-path:inset(61% 100% 15% 0);}to {clip-path:inset(61% 0 15% 0);}}
 @media (min-aspect-ratio:3/4) {.bd-splash-art-stage-v529 {width:calc(100dvh * 853 / 1844);height:100dvh;}}
 @media (prefers-reduced-motion:reduce) {.bd-splash-art-stage-v529 img {animation:none;}}
-/* Native iOS starts with the same complete still: do not replay an entrance over it. */
-@media (display-mode:standalone) {.bd-splash-art-stage-v529 img {animation:none;}}
+/* Native launch rasters are static; HTML motion is independent of display mode. */
 `;
 export const splashMarkup=`<div class="bd-splash-art-v529" aria-hidden="true"><div class="bd-splash-art-stage-v529">${['static','brand','line'].map(part=>`<img class="bd-splash-${part}-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" />`).join('')}</div></div>`;
 const head=`<!-- splash-v529:head --><link rel="preload" as="image" href="/icons/bardoctor-splash-reference-v529.png" /><style>${splashCss}</style><!-- /splash-v529:head -->`;
