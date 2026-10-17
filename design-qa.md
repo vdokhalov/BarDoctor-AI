@@ -106,3 +106,7 @@ This is local visual/functional verification under the explicitly requested scop
 ## Standalone HTML motion correction (v530)
 
 Removed the display-mode:standalone animation override. Native iOS launch PNGs remain static; HTML now animates normally in standalone, while prefers-reduced-motion still disables motion. No artwork, timings, readiness, or auth changes. Scoped regression projects the standalone CSS media condition to screen in the local fixture because Chromium CDP does not emulate display-mode. It checks both animations exist (not a vacuous empty-array check), reduced-motion disables them, and readiness hides the splash immediately. This is a local CSS-condition simulation, not physical iPhone verification.
+
+## Visible duration correction (v531)
+
+User observed v530 disappearing too quickly and requested a 1500ms visible minimum, superseding immediate success hiding. An inline one-shot coordinator starts on a visible animation frame, queues the latest committed success target, and waits only the remaining minimum. Normal motion fades opacity for180ms; reduced motion exits with no transition at the minimum. Slow readiness after1500ms fades immediately. Error/recovery removal cancels the coordinator and its timers; existing recovery code/timeouts are unchanged. Internal navigation does not create another splash. Local scoped fixtures cover fast/slow, standalone CSS condition, reduced motion, recovery, internal navigation, and replacement of a ready target (Home→login). No image/design changes or production business operations.

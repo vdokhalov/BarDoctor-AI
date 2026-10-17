@@ -1,5 +1,6 @@
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 const restore=process.argv.includes('--restore');
+const timing=readFileSync('scripts/splash-timing-v531.js','utf8');
 export const splashCss=`
 html[data-bd-startup-pending="v201"],html[data-bd-startup-pending="v201"] body,html[data-bd-startup-pending="v201"] #root {background:#0733aa !important;}
 html .bd-static-startup-v201.bd-unified-splash-v394 {background:#0733aa !important;padding:0 !important;}
@@ -15,6 +16,8 @@ html .bd-unified-splash-tagline-v394 {display:none !important;}
 @keyframes bd-splash-line-v529 {from {clip-path:inset(61% 100% 15% 0);}to {clip-path:inset(61% 0 15% 0);}}
 @media (min-aspect-ratio:3/4) {.bd-splash-art-stage-v529 {width:calc(100dvh * 853 / 1844);height:100dvh;}}
 @media (prefers-reduced-motion:reduce) {.bd-splash-art-stage-v529 img {animation:none;}}
+html[data-bd-startup-pending="v201"] .bd-static-startup-v201[data-bd-splash-fading] {opacity:0 !important;transition:opacity 180ms ease-out !important;}
+@media (prefers-reduced-motion:reduce) {html[data-bd-startup-pending="v201"] .bd-static-startup-v201[data-bd-splash-fading] {transition:none !important;}}
 /* Native launch rasters are static; HTML motion is independent of display mode. */
 `;
 export const splashMarkup=`<div class="bd-splash-art-v529" aria-hidden="true"><div class="bd-splash-art-stage-v529">${['static','brand','line'].map(part=>`<img class="bd-splash-${part}-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" />`).join('')}</div></div>`;
@@ -23,10 +26,20 @@ for(const file of ['public/app.html','app/bar-doctor-response.ts','dist/client/a
  if(!existsSync(file))continue;
  let s=readFileSync(file,'utf8').replace(/<!-- splash-v529:head -->[\s\S]*?<!-- \/splash-v529:head -->\n?/g,'').replace(/<!-- splash-v529:art -->[\s\S]*?<!-- \/splash-v529:art -->/g,'').replaceAll(/(bardoctor-launch-\d+x\d+-\dx)-v529.png/g,'$1-v394.png');
  if(!restore){
-  s=s.replace('</head>',head+'\n</head>').replace(/(<div class="bd-static-startup-v201 bd-unified-splash-v394"[^>]*>)/,'$1<!-- splash-v529:art -->'+splashMarkup+'<!-- /splash-v529:art -->');
+  s=s.replace('</head>',head+'\n</head>').replace(/(<div class="bd-static-startup-v201 bd-unified-splash-v394"[^>]*>)/,'$1<!-- splash-v529:art -->'+splashMarkup+'<script>'+timing+'</script><!-- /splash-v529:art -->');
   s=s.replaceAll(/(bardoctor-launch-\d+x\d+-\dx)-v394.png/g,'$1-v529.png');
   if(!s.includes(head)||!s.includes(splashMarkup))throw Error('Missing splash host: '+file);
  }
  writeFileSync(file,s);
 }
 console.log(restore?'Splash v529 restored':'Splash v529 applied');
+
+const home=`const t=document.querySelector('[data-bd-home-page], [data-bd-authenticated-home-shell]');if(!t)return;`;
+const homeTimed=home+'if(window.bdSplashReadyV531&&window.bdSplashReadyV531(()=>bdStartupFirstPaintCompleteV201()))return;';
+const auth=`  document.documentElement.removeAttribute("data-bd-startup-pending");
+  document.documentElement.removeAttribute("data-bd-startup-completing");
+  document.querySelector('[data-bd-static-startup="v201"]')?.remove();
+  window.__bdSplashReleasedV396=true;
+  window.dispatchEvent(new CustomEvent("bd:startup-complete",{detail:{version:"auth-handoff-v423"}}));`;
+const authTimed='  const bdReleaseSplashV531=()=>{\n'+auth+'\n  };if(!window.bdSplashReadyV531||!window.bdSplashReadyV531(bdReleaseSplashV531))bdReleaseSplashV531();';
+for(const file of process.argv.includes('--shell-only')?[]:['public/assets/index-BQGspy0I.js']){let s=readFileSync(file,'utf8');s=s.replace(homeTimed,home).replace(authTimed,auth);if(!restore){if(!s.includes(home)||!s.includes(auth))throw Error('Splash success handoff anchor missing');s=s.replace(home,homeTimed).replace(auth,authTimed);}writeFileSync(file,s);}

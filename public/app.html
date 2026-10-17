@@ -358,11 +358,42 @@ html .bd-unified-splash-tagline-v394 {display:none !important;}
 @keyframes bd-splash-line-v529 {from {clip-path:inset(61% 100% 15% 0);}to {clip-path:inset(61% 0 15% 0);}}
 @media (min-aspect-ratio:3/4) {.bd-splash-art-stage-v529 {width:calc(100dvh * 853 / 1844);height:100dvh;}}
 @media (prefers-reduced-motion:reduce) {.bd-splash-art-stage-v529 img {animation:none;}}
+html[data-bd-startup-pending="v201"] .bd-static-startup-v201[data-bd-splash-fading] {opacity:0 !important;transition:opacity 180ms ease-out !important;}
+@media (prefers-reduced-motion:reduce) {html[data-bd-startup-pending="v201"] .bd-static-startup-v201[data-bd-splash-fading] {transition:none !important;}}
 /* Native launch rasters are static; HTML motion is independent of display mode. */
 </style><!-- /splash-v529:head -->
 </head>
   <body>
-    <div class="bd-static-startup-v201 bd-unified-splash-v394" data-bd-static-startup="v201" data-bd-stable-splash="v394" data-bd-single-splash="v395" data-bd-native-continuity="v396" data-bd-native-fullscreen-raster="v398" data-bd-shell-first-startup="v397" role="status" aria-label="BarDoctor загружается"><!-- splash-v529:art --><div class="bd-splash-art-v529" aria-hidden="true"><div class="bd-splash-art-stage-v529"><img class="bd-splash-static-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-brand-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-line-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /></div></div><!-- /splash-v529:art -->
+    <div class="bd-static-startup-v201 bd-unified-splash-v394" data-bd-static-startup="v201" data-bd-stable-splash="v394" data-bd-single-splash="v395" data-bd-native-continuity="v396" data-bd-native-fullscreen-raster="v398" data-bd-shell-first-startup="v397" role="status" aria-label="BarDoctor загружается"><!-- splash-v529:art --><div class="bd-splash-art-v529" aria-hidden="true"><div class="bd-splash-art-stage-v529"><img class="bd-splash-static-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-brand-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /><img class="bd-splash-line-v529" src="/icons/bardoctor-splash-reference-v529.png" alt="" width="853" height="1844" decoding="sync" fetchpriority="high" /></div></div><script>(function () {
+  var root=document.documentElement,node=document.querySelector('[data-bd-static-startup="v201"]');
+  if(!node||root.getAttribute('data-bd-startup-pending')!=='v201')return;
+  var started=null,callback=null,timer=0,frame=0,finished=false,fading=false;
+  var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
+  function event(name){window.dispatchEvent(new CustomEvent('bd:splash-'+name,{detail:{at:performance.now()}}));}
+  function cancel(){finished=true;clearTimeout(timer);cancelAnimationFrame(frame);observer.disconnect();}
+  function complete(){if(finished)return;var done=callback;cancel();event('finished');if(done)done();}
+  function fade(){
+    if(finished||fading)return;
+    if(started!==null&&performance.now()-started<1500){schedule();return;}
+    if(!node.isConnected||root.getAttribute('data-bd-startup-pending')!=='v201'){cancel();return;}
+    fading=true;event('fade');
+    if(reduced.matches){complete();return;}
+    node.setAttribute('data-bd-splash-fading','');timer=setTimeout(complete,180);
+  }
+  function schedule(){if(started===null||!callback||finished||fading)return;clearTimeout(timer);timer=setTimeout(fade,Math.max(0,Math.ceil(1500-(performance.now()-started))));}
+  function visible(){
+    if(finished)return;
+    var style=getComputedStyle(node);
+    if(!document.hidden&&node.isConnected&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0){started=performance.now();event('visible');schedule();}
+    else frame=requestAnimationFrame(visible);
+  }
+  // Recovery owns immediate exit. Never restore a pending attribute or removed node.
+  var observer=new MutationObserver(function(){if(!node.isConnected||root.getAttribute('data-bd-startup-pending')!=='v201')cancel();});
+  observer.observe(root,{attributes:true,attributeFilter:['data-bd-startup-pending'],childList:true,subtree:true});
+  window.bdSplashReadyV531=function(done){if(finished)return false;if(!callback)event('ready');callback=done;schedule();return true;};
+  frame=requestAnimationFrame(visible);
+})();
+</script><!-- /splash-v529:art -->
       <div class="bd-unified-splash-content-v394">
         <img class="bd-unified-splash-mark-v394" src="/icons/bardoctor-mark-v159.svg" alt="" width="100" height="100" aria-hidden="true" />
         <h1 class="bd-unified-splash-brand-v394">BarDoctor</h1>

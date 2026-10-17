@@ -36,7 +36,7 @@
     },
     "public/assets/index-BQGspy0I.js": {
       "before": "9d39f5701c3f3dec678a1b13f8ac85c15aa9e6a3a7bbfe4141b46c34eb980d8c",
-      "after": "22c86c59dd182e2f168c813ba38804b1dc097f2f2b9a3f05508e3b0f4eff1026"
+      "after": "5c7b0737160963a194b280b634fc3ca9aae068bd14b10cf4aeef81e16cacbee0"
     },
     "public/bardoctor-preview-v396.js": {
       "before": "4ab0e1a3f6238d3e48aff8d21fa3d8cd8cb7515c72f18798d42feca6e904f5b4",
@@ -340,7 +340,7 @@
     },
     "app/bar-doctor-response.ts": {
       "before": "8253f8be1bd1fb3ef3371dde5463a9681ff6c78529f6a45e2bfe47a3a66c766e",
-      "after": "f5aaaad22dca97306741d316983cc10e145a9b117da6e424ce621d64999da73c"
+      "after": "2be16c5112dc319ac8ae8cefed14d8ee39128e75fc08939b687a0fd280afe0da"
     },
     "drizzle/0028_staff_pin_revocation.sql": {
       "before": null,
@@ -652,7 +652,7 @@
     },
     "scripts/build-verified.sh": {
       "before": "39591fbe86f1a7ea60977d3676e2956b436908e4724f9ac9fe8ae3437a1582d4",
-      "after": "84d8ce7d60675c65cf96e163320201f0930e6636247cbf5e8f6e191fdeaac8d6"
+      "after": "2858f939a17442a7f0553fa4c75c3fc78ac0e454b4d3816c6417eedd6150a7a2"
     },
     "scripts/patch-warehouse-document.mjs": {
       "before": null,
@@ -660,7 +660,7 @@
     },
     "scripts/patch-splash-v529.mjs": {
       "before": null,
-      "after": "da78acb60a94d461b1775cb739d6af7548fec4c0489a3f5345060b5c81cb264c"
+      "after": "a115713fa53230c156620a2f232c39e72a980e5cc70221ce11f6552b631428ae"
     },
     "scripts/capture-splash-v529.mjs": {
       "before": null,
@@ -720,7 +720,11 @@
     },
     "public/app.html": {
       "before": "a7116916269940c4f4f96f54ad40f2ad836d9b0a5c1ab45def0c38fc4887f7f7",
-      "after": "03caf97dbb620bfc2399d3ff7abde703f6283fdb65b4ad5f6e8dbf04bb9bbb90"
+      "after": "0eb92f787261def0aeb981f50808224ac0209ec37bfb1083edca85e9437e8af3"
+    },
+    "scripts/splash-timing-v531.js": {
+      "before": null,
+      "after": "d625f97e341c0abb31f7efa2664f3dc418407684fb7645206495677a5cd12d83"
     }
   }
 }
