@@ -17,6 +17,8 @@ patches.push([oldEmpty,newEmpty]);
 if(process.argv.includes('--restore')){for(const[before,after]of patches)page=page.replace(after,before);source=source.slice(0,node.start)+page+source.slice(node.end);writeFileSync(file,source);process.exit(0);}
 if(!page.includes(newEmpty)){if(!page.includes(oldEmpty))throw Error('Warehouse empty anchor missing');page=page.replace(oldEmpty,newEmpty);}
 source=source.slice(0,node.start)+page+source.slice(node.end);
-const built=await build({entryPoints:['lib/bardoctor/client/warehouse-document.tsx'],bundle:true,write:false,format:'iife',globalName:'bdWarehouseDocumentModule',jsxFactory:'React.createElement',jsxFragment:'React.Fragment',minify:true});
+// The host owns React. Override react-jsx from tsconfig: a bundled React 19
+// JSX runtime creates elements that the shipped React renderer cannot render.
+const built=await build({entryPoints:['lib/bardoctor/client/warehouse-document.tsx'],bundle:true,write:false,format:'iife',globalName:'bdWarehouseDocumentModule',jsx:'transform',tsconfigRaw:{compilerOptions:{jsx:'react'}},jsxFactory:'React.createElement',jsxFragment:'React.Fragment',minify:true});
 const clientCode=built.outputFiles[0].text+'\nconst bdWarehouseDocumentClient=bdWarehouseDocumentModule.createWarehouseDocumentClient(S,{headers:()=>ca(Ot()),venue:()=>Number(localStorage.getItem("bd_active_venue_id")),identity:()=>String(Ot())+":"+String(gz())});';
 source=source.replace('function bdWarehousePage(',start+'\n'+clientCode+'\n'+end+'\nfunction bdWarehousePage(');parse(source,{ecmaVersion:'latest',sourceType:'module'});writeFileSync(file,source);console.log('Warehouse document server reader applied');
