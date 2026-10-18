@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { lifecycleRuntime } from './helpers/lifecycle-runtime';
+import { HEALTH_OPERATIONS_KEYS } from '../lib/bardoctor/health-operations-inputs';
+import { VENUE_CONTEXT_SOURCES } from '../lib/bardoctor/venue-context-access';
+
+test('Health: 31 receipts / 7001 and complete operational day survive both journal migrations; absent optional history is unknown', async t => {
+  const r = await lifecycleRuntime({ health: './app/api/business-health/route', database: './db', stock: './lib/bardoctor/stock-journal', events: './lib/bardoctor/sales-event-storage' }, { now: '2026-10-03T12:00:00Z' });
+  t.after(r.close);
+  const owner = await r.register('health-journal-diagnostic@isolated.test');
+  const venueId = owner.activeVenueId, accountId = Number(r.sqlite.prepare('SELECT data_account_id FROM venues WHERE id=?').get(venueId)!.data_account_id);
+  const scope = { venueId, accountId };
+  const put = (key: string, value: unknown) => r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES(?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(accountId, key, JSON.stringify(value));
+  for (const key of new Set([...HEALTH_OPERATIONS_KEYS, ...Object.values(VENUE_CONTEXT_SOURCES).flat()])) put(key, key === 'bd_assortment_v1' ? { stockBalances: [] } : []);
+  r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({ currency: 'PMR_RUB', timezone: 'UTC' }), accountId);
+  put('bd_finance_revenue', [{ id: 'shift', venueId, date: '2026-10-02', currency: 'PMR_RUB', revenueSource: 'sales_events_v1', revenue: 7001, receipts: 31, closingStatus: 'closed' }]);
+  put('bd_operational_reports_v1', [{ id: 'report', venueId, date: '2026-10-02', closingStatus: 'closed', payrollBreakdown: { total: 500 }, incidentIds: ['case'] }]);
+  put('bd_cases', [{ id: 'case', venueId, date: '2026-10-02', shiftId: 'shift', priority: 'low', status: 'closed' }]);
+  put('bd_sales_events_v1', Array.from({ length: 31 }, (_, i) => ({ id: `sale-${i}`, externalId: `sale-${i}`, fingerprint: `fp-${i}`, venueId, businessDate: '2026-10-02', revenueRowId: 'shift', source: 'POS_API', status: 'POSTED', currency: 'PMR_RUB', revenue: i === 30 ? 1001 : 200, batch: {}, originalMovements: [], prices: [] })));
+  const read = async () => { const req = r.request(owner, '/api/business-health'); req.headers.set('X-Venue-Id', String(venueId)); const res = await r.api.health.GET(req); assert.equal(res.status, 200); return (await res.json() as any).data.businessHealthSnapshot; };
+  const before = await read();
+  assert.equal(before.operationsInputs.days[0].status, 'COMPLETE');
+  assert.equal(before.factorScores.find((c: any) => c.id === 'operations').score, 90);
+  assert.equal(before.livePeriod.current.revenue, 7001);
+  assert.equal(before.livePeriod.current.checks, 31);
+  const db = (r.api.database as unknown as typeof import('../db')).getD1();
+  const stock = r.api.stock as unknown as typeof import('../lib/bardoctor/stock-journal');
+  const events = r.api.events as unknown as typeof import('../lib/bardoctor/sales-event-storage');
+  await stock.copyLegacyJournal(db, scope); await stock.activateJournal(db, scope);
+  for (let i = 0; i < 7; i++) { if ((await events.copyLegacySalesEvents(db, scope)).state === 'verified') break; }
+  await events.activateSalesEvents(db, scope);
+  const after = await read();
+  assert.deepEqual(after.operationsInputs.days, before.operationsInputs.days);
+  assert.deepEqual(after.operationsInputs.counters, before.operationsInputs.counters);
+  assert.equal(after.livePeriod.current.revenue, 7001); assert.equal(after.livePeriod.current.checks, 31);
+  r.sqlite.prepare('DELETE FROM domain_data WHERE account_id=? AND store_key=?').run(accountId, 'bd_equipment_work_orders');
+  const missing = await read();
+  assert.equal(missing.operationsInputs.days[0].status, 'COMPLETE');
+  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.value, null);
+  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.availability, 'UNAVAILABLE');
+  assert.equal(missing.factorScores.find((c: any) => c.id === 'operations').score, null);
+  put('bd_equipment_work_orders', []);
+  const empty = await read();
+  assert.equal(empty.operationsInputs.counters.recurringEquipmentFailures.zero, 'KNOWN_ZERO');
+  assert.equal(empty.factorScores.find((c: any) => c.id === 'operations').score, 90);
+});
