@@ -1,3 +1,4 @@
+import { preparationConfig, preparationKey } from '../../../lib/bardoctor/pos-preparation';
 import {readSaleEvent,readOrderPaymentFacts,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
@@ -19,7 +20,7 @@ import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountView
 const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector) {
-  const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, keys);
+  const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, [...keys,preparationKey(account.venueId)]);
   const read = (key: string, fallback: unknown): unknown => { const data = snapshots.find(snapshot => snapshot.key === key)?.dataJson; return data == null ? fallback : JSON.parse(data); };
   const rows = (key: string) => { const value = read(key, []); if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW"); return value; };
   const assortment = read("bd_assortment_v1", {});
@@ -33,6 +34,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: PosOrderContext = { ...venueTimeFromJson(account.restaurantJson), venueId: account.venueId,
     currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now,
     actor: { accountId: account.actorAccountId, name: [account.firstName, account.lastName].filter(Boolean).join(" "), role: account.role, ...(account.jobTitle ? { jobTitle: account.jobTitle } : {}) },
+    preparationConfig:preparationConfig(read(preparationKey(account.venueId),null),account.venueId),
     discountRules: parsePosDiscountRules(rows(POS_DISCOUNT_STORE_KEY)),
     assortment: assortment as Record<string, unknown>, movements: stock.movements, events, revenues: rows("bd_finance_revenue"),
     mappings: rows("bd_sales_mappings"), warehouseRoutes: rows("bd_sales_warehouse_routes"), warehouses: rows("bd_warehouses"), closedMonths: closedMonthsFromStore(read("bd_month_closings", null)),
@@ -43,6 +45,10 @@ function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
   if (error instanceof Error && /^(STOCK_JOURNAL_|POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
+      POS_ORDER_CONFIRMED_LOCKED: "Позиции уже подтверждены. Исправление или отмена отправленного заказа пока недоступны; требуется отдельный корректирующий процесс руководителя.",
+      POS_ORDER_NOTHING_TO_CONFIRM: "Новых позиций для подтверждения нет.",
+      POS_ORDER_PREPARATION_SECTION_REQUIRED: "Руководитель должен заранее указать действующий раздел в карточке позиции меню.",
+      POS_ORDER_PREPARATION_INVALID: "Настройки или бегунки требуют проверки. Ничего не изменено.",
       POS_ORDER_CANCELLATION_HAS_PAYMENT: "У счёта есть признаки оплаты. Отмена неоплаченного счёта недоступна; возвраты рассматриваются отдельно.",
       POS_ORDER_SHIFT_NEEDS_REVIEW: "Исходная кассовая смена не определена однозначно. Ничего не изменено.",
       POS_ORDER_DISCOUNT_LOCKED: "Руководитель должен снять скидку перед изменением позиций.",
@@ -106,7 +112,7 @@ async function command(request: Request): Promise<Response> {
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(account.id, POS_ORDER_STORE_KEY, body.action, plan.order.id, `Стол ${plan.order.tableNumber}`, String(shift?.date ?? "").slice(0, 7),
         JSON.stringify(orders.find(order => order.id === plan.order.id) ?? null), JSON.stringify({ order: plan.order, salesEventId: plan.event?.id }),
-        JSON.stringify(["revision", "status", "lines", "precheck", "discount", "totals"]), context.actor.name, context.actor.role, typeof body.reason === "string" && body.reason.trim() || "Подтверждённая операция", context.now));
+        JSON.stringify(["revision", "status", "lines", "precheck", "discount", "totals", "preparationTickets"]), context.actor.name, context.actor.role, typeof body.reason === "string" && body.reason.trim() || "Подтверждённая операция", context.now));
     statements.unshift(posMembershipGuard(db,account,context.now));
     await runStoreCasBatch(db, account.id, snapshots, statements, context.now);
     return reply(result, 201);

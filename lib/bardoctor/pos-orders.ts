@@ -1,3 +1,4 @@
+import { confirmedLineIds, prepareTickets, validatePreparationTickets, type PreparationConfig, type PreparationTicket } from './pos-preparation';
 import {paidOrderIds} from './sales-event-history';
 import { posWorkdayGate } from "./pos-workday-gate";
 import { capturePosDiscount, posDiscountCents, validatePosDiscountSnapshot, type PosDiscountRule, type PosDiscountSnapshot, type PosDiscountTotals } from "./pos-discounts";
@@ -15,10 +16,10 @@ export type PosOrder = {
   precheck: { id: string; issuedAt: string; issuedBy: PosOrderActor; revision: number } | null;
   parentOrderId?: string; salesEventId?: string; paidAt?: string; paidBy?: PosOrderActor; cancelledAt?: string;
   discount?: PosDiscountSnapshot | null; totals?: PosDiscountTotals;
-  operations: PosOrderOperation[];
+  operations: PosOrderOperation[]; preparationTickets?: PreparationTicket[];
 };
 export type PosOrderCommand = {
-  action: "create" | "add_items" | "set_quantity" | "cancel_item" | "cancel_order" | "precheck" | "cancel_precheck" | "split" | "preview_payment" | "pay" | "apply_discount" | "remove_discount";
+  action: "confirm" | "create" | "add_items" | "set_quantity" | "cancel_item" | "cancel_order" | "precheck" | "cancel_precheck" | "split" | "preview_payment" | "pay" | "apply_discount" | "remove_discount";
   operationId: string; orderId: string; expectedRevision: number;
   shiftId?: string; tableNumber?: string; comment?: string;
   lines?: { id?: string; menuItemId?: string; lineId?: string; quantity: number }[];
@@ -28,8 +29,8 @@ export type PosOrderCommand = {
 };
 type SalesPlan = Awaited<ReturnType<typeof planSalesEvent>>;
 export type PosOrderPlan = { orders: PosOrder[]; order: PosOrder; duplicate: boolean; event?: SalesEvent; previewHash?: string; salesPlan?: SalesPlan };
-export type PosOrderContext = SalesEventContext & { discountRules?: PosDiscountRule[] };
-const actions = new Set(["create", "add_items", "set_quantity", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
+export type PosOrderContext = SalesEventContext & { preparationConfig?:PreparationConfig; discountRules?: PosDiscountRule[] };
+const actions = new Set(["confirm", "create", "add_items", "set_quantity", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
 const privileged = new Set(["cancel_item", "cancel_order", "cancel_precheck", "split", "apply_discount", "remove_discount"]);
 function fail(code: string): never { throw new Error("POS_ORDER_" + code); }
 const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -168,6 +169,7 @@ export function parsePosOrders(value: unknown): PosOrder[] {
           })) fail("STORE_NEEDS_REVIEW");
       }
     } catch { fail("STORE_NEEDS_REVIEW"); }
+    validatePreparationTickets(order as unknown as PosOrder);
     if (order.precheck !== null && (!record(order.precheck) || !identifier(order.precheck.id) || !instant(order.precheck.issuedAt)
       || !actor(order.precheck.issuedBy) || !Number.isSafeInteger(order.precheck.revision))) fail("STORE_NEEDS_REVIEW");
     if (order.status === "PAID" && (typeof order.salesEventId !== "string" || !actor(order.paidBy) || !instant(order.paidAt))) fail("STORE_NEEDS_REVIEW");
@@ -292,8 +294,15 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
     if(command.action==="cancel_order")assertUnpaidOrderCancellation(c,order);else assertShiftOpen(c, order.shiftId);
     if (order.precheck && ["add_items", "set_quantity", "cancel_item", "split", "precheck", "apply_discount", "remove_discount"].includes(command.action)) fail("PRECHECK_LOCKED");
     if (order.discount && ["add_items", "set_quantity", "cancel_item", "split"].includes(command.action)) fail(command.action === "split" ? "SPLIT_DISCOUNTED" : "DISCOUNT_LOCKED");
+    const sent=confirmedLineIds(order);
+    if(sent.size&&(["cancel_order","split"].includes(command.action)||["set_quantity","cancel_item"].includes(command.action)&&sent.has(command.lineId!)))fail("CONFIRMED_LOCKED");
     order = { ...order, revision: order.revision + 1 };
-    if (command.action === "add_items") {
+    if(command.action==="confirm"){
+      if(order.precheck||order.discount)fail("PRECHECK_LOCKED");
+      const config=c.preparationConfig??{version:1 as const,venueId:c.venueId,revision:0,routes:[],operations:[]};
+      if(config.venueId!==c.venueId)fail("PREPARATION_INVALID");
+      order.preparationTickets=[...(order.preparationTickets||[]),...prepareTickets(order,c.assortment,config,command.operationId,c.now,c.actor)];
+    } else if (command.action === "add_items") {
       const incoming = details.lines as { id: string; menuItemId: string; quantity: number }[];
       if (incoming.some(line => order!.lines.some(current => current.id === line.id)) || order.lines.length + incoming.length > 100) fail("LINES_INVALID");
       order.lines = [...order.lines, ...incoming].map(line => priceLine(c, line));
