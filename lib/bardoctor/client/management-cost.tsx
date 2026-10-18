@@ -26,7 +26,7 @@ export function createCostManagementClient(React: typeof import('react'), runtim
       if([...next].sort().join("\0")!==[...(covered.get(venue)||[])].sort().join("\0")){covered.set(venue,next);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
       return page;
     },
-    evaluate:(venue,cursor,signal)=>request('/api/management/cost-signals/evaluate',venue,{batchSize:1,...(cursor?{cursor}:{})},signal)
+    evaluate:(venue,cursor,signal)=>request('/api/management/cost-signals/evaluate',venue,{batchSize:3,...(cursor?{cursor}:{})},signal)
   });
   const start=()=>{const venue=runtime.venue();if(runtime.enabled()&&venue>0)void background.start(venue);};
   const reset=()=>{disabled.clear();covered.clear();background.reset();};

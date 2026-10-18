@@ -35,10 +35,12 @@ export async function costRevision(value: unknown): Promise<string> {
 }
 export function parseCostSources(snapshots: StoreSnapshot[], scope: CostScope) {
   const sources: Record<string, unknown> = {}, reasons: CostReason[] = [];
+  let sourceBytes=0;
   for (const snapshot of snapshots.filter(s => COST_SOURCE_KEYS.includes(s.key))) {
     if (snapshot.dataJson === null) { reasons.push("SOURCE_MISSING"); continue; }
     try {
-      if (bytes(snapshot.dataJson) > 2_000_000) throw new Error("source size");
+      const size=bytes(snapshot.dataJson);sourceBytes+=size;
+      if (size > 2_000_000) throw new Error("source size");
       const value: unknown = JSON.parse(snapshot.dataJson);
       const collections = snapshot.key === "bd_assortment_v1" ? [record(value).menuItems, record(value).recipes, record(value).nomenclature, record(value).stockBalances] : [value];
       if (!collections.every(c => Array.isArray(c) && c.length <= 10000 && c.every(v => v && typeof v === "object" && !Array.isArray(v)))) throw new Error("source shape");
@@ -48,24 +50,24 @@ export function parseCostSources(snapshots: StoreSnapshot[], scope: CostScope) {
       sources[snapshot.key] = value;
     } catch { reasons.push("SOURCE_INVALID"); }
   }
-  return { sources, reasons: [...new Set(reasons)], assortment: record(sources.bd_assortment_v1) };
+  return { sources, reasons: [...new Set(reasons)], assortment: record(sources.bd_assortment_v1), sourceBytes };
 }
 
-export async function readCostSources(snapshots:StoreSnapshot[],scope:CostScope){
+export async function readCostSources(snapshots:StoreSnapshot[],scope:CostScope,now=new Date().toISOString()){
   let costSnapshots=snapshots;
   const movement=snapshots.find(s=>s.key==='bd_stock_movements');
   if(movement?.dataJson){try{if(stockJournalMarker(JSON.parse(movement.dataJson))){
     const {getD1}=await import('../../db');
     const assortment=record(JSON.parse(snapshots.find(s=>s.key==='bd_assortment_v1')?.dataJson??'{}'));
-    const stock=await readSaleStock(getD1(),scope.dataAccountId,movement.dataJson,assortment,new Date().toISOString());
+    const stock=await readSaleStock(getD1(),scope.dataAccountId,movement.dataJson,assortment,now);
     costSnapshots=snapshots.map(s=>s===movement?{...s,dataJson:JSON.stringify(stock.movements)}:s);
   }}catch{/* Invalid or unavailable evidence remains SOURCE_INVALID below. */}}
   return parseCostSources(costSnapshots, scope);
 }
 
 type CostReadInput = { scope: CostScope; snapshots: StoreSnapshot[]; profileJson: string | null; menuItemId: string; now: string };
-async function prepareCurrentCostRead({scope, snapshots, profileJson}: Omit<CostReadInput, "menuItemId">) {
-  const parsed=await readCostSources(snapshots,scope),reasons=[...parsed.reasons];
+async function prepareCurrentCostRead({scope, snapshots, profileJson, now}: Omit<CostReadInput, "menuItemId">) {
+  const parsed=await readCostSources(snapshots,scope,now),reasons=[...parsed.reasons];
   let profile: Record<string, unknown> = {};
   try { profile = record(JSON.parse(profileJson ?? "null")); } catch { reasons.push("SOURCE_INVALID"); }
   const currency = typeof profile.currency === "string" && /^[A-Z]{3}$/.test(profile.currency) ? profile.currency : null;
@@ -151,9 +153,16 @@ async function observePreparedCurrentCost(input: CostReadInput, prepared: Return
 export function createCurrentCostReader(input: Omit<Parameters<typeof observeCurrentCost>[0], "menuItemId">, memo = createIngredientReconciliationMemo()) {
   const observations = new Map<string, ReturnType<typeof observeCurrentCost>>();
   let prepared: ReturnType<typeof prepareCurrentCostRead> | undefined;
-  return (menuItemId: string) => {
+  const read = (menuItemId: string) => {
     let result = observations.get(menuItemId);
     if (!result) { result = observePreparedCurrentCost({ ...input, menuItemId }, prepared ??= prepareCurrentCostRead(input), memo); observations.set(menuItemId, result); }
     return result.then(value => structuredClone(value));
   };
+  return Object.assign(read,{sourceBytes:async()=> (await (prepared??=prepareCurrentCostRead(input))).parsed.sourceBytes});
+}
+
+/** Conservative input identity: byte changes, migration revisions, date and calculator changes invalidate receipts. */
+export async function costEvaluationInputRevision(input: Omit<CostReadInput, "menuItemId">) {
+  return costRevision({version:"cost-evaluation-receipt-v1",calculationVersion:COST_CALCULATION_VERSION,scope:input.scope,date:input.now.slice(0,10),profile:input.profileJson,
+    sources:input.snapshots.filter(s=>COST_SOURCE_KEYS.includes(s.key)).map(s=>({key:s.key,data:s.dataJson,updatedAt:s.updatedAt}))});
 }

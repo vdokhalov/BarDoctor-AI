@@ -1,11 +1,12 @@
+import { stockJournalMarker } from "./stock-storage";
 import { readJsonRequest } from "./http";
 import { runtimeEnv } from "./runtime-env";
 import { getD1 } from "../../db";
 import { hasPermission, isAccessRole, permissionPayload } from "./access-control";
 import { authenticatedEvidenceContext } from "./evidence-resolver";
 import { canReadVenueSource } from "./venue-context-access";
-import { runStoreCasBatch, storeSnapshots, withStoreCasRetries } from "./store-cas";
-import { canonicalItemId, COST_SOURCE_KEYS, costRevision, observeCurrentCost, readCostSources, record } from "./management-cost-observation";
+import { runStoreCasBatch, storeSnapshots, readStoreSnapshots, StoreWriteConflictError, withStoreCasRetries } from "./store-cas";
+import { canonicalItemId, COST_SOURCE_KEYS, createCurrentCostReader, costEvaluationInputRevision, costRevision, observeCurrentCost, readCostSources, record } from "./management-cost-observation";
 import { COST_WHY, type CostEpisodeV1, type CostScope, type CostStateV1 } from "./management-cost-contracts";
 
 export const COST_STATE_PREFIX = "__bd_p4a_cost_state_v1__:";
@@ -29,11 +30,11 @@ async function authorized(request: Request) {
   return context;
 }
 
-async function snapshot(context: NonNullable<Awaited<ReturnType<typeof authorized>>>, extraKeys: string[]) {
+async function snapshot(context: NonNullable<Awaited<ReturnType<typeof authorized>>>, extraKeys: string[], sourceKeys = COST_SOURCE_KEYS) {
   const database = getD1(), account = context.account;
   const scope: CostScope = { venueId: context.venueId, workspaceId: context.workspaceId, dataAccountId: account.id };
   const args = [account.actorAccountId, scope.venueId, account.id, account.membershipId];
-  const keys = [...COST_SOURCE_KEYS, ...extraKeys];
+  const keys = [...sourceKeys, ...extraKeys];
   const result = await database.prepare(`SELECT store_key,CASE WHEN length(CAST(data_json AS BLOB))<=2000000 THEN data_json ELSE 'invalid oversized source' END data_json,updated_at FROM domain_data WHERE account_id=? AND store_key IN (${keys.map(() => "?").join(",")}) UNION ALL SELECT '__profile__',restaurant_json,updated_at FROM accounts WHERE id=? UNION ALL SELECT '__access__',(${boundarySql}),NULL`).bind(account.id, ...keys, account.id, ...args).all<StoredRow>();
   const rows = result.results ?? [], profile = rows.find(row => row.store_key === "__profile__"), boundary = rows.find(row => row.store_key === "__access__");
   if (!profile || !boundary?.data_json) return null;
@@ -59,15 +60,21 @@ export async function projectManagementCostEpisode(episode: CostEpisodeV1, menuI
 }
 const project = projectManagementCostEpisode;
 
-async function transition(context: NonNullable<Awaited<ReturnType<typeof authorized>>>, menuItemId: string, expectedSignal: string | null, trigger: "OWNER_CHECK" | "VIEW_REEVALUATION") {
+type CostRead = NonNullable<Awaited<ReturnType<typeof snapshot>>>;
+type EvaluationBatch = {read:CostRead; now:string; inputRevision:string; reader:ReturnType<typeof createCurrentCostReader>; statements:D1PreparedStatement[]; evaluated:number; reused:number};
+const receiptKey=(scope:CostScope,id:string)=>`__bd_p4a_cost_receipt_v1__:${scope.venueId}:${encode(id)}`;
+const upsertCost=(read:CostRead,key:string,value:unknown,now:string)=>read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at").bind(read.scope.dataAccountId,key,boundedJson(value),now);
+const accessGuard=(read:CostRead,now:string)=>read.database.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL,? WHERE NOT(EXISTS(SELECT 1 FROM accounts WHERE id=? AND restaurant_json IS ?) AND (${boundarySql}) IS ?)`).bind(read.scope.dataAccountId,now,read.scope.dataAccountId,read.profile,...read.args,read.boundary);
+
+async function transition(context: NonNullable<Awaited<ReturnType<typeof authorized>>>, menuItemId: string, expectedSignal: string | null, trigger: "OWNER_CHECK" | "VIEW_REEVALUATION", batch?:EvaluationBatch) {
   const scope: CostScope = { venueId: context.venueId, workspaceId: context.workspaceId, dataAccountId: context.account.id };
   const sk = stateKey(scope, menuItemId);
   // Discover the episode key, then reread state + episode + sources together.
-  const preliminary = await getD1().prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").bind(scope.dataAccountId, sk).first<{ data_json: string }>();
+  const preliminary = batch ? {data_json:batch.read.snapshots.find(s=>s.key===sk)?.dataJson??null} : await getD1().prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").bind(scope.dataAccountId, sk).first<{ data_json: string }>();
   const prior = parseStored<CostStateV1>(preliminary?.data_json ?? null);
   const generation = prior?.generation ?? 0;
   const keys = [sk, episodeKey(scope, menuItemId, Math.max(1, generation)), episodeKey(scope, menuItemId, generation + 1)];
-  const read = await snapshot(context, [...new Set(keys)]);
+  const read = batch?.read ?? await snapshot(context, [...new Set(keys)]);
   if (!read) return fail("ACCESS_DENIED", 403);
   const loaded = (key: string) => read.snapshots.find(s => s.key === key)?.dataJson ?? null;
   const state = parseStored<CostStateV1>(loaded(sk));
@@ -79,14 +86,24 @@ async function transition(context: NonNullable<Awaited<ReturnType<typeof authori
   if (!state && loaded(episodeKey(scope, menuItemId, 1)) !== null || state && (!episode || state.lastEpisodeId !== episode.signalId || state.activeEpisodeId !== (episode.condition === "ACTIVE" ? episode.signalId : null))) return fail("SOURCE_INVALID", 422);
   if (expectedSignal && episode?.signalId !== expectedSignal) return fail("UNAVAILABLE", 404);
   if (expectedSignal && episode?.condition !== "ACTIVE") return json({ ok: true, episode: episode && await project(episode), idempotent: true });
-  const now = new Date().toISOString();
-  const observed = await observeCurrentCost({ scope, snapshots: read.snapshots, profileJson: read.profile, menuItemId, now });
+  const now = batch?.now ?? new Date().toISOString();
+  if(batch){
+    const receipt=parseStored<{version:number;scope:CostScope;menuItemId:string;inputRevision:string;stateRevision:string}>(loaded(receiptKey(scope,menuItemId)));
+    if(receipt?.version===1&&sameScope(receipt.scope,scope)&&receipt.menuItemId===menuItemId&&receipt.inputRevision===batch.inputRevision&&receipt.stateRevision===await costRevision([loaded(sk),state?loaded(episodeKey(scope,menuItemId,generation)):null])){
+      batch.reused++;return json({ok:true,episode:episode&&await project(episode),reused:true});
+    }
+    batch.evaluated++;
+  }
+  const observed = batch ? await batch.reader(menuItemId) : await observeCurrentCost({ scope, snapshots: read.snapshots, profileJson: read.profile, menuItemId, now });
+  const receiptWrite=async(nextState:CostStateV1|null,nextEpisode:CostEpisodeV1|null)=>{
+    if(batch&&observed.observation.quality.availability!=="UNAVAILABLE")batch.statements.push(upsertCost(read,receiptKey(scope,menuItemId),{version:1,scope,menuItemId,inputRevision:batch.inputRevision,stateRevision:await costRevision([nextState?boundedJson(nextState):null,nextEpisode?boundedJson(nextEpisode):null])},now));
+  };
   const { observation } = observed;
   const fingerprint = await costRevision([scope.workspaceId, scope.venueId, scope.dataAccountId, "active_recipe_cost_unknown", menuItemId]);
   if (episode?.condition !== "ACTIVE") {
-    if (!observed.eligible) return json({ ok: true, episode: episode && await project(episode), observation });
+    if (!observed.eligible) { await receiptWrite(state,episode); return json({ ok: true, episode: episode && await project(episode), observation }); }
     const next = generation + 1;
-    episode = { contractVersion: 1, scope, signalId: `cost-v1:${fingerprint}:${next}`, fingerprint, generation: next, ruleId: "active_recipe_cost_unknown", ruleVersion: 1, menuItemId, previousEpisodeId: state?.lastEpisodeId ?? null, detectedAt: now, lastObservedAt: now, category: "DATA_QUALITY", severity: "IMPORTANT", severityBasis: "CURRENT_ITEM_COST_NOT_CALCULABLE", before: observation, latest: observation, condition: "ACTIVE", verificationStatus: "NOT_CHECKED", dispositionReason: null, verificationResult: null };
+    episode = { contractVersion: 1, scope, signalId: `cost-v1:${fingerprint}:${next}`, fingerprint, generation: next, ruleId: "active_recipe_cost_unknown", ruleVersion: 1, menuItemId, previousEpisodeId: state?.lastEpisodeId ?? null, detectedAt: now, lastObservedAt: now, category: "DATA_QUALITY", severity: "IMPORTANT", severityBasis: "CURRENT_ITEM_COST_NOT_CALCULABLE", before: observation, latest: observation, condition: "ACTIVE", verificationStatus: batch ? "CANNOT_VERIFY" : "NOT_CHECKED", dispositionReason: null, verificationResult: null };
   } else {
     episode = { ...episode, lastObservedAt: now, latest: observation };
     if (!observed.applicable && observation.quality.availability !== "UNAVAILABLE") { episode.condition = "NOT_APPLICABLE"; episode.dispositionReason = "Позиция удалена, архивирована или больше не требует рецепта."; }
@@ -96,10 +113,65 @@ async function transition(context: NonNullable<Awaited<ReturnType<typeof authori
     } else episode.verificationStatus = "CANNOT_VERIFY";
   }
   const nextState: CostStateV1 = { version: 1, scope, menuItemId, fingerprint, generation: episode.generation, activeEpisodeId: episode.condition === "ACTIVE" ? episode.signalId : null, lastEpisodeId: episode.signalId, lastObservationRevision: observation.observationRevision, stateVersion: (state?.stateVersion ?? 0) + 1 };
-  const guard = read.database.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL,? WHERE NOT(EXISTS(SELECT 1 FROM accounts WHERE id=? AND restaurant_json IS ?) AND (${boundarySql}) IS ?)`).bind(scope.dataAccountId, now, scope.dataAccountId, read.profile, ...read.args, read.boundary);
-  const upsert = (key: string, value: unknown) => read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at").bind(scope.dataAccountId, key, boundedJson(value), now);
-  await runStoreCasBatch(read.database, scope.dataAccountId, read.snapshots, [guard, upsert(sk, nextState), upsert(episodeKey(scope, menuItemId, episode.generation), episode)], now);
+  const writes=[upsertCost(read,sk,nextState,now),upsertCost(read,episodeKey(scope,menuItemId,episode.generation),episode,now)];
+  if(batch){batch.statements.push(...writes);await receiptWrite(nextState,episode);}
+  else await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),...writes],now);
   return json({ ok: true, episode: await project(episode, observed.itemName), observation, itemName: observed.itemName });
+}
+
+/** Three items share a final immutable snapshot and one atomic source/state/access guard. */
+async function evaluateBatch(context:NonNullable<Awaited<ReturnType<typeof authorized>>>,body:Record<string,unknown>):Promise<Response>{
+  const now=new Date().toISOString();
+  const discovery=await snapshot(context,[],["bd_assortment_v1"]);if(!discovery)return fail("ACCESS_DENIED",403);
+  const {scope}=discovery;
+  let cursor:{venueId:number;phase:string;after:string;inputRevision?:string}={venueId:scope.venueId,phase:"menu",after:""};
+  if(body.cursor){try{cursor=JSON.parse(String(body.cursor))}catch{return fail("INVALID_CURSOR",400)}}
+  if(!cursor||cursor.venueId!==scope.venueId||!["menu","tracked"].includes(cursor.phase)||typeof cursor.after!=="string")return fail("INVALID_CURSOR",400);
+  let ids:string[],more:boolean;
+  if(cursor.phase==="menu"){
+    let assortment:Record<string,unknown>;try{assortment=record(JSON.parse(discovery.snapshots.find(s=>s.key==="bd_assortment_v1")?.dataJson??"null"))}catch{return fail("SOURCE_INVALID",422)}
+    if(!Array.isArray(assortment.menuItems)||assortment.menuItems.length>10000)return fail("SOURCE_INVALID",422);
+    const menu=assortment.menuItems.map(record);
+    if(menu.some(item=>!canonicalItemId(item.id))||new Set(menu.map(item=>item.id)).size!==menu.length)return fail("SOURCE_INVALID",422);
+    const all=menu.filter(item=>item.active!==false&&item.consumptionMode==="RECIPE").map(item=>String(item.id)).sort().filter(id=>id>cursor.after);
+    ids=all.slice(0,3);more=all.length>3;
+  }else{
+    const p=prefix(scope);const rows=await discovery.database.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key>=? AND store_key<? AND store_key>? ORDER BY store_key LIMIT 4").bind(scope.dataAccountId,p,p+"\uffff",cursor.after||p).all<{data_json:string}>();
+    const page=rows.results??[];ids=page.slice(0,3).map(row=>String(parseStored<CostStateV1>(row.data_json)?.menuItemId??""));more=page.length>3;
+    if(ids.some(id=>!canonicalItemId(id))||new Set(ids).size!==ids.length)return fail("SOURCE_INVALID",422);
+  }
+  const discoveredStates=await readStoreSnapshots(discovery.database,scope.dataAccountId,ids.map(id=>stateKey(scope,id)));
+  const generations=new Map(ids.map(id=>[id,parseStored<CostStateV1>(discoveredStates.find(s=>s.key===stateKey(scope,id))?.dataJson??null)?.generation??0]));
+  const keys=ids.flatMap(id=>{const generation=generations.get(id)!;return [stateKey(scope,id),receiptKey(scope,id),episodeKey(scope,id,Math.max(1,generation)),episodeKey(scope,id,generation+1)]});
+  const read=await snapshot(context,[...new Set(keys)]);if(!read)return fail("ACCESS_DENIED",403);
+  // Candidate membership must come from the same source revision as the final snapshot.
+  if(read.profile!==discovery.profile||read.snapshots.find(s=>s.key==="bd_assortment_v1")?.dataJson!==discovery.snapshots.find(s=>s.key==="bd_assortment_v1")?.dataJson)throw new StoreWriteConflictError();
+  for(const id of ids)if((parseStored<CostStateV1>(read.snapshots.find(s=>s.key===stateKey(scope,id))?.dataJson??null)?.generation??0)!==generations.get(id))throw new StoreWriteConflictError();
+  const input={scope,snapshots:read.snapshots,profileJson:read.profile,now};
+  const batch:EvaluationBatch={read,now,inputRevision:await costEvaluationInputRevision(input),reader:createCurrentCostReader(input),statements:[],evaluated:0,reused:0};
+  // Restart discovery if inputs/date changed between pages: otherwise newly inserted IDs before the cursor could be missed.
+  if(cursor.inputRevision&&cursor.inputRevision!==batch.inputRevision)return json({ok:true,scope,items:[],coverage:"AVAILABLE",nextCursor:JSON.stringify({venueId:scope.venueId,phase:"menu",after:"",inputRevision:batch.inputRevision}),evaluation:{evaluated:0,reused:0}});
+  cursor={...cursor,inputRevision:batch.inputRevision};
+  const items:unknown[]=[];
+  if(!ids.length){const parsed=await readCostSources(read.snapshots,scope,now);if(parsed.reasons.length)return json({ok:true,coverage:"UNAVAILABLE",reasons:parsed.reasons,items:[],nextCursor:null});}
+  const sourceBytes=read.snapshots.filter(s=>COST_SOURCE_KEYS.includes(s.key)).reduce((total,s)=>total+new TextEncoder().encode(s.dataJson??"").byteLength,0);
+  let calculationBudget=sourceBytes>256_000?1:3;
+  let processed=0;
+  for(const id of ids){const response=await transition(context,id,null,"VIEW_REEVALUATION",batch);if(!response.ok)return response;const value=await response.json() as {episode?:CostEpisodeV1;observation?:{quality:{availability:string}}};
+    if(value.observation?.quality.availability==="UNAVAILABLE")return json({ok:true,coverage:"UNAVAILABLE",items:[],nextCursor:null});
+    if(value.episode)items.push(value.episode);
+    processed++;
+    if(batch.evaluated>0&&(await batch.reader.sourceBytes())>256_000)calculationBudget=1;
+    if(batch.evaluated>=calculationBudget)break;
+  }
+  more=more||processed<ids.length;ids=ids.slice(0,processed);
+  // Reuse must validate the live journal too, not only its domain_data marker.
+  let marker:unknown;try{marker=JSON.parse(read.snapshots.find(s=>s.key==="bd_stock_movements")?.dataJson??"null")}catch{/* Unavailable sources cannot create a receipt. */}
+  if(stockJournalMarker(marker))batch.statements.unshift(read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL WHERE NOT EXISTS(SELECT 1 FROM stock_journals WHERE account_id=? AND venue_id=? AND state='active' AND revision=?)").bind(scope.dataAccountId,scope.dataAccountId,scope.venueId,marker.revision));
+  // Also guard a reuse-only page; no cached decision may bypass current access/source integrity.
+  await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),...batch.statements],now);
+  const nextCursor=more?JSON.stringify({...cursor,after:cursor.phase==="menu"?ids.at(-1):stateKey(scope,ids.at(-1)!)}):cursor.phase==="menu"?JSON.stringify({venueId:scope.venueId,phase:"tracked",after:"",inputRevision:batch.inputRevision}):null;
+  return json({ok:true,scope,items,nextCursor,coverage:"AVAILABLE",evaluation:{evaluated:batch.evaluated,reused:batch.reused}});
 }
 
 /** Private versioned domain rows; GET never materializes episodes. */
@@ -140,6 +212,7 @@ export async function managementCostRequest(request: Request, signalId?: string)
         const body = parsedBody.data;
       if (Object.keys(body).some(key => !["menuItemId", "cursor", "batchSize"].includes(key)) || body.menuItemId != null && !canonicalItemId(body.menuItemId)) return fail("INVALID_COMMAND", 400);
       if (body.menuItemId) return await withStoreCasRetries(request, () => transition(context, String(body.menuItemId), null, "VIEW_REEVALUATION"));
+      if(body.batchSize===3)return await withStoreCasRetries(request,()=>evaluateBatch(context,body));
       const batchSize = body.batchSize === 1 ? 1 : 25;
       const read = await snapshot(context, []);
       if (!read) return fail("ACCESS_DENIED", 403);
