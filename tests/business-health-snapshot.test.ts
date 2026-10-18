@@ -38,6 +38,7 @@ function intelligence(input: {
       label: "attention",
       confidencePercent: input.confidence,
       confidence: "medium",
+      coverage: { measured: 3, total: 4, weightPercent: 85, financeAvailable: true, label: "Покрытие индекса: 3 из 4 направлений · 85% весов." },
       components: [
         { id: "finance", label: "Финансы", score: input.finance, weight: 40, confidence: "medium", evidence: ["Финансовый результат"], gaps: [] },
         { id: "demand", label: "Спрос", score: input.demand, weight: 20, confidence: "medium", evidence: ["Выручка к медиане"], gaps: [] },
@@ -272,7 +273,7 @@ test("venue, calculation version and reporting period isolate cache identities",
   const nextVersion = businessHealthSnapshotCacheKey({
     ...base,
     venueId: "3280",
-    calculationVersion: "business-health-engine-v6",
+    calculationVersion: "business-health-engine-future",
   });
 
   assert.notEqual(venueA, venueB);

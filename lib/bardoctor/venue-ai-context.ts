@@ -439,7 +439,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const currency = accountingCurrencyFromProfile({ ...sources.accountProfile, currency: sources.accountProfile.currency ?? sources.accountProfile.accountingCurrency });
   const canonical = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: "0000-01-01", endDate: zonedDateKey(now, timezone),
     revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
-    documents: array(store(sources, "bd_sales_documents")?.data), expenses: expenseRows, payrollEntries: payrollRows });
+    documents: array(store(sources, "bd_sales_documents")?.data), expenses: expenseRows, payrollEntries: payrollRows, expensesAvailable: !!storedExpenses && storedExpenses.sourceState !== "PARTIAL" && Array.isArray(storedExpenses.data), payrollEntriesAvailable: !!storedPayroll && storedPayroll.sourceState !== "PARTIAL" && Array.isArray(storedPayroll.data) });
   const rows = canonical.daily;
   const salesDocuments = array(store(sources, "bd_sales_documents")?.data).map(record)
     .filter((item) => !item.status || text(item.status) === "confirmed")
@@ -485,11 +485,11 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   });
   const monthInputs = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
     revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
-    documents: array(store(sources, "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries });
-  const effectiveRevenue = monthInputs.revenue;
+    documents: array(store(sources, "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries, expensesAvailable: !!storedExpenses && storedExpenses.sourceState !== "PARTIAL" && Array.isArray(storedExpenses.data), payrollEntriesAvailable: !!storedPayroll && storedPayroll.sourceState !== "PARTIAL" && Array.isArray(storedPayroll.data) });
+  const effectiveRevenue = monthInputs.revenueRows.length ? monthInputs.revenue : null;
   const receiptValues = monthInputs.revenueRows.map(row => number(row.receipts ?? row.checks));
   const guestValues = monthInputs.revenueRows.map(row => number(row.guests ?? row.guestCount));
-  const effectiveReceipts = receiptValues.every(value => value !== null) ? receiptValues.reduce<number>((total, value) => total + value!, 0) : null;
+  const effectiveReceipts = receiptValues.length && receiptValues.every(value => value !== null) ? receiptValues.reduce<number>((total, value) => total + value!, 0) : null;
   const effectiveGuests = guestValues.length && guestValues.every(value => value !== null) ? guestValues.reduce<number>((total, value) => total + value!, 0) : null;
   const effectivePayroll = monthInputs.payroll;
   const effectiveExpenses = monthInputs.expenses;
@@ -849,7 +849,7 @@ function summariseReviews(sources: VenueAIContextSources) {
   const reviewStore = store(sources, "bd_guest_reviews");
   const external = record(sources.external?.reviews);
   const storedReviews = array(reviewStore?.data).map(record);
-  const aggregate = aggregateReviews(storedReviews);
+  const aggregate = aggregateReviews(reviewStore?.sourceState === "PARTIAL" ? [] : storedReviews);
   const total = aggregate.total;
   const averageRating = aggregate.averageRating;
   const negative = aggregate.sentiment.negative;

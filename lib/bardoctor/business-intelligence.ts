@@ -219,6 +219,7 @@ export type AIDoctorIntelligence = {
     score: number | null;
     label: "healthy" | "attention" | "critical" | "insufficient_data";
     confidencePercent: number;
+    coverage: { measured: number; total: number; weightPercent: number; financeAvailable: boolean; label: string };
     confidence: ConfidenceLevel;
     components: BusinessHealthComponent[];
     lowersScore: string[];
@@ -763,10 +764,10 @@ function liveHeadline(direction: LivePeriodAnalysis["direction"], periodEnd: str
 }
 
 function periodCaption(startDate: string | null, endDate: string | null): string {
-  if (!startDate || !endDate) return "Текущий период · предварительно";
+  if (!startDate || !endDate) return "Текущий период";
   const startDay = Number(startDate.slice(-2));
   const endDay = Number(endDate.slice(-2));
-  return `Данные по ${startDay}–${endDay} ${monthName(endDate)} · предварительно`;
+  return `Данные по ${startDay}–${endDay} ${monthName(endDate)}`;
 }
 
 /**
@@ -976,7 +977,8 @@ function demandComponent(input: {
 }): BusinessHealthComponent {
   const evidence: string[] = [];
   const gaps: string[] = [];
-  if (!input.target || !input.baseline || input.baseline.sampleSize < 2) {
+  if (!input.target || input.target.revenueStatus === "PROVISIONAL" || !input.baseline || input.baseline.sampleSize < 2
+    || [input.trafficChange, input.averageChange, input.revenueChange].every(value => value === null)) {
     return { id: "demand", label: "Спрос", score: null, weight: 20, confidence: "low", evidence, gaps: ["Недостаточно сопоставимых смен одного дня недели"] };
   }
   if (input.revenueChange !== null) evidence.push(`Выручка к медиане сопоставимых смен: ${input.revenueChange >= 0 ? "+" : ""}${input.revenueChange}%`);
@@ -1009,8 +1011,8 @@ function operationsComponent(value: NonNullable<BusinessIntelligenceInput["opera
   const states: string[] = [];
   for (const key of Object.keys(labels) as Array<keyof typeof labels>) {
     const input: HealthCounter | undefined = value.counters?.[key];
-    const known = input ? input.availability === "AVAILABLE" && input.evidenceStatus === "COMPLETE" : typeof value[key] === "number" && Number.isFinite(value[key]);
-    const state = known ? "AVAILABLE" : input?.availability ?? "UNAVAILABLE";
+    const known = input ? input.availability === "AVAILABLE" && input.evidenceStatus === "COMPLETE" && typeof value[key] === "number" && Number.isFinite(value[key]) : typeof value[key] === "number" && Number.isFinite(value[key]);
+    const state = known ? "AVAILABLE" : input?.availability === "AVAILABLE" ? "PARTIAL" : input?.availability ?? "UNAVAILABLE";
     states.push(state);
     if (!known) gaps.push(`${labels[key][0]}: ${state} — полнота источника не подтверждена`);
     else evidence.push(value[key]! > 0 ? `${labels[key][0]}: ${value[key]}` : labels[key][1]);
@@ -1025,7 +1027,7 @@ function operationsComponent(value: NonNullable<BusinessIntelligenceInput["opera
 
 function guestsComponent(value: NonNullable<BusinessIntelligenceInput["reviews"]>): BusinessHealthComponent {
   const total = Math.max(0, Math.round(value.total ?? 0));
-  if (!total) return { id: "guests", label: "Гости", score: null, weight: 15, confidence: "low", evidence: [], gaps: ["Нет отзывов; финансовая оценка от этого не ухудшается"] };
+  if (!total || (numeric(value.averageRating) === null && !(value.negativeDenominator != null && value.negativeDenominator > 0))) return { id: "guests", label: "Гости", score: null, weight: 15, confidence: "low", evidence: [], gaps: ["Нет отзывов; финансовая оценка от этого не ухудшается"] };
   const rating = numeric(value.averageRating);
   const negative = Math.max(0, Math.round(value.negative ?? 0));
   const recurring = Math.max(0, Math.round(value.recurringComplaints ?? 0));
@@ -1059,7 +1061,10 @@ function healthFromComponents(
   const financeScore = components.find((component) => component.id === "finance")?.score ?? null;
   const financeAvailable = financeScore !== null;
   const weight = available.reduce((sum, component) => sum + component.weight, 0);
-  const rawScore = financeAvailable && available.length >= 2 && weight > 0
+  const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
+  const coverage = { measured: available.length, total: components.length, weightPercent: Math.round(weight / Math.max(1, totalWeight) * 100), financeAvailable,
+    label: `Покрытие индекса: ${available.length} из ${components.length} направлений · ${Math.round(weight / Math.max(1, totalWeight) * 100)}% весов.${financeAvailable ? "" : " Финансовое состояние не оценено."}` };
+  const rawScore = available.length >= 2 && weight > 0
     ? clamp(available.reduce((sum, component) => sum + (component.score ?? 0) * component.weight, 0) / weight)
     : null;
   let score = rawScore;
@@ -1097,6 +1102,7 @@ function healthFromComponents(
     .map((component) => `${component.label}: ${component.score}/100 — ${component.evidence[0] ?? "показатель поддерживает оценку"}`);
   return {
     score,
+    coverage,
     // A confirmed severe loss is business-wide and cannot be averaged away by
     // clean operational or review data. Data quality remains a separate axis.
     label: financeScore !== null && financeScore < 35
@@ -1110,10 +1116,10 @@ function healthFromComponents(
     adjustments,
     methodology: "Взвешенная оценка фактических направлений с caps для подтверждённых business-wide отклонений. Confidence считается отдельно и не повышает score.",
     explanation: score === null
-      ? "Business Health не рассчитан: нужен закрытый финансовый период и минимум ещё одно фактическое направление. Data Quality показан отдельно."
+      ? `Business Health не рассчитан: нужны минимум два подтверждённых бизнес-направления. ${coverage.label} Полнота данных не является бизнес-направлением.`
       : lowersScore.length || adjustments.length
-        ? `Главное давление на Business Health: ${lowersScore[0] ?? adjustments[0]}. ${adjustments[0] ? `Ограничение оценки: ${adjustments[0]}. ` : ""}Достоверность оценки ${confidencePercent}%.`
-        : `Критичных отклонений по доступным бизнес-показателям не обнаружено. Достоверность оценки ${confidencePercent}%.`,
+        ? `По доступным направлениям. ${coverage.label} Главное давление на Business Health: ${lowersScore[0] ?? adjustments[0]}. ${adjustments[0] ? `Ограничение оценки: ${adjustments[0]}. ` : ""}Достоверность оценки ${confidencePercent}%.`
+        : `По доступным направлениям. ${coverage.label} Критичных отклонений по доступным бизнес-показателям не обнаружено. Достоверность оценки ${confidencePercent}%.`,
   };
 }
 

@@ -8,7 +8,7 @@ import type {
 import { businessHealthStatusForScore } from "./business-intelligence";
 import type { VenueAIContext } from "./venue-ai-context";
 
-export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v5" as const;
+export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v6" as const;
 
 export type BusinessHealthFactorAvailability = "measured" | "unavailable";
 
@@ -18,7 +18,8 @@ export type BusinessHealthSnapshot = {
   dataAccountId: string;
   score: number | null;
   status: AIDoctorIntelligence["businessHealth"]["label"];
-  statusLabel: "Хорошее состояние" | "Требует внимания" | "Критично" | "Недостаточно данных";
+  statusLabel: "Хорошее состояние" | "Хорошо по доступным направлениям" | "Требует внимания" | "Критично" | "Недостаточно данных";
+  coverage: AIDoctorIntelligence["businessHealth"]["coverage"];
   confidence: number;
   confidenceLevel: AIDoctorIntelligence["businessHealth"]["confidence"];
   primaryFactor: {
@@ -173,8 +174,8 @@ function operationalInterpretation(component: BusinessHealthComponent): string {
 function zoneInterpretation(component: BusinessHealthComponent, intelligence: AIDoctorIntelligence): { interpretation: string; factors: string[] } {
   if (component.id === "finance") {
     return {
-      interpretation: intelligence.livePeriod.financeSummary,
-      factors: intelligence.livePeriod.factors.slice(0, 2),
+      interpretation: component.score === null ? "Финансовое состояние не оценено: нет подтверждённой оценки закрытого периода." : `Финансовая оценка: ${intelligence.periods.closedFinance?.label ?? "закрытый период"}. Это не прибыль текущего месяца.`,
+      factors: [...component.evidence, ...component.gaps].slice(0, 3),
     };
   }
   if (component.id === "demand") {
@@ -269,7 +270,8 @@ export function buildBusinessHealthSnapshot(input: {
     dataAccountId: String(input.dataAccountId ?? input.venueId),
     score: health.score,
     status: health.label,
-    statusLabel: statusLabel(health.label),
+    statusLabel: health.label === "healthy" && !health.coverage.financeAvailable ? "Хорошо по доступным направлениям" : statusLabel(health.label),
+    coverage: health.coverage,
     confidence: health.confidencePercent,
     confidenceLevel: health.confidence,
     primaryFactor: primaryFactor(health.components),
