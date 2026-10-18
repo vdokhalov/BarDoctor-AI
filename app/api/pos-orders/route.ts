@@ -45,7 +45,7 @@ function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
   if (error instanceof Error && /^(STOCK_JOURNAL_|POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
-      POS_ORDER_CONFIRMED_LOCKED: "Позиции уже подтверждены. Исправление или отмена отправленного заказа пока недоступны; требуется отдельный корректирующий процесс руководителя.",
+      POS_ORDER_CONFIRMED_LOCKED: "Позиции уже подтверждены. Руководитель может отменить нужное количество отдельным бегунком «ОТМЕНА» с причиной; прямое изменение или разделение недоступно.",
       POS_ORDER_NOTHING_TO_CONFIRM: "Новых позиций для подтверждения нет.",
       POS_ORDER_PREPARATION_SECTION_REQUIRED: "Руководитель должен заранее указать действующий раздел в карточке позиции меню.",
       POS_ORDER_PREPARATION_INVALID: "Настройки или бегунки требуют проверки. Ничего не изменено.",

@@ -1,4 +1,4 @@
-import { confirmedLineIds, prepareTickets, validatePreparationTickets, type PreparationConfig, type PreparationTicket } from './pos-preparation';
+import { cancellationTicket, confirmedLineIds, prepareTickets, validatePreparationTickets, type PreparationConfig, type PreparationTicket } from './pos-preparation';
 import {paidOrderIds} from './sales-event-history';
 import { posWorkdayGate } from "./pos-workday-gate";
 import { capturePosDiscount, posDiscountCents, validatePosDiscountSnapshot, type PosDiscountRule, type PosDiscountSnapshot, type PosDiscountTotals } from "./pos-discounts";
@@ -295,7 +295,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
     if (order.precheck && ["add_items", "set_quantity", "cancel_item", "split", "precheck", "apply_discount", "remove_discount"].includes(command.action)) fail("PRECHECK_LOCKED");
     if (order.discount && ["add_items", "set_quantity", "cancel_item", "split"].includes(command.action)) fail(command.action === "split" ? "SPLIT_DISCOUNTED" : "DISCOUNT_LOCKED");
     const sent=confirmedLineIds(order);
-    if(sent.size&&(["cancel_order","split"].includes(command.action)||["set_quantity","cancel_item"].includes(command.action)&&sent.has(command.lineId!)))fail("CONFIRMED_LOCKED");
+    if(sent.size&&(command.action==="split"||command.action==="cancel_order"&&order.lines.some(l=>sent.has(l.id))||command.action==="set_quantity"&&sent.has(command.lineId!)))fail("CONFIRMED_LOCKED");
     order = { ...order, revision: order.revision + 1 };
     if(command.action==="confirm"){
       if(order.precheck||order.discount)fail("PRECHECK_LOCKED");
@@ -304,7 +304,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       order.preparationTickets=[...(order.preparationTickets||[]),...prepareTickets(order,c.assortment,config,command.operationId,c.now,c.actor)];
     } else if (command.action === "add_items") {
       const incoming = details.lines as { id: string; menuItemId: string; quantity: number }[];
-      if (incoming.some(line => order!.lines.some(current => current.id === line.id)) || order.lines.length + incoming.length > 100) fail("LINES_INVALID");
+      if (incoming.some(line => (order!.lines.some(current => current.id === line.id)||sent.has(line.id))) || order.lines.length + incoming.length > 100) fail("LINES_INVALID");
       order.lines = [...order.lines, ...incoming].map(line => priceLine(c, line));
     } else if (command.action === "set_quantity") {
       if (!order.lines.some(line => line.id === command.lineId)) fail("LINES_INVALID");
@@ -313,7 +313,11 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       const target = order.lines.find(line => line.id === command.lineId);
       if (!target || command.quantity !== undefined && command.quantity > target.quantity) fail("LINES_INVALID");
       const removed = command.quantity ?? target.quantity;
-      order.lines = order.lines.flatMap(line => line.id !== target.id ? [line] : line.quantity === removed ? [] : [priceLine(c, { ...line, quantity: line.quantity - removed })]);
+      if(sent.has(target.id)){
+        assertUnpaidOrderCancellation(c,order);
+        order.preparationTickets=[...(order.preparationTickets||[]),cancellationTicket(order,target.id,removed,command.operationId,String(details.reason),c.now,c.actor)];
+      }
+      order.lines = order.lines.flatMap(line => line.id !== target.id ? [line] : line.quantity === removed ? [] : [sent.has(line.id)?{...line,quantity:line.quantity-removed,total:Math.round(line.unitPrice*(line.quantity-removed)*100)/100}:priceLine(c, { ...line, quantity: line.quantity - removed })]);
     } else if (command.action === "apply_discount") {
       if (!order.lines.length) fail("EMPTY");
       const current = order.lines.map(line => priceLine(c, line));
