@@ -56,6 +56,9 @@ export type BusinessHealthComponent = {
   label: string;
   score: number | null;
   weight: number;
+  nominalWeight?: number;
+  operationsCoverage?: { measured: number; total: number; notApplicable: string[]; missing: string[] };
+  confirmedRiskScore?: number;
   confidence: ConfidenceLevel;
   evidence: string[];
   gaps: string[];
@@ -1007,22 +1010,30 @@ function operationsComponent(value: NonNullable<BusinessIntelligenceInput["opera
     criticalBlockers: ["Критические операционные блокеры", "Критических блокеров не зафиксировано"],
     recurringEquipmentFailures: ["Повторяющиеся сбои оборудования / просроченное ТО", "Повторяющихся сбоев оборудования и просроченного ТО не зафиксировано"],
   };
-  const evidence: string[] = [], gaps: string[] = [];
-  const states: string[] = [];
+  const evidence: string[] = [], gaps: string[] = [], missing: string[] = [], notApplicable: string[] = [];
+  const penalties = { unclosedShifts: [5, 30], stockAnomalies: [7, 20], criticalBlockers: [30, 60], recurringEquipmentFailures: [8, 25] };
+  let measured = 0, penalty = 0;
   for (const key of Object.keys(labels) as Array<keyof typeof labels>) {
-    const input: HealthCounter | undefined = value.counters?.[key];
-    const known = input ? input.availability === "AVAILABLE" && input.evidenceStatus === "COMPLETE" && typeof value[key] === "number" && Number.isFinite(value[key]) : typeof value[key] === "number" && Number.isFinite(value[key]);
-    const state = known ? "AVAILABLE" : input?.availability === "AVAILABLE" ? "PARTIAL" : input?.availability ?? "UNAVAILABLE";
-    states.push(state);
-    if (!known) gaps.push(`${labels[key][0]}: ${state} — полнота источника не подтверждена`);
-    else evidence.push(value[key]! > 0 ? `${labels[key][0]}: ${value[key]}` : labels[key][1]);
+    const input = value.counters?.[key];
+    if (input?.notApplicable) { notApplicable.push(key); evidence.push("Оборудование не используется: подтверждён пустой реестр"); continue; }
+    const amount = input ? input.value : value[key];
+    const known = typeof amount === "number" && Number.isFinite(amount) && amount >= 0
+      && (!input || input.availability === "AVAILABLE" && input.evidenceStatus === "COMPLETE");
+    if (!known) { missing.push(key); gaps.push(`${labels[key][0]}: пока недостаточно подтверждённых данных`); continue; }
+    measured++;
+    penalty += Math.min(penalties[key][1], Math.round(amount) * penalties[key][0]);
+    evidence.push(amount > 0 ? `${labels[key][0]}: ${amount}` : labels[key][1]);
   }
-  const availability = states.includes("RESTRICTED") ? "RESTRICTED" : states.includes("UNAVAILABLE") ? "UNAVAILABLE" : states.includes("PARTIAL") ? "PARTIAL" : "AVAILABLE";
-  const complete = availability === "AVAILABLE";
-  const unclosed = Math.max(0, Math.round(value.unclosedShifts ?? 0)), stock = Math.max(0, Math.round(value.stockAnomalies ?? 0));
-  const blockers = Math.max(0, Math.round(value.criticalBlockers ?? 0)), equipment = Math.max(0, Math.round(value.recurringEquipmentFailures ?? 0));
-  const score = complete ? clamp(90 - Math.min(30, unclosed * 5) - Math.min(20, stock * 7) - Math.min(60, blockers * 30) - Math.min(25, equipment * 8)) : null;
-  return { id: "operations", label: "Операции", score, weight: 25, confidence: complete ? "high" : "low", availability, inputCounters: value.counters, evidence, gaps };
+  const total = Object.keys(labels).length - notApplicable.length, complete = measured === total;
+  // Missing counters add neither evidence nor weight. Two independent measured
+  // populations are required; a lone good day cannot certify operations.
+  const confirmedRiskScore = clamp(90 - penalty);
+  const score = measured >= 2 ? confirmedRiskScore : null;
+  return { id: "operations", label: "Операции", score, weight: score === null ? 0 : 25 * measured / Math.max(1, total), nominalWeight: 25,
+    confidence: complete ? "high" : "low", availability: complete ? "AVAILABLE" : measured ? "PARTIAL" : "UNAVAILABLE",
+    operationsCoverage: { measured, total, notApplicable, missing }, confirmedRiskScore,
+    inputCounters: value.counters, evidence, gaps };
+
 }
 
 function guestsComponent(value: NonNullable<BusinessIntelligenceInput["reviews"]>): BusinessHealthComponent {
@@ -1061,7 +1072,7 @@ function healthFromComponents(
   const financeScore = components.find((component) => component.id === "finance")?.score ?? null;
   const financeAvailable = financeScore !== null;
   const weight = available.reduce((sum, component) => sum + component.weight, 0);
-  const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
+  const totalWeight = components.reduce((sum, component) => sum + (component.nominalWeight ?? component.weight), 0);
   const coverage = { measured: available.length, total: components.length, weightPercent: Math.round(weight / Math.max(1, totalWeight) * 100), financeAvailable,
     label: `Покрытие индекса: ${available.length} из ${components.length} направлений · ${Math.round(weight / Math.max(1, totalWeight) * 100)}% весов.${financeAvailable ? "" : " Финансовое состояние не оценено."}` };
   const rawScore = available.length >= 2 && weight > 0
@@ -1086,13 +1097,14 @@ function healthFromComponents(
   if (demandScore !== null && demandScore < 55 && (context?.currentFinancialResult ?? 0) < 0) {
     applyCap(52, "Просадка спроса совпала с отрицательным предварительным результатом текущего периода");
   }
-  if (operationsScore !== null && operationsScore < 40) {
+  const operationalRisk = components.find(component => component.id === "operations")?.confirmedRiskScore ?? operationsScore;
+  if (operationalRisk !== null && operationalRisk !== undefined && operationalRisk < 40) {
     applyCap(49, "Критические операционные блокеры ограничивают способность заведения работать");
   }
   const confidencePercent = clamp(available.reduce((sum, component) => {
     const confidence = component.confidence === "high" ? 100 : component.confidence === "medium" ? 72 : 42;
     return sum + confidence * component.weight;
-  }, 0) / Math.max(1, components.reduce((sum, component) => sum + component.weight, 0)));
+  }, 0) / Math.max(1, totalWeight));
   const sorted = available.slice().sort((left, right) => (left.score ?? 100) - (right.score ?? 100));
   const lowersScore = sorted.filter((component) => (component.score ?? 100) < 60)
     .slice(0, 3)

@@ -163,7 +163,7 @@ test("healthy Health without an actionable diagnosis stays positive without inve
   const snapshot = buildBusinessHealthSnapshot({ venueId: 3280, intelligence: source, context });
 
   assert.equal(snapshot.status, "healthy");
-  assert.equal(snapshot.statusLabel, "Хорошее состояние");
+  assert.equal(snapshot.statusLabel, "Хорошо по доступным направлениям");
   assert.equal(snapshot.priorityAction, null);
 });
 

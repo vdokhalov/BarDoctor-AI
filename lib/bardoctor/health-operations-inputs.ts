@@ -8,7 +8,7 @@ import type { Availability } from "./evidence-contracts";
 type Row = Record<string, unknown>;
 export type HealthSourceState = Availability | "RESTRICTED";
 export type HealthSource = { key: string; state: HealthSourceState; revision: string | null; updatedAt: string | null; data: unknown };
-export type HealthCounter = { value: number | null; availability: HealthSourceState; evidenceStatus: "COMPLETE" | "PARTIAL" | "NONE"; zero: "KNOWN_ZERO" | null; sources: string[]; grain: string; window: string; diagnostics: string[] };
+export type HealthCounter = { notApplicable?: boolean; value: number | null; availability: HealthSourceState; evidenceStatus: "COMPLETE" | "PARTIAL" | "NONE"; zero: "KNOWN_ZERO" | null; sources: string[]; grain: string; window: string; diagnostics: string[] };
 export type HealthOperationIssue = Row & { managementId: string; issueKey: string; title: string; target: {path:string;label:string}; verificationKind?: "day" | "stock" };
 export type HealthStockFact = { managementId:string; productKey:string; warehouseKey:string; unit:string; name:string; quantity:number|null; minimum:number|null; evidenceComplete:boolean; active:boolean };
 export type HealthOperationsInputs = {
@@ -81,6 +81,15 @@ export function buildHealthOperationsInputs(input: { sources: HealthSource[]; ve
   // Keep the existing combined equipment counter and >=2 threshold; an asset
   // with both recurrence and overdue maintenance contributes only once.
   const equipmentCounter = counter(equipmentKeys, affected.length, "EQUIPMENT_ID", `retained repair history and maintenance due before ${today}`, equipmentDiagnostics);
+  // Only a fully available, explicitly empty registry can establish that no
+  // equipment is used. Contradictory retained repairs prevent this exemption.
+  const equipmentSource = sourceMap.get("bd_equipment");
+  const noEquipment = equipmentSource?.state === "AVAILABLE" && Array.isArray(equipmentSource.data) && equipmentSource.data.length === 0
+    && equipmentKeys.slice(1).every(key => !["PARTIAL", "RESTRICTED"].includes(sourceMap.get(key)?.state ?? "UNAVAILABLE"))
+    && equipmentDiagnostics.length === 0 && !history.length && !orders.length
+    && !expenses.some(row => row.category === "repairs" && row.equipmentId);
+  if (noEquipment) Object.assign(equipmentCounter, { value: 0, availability: "AVAILABLE", evidenceStatus: "COMPLETE", zero: "KNOWN_ZERO", notApplicable: true, sources: ["bd_equipment"], diagnostics: [] });
+
 
   const stockKeys = ["bd_assortment_v1", "bd_inventory_snapshots", "bd_opening_stock_v1", "bd_stock_movements"];
   const stockSourcesTrusted=stockKeys.every(key=>{

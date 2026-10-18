@@ -8,7 +8,7 @@ import type {
 import { businessHealthStatusForScore } from "./business-intelligence";
 import type { VenueAIContext } from "./venue-ai-context";
 
-export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v6" as const;
+export const BUSINESS_HEALTH_CALCULATION_VERSION = "business-health-engine-v7" as const;
 
 export type BusinessHealthFactorAvailability = "measured" | "unavailable";
 
@@ -19,6 +19,7 @@ export type BusinessHealthSnapshot = {
   score: number | null;
   status: AIDoctorIntelligence["businessHealth"]["label"];
   statusLabel: "Хорошее состояние" | "Хорошо по доступным направлениям" | "Требует внимания" | "Критично" | "Недостаточно данных";
+  assessment: { partial: boolean; note: string; hint: { label: string; path: string } | null; details: string[] };
   coverage: AIDoctorIntelligence["businessHealth"]["coverage"];
   confidence: number;
   confidenceLevel: AIDoctorIntelligence["businessHealth"]["confidence"];
@@ -42,7 +43,7 @@ export type BusinessHealthSnapshot = {
     score: number | null;
     availability: BusinessHealthFactorAvailability;
     status: BusinessHealthStatus;
-    statusLabel: "Хорошо" | "Требует внимания" | "Критично" | "Недостаточно данных";
+    statusLabel: "Хорошо" | "Частично оценено" | "Требует внимания" | "Критично" | "Недостаточно данных";
     evidence: string[];
     gaps: string[];
     interpretation: string;
@@ -163,7 +164,8 @@ export function businessHealthActionTarget(issueKey: string, context: Record<str
 }
 
 function operationalInterpretation(component: BusinessHealthComponent): string {
-  if (component.score === null) return "Операционная оценка недоступна: полнота источников не подтверждена.";
+  if (component.score === null) return "Для оценки операций нужны хотя бы две подтверждённые составляющие.";
+  if (component.availability === "PARTIAL") return "Операции оценены частично. Подтверждённые проблемы учтены, неизвестные составляющие не приняты за благополучные.";
   const issue = component.evidence.find((item) => /:\s*[1-9]\d*/.test(item));
   const status = businessHealthStatusForScore(component.score);
   if (issue && status !== "healthy") return `Операционная зона требует внимания: ${issue.charAt(0).toLocaleLowerCase("ru")}${issue.slice(1)}.`;
@@ -241,6 +243,39 @@ function zoneStatusLabel(status: BusinessHealthStatus): BusinessHealthSnapshot["
   return "Недостаточно данных";
 }
 
+function assessmentSummary(intelligence: AIDoctorIntelligence, venueId: string, primaryAction: AIDoctorIntelligence["briefing"]["todayActions"][number] | null): BusinessHealthSnapshot["assessment"] {
+  const health = intelligence.businessHealth, ops = health.components.find(item => item.id === "operations");
+  const coverage = ops?.operationsCoverage;
+  const partial = health.coverage.weightPercent < 100 || Boolean(coverage && coverage.measured < coverage.total);
+  const paths = { unclosedShifts: ["Проверьте отчёты рабочих дней", "/shifts"], stockAnomalies: ["Уточните остатки, чтобы оценить склад", "/warehouse"], criticalBlockers: ["Проверьте журнал происшествий", "/cases"], recurringEquipmentFailures: ["Проверьте учёт оборудования", "/equipment"] };
+  let hint: BusinessHealthSnapshot["assessment"]["hint"] = null;
+  const setHint = (label: string, path: string) => { hint = { label, path: path + (path.includes("?") ? "&" : "?") + "venueId=" + encodeURIComponent(venueId) }; };
+  const finance = health.components.find(item => item.id === "finance");
+  if (finance?.score != null && finance.score < 55) setHint("Разберите убыток или низкую прибыль закрытого периода", "/finance");
+  const positive = (key: keyof typeof paths) => {
+    const counter = ops?.inputCounters?.[key];
+    return counter?.availability === "AVAILABLE" && counter.evidenceStatus === "COMPLETE" && counter.value !== null && counter.value > 0;
+  };
+  if (!hint && positive("criticalBlockers")) setHint("Разберите критическое происшествие", "/cases");
+  if (!hint && primaryAction) {
+    const target = businessHealthActionTarget(primaryAction.issueKey, primaryAction);
+    if (target) hint = { label: target.label, path: target.path };
+  }
+  if (!hint) for (const key of ["stockAnomalies", "unclosedShifts", "recurringEquipmentFailures"] as const) {
+    if (positive(key)) { setHint(key === "stockAnomalies" ? "Проверьте проблемные остатки" : paths[key][0], paths[key][1]); break; }
+  }
+  if (!hint) for (const key of ["stockAnomalies", "unclosedShifts", "criticalBlockers", "recurringEquipmentFailures"] as const) {
+    if (coverage?.missing.includes(key) && ops?.inputCounters?.[key]?.availability !== "RESTRICTED") { setHint(paths[key][0], paths[key][1]); break; }
+  }
+  const details = [health.coverage.label, "Полнота данных показывается отдельно и не повышает бизнес-оценку."];
+  if (coverage) details.push(`Операции: подтверждено ${coverage.measured} из ${coverage.total} применимых составляющих. Вклад в индекс: ${Math.round((ops?.weight ?? 0) * 100) / 100} из 25. Для балла нужны хотя бы две составляющие.`);
+  if (coverage?.notApplicable.length) details.push("Оборудование не используется: реестр подтверждённо пуст. Заполнять модуль не требуется.");
+  if (ops) details.push("Операции: текущие остатки и открытые происшествия; рабочие дни и ремонты — по сохранённой истории. Месяц закрывать не требуется.", ...ops.evidence, ...ops.gaps);
+  if (intelligence.periods.closedFinance && health.coverage.financeAvailable) details.push(`Финансовая оценка: ${intelligence.periods.closedFinance.label}. Это не прибыль текущего месяца.`);
+  details.push(...health.adjustments);
+  return { partial, note: partial ? "Оценка по доступным данным" : "Оценка по всем направлениям", hint, details };
+}
+
 export function buildBusinessHealthSnapshot(input: {
   venueId: string | number;
   dataAccountId?: string | number;
@@ -258,6 +293,7 @@ export function buildBusinessHealthSnapshot(input: {
   const venueId = String(input.venueId);
   const generatedAt = input.intelligence.generatedAt;
   const primaryAction = input.intelligence.briefing.todayActions[0] ?? null;
+  const assessment = assessmentSummary(input.intelligence, venueId, primaryAction);
   const dataQualityGaps = Object.values(input.intelligence.dataQuality.gapsByScope).flat();
   return {
     snapshotId: businessHealthSnapshotIdentity({
@@ -270,8 +306,9 @@ export function buildBusinessHealthSnapshot(input: {
     dataAccountId: String(input.dataAccountId ?? input.venueId),
     score: health.score,
     status: health.label,
-    statusLabel: health.label === "healthy" && !health.coverage.financeAvailable ? "Хорошо по доступным направлениям" : statusLabel(health.label),
+    statusLabel: health.label === "healthy" && assessment.partial ? "Хорошо по доступным направлениям" : statusLabel(health.label),
     coverage: health.coverage,
+    assessment,
     confidence: health.confidencePercent,
     confidenceLevel: health.confidence,
     primaryFactor: primaryFactor(health.components),
@@ -292,7 +329,7 @@ export function buildBusinessHealthSnapshot(input: {
         score: component.score,
         availability: component.score === null ? "unavailable" : "measured",
         status,
-        statusLabel: zoneStatusLabel(status),
+        statusLabel: component.id === "operations" && component.score !== null && component.availability === "PARTIAL" && status === "healthy" ? "Частично оценено" : zoneStatusLabel(status),
         evidence: component.evidence,
         gaps: component.gaps,
         ...interpretation,

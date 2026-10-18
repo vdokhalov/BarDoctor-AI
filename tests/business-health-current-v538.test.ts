@@ -29,11 +29,11 @@ test('partial proof or missing operation value is not a known zero', () => {
   const counters = Object.fromEntries(Object.keys(operations).map(key => [key, { value: 0, availability: 'AVAILABLE', evidenceStatus: 'COMPLETE' }])) as NonNullable<BusinessIntelligenceInput['operations']>['counters'];
   counters!.stockAnomalies.evidenceStatus = 'PARTIAL';
   let result = read({ operations: { ...operations, counters } });
-  assert.equal(result.businessHealth.components.find(c => c.id === 'operations')!.score, null);
-  assert.equal(result.businessHealth.score, null);
+  assert.equal(result.businessHealth.components.find(c => c.id === 'operations')!.availability, 'PARTIAL');
+  assert.equal(result.businessHealth.components.find(c => c.id === 'operations')!.weight, 18.75);
   counters!.stockAnomalies.evidenceStatus = 'COMPLETE';
-  result = read({ operations: { ...operations, stockAnomalies: null, counters } });
-  assert.equal(result.businessHealth.score, null);
+  result = read({ operations: { ...operations, stockAnomalies: null, counters: { ...counters!, stockAnomalies: { ...counters!.stockAnomalies, value: null } } } });
+  assert.equal(result.businessHealth.components.find(c => c.id === 'operations')!.availability, 'PARTIAL');
 });
 test('provisional demand or absent measurable baseline delta cannot manufacture baseline 70', () => {
   assert.equal(read({ daily: daily.map(row => ({ ...row, closingStatus: 'open' })) }).businessHealth.score, null);
@@ -70,23 +70,22 @@ test('complete shift alone does not certify cases, warehouse and equipment sourc
   const ops = buildHealthOperationsInputs({ sources, venueId: 3389, workspaceId: 1, dataAccountId: 1, profile: {}, asOf: '2026-10-18T12:00:00Z', currency: 'MDL' });
   assert.equal(ops.days[0].status, 'COMPLETE');
   assert.equal(ops.counters.unclosedShifts.value, 0); assert.equal(ops.counters.criticalBlockers.value, null);
-  assert.equal(read({ operations: ops }).businessHealth.score, null);
+  assert.notEqual(read({ operations: ops }).businessHealth.score, null);
+  assert.equal(read({ operations: ops }).businessHealth.components.find(c => c.id === 'operations')!.availability, 'PARTIAL');
 });
 test('actual client helpers show coverage, separate financial period and qualified status; patch is idempotent', () => {
   const source = fs.readFileSync('public/assets/index-BQGspy0I.js', 'utf8');
   assert.equal(patchCurrentHealthClient(source), source);
   const extract = (name: string) => source.slice(source.indexOf(`function ${name}(`)).split('\n')[0];
   const ctx = vm.createContext({ localStorage: { getItem: () => '3389' }, i: { jsx: (type: unknown, props: unknown) => ({ type, props }), jsxs: (type: unknown, props: unknown) => ({ type, props }) } }); vm.runInContext(extract('bdHealthLivePeriodV334') + '\n' + extract('bdHealthUiStatusV332'), ctx);
-  vm.runInContext(extract('bdCostHomeScorePhase4a'), ctx);
+  vm.runInContext(extract('bdHealthExplanationV539') + '\n' + extract('bdCostHomeScorePhase4a'), ctx);
   const current = snapshot();
   const home = JSON.stringify(ctx.bdCostHomeScorePhase4a({ snapshot: current, loading: false, onNavigate: () => {} }));
   assert.match(home, /Текущее состояние/);
   assert.match(home, /Хорошо по доступным направлениям/);
-  assert.match(home, /Покрытие индекса: 2 из 4/);
-  assert.match(home, /Финансовое состояние не оценено/);
-  assert.match(ctx.bdHealthLivePeriodV334(current).periodLabel, /2 из 4.*45%.*Финансовое состояние не оценено/);
+  assert.doesNotMatch(ctx.bdHealthLivePeriodV334(current).periodLabel, /из 4|весов/);
   assert.doesNotMatch(ctx.bdHealthLivePeriodV334(current).periodLabel, /предварительно/);
   assert.equal(ctx.bdHealthUiStatusV332(81, 'healthy', current).label, 'Хорошо по доступным направлениям');
   const closed = snapshot(read({ latestClosedMonth: { monthKey: '2026-09', revenue: 1000, finalProfit: 100 } }));
-  assert.match(ctx.bdHealthLivePeriodV334(closed).periodLabel, /Финансовая оценка: 2026-09; не прибыль текущего месяца/);
+  assert.match(closed.assessment.details.join(' '), /Финансовая оценка: 2026-09.*не прибыль текущего месяца/);
 });

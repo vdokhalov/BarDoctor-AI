@@ -3,9 +3,10 @@ import test from 'node:test';
 import { healthInputsFixture } from './helpers/health-inputs-fixture';
 import { buildBusinessIntelligence } from '../lib/bardoctor/business-intelligence';
 import { MAX_HEALTH_ROWS } from '../lib/bardoctor/health-operations-inputs';
-type Reply = { data: { businessHealth: { components: { id: string; score: number | null; confidence: string; evidence: string[]; gaps: string[] }[] }; businessHealthSnapshot: { score: number | null; inputRevision: string; inputManifest: { sources: { key: string; state: string }[] }; operationsInputs: { counters: Record<string, { value: number | null; availability: string; zero: string | null }>; days: { businessDate: string; status: string; cashShiftStatuses: string[]; reportSaved: boolean }[] } } } };
+type Reply = { data: { businessHealth: { components: { id: string; score: number | null; weight: number; availability: string; confidence: string; evidence: string[]; gaps: string[] }[] }; businessHealthSnapshot: { score: number | null; inputRevision: string; inputManifest: { sources: { key: string; state: string }[] }; operationsInputs: { counters: Record<string, { value: number | null; availability: string; zero: string | null }>; days: { businessDate: string; status: string; cashShiftStatuses: string[]; reportSaved: boolean }[] } } } };
 const reply = async (promise: Promise<unknown>) => await promise as Reply;
 const ops = (body: Reply) => body.data.businessHealth.components.find(item => item.id === 'operations')!;
+const assertPartialOperations = (body: Reply) => { const component = ops(body); assert.equal(component.score, 90); assert.equal(component.availability, 'PARTIAL'); assert.equal(component.confidence, 'low'); assert.ok(component.weight > 0 && component.weight < 25); };
 test('G06 complete empty sources prove KNOWN ZERO; reads preserve canonical bytes', async () => {
   const r = await healthInputsFixture(); try { const before = r.before(), body = await reply(r.read()); assert.equal(ops(body).score, 90); assert.equal(ops(body).confidence, 'high');
     for (const counter of Object.values(body.data.businessHealthSnapshot.operationsInputs.counters)) { assert.equal(counter.value, 0); assert.equal(counter.zero, 'KNOWN_ZERO'); assert.equal(counter.availability, 'AVAILABLE'); } assert.deepEqual(r.before(), before);
@@ -20,7 +21,7 @@ for (const [name, key, mutate, state] of [
   const r = await healthInputsFixture(); try {
     if (mutate === 'delete') r.sqlite.prepare('DELETE FROM domain_data WHERE account_id=? AND store_key=?').run(r.accountId, key);
     else r.sqlite.prepare('UPDATE domain_data SET data_json=? WHERE account_id=? AND store_key=?').run(mutate === 'corrupt' ? '{bad' : '{}', r.accountId, key);
-    const body = await reply(r.read()); assert.equal(ops(body).score, null); assert.equal(ops(body).confidence, 'low'); assert.match(ops(body).gaps.join(' '), new RegExp(state));
+    const body = await reply(r.read()); assertPartialOperations(body); assert.match(ops(body).gaps.join(' '), /недостаточно подтверждённых данных/);
     assert.equal(body.data.businessHealthSnapshot.inputManifest.sources.find(source => source.key === key)!.state, state);
   } finally { r.close(); }
 });
@@ -43,7 +44,7 @@ test('G06 stock anomaly proven from Phase3A.7 anchor; partial evidence never zer
   const r = await healthInputsFixture(); try {
     r.seed('bd_assortment_v1', { stockBalances: [{ productKey: 'stock', unit: 'kg', current: -1, openingDocumentId: 'opening' }] }); r.seed('bd_opening_stock_v1', [{ id: 'opening', status: 'confirmed', createdAt: '2026-10-01T12:00:00Z', anchorBoundary: { movements: [] }, items: [{ id: 'line', productKey: 'stock', unit: 'kg', quantity: -1 }] }]);
     let body = await reply(r.read()); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.stockAnomalies.value, 1); assert.equal(ops(body).score, 83);
-    r.seed('bd_opening_stock_v1', []); body = await reply(r.read()); assert.equal(ops(body).score, null); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.stockAnomalies.value, null); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.stockAnomalies.availability, 'PARTIAL');
+    r.seed('bd_opening_stock_v1', []); body = await reply(r.read()); assertPartialOperations(body); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.stockAnomalies.value, null); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.stockAnomalies.availability, 'PARTIAL');
   } finally { r.close(); }
 });
 test('G06 Home = Doctor canonical snapshot despite forged body; revision updates without timestamp change', async () => {
@@ -53,19 +54,19 @@ test('G06 Home = Doctor canonical snapshot despite forged body; revision updates
   } finally { r.close(); }
 });
 test('G06 nested/foreign scope, duplicate and guessed parent IDs cannot prove a zero', async () => {
-  const r = await healthInputsFixture(); try { for (const scope of [{ venueId: 999 }, { workspaceId: 999 }, { dataAccountId: 999 }, { nested: { venueId: 999 } }]) { r.seed('bd_cases', [{ id: 'foreign', priority: 'critical', status: 'open', ...scope }]); const body = await reply(r.read()); assert.equal(ops(body).score, null); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.criticalBlockers.value, null); assert.equal(JSON.stringify(body).includes('foreign'), false); }
-    r.seed('bd_cases', [{ id: 'dup', priority: 'critical', status: 'open' }, { id: 'dup', priority: 'critical', status: 'closed' }]); assert.equal(ops(await reply(r.read())).score, null); r.seed('bd_cases', []); r.seed('bd_equipment_work_orders', [{ id: 'guess', equipmentId: 'missing', kind: 'repair' }]); assert.equal(ops(await reply(r.read())).score, null);
+  const r = await healthInputsFixture(); try { for (const scope of [{ venueId: 999 }, { workspaceId: 999 }, { dataAccountId: 999 }, { nested: { venueId: 999 } }]) { r.seed('bd_cases', [{ id: 'foreign', priority: 'critical', status: 'open', ...scope }]); const body = await reply(r.read()); assertPartialOperations(body); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.criticalBlockers.value, null); assert.equal(JSON.stringify(body).includes('foreign'), false); }
+    r.seed('bd_cases', [{ id: 'dup', priority: 'critical', status: 'open' }, { id: 'dup', priority: 'critical', status: 'closed' }]); assertPartialOperations(await reply(r.read())); r.seed('bd_cases', []); r.seed('bd_equipment_work_orders', [{ id: 'guess', equipmentId: 'missing', kind: 'repair' }]); assertPartialOperations(await reply(r.read()));
   } finally { r.close(); }
 });
 test('G06 bounded source does not silently truncate then certify zero', async () => {
-  const r = await healthInputsFixture(); try { r.seed('bd_cases', Array.from({ length: MAX_HEALTH_ROWS + 1 }, (_, i) => ({ id: String(i), priority: 'low', status: 'closed' }))); assert.equal(ops(await reply(r.read())).score, null); } finally { r.close(); }
+  const r = await healthInputsFixture(); try { r.seed('bd_cases', Array.from({ length: MAX_HEALTH_ROWS + 1 }, (_, i) => ({ id: String(i), priority: 'low', status: 'closed' }))); assertPartialOperations(await reply(r.read())); } finally { r.close(); }
 });
 test('G06 restricted operational source no leak/no zero; live revoked membership/foreign venue rejected', async () => {
   const r = await healthInputsFixture(); try {
     const member = await r.register('health-member@phase3a9.isolated.test'), foreign = await r.register('health-foreign@phase3a9.isolated.test');
     r.sqlite.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role) VALUES(?,?,'member')").run(r.workspaceId, member.userId); r.sqlite.prepare("INSERT INTO venue_memberships(venue_id,account_id,role) VALUES(?,?,'manager')").run(r.venueId, member.userId);
     r.seed('bd_cases', [{ id: 'secret-case', priority: 'critical', status: 'open' }]); r.sqlite.prepare('UPDATE venue_memberships SET permissions_json=? WHERE venue_id=? AND account_id=?').run('{"deny":["incidents.view"]}', r.venueId, member.userId);
-    const response = await r.api.health.GET(r.healthRequest('/api/business-health', member)); assert.equal(response.status, 200); const body = await response.json() as Reply; assert.equal(ops(body).score, null); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.criticalBlockers.availability, 'RESTRICTED'); assert.equal(JSON.stringify(body).includes('secret-case'), false);
+    const response = await r.api.health.GET(r.healthRequest('/api/business-health', member)); assert.equal(response.status, 200); const body = await response.json() as Reply; assertPartialOperations(body); assert.equal(body.data.businessHealthSnapshot.operationsInputs.counters.criticalBlockers.availability, 'RESTRICTED'); assert.equal(JSON.stringify(body).includes('secret-case'), false);
     for (const selected of [foreign.activeVenueId, 999999]) assert.equal((await r.api.health.GET(r.healthRequest('/api/business-health', member, 'GET', undefined, selected))).status, 401);
     r.sqlite.prepare("UPDATE venue_memberships SET status='revoked' WHERE venue_id=? AND account_id=?").run(r.venueId, member.userId); assert.equal((await r.api.health.GET(r.healthRequest('/api/business-health', member))).status, 401);
   } finally { r.close(); }

@@ -4,7 +4,7 @@ import { lifecycleRuntime } from './helpers/lifecycle-runtime';
 import { HEALTH_OPERATIONS_KEYS } from '../lib/bardoctor/health-operations-inputs';
 import { VENUE_CONTEXT_SOURCES } from '../lib/bardoctor/venue-context-access';
 
-test('Health: 31 receipts / 7001 and complete operational day survive both journal migrations; absent optional history is unknown', async t => {
+test('Health: 31 receipts / 7001 and complete operational day survive both journal migrations; confirmed unused equipment needs no optional history', async t => {
   const r = await lifecycleRuntime({ health: './app/api/business-health/route', database: './db', stock: './lib/bardoctor/stock-journal', events: './lib/bardoctor/sales-event-storage' }, { now: '2026-10-03T12:00:00Z' });
   t.after(r.close);
   const owner = await r.register('health-journal-diagnostic@isolated.test');
@@ -36,9 +36,10 @@ test('Health: 31 receipts / 7001 and complete operational day survive both journ
   r.sqlite.prepare('DELETE FROM domain_data WHERE account_id=? AND store_key=?').run(accountId, 'bd_equipment_work_orders');
   const missing = await read();
   assert.equal(missing.operationsInputs.days[0].status, 'COMPLETE');
-  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.value, null);
-  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.availability, 'UNAVAILABLE');
-  assert.equal(missing.factorScores.find((c: any) => c.id === 'operations').score, null);
+  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.value, 0);
+  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.notApplicable, true);
+  assert.equal(missing.operationsInputs.counters.recurringEquipmentFailures.availability, 'AVAILABLE');
+  assert.equal(missing.factorScores.find((c: any) => c.id === 'operations').score, 90);
   put('bd_equipment_work_orders', []);
   const empty = await read();
   assert.equal(empty.operationsInputs.counters.recurringEquipmentFailures.zero, 'KNOWN_ZERO');
