@@ -1,0 +1,16 @@
+# Durable complete cost pass and unchanged fast path
+
+Previously reload discarded the completion time and traversed every evaluation page even when all per-item receipts were reusable. The server now stores a private, venue/account/workspace-scoped pass record. Each successful page atomically advances its exact server-held cursor together with its writes. Only the final tracked-state page can stamp completedAt. Forged, skipped, stale and concurrent-pass cursors fail closed; changed inputs/state during a pass require a fresh start. A previous successful time is retained as history during an interrupted or failed new pass.
+
+The completion identity includes the existing conservative raw source contents/timestamps, full profile, scope, UTC evaluation date and calculator version, plus a versioned pass protocol and exact state/episode bytes. This retains invalidation for recipes, aliases/links, purchases, stock/migration revisions, currency/profile, future dates and server signal changes. Every page and unchanged confirmation retain access/profile/source CAS and a live active-stock-journal revision guard. The new range guard covers added, deleted and changed state/episode rows, including changes outside the current page. Generic store clients cannot read/write the private record.
+
+On a new request, a matching completed pass returns its original server time with no card calculation and no continuation cursor. Source/state integrity and authorization are still read and guarded; this is not an unvalidated browser cache. The persisted timestamp is returned with the signal list even when items is empty. Client reload displays it as the previous complete check while background confirmation is pending. No browser-clock completion is synthesized, and a terminal response without server completion proof is an error. Single-item owner verification and existing closure rules remain unchanged.
+
+Local comparison against published af662c2e on77 synthetic healthy recipes:
+- Cold: both27 evaluation POSTs and77 calculations.
+- Unchanged:27→1 evaluation POST; including two list GETs29→3 requests. Both perform0 new calculations.
+These are request/calculation counts, not a production latency claim. The quick path still reads current source bytes and a state/episode digest; its guard input is bounded to2MB/10000 rows and fails closed above that bound. The cold pass gains this integrity check, so production timing remains unmeasured.
+
+Validation:84 distinct scoped tests PASS across completion, batching/invalidation, client refresh, PMR, isolation and correction/closure suites. Tests cover interruption, cursor forgery/replay, simultaneous restarts, final-page conflict, failed source reads, changed dependency/calculator/date/journal, private-key access, empty results and retained server timestamps. Actual emitted390px app test confirms saved time while busy, reload and unchanged confirmation with empty results. Build PASS; asset index-BQGspy0I-4ec33e163e35.js.
+
+Typecheck remains blocked only in unchanged files: business-health-snapshot.ts:372 (partial status label union) and tests/health-partial-operations-v539.test.ts:10 (counter record cast). No diagnostics in modified files. No full suite, production data, keys, push or deployment. Evidence: /workspace/checkpoint/cost-complete-pass.

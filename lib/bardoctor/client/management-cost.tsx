@@ -4,7 +4,7 @@ import { readCanonicalJson } from './canonical-read';
 import { createCostRefresh } from './cost-refresh';
 
 type Episode = CostEpisodeV1 & { menuItemName?:string; why: string[]; effect: string; targets: {health:string;techCard:string;purchase?:string} };
-type Payload = {ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;currentObservation?:CostObservationV1;itemName?:string;coverage?:string;reasons?:string[];nextCursor?:string|null;evaluationCursor?:string|null};
+type Payload = {lastCompletedAt?:string|null;completedAt?:string|null;ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;currentObservation?:CostObservationV1;itemName?:string;coverage?:string;reasons?:string[];nextCursor?:string|null;evaluationCursor?:string|null};
 type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;enabled:()=>boolean;session?:()=>string};
 /** React is supplied by the prepared client; keep its existing renderer/hooks. */
 export function createCostManagementClient(React: typeof import('react'), runtime: Runtime) {
@@ -55,8 +55,8 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     if(!runtime.enabled()||disabled.has(venue)||!venue)return null;
     const data=state?.venue===venue?state.data:null;
     const progress=background.get(venue);
-    const updatedAt=progress?.completedAt||(data?.items||[]).map(e=>e.lastObservedAt).sort().at(-1);
-    const freshness=<p role="status">{updatedAt?'Сохранённые результаты · обновлено '+new Date(updatedAt).toLocaleString('ru-RU'):'Время предыдущего обновления неизвестно.'}{busy?' Обновляем в фоне…':''}{error?(data?.items?.length?' Обновление не завершено; показаны сохранённые результаты.':data?' Сохранённых сигналов нет; проверка не завершена.':' Сохранённые результаты пока недоступны.'):''}</p>;
+    const updatedAt=progress?.completedAt||data?.lastCompletedAt||(data?.items||[]).map(e=>e.lastObservedAt).sort().at(-1);
+    const freshness=<p role="status">{updatedAt?(progress?.completedAt||data?.lastCompletedAt?'Последняя полная проверка · ':'Сохранённые сигналы · обновлено ')+new Date(updatedAt).toLocaleString('ru-RU'):'Время предыдущего обновления неизвестно.'}{busy?' Обновляем в фоне…':''}{error?(data?.items?.length?' Обновление не завершено; показаны сохранённые результаты.':data?' Сохранённых сигналов нет; проверка не завершена.':' Сохранённые результаты пока недоступны.'):''}</p>;
     const all=data?.items||[],active=all.filter(e=>e.condition==='ACTIVE').sort((a,b)=>a.detectedAt.localeCompare(b.detectedAt)||a.menuItemId.localeCompare(b.menuItemId));
     const recent=all.filter(e=>e.condition==='VERIFIED_RESOLVED').sort((a,b)=>b.verificationResult!.checkedAt.localeCompare(a.verificationResult!.checkedAt));
     const detail=selected?all.find(e=>e.signalId===selected):null;

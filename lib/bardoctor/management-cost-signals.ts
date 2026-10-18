@@ -1,3 +1,4 @@
+import { COST_RUN_VERSION, costRunKey, costStateView, type CostRun } from './cost-run-checkpoint';
 import { stockJournalMarker } from "./stock-storage";
 import { readJsonRequest } from "./http";
 import { runtimeEnv } from "./runtime-env";
@@ -61,7 +62,7 @@ export async function projectManagementCostEpisode(episode: CostEpisodeV1, menuI
 const project = projectManagementCostEpisode;
 
 type CostRead = NonNullable<Awaited<ReturnType<typeof snapshot>>>;
-type EvaluationBatch = {read:CostRead; now:string; inputRevision:string; reader:ReturnType<typeof createCurrentCostReader>; statements:D1PreparedStatement[]; evaluated:number; reused:number};
+type EvaluationBatch = {read:CostRead; now:string; inputRevision:string; reader:ReturnType<typeof createCurrentCostReader>; statements:D1PreparedStatement[]; evaluated:number; reused:number; stateUpdates:Map<string,string>};
 const receiptKey=(scope:CostScope,id:string)=>`__bd_p4a_cost_receipt_v1__:${scope.venueId}:${encode(id)}`;
 const upsertCost=(read:CostRead,key:string,value:unknown,now:string)=>read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at").bind(read.scope.dataAccountId,key,boundedJson(value),now);
 const accessGuard=(read:CostRead,now:string)=>read.database.prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL,? WHERE NOT(EXISTS(SELECT 1 FROM accounts WHERE id=? AND restaurant_json IS ?) AND (${boundarySql}) IS ?)`).bind(read.scope.dataAccountId,now,read.scope.dataAccountId,read.profile,...read.args,read.boundary);
@@ -114,7 +115,7 @@ async function transition(context: NonNullable<Awaited<ReturnType<typeof authori
   }
   const nextState: CostStateV1 = { version: 1, scope, menuItemId, fingerprint, generation: episode.generation, activeEpisodeId: episode.condition === "ACTIVE" ? episode.signalId : null, lastEpisodeId: episode.signalId, lastObservationRevision: observation.observationRevision, stateVersion: (state?.stateVersion ?? 0) + 1 };
   const writes=[upsertCost(read,sk,nextState,now),upsertCost(read,episodeKey(scope,menuItemId,episode.generation),episode,now)];
-  if(batch){batch.statements.push(...writes);await receiptWrite(nextState,episode);}
+  if(batch){batch.stateUpdates.set(sk,boundedJson(nextState));batch.stateUpdates.set(episodeKey(scope,menuItemId,episode.generation),boundedJson(episode));batch.statements.push(...writes);await receiptWrite(nextState,episode);}
   else await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),...writes],now);
   return json({ ok: true, episode: await project(episode, observed.itemName), observation, itemName: observed.itemName });
 }
@@ -143,14 +144,24 @@ async function evaluateBatch(context:NonNullable<Awaited<ReturnType<typeof autho
   const discoveredStates=await readStoreSnapshots(discovery.database,scope.dataAccountId,ids.map(id=>stateKey(scope,id)));
   const generations=new Map(ids.map(id=>[id,parseStored<CostStateV1>(discoveredStates.find(s=>s.key===stateKey(scope,id))?.dataJson??null)?.generation??0]));
   const keys=ids.flatMap(id=>{const generation=generations.get(id)!;return [stateKey(scope,id),receiptKey(scope,id),episodeKey(scope,id,Math.max(1,generation)),episodeKey(scope,id,generation+1)]});
-  const read=await snapshot(context,[...new Set(keys)]);if(!read)return fail("ACCESS_DENIED",403);
+  const read=await snapshot(context,[...new Set([...keys,costRunKey(scope)])]);if(!read)return fail("ACCESS_DENIED",403);
   // Candidate membership must come from the same source revision as the final snapshot.
   if(read.profile!==discovery.profile||read.snapshots.find(s=>s.key==="bd_assortment_v1")?.dataJson!==discovery.snapshots.find(s=>s.key==="bd_assortment_v1")?.dataJson)throw new StoreWriteConflictError();
   for(const id of ids)if((parseStored<CostStateV1>(read.snapshots.find(s=>s.key===stateKey(scope,id))?.dataJson??null)?.generation??0)!==generations.get(id))throw new StoreWriteConflictError();
   const input={scope,snapshots:read.snapshots,profileJson:read.profile,now};
-  const batch:EvaluationBatch={read,now,inputRevision:await costEvaluationInputRevision(input),reader:createCurrentCostReader(input),statements:[],evaluated:0,reused:0};
-  // Restart discovery if inputs/date changed between pages: otherwise newly inserted IDs before the cursor could be missed.
-  if(cursor.inputRevision&&cursor.inputRevision!==batch.inputRevision)return json({ok:true,scope,items:[],coverage:"AVAILABLE",nextCursor:JSON.stringify({venueId:scope.venueId,phase:"menu",after:"",inputRevision:batch.inputRevision}),evaluation:{evaluated:0,reused:0}});
+  const batch:EvaluationBatch={read,now,inputRevision:await costEvaluationInputRevision(input),reader:createCurrentCostReader(input),statements:[],evaluated:0,reused:0,stateUpdates:new Map()};
+  const stateView=await costStateView(read.database,scope);
+  const stored=parseStored<CostRun>(read.snapshots.find(s=>s.key===costRunKey(scope))?.dataJson??null);
+  const validRun=stored?.version===COST_RUN_VERSION&&sameScope(stored.scope,scope);
+  const unchanged=validRun&&stored.inputRevision===batch.inputRevision&&stored.stateRevision===stateView.revision;
+  const journalGuard=()=>{let marker:unknown;try{marker=JSON.parse(read.snapshots.find(s=>s.key==="bd_stock_movements")?.dataJson??"null")}catch{}return stockJournalMarker(marker)?[read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL WHERE NOT EXISTS(SELECT 1 FROM stock_journals WHERE account_id=? AND venue_id=? AND state='active' AND revision=?)").bind(scope.dataAccountId,scope.dataAccountId,scope.venueId,marker.revision)]:[]};
+  if(!body.cursor&&unchanged&&stored.completedAt){
+    await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),stateView.guard,...journalGuard()],now);
+    return json({ok:true,scope,items:[],coverage:"AVAILABLE",nextCursor:null,completedAt:stored.completedAt,unchanged:true,evaluation:{evaluated:0,reused:0}});
+  }
+  // A client cannot skip pages, replay another pass, or finish after any intervening state/input change.
+  if(body.cursor&&(!unchanged||stored.nextCursor!==body.cursor||stored.completedAt))return fail("COST_RUN_CHANGED",409);
+  const runId=body.cursor?stored!.runId:crypto.randomUUID();
   cursor={...cursor,inputRevision:batch.inputRevision};
   const items:unknown[]=[];
   if(!ids.length){const parsed=await readCostSources(read.snapshots,scope,now);if(parsed.reasons.length)return json({ok:true,coverage:"UNAVAILABLE",reasons:parsed.reasons,items:[],nextCursor:null});}
@@ -165,13 +176,10 @@ async function evaluateBatch(context:NonNullable<Awaited<ReturnType<typeof autho
     if(batch.evaluated>=calculationBudget)break;
   }
   more=more||processed<ids.length;ids=ids.slice(0,processed);
-  // Reuse must validate the live journal too, not only its domain_data marker.
-  let marker:unknown;try{marker=JSON.parse(read.snapshots.find(s=>s.key==="bd_stock_movements")?.dataJson??"null")}catch{/* Unavailable sources cannot create a receipt. */}
-  if(stockJournalMarker(marker))batch.statements.unshift(read.database.prepare("INSERT INTO domain_data(account_id,store_key,data_json) SELECT ?,'__bd_p4a_cost_guard_v1__',NULL WHERE NOT EXISTS(SELECT 1 FROM stock_journals WHERE account_id=? AND venue_id=? AND state='active' AND revision=?)").bind(scope.dataAccountId,scope.dataAccountId,scope.venueId,marker.revision));
-  // Also guard a reuse-only page; no cached decision may bypass current access/source integrity.
-  await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),...batch.statements],now);
-  const nextCursor=more?JSON.stringify({...cursor,after:cursor.phase==="menu"?ids.at(-1):stateKey(scope,ids.at(-1)!)}):cursor.phase==="menu"?JSON.stringify({venueId:scope.venueId,phase:"tracked",after:"",inputRevision:batch.inputRevision}):null;
-  return json({ok:true,scope,items,nextCursor,coverage:"AVAILABLE",evaluation:{evaluated:batch.evaluated,reused:batch.reused}});
+  const nextCursor=more?JSON.stringify({...cursor,runId,after:cursor.phase==="menu"?ids.at(-1):stateKey(scope,ids.at(-1)!)}):cursor.phase==="menu"?JSON.stringify({venueId:scope.venueId,phase:"tracked",after:"",inputRevision:batch.inputRevision,runId}):null;
+  const run:CostRun={version:COST_RUN_VERSION,scope,runId,inputRevision:batch.inputRevision,stateRevision:await stateView.after(batch.stateUpdates),nextCursor,completedAt:nextCursor?null:now,lastCompletedAt:nextCursor?(validRun?(stored.completedAt||stored.lastCompletedAt):null):now};
+  await runStoreCasBatch(read.database,scope.dataAccountId,read.snapshots,[accessGuard(read,now),stateView.guard,...journalGuard(),...batch.statements,upsertCost(read,costRunKey(scope),run,now)],now);
+  return json({ok:true,scope,items,nextCursor,coverage:"AVAILABLE",completedAt:run.completedAt,evaluation:{evaluated:batch.evaluated,reused:batch.reused}});
 }
 
 /** Private versioned domain rows; GET never materializes episodes. */
@@ -240,11 +248,13 @@ export async function managementCostRequest(request: Request, signalId?: string)
     const rows = await getD1().prepare(`SELECT store_key,data_json FROM domain_data WHERE account_id=? AND store_key>=? AND store_key<? ${cursor ? `AND store_key${historyItem ? "<" : ">"}?` : ""} ORDER BY store_key ${historyItem ? "DESC" : "ASC"} LIMIT ?`).bind(scope.dataAccountId, p, p + "\uffff", ...(cursor ? [cursor] : []), limit + 1).all<{ store_key: string; data_json: string }>();
     const page = (rows.results ?? []).slice(0, limit);
     const keys = historyItem ? page.map(row => row.store_key) : page.map(row => { const state = parseStored<CostStateV1>(row.data_json)!; return episodeKey(scope, state.menuItemId, state.generation); });
-    const read = await snapshot(context, keys);
+    const read = await snapshot(context, [...keys,costRunKey(scope)]);
     if (!read) return fail("ACCESS_DENIED", 403);
     const sources = await readCostSources(read.snapshots, scope);
     const items: unknown[] = [];
     for (const key of keys) { const e = parseStored<CostEpisodeV1>(read.snapshots.find(row => row.key === key)?.dataJson ?? null); if (e && sameScope(e.scope, scope) && (stateFilter === "all" || stateFilter === "active" && e.condition === "ACTIVE" || stateFilter === "verified" && e.condition === "VERIFIED_RESOLVED")) items.push(await project(e, String((sources.assortment.menuItems as Record<string,unknown>[] | undefined)?.find(item => item.id === e.menuItemId)?.name ?? e.menuItemId))); }
-    return json({ ok: true, contractVersion: 1, scope, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: sources.reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
+    const previousRun=parseStored<CostRun>(read.snapshots.find(row=>row.key===costRunKey(scope))?.dataJson??null);
+    const lastCompletedAt=previousRun&&sameScope(previousRun.scope,scope)?previousRun.completedAt||previousRun.lastCompletedAt:null;
+    return json({ ok: true, contractVersion: 1, scope, lastCompletedAt, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: sources.reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
   } catch { return fail("CANNOT_VERIFY", 503); }
 }

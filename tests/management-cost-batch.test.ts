@@ -13,7 +13,7 @@ test('three-item snapshot matches legacy observations and verification; unchange
  const old=await costFixture(),fresh=await costFixture();try{seedCards(old);seedCards(fresh);const oldPages=await run(old,1),pages=await run(fresh);assert.equal(sums(pages).evaluated,4);assert.equal(sums(pages).reused,2);
  const episodes=(r:typeof fresh)=>r.sqlite.prepare("SELECT data_json FROM domain_data WHERE store_key LIKE '__bd_p4a_cost_episode_v1__:%' ORDER BY store_key").all().map(x=>JSON.parse(String(x.data_json)));
  assert.deepEqual(episodes(fresh),episodes(old));assert.equal(oldPages.length,6);assert.equal(pages.length,3);
- const before=fresh.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all();assert.deepEqual(sums(await run(fresh)),{evaluated:0,reused:6});assert.deepEqual(fresh.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all(),before);
+ const before=fresh.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all();assert.deepEqual(sums(await run(fresh)),{evaluated:0,reused:0});assert.deepEqual(fresh.sqlite.prepare('SELECT * FROM domain_data ORDER BY store_key').all(),before);
  const a=fresh.read('bd_assortment_v1');a.recipes.forEach((x:any)=>x.ingredients=a.recipes[1].ingredients);fresh.seed('bd_assortment_v1',a);await run(fresh);assert.ok(episodes(fresh).every(e=>e.condition==='VERIFIED_RESOLVED'));
  }finally{old.close();fresh.close();}
 });
@@ -84,12 +84,12 @@ test('exhausted CAS retries leave no partial episodes, receipts or advanced curs
  const r=await costFixture();try{seedCards(r,3);let conflicts=0;const race=()=>{const a=r.read('bd_assortment_v1');a.menuItems[0].name='race'+(++conflicts);r.seed('bd_assortment_v1',a);r.beforeNextDomainWrite(race);};r.beforeNextDomainWrite(race);const result=await page(r);assert.equal(result.status,409);assert.equal(conflicts,3);assert.equal(result.nextCursor,undefined);assert.equal(r.sqlite.prepare("SELECT count(*) n FROM domain_data WHERE store_key LIKE '__bd_p4a_cost_%'").get()!.n,0);}finally{r.close()}
 });
 
-test('source change between pages restarts discovery so IDs before cursor cannot be missed',async()=>{
- const r=await costFixture();try{const a=seedCards(r,4);const first=await page(r);a.menuItems.push({...a.menuItems[0],id:'a-new'});r.seed('bd_assortment_v1',a);const resumed=await page(r,first.nextCursor);assert.equal(resumed.evaluation.evaluated,0);assert.equal(JSON.parse(resumed.nextCursor).after,'');const restarted=await page(r,resumed.nextCursor);assert.ok(restarted.items.some((e:any)=>e.menuItemId==='a-new'));assert.equal(restarted.evaluation.evaluated,3);}finally{r.close()}
+test('source change between pages rejects resume and fresh pass discovers IDs before cursor',async()=>{
+ const r=await costFixture();try{const a=seedCards(r,4);const first=await page(r);a.menuItems.push({...a.menuItems[0],id:'a-new'});r.seed('bd_assortment_v1',a);const resumed=await page(r,first.nextCursor);assert.equal(resumed.status,409);const restarted=await page(r);assert.ok(restarted.items.some((e:any)=>e.menuItemId==='a-new'));assert.equal(restarted.evaluation.evaluated,3);}finally{r.close()}
 });
 
 test('large valid sources cap fresh calculation at one, while unchanged receipts still reuse three',async()=>{
- const r=await costFixture();try{const a=seedCards(r,3) as any;a.padding='x'.repeat(260_000);r.seed('bd_assortment_v1',a);const first=await page(r);assert.equal(first.evaluation.evaluated,1);assert.equal(JSON.parse(first.nextCursor).after,'m0');await run(r);const warm=await page(r);assert.equal(warm.evaluation.evaluated,0);assert.equal(warm.evaluation.reused,3);}finally{r.close()}
+ const r=await costFixture();try{const a=seedCards(r,3) as any;a.padding='x'.repeat(260_000);r.seed('bd_assortment_v1',a);const first=await page(r);assert.equal(first.evaluation.evaluated,1);assert.equal(JSON.parse(first.nextCursor).after,'m0');await run(r);const warm=await page(r);assert.equal(warm.evaluation.evaluated,0);assert.equal(warm.evaluation.reused,0);assert.equal(warm.unchanged,true);}finally{r.close()}
 });
 
 test('large expanded journal also limits new calculations despite a tiny source marker',async()=>{

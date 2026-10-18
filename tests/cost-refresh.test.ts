@@ -5,7 +5,7 @@ const flush=()=>new Promise<void>(r=>setImmediate(r));
 const deferred=<T>()=>{let resolve!:(value:T)=>void;const promise=new Promise<T>(r=>resolve=r);return {promise,resolve};};
 test('saved results publish before background work; all pages discover new signals; navigation coalesces',async()=>{
  const gate=deferred<{nextCursor:string}>();let reads=0;const pages:(string|undefined)[]=[];
- const io={current:()=> 'session',read:async()=>({items:[++reads===1?'saved':'new'],nextCursor:null}),evaluate:async(_v:number,c?:string)=>{pages.push(c);return c?{nextCursor:null}:gate.promise;}};
+ const io={current:()=> 'session',read:async()=>({items:[++reads===1?'saved':'new'],nextCursor:null}),evaluate:async(_v:number,c?:string)=>{pages.push(c);return c?{nextCursor:null,completedAt:'2026-10-04T12:00:00Z'}:gate.promise;}};
  const worker=createCostRefresh(io);const job=worker.start(1);await flush();
  assert.deepEqual(worker.get(1)?.data?.items,['saved']);assert.equal(worker.get(1)?.busy,true);
  assert.equal(worker.start(1),job);gate.resolve({nextCursor:'tracked'});await job;
@@ -14,13 +14,13 @@ test('saved results publish before background work; all pages discover new signa
  const restart=createCostRefresh(io);await restart.start(1);assert.equal(pages.length,4,'new app session automatically reevaluates');
 });
 test('error preserves saved evidence, navigation does not retry storm, explicit retry succeeds',async()=>{
- let fail=true,calls=0;const worker=createCostRefresh({current:()=> 's',read:async()=>({items:['saved']}),evaluate:async()=>{calls++;if(fail)throw Error('deadline');return {};}});
+ let fail=true,calls=0;const worker=createCostRefresh({current:()=> 's',read:async()=>({items:['saved']}),evaluate:async()=>{calls++;if(fail)throw Error('deadline');return {completedAt:"2026-10-04T12:00:00Z"};}});
  await worker.start(1);assert.deepEqual(worker.get(1)?.data?.items,['saved']);assert.equal(worker.get(1)?.error,'deadline');assert.equal(worker.get(1)?.completedAt,undefined);
  await worker.start(1);assert.equal(calls,1);fail=false;await worker.start(1,true);assert.equal(calls,2);assert.equal(worker.get(1)?.error,undefined);assert.ok(worker.get(1)?.completedAt);
 });
 test('logout aborts old work and ignores late responses; venue results remain separate',async()=>{
  let session='a';const gate=deferred<{items:string[]}>();let signal:AbortSignal|undefined;
- const worker=createCostRefresh({current:()=>session,read:async(v,s)=>{signal=s;return session==='a'?gate.promise:{items:[String(v)]};},evaluate:async()=>({})});
+ const worker=createCostRefresh({current:()=>session,read:async(v,s)=>{signal=s;return session==='a'?gate.promise:{items:[String(v)]};},evaluate:async()=>({completedAt:"2026-10-04T12:00:00Z"})});
  const old=worker.start(1);session='b';worker.reset();assert.equal(signal?.aborted,true);
  await worker.start(2);gate.resolve({items:['private-a']});await old;
  assert.equal(worker.get(1),undefined);assert.deepEqual(worker.get(2)?.data?.items,['2']);await worker.start(1);assert.deepEqual(worker.get(1)?.data?.items,['1']);
@@ -35,3 +35,9 @@ test('unavailable sources and repeated cursor cannot certify completion',async()
 test('unavailable calculation preserves specific reasons and never marks the run complete',async()=>{
  const worker=createCostRefresh({current:()=> 's',read:async()=>({items:[]}),evaluate:async()=>({coverage:'UNAVAILABLE',reasons:['CURRENCY_UNKNOWN','CURRENCY_UNKNOWN','untrusted-code']})});await worker.start(1);const state=worker.get(1);assert.equal(state?.completedAt,undefined);assert.equal(state?.busy,false);assert.match(state?.error||'',/Не подтверждена единая валюта/);assert.doesNotMatch(state?.error||'',/untrusted-code/);
 });
+test('reload hydrates historical server completion even with no signals; unchanged confirms same server time',async()=>{
+ const saved={items:[],lastCompletedAt:'2026-10-04T12:00:00Z'};let calls=0;const gate=deferred<{completedAt:string}>();
+ const worker=createCostRefresh({current:()=> 's',read:async()=>saved,evaluate:async()=>{calls++;return gate.promise}});const job=worker.start(1);await flush();assert.equal(worker.get(1)?.data?.lastCompletedAt,saved.lastCompletedAt);assert.equal(worker.get(1)?.completedAt,undefined);assert.equal(worker.get(1)?.busy,true);gate.resolve({completedAt:saved.lastCompletedAt});await job;assert.equal(worker.get(1)?.completedAt,saved.lastCompletedAt);assert.equal(calls,1);
+ const reload=createCostRefresh({current:()=> 's',read:async()=>saved,evaluate:async()=>({completedAt:saved.lastCompletedAt})});await reload.start(1);assert.equal(reload.get(1)?.completedAt,saved.lastCompletedAt);
+});
+test('missing completion proof cannot invent browser time',async()=>{const worker=createCostRefresh({current:()=> 's',read:async()=>({items:[]}),evaluate:async()=>({nextCursor:null})});await worker.start(1);assert.ok(worker.get(1)?.error);assert.equal(worker.get(1)?.completedAt,undefined)});
