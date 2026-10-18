@@ -27,8 +27,11 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-approved selected splash presentation only; save without publication (2026-10-17).
 // Owner-requested visible splash minimum and fade (2026-10-17).
 // Owner-approved native/HTML splash coordinate alignment (2026-10-18); save only.
+// Owner-requested local transparent line accent, no publication (2026-10-18).
 export const p0Paths=Object.freeze([
  "scripts/splash-timing-v531.js",
+ "scripts/splash-accent-v534.svg",
+ "public/icons/bardoctor-splash-reference-v534.webp",
  "scripts/splash-geometry-v532.js",
  "public/app.html",
  "scripts/patch-splash-v529.mjs",

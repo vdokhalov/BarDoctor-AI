@@ -20,7 +20,7 @@
   function visible(){
     if(finished)return;
     var style=getComputedStyle(node);
-    if(imageReady&&!document.hidden&&node.isConnected&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0){started=performance.now();event('visible');schedule();}
+    if(imageReady&&!document.hidden&&node.isConnected&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0){node.setAttribute('data-bd-splash-art-ready','');started=performance.now();event('visible');schedule();}
     else frame=requestAnimationFrame(visible);
   }
   // Recovery owns immediate exit. Never restore a pending attribute or removed node.

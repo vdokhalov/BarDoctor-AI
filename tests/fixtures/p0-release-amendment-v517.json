@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling; owner-authorized normalized stock journal, resumable migration, lifecycle/reader/export integration and local scoped validation (2026-10-16); no push, publication or production cutover; owner-approved standalone splash screen/viewport origin alignment (2026-10-18), save only; owner-approved local complete first splash frame and removal of opaque strip animations (2026-10-18), no publication",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling; owner-authorized normalized stock journal, resumable migration, lifecycle/reader/export integration and local scoped validation (2026-10-16); no push, publication or production cutover; owner-approved standalone splash screen/viewport origin alignment (2026-10-18), save only; owner-approved local complete first splash frame and removal of opaque strip animations (2026-10-18), no publication; owner-requested local transparent SVG accent along existing splash curve, no publication (2026-10-18)",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -340,7 +340,7 @@
     },
     "app/bar-doctor-response.ts": {
       "before": "8253f8be1bd1fb3ef3371dde5463a9681ff6c78529f6a45e2bfe47a3a66c766e",
-      "after": "85f804626e10732362a279fb39ddb2f69a48e927a029c6785e5ee6088cadf31e"
+      "after": "470add94065fee698a631eb4a3727bc7912f09959d973b5ca88f980b158af029"
     },
     "drizzle/0028_staff_pin_revocation.sql": {
       "before": null,
@@ -660,7 +660,7 @@
     },
     "scripts/patch-splash-v529.mjs": {
       "before": null,
-      "after": "5f58fadcfbfdd9c81a674dfa9e52cd39678ad34ba7d01df7d5749b006e6087a3"
+      "after": "99fba4fa2686fa97cbb31a65dbe9ffa7ee0959db52a7851f9e7721a2207c67ec"
     },
     "scripts/capture-splash-v529.mjs": {
       "before": null,
@@ -720,15 +720,23 @@
     },
     "public/app.html": {
       "before": "a7116916269940c4f4f96f54ad40f2ad836d9b0a5c1ab45def0c38fc4887f7f7",
-      "after": "d30633f3617078326e64e66ce026fce2e89ecb1e76b5dda9f400d87989d0a26a"
+      "after": "9096eeb56b1ea5f9cbea4880d31c3df28a2424ba2bf2e9e52da76d9dd5feff5d"
     },
     "scripts/splash-timing-v531.js": {
       "before": null,
-      "after": "7167f2ac79da06fbfe99d117f0a08b02d0c6ae3fb47514e5ff55d32c38f72f95"
+      "after": "aaba9d5d3ff14b2c8de796678c805b04945e1eeac1ea9794cce5169ee190b7c2"
     },
     "scripts/splash-geometry-v532.js": {
       "before": null,
       "after": "07a1c933f50802cef1910c72014a3eb489a8cb344355c572af5a0af47490a887"
+    },
+    "scripts/splash-accent-v534.svg": {
+      "before": null,
+      "after": "36f4005a3ea9c3cf77dc0e477d4d45cbeeb5af7b6e7edb05d43059a8483ed709"
+    },
+    "public/icons/bardoctor-splash-reference-v534.webp": {
+      "before": null,
+      "after": "0af8c7cf74534acb0bcb94f4a0f0ac9cfefcaf316cf11148430e66e027295534"
     }
   }
 }
