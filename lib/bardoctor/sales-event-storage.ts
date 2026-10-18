@@ -29,10 +29,26 @@ async function insert(db:D1Database,scope:JournalScope,event:SalesEvent,position
  if((event as SalesEvent & {workspaceId?:unknown}).workspaceId!=null)statements.push(db.prepare(`INSERT INTO domain_data(account_id,store_key,data_json) SELECT ?,'__sales_event_scope__',NULL WHERE NOT EXISTS(SELECT 1 FROM venues WHERE id=? AND data_account_id=? AND workspace_id=?)`).bind(scope.accountId,scope.venueId,scope.accountId,(event as SalesEvent & {workspaceId?:unknown}).workspaceId));
  return statements;
 }
+type EventPart={ordinal:number;payload:string};
+async function hydrateParts(scope:JournalScope,row:RecordRow,parts:EventPart[]){
+ if(parts.length!==row.chunk_count||parts.some((p,i)=>p.ordinal!==i))fail();
+ const json=parts.map(p=>p.payload).join('');if(await hash(json)!==row.payload_hash)fail();const event=JSON.parse(json);validate(event,scope);if(event.id!==row.event_id)fail();return event as SalesEvent;
+}
 async function hydrate(db:D1Database,scope:JournalScope,row:RecordRow){
- const parts=await db.prepare('SELECT ordinal,payload FROM sales_event_chunks WHERE account_id=? AND event_id=? AND version=? ORDER BY ordinal').bind(scope.accountId,row.event_id,row.version).all<{ordinal:number;payload:string}>();
- if(parts.results.length!==row.chunk_count||parts.results.some((p,i)=>p.ordinal!==i))fail();
- const json=parts.results.map(p=>p.payload).join('');if(await hash(json)!==row.payload_hash)fail();const event=JSON.parse(json);validate(event,scope);if(event.id!==row.event_id)fail();return event as SalesEvent;
+ const parts=await db.prepare('SELECT ordinal,payload FROM sales_event_chunks WHERE account_id=? AND event_id=? AND version=? ORDER BY ordinal').bind(scope.accountId,row.event_id,row.version).all<EventPart>();
+ return hydrateParts(scope,row,parts.results);
+}
+/** Bounded chunk reads replace one round trip per event. Keep every integrity check. */
+async function hydratePage(db:D1Database,scope:JournalScope,rows:RecordRow[]){
+ const events:SalesEvent[]=[];
+ for(let start=0;start<rows.length;start+=40){
+  const batch=rows.slice(start,start+40);
+  const parts=await db.prepare(`SELECT event_id,version,ordinal,payload FROM sales_event_chunks WHERE account_id=? AND (${batch.map(()=>'(event_id=? AND version=?)').join(' OR ')}) ORDER BY event_id,version,ordinal`).bind(scope.accountId,...batch.flatMap(row=>[row.event_id,row.version])).all<EventPart&{event_id:string;version:number}>();
+  const grouped=new Map<string,EventPart[]>();
+  for(const part of parts.results){const key=JSON.stringify([part.event_id,part.version]);const list=grouped.get(key)||[];list.push(part);grouped.set(key,list);}
+  for(const row of batch)events.push(await hydrateParts(scope,row,grouped.get(JSON.stringify([row.event_id,row.version]))||[]));
+ }
+ return events;
 }
 export async function salesEventPage(db:D1Database,scope:JournalScope,revision:number,after=-1,limit=100,selector:EventSelector={}){
  if(!Number.isSafeInteger(after)||!Number.isSafeInteger(limit)||limit<1||limit>100)fail();
@@ -40,7 +56,7 @@ export async function salesEventPage(db:D1Database,scope:JournalScope,revision:n
  const fields={id:'event_id',externalId:'external_id',source:'source',shiftId:'revenue_row_id',date:'business_date',orderId:'order_id'};
  const filters=Object.entries(selector).filter(([,v])=>v!==undefined);if(filters.some(([key,value])=>!Object.hasOwn(fields,key)||typeof value!=='string'))fail();
  const rows=await db.prepare(`SELECT event_id,position,version,payload_hash,chunk_count FROM sales_event_records WHERE account_id=? AND position>? ${filters.map(([k])=>'AND '+fields[k as keyof typeof fields]+'=?').join(' ')} ORDER BY position LIMIT ?`).bind(scope.accountId,after,...filters.map(([,v])=>v),limit+1).all<RecordRow>();
- const page=rows.results.slice(0,limit),items:SalesEvent[]=[];for(const row of page)items.push(await hydrate(db,scope,row));
+ const page=rows.results.slice(0,limit),items=await hydratePage(db,scope,page);
  const current=await salesEventState(db,scope);if(!current||current.revision!==revision||current.state!==state.state)throw new StoreWriteConflictError();
  return {items,next:rows.results.length>limit?page.at(-1)!.position:null};
 }

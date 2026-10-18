@@ -87,3 +87,20 @@ test('revenue mismatch fails migration and post-cutover writes; staging restart 
  const deleted=await r.api.venue.DELETE(r.request(owner,`/api/venues/${scope.venueId}`,'DELETE',{confirmation:`Заведение №${scope.venueId}`}),{params:Promise.resolve({id:String(scope.venueId)})});assert.equal(deleted.status,200,await deleted.clone().text());
  assert.equal(r.sqlite.prepare('SELECT count(*) n FROM sales_event_records WHERE account_id=?').get(scope.accountId)!.n,0);assert.equal(r.sqlite.prepare('SELECT count(*) n FROM sales_event_chunks WHERE account_id=?').get(scope.accountId)!.n,0);assert.ok(r.sqlite.prepare('SELECT id FROM accounts WHERE id=?').get(scope.accountId));assert.ok(await events.salesEventState(db,{accountId:other.userId,venueId:other.activeVenueId}));
 });
+test('bounded page hydration preserves100 events with measured chunk queries',async t=>{
+ const sample=await example();const initial=Array.from({length:100},(_,i)=>({...sample,id:'read-'+i,externalId:'read-'+i,unknown:i===0?{text:'я'.repeat(33000)}:{index:i}}));
+ const {r,scope,db,events,raw,activate}=await setup(initial);t.after(r.close);await activate();
+ let chunkReads=0;const sqls:string[]=[];r.onRead(sql=>{if(sql.includes('FROM sales_event_chunks')){chunkReads++;sqls.push(sql)}});
+ const actual=await events.readSalesEvents(db,scope.accountId,raw());
+ assert.deepEqual(actual,JSON.parse(JSON.stringify(initial)));console.log(JSON.stringify({fixture:'100 events including multi-chunk Unicode',chunkReads,events:actual.length}));
+ assert.equal(chunkReads,3);
+});
+for(const issue of ['missing','ordinal','hash','version','revision'] as const)test('batched hydration rejects '+issue,async t=>{
+ const original=await example(),{r,scope,db,events,raw,activate}=await setup([original]);t.after(r.close);await activate();
+ if(issue==='missing')r.sqlite.prepare('DELETE FROM sales_event_chunks WHERE account_id=? AND event_id=?').run(scope.accountId,original.id);
+ if(issue==='ordinal')r.sqlite.prepare('UPDATE sales_event_chunks SET ordinal=9 WHERE account_id=? AND event_id=?').run(scope.accountId,original.id);
+ if(issue==='hash')r.sqlite.prepare("UPDATE sales_event_chunks SET payload='{}' WHERE account_id=? AND event_id=?").run(scope.accountId,original.id);
+ if(issue==='version')r.sqlite.prepare('UPDATE sales_event_records SET version=1 WHERE account_id=? AND event_id=?').run(scope.accountId,original.id);
+ if(issue==='revision'){let changed=false;r.onRead(sql=>{if(!changed&&sql.includes('FROM sales_event_chunks')){changed=true;r.sqlite.prepare('UPDATE sales_event_journals SET revision=revision+1 WHERE account_id=?').run(scope.accountId)}})}
+ await assert.rejects(events.readSalesEvents(db,scope.accountId,raw()));
+});
