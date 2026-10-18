@@ -1,3 +1,4 @@
+import {preparationConsumption,planCancellationStock,type CancellationStockPlan} from './pos-cancellation-stock';
 import { cancellationTicket, confirmedLineIds, prepareTickets, validatePreparationTickets, type PreparationConfig, type PreparationTicket } from './pos-preparation';
 import {paidOrderIds} from './sales-event-history';
 import { posWorkdayGate } from "./pos-workday-gate";
@@ -23,13 +24,14 @@ export type PosOrderCommand = {
   operationId: string; orderId: string; expectedRevision: number;
   shiftId?: string; tableNumber?: string; comment?: string;
   lines?: { id?: string; menuItemId?: string; lineId?: string; quantity: number }[];
+  stockDecision?: 'NO_WRITE_OFF'|'WRITE_OFF';
   lineId?: string; quantity?: number; reason?: string; newOrderId?: string;
   ruleId?: string; ruleRevision?: number;
   payment?: PosPayment; previewHash?: string;
 };
 type SalesPlan = Awaited<ReturnType<typeof planSalesEvent>>;
-export type PosOrderPlan = { orders: PosOrder[]; order: PosOrder; duplicate: boolean; event?: SalesEvent; previewHash?: string; salesPlan?: SalesPlan };
-export type PosOrderContext = SalesEventContext & { preparationConfig?:PreparationConfig; discountRules?: PosDiscountRule[] };
+export type PosOrderPlan = { orders: PosOrder[]; order: PosOrder; duplicate: boolean; event?: SalesEvent; previewHash?: string; salesPlan?: SalesPlan; cancellationStockPlan?:CancellationStockPlan };
+export type PosOrderContext = SalesEventContext & { canWriteOff?:boolean;writeOffDocuments?:unknown[];writeOffExpenses?:unknown[];preparationConfig?:PreparationConfig; discountRules?: PosDiscountRule[] };
 const actions = new Set(["confirm", "create", "add_items", "set_quantity", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
 const privileged = new Set(["cancel_item", "cancel_order", "cancel_precheck", "split", "apply_discount", "remove_discount"]);
 function fail(code: string): never { throw new Error("POS_ORDER_" + code); }
@@ -240,7 +242,8 @@ function normalize(c: PosOrderCommand): Record<string, unknown> {
   if (["discount", "totals", "discountAmount", "grossAmount", "netAmount"].some(key => Object.hasOwn(c, key))) fail("DISCOUNT_FIELDS_FORBIDDEN");
   if (c.action === "cancel_item") {
     if (!identifier(c.lineId) || c.quantity !== undefined && !quantity(c.quantity)) fail("LINES_INVALID");
-    Object.assign(base, { lineId: c.lineId, quantity: c.quantity });
+    if (!["NO_WRITE_OFF","WRITE_OFF"].includes(String(c.stockDecision))) fail("STOCK_DECISION_REQUIRED");
+    Object.assign(base, { lineId: c.lineId, quantity: c.quantity, stockDecision:c.stockDecision });
   }
   if (c.action === "split") {
     if (!identifier(c.newOrderId) || c.newOrderId === c.orderId || !Array.isArray(c.lines) || !c.lines.length || c.lines.length > 100
@@ -270,6 +273,8 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
   const details = normalize(command), fingerprint = await operationFingerprint(details), orders = parsePosOrders(existing);
   if (!actor(c.actor) || !Number.isSafeInteger(c.venueId) || c.venueId <= 0 || !c.currency || !instant(c.now)) fail("CONTEXT_INVALID");
   if (privileged.has(command.action) && !canManagePosPrivilegedAction({ role: c.actor.role as AccessRole })) fail("ACCESS_DENIED");
+  if(command.action==="cancel_item"&&command.stockDecision==="WRITE_OFF"&&!c.canWriteOff)fail("STOCK_ACCESS_DENIED");
+  let cancellationStockPlan:CancellationStockPlan|undefined;
   const seenOrder = orders.find(order => order.operations.some(operation => operation.id === command.operationId));
   if (seenOrder) {
     if (!canReadOrder(c.actor, seenOrder)) fail("NOT_FOUND");
@@ -301,7 +306,10 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       if(order.precheck||order.discount)fail("PRECHECK_LOCKED");
       const config=c.preparationConfig??{version:1 as const,venueId:c.venueId,revision:0,routes:[],operations:[]};
       if(config.venueId!==c.venueId)fail("PREPARATION_INVALID");
-      order.preparationTickets=[...(order.preparationTickets||[]),...prepareTickets(order,c.assortment,config,command.operationId,c.now,c.actor)];
+      const consumption=preparationConsumption(c,order);
+      const tickets=prepareTickets(order,c.assortment,config,command.operationId,c.now,c.actor);
+      for(const t of tickets)for(const l of t.lines)Object.assign(l,consumption.get(l.lineId));
+      order.preparationTickets=[...(order.preparationTickets||[]),...tickets];
     } else if (command.action === "add_items") {
       const incoming = details.lines as { id: string; menuItemId: string; quantity: number }[];
       if (incoming.some(line => (order!.lines.some(current => current.id === line.id)||sent.has(line.id))) || order.lines.length + incoming.length > 100) fail("LINES_INVALID");
@@ -312,10 +320,14 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
     } else if (command.action === "cancel_item") {
       const target = order.lines.find(line => line.id === command.lineId);
       if (!target || command.quantity !== undefined && command.quantity > target.quantity) fail("LINES_INVALID");
+      if(!sent.has(target.id)&&command.stockDecision==="WRITE_OFF")fail("STOCK_SNAPSHOT_REQUIRED");
       const removed = command.quantity ?? target.quantity;
       if(sent.has(target.id)){
         assertUnpaidOrderCancellation(c,order);
-        order.preparationTickets=[...(order.preparationTickets||[]),cancellationTicket(order,target.id,removed,command.operationId,String(details.reason),c.now,c.actor)];
+        const ticket=cancellationTicket(order,target.id,removed,command.operationId,String(details.reason),c.now,c.actor);
+        ticket.stockDecision=command.stockDecision;
+        if(command.stockDecision==="WRITE_OFF"){cancellationStockPlan=await planCancellationStock(c,order,ticket,command.operationId);ticket.writeOffId=cancellationStockPlan.document.id;}
+        order.preparationTickets=[...(order.preparationTickets||[]),ticket];
       }
       order.lines = order.lines.flatMap(line => line.id !== target.id ? [line] : line.quantity === removed ? [] : [sent.has(line.id)?{...line,quantity:line.quantity-removed,total:Math.round(line.unitPrice*(line.quantity-removed)*100)/100}:priceLine(c, { ...line, quantity: line.quantity - removed })]);
     } else if (command.action === "apply_discount") {
@@ -355,7 +367,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       order = saveOperation(order, c, command, details, fingerprint);
       const next = [...orders.map(current => current.id === order!.id ? order! : current), child];
       capacity(next); parsePosOrders(next);
-      return { orders: next, order, duplicate: false };
+      return { orders: next, order, duplicate: false, ...(cancellationStockPlan?{cancellationStockPlan}:{}) };
     } else if (command.action === "preview_payment" || command.action === "pay") {
       if (!order.lines.length) fail("EMPTY");
       assertFrozenPrices(c, order);
@@ -376,7 +388,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
   order = saveOperation(order, c, command, details, fingerprint);
   const next = command.action === "create" ? [...orders, order] : orders.map(current => current.id === order!.id ? order! : current);
   capacity(next); parsePosOrders(next);
-  return { orders: next, order, duplicate: false };
+  return { orders: next, order, duplicate: false, ...(cancellationStockPlan?{cancellationStockPlan}:{}) };
 }
 function capacity(orders: PosOrder[]): void {
   if (new TextEncoder().encode(JSON.stringify(orders)).byteLength > 4_000_000) fail("HISTORY_CAPACITY_REQUIRES_REVIEW");

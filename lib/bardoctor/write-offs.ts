@@ -30,6 +30,7 @@ export type WriteOffStatus = "draft" | "posted" | "cancelled";
 export type WriteOffCostStatus = "full" | "partial" | "unvalued";
 
 export type WriteOffItem = {
+  warehouseId?: string;
   id: string;
   nomenclatureItemId: string;
   productKey: string;
@@ -55,6 +56,7 @@ export type WriteOffItem = {
 };
 
 export type WriteOffDocument = {
+  posOrderId?: string; preparationTicketId?: string; cancellationTicketId?: string;
   id: string;
   venueId: number;
   number: number;
@@ -71,7 +73,7 @@ export type WriteOffDocument = {
   unvaluedItemCount: number;
   currency?: string;
   idempotencyKey?: string;
-  source: "warehouse" | "shift_close" | "integration";
+  source: "warehouse" | "shift_close" | "integration" | "pos_cancellation";
   shiftId?: string;
   shiftCloseId?: string;
   externalSystem?: string;
@@ -175,8 +177,8 @@ function document(value: unknown, fallbackVenueId?: number): WriteOffDocument | 
     ...item,
     venueId,
     status: status === "confirmed" ? "posted" : status,
-    source: (["warehouse", "shift_close", "integration"] as const).includes(item.source as "warehouse" | "shift_close" | "integration")
-      ? item.source as "warehouse" | "shift_close" | "integration"
+    source: (["warehouse", "shift_close", "integration", "pos_cancellation"] as const).includes(item.source as "warehouse" | "shift_close" | "integration" | "pos_cancellation")
+      ? item.source as "warehouse" | "shift_close" | "integration" | "pos_cancellation"
       : "warehouse",
     movementIds: array(item.movementIds).map((value) => text(value, "", 100)).filter(Boolean),
   } as unknown as WriteOffDocument;
@@ -342,8 +344,8 @@ export function saveWriteOffDraft(input: {
     unvaluedItemCount,
     currency: currencies.length === 1 ? currencies[0] : undefined,
     idempotencyKey: text(input.draft.idempotencyKey, existing?.idempotencyKey ?? "", 240) || undefined,
-    source: (["warehouse", "shift_close", "integration"] as const).includes(text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration")
-      ? text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration"
+    source: (["warehouse", "shift_close", "integration", "pos_cancellation"] as const).includes(text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration" | "pos_cancellation")
+      ? text(input.draft.source, existing?.source ?? "warehouse", 30) as "warehouse" | "shift_close" | "integration" | "pos_cancellation"
       : "warehouse",
     shiftId: text(input.draft.shiftId, existing?.shiftId ?? "", 140) || undefined,
     shiftCloseId: text(input.draft.shiftCloseId, existing?.shiftCloseId ?? "", 140) || undefined,
@@ -503,6 +505,7 @@ export function cancelPostedWriteOff(input: {
   const documents = writeOffDocuments(input.documents, input.venueId);
   const existing = documents.find((item) => item.id === input.id);
   if (!existing) return { ok: false, code: "WRITE_OFF_NOT_FOUND", error: "Списание не найдено" };
+  if (existing.source === "pos_cancellation") return { ok: false, code: "WRITE_OFF_READ_ONLY", error: "Списание связано с отменой POS. Отдельное сторнирование недоступно." };
   if (existing.status === "cancelled") return { ok: true, idempotent: true, document: existing, documents, assortment: record(input.assortment), stockMovements: array(input.stockMovements) as StockMovement[] };
   if (existing.status !== "posted") return { ok: false, code: "WRITE_OFF_READ_ONLY", error: "Отменить проведение можно только у проведённого списания" };
   const now = input.now ?? new Date().toISOString();

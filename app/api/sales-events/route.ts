@@ -78,7 +78,7 @@ export async function GET(request:Request) {
         .map(m => ({id:m.id,name:m.name,...menuTaxonomyPresentation(c.assortment,m,taxonomy),salePrice:m.salePrice ?? null,currency:m.currency ?? c.currency})),
       shifts:c.revenues.filter(r => r.venueId === c.venueId && r.revenueSource === EVENT_REVENUE_SOURCE && r.closingStatus != null && (canManagePosPrivilegedAction(account) || r.closingStatus === "open")).map(shift => account.role === "cashier" ? posShiftView(shift) : workdayPersonnelView(shift,canReadManagementWorkday(account))),
       events:c.events.filter(e => e.venueId === c.venueId && canReadPosSaleHistory(c.actor,e) && (!new URL(request.url).searchParams.get("externalId") || e.externalId === new URL(request.url).searchParams.get("externalId"))).slice(-100).reverse().map(event => account.role === "cashier" ? posSalesEventView(event) : event),
-      permissions:{post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage"),managementDay:canReadManagementWorkday(account)} }));
+      permissions:{inventoryWriteOff:hasPermission(account,"inventory.manage"),post:hasPermission(account,"sales.post") && hasPermission(account,"sales.create"),reverse:hasPermission(account,"sales.reverse"),shifts:canManagePosPrivilegedAction(account) && hasPermission(account,"shifts.manage"),managementDay:canReadManagementWorkday(account)} }));
   } catch(error) { return navigation(controlled(error)); }
 }
 export async function POST(request:Request):Promise<Response> { return withStoreCasRetries(request,command); }

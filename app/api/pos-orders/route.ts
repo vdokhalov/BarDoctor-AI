@@ -1,4 +1,4 @@
-import { preparationConfig, preparationKey } from '../../../lib/bardoctor/pos-preparation';
+import { preparationOrderView, preparationConfig, preparationKey } from '../../../lib/bardoctor/pos-preparation';
 import {readSaleEvent,readOrderPaymentFacts,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
@@ -17,7 +17,7 @@ import { POS_DISCOUNT_STORE_KEY, parsePosDiscountRules } from "../../../lib/bard
 import { posSalesEventView } from "../../../lib/bardoctor/pos-shift-report";
 import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountViews, posOrderCancellationDayAllowed, planPosOrder, type PosOrderCommand, type PosOrderContext } from "../../../lib/bardoctor/pos-orders";
 
-const keys = [POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
+const keys = ["bd_inventory_writeoffs","bd_finance_expenses",POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, [...keys,preparationKey(account.venueId)]);
@@ -34,6 +34,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: PosOrderContext = { ...venueTimeFromJson(account.restaurantJson), venueId: account.venueId,
     currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now,
     actor: { accountId: account.actorAccountId, name: [account.firstName, account.lastName].filter(Boolean).join(" "), role: account.role, ...(account.jobTitle ? { jobTitle: account.jobTitle } : {}) },
+    canWriteOff:hasPermission(account,"inventory.manage"),writeOffDocuments:rows("bd_inventory_writeoffs"),writeOffExpenses:rows("bd_finance_expenses"),
     preparationConfig:preparationConfig(read(preparationKey(account.venueId),null),account.venueId),
     discountRules: parsePosDiscountRules(rows(POS_DISCOUNT_STORE_KEY)),
     assortment: assortment as Record<string, unknown>, movements: stock.movements, events, revenues: rows("bd_finance_revenue"),
@@ -45,6 +46,13 @@ function controlled(error: unknown): Response {
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
   if (error instanceof Error && /^(STOCK_JOURNAL_|POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
+      POS_ORDER_STOCK_DECISION_REQUIRED: "Выберите явно: списать со склада или не списывать.",
+      POS_ORDER_STOCK_SNAPSHOT_REQUIRED: "Списание недоступно: нет сохранённого состава, единиц или складского источника. Отмена без списания требует отдельного выбора.",
+      POS_ORDER_STOCK_NO_CONSUMPTION: "У позиции нет складского потребления. Выберите отмену без списания.",
+      POS_ORDER_STOCK_SOURCE_REQUIRED: "Складской источник, единицы или остаток требуют проверки. Ничего не изменено.",
+      POS_ORDER_STOCK_INSUFFICIENT: "Недостаточно остатка для списания. Ничего не изменено.",
+      POS_ORDER_STOCK_LINK_CONFLICT: "Связанное списание требует проверки. Ничего не изменено.",
+      POS_ORDER_STOCK_ACCESS_DENIED: "Нет права списывать со склада.",
       POS_ORDER_CONFIRMED_LOCKED: "Позиции уже подтверждены. Руководитель может отменить нужное количество отдельным бегунком «ОТМЕНА» с причиной; прямое изменение или разделение недоступно.",
       POS_ORDER_NOTHING_TO_CONFIRM: "Новых позиций для подтверждения нет.",
       POS_ORDER_PREPARATION_SECTION_REQUIRED: "Руководитель должен заранее указать действующий раздел в карточке позиции меню.",
@@ -79,7 +87,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!hasPermission(account, "sales.view")) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
   try {
     const { context, orders, workdays } = await load(account);
-    return reply({ ok: true, venueId: account.venueId, serverNow: context.now, orders: posOrderAccountViews(context, orders, workdays, hasPermission(account,"sales.create")&&canManagePosPrivilegedAction(account)),
+    return reply({ ok: true, venueId: account.venueId, serverNow: context.now, orders: posOrderAccountViews(context, orders, workdays, hasPermission(account,"sales.create")&&canManagePosPrivilegedAction(account)).map(preparationOrderView),
       permissions: { create: hasPermission(account, "sales.create"), pay: hasPermission(account, "sales.create") && hasPermission(account, "sales.post"), privileged: hasPermission(account, "sales.create") && canManagePosPrivilegedAction(account) } });
   } catch (error) { return controlled(error); }
 }
@@ -91,15 +99,17 @@ async function command(request: Request): Promise<Response> {
   const body = parsed.data;
   if (!hasPermission(account, "sales.create") || ["pay", "preview_payment"].includes(body.action) && !hasPermission(account, "sales.post")
     || ["split", "cancel_item", "cancel_order", "cancel_precheck", "apply_discount", "remove_discount"].includes(body.action) && !canManagePosPrivilegedAction(account)) return reply({ ok: false, code: "ACCESS_DENIED" }, 403);
+  if(body.action==="cancel_item"&&body.stockDecision==="WRITE_OFF"&&!hasPermission(account,"inventory.manage"))return reply({ok:false,code:"ACCESS_DENIED",error:"Нет права списывать со склада."},403);
   if (body.venueId !== account.venueId) return reply({ ok: false, code: "VENUE_CHANGED" }, 409);
   try {
     const { db, snapshots, context, orders, workdays, stockRevision, eventRevision } = await load(account,undefined,{externalId:`pos-order:${body.orderId}`,source:"POS_API"});
     const plan = await planPosOrder(context, orders, body);
-    const result = { ok: true, duplicate: plan.duplicate, order: plan.order, orders: posOrderViews(context, plan.orders), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
+    const result = { ok: true, duplicate: plan.duplicate, order: preparationOrderView(plan.order), orders: posOrderViews(context, plan.orders).map(preparationOrderView), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
     if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);
     const updates: [string, unknown][] = [[POS_ORDER_STORE_KEY, plan.orders]];
     if (plan.salesPlan) updates.push(["bd_assortment_v1", plan.salesPlan.assortment], ["bd_stock_movements", plan.salesPlan.movements], [SALES_EVENT_STORE_KEY, plan.salesPlan.events], ["bd_finance_revenue", plan.salesPlan.revenues]);
+    if(plan.cancellationStockPlan){const stock=plan.cancellationStockPlan;updates.push(["bd_assortment_v1",stock.assortment],["bd_stock_movements",stock.movements],["bd_inventory_writeoffs",stock.documents],["bd_finance_expenses",stock.expenses]);}
     const statements:D1PreparedStatement[]=[];
     for(const [key,value] of updates){
       statements.push(...(key===SALES_EVENT_STORE_KEY&&eventRevision!==null
@@ -113,6 +123,7 @@ async function command(request: Request): Promise<Response> {
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(account.id, POS_ORDER_STORE_KEY, body.action, plan.order.id, `Стол ${plan.order.tableNumber}`, String(shift?.date ?? "").slice(0, 7),
         JSON.stringify(orders.find(order => order.id === plan.order.id) ?? null), JSON.stringify({ order: plan.order, salesEventId: plan.event?.id }),
         JSON.stringify(["revision", "status", "lines", "precheck", "discount", "totals", "preparationTickets"]), context.actor.name, context.actor.role, typeof body.reason === "string" && body.reason.trim() || "Подтверждённая операция", context.now));
+    if(plan.cancellationStockPlan){const document=plan.cancellationStockPlan.document;statements.push(db.prepare('INSERT INTO audit_log(account_id,store_key,action,entity_id,after_json,actor_name,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(account.id,'bd_inventory_writeoffs','pos_cancellation.posted',document.id,JSON.stringify(document),context.actor.name,context.actor.role,body.reason!,context.now));}
     statements.unshift(posMembershipGuard(db,account,context.now));
     await runStoreCasBatch(db, account.id, snapshots, statements, context.now);
     return reply(result, 201);
