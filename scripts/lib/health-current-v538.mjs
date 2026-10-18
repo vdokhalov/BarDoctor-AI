@@ -25,5 +25,17 @@ export function patchCurrentHealthClient(source) {
   source = source.replace('children:"Общее состояние"', 'children:"Текущее состояние"');
   source = source.replace('i.jsx("small",{className:"bd-cost-home-period",children:period.periodLabel})]})}', 'i.jsx("small",{className:"bd-cost-home-period",children:period.periodLabel}),i.jsx(bdHealthExplanationV539,{snapshot:snapshot,onNavigate:r})]})}');
   source = source.replace('i.jsx("p",{children:m.periodLabel}),m.comparisonLabel', 'i.jsx("p",{children:m.periodLabel}),i.jsx(bdHealthExplanationV539,{snapshot:l,onNavigate:e}),m.comparisonLabel');
+  // The restored production Home uses the non-compact V200 branch.
+  const homeStart = source.indexOf('function bdHomeHealthIndexV200('), homeEnd = source.indexOf('\n', homeStart);
+  if (homeStart < 0 || homeEnd < 0) throw new Error('Missing actual Home Health branch');
+  let home = source.slice(homeStart, homeEnd);
+  const priorityStart = home.indexOf('i.jsxs("div",{className:"bd-home-health-priority-v332"');
+  if (priorityStart >= 0) home = home.slice(0, priorityStart) + 'i.jsx(bdHealthExplanationV539,{snapshot:e,onNavigate:r})]})}';
+  if (!home.includes('i.jsx(bdHealthExplanationV539,{snapshot:e,onNavigate:r})')) throw new Error('Home explanation insertion failed');
+  home = home.replace('u=bdHealthPriorityV332(e,t),', '').replace('onClick:()=>r("/health")', 'onClick:()=>r("/health?venueId="+encodeURIComponent(e.venueId))');
+  home = home.replace('style:{color:a.color},children:a.label', 'style:{color:a.color,whiteSpace:"normal",overflowWrap:"anywhere",minWidth:0,flex:"1 1 0"},children:a.label');
+  source = source.slice(0, homeStart) + home + source.slice(homeEnd);
+  source = source.replaceAll('s?.assessment?.partial===true?"Хорошо по доступным направлениям"', 's?.assessment?.partial===true?"Оценено частично"');
+  source = source.replace('const t=bdHealthUiStatusV332(e.score,e.status);return i.jsxs("div",{className:"bd-home-health-zone-v332', 'const t=bdHealthUiStatusV332(e.score,e.status);if(e.id==="operations"&&e.statusLabel==="Частично оценено")t.short="частично";return i.jsxs("div",{className:"bd-home-health-zone-v332');
   return source;
 }

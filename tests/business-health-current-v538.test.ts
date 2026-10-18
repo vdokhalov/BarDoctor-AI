@@ -82,10 +82,10 @@ test('actual client helpers show coverage, separate financial period and qualifi
   const current = snapshot();
   const home = JSON.stringify(ctx.bdCostHomeScorePhase4a({ snapshot: current, loading: false, onNavigate: () => {} }));
   assert.match(home, /Текущее состояние/);
-  assert.match(home, /Хорошо по доступным направлениям/);
+  assert.match(home, /Оценено частично/);
   assert.doesNotMatch(ctx.bdHealthLivePeriodV334(current).periodLabel, /из 4|весов/);
   assert.doesNotMatch(ctx.bdHealthLivePeriodV334(current).periodLabel, /предварительно/);
-  assert.equal(ctx.bdHealthUiStatusV332(81, 'healthy', current).label, 'Хорошо по доступным направлениям');
+  assert.equal(ctx.bdHealthUiStatusV332(81, 'healthy', current).label, 'Оценено частично');
   const closed = snapshot(read({ latestClosedMonth: { monthKey: '2026-09', revenue: 1000, finalProfit: 100 } }));
   assert.match(closed.assessment.details.join(' '), /Финансовая оценка: 2026-09.*не прибыль текущего месяца/);
 });

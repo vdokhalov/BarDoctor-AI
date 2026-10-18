@@ -64,13 +64,13 @@ test('Home hides coverage math under How calculated, keeps a partial note and on
   const extract = (name: string) => source.slice(source.indexOf(`function ${name}(`)).split('\n')[0];
   type Node = { type: string; props: { children?: unknown; onClick?: () => void; open?: boolean } };
   const jsx = (type: string | Function, props: object) => typeof type === 'function' ? type(props) : { type, props };
-  const ctx = vm.createContext({ localStorage: { getItem: () => '3389' }, i: { jsx, jsxs: jsx } });
-  for (const name of ['bdHealthLivePeriodV334', 'bdHealthUiStatusV332', 'bdHealthExplanationV539', 'bdCostHomeScorePhase4a']) vm.runInContext(extract(name), ctx);
+  const ctx = vm.createContext({ localStorage: { getItem: () => '3389' }, bdLegacyHealthRingV493: () => null, i: { jsx, jsxs: jsx } });
+  for (const name of ['bdBusinessHealthNullableNumberV284', 'bdHealthTrendV332', 'bdHealthZoneV332', 'bdHealthHomeZonesV332', 'bdHomeHealthZoneV332', 'bdHealthLivePeriodV334', 'bdHealthUiStatusV332', 'bdHealthExplanationV539', 'bdHomeHealthIndexV200']) vm.runInContext(extract(name), ctx);
   let navigation = '';
-  const tree: Node = ctx.bdCostHomeScorePhase4a({ snapshot: snap(read([0, null, 0, null])), loading: false, onNavigate: (path: string) => { navigation = path; } });
+  const tree: Node = ctx.bdHomeHealthIndexV200({ snapshot: snap(read([0, null, 0, null])), loading: false, onNavigate: (path: string) => { navigation = path; } });
   const walk = (node: any, includeDetails = false): any[] => Array.isArray(node) ? node.flatMap(n => walk(n, includeDetails)) : node && typeof node === 'object' ? [node, ...(node.type === 'details' && !includeDetails ? walk(node.props.children[0], includeDetails) : walk(node.props?.children, includeDetails))] : [node];
   const visible = walk(tree).filter(v => typeof v === 'string').join(' ');
-  assert.match(visible, /Оценка по доступным данным/); assert.match(visible, /Как рассчитано/); assert.match(visible, /Уточните остатки/);
+  assert.match(visible, /Оценено частично/); assert.match(visible, /частично/); assert.match(visible, /Оценка по доступным данным/); assert.match(visible, /Как рассчитано/); assert.match(visible, /Уточните остатки/);
   assert.doesNotMatch(visible, /из 4|весов|UNAVAILABLE|PARTIAL/);
   const all = walk(tree, true); const details = all.find(v => v?.type === 'details'); assert.equal(details.props.open, undefined);
   assert.match(all.filter(v => typeof v === 'string').join(' '), /2 из 4.*33%/);
