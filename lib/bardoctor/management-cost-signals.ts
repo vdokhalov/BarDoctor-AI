@@ -157,8 +157,8 @@ async function evaluateBatch(context:NonNullable<Awaited<ReturnType<typeof autho
   const sourceBytes=read.snapshots.filter(s=>COST_SOURCE_KEYS.includes(s.key)).reduce((total,s)=>total+new TextEncoder().encode(s.dataJson??"").byteLength,0);
   let calculationBudget=sourceBytes>256_000?1:3;
   let processed=0;
-  for(const id of ids){const response=await transition(context,id,null,"VIEW_REEVALUATION",batch);if(!response.ok)return response;const value=await response.json() as {episode?:CostEpisodeV1;observation?:{quality:{availability:string}}};
-    if(value.observation?.quality.availability==="UNAVAILABLE")return json({ok:true,coverage:"UNAVAILABLE",items:[],nextCursor:null});
+  for(const id of ids){const response=await transition(context,id,null,"VIEW_REEVALUATION",batch);if(!response.ok)return response;const value=await response.json() as {episode?:CostEpisodeV1;observation?:{quality:{availability:string};reasonCodes:string[]}};
+    if(value.observation?.quality.availability==="UNAVAILABLE")return json({ok:true,coverage:"UNAVAILABLE",reasons:value.observation.reasonCodes,blockedMenuItemId:id,items:[],nextCursor:null});
     if(value.episode)items.push(value.episode);
     processed++;
     if(batch.evaluated>0&&(await batch.reader.sourceBytes())>256_000)calculationBudget=1;

@@ -56,7 +56,7 @@ test('input identity includes scope, date, raw content, journal revision ',async
 });
 
 test('calculator release invalidates retained receipts',async()=>{
- const old=await costFixture();const fresh=await costFixture({}, {plugins:[{name:'new-calculator-release',setup(build){build.onLoad({filter:/management-cost-observation\.ts$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace('current-recipe-cost-phase4a-v1','current-recipe-cost-phase4a-v2'),loader:'ts',resolveDir:path.dirname(args.path)}));}}]});
+ const old=await costFixture();const fresh=await costFixture({}, {plugins:[{name:'new-calculator-release',setup(build){build.onLoad({filter:/management-cost-observation\.ts$/},args=>({contents:fs.readFileSync(args.path,'utf8').replace('current-recipe-cost-phase4a-v2','current-recipe-cost-phase4a-v3'),loader:'ts',resolveDir:path.dirname(args.path)}));}}]});
  try{seedCards(old,2);seedCards(fresh,2);await run(old);for(const row of old.sqlite.prepare("SELECT store_key,data_json FROM domain_data WHERE store_key LIKE '__bd_p4a_cost_%'").all())fresh.seed(String(row.store_key),JSON.parse(String(row.data_json)));assert.equal((await page(fresh)).evaluation.evaluated,2);}finally{old.close();fresh.close();}
 });
 test('journal migration, revision and future receipt date invalidate without weakening scope',async()=>{

@@ -31,3 +31,7 @@ test('unavailable sources and repeated cursor cannot certify completion',async()
   assert.ok(worker.get(1)?.error);assert.equal(worker.get(1)?.completedAt,undefined);assert.deepEqual(worker.get(1)?.data?.items,['saved']);
  }
 });
+
+test('unavailable calculation preserves specific reasons and never marks the run complete',async()=>{
+ const worker=createCostRefresh({current:()=> 's',read:async()=>({items:[]}),evaluate:async()=>({coverage:'UNAVAILABLE',reasons:['CURRENCY_UNKNOWN','CURRENCY_UNKNOWN','untrusted-code']})});await worker.start(1);const state=worker.get(1);assert.equal(state?.completedAt,undefined);assert.equal(state?.busy,false);assert.match(state?.error||'',/Не подтверждена единая валюта/);assert.doesNotMatch(state?.error||'',/untrusted-code/);
+});

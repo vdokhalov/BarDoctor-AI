@@ -1,5 +1,6 @@
+import { COST_WHY, type CostReason } from "../management-cost-contracts";
 /** One background evaluation per authenticated app session and venue. Never persist across users. */
-export function createCostRefresh<T>(io:{read:(venue:number,signal:AbortSignal)=>Promise<T>;evaluate:(venue:number,cursor:string|undefined,signal:AbortSignal)=>Promise<{nextCursor?:string|null;coverage?:string}>;current:()=>string}) {
+export function createCostRefresh<T>(io:{read:(venue:number,signal:AbortSignal)=>Promise<T>;evaluate:(venue:number,cursor:string|undefined,signal:AbortSignal)=>Promise<{nextCursor?:string|null;coverage?:string;reasons?:string[]}>;current:()=>string}) {
   type State={data?:T;busy:boolean;error?:string;completedAt?:string};
   const entries=new Map<number,{state:State;job?:Promise<void>;controller:AbortController}>();
   const listeners=new Set<()=>void>();let identity=io.current();
@@ -14,7 +15,7 @@ export function createCostRefresh<T>(io:{read:(venue:number,signal:AbortSignal)=
       const saved=await io.read(venue,own.controller.signal);if(!valid())return;own.state={...own.state,data:saved};emit();
       let cursor:string|undefined;const seen=new Set<string>();
       do {const page=await io.evaluate(venue,cursor,own.controller.signal);if(!valid())return;
-        if(page.coverage==='UNAVAILABLE')throw Error('Не все источники доступны. Обновление себестоимости не завершено.');
+        if(page.coverage==='UNAVAILABLE'){const reasons=[...new Set(page.reasons||[])].filter((reason):reason is CostReason=>Object.prototype.hasOwnProperty.call(COST_WHY,reason));throw Error('Обновление себестоимости не завершено. '+(reasons.length?reasons.map(reason=>COST_WHY[reason]).join(' '):'Не все источники доступны.'));}
         cursor=page.nextCursor||undefined;if(cursor&&seen.has(cursor))throw Error('Проверка не завершена. Повторите обновление.');if(cursor)seen.add(cursor);
       }while(cursor);
       const fresh=await io.read(venue,own.controller.signal);if(valid())own.state={data:fresh,busy:true,completedAt:new Date().toISOString()};

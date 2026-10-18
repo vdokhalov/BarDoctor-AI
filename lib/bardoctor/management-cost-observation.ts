@@ -1,3 +1,4 @@
+import { accountingCurrencyFromProfile } from "./currency";
 import {readSaleStock,stockJournalMarker} from "./stock-storage";
 import { createIngredientReconciliationMemo, type IngredientReconciliationMemo } from "./tech-card-reconciliation";
 import { buildAssortmentAnalytics } from "./assortment-analytics";
@@ -7,7 +8,7 @@ import type { StoreSnapshot } from "./store-cas";
 import type { CostIngredientBlockerV1, CostObservationV1, CostReason, CostScope } from "./management-cost-contracts";
 
 export const COST_SOURCE_KEYS = ["bd_assortment_v1", "bd_purchase_documents", "bd_stock_movements"];
-export const COST_CALCULATION_VERSION = "current-recipe-cost-phase4a-v1";
+export const COST_CALCULATION_VERSION = "current-recipe-cost-phase4a-v2";
 export const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 export const canonicalItemId = (id: unknown): id is string => typeof id === "string" && id.length > 0 && id.length <= 120 && id.trim() === id && !/[\u0000-\u001f]/.test(id);
 const identity = (value: unknown) => typeof value === "string" && value.trim() && value.length <= 300 ? value : null;
@@ -70,7 +71,7 @@ async function prepareCurrentCostRead({scope, snapshots, profileJson, now}: Omit
   const parsed=await readCostSources(snapshots,scope,now),reasons=[...parsed.reasons];
   let profile: Record<string, unknown> = {};
   try { profile = record(JSON.parse(profileJson ?? "null")); } catch { reasons.push("SOURCE_INVALID"); }
-  const currency = typeof profile.currency === "string" && /^[A-Z]{3}$/.test(profile.currency) ? profile.currency : null;
+  const currency = accountingCurrencyFromProfile(profile);
   if (!currency) reasons.push("CURRENCY_UNKNOWN");
   const manifest = await Promise.all(snapshots.filter(s => COST_SOURCE_KEYS.includes(s.key)).map(async s => ({ sourceKey: s.key, present: s.dataJson !== null, updatedAt: s.updatedAt, contentRevision: await costRevision([scope, s.key, s.dataJson]) })));
   const profileRevision = await costRevision(profileJson);

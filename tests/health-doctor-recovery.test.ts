@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {lifecycleRuntime} from './helpers/lifecycle-runtime';
 import {createIngredientReconciliationMemo,reconcileTechCards} from '../lib/bardoctor/tech-card-reconciliation';
 import {buildAssortmentAnalytics} from '../lib/bardoctor/assortment-analytics';
-import {createCurrentCostReader} from '../lib/bardoctor/management-cost-observation';
+import {createCurrentCostReader,COST_CALCULATION_VERSION} from '../lib/bardoctor/management-cost-observation';
 import {createIngredientReferenceResolver,canonicalIngredientReference} from '../lib/bardoctor/ingredient-reference';
 
 const baseline='ad0378431dfea73ded6e67c176dbfcae7ddf4f42';
@@ -24,6 +24,8 @@ function historicalSource(path:string) {
    source=source.replace(before,after);
   }
  }
+ // The cost math oracle remains pinned; align only the explicit calculation-version label.
+ if(path==='lib/bardoctor/management-cost-observation.ts')source=source.replace("current-recipe-cost-phase4a-v1",COST_CALCULATION_VERSION);
  return source;
 }
 test('request indexes preserve baseline analytics and certified costs with released v511 unit semantics across mixed sources',async()=>{
