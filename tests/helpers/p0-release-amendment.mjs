@@ -26,8 +26,10 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Approved document-only warehouse reader and scoped publication (2026-10-16).
 // Owner-approved selected splash presentation only; save without publication (2026-10-17).
 // Owner-requested visible splash minimum and fade (2026-10-17).
+// Owner-approved native/HTML splash coordinate alignment (2026-10-18); save only.
 export const p0Paths=Object.freeze([
  "scripts/splash-timing-v531.js",
+ "scripts/splash-geometry-v532.js",
  "public/app.html",
  "scripts/patch-splash-v529.mjs",
  "scripts/capture-splash-v529.mjs",

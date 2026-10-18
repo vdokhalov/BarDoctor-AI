@@ -110,3 +110,11 @@ Removed the display-mode:standalone animation override. Native iOS launch PNGs r
 ## Visible duration correction (v531)
 
 User observed v530 disappearing too quickly and requested a 1500ms visible minimum, superseding immediate success hiding. An inline one-shot coordinator starts on a visible animation frame, queues the latest committed success target, and waits only the remaining minimum. Normal motion fades opacity for180ms; reduced motion exits with no transition at the minimum. Slow readiness after1500ms fades immediately. Error/recovery removal cancels the coordinator and its timers; existing recovery code/timeouts are unchanged. Internal navigation does not create another splash. Local scoped fixtures cover fast/slow, standalone CSS condition, reduced motion, recovery, internal navigation, and replacement of a ready target (Home→login). No image/design changes or production business operations.
+
+## v532 — standalone launch coordinate continuity (2026-10-18)
+
+Preserves the selected v529 raster layers and v531 visible minimum/fade. In the existing edge-to-edge standalone policy (`viewport-fit=cover`, `black-translucent`), screen origin is (0,0); safe-area insets are interior exclusion zones, not an extra viewport origin. Screen-size artwork is translated through visualViewport offset and the actual artwork container rect. No missing-height heuristic or device-specific notch offsets. Non-standalone / unknown launch geometry keeps the existing responsive layout.
+
+Scoped Chromium fixtures model standalone, fixed screen, shortened viewport, translated container and visual viewport offset. They do not run iOS or observe an OS viewport origin. Tested 390×844 at844/797/763 and393×852 at852/793/759, including live viewport resize. Current native PNG title and lower-line landmarks agree after alignment. No physical-iPhone PASS claim; stale OS launch caches remain unobserved. Native PNGs and motion assets unchanged.
+
+Origin policy references: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html and https://webkit.org/blog/7929/designing-websites-for-iphone-x/ . A host that violates this edge-to-edge contract or supplies unobservable OS window displacement is outside this emulation's proof.

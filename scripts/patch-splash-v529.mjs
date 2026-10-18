@@ -1,5 +1,6 @@
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 const restore=process.argv.includes('--restore');
+const geometry=readFileSync('scripts/splash-geometry-v532.js','utf8');
 const timing=readFileSync('scripts/splash-timing-v531.js','utf8');
 export const splashCss=`
 html[data-bd-startup-pending="v201"],html[data-bd-startup-pending="v201"] body,html[data-bd-startup-pending="v201"] #root {background:#0733aa !important;}
@@ -26,7 +27,7 @@ for(const file of ['public/app.html','app/bar-doctor-response.ts','dist/client/a
  if(!existsSync(file))continue;
  let s=readFileSync(file,'utf8').replace(/<!-- splash-v529:head -->[\s\S]*?<!-- \/splash-v529:head -->\n?/g,'').replace(/<!-- splash-v529:art -->[\s\S]*?<!-- \/splash-v529:art -->/g,'').replaceAll(/(bardoctor-launch-\d+x\d+-\dx)-v529.png/g,'$1-v394.png');
  if(!restore){
-  s=s.replace('</head>',head+'\n</head>').replace(/(<div class="bd-static-startup-v201 bd-unified-splash-v394"[^>]*>)/,'$1<!-- splash-v529:art -->'+splashMarkup+'<script>'+timing+'</script><!-- /splash-v529:art -->');
+  s=s.replace('</head>',head+'\n</head>').replace(/(<div class="bd-static-startup-v201 bd-unified-splash-v394"[^>]*>)/,'$1<!-- splash-v529:art -->'+splashMarkup+'<script>'+geometry+'</script><script>'+timing+'</script><!-- /splash-v529:art -->');
   s=s.replaceAll(/(bardoctor-launch-\d+x\d+-\dx)-v394.png/g,'$1-v529.png');
   if(!s.includes(head)||!s.includes(splashMarkup))throw Error('Missing splash host: '+file);
  }

@@ -1,6 +1,6 @@
 {
   "baseline": "691ab51840266c9b6297fda7a84ee2077694a75f",
-  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling; owner-authorized normalized stock journal, resumable migration, lifecycle/reader/export integration and local scoped validation (2026-10-16); no push, publication or production cutover",
+  "scope": "User-approved P0 recovery; exact released-v517 expectations for audited WebKit390/820/1280 and current nomenclature-picker harnesses, isolated diagnostics and minimal Reports wizard route repair; no calculation or business-data changes; mandatory harness explicit Doctor consent and venue-date OPEN/team fixtures, native workday close and current UI locators; server restrictions unchanged; late workday view reconciliation and exact DOM/request lifecycle guards; owner-approved v519 mobile Sales shell gap correction and exact iframe/nav edge assertion only; no cashier logic changes; owner-approved conservative CI change classification and selected-gate validation; existing full commands and product files unchanged; owner-authorized staff username and six-digit PIN development, exact reviewed bytes, no device activation; no publication approval; targeted security review: monotonic revoke/restore epoch and fail-closed ingress policy; owner-authorized IP-independent login/credential lifetime budgets and concurrency leases; source throttle optional and additive; owner decision removes lifetime lockout; preserve atomic automatic window/concurrency throttling; owner-authorized normalized stock journal, resumable migration, lifecycle/reader/export integration and local scoped validation (2026-10-16); no push, publication or production cutover; owner-approved standalone splash screen/viewport origin alignment (2026-10-18), save only",
   "files": {
     ".github/workflows/google-reviews-setup-v400.yml": {
       "before": "432d4594aa27db182d7e33ee784c3c6390a5d99c5193eb7317b4ff72dba40b38",
@@ -340,7 +340,7 @@
     },
     "app/bar-doctor-response.ts": {
       "before": "8253f8be1bd1fb3ef3371dde5463a9681ff6c78529f6a45e2bfe47a3a66c766e",
-      "after": "2be16c5112dc319ac8ae8cefed14d8ee39128e75fc08939b687a0fd280afe0da"
+      "after": "f4591b1f94f2a4ca902ff5b46f704db9183b85e8d87a299262c67cd8937d5cab"
     },
     "drizzle/0028_staff_pin_revocation.sql": {
       "before": null,
@@ -660,7 +660,7 @@
     },
     "scripts/patch-splash-v529.mjs": {
       "before": null,
-      "after": "a115713fa53230c156620a2f232c39e72a980e5cc70221ce11f6552b631428ae"
+      "after": "c463613b4fba516338eeadbe644b804c46ef7e46d766ce232eb01c21e73d95c5"
     },
     "scripts/capture-splash-v529.mjs": {
       "before": null,
@@ -720,11 +720,15 @@
     },
     "public/app.html": {
       "before": "a7116916269940c4f4f96f54ad40f2ad836d9b0a5c1ab45def0c38fc4887f7f7",
-      "after": "0eb92f787261def0aeb981f50808224ac0209ec37bfb1083edca85e9437e8af3"
+      "after": "8b878c74cc534e6b1e46268a8de97d1b407b4f114a0a29712fab218534d7b13d"
     },
     "scripts/splash-timing-v531.js": {
       "before": null,
       "after": "d625f97e341c0abb31f7efa2664f3dc418407684fb7645206495677a5cd12d83"
+    },
+    "scripts/splash-geometry-v532.js": {
+      "before": null,
+      "after": "525b9c6eba075a7a67e208201b13e73132d5e31381650adc805528f9a04e251c"
     }
   }
 }
