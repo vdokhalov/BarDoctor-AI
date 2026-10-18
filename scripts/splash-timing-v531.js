@@ -2,6 +2,8 @@
   var root=document.documentElement,node=document.querySelector('[data-bd-static-startup="v201"]');
   if(!node||root.getAttribute('data-bd-startup-pending')!=='v201')return;
   var started=null,callback=null,timer=0,frame=0,finished=false,fading=false;
+  var image=node.querySelector('.bd-splash-art-stage-v529 img'),imageReady=!image;
+  if(image)image.decode().then(function(){imageReady=true;},function(){imageReady=true;});
   var reduced=window.matchMedia('(prefers-reduced-motion: reduce)');
   function event(name){window.dispatchEvent(new CustomEvent('bd:splash-'+name,{detail:{at:performance.now()}}));}
   function cancel(){finished=true;clearTimeout(timer);cancelAnimationFrame(frame);observer.disconnect();}
@@ -18,7 +20,7 @@
   function visible(){
     if(finished)return;
     var style=getComputedStyle(node);
-    if(!document.hidden&&node.isConnected&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0){started=performance.now();event('visible');schedule();}
+    if(imageReady&&!document.hidden&&node.isConnected&&style.display!=='none'&&style.visibility!=='hidden'&&Number(style.opacity)>0){started=performance.now();event('visible');schedule();}
     else frame=requestAnimationFrame(visible);
   }
   // Recovery owns immediate exit. Never restore a pending attribute or removed node.

@@ -12,7 +12,8 @@ test('splash is accessible, responsive, static under reduced motion and never ga
   assert.ok(await page.locator('.bd-unified-splash-tagline-v394').isHidden());
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width);
   const animations=await page.locator('.bd-splash-art-stage-v529').evaluate(el=>el.getAnimations({subtree:true}).map(a=>({duration:a.effect.getTiming().duration,iterations:a.effect.getTiming().iterations})));
-  if(reducedMotion==='reduce')assert.deepEqual(animations,[]);else {assert.equal(animations.length,2,'brand and lower illustration animate in browser and standalone');assert.ok(animations.every(a=>a.duration<=850&&a.iterations===1));}
+  assert.deepEqual(animations,[],'first HTML artwork is complete, opaque and has no entrance motion');
+  assert.equal(await page.locator('.bd-splash-art-stage-v529 img').count(),1);
   // The existing pending attribute owns visibility; animation has no completion callback.
   await page.evaluate(()=>document.documentElement.removeAttribute('data-bd-startup-pending'));
   assert.ok(await page.locator('[data-bd-static-startup]').isHidden());await page.close();
@@ -20,6 +21,8 @@ test('splash is accessible, responsive, static under reduced motion and never ga
 });
 test('splash patch roundtrips only its owned markup and launch references',()=>{
  const files=['public/app.html','app/bar-doctor-response.ts'];const before=files.map(f=>readFileSync(f,'utf8'));
+ const inline=before[0].match(/src="data:image\/png;base64,([^"]+)"/);assert.ok(inline,'no network-dependent startup artwork');
+ assert.deepEqual(Buffer.from(inline[1],'base64'),readFileSync('public/icons/bardoctor-splash-reference-v529.png'),'embedded artwork preserves original bytes');
  execFileSync(process.execPath,['scripts/patch-splash-v529.mjs','--restore']);execFileSync(process.execPath,['scripts/patch-splash-v529.mjs']);
  files.forEach((file,i)=>assert.equal(readFileSync(file,'utf8'),before[i]));
  const patch=readFileSync('scripts/patch-splash-v529.mjs','utf8');assert.doesNotMatch(patch,/setTimeout|animationend|localStorage|\/api\//);

@@ -8,7 +8,7 @@
   if(!art||!stage||!standalone||!root.hasAttribute('data-bd-launch-raster-v396')||!viewport||!viewport.content.includes('viewport-fit=cover')||!status||status.content!=='black-translucent')return;
   var width=Math.round(screen.width),height=Math.round(screen.height),frame=0;
   if(innerWidth!==width||width>=height)return;
-  var scale=Math.max(width/853,height/1844),w=853*scale,h=1844*scale;
+  // Keep the same CSS cover arithmetic/rounding used to generate native PNGs.
   function align(){
     if(!art.isConnected||root.getAttribute('data-bd-startup-pending')!=='v201')return;
     var rect=art.getBoundingClientRect(),view=window.visualViewport;
@@ -16,7 +16,7 @@
     // through the visual viewport, then through the artwork container origin.
     // This also cancels an ancestor's safe-area padding/translation.
     var x=(view?view.offsetLeft:0)-rect.left,y=(view?view.offsetTop:0)-rect.top;
-    stage.style.cssText='left:'+(x+(width-w)/2)+'px;top:'+(y+(height-h)/2)+'px;width:'+w+'px;height:'+h+'px;transform:none';
+    stage.style.cssText='left:calc('+x+'px + '+width+'px / 2);top:calc('+y+'px + '+height+'px / 2);width:max('+width+'px,calc('+height+'px * 853 / 1844));height:max('+height+'px,calc('+width+'px * 1844 / 853));transform:translate(-50%,-50%)';
     frame=requestAnimationFrame(align);
   }
   align();
