@@ -138,8 +138,9 @@ export async function managementCostRequest(request: Request, signalId?: string)
       const parsedBody = await readJsonRequest<Record<string, unknown>>(request.clone() as unknown as Request, { maxBytes: 16 * 1024 });
         if (!parsedBody.ok) { parsedBody.response.headers.set("Cache-Control", "private, no-store"); return parsedBody.response; }
         const body = parsedBody.data;
-      if (Object.keys(body).some(key => !["menuItemId", "cursor"].includes(key)) || body.menuItemId != null && !canonicalItemId(body.menuItemId)) return fail("INVALID_COMMAND", 400);
+      if (Object.keys(body).some(key => !["menuItemId", "cursor", "batchSize"].includes(key)) || body.menuItemId != null && !canonicalItemId(body.menuItemId)) return fail("INVALID_COMMAND", 400);
       if (body.menuItemId) return await withStoreCasRetries(request, () => transition(context, String(body.menuItemId), null, "VIEW_REEVALUATION"));
+      const batchSize = body.batchSize === 1 ? 1 : 25;
       const read = await snapshot(context, []);
       if (!read) return fail("ACCESS_DENIED", 403);
       const parsed = (await readCostSources(read.snapshots, scope));
@@ -150,8 +151,8 @@ export async function managementCostRequest(request: Request, signalId?: string)
       const menu = (parsed.assortment.menuItems as unknown[]).map(record);
       if (menu.some(item => !canonicalItemId(item.id)) || new Set(menu.map(item => item.id)).size !== menu.length) return fail("SOURCE_INVALID", 422);
       let ids: string[], more: boolean;
-      if (cursor.phase === "menu") { const all = menu.filter(item => item.active !== false && item.consumptionMode === "RECIPE").map(item => String(item.id)).sort().filter(id => id > cursor.after); ids = all.slice(0, 25); more = all.length > 25; }
-      else { const p = prefix(scope); const rows = await getD1().prepare("SELECT store_key,data_json FROM domain_data WHERE account_id=? AND store_key>=? AND store_key<? AND store_key>? ORDER BY store_key LIMIT 26").bind(scope.dataAccountId, p, p + "\uffff", cursor.after || p).all<{ store_key: string; data_json: string }>(); const page = rows.results ?? []; ids = page.slice(0, 25).map(row => JSON.parse(row.data_json).menuItemId); more = page.length > 25; }
+      if (cursor.phase === "menu") { const all = menu.filter(item => item.active !== false && item.consumptionMode === "RECIPE").map(item => String(item.id)).sort().filter(id => id > cursor.after); ids = all.slice(0, batchSize); more = all.length > batchSize; }
+      else { const p = prefix(scope); const rows = await getD1().prepare("SELECT store_key,data_json FROM domain_data WHERE account_id=? AND store_key>=? AND store_key<? AND store_key>? ORDER BY store_key LIMIT 26").bind(scope.dataAccountId, p, p + "\uffff", cursor.after || p).all<{ store_key: string; data_json: string }>(); const page = rows.results ?? []; ids = page.slice(0, batchSize).map(row => JSON.parse(row.data_json).menuItemId); more = page.length > batchSize; }
       const items = [];
       for (const id of ids) { const response = await withStoreCasRetries(request, () => transition(context, id, null, "VIEW_REEVALUATION")); if (!response.ok) return response; const value = await response.json() as { episode: CostEpisodeV1 | null }; if (value.episode) items.push(value.episode); }
       const nextCursor = more ? JSON.stringify({ ...cursor, after: cursor.phase === "menu" ? ids.at(-1) : stateKey(scope, ids.at(-1)!) }) : cursor.phase === "menu" ? JSON.stringify({ venueId: scope.venueId, phase: "tracked", after: "" }) : null;
@@ -168,8 +169,9 @@ export async function managementCostRequest(request: Request, signalId?: string)
     const keys = historyItem ? page.map(row => row.store_key) : page.map(row => { const state = parseStored<CostStateV1>(row.data_json)!; return episodeKey(scope, state.menuItemId, state.generation); });
     const read = await snapshot(context, keys);
     if (!read) return fail("ACCESS_DENIED", 403);
+    const sources = await readCostSources(read.snapshots, scope);
     const items: unknown[] = [];
-    for (const key of keys) { const e = parseStored<CostEpisodeV1>(read.snapshots.find(row => row.key === key)?.dataJson ?? null); if (e && sameScope(e.scope, scope) && (stateFilter === "all" || stateFilter === "active" && e.condition === "ACTIVE" || stateFilter === "verified" && e.condition === "VERIFIED_RESOLVED")) items.push(await project(e, String(((await readCostSources(read.snapshots, scope)).assortment.menuItems as Record<string,unknown>[] | undefined)?.find(item => item.id === e.menuItemId)?.name ?? e.menuItemId))); }
-    return json({ ok: true, contractVersion: 1, scope, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: (await readCostSources(read.snapshots, scope)).reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
+    for (const key of keys) { const e = parseStored<CostEpisodeV1>(read.snapshots.find(row => row.key === key)?.dataJson ?? null); if (e && sameScope(e.scope, scope) && (stateFilter === "all" || stateFilter === "active" && e.condition === "ACTIVE" || stateFilter === "verified" && e.condition === "VERIFIED_RESOLVED")) items.push(await project(e, String((sources.assortment.menuItems as Record<string,unknown>[] | undefined)?.find(item => item.id === e.menuItemId)?.name ?? e.menuItemId))); }
+    return json({ ok: true, contractVersion: 1, scope, generatedAt: new Date().toISOString(), items, nextCursor: (rows.results?.length ?? 0) > limit ? page.at(-1)?.store_key : null, coverage: sources.reasons.length ? "UNAVAILABLE" : "AVAILABLE" });
   } catch { return fail("CANNOT_VERIFY", 503); }
 }

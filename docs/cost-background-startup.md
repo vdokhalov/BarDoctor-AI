@@ -1,0 +1,11 @@
+# Automatic cost refresh on application startup
+
+Opening the authenticated application starts a shared background evaluation for the active venue. The cost panel first reads saved episodes and displays their observation time, then receives fresh results after evaluation. Navigation uses the same in-memory job/results; a new application load starts a new evaluation. Auth bootstrap resets the cache and aborts old work. Venue scopes remain separate and responses are checked against the current session and venue.
+
+Evaluation follows every menu/tracked cursor, one item per request instead of up to25. This reduces the sequential work inside each15-second request without raising the deadline or changing server-side verification/CAS. Tracked deletion and new-problem discovery remain enabled. Listing parses cost sources once per request instead of once per returned episode. This does not prove the exact cause of the earlier production timeout or guarantee an individual expensive item will finish in15seconds.
+
+Saved episodes remain visible on failure, with an incomplete-update notice. Navigation does not cause retry storms; an explicit retry or a new application load retries. Selected detail rereads after background completion, including signals outside the first list page. No shared/global server promises, persistent client caches, schema changes, Health score changes or weaker resolution rules were introduced.
+
+Validation:32 focused coordinator/lifecycle/correction tests passed; single-item paging/discovery/tracked-deletion test passed; existing stalled-fetch/body timeout test passed. Scoped TypeScript check passed. Local Chromium390px mocked-network scenarios passed: saved results before computation, navigation coalescing, fresh results, reload, retained results on503, no route-triggered retry storm, explicit retry, selected-detail reread. The actual emitted app passed startup-on-Home, Home/Health navigation coalescing and reload checks. Build and emitted asset validation passed. No production API calls, paid AI, credentials, push or publication.
+
+Evidence: /workspace/checkpoint/cost-background-startup. Browser fixtures are synthetic; production latency remains unmeasured. Screenshots are local QA evidence only.

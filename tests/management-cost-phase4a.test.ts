@@ -134,3 +134,16 @@ test('invalid IDs, duplicate entities, oversized sources and malformed/oversized
  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM domain_data WHERE store_key>=? AND store_key<?").get('__bd_p4a_cost_','__bd_p4a_cost_\uffff')!.n,0);
  }finally{r.close()}
 });
+
+test('startup single-item batches discover every new problem and retain tracked deletion checks',async()=>{
+ const r=await costFixture();try{
+ const menu=structuredClone(r.assortment);menu.menuItems=Array.from({length:3},(_,i)=>({...menu.menuItems[0],id:'startup-'+i}));menu.recipes=[];r.seed('bd_assortment_v1',menu);
+ type Page={ok:boolean;items:{signalId:string;condition:string}[];nextCursor:string|null};
+ let cursor:string|null=null;const signals=new Set<string>();let requests=0;
+ do{const response=await r.api.evaluate.POST(r.request('/api/management/cost-signals/evaluate','POST',{batchSize:1,...(cursor?{cursor}:{})}));assert.equal(response.status,200);const page=await response.json() as Page;assert.ok(page.items.length<=1);page.items.forEach(e=>signals.add(e.signalId));cursor=page.nextCursor;assert.ok(++requests<10);}while(cursor);
+ assert.equal(signals.size,3);assert.equal(requests,6);
+ menu.menuItems=[];r.seed('bd_assortment_v1',menu);requests=0;
+ do{const response=await r.api.evaluate.POST(r.request('/api/management/cost-signals/evaluate','POST',{batchSize:1,...(cursor?{cursor}:{})}));const page=await response.json() as Page;assert.ok(page.items.length<=1);assert.ok(page.items.every(e=>e.condition==='NOT_APPLICABLE'));cursor=page.nextCursor;assert.ok(++requests<10);}while(cursor);
+ for(const id of signals)assert.equal((await body(await r.detail(id))).episode.condition,'NOT_APPLICABLE');
+ }finally{r.close()}
+});

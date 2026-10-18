@@ -1,36 +1,35 @@
 import type { CostEpisodeV1, CostObservationV1, CostVerificationV1 } from '../management-cost-contracts';
 import type { EvidenceReference } from '../evidence-contracts';
 import { readCanonicalJson } from './canonical-read';
+import { createCostRefresh } from './cost-refresh';
 
 type Episode = CostEpisodeV1 & { menuItemName?:string; why: string[]; effect: string; targets: {health:string;techCard:string;purchase?:string} };
 type Payload = {ok:boolean;error?:string;code?:string;items?:Episode[];episode?:Episode;currentObservation?:CostObservationV1;itemName?:string;coverage?:string;nextCursor?:string|null;evaluationCursor?:string|null};
-type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;enabled:()=>boolean};
+type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=>void;enabled:()=>boolean;session?:()=>string};
 /** React is supplied by the prepared client; keep its existing renderer/hooks. */
 export function createCostManagementClient(React: typeof import('react'), runtime: Runtime) {
-  const disabled=new Set<number>();const pending=new Map<number,Promise<Payload>>(),covered=new Map<number,Set<string>>();
+  const disabled=new Set<number>();const covered=new Map<number,Set<string>>();
   const checkScope=(venue:number)=>{if(runtime.venue()!==venue)throw new Error('Заведение изменилось. Откройте сигнал в нужном заведении.');};
   async function request(path:string,venue:number,body?:object,signal?:AbortSignal):Promise<Payload> {
-    checkScope(venue);
+    checkScope(venue);const session=runtime.session?.();
     const headers=new Headers(runtime.headers());headers.set('X-Venue-Id',String(venue));if(body)headers.set('Content-Type','application/json');
     const {response,value}=await readCanonicalJson<Payload>(path,headers,signal,{method:body?'POST':'GET',body:body?JSON.stringify(body):undefined});
-    checkScope(venue);if(value.code==='FEATURE_DISABLED'){disabled.add(venue);covered.delete(venue);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
+    checkScope(venue);if(runtime.session?.()!==session)throw new Error('Сессия изменилась.');if(value.code==='FEATURE_DISABLED'){disabled.add(venue);covered.delete(venue);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
     if(!response.ok||value.ok===false)throw new Error(value.error||'Проверка пока недоступна. Повторите.');
     if(value.episode&&value.episode.scope.venueId!==venue)throw new Error('Не удалось подтвердить заведение сигнала.');
     return value;
   }
-  async function load(venue:number,evaluationCursor?:string):Promise<Payload> {
-    if(pending.has(venue))return pending.get(venue)!;
-    const promise=(async()=>{
-      let page=await request('/api/management/cost-signals/evaluate',venue,evaluationCursor?{cursor:evaluationCursor}:{});
-      let continuation=page.nextCursor;
-      // At most two bounded commands per refresh, including tracked deletions.
-      if(continuation&&JSON.parse(continuation).phase==='tracked'){page=await request('/api/management/cost-signals/evaluate',venue,{cursor:continuation});continuation=page.nextCursor;}
-      page=await request('/api/management/cost-signals?state=all',venue);
-      const all=page.items||[];
-      const active=all.filter(e=>e.condition==='ACTIVE');const nextCovered=new Set(active.map(e=>e.menuItemId));if([...nextCovered].sort().join("\0")!==[...(covered.get(venue)||[])].sort().join("\0")){covered.set(venue,nextCovered);window.dispatchEvent(new CustomEvent("bd-cost-projection-updated"));}
-      return {...page,items:all,evaluationCursor:continuation};
-    })();pending.set(venue,promise);try{return await promise}finally{pending.delete(venue)}
-  }
+  const background=createCostRefresh<Payload>({current:()=>runtime.session?.()||'',
+    read:async(venue,signal)=>{
+      const page=await request('/api/management/cost-signals?state=all',venue,undefined,signal);
+      const active=(page.items||[]).filter(e=>e.condition==='ACTIVE');const next=new Set(active.map(e=>e.menuItemId));
+      if([...next].sort().join("\0")!==[...(covered.get(venue)||[])].sort().join("\0")){covered.set(venue,next);window.dispatchEvent(new CustomEvent('bd-cost-projection-updated'));}
+      return page;
+    },
+    evaluate:(venue,cursor,signal)=>request('/api/management/cost-signals/evaluate',venue,{batchSize:1,...(cursor?{cursor}:{})},signal)
+  });
+  const start=()=>{const venue=runtime.venue();if(runtime.enabled()&&venue>0)void background.start(venue);};
+  const reset=()=>{disabled.clear();covered.clear();background.reset();};
   const notify=()=>window.dispatchEvent(new CustomEvent('bd-cost-management-refresh'));
   const format=(value:CostVerificationV1['after'])=>value.status==='UNKNOWN'?'Не рассчитана (UNKNOWN)':`${new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(value.value!)} ${value.currency||''}`;
   function Result({result}:{result:CostVerificationV1}) {return <section className="bd-cost-result" aria-label="Контроль результата" data-verification-id={result.verificationId}><h3>Проверено: себестоимость рассчитана</h3><p>Было: {format(result.before)}</p><p>Стало: <strong>{format(result.after)}</strong></p><small>Проверено {new Date(result.checkedAt).toLocaleString('ru-RU')}</small><p>Проверка текущей техкарты. Влияние действия на прибыль не доказано.</p></section>}
@@ -41,13 +40,23 @@ export function createCostManagementClient(React: typeof import('react'), runtim
   function Center({venue,surface,onNavigate,signalId}:{venue:number;surface:'home'|'health';onNavigate:(path:string)=>void;signalId?:string|null}) {
     const [state,setState]=React.useState<{venue:number;data:Payload}|null>(null),[error,setError]=React.useState(''),[busy,setBusy]=React.useState(false),[history,setHistory]=React.useState<Episode[]>([]),[historyCursor,setHistoryCursor]=React.useState<string|null>(null),[names,setNames]=React.useState<Record<string,string>>({});
     const epoch=React.useRef(0);const invalidate=React.useCallback(()=>{epoch.current++},[]);const selected=signalId||null;
-    const refresh=React.useCallback(async(evaluationCursor?:string)=>{const stamp=++epoch.current;setBusy(true);setError('');try{
-      const data=await load(venue,evaluationCursor);if(selected){const detail=await request('/api/management/cost-signals/'+encodeURIComponent(selected),venue);if(detail.episode&&!data.items?.some(e=>e.signalId===selected))data.items=[detail.episode,...data.items||[]];if(detail.itemName)setNames(old=>({...old,[selected]:detail.itemName!}));}
-      if(stamp===epoch.current)setState({venue,data});
-    }catch(value){if(stamp===epoch.current)setError(value instanceof Error?value.message:'Проверка недоступна.')}finally{if(stamp===epoch.current)setBusy(false)}},[venue,selected]);
-    React.useEffect(()=>{setState(null);setHistory([]);setHistoryCursor(null);setNames({});if(runtime.enabled()&&venue>0)void refresh();const listener=()=>void refresh();window.addEventListener('bd-cost-management-refresh',listener);return()=>{window.removeEventListener('bd-cost-management-refresh',listener);invalidate();}},[venue,refresh,invalidate]);
+    const refresh=React.useCallback(async(_cursor?:string)=>{await background.start(venue,true)},[venue]);
+    React.useEffect(()=>{
+      setState(null);setHistory([]);setHistoryCursor(null);setNames({});
+      const apply=()=>{const value=background.get(venue);setState(old=>value?.data?{venue,data:{...value.data,items:[...(value.data.items||[]),...(old?.venue===venue&&selected?(old.data.items||[]).filter(e=>e.signalId===selected&&!value.data!.items?.some(item=>item.signalId===selected)):[])]}}:null);setBusy(!!value?.busy);setError(value?.error||'');};
+      const unsubscribe=background.subscribe(apply);apply();if(runtime.enabled()&&venue>0)void background.start(venue);
+      const listener=()=>void refresh();window.addEventListener('bd-cost-management-refresh',listener);
+      return()=>{unsubscribe();window.removeEventListener('bd-cost-management-refresh',listener);invalidate();};
+    },[venue,selected,refresh,invalidate]);
+    React.useEffect(()=>{if(!selected||!runtime.enabled()||!venue)return;let live=true;const controller=new AbortController();
+      request('/api/management/cost-signals/'+encodeURIComponent(selected),venue,undefined,controller.signal).then(detail=>{if(!live)return;if(detail.itemName)setNames(old=>({...old,[selected]:detail.itemName!}));if(detail.episode)setState(old=>({venue,data:{...old?.data,ok:true,items:[detail.episode!,...(old?.data.items||[]).filter(e=>e.signalId!==selected)]}}));}).catch(error=>{if(live)setError(error.message)});
+      return()=>{live=false;controller.abort();};
+    },[venue,selected,background.get(venue)?.completedAt]);
     if(!runtime.enabled()||disabled.has(venue)||!venue)return null;
     const data=state?.venue===venue?state.data:null;
+    const progress=background.get(venue);
+    const updatedAt=progress?.completedAt||(data?.items||[]).map(e=>e.lastObservedAt).sort().at(-1);
+    const freshness=<p role="status">{updatedAt?'Сохранённые результаты · обновлено '+new Date(updatedAt).toLocaleString('ru-RU'):'Время предыдущего обновления неизвестно.'}{busy?' Обновляем в фоне…':''}{error?(data?' Обновление не завершено; показаны сохранённые результаты.':' Сохранённые результаты пока недоступны.'):''}</p>;
     const all=data?.items||[],active=all.filter(e=>e.condition==='ACTIVE').sort((a,b)=>a.detectedAt.localeCompare(b.detectedAt)||a.menuItemId.localeCompare(b.menuItemId));
     const recent=all.filter(e=>e.condition==='VERIFIED_RESOLVED').sort((a,b)=>b.verificationResult!.checkedAt.localeCompare(a.verificationResult!.checkedAt));
     const detail=selected?all.find(e=>e.signalId===selected):null;
@@ -58,12 +67,13 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     const purchase=(e:Episode)=>{if(e.targets.purchase){if(surface==='home')remember(e);onNavigate(e.targets.purchase)}};
     if(surface==='home'){
       const partial=!!data?.evaluationCursor||!!data?.nextCursor;
-      const state=error?'ERROR':busy&&!data?'LOADING':data?.coverage!=='AVAILABLE'||partial&&!active.length?'INSUFFICIENT_STALE':active.length?'ATTENTION':'STABLE';
+      const state=error?'ERROR':busy&&!data?'LOADING':data?.coverage!=='AVAILABLE'||(!progress?.completedAt||partial)&&!active.length?'INSUFFICIENT_STALE':active.length?'ATTENTION':'STABLE';
       const top=active[0];
       return <section id="management" className="bd-cost-management bd-cost-home-priority" data-cost-venue={venue} data-cost-surface="home" data-cost-state={state} aria-label="Сигналы себестоимости">
         <p className={'bd-cost-home-status is-'+state.toLowerCase()} data-cost-count role="status">{state==='LOADING'?'Проверяем себестоимость…':state==='ERROR'?'Проверка себестоимости недоступна':state==='INSUFFICIENT_STALE'&&!top?'Недостаточно данных для проверки себестоимости':top?'Требует внимания: '+(partial?'≥':'')+active.length+' · Себестоимость':recent.length?'Исправление себестоимости проверено':'Себестоимость: подтверждённых вопросов нет'}</p>
+        {freshness}
         {partial&&<small className="bd-cost-home-coverage">Проверка охватывает часть позиций. Остальные — в полном Business Health.</small>}
-        {error&&<p role="alert">{error} Сигнал не закрыт.</p>}
+        {error&&<p role="alert">{error}</p>}
         {data?.coverage==='UNAVAILABLE'&&<p role="status">Не все источники доступны. Подтверждать исправление пока нельзя.</p>}
         {top&&<article className="bd-cost-home-top" data-top-signal={top.signalId}>
           <button type="button" className="bd-cost-signal bd-cost-home-signal" data-signal-id={top.signalId} onClick={()=>go(top)}>
@@ -81,9 +91,9 @@ export function createCostManagementClient(React: typeof import('react'), runtim
     }
     return <section id="management" className="bd-cost-management" data-cost-venue={venue} data-cost-surface="health" aria-label="Себестоимость: управление сигналами">
       <header><h2>Себестоимость — проверка и результат</h2><button type="button" disabled={busy} onClick={()=>void refresh()}>Обновить</button></header>
-      {busy&&<p role="status">Проверяем данные на сервере…</p>}{error&&<p role="alert">{error} Сигнал не закрыт.</p>}
+      {freshness}{error&&<p role="alert">{error}</p>}
       {data?.coverage==='UNAVAILABLE'&&<p role="status">Не все источники доступны. Подтверждать исправление пока нельзя.</p>}
-      {!busy&&!error&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!selected&&<p>Нет подтверждённых проблем с обязательной техкартой. Другие проверки доступны ниже.</p>}
+      {!busy&&!error&&!!progress?.completedAt&&data?.coverage==='AVAILABLE'&&!active.length&&!recent.length&&!selected&&<p>Нет подтверждённых проблем с обязательной техкартой. Другие проверки доступны ниже.</p>}
       {detail?<article data-signal-id={detail.signalId}>
         <small>{detail.condition==='VERIFIED_RESOLVED'?'Проверено':detail.condition==='NOT_APPLICABLE'?'Больше не применимо':'Нужна проверка'} · эпизод {detail.generation}</small><h3>{names[detail.signalId]||detail.menuItemId}</h3>
         {detail.condition==='VERIFIED_RESOLVED'&&detail.verificationResult?<Result result={detail.verificationResult}/>:detail.condition==='NOT_APPLICABLE'?<p>Позиция больше не требует этой проверки. Это не подтверждение рассчитанной себестоимости.</p>:<p>Себестоимость не рассчитана (UNKNOWN).</p>}
@@ -153,5 +163,5 @@ export function createCostManagementClient(React: typeof import('react'), runtim
   }
   async function afterSave(venue:number,itemId:string,status:string){const params=new URLSearchParams(window.location.search),id=params.get('signalId');if(status!=='confirmed'||!id||params.get('menuItemId')!==itemId||Number(params.get('venueId'))!==venue||!runtime.enabled())return;
     try{const result=await request('/api/management/cost-signals/'+encodeURIComponent(id)+'/verify',venue,{trigger:'ACCEPTED_SAVE'});window.dispatchEvent(new CustomEvent('bd-cost-save-verification',{detail:{venue,signal:id,message:result.episode?.condition==='VERIFIED_RESOLVED'?'Проверено: себестоимость рассчитана. Результат сохранён.':'Техкарта сохранена; себестоимость пока не удалось подтвердить. Вернитесь к сигналу для проверки.'}}));notify()}catch{if(runtime.venue()===venue)window.dispatchEvent(new CustomEvent('bd-cost-save-verification',{detail:{venue,signal:id,message:'Техкарта сохранена. Проверка результата недоступна; сигнал остаётся открытым. Вернитесь к сигналу и повторите проверку.'}}));notify()}}
-  return {Center,Result,useCatalogContext,usePurchaseContext,afterSave,covered:(venue:number)=>runtime.enabled()&&!disabled.has(venue)?covered.get(venue)||new Set<string>():new Set<string>()};
+  return {start,reset,Center,Result,useCatalogContext,usePurchaseContext,afterSave,covered:(venue:number)=>runtime.enabled()&&!disabled.has(venue)?covered.get(venue)||new Set<string>():new Set<string>()};
 }
