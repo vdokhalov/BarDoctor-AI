@@ -1,0 +1,9 @@
+import{readFileSync,mkdirSync,writeFileSync}from'node:fs';import{createRequire}from'node:module';import{chromium}from'playwright-core';const{resolveBrowserExecutable,chromiumArgs}=createRequire(import.meta.url)('./browser-runtime.cjs');
+const out=process.env.BD_SPLASH_OUTPUT||'outputs/splash-v537';mkdirSync(out,{recursive:true});
+// Native image is the initial state, not reduced-motion's final static state.
+const html=readFileSync('public/app.html','utf8').replace('</head>','<style>.bd-lower-ink-v535{animation:none!important;transform:translateX(-870px)!important}</style></head>');
+const browser=await chromium.launch({headless:true,executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs});const files=[];
+try{for(const[w,h,ratio]of[[320,568,2],[375,667,2],[414,736,3],[375,812,3],[414,896,2],[414,896,3],[390,844,3],[428,926,3],[393,852,3],[430,932,3],[402,874,3],[440,956,3]]){
+ const page=await browser.newPage({viewport:{width:w,height:h},screen:{width:w,height:h},deviceScaleFactor:ratio,reducedMotion:'no-preference'});await page.addInitScript(()=>Object.defineProperty(navigator,'standalone',{value:true}));
+ await page.route('**/*',r=>{const u=new URL(r.request().url());if(u.origin!=='http://splash.test')throw Error('External request');return r.fulfill({body:u.pathname==='/'?html:'',contentType:u.pathname==='/'?'text/html; charset=utf-8':'text/javascript'});});await page.goto('http://splash.test/');await page.locator('.bd-splash-art-stage-v529 img').evaluate(i=>i.decode());const file=`public/icons/bardoctor-launch-${w}x${h}-${ratio}x-v537.png`;await page.screenshot({path:file});files.push(file);await page.close();
+}}finally{await browser.close();}writeFileSync(out+'/native-capture.json',JSON.stringify({state:'initial, lower layer outside viewport',files},null,2));

@@ -28,8 +28,24 @@ export const p0Roots=Object.freeze(['app','lib','public','scripts','worker','bui
 // Owner-requested visible splash minimum and fade (2026-10-17).
 // Owner-approved native/HTML splash coordinate alignment (2026-10-18); save only.
 // Owner-requested local transparent line accent, no publication (2026-10-18).
+// Owner-selected whole-layer splash slide and matching native assets; save only (2026-10-18).
 export const p0Paths=Object.freeze([
  "scripts/splash-timing-v531.js",
+ "scripts/splash-scene-v537.svg",
+ "scripts/capture-splash-v537.mjs",
+ "public/icons/bardoctor-launch-320x568-2x-v537.png",
+ "public/icons/bardoctor-launch-375x667-2x-v537.png",
+ "public/icons/bardoctor-launch-414x736-3x-v537.png",
+ "public/icons/bardoctor-launch-375x812-3x-v537.png",
+ "public/icons/bardoctor-launch-414x896-2x-v537.png",
+ "public/icons/bardoctor-launch-414x896-3x-v537.png",
+ "public/icons/bardoctor-launch-390x844-3x-v537.png",
+ "public/icons/bardoctor-launch-428x926-3x-v537.png",
+ "public/icons/bardoctor-launch-393x852-3x-v537.png",
+ "public/icons/bardoctor-launch-430x932-3x-v537.png",
+ "public/icons/bardoctor-launch-402x874-3x-v537.png",
+ "public/icons/bardoctor-launch-440x956-3x-v537.png",
+
  "scripts/splash-accent-v534.svg",
  "public/icons/bardoctor-splash-reference-v534.webp",
  "scripts/splash-geometry-v532.js",
