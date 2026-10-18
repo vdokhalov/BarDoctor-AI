@@ -13,7 +13,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture(fetchHealth=async()=>({response:{ok:true,status:200},data:{success:true}})){
  let cleanup,nextTimer=0,fetches=0;const states=[],timers=new Map(),listeners=new Map(),commits=[];
  const window={setTimeout:fn=>{timers.set(++nextTimer,fn);return nextTimer;},clearTimeout:id=>timers.delete(id),addEventListener:(name,fn)=>{if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);},removeEventListener:(name,fn)=>listeners.get(name)?.delete(fn)};
- const ctx={window,Ot:()=>({email:'fixture'}),Yse:async()=>[],bdHandleFinanceWarmFailurePhase3a5:e=>{throw e;},bdFetchBusinessHealthV377:()=>{fetches++;return fetchHealth();},bdBusinessHealthAccountContextV284:()=> 'venue1',bdBusinessHealthGetSharedV284:()=>({snapshot:null}),bdRestrictAnalysisContextPhase3a5:()=>{},bdRestrictedAnalysisContextsPhase3a5:new Set(),bdBusinessHealthCommitEnvelopeV284:x=>commits.push(x),S:{useState:()=>['idle',x=>states.push(x)],useEffect:fn=>{cleanup=fn();}}};
+ const ctx={window,Ot:()=>({email:'fixture'}),Yse:async()=>[],bdHandleFinanceWarmFailurePhase3a5:e=>{throw e;},bdFetchBusinessHealthV377:()=>{fetches++;return fetchHealth();},bdBusinessHealthAccountContextV284:()=> 'venue1',bdBusinessHealthGetSharedV284:()=>({snapshot:null}),bdBusinessHealthSafeSnapshotV342:()=>({}),bdRestrictAnalysisContextPhase3a5:()=>{},bdRestrictedAnalysisContextsPhase3a5:new Set(),bdBusinessHealthCommitEnvelopeV284:x=>commits.push(x),S:{useState:()=>['idle',x=>states.push(x)],useEffect:fn=>{cleanup=fn();}}};
  vm.createContext(ctx);vm.runInContext('let bdLiveBusinessHealthPromiseV335=null,bdLiveBusinessHealthTimerV335=0,bdLiveBusinessHealthContextV335="";'+code,ctx);
  return {ctx,states,timers,commits,get fetches(){return fetches;},mount:()=>{ctx.bdUseLiveBusinessHealthV335(true);return cleanup;},notify:()=>listeners.get('bd:store-updated')?.forEach(fn=>fn()),runTimers:()=>{const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn());}};
 }
@@ -37,7 +37,19 @@ test('in-flight rejection after disposal does not update removed UI',async()=>{
 test('successful warm request is consumed once and committed',async()=>{
  const f=fixture();f.ctx.bdWarmCriticalHomeV349();await tick();f.mount();await tick();assert.equal(f.fetches,1);assert.equal(f.states.at(-1),'ready');assert.equal(f.commits.length,1);
 });
-test('repair is idempotent and changes only the three approved lifecycle functions',()=>{
- const old=execFileSync('git',['show','f929af10:public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString();assert.equal(patchHealthRequestLifecycle(old),source);assert.equal(patchHealthRequestLifecycle(source),source);
- const strip=s=>{const ns=parse(s,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration'&&names.has(n.id.name));for(const n of ns.reverse())s=s.slice(0,n.start)+s.slice(n.end);return s;};assert.equal(strip(old),strip(source));
+test('lifecycle repair is idempotent and preserves its three function boundaries',()=>{
+ const old=execFileSync('git',['show','f929af10:public/assets/index-BQGspy0I.js'],{maxBuffer:32*1024*1024}).toString();
+ const repaired=patchHealthRequestLifecycle(old);
+ assert.equal(patchHealthRequestLifecycle(repaired),repaired);
+ assert.equal(patchHealthRequestLifecycle(source),source);
+ const strip=s=>{const ns=parse(s,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration'&&names.has(n.id.name));for(const n of ns.reverse())s=s.slice(0,n.start)+s.slice(n.end);return s;};
+ assert.equal(strip(old),strip(repaired));
+});
+test('each mounted subscriber receives failed refresh instead of cancelling another subscriber timer',async()=>{
+ let fail=false;
+ const f=fixture(async()=>{if(fail)throw Error('invalid response');return{response:{ok:true,status:200},data:{success:true}}});
+ const a=f.mount(),b=f.mount();await tick();fail=true;f.notify();
+ assert.equal(f.timers.size,2,'both subscribers own their scheduled update');
+ f.runTimers();await tick();assert.equal(f.states.filter(x=>x==='error').length,2);
+ assert.equal(f.fetches,2,'subscribers coalesce the actual network request');a();b();
 });

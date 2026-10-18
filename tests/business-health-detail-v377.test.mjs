@@ -11,15 +11,15 @@ test("Business Health detail does not wait for unrelated cloud-store reconciliat
 
   assert.ok(start > 0 && end > start, "Health detail component is present");
   assert.match(detail, /\{profile:bdHealthProfile\}=Un\(\)/);
-  assert.match(detail, /bdUseLiveBusinessHealthV335\(bdHealthCanLoad\)/);
-  assert.match(detail, /(?:l=bdHealthCanLoad\?n:null|const l=n)/);
+  assert.match(detail, /bdUseLiveBusinessHealthV335\(bdHealthCanLoad,bdHealthRetry\)/);
+  assert.match(detail, /const l=bdLiveHealthStatus==="ready"\?n:null/);
   assert.doesNotMatch(detail, /\{isReady:t\}=Ai\(\)/);
 });
 
 test("Business Health request has a bounded loading state", () => {
   assert.match(bundle, /function bdFetchBusinessHealthV377/);
   assert.match(bundle, /new AbortController/);
-  assert.match(bundle, /controller\.abort\(\),8e3/);
+  assert.match(bundle, /controller\.abort\(\)\},15000/);
   assert.match(bundle, /Business Health request timed out/);
-  assert.match(bundle, /bdHealthLoading=(?:!bdHealthCanLoad\|\|!n&&bdLiveHealthStatus!=="error"|!n&&bdLiveHealthStatus!=="error"&&!bdHealthWaitExpired)/);
+  assert.match(bundle, /bdHealthLoading=!l&&bdLiveHealthStatus!=="error"/);
 });
