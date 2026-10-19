@@ -14,13 +14,12 @@ export async function GET(request:Request){
  const db=getD1(),row=await db.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_stock_movements'").bind(account.id).first<{data_json:string}>();
  const value=row?JSON.parse(row.data_json):[];
  if(!stockJournalMarker(value)){
-  if(documentId===null)return Response.json({ok:false,code:'STOCK_JOURNAL_NOT_MIGRATED',legacyEndpoint:'/api/store/bd_stock_movements'},{status:409});
   if(!Array.isArray(value)||value.some(item=>!item||typeof item!=='object'||Array.isArray(item)))return Response.json({ok:false,code:'STOCK_HISTORY_INVALID'},{status:409});
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(row?.data_json??'[]'));
   const current='legacy:'+Array.from(new Uint8Array(digest),x=>x.toString(16).padStart(2,'0')).join('');
   if(cursor!==null&&revision===null)return Response.json({ok:false,code:'REVISION_REQUIRED'},{status:422});
   if(revision!==null&&revision!==current)return Response.json({ok:false,code:'STOCK_JOURNAL_PAGE_CHANGED',restart:true},{status:409});
-  const matches=value.map((item,position)=>({item,position})).filter(({item,position})=>(cursor===null||position>Number(cursor))&&(item.venueId==null||item.venueId===account.venueId)&&(item.sourceDocumentId===documentId||item.salesBatchId===documentId)).slice(0,limit+1);
+  const matches=value.map((item,position)=>({item,position})).filter(({item,position})=>(cursor===null||position>Number(cursor))&&(item.venueId==null||item.venueId===account.venueId)&&(documentId===null||item.sourceDocumentId===documentId||item.salesBatchId===documentId)).slice(0,limit+1);
   return Response.json({ok:true,venueId:account.venueId,sourceDocumentId:documentId,revision:current,items:matches.slice(0,limit).map(x=>x.item),next:matches.length>limit?matches[limit-1].position:null},{headers:{'Cache-Control':'private, no-store'}});
  }
  if(revision!==null&&!Number.isSafeInteger(Number(revision)))return Response.json({ok:false,code:'INVALID_PAGE'},{status:422});

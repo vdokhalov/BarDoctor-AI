@@ -15,6 +15,6 @@ test('document screen ignores stale/full browser cache: 12/10 navigation, pages,
  }finally{await browser.close();}
 });
 test('real warehouse patch owns empty state and round trips without changing other page behavior',()=>{
- const file='public/assets/index-BQGspy0I.js',before=readFileSync(file,'utf8');assert.match(before,/bdWarehouseDocument\.notice/);assert.match(before,/:bdWarehouseDocument\.active\?null:i\.jsxs\("div",\{className:"bd-warehouse-empty"/);assert.match(before,/bdWarehouseDocument\.active\|\|bdWarehouseMovementFilterV275/);
+ const file='public/assets/index-BQGspy0I.js',before=readFileSync(file,'utf8');assert.match(before,/bdWarehouseDocument\.notice/);assert.match(before,/:bdWarehouseDocument\.active\?null:i\.jsxs\("div",\{className:"bd-warehouse-empty"/);assert.match(before,/bdWarehouseDocument\.documentScoped\|\|bdWarehouseMovementFilterV275/);
  execFileSync(process.execPath,['scripts/patch-warehouse-document.mjs','--restore']);execFileSync(process.execPath,['scripts/patch-warehouse-document.mjs']);assert.equal(readFileSync(file,'utf8'),before);
 });
