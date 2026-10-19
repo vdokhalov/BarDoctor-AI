@@ -10,8 +10,17 @@ export async function syncOnce(q,config,api,transport=send){
  for(const remote of jobs){const local=q.get(remote.payload.id);
   if(local.status==='pending'&&remote.status!=='leased'&&remote.status!=='failed_before_send')q.finish(local.id,remote.status==='sending'?'outcome_unknown':remote.status,'Restored from cloud; no resend');
  }
- // Local terminal states may be unsent acknowledgements from a previous crash/network loss.
- async function acknowledge(){for(const remote of jobs){const local=q.get(remote.payload.id);if(local.status!==remote.status&&['accepted_by_transport','failed_before_send','outcome_unknown','operator_confirmed','operator_resolved'].includes(local.status)){await api('ack',{jobId:local.id,status:local.status,detail:String(local.detail??'').slice(0,500)});remote.status=local.status}}}
+ // Persist acknowledgements independently from the bounded cloud active window.
+ q.db.exec('CREATE TABLE IF NOT EXISTS cloud_ack(id TEXT PRIMARY KEY,status TEXT NOT NULL)');
+ async function acknowledge(){for(const local of q.list()){
+  if(local.copy_of||!['accepted_by_transport','failed_before_send','outcome_unknown','operator_confirmed','operator_resolved'].includes(local.status))continue;
+  const last=q.db.prepare('SELECT status FROM cloud_ack WHERE id=?').get(local.id);if(last?.status===local.status)continue;
+  await api('ack',{jobId:local.id,status:local.status,detail:String(local.detail??'').slice(0,500)});
+  q.db.prepare('INSERT INTO cloud_ack(id,status) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status').run(local.id,local.status);
+ }}
+ // Never reconstruct a lost physical route from today's mapping.
+ for(const remote of jobs){const local=q.get(remote.payload.id),parentId=remote.payload.originalTicketId;if(local.status==='pending'&&parentId&&!q.get(parentId).endpoint)q.finish(local.id,'outcome_unknown','Original local route is unavailable; operator review required');}
+
  await acknowledge();
  while(await q.runOne(id=>endpoint(config.printers?.[id]),async(p,t,copy)=>{
   // Copies are explicit local operations, never fetched again as original jobs.

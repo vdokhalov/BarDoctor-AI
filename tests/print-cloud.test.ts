@@ -35,9 +35,9 @@ test('automatic cloud delivery: confirm/cancel → node → fake transport; lost
  const cancelled=await planPosOrder(f.c,confirmed.orders,{action:'cancel_item',orderId:'order',operationId:'cancel',expectedRevision:2,lineId:'a',quantity:1,reason:'Test',stockDecision:'NO_WRITE_OFF'});f.put('bd_pos_orders_v1',cancelled.orders);
  await syncOnce(q,{printers:{bar:{...profile,host:'192.0.2.9'}}},f.api,transport);assert.equal(sent.length,2);assert.equal(sent[1].host,'127.0.0.1');assert.match(sent[1].id,/cancel/);
  await syncOnce(q,{printers:{bar:profile}},f.api,transport);assert.equal(sent.length,2);
- const view:any=await(await f.management()).json();assert.ok(view.jobs.every((j:any)=>j.status==='accepted_by_transport'));assert.ok(!JSON.stringify(view).includes(f.token));assert.ok(!JSON.stringify(view).includes('"hash"'));
+ const view:any=await(await f.management()).json();assert.equal(view.jobs.length,0);assert.equal(view.archivedCount,2);assert.ok(!JSON.stringify(view).includes(f.token));assert.ok(!JSON.stringify(view).includes('"hash"'));
  const bootstrap:any=await(await f.r.api.store.GET(f.r.request(f.owner,'/api/store'))).json();assert.equal(bootstrap.entries[printKey(f.venueId)],undefined);
- const first=view.jobs[0].id;const repeat:any=await(await f.node('start',{jobId:first})).json();assert.equal(repeat.go,false);
+ const archived:any=await(await f.r.api.management.GET(f.r.request(f.owner,'/api/print-management?archive=1'))).json();assert.ok(archived.jobs.every((j:any)=>j.status==='accepted_by_transport'));const first=archived.jobs[0].id;const repeat:any=await(await f.node('start',{jobId:first})).json();assert.equal(repeat.go,false);
  assert.equal((await f.node('poll',{},'b'.repeat(64))).status,401);assert.equal((await f.node('poll',{venueId:f.venueId+1})).status,401);
  assert.equal((await f.management({action:'revoke',expectedRevision:(await(await f.management()).json() as any).revision})).status,200);assert.equal((await f.node('poll')).status,401);assert.equal((await f.node('start',{jobId:first})).status,401);
 });
@@ -65,7 +65,7 @@ test('test jobs are idempotent; concurrent start grants only once and revocation
  const jobs:any=await f.api('poll');assert.equal(jobs.jobs.length,1);const jobId=jobs.jobs[0].payload.id;
  const starts=await Promise.all([f.api('start',{jobId}),f.api('start',{jobId})]);assert.equal(starts.filter((s:any)=>s.go).length,1);
  await f.api('ack',{jobId,status:'accepted_by_transport',detail:'test transport'});
- const nextRevision=(await(await f.management()).json() as any).revision;await f.management({...command,operationId:'test-revoke',expectedRevision:nextRevision});const second:any=await f.api('poll');const secondId=second.jobs[1].payload.id;
+ const nextRevision=(await(await f.management()).json() as any).revision;await f.management({...command,operationId:'test-revoke',expectedRevision:nextRevision});const second:any=await f.api('poll');const secondId=second.jobs[0].payload.id;
  f.r.beforeNextBatch(()=>{const raw=JSON.parse(String(f.r.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(f.owner.userId,printKey(f.venueId))!.data_json));raw.node.revoked=true;f.put(printKey(f.venueId),raw)});
  assert.equal((await f.node('start',{jobId:secondId})).status,401);
 });

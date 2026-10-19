@@ -17,6 +17,7 @@ export async function GET(request: Request): Promise<Response> {
     SELECT store_key, data_json, updated_at
     FROM domain_data
     WHERE account_id = ? AND store_key NOT IN (?, ?)
+      AND NOT (store_key >= '__bd_print_job_' AND store_key < '__bd_print_job_\uffff')
       AND NOT (store_key >= '__bd_print_node_' AND store_key < '__bd_print_node_\uffff')
       AND NOT (store_key >= '__bd_pos_preparation_' AND store_key < '__bd_pos_preparation_\uffff')
       AND NOT (store_key >= '__bd_p4a_cost_' AND store_key < '__bd_p4a_cost_\uffff')

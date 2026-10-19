@@ -20,6 +20,7 @@ try{
   // Pairing JSON goes through stdin; token is generated locally and never printed.
   let input='';for await(const chunk of process.stdin){input+=chunk;if(input.length>4096)throw Error('Pairing input too large')}
   const pairing=JSON.parse(input);if(pairing.accountId!==config.accountId||pairing.venueId!==config.venueId)throw Error('Pairing scope mismatch');
+  if(pairing.replacement&&q.list().length)throw Error('Replacement requires a NEW empty state directory; preserve the old journal');
   let token;if(fs.existsSync(credentialFile))token=await credential('unprotect',fs.readFileSync(credentialFile,'utf8'));else{token=randomBytes(32).toString('hex');const protectedValue=await credential('protect',token);fs.mkdirSync(path.dirname(credentialFile),{recursive:true});const fd=fs.openSync(credentialFile,'wx',0o600);try{fs.writeFileSync(fd,protectedValue);fs.fsyncSync(fd)}finally{fs.closeSync(fd)}}
   for(const id of Object.keys(config.printers||{}))route(id);
   await cloudClient(config,null)('pair',{code:pairing.code,token,printers:Object.keys(config.printers).map(id=>({id,name:config.printers[id].name||id}))});console.log('Node paired; credential protected for this Windows user');
