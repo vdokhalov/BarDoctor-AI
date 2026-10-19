@@ -1,11 +1,12 @@
 // Local rehearsal only. Never import this module from an application route.
-import {backupDigest,BUSINESS_TABLES,type Snapshot,type RehearsalReceipt} from '../../lib/bardoctor/qa-pos-backup';
+import {backupDigest,BUSINESS_TABLES,contractSchemaHash,validateBackupContract,type Snapshot,type RehearsalReceipt} from '../../lib/bardoctor/qa-pos-backup';
 import {stableSalesValue as canonical} from '../../lib/bardoctor/sales-events';
 import {preparePosOrderMigration,copyPosOrders,activatePosOrders,restorePosOrderMigration,readPosOrders} from '../../lib/bardoctor/pos-order-storage';
 const ident=(s:string)=>{if(!/^[a-z_][a-z0-9_]*$/.test(s))throw Error('Invalid backup identifier');return '"'+s+'"'};
 export async function rehearseQaSnapshot(db:D1Database,snapshot:Snapshot,expectedHash:string,files:{put(key:string,value:Uint8Array):Promise<unknown>;get(key:string):Promise<{arrayBuffer():Promise<ArrayBuffer>}|null>}):Promise<RehearsalReceipt>{
- if(snapshot.format!=='bardoctor-qa-business-backup-v1'||snapshot.scope.accountId!==148||snapshot.scope.venueId!==3389||await backupDigest(canonical(snapshot))!==expectedHash)throw Error('Backup integrity/scope mismatch');
- const schema=(await db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name").all()).results;if(await backupDigest(canonical(schema))!==snapshot.schemaHash)throw Error('Local schema differs from backup');
+ if(snapshot.format!=='bardoctor-qa-business-backup-v2'||snapshot.scope.accountId!==148||snapshot.scope.venueId!==3389||await backupDigest(canonical(snapshot))!==expectedHash)throw Error('Backup integrity/scope mismatch');
+ await validateBackupContract(snapshot);
+ const schema=(await db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name").all()).results;if(await contractSchemaHash(schema)!==snapshot.schemaHash)throw Error('Local schema differs from backup');
  if((await db.prepare('SELECT count(*) n FROM accounts').first<{n:number}>())?.n)throw Error('Rehearsal requires a NEW empty local database');
  if(canonical(Object.keys(snapshot.tables).sort())!==canonical([...BUSINESS_TABLES].sort()))throw Error('Incomplete table inventory');
  const ids=new Set<number>([148,Number(snapshot.venue.created_by_account_id??148)]);
@@ -21,5 +22,5 @@ export async function rehearseQaSnapshot(db:D1Database,snapshot:Snapshot,expecte
  const verify=async()=>{for(const table of BUSINESS_TABLES){const rows=(await db.prepare(`SELECT * FROM ${ident(table)} ORDER BY rowid`).all()).results;const normalize=(values:unknown[])=>values.map(canonical).sort();if(canonical(normalize(rows))!==canonical(normalize(snapshot.tables[table])))throw Error('Restored table mismatch: '+table)}const profile=await db.prepare(`SELECT ${Object.keys(snapshot.profile).map(ident).join(',')} FROM accounts WHERE id=148`).first();if(canonical(profile)!==canonical(snapshot.profile))throw Error('Profile mismatch')};
  await verify();const objects=new Map<string,string>(),bucket={async put(k:string,v:string){objects.set(k,v)},async get(k:string){return objects.has(k)?{async text(){return objects.get(k)!}}:null}},scope={accountId:148,venueId:3389};
  const original=snapshot.tables.domain_data.find(row=>row.store_key==='bd_pos_orders_v1');await preparePosOrderMigration(db,bucket,scope);while((await copyPosOrders(db,bucket,scope,5)).state!=='verified'){}await activatePosOrders(db,bucket,scope);const raw=await db.prepare("SELECT data_json FROM domain_data WHERE account_id=148 AND store_key='bd_pos_orders_v1'").first<string>('data_json');if(canonical(await readPosOrders(db,148,raw))!==canonical(JSON.parse(String(original?.data_json??'[]'))))throw Error('Migrated orders differ');await restorePosOrderMigration(db,bucket,scope);await verify();
- return {format:'qa-pos-rehearsal-v1',backupHash:expectedHash,schemaHash:snapshot.schemaHash,counts:Object.fromEntries(Object.entries(snapshot.tables).map(([k,v])=>[k,v.length])),restore:'PASS',migration:'PASS',rollback:'PASS',engine:'workerd-d1'};
+ return {format:'qa-pos-rehearsal-v2',backupHash:expectedHash,contractHash:snapshot.contractHash,schemaHash:snapshot.schemaHash,counts:Object.fromEntries(Object.entries(snapshot.tables).map(([k,v])=>[k,v.length])),restore:'PASS',migration:'PASS',rollback:'PASS',engine:'workerd-d1'};
 }

@@ -21,6 +21,6 @@
   $('status').onclick=()=>perform();$('ready').onchange=render;
   for(const [id,action] of Object.entries({prepare:'prepare',resume:'resume_backup',abort:'abort',attest:'attest_local_rehearsal',step:'step'}))$(id).onclick=()=>perform(action);
   $('download').onclick=()=>perform(null,true);
-  $('receipt').onchange=async()=>{receipt=null;const file=$('receipt').files[0];try{if(!file||file.size>16000)throw Error('Выберите квитанцию JSON до 16 КБ');const value=JSON.parse(await file.text());context();if(value.format!=='qa-pos-rehearsal-v1'||value.backupHash!==state?.run?.backup_hash||!['workerd-d1','node-sqlite-file-r2'].includes(value.engine)||['restore','migration','rollback'].some(k=>value[k]!=='PASS'))throw Error('Квитанция не подтверждает восстановление текущей копии');receipt=value;notice('Квитанция выбрана. Подтвердите выполненное восстановление.');}catch(e){notice(e.message)}render();};
+  $('receipt').onchange=async()=>{receipt=null;const file=$('receipt').files[0];try{if(!file||file.size>16000)throw Error('Выберите квитанцию JSON до 16 КБ');const value=JSON.parse(await file.text());context();if(value.format!=='qa-pos-rehearsal-v2'||value.backupHash!==state?.run?.backup_hash||!['workerd-d1','node-sqlite-file-r2'].includes(value.engine)||['restore','migration','rollback'].some(k=>value[k]!=='PASS'))throw Error('Квитанция не подтверждает восстановление текущей копии');receipt=value;notice('Квитанция выбрана. Подтвердите выполненное восстановление.');}catch(e){notice(e.message)}render();};
   render();
 })();
