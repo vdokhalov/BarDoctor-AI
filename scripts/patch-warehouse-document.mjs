@@ -12,6 +12,7 @@ const patches=[
 ];
 for(const [before,after] of patches){if(process.argv.includes('--restore'))continue;if(page.includes(after))continue;if(!page.includes(before))throw Error('Warehouse anchor missing: '+before);page=page.replace(before,after);}
 const labels=[
+ ['(A.location||"Основной склад")+(A.shiftId?" · Смена":"")','bdWarehouseDocumentModule.writeoffLocationLabel(A)+" · "+bdWarehouseDocumentModule.writeoffSourceLabel(A)'],
  ['e.location||e.warehouseExternalId||"Основной склад"','bdWarehouseDocumentModule.writeoffLocationLabel(e)'],
  ['...(e.shiftId?[["Источник","Закрытие смены"]]:[])','["Источник",bdWarehouseDocumentModule.writeoffSourceLabel(e)]'],
  ['groupName:n.groups.find(j=>j.id===m.groupId)?.name||({bar:"Бар",kitchen:"Кухня",hookah:"Кальяны"}[m.department]||"Другое")','groupName:bdWarehouseDocumentModule.menuSectionLabel(n,m)'],
