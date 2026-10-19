@@ -1,4 +1,4 @@
-# Proposed USB and LAN printing (not implemented)
+# USB and LAN printing architecture
 
 Current code maps canonical menu section IDs to logical printers and stores immutable pending/unconfigured preparation tickets inside orders. No physical transport exists. Cancellation tickets retain the original route. The waiter never chooses a section.
 
@@ -25,4 +25,4 @@ Permission boundary: pairing, revocation and route management restricted to venu
 
 Software tests: duplicate delivery, crash before/after write, lease expiry, revocation, venue isolation, cancellation original route, ordering, queue restart, explicit copy. Hardware matrix: each supported USB/LAN model + OS/driver/profile, Cyrillic, paper widths, cutter, out-of-paper, disconnected cable/network, power loss, spooler restart. Start with at least one validated USB and one LAN model; all real hardware checks are currently unperformed. No support promise for all ESC/POS models.
 
-Pending: product agreement to an always-on local computer; approval before installing an agent, creating permanent credentials or changing security. No printer transport has been installed or enabled by this work.
+Product agreement to an always-on Windows computer received 2026-10-19. Stage 1 local source implementation and manual export/import are documented in tools/print-agent/README.md. Cloud delivery/pairing and PWA controls remain pending. Approval is still required before installation, permanent credentials or security changes. No printer transport has been installed or enabled in any venue.

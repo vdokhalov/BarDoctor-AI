@@ -1,0 +1,8 @@
+{
+  "venueId": 1,
+  "database": "state/queue.sqlite",
+  "printers": {
+    "kitchen": { "type": "tcp", "host": "192.0.2.10", "port": 9100, "codePage": 17, "columns": 42, "cut": false },
+    "bar": { "type": "windows-raw", "queue": "REPLACE_WITH_LOCAL_WINDOWS_QUEUE", "codePage": 17, "columns": 32, "cut": false }
+  }
+}
