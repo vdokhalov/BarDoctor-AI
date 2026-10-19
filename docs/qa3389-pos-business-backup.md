@@ -1,0 +1,43 @@
+# QA3389 account-scoped backup and POS cutover — prepared, NOT published or executed
+
+Authorization: user accepted account-scoped recovery instead of a full multi-tenant database backup, Sentinel_f2dc57a996f88191b9591342f980ec9b, 2026-10-19 08:13:04 UTC. This does not authorize exposing credentials, touching other venues, repeating sales or bypassing failed backup/rehearsal checks. Publication of this new operator mechanism is a separate pending step.
+
+## Recovery guarantee
+
+This is an application business-data backup for exactly venue3389/data account148. It is NOT a physical database backup or a backup of other venues. Every supported business table is copied in full, including all domain_data (and print queue/archive), stock journals/snapshots/movements, sales records/chunks/reversals/totals, POS records/components/chunks, business audit, review events, existing venue migration evidence and the previous journal migration run/log. Exact non-secret business profile fields and venue identity are retained. All owned R2 objects under the application's five account file prefixes (`venues`, `purchases`, `sales`, `catalog`, `employees` /148/) are copied with bytes, hashes and source ETag/size checks. External URL references remain references; external services are not backed up.
+
+Passwords, sessions, PINs, integration credentials, device tokens, platform identity/access state and provider-internal migration metadata are deliberately not exported or restored. They are not business records changed by POS migration. Local restoration uses fake, non-login identities for FK integrity; it does not clone real users. Known credential-bearing fields in business JSON, or any paired/pending/retired print-node credential verifier, STOP capture instead of being silently redacted. Do not distribute private backup JSON in public GitHub, Library, logs or user-facing checkpoints; keep private local files mode0600 and server R2 private. Only aggregate receipts/hashes belong in release evidence.
+
+A schema inventory is mandatory. Unsupported scoped business tables (integrations, invoice jobs, notification history/jobs, AI usage events) must be empty, otherwise capture FAILS with the table named. Unknown business tables fail even when empty until classified and covered by the pause. Nothing nonempty is silently skipped. This may block real QA3389 preparation; report and extend the reviewed backup implementation rather than overriding the gate. Full closure of every possible integration is not claimed.
+
+Current bounded implementation stops above16MB owned file bytes or32MB serialized snapshot; it does not truncate. A larger venue needs a reviewed streaming implementation. Actual QA3389 size and supported-table coverage have not been measured by this new endpoint yet.
+
+## Consistency, scope and pause
+
+0036 only installs a control table and triggers. It does not create a run, pause traffic, back up or migrate anything.
+
+Every operation requires the current owner, active user/workspace/venue memberships, exactly3389→148, a unique venue for that data account, and `accounts.account_kind='venue_data'`. A legacy user account rather than an isolated venue_data account is a blocker, not an exception. Owner and run revision guards also participate in write transactions; stale run IDs and revoked ownership cannot act on a replacement run.
+
+Preparation establishes a durable pause only for this account's business writes. Business rows are then read in one D1 batch; the pause remains during R2 readback and local rehearsal. R2 listings are bounded/paginated without truncation and compared again; fetched object ETags and lengths must match. Other venues remain writable. Credential/auth state is not frozen or copied. Owner revocation blocks further operation; another valid owner/operator recovery is required. No TTL silently reopens writes. An error may leave `paused=1`; read status, resume the same run or abort before activation. QA operators must reserve a short maintenance window and complete or abort it promptly.
+
+The cutover marker is the only permitted domain-data write during CUTOVER. Normal POS/storage transactions remain blocked until verification completes. Historical stock/sales journals are not migrated again. Server compares all captured non-POS business records and files before cutover, verifies exact complete orders afterward, rechecks unrelated records, then releases the pause. New normalized writes make old-snapshot restoration invalid; the server exposes no post-write rollback.
+
+## Operator sequence after approved publication
+
+Use the existing authenticated OWNER session for QA3389. No new credentials or generic SQL endpoint.
+
+1. GET `/api/migration/pos-backup`: read-only scope/status. Verify scope148/3389 and no unexpected active run.
+2. POST same-origin with `{venueId:3389,accountId:148,confirmation:"QA3389_ACCOUNT_BACKUP_AND_POS_CUTOVER",action:"prepare"}`. This starts the maintenance pause and copies to private R2. Record returned run_id, backup hash/key and phase. On CAPTURE error, `resume_backup` repeats capture; `abort` releases the pause without changing the original POS data. Every action after prepare must include the exact returned `runId`.
+3. GET `/api/migration/pos-backup?download=1` through the same authorized session. Save privately, without printing payloads/tokens. The file is `{snapshot,hash}`. Use the server-reported hash, not a locally invented replacement hash.
+4. In a fresh local environment with this exact schema/source:
+   `node scripts/rehearse-qa-pos-backup.mjs /private/qa3389-business-backup.json SERVER_SHA256 /private/qa3389-receipt.json`
+   This creates NEW in-memory local Worker/D1/R2, refuses a nonempty target, checks schema/scope/hash/table inventory, restores exact rows/profile and R2 bytes, compares each table, migrates POS, compares complete orders, rolls back at revision0 and compares all original business tables again. It blocks outbound traffic. No production connection is used.
+5. Only when the actual generated receipt is PASS for restore/migration/rollback, POST `action:"attest_local_rehearsal"` with runId and the generated `receipt`. This is an explicit authenticated operator attestation of execution, not remote cryptographic proof that arbitrary submitted JSON came from a real test. The server binds receipt format, engine, counts, source hash and schema hash to its backup. Never fabricate a receipt from expected values.
+6. POST `action:"step"`, runId repeatedly. Phases: REHEARSED→COPYING→CUTOVER→COMPLETE. Each copy step is ≤5 orders. Resume after interruption using the same run; read status first. COMPLETE must show paused0 and active POS journal. If an error occurs after activation, resume forward; `abort` refuses active POS.
+7. Read-only verify orders/totals/export and print state. Do not create a sale, open a working day, pair a print node or run test printing to validate this migration.
+
+Abort before activation removes only inactive POS staging, retains external backups and original business data, and releases the pause. It cannot resurrect/overwrite a different run. The separate legacy POS helper backup remains mandatory in addition to this account backup.
+
+## Local evidence and limits
+
+Scoped SQLite real-route tests and native local Worker/D1/R2 rehearsal cover owner/scope/origin, pause isolation, corruption, credential rejection, missing receipt, stale runs, original POS preservation, normalized journals, multi-chunk event hydration, R2 byte restoration, migration/rollback and final cutover. These are synthetic fixtures, not proof of successful real QA3389 capture or restore. Actual scope/account-kind/coverage/size/backup and rehearsal remain pending after publication. No public endpoint for restoring an uploaded database is introduced.
