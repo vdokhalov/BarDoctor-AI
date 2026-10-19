@@ -1,3 +1,4 @@
+import {readPosOrders,posOrderMarker,posOrderStatements} from '../../../lib/bardoctor/pos-order-storage';
 import { preparationOrderView, preparationConfig, preparationKey } from '../../../lib/bardoctor/pos-preparation';
 import {readSaleEvent,readOrderPaymentFacts,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
@@ -21,7 +22,9 @@ const keys = ["bd_inventory_writeoffs","bd_finance_expenses",POS_ORDER_STORE_KEY
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, [...keys,preparationKey(account.venueId)]);
-  const read = (key: string, fallback: unknown): unknown => { const data = snapshots.find(snapshot => snapshot.key === key)?.dataJson; return data == null ? fallback : JSON.parse(data); };
+  const orderRaw=snapshots.find(s=>s.key===POS_ORDER_STORE_KEY)?.dataJson;
+  const storedOrders=await readPosOrders(db,account.id,orderRaw);
+  const read = (key: string, fallback: unknown): unknown => { const data = snapshots.find(snapshot => snapshot.key === key)?.dataJson; return key===POS_ORDER_STORE_KEY?storedOrders:data == null ? fallback : JSON.parse(data); };
   const rows = (key: string) => { const value = read(key, []); if (!Array.isArray(value) || value.some(row => !row || typeof row !== "object" || Array.isArray(row))) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW"); return value; };
   const assortment = read("bd_assortment_v1", {});
   if (!assortment || typeof assortment !== "object" || Array.isArray(assortment)) throw new Error("POS_ORDER_STORE_NEEDS_REVIEW");
@@ -34,7 +37,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: PosOrderContext = { ...venueTimeFromJson(account.restaurantJson), venueId: account.venueId,
     currency: accountingCurrencyFromRestaurantJson(account.restaurantJson) || "", now,
     actor: { accountId: account.actorAccountId, name: [account.firstName, account.lastName].filter(Boolean).join(" "), role: account.role, ...(account.jobTitle ? { jobTitle: account.jobTitle } : {}) },
-    canWriteOff:hasPermission(account,"inventory.manage"),writeOffDocuments:rows("bd_inventory_writeoffs"),writeOffExpenses:rows("bd_finance_expenses"),
+    normalizedOrders:!!posOrderMarker(orderRaw),canWriteOff:hasPermission(account,"inventory.manage"),writeOffDocuments:rows("bd_inventory_writeoffs"),writeOffExpenses:rows("bd_finance_expenses"),
     preparationConfig:preparationConfig(read(preparationKey(account.venueId),null),account.venueId),
     discountRules: parsePosDiscountRules(rows(POS_DISCOUNT_STORE_KEY)),
     assortment: assortment as Record<string, unknown>, movements: stock.movements, events, revenues: rows("bd_finance_revenue"),
@@ -112,7 +115,7 @@ async function command(request: Request): Promise<Response> {
     if(plan.cancellationStockPlan){const stock=plan.cancellationStockPlan;updates.push(["bd_assortment_v1",stock.assortment],["bd_stock_movements",stock.movements],["bd_inventory_writeoffs",stock.documents],["bd_finance_expenses",stock.expenses]);}
     const statements:D1PreparedStatement[]=[];
     for(const [key,value] of updates){
-      statements.push(...(key===SALES_EVENT_STORE_KEY&&eventRevision!==null
+      statements.push(...(key===POS_ORDER_STORE_KEY?await posOrderStatements(db,{accountId:account.id,venueId:account.venueId},snapshots.find(s=>s.key===POS_ORDER_STORE_KEY)?.dataJson,orders,plan.orders,context.now):key===SALES_EVENT_STORE_KEY&&eventRevision!==null
         ?await salesEventStatements(db,{accountId:account.id,venueId:account.venueId},eventRevision,context.events,value as typeof context.events)
         :key==='bd_stock_movements'&&stockRevision!==null
         ?await saleStockStatements(db,{accountId:account.id,venueId:account.venueId},stockRevision,context.movements,value as typeof context.movements)
@@ -121,7 +124,7 @@ async function command(request: Request): Promise<Response> {
     const shift = context.revenues.find(row => row.id === plan.order.shiftId && row.venueId === context.venueId);
     statements.push(db.prepare(`INSERT INTO audit_log (account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(account.id, POS_ORDER_STORE_KEY, body.action, plan.order.id, `Стол ${plan.order.tableNumber}`, String(shift?.date ?? "").slice(0, 7),
-        JSON.stringify(orders.find(order => order.id === plan.order.id) ?? null), JSON.stringify({ order: plan.order, salesEventId: plan.event?.id }),
+        JSON.stringify(context.normalizedOrders?{orderId:plan.order.id,revision:orders.find(o=>o.id===plan.order.id)?.revision??null}:orders.find(order => order.id === plan.order.id) ?? null), JSON.stringify(context.normalizedOrders?{orderId:plan.order.id,revision:plan.order.revision,salesEventId:plan.event?.id,operationId:body.operationId}:{ order: plan.order, salesEventId: plan.event?.id }),
         JSON.stringify(["revision", "status", "lines", "precheck", "discount", "totals", "preparationTickets"]), context.actor.name, context.actor.role, typeof body.reason === "string" && body.reason.trim() || "Подтверждённая операция", context.now));
     if(plan.cancellationStockPlan){const document=plan.cancellationStockPlan.document;statements.push(db.prepare('INSERT INTO audit_log(account_id,store_key,action,entity_id,after_json,actor_name,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)').bind(account.id,'bd_inventory_writeoffs','pos_cancellation.posted',document.id,JSON.stringify(document),context.actor.name,context.actor.role,body.reason!,context.now));}
     statements.unshift(posMembershipGuard(db,account,context.now));

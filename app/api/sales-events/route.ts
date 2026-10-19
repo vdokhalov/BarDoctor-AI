@@ -1,3 +1,4 @@
+import {readPosOrders} from '../../../lib/bardoctor/pos-order-storage';
 import {readSaleEvent,readSalesEvents,readRecentSalesEvents,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
 import { posWorkdayGate } from "../../../lib/bardoctor/pos-workday-gate";
@@ -38,7 +39,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   const context: SalesEventContext = { ...venueTimeFromJson(account.restaurantJson), venueId:account.venueId,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)||"",now,
     actor:{ accountId:account.actorAccountId,name:[account.firstName,account.lastName].filter(Boolean).join(" "),role:account.role, ...(account.jobTitle ? { jobTitle:account.jobTitle } : {}) },
     assortment:assortment as Record<string,unknown>,movements:stock.movements,events,revenues:rows(keys[3]),mappings:rows(keys[4]),warehouseRoutes:rows(keys[5]),warehouses:rows(keys[6]),closedMonths:closedMonthsFromStore(read(keys[7],null)) };
-  return { db,snapshots,context,eventRevision:selected.revision, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
+  return { db,snapshots,context,eventRevision:selected.revision, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:await readPosOrders(db,account.id,snapshots.find(s=>s.key===POS_ORDER_STORE_KEY)?.dataJson,{open:true}) };
 }
 function controlled(error:unknown) {
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);

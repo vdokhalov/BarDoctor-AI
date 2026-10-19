@@ -1,3 +1,4 @@
+import {readPosTickets} from './pos-order-storage';
 import {getD1} from '../../db';
 import {readStoreSnapshots,runStoreCasBatch} from './store-cas';
 import {parsePosOrders,POS_ORDER_STORE_KEY} from './pos-orders';
@@ -18,7 +19,7 @@ export async function loadPrint(accountId:number,venueId:number){
  const db=getD1(),key=printKey(venueId),snapshots=await readStoreSnapshots(db,accountId,[key,POS_ORDER_STORE_KEY]);
  const raw=JSON.parse(snapshots[0].dataJson??'null') as PrintState|null;
  if(raw&&(raw.version!==1||raw.venueId!==venueId||!Array.isArray(raw.baseline)||!Array.isArray(raw.jobs)))throw Error('PRINT_STATE_INVALID');
- const tickets=parsePosOrders(JSON.parse(snapshots[1].dataJson??'[]')).filter(o=>o.venueId===venueId).flatMap(o=>o.preparationTickets??[]).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
+ const tickets=(await readPosTickets(db,accountId,snapshots[1].dataJson)).filter(t=>t.venueId===venueId).sort((a,b)=>Date.parse(a.createdAt)-Date.parse(b.createdAt));
  const state:PrintState=raw??{version:1,venueId,revision:0,baseline:[],jobs:[]};
  const archives=new Map<string,PrintJob>(),known=new Set(state.baseline);
  // Query only source IDs still in the bounded order store, never scan all lifetime archives.

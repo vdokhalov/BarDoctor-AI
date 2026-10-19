@@ -1,3 +1,4 @@
+import {readPosOrders} from '../../../lib/bardoctor/pos-order-storage';
 import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import { MEMBER_JOB_TITLE_SQL } from "../../../lib/bardoctor/staff-job-storage";
 import { getD1 } from "../../../db";
@@ -50,7 +51,7 @@ export async function GET(request: Request): Promise<Response> {
     const stores = new Map<string, unknown>();
     for (const item of results[0].results!) {
       if (typeof item.store_key !== "string" || typeof item.data_json !== "string" || stores.has(item.store_key)) needsReview();
-      stores.set(item.store_key, item.store_key===SALES_EVENT_STORE_KEY?await readSalesEvents(getD1(),account.id,item.data_json,{shiftId}):JSON.parse(item.data_json));
+      stores.set(item.store_key, item.store_key===POS_ORDER_STORE_KEY?await readPosOrders(getD1(),account.id,item.data_json,{shiftId}):item.store_key===SALES_EVENT_STORE_KEY?await readSalesEvents(getD1(),account.id,item.data_json,{shiftId}):JSON.parse(item.data_json));
     }
     const valueOrAbsent = (key: string, fallback: unknown) => stores.has(key) ? stores.get(key) : fallback;
     const rows = (key: string) => { const value = valueOrAbsent(key, []); if (!Array.isArray(value) || value.some(item => !record(item))) needsReview(); return value; };

@@ -1,3 +1,4 @@
+import {readPosOrders} from '../../../../lib/bardoctor/pos-order-storage';
 import { authenticateRequest, unauthorized } from '../../../../lib/bardoctor/auth';
 import { hasPermission, canManagePosPrivilegedAction } from '../../../../lib/bardoctor/access-control';
 import { getD1 } from '../../../../db';
@@ -11,7 +12,7 @@ export async function GET(request:Request){
  if(!orderId||orderId.length>120)return Response.json({ok:false,code:'ORDER_REQUIRED'},{status:400});
  const snapshots=await readStoreSnapshots(getD1(),account.id,[POS_ORDER_STORE_KEY]);
  try{
-  const orders=parsePosOrders(JSON.parse(snapshots[0].dataJson??'[]'));
+  const orders=await readPosOrders(getD1(),account.id,snapshots[0].dataJson,{id:orderId});
   const order=orders.find(o=>o.venueId===account.venueId&&o.id===orderId);
   if(!order)return Response.json({ok:false,code:'ORDER_NOT_FOUND'},{status:404});
   const tickets=(order.preparationTickets??[]).map(t=>({id:t.id,venueId:t.venueId,orderId:t.orderId,tableNumber:t.tableNumber,sectionId:t.sectionId,sectionName:t.sectionName,printerId:t.printerId,routeRevision:t.routeRevision,kind:t.kind??'PREPARATION',originalTicketId:t.originalTicketId??null,reason:t.reason??null,createdAt:t.createdAt,lines:t.lines.map(l=>({name:l.name,quantity:l.quantity}))}));

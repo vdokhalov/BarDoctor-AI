@@ -31,7 +31,7 @@ export type PosOrderCommand = {
 };
 type SalesPlan = Awaited<ReturnType<typeof planSalesEvent>>;
 export type PosOrderPlan = { orders: PosOrder[]; order: PosOrder; duplicate: boolean; event?: SalesEvent; previewHash?: string; salesPlan?: SalesPlan; cancellationStockPlan?:CancellationStockPlan };
-export type PosOrderContext = SalesEventContext & { canWriteOff?:boolean;writeOffDocuments?:unknown[];writeOffExpenses?:unknown[];preparationConfig?:PreparationConfig; discountRules?: PosDiscountRule[] };
+export type PosOrderContext = SalesEventContext & { normalizedOrders?:boolean; canWriteOff?:boolean;writeOffDocuments?:unknown[];writeOffExpenses?:unknown[];preparationConfig?:PreparationConfig; discountRules?: PosDiscountRule[] };
 const actions = new Set(["confirm", "create", "add_items", "set_quantity", "cancel_item", "cancel_order", "precheck", "cancel_precheck", "split", "preview_payment", "pay", "apply_discount", "remove_discount"]);
 const privileged = new Set(["cancel_item", "cancel_order", "cancel_precheck", "split", "apply_discount", "remove_discount"]);
 function fail(code: string): never { throw new Error("POS_ORDER_" + code); }
@@ -366,7 +366,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
         }] };
       order = saveOperation(order, c, command, details, fingerprint);
       const next = [...orders.map(current => current.id === order!.id ? order! : current), child];
-      capacity(next); parsePosOrders(next);
+      if(!c.normalizedOrders)capacity(next); parsePosOrders(next);
       return { orders: next, order, duplicate: false, ...(cancellationStockPlan?{cancellationStockPlan}:{}) };
     } else if (command.action === "preview_payment" || command.action === "pay") {
       if (!order.lines.length) fail("EMPTY");
@@ -380,14 +380,14 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       order = { ...order, status: "PAID", salesEventId: salesPlan.event.id, paidAt: c.now, paidBy: { ...c.actor }, totals: { grossAmount: salesPlan.event.grossAmount!, discountAmount: salesPlan.event.discountAmount!, netAmount: salesPlan.event.revenue, currency: c.currency },
         lines: salesPlan.event.prices.map(line => ({ id: line.lineId, menuItemId: line.menuItemId, quantity: line.quantity, name: line.name, unitPrice: line.unitPrice, total: line.total, grossTotal: line.grossTotal, discountAmount: line.discountAmount, currency: salesPlan.event.currency })) };
       order = saveOperation(order, c, command, details, fingerprint);
-      const next = orders.map(current => current.id === order!.id ? order! : current); capacity(next); parsePosOrders(next);
+      const next = orders.map(current => current.id === order!.id ? order! : current); if(!c.normalizedOrders)capacity(next); parsePosOrders(next);
       return { orders: next, order, duplicate: false, event: salesPlan.event, salesPlan, previewHash: salesPlan.previewHash };
     }
   }
   if (order.status === "OPEN" && !order.discount) order.totals = totals(order.lines, c.currency);
   order = saveOperation(order, c, command, details, fingerprint);
   const next = command.action === "create" ? [...orders, order] : orders.map(current => current.id === order!.id ? order! : current);
-  capacity(next); parsePosOrders(next);
+  if(!c.normalizedOrders)capacity(next); parsePosOrders(next);
   return { orders: next, order, duplicate: false, ...(cancellationStockPlan?{cancellationStockPlan}:{}) };
 }
 function capacity(orders: PosOrder[]): void {
