@@ -1,3 +1,4 @@
+import { workdayPersonalSales, staffingWithPersonalSales } from '../../../lib/bardoctor/workday-personal-sales';
 import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import { authenticatedEvidenceContext } from "../../../lib/bardoctor/evidence-resolver";
 import { unauthorized } from "../../../lib/bardoctor/auth";
@@ -28,11 +29,13 @@ async function load(request:Request){
   for(const key of keys.filter(k=>k!=="bd_month_closings"))if(!Array.isArray(raw[key])||raw[key].some((r:unknown)=>!r||typeof r!=="object"||Array.isArray(r)))throw Error("Invalid store");
   const rows=(key:string)=>scopedBusinessRows(raw[key],scope);
   const profile=record(JSON.parse(account.restaurantJson||"{}"));
-  return {context,account,db,snapshots,raw,rows,profile,now:new Date().toISOString(),timezone:venueTimeFromJson(account.restaurantJson).timezone};
+  const memberships=(await db.prepare('SELECT account_id,employee_id FROM venue_memberships WHERE venue_id=? AND employee_id IS NOT NULL').bind(account.venueId).all<Row>()).results;
+  return {context,account,db,snapshots,raw,rows,profile,memberships,now:new Date().toISOString(),timezone:venueTimeFromJson(account.restaurantJson).timezone};
  }catch{return {error:reply({ok:false,code:"WORKDAY_STORE_NEEDS_REVIEW",error:"Данные рабочего дня требуют проверки"},409)};}
 }
 type Loaded=Extract<Awaited<ReturnType<typeof load>>,{account:unknown}>;
 function projection(c:Loaded,date:string){return operationalDay({venueId:c.account.venueId,workspaceId:c.context.workspaceId,dataAccountId:c.account.id,businessDate:date,asOf:c.now,currency:accountingCurrencyFromRestaurantJson(c.account.restaurantJson),revenues:c.rows(keys[1]),events:c.rows(keys[2]),documents:c.rows(keys[3]),reports:c.rows(keys[0]),writeOffs:c.rows(keys[7]),incidents:c.rows(keys[8])});}
+function personalSales(c:Loaded,date:string){return workdayPersonalSales({date,venueId:c.account.venueId,currency:accountingCurrencyFromRestaurantJson(c.account.restaurantJson),employees:c.rows(keys[4]),memberships:c.memberships,revenues:c.rows(keys[1]),events:c.rows(keys[2])});}
 function openingBlockers(c:Loaded){return [...c.rows(keys[0]).filter(r=>r.workdayStatus==="OPEN").map(r=>({kind:"workday",id:r.id,date:r.date,name:"Рабочий день",href:"/shifts?venue="+c.account.venueId+"&workday="+encodeURIComponent(String(r.date))+"&month="+String(r.date).slice(0,7)})),...c.rows(keys[1]).filter(r=>r.closingStatus==="open").map(r=>({kind:"cash",id:r.id,date:r.date,name:r.shiftName||"Касса",href:"/cashier?venue="+c.account.venueId}))];}
 export async function GET(request:Request){
  const c=await load(request);if(c.error)return c.error;
@@ -40,7 +43,7 @@ export async function GET(request:Request){
  const open=c.rows(keys[0]).find(r=>r.workdayStatus==="OPEN"),query=new URL(request.url).searchParams.get("date"),date=query||String(open?.date||defaultDate);
  if(!validDate(date))return reply({ok:false,code:"DATE_INVALID"},400);
  const report=c.rows(keys[0]).find(r=>r.date===date),rules=c.rows(keys[5]);
- return reply({ok:true,openingBlockers:openingBlockers(c),venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
+ return reply({ok:true,personalSales:report?.workdayStatus==="CLOSED"?null:personalSales(c,date),openingBlockers:openingBlockers(c),venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
 }
 export async function POST(request:Request){return withStoreCasRetries(request,command);}
 async function command(request:Request):Promise<Response>{
@@ -63,7 +66,8 @@ async function command(request:Request):Promise<Response>{
  const staffing=body.action==="close"?previous?.staffing:body.staffing;
  if(!Array.isArray(staffing)||!staffing.length||staffing.length>200||new Set(staffing.map(s=>record(s).employeeId)).size!==staffing.length)return reply({ok:false,code:"WORKDAY_TEAM_REQUIRED",error:"Выберите работавших сотрудников."},422);
  const employees=c.rows(keys[4]),normalized:Row[]=[];
- for(const value of staffing){const staff=record(value);if(!employees.some(e=>e.id===staff.employeeId))return reply({ok:false,code:"WORKDAY_EMPLOYEE_INVALID"},422);const row:Row={employeeId:staff.employeeId};for(const field of ["hours","personalSales","units"]){if(staff[field]!==undefined&&staff[field]!==null&&staff[field]!==""){if(typeof staff[field]!=="number"||!Number.isFinite(staff[field])||Number(staff[field])<0)return reply({ok:false,code:"WORKDAY_INPUT_INVALID"},422);row[field]=staff[field];}}normalized.push(row);}
+ for(const value of staffing){const staff=record(value);if(!employees.some(e=>e.id===staff.employeeId))return reply({ok:false,code:"WORKDAY_EMPLOYEE_INVALID"},422);const row:Row={employeeId:staff.employeeId,...(staff.personalSalesSource==="AUTO"?{personalSalesSource:"AUTO"}:{})};for(const field of ["hours","personalSales","units"]){if(staff[field]!==undefined&&staff[field]!==null&&staff[field]!==""){if(typeof staff[field]!=="number"||!Number.isFinite(staff[field])||Number(staff[field])<0)return reply({ok:false,code:"WORKDAY_INPUT_INVALID"},422);row[field]=staff[field];}}normalized.push(row);}
+ const facts=personalSales(c,date);const resolved=normalized.map(staff=>workdayPayrollRequirements(employees.find(e=>e.id===staff.employeeId)!,c.rows(keys[5])).personalSales?staffingWithPersonalSales([staff],facts)[0]:staff);normalized.splice(0,normalized.length,...resolved);
  const day=projection(c,date);
  const shiftVenueSales=day.revenue.readOnly?day.revenue.amount:body.action==="close"?previous?.shiftVenueSales:body.shiftVenueSales,shiftDepartmentSales=body.action==="close"?previous?.shiftDepartmentSales:body.shiftDepartmentSales;
  if(shiftVenueSales!==undefined&&(typeof shiftVenueSales!=="number"||!Number.isFinite(shiftVenueSales)||shiftVenueSales<0))return reply({ok:false,code:"WORKDAY_INPUT_INVALID"},422);

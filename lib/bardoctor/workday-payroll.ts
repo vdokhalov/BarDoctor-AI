@@ -19,7 +19,7 @@ export function workdaySalaryDivisor(profile:Row,date:string,revenues:Row[],gaps
   }
   return count||1;
 }
-/** Same enabled-block arithmetic and per-employee rounding as Wz/Kz/m7.
+/** Enabled-block arithmetic with per-employee monetary rounding to kopecks.
  * Unlike the legacy editor, this new path refuses to certify missing inputs. */
 export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employees:unknown[];rules:unknown[];profile:Row;revenues:Row[];gaps:Row[];venueId:number;shiftVenueSales?:unknown;shiftDepartmentSales?:unknown;previous?:unknown}) {
   const employees=scopedBusinessRows(input.employees,{venueId:input.venueId}),rules=scopedBusinessRows(input.rules,{venueId:input.venueId});
@@ -51,10 +51,10 @@ export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employ
       }
     }
     if(!Number.isFinite(sum)){add("calculation","Сумма ФОТ требует проверки");continue;}
-    const value=Math.round(sum);perEmployee[String(staff.employeeId)]=value;const department=String(employee.department||"Без отдела");perDepartment[department]=(perDepartment[department]||0)+value;
+    const value=Math.round((sum+Number.EPSILON)*100)/100;perEmployee[String(staff.employeeId)]=value;const department=String(employee.department||"Без отдела");perDepartment[department]=Math.round(((perDepartment[department]||0)+value)*100)/100;
   }
   if(!Number.isFinite(Object.values(perEmployee).reduce((sum,value)=>sum+value,0)))missing.push({employeeId:null,field:"calculation",message:"Сумма ФОТ требует проверки"});
-  const estimate=missing.length?undefined:{perEmployee,perDepartment,total:Object.values(perEmployee).reduce((sum,value)=>sum+value,0),monthlySalaryShiftsInMonth:divisor};
+  const estimate=missing.length?undefined:{perEmployee,perDepartment,total:Math.round(Object.values(perEmployee).reduce((sum,value)=>sum+value,0)*100)/100,monthlySalaryShiftsInMonth:divisor};
   const result=payrollForOperationalEdit({previous:input.previous,businessDate:input.date,staffing:input.staffing,shiftDepartmentSales:input.shiftDepartmentSales,shiftVenueSales:input.shiftVenueSales,estimate});
   const recorded=result.basis==="RECORDED";
   return {status:recorded||!missing.length?"COMPLETE":"INCOMPLETE",missing:recorded?[]:missing,notes:recorded&&missing.length?["Сохранённый ФОТ сохранён без пересчёта; текущие правила или исходные данные требуют проверки"]:[],payrollBreakdown:result.payrollBreakdown??null,basis:result.basis};

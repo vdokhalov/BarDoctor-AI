@@ -66,7 +66,7 @@ try {
  const person=(id:string)=>flow.locator(`[data-workday-employee="${id}"]`);
  for(const id of ['fixed','percent'])assert.equal(await person(id).getByLabel('Часы',{exact:false}).count(),0);
  for(const id of ['hourly','mixed'])await person(id).getByLabel('Часы · обязательно',{exact:true}).fill('8');
- await person('percent').getByLabel('Личные продажи',{exact:true}).fill('1000');
+ await person('percent').getByLabel('Личные продажи · ручная корректировка',{exact:true}).fill('1000');
  await flow.getByRole('button',{name:'Сохранить данные команды',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('[data-workday-state]')?.textContent?.includes('2 000'));
  const report=get('bd_operational_reports_v1')[0];assert.equal(report.workdayPayrollDraft.status,'COMPLETE');assert.deepEqual(report.workdayPayrollDraft.payrollBreakdown.perEmployee,{fixed:500,percent:100,hourly:800,mixed:600});
