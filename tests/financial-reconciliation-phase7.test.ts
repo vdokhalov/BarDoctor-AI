@@ -197,7 +197,7 @@ test('real event refund excludes immutable POSTED batch once, with original and 
   assert.equal(input.events[0].status, 'REVERSED');
   assert.equal(input.events[0].batch.status, 'POSTED');
   assert.ok(input.movements.some((movement: Movement) => movement.type === 'sale_reversal'));
-  assert.deepEqual(historicalPeriodCost(input), { known: true, cost: 720, adjustment: -36,
+  assert.deepEqual(historicalPeriodCost(input), { known: true, salesCostKnown: true, adjustmentsKnown: true, cost: 720, adjustment: -36,
     daily: { '2026-09-02': { cost: 720, adjustment: -36 } }, reasons: [], eventCount: 2 });
   assert.equal(JSON.stringify(input), before);
 });

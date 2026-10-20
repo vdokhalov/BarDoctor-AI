@@ -105,7 +105,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   if (request.method !== "POST" && url.searchParams.get("view") === "current" && monthKey === venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7)) {
     const current = currentFinance({ profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
-      movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, costInputsAvailable: ["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches"].every(key=>snapshots.some(x=>x.key===key&&x.dataJson!=null)),
+      movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
       expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
       expensesAvailable: snapshots.some(x=>x.key==='bd_finance_expenses'&&x.dataJson!=null), payrollEntriesAvailable: snapshots.some(x=>x.key==='bd_payroll_entries'&&x.dataJson!=null) });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));

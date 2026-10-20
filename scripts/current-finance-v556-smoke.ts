@@ -77,7 +77,7 @@ try{
      const backgrounds=stops.flatMap(c=>[{fg,bg:c},{fg:blend(fg),bg:blend(c)}]);
      const ratios=backgrounds.map(c=>(Math.max(lum(c.fg),lum(c.bg))+.05)/(Math.min(lum(c.fg),lum(c.bg))+.05));
      return {color:heading.color,background:card.backgroundImage,overlay:overlay.backgroundColor,minContrast:Math.min(...ratios),samples:ratios.length};
-    })()`);
+    })()`) as {color:string;minContrast:number;samples:number};
     assert.equal(contrast.color,'rgb(255, 255, 255)');assert.ok(contrast.samples>=3&&contrast.minContrast>=4.5,JSON.stringify(contrast));assert.deepEqual(errors,[]);assert.equal(snapshot(),before);
     results.push({width,scenario,status:'PASS',contrast,loadedAssets});continue;
    }

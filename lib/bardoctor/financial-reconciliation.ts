@@ -252,7 +252,9 @@ export function historicalPeriodCost(input: {
     adjustment += amount;
     day(String(movement.businessDate ?? movement.date)).adjustment += amount;
   }
-  return { known: reasons.length === 0, cost: money(cost), adjustment: money(adjustment), daily,
+  return { known: reasons.length === 0, salesCostKnown: reasons.every(reason => reason === "INVENTORY_ADJUSTMENT_COST_UNKNOWN"),
+    adjustmentsKnown: !reasons.some(reason => ["INVENTORY_ADJUSTMENT_COST_UNKNOWN", "DUPLICATE_FINANCIAL_HISTORY", "ACCOUNTING_CURRENCY_UNKNOWN"].includes(reason)),
+    cost: money(cost), adjustment: money(adjustment), daily,
     reasons: [...new Set(reasons)], eventCount: events.length };
 }
 
