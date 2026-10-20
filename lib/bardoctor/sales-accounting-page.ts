@@ -39,7 +39,7 @@ export function salesAccountingPage(settings: boolean) {
   </form>
   <section id="accounting-imports" hidden><h2>Импорт для сверки</h2><p class="accounting-help">Эти отчёты сохранены отдельно. В выручку и склад они ещё не включены.</p><div></div></section>
   </main>
-  <dialog id="accounting-confirm" aria-labelledby="accounting-confirm-title"><form method="dialog"><span class="accounting-handle"></span><span class="accounting-icon">✎</span>
+  <dialog class="accounting-dialog" id="accounting-confirm" aria-labelledby="accounting-confirm-title"><form method="dialog"><span class="accounting-handle"></span><span class="accounting-icon">✎</span>
     <h2 id="accounting-confirm-title">Перейти на ручной ввод?</h2>
     <p id="accounting-confirm-copy">Вы вводите итоги смены самостоятельно. Продажи по позициям и автоматическое списание со склада в этом режиме не ведутся. История сохраняется.</p>
     <p class="accounting-notice">Со следующего рабочего дня<br><span id="accounting-effective"></span></p>
@@ -47,5 +47,11 @@ export function salesAccountingPage(settings: boolean) {
     <p id="accounting-confirm-error" role="alert"></p>
     <button type="button" id="accounting-confirm-save" class="primary">Перейти на ручной ввод</button>
     <button id="accounting-confirm-cancel" class="secondary" value="cancel">Оставить кассу</button>
+  </form></dialog>
+  <dialog class="accounting-dialog" id="accounting-date-confirm" aria-labelledby="accounting-date-title" aria-describedby="accounting-date-copy"><form method="dialog">
+    <span class="accounting-handle"></span><h2 id="accounting-date-title">Изменить дату без сохранения?</h2>
+    <p id="accounting-date-copy">Введённые изменения не сохранены. При переходе к другой дате они будут потеряны. Сохранённые итоги останутся без изменений.</p>
+    <button id="accounting-date-cancel" class="primary" value="cancel" autofocus>Остаться и продолжить</button>
+    <button id="accounting-date-discard" class="secondary" type="button">Изменить дату без сохранения</button>
   </form></dialog></body></html>`;
 }

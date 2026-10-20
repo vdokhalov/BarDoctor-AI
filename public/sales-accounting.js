@@ -1,6 +1,7 @@
 (function () {
   "use strict";
   var state = null, saved = null, pendingMode = null, busy = false, saveRequest = null, modeOperation = null, pendingImport = null;
+  var renderedDate = null, pendingDate = null, savedFields = null;
   var venue = localStorage.getItem("bd_active_venue_id");
   var byId = function (id) { return document.getElementById(id); };
   var status = function (message, error) { byId("accounting-status").textContent = message; byId("accounting-status").dataset.error = String(Boolean(error)); };
@@ -26,6 +27,9 @@
     var cash = byId("totals-cash").value, card = byId("totals-card").value;
     byId("totals-sum").textContent = cash === "" || card === "" ? "—" : format(Number(cash) + Number(card));
   }
+  function formFields() {
+    return JSON.stringify(["cash", "card", "receipts", "cogs", "reason"].map(function (key) { return byId("totals-" + key).value; }));
+  }
   function renderDate() {
     var date = byId("totals-date").value;
     saved = state.totals.find(function (x) { return x.date === date; }) || null;
@@ -49,7 +53,7 @@
       p.textContent = "Версия " + revision.revision + " · " + new Date(revision.recordedAt).toLocaleString("ru-RU", { timeZone: state.timezone }) + " · " + format(revision.values.cash + revision.values.card) + ". " + revision.reason;
       history.querySelector("div").append(p);
     });
-    updateSum(); saveRequest = null;
+    updateSum(); saveRequest = null; renderedDate = date; savedFields = formFields();
     if (!state.canManage) status("Ручные итоги доступны владельцу заведения.");
     else if (!canWrite) status(state.occupiedDates?.includes(date) ? "За этот день уже учтена выручка другого источника. Итоги доступны в журнале продаж." : "Для выбранного дня ручной ввод не включён. История и прежний способ учёта сохраняются.");
     else status("");
@@ -118,8 +122,22 @@
     } catch (error) { byId("accounting-confirm-error").textContent = error.message; }
     finally { busy = false; this.disabled = false; }
   });
-  byId("totals-date").addEventListener("change", renderDate);
-  byId("accounting-totals").addEventListener("input", function () { updateSum(); saveRequest = null; });
+  byId("totals-date").addEventListener("change", function () {
+    var next = this.value;
+    if (busy || next === renderedDate) { this.value = renderedDate; return; }
+    if (savedFields !== null && formFields() !== savedFields) {
+      pendingDate = next; this.value = renderedDate;
+      byId("accounting-date-confirm").showModal();
+      byId("accounting-date-cancel").focus();
+    } else renderDate();
+  });
+  byId("accounting-date-discard").addEventListener("click", function () {
+    if (pendingDate === null) return;
+    byId("totals-date").value = pendingDate; pendingDate = null;
+    byId("accounting-date-confirm").close(); renderDate();
+  });
+  byId("accounting-date-confirm").addEventListener("close", function () { if (!this.open) pendingDate = null; });
+  byId("accounting-totals").addEventListener("input", function (event) { if (event.target.id !== "totals-date") { updateSum(); saveRequest = null; } });
   byId("accounting-totals").addEventListener("submit", async function (event) {
     event.preventDefault(); if (busy) return;
     var optional = function (id) { return byId(id).value === "" ? null : Number(byId(id).value); };

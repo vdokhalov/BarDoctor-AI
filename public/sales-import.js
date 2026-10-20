@@ -122,7 +122,6 @@
       ? ((k.reflectedPercent || 0) + "% продаж отражено на складе. Добавьте следующую смену или откройте документ для проверки.")
       : "Загрузите итоги смены — BarDoctor сам разложит позиции по техкартам и покажет складской расход до проведения.";
     document.body.classList.toggle("has-sales-documents", Boolean((payload.batches || []).length));
-    document.querySelector('[data-source="manual"]').hidden=!(payload.capabilities && payload.capabilities.create);
     renderJournalOptions();
     renderJournal();
     renderQuality(payload.dataQuality || { issues: [] });
