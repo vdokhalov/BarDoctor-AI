@@ -57,7 +57,7 @@ const HTML = `<!doctype html>
       <label><input type="checkbox" id="reconciliation-backup-saved"> Резервная копия сохранена</label>
       <button type="button" id="reconciliation-apply" disabled>Подтвердить связь</button></div>
       <p id="reconciliation-status" role="status" aria-live="polite"></p>
-    </details><script src="/sales-reconciliation.js?v=564" defer></script>
+    </details><script src="/sales-reconciliation.js?v=preview-bounds" defer></script>
     <section id="manual-entry" class="workspace-card journal-entry" hidden><h2>Итоги смены</h2><p>Внесите наличные и безналичные продажи. Склад по итоговой сумме не списывается.</p><a class="primary-action" id="manual-sale-link" href="/sales-totals">Ввести итоги смены</a><p><a href="/settings/sales-accounting">Как учитывать продажи →</a></p></section>
     <section id="import-entry" class="journal-entry workspace-card" hidden><h2>Импорт</h2><p>Загрузите внешний отчёт: файл, фото, текст или диктовку. Проверьте сопоставление и складской расход перед проведением.</p><button id="add-sales" class="primary-action" type="button" disabled>Импортировать продажи</button><h3 id="coverage-title" class="sr-only">Обработка импорта</h3><p id="coverage-copy" class="sr-only"></p></section>
     <section id="import-metrics" hidden class="sales-kpis" aria-label="Статус отражения продаж">

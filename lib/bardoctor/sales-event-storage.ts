@@ -1,3 +1,4 @@
+import {derivedInputBelongs} from './derived-input-scope';
 import {stockScope} from './stock-storage';
 import type {JournalScope} from './stock-journal';
 import type {SalesEvent} from './sales-events';
@@ -66,6 +67,45 @@ export async function readSalesEvents(db:D1Database,accountId:number,raw:string|
  const scope=await stockScope(db,accountId),events:SalesEvent[]=[];let after=-1,bytes=2;
  do{const page=await salesEventPage(db,scope,value.revision,after,100,selector);events.push(...page.items);bytes+=new TextEncoder().encode(JSON.stringify(page.items)).length;if(events.length>(limits.rows??Infinity)||bytes>(limits.bytes??Infinity))throw Error('SALES_EVENT_READ_LIMIT');if(page.next===null)break;after=page.next;}while(true);
  return events;
+}
+/** Read only batch references for reconciliation. Validate one captured event at a
+ * time instead of retaining the entire expanded POS history in request memory.
+ * Raw journal marker/revision still belongs to the caller's CAS snapshot. */
+export async function readSalesEventBatchReferences(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+ const value=JSON.parse(raw??'[]'),refs:{id:string;venueId:number;batch:{id:string}}[]=[];
+ const bytes=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)).length;let referenceBytes=2;
+ const scope=await stockScope(db,accountId);
+ if(scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)throw Error('SALES_EVENT_SCOPE_MISMATCH');
+ const append=(event:SalesEvent)=>{
+  if(!derivedInputBelongs(event,ownership))throw Error('SALES_EVENT_SCOPE_MISMATCH');
+  if(!event||typeof event.batch?.id!=='string'||!event.batch.id)fail();
+  const ref={id:event.id,venueId:event.venueId,batch:{id:event.batch.id}};
+  referenceBytes+=bytes(ref)+(refs.length?1:0);if(referenceBytes>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+  refs.push(ref);
+ };
+ if(Array.isArray(value)){
+  if(value.length>limits.rows||bytes(value)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+  for(const event of value)append(event);
+  return refs;
+ }
+ if(!marker(value))fail();
+ const state=await salesEventState(db,scope);
+ if(!state||!['active','verified'].includes(state.state)||state.revision!==value.revision)throw new StoreWriteConflictError();
+ const records=await db.prepare('SELECT event_id,position,version,payload_hash,chunk_count FROM sales_event_records WHERE account_id=? ORDER BY position LIMIT ?').bind(accountId,limits.rows+1).all<RecordRow>();
+ if(records.results.length>limits.rows||bytes(records.results)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+ for(const record of records.results){
+  // Each writer chunk contains up to 32000 code points. Reject malformed metadata
+  // and oversized payloads before joining/parsing, then run the original hash,
+  // ordinal, event identity and tenant validation in hydrateParts.
+  if(!Number.isSafeInteger(record.chunk_count)||record.chunk_count<1||record.chunk_count>Math.ceil(limits.bytes/32000)+1)throw Error('SALES_EVENT_READ_LIMIT');
+  const parts=await db.prepare('SELECT ordinal,CASE WHEN SUM(length(CAST(payload AS BLOB))) OVER ()>? THEN NULL ELSE payload END payload FROM sales_event_chunks WHERE account_id=? AND event_id=? AND version=? ORDER BY ordinal LIMIT ?').bind(limits.bytes,accountId,record.event_id,record.version,record.chunk_count+1).all<EventPart>();
+  if(parts.results.some(p=>typeof p.payload!=='string')||parts.results.reduce((n,p)=>n+new TextEncoder().encode(p.payload).length,0)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+  append(await hydrateParts(scope,record,parts.results));
+ }
+ const current=await salesEventState(db,scope);
+ if(!current||current.revision!==value.revision||current.state!==state.state)throw new StoreWriteConflictError();
+ if(bytes(refs)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+ return refs;
 }
 export async function readSaleEvent(db:D1Database,accountId:number,raw:string|null|undefined,selector:EventSelector,revenueRowId?:string){
  const value=JSON.parse(raw??'[]');if(Array.isArray(value))return {events:value as SalesEvent[],revision:null};if(!marker(value))fail();

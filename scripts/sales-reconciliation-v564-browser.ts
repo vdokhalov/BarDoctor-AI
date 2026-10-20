@@ -15,12 +15,14 @@ const revenue={id:'legacy-browser',venueId,date:'2026-10-02',revenue:1000,receip
 const batch={id:'batch-browser',venueId,shiftId:revenue.id,businessDate:revenue.date,status:'POSTED',costStatus:'FULL',totalTheoreticalCost:180,lines:[{id:'line',salesBatchId:'batch-browser',rawName:'Капучино',menuItemId:'coffee',quantity:20,unit:'порция',processingStatus:'POSTED',currency:'MDL',theoreticalCost:180,recipeSnapshot:{recipeId:'recipe',capturedAt:'2026-10-09T16:00:00Z',ingredients:[{productKey:'coffee',baseQuantityTotal:20,unitCost:9,totalCost:180,costStatus:'KNOWN_VALUE',currency:'MDL'}]}}]};
 put('bd_finance_revenue',[revenue]);put('bd_sales_batches',[batch]);
 for(const key of ['bd_sales_documents','bd_sales_events_v1','bd_month_closings','bd_sales_reconciliations_v1','bd_stock_movements'])put(key,[]);
-let loseResponse=false;
+let loseResponse=false,emptyPreviewOnce=true,previewCalls=0;
 const server=createServer(async(req,res)=>{try{
  const url=new URL(req.url??'/','http://localhost');let response:Response;
  if(url.pathname==='/api/sales-reconciliation'){
   const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));const body=Buffer.concat(chunks);
+  if(body.length&&JSON.parse(body.toString()).action==='preview')previewCalls++;
   response=await (r.api as any).reconcile[req.method??'GET'](new Request(url,{method:req.method,headers:req.headers as HeadersInit,...(body.length?{body}:{})}));
+  if(emptyPreviewOnce&&body.length&&JSON.parse(body.toString()).action==='preview'){emptyPreviewOnce=false;res.writeHead(502);res.end();return;}
   if(loseResponse&&body.length&&JSON.parse(body.toString()).action==='apply'&&response.status===201){loseResponse=false;res.writeHead(502,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:false,code:'UPSTREAM_RESPONSE_LOST'}));return;}
  }else if(url.pathname==='/sales-import'){
   // Component probe using the shipped journal HTML; other journal controllers are outside this scoped test.
@@ -41,6 +43,8 @@ try{
  await page.locator('#reconciliation-from').fill('2026-10-02');await page.locator('#reconciliation-to').fill('2026-10-02');await page.locator('#reconciliation-load').click();
  await page.locator('#reconciliation-selection input').check();await page.locator('#reconciliation-kind').selectOption('SYNTHETIC_FIXTURE');
  await page.locator('#reconciliation-reference').fill('Isolated browser fixture original weekly report');await page.locator('#reconciliation-method').fill('Explicit quantity coverage checked using original test report; historical sale prices unavailable.');await page.locator('#reconciliation-coverage').check();
+ await page.locator('#reconciliation-form button[type=submit]').click();await page.waitForFunction(()=>document.getElementById('reconciliation-status')?.textContent?.includes('HTTP 502'));
+ assert.equal(previewCalls,1);assert.equal(await page.locator('#reconciliation-coverage').isChecked(),true);assert.equal(await page.locator('#reconciliation-preview').isVisible(),false);assert.match(await page.locator('#reconciliation-status').innerText(),/Операция/);
  await page.locator('#reconciliation-form button[type=submit]').click();await page.locator('#reconciliation-preview').waitFor({state:'visible'});
  assert.equal(await page.locator('#reconciliation-apply').isDisabled(),true);
  assert.match(await page.locator('#reconciliation-summary').innerText(),/180 MDL/);
@@ -53,7 +57,7 @@ try{
  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM audit_log WHERE action='legacy_sales.reconcile'").get()!.n,1);
  assert.deepEqual(JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_stock_movements'").get(owner.userId)!.data_json)),[]);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
- mkdirSync('/workspace/checkpoint/sales-reconciliation-v564',{recursive:true});await page.screenshot({path:'/workspace/checkpoint/sales-reconciliation-v564/browser-390.png',fullPage:true});
- console.log('PASS: 390px journal component, selection/preview, backup gate/download, stale preview rejected, uncertain committed response resolved by status, one audit, stock unchanged, no horizontal overflow.');
+ mkdirSync('/workspace/checkpoint/reconciliation-preview-recovery',{recursive:true});await page.screenshot({path:'/workspace/checkpoint/reconciliation-preview-recovery/browser-390.png',fullPage:true});
+ console.log('PASS: empty preview response preserves form/operation ID and no automatic retry; 390px journal component, selection/preview, backup gate/download, stale preview rejected, uncertain committed response resolved by status, one audit, stock unchanged, no horizontal overflow.');
  await context.close();
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));r.close();}

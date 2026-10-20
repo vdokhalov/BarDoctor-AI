@@ -6,7 +6,7 @@
  async function request(body,query=''){
   if(venue!==localStorage.getItem('bd_active_venue_id'))throw new Error('Заведение изменилось. Откройте страницу заново.');
   const response=await fetch('/api/sales-reconciliation'+query,{method:body?'POST':'GET',headers:{'Content-Type':'application/json','X-Session-Email':localStorage.getItem('bd_session')||'','X-Session-Token':localStorage.getItem('bd_session_token')||'','X-Venue-Id':venue||''},...(body?{body:JSON.stringify(body)}:{})});
-  const data=await response.json();if(!response.ok||!data.ok)throw new Error(data.code||'Не удалось проверить данные');return data;
+  let data;try{data=await response.json();}catch{throw new Error('Сервер вернул пустой или некорректный ответ (HTTP '+response.status+'). Запрос автоматически не повторяется');}if(!response.ok||!data.ok)throw new Error(data.code||'Не удалось проверить данные');return data;
  }
  function invalidate(){if(busy||uncertain)return;preview=null;command=null;downloaded=false;el('preview').hidden=true;el('backup-saved').checked=false;el('apply').disabled=true;}
  el('form').addEventListener('input',event=>{invalidate();if(event.target===el('from')||event.target===el('to')){selection=null;el('selection').replaceChildren();}});
@@ -28,7 +28,7 @@
    command={venueId:selection.venueId,workspaceId:selection.workspaceId,dataAccountId:selection.dataAccountId,operationId:crypto.randomUUID(),mappings,evidence:{kind:el('kind').value,reference:el('reference').value.trim(),method:el('method').value.trim(),completeCoverage:el('coverage').checked,historicalPricesAvailable:el('prices').checked}};
    preview=await request({...command,action:'preview'});const host=el('summary');host.replaceChildren();preview.summary.forEach(s=>{summaryLine(s.date+': выручка '+s.revenue+', '+s.receipts+' чеков → связанная себестоимость '+s.cost+' '+s.currency,host);s.batches.forEach(b=>summaryLine(b.lines.map(l=>(l.name||l.menuItemId)+' × '+l.quantity+' = '+l.cost).join('; '),host));});
    el('preview').hidden=false;downloaded=false;el('backup-saved').checked=false;message('Проверка готова. Скачайте копию исходных данных и проверьте результат перед подтверждением.');
-  }catch(e){preview=null;message(e.message);}finally{lock(false);}
+  }catch(e){preview=null;message(e.message+(command?' · Операция '+command.operationId:''));}finally{lock(false);}
  };
  el('backup').onclick=()=>{if(!preview)return;const url=URL.createObjectURL(new Blob([JSON.stringify(preview,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='sales-reconciliation-'+command.operationId+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);downloaded=true;};
  el('backup-saved').onchange=()=>lock(busy);

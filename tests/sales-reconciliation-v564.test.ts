@@ -9,7 +9,7 @@ import {VENUE_CONTEXT_SOURCES} from '../lib/bardoctor/venue-context-access';
 const matrix=[[1600,24,20,10,12,350],[1725,26,22,10,13,378],[2300,34,30,10,20,520],[2400,36,32,10,20,538],[1600,24,20,10,12,350],[1450,22,18,10,10,312],[1525,23,18,10,13,342]];
 test('explicit legacy reconciliation: actual auth, CAS, audit, Finance and Health',async t=>{
  const now='2026-10-20T19:00:00Z';
- const r=await lifecycleRuntime({reconcile:'./app/api/sales-reconciliation/route',month:'./app/api/month-close/route',health:'./lib/bardoctor/canonical-health-inputs',authReader:'./lib/bardoctor/auth',store:'./app/api/store/[key]/route'},{now});t.after(r.close);
+ const r=await lifecycleRuntime({eventStorage:'./lib/bardoctor/sales-event-storage',database:'./db',reconcile:'./app/api/sales-reconciliation/route',month:'./app/api/month-close/route',health:'./lib/bardoctor/canonical-health-inputs',authReader:'./lib/bardoctor/auth',store:'./app/api/store/[key]/route'},{now});t.after(r.close);
  const owner=await r.register('reconcile@isolated.test'),other=await r.register('other-reconcile@isolated.test');
  const venueId=owner.activeVenueId,v=r.sqlite.prepare('SELECT data_account_id,workspace_id FROM venues WHERE id=?').get(venueId)!;
  const accountId=Number(v.data_account_id),workspaceId=Number(v.workspace_id),scope={venueId,workspaceId,dataAccountId:accountId};
@@ -88,4 +88,31 @@ test('explicit legacy reconciliation: actual auth, CAS, audit, Finance and Healt
   put('bd_sales_batches',[...batches,{...batches[0],id:'unlinked-extra'}]);
   const health=await api.health.loadCanonicalHealthInputs(account,now);const finance=health.context.promptData.performanceHistory.period.inputContract;assert.equal(finance.resultAfterCost,null);assert(finance.costReasons.includes('UNLINKED_SALES_CONSUMPTION'));assert.equal(health.intelligence.businessHealth.components.find((x:any)=>x.id==='finance').score,null);put('bd_sales_batches',batches);
  });
+ await t.test('normalized 47-event history above 2 MB previews without materializing full history; guards survive',async()=>{
+  const storage=api.eventStorage,db=api.database.getD1(),journalScope={accountId,venueId};
+  put(KEY,[]);
+  await storage.copyLegacySalesEvents(db,journalScope);await storage.activateSalesEvents(db,journalScope);
+  const {salesEventFixture,saleCommand}=await import('./helpers/sales-event-fixture');
+  const {planSalesEvent}=await import('../lib/bardoctor/sales-events');
+  const sample=(await planSalesEvent(salesEventFixture(),saleCommand('whisky',1))).event;
+  for(let i=0;i<47;i++)await db.batch(await storage.salesEventStatements(db,journalScope,i,[],[{...sample,id:'large-'+i,externalId:'large-'+i,batch:{...sample.batch,id:'pos-batch-'+i},evidencePadding:'x'.repeat(60000)}]));
+  const raw=String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(accountId)!.data_json);
+  await assert.rejects(()=>storage.readSalesEvents(db,accountId,raw,undefined,{rows:10000,bytes:2000000}),/SALES_EVENT_READ_LIMIT/);
+  const before=sources(),command={...base,action:'preview',operationId:'normalized-history-preview'};
+  const preview=await post(command);assert.equal(preview.status,200,JSON.stringify(preview.data));assert.equal(preview.data.summary.reduce((n:number,x:any)=>n+x.cost,0),2790);assert.equal(sources(),before);
+  const first=r.sqlite.prepare("SELECT payload FROM sales_event_chunks WHERE account_id=? AND event_id='large-0' AND ordinal=0").get(accountId)!;
+  r.sqlite.prepare("UPDATE sales_event_chunks SET payload='{}' WHERE account_id=? AND event_id='large-0' AND ordinal=0").run(accountId);
+  assert.equal((await post(command)).data.code,'SALES_EVENT_STORE_NEEDS_REVIEW');
+  r.sqlite.prepare("UPDATE sales_event_chunks SET payload=? WHERE account_id=? AND event_id='large-0' AND ordinal=0").run(first.payload,accountId);
+  r.sqlite.prepare("UPDATE sales_event_chunks SET payload=? WHERE account_id=? AND event_id='large-0' AND ordinal=0").run('x'.repeat(2000001),accountId);
+  assert.equal((await post(command)).data.code,'SALES_EVENT_READ_LIMIT');
+  r.sqlite.prepare("UPDATE sales_event_chunks SET payload=? WHERE account_id=? AND event_id='large-0' AND ordinal=0").run(first.payload,accountId);
+  let changed=false;r.onRead(sql=>{if(!changed&&sql.includes('FROM sales_event_chunks')){changed=true;r.sqlite.prepare('UPDATE sales_event_journals SET revision=revision+1 WHERE account_id=?').run(accountId);}});
+  assert.equal((await post(command)).data.code,'INPUTS_CHANGED');r.onRead(null);r.sqlite.prepare('UPDATE sales_event_journals SET revision=revision-1 WHERE account_id=?').run(accountId);
+  await db.batch(await storage.salesEventStatements(db,journalScope,47,[],[{...sample,id:'already-linked-pos',externalId:'already-linked-pos',batch:{...sample.batch,id:'batch-0'}}]));
+  assert.equal((await post(command)).data.code,'BATCH_ALREADY_LINKED');
+  await db.batch(await storage.salesEventStatements(db,journalScope,48,[],[{...sample,id:'foreign-nested',externalId:'foreign-nested',batch:{...sample.batch,id:'unrelated-pos-batch'},extra:{workspaceId:999999}}]));
+  assert.equal((await post(command)).data.code,'SALES_EVENT_SCOPE_MISMATCH');
+ });
+
 });

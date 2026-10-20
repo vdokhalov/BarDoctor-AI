@@ -9,7 +9,7 @@ import { readJsonRequest } from '../../../lib/bardoctor/http';
 import { closedMonthsFromStore } from '../../../lib/bardoctor/data-trust';
 import { readStoreSnapshots, runStoreCasBatch, StoreWriteConflictError } from '../../../lib/bardoctor/store-cas';
 import { posMembershipGuard } from '../../../lib/bardoctor/pos-auth-guard';
-import { readSalesEvents } from '../../../lib/bardoctor/sales-event-storage';
+import { readSalesEventBatchReferences } from '../../../lib/bardoctor/sales-event-storage';
 import { capturedBatchCost } from '../../../lib/bardoctor/financial-reconciliation';
 import { SALES_RECONCILIATION_KEY as KEY, canonicalReconciliationValue, validReconciliationEvidence } from '../../../lib/bardoctor/sales-reconciliation-contract';
 
@@ -46,7 +46,7 @@ export async function POST(request:Request):Promise<Response>{
   const commandRevision=await digest(input);
   if(existing.length){if(existing.some(x=>x.commandRevision!==commandRevision))reject('OPERATION_ID_REUSED');return reply({ok:true,duplicate:true,state:'APPLIED',links:existing});}
   const revenues=read('bd_finance_revenue'),batches=read('bd_sales_batches'),documents=read('bd_sales_documents'),closings=read('bd_month_closings');
-  const events=list(await readSalesEvents(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson??null,undefined,{rows:10000,bytes:MAX_BYTES}));
+  const events=list(await readSalesEventBatchReferences(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson??null,scope,{rows:10000,bytes:MAX_BYTES}));
   if(![revenues,batches,documents,events,closings].every(x=>derivedInputBelongs(x,scope)))reject('SOURCE_SCOPE_MISMATCH');
   const currency=accountingCurrencyFromRestaurantJson(account.restaurantJson);if(!currency)reject('CURRENCY_UNKNOWN');
   const closed=closedMonthsFromStore(closings),seenRevenue=new Set<string>(),seenBatch=new Set<string>();
@@ -89,6 +89,7 @@ export async function POST(request:Request):Promise<Response>{
  }catch(error){
   if(error instanceof StoreWriteConflictError)return reply({ok:false,code:'INPUTS_CHANGED'},409);
   if(error instanceof ReconciliationError)return reply({ok:false,code:error.code},error.status);
+  if(error instanceof Error&&['SALES_EVENT_READ_LIMIT','SALES_EVENT_STORE_NEEDS_REVIEW','SALES_EVENT_SCOPE_MISMATCH'].includes(error.message))return reply({ok:false,code:error.message},422);
   if(error instanceof SyntaxError)return reply({ok:false,code:'SOURCE_MALFORMED'},422);
   throw error;
  }
