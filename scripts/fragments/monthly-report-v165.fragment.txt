@@ -52,15 +52,16 @@ function bdMonthlyHeroV165({ report, previous }) {
     className: "bd-monthly-hero-v165 " + (positive ? "is-positive" : "is-negative"),
     children: [
       i.jsxs("div", { className: "bd-monthly-hero-top-v165", children: [
-        i.jsx("span", { className: "bd-monthly-status-v165", children: report.isClosed ? "Закрыт" : "Предварительный" }),
+        i.jsx("span", { className: "bd-monthly-status-v165", children: report.currentFinance ? "На " + report.asOfDate : report.isClosed ? "Закрыт" : "Предварительный" }),
         i.jsx("span", { className: "bd-monthly-coverage-v165", children: report.accountedShifts + " из " + report.expectedShifts + " смен" }),
       ] }),
-      i.jsx("p", { className: "bd-monthly-hero-label-v165", children: report.isClosed ? "Чистая прибыль месяца" : "Предварительный результат месяца" }),
+      i.jsx("p", { className: "bd-monthly-hero-label-v165", children: report.currentFinance ? "Результат до себестоимости" : report.isClosed ? "Чистая прибыль месяца" : "Предварительный результат месяца" }),
       i.jsx("strong", { className: "bd-monthly-hero-value-v165", children: shownValue === null ? "Пока не рассчитан" : bdMoney2(shownValue) }),
       i.jsxs("div", { className: "bd-monthly-hero-meta-v165", children: [
         i.jsxs("span", { children: [i.jsx("small", { children: "Доля от выручки" }), i.jsx("b", { children: bdMonthlyRatioLabelV165(margin) })] }),
         i.jsxs("span", { children: [i.jsx("small", { children: "Выручка" }), i.jsx("b", { children: bdMoney2(report.revenue) })] }),
       ] }),
+      report.currentFinance && i.jsx(bdCurrentFinanceDetailsV556, {report}),
       comparison
         ? i.jsxs("p", { className: "bd-monthly-hero-comparison-v165", children: [comparison.value, " к ", bdMonthDisplay(previous.meta.key)] })
         : i.jsx("p", { className: "bd-monthly-hero-note-v165", children: report.isClosed ? "Сравнение появится после предыдущего сопоставимого закрытого месяца." : "Итог станет финальным после проверки смен, остатков и закрытия месяца." }),
@@ -257,31 +258,34 @@ function bdMonthlyShiftAnalysisV165({ report, period, navigate }) {
       i.jsx("p", { children: "Нет завершённых смен с финансовыми данными." }),
     ] });
   }
-  const resultOf = (shift) => shift.estimatedResult ?? shift.resultBeforeCost;
-  const profitable = shifts.filter((shift) => Number(resultOf(shift)) >= 0).length;
-  const losing = shifts.length - profitable;
-  const average = shifts.reduce((sum, shift) => sum + Number(resultOf(shift) || 0), 0) / shifts.length;
-  const ordered = [...shifts].sort((left, right) => Number(resultOf(right) || 0) - Number(resultOf(left) || 0));
+  const beforeCost = report.costOfGoods == null || shifts.some(shift => shift.estimatedResult == null);
+  const resultOf = (shift) => beforeCost ? shift.resultBeforeCost : shift.estimatedResult;
+  const known = shifts.filter(shift => typeof resultOf(shift) === "number" && Number.isFinite(resultOf(shift)));
+  const profitable = known.filter(shift => resultOf(shift) >= 0).length;
+  const losing = known.filter(shift => resultOf(shift) < 0).length;
+  const average = known.length ? known.reduce((sum, shift) => sum + resultOf(shift), 0) / known.length : null;
+  const ordered = [...known].sort((left, right) => resultOf(right) - resultOf(left));
   const best = ordered[0];
   const worst = ordered[ordered.length - 1];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-shifts-v165", children: [
     i.jsx(bdMonthlySectionHeaderV165, { title: "Операционный результат по сменам", caption: report.costOfGoods !== null ? (report.costBasis === "historical_sales_snapshots" ? "Себестоимость по сохранённым продажам каждой смены" : "Себестоимость распределена пропорционально выручке") : "Показан результат без себестоимости", ...(shifts.some(shift => shift.estimatedResult == null) ? { caption: "Неподтверждённый результат показан до себестоимости; сохранённая себестоимость указана отдельно." } : {}), action: () => navigate("/finance?month=" + period + "&view=revenue"), actionLabel: "Открыть смены" }),
     i.jsx("div", { className: "bd-monthly-shift-summary-v165", children: [
       { key: "all", label: "Завершено", value: shifts.length },
-      { key: "profit", label: "Прибыльных", value: profitable },
-      { key: "loss", label: "Убыточных", value: losing },
-      { key: "average", label: "Средний результат", value: bdMoney2(average) },
-      { key: "best", label: "Лучшая", value: sg(best.date) + " · " + bdMoney2(resultOf(best)) },
-      { key: "worst", label: "Худшая", value: sg(worst.date) + " · " + bdMoney2(resultOf(worst)) },
+      { key: "profit", label: beforeCost ? "До себестоимости ≥ 0" : "Результат ≥ 0", value: profitable },
+      { key: "loss", label: beforeCost ? "До себестоимости < 0" : "Результат < 0", value: losing },
+      { key: "unknown", label: "Результат неизвестен", value: shifts.length - known.length },
+      { key: "average", label: beforeCost ? "Средний до себестоимости (известные смены)" : "Средний результат (известные смены)", value: average == null ? "Неизвестно" : bdMoney2(average) },
+      { key: "best", label: "Лучшая", value: best ? sg(best.date) + " · " + bdMoney2(resultOf(best)) : "Неизвестно" },
+      { key: "worst", label: "Худшая", value: worst ? sg(worst.date) + " · " + bdMoney2(resultOf(worst)) : "Неизвестно" },
     ].map((entry) => i.jsxs("article", { className: "is-" + entry.key, children: [i.jsx("small", { children: entry.label }), i.jsx("strong", { children: entry.value })] }, entry.key)) }),
     i.jsx("div", { className: "bd-monthly-shift-list-v165", children: shifts.map((shift) => {
       const result = resultOf(shift);
       return i.jsxs("button", { type: "button", onClick: () => navigate("/finance?month=" + period + "&view=revenue"), children: [
-        i.jsxs("span", { children: [i.jsx("strong", { children: sg(shift.date) }), i.jsxs("small", { children: ["Выручка ", bdMoney2(shift.revenue), " · Себестоимость ", shift.estimatedCost === null ? "—" : bdMoney2(shift.estimatedCost), " · ФОТ ", bdMoney2(shift.payroll), " · Постоянные ", bdMoney2(shift.recurringAllocation)] })] }),
-        i.jsx("b", { className: Number(result) >= 0 ? "is-positive" : "is-negative", children: (shift.estimatedResult == null ? "До себестоимости: " : "") + bdMoney2(result) }),
+        i.jsxs("span", { children: [i.jsx("strong", { children: sg(shift.date) }), i.jsxs("small", { children: ["Выручка ", bdMoney2(shift.revenue), " · Себестоимость ", shift.estimatedCost === null ? "—" : bdMoney2(shift.estimatedCost), " · ФОТ ", shift.payroll == null ? "Неизвестно" : bdMoney2(shift.payroll), " · Постоянные ", bdMoney2(shift.recurringAllocation)] })] }),
+        i.jsx("b", { className: result == null ? "" : result >= 0 ? "is-positive" : "is-negative", children: result == null ? "Результат неизвестен" : (beforeCost ? "До себестоимости: " : "") + bdMoney2(result) }),
       ] }, shift.date);
     }) }),
-    i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
+    beforeCost ? i.jsx("p", { className: "bd-monthly-method-note-v165", children: "Показан результат до себестоимости, а не прибыль. Неизвестные результаты исключены из среднего и сравнения смен." }) : i.jsx("p", { className: "bd-monthly-method-note-v165", children: report.costBasis === "historical_sales_snapshots" ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов." }),
   ] });
 }
 
@@ -315,12 +319,12 @@ function bdMonthlyCurrencyBoundaryNoticeV320({ report }) {
 }
 
 async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
-  const response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
+  const response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&view=current&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
   const value = await response.json();
   if (!response.ok || !value.ok) throw new Error("Не удалось проверить отчёт. Проверьте доступ и повторите загрузку.");
   const scope = value.inputManifest?.scope || value.closing?.inputManifest?.scope;
   const legacyScope = value.closing && (!value.closing.venueId || value.closing.venueId === "primary" || Number(value.closing.venueId) === venueId);
-  if ((scope ? Number(scope.venueId) !== venueId : !legacyScope) || (value.closing?.monthKey || value.report?.meta?.key) !== monthKey || !value.report) throw new Error("Контекст отчёта изменился. Повторите загрузку.");
+  if ((scope ? Number(scope.venueId) !== venueId : !legacyScope) || (monthKey !== "current" && (value.closing?.monthKey || value.report?.meta?.key) !== monthKey) || !value.report) throw new Error("Контекст отчёта изменился. Повторите загрузку.");
   return { report: value.closing ? { ...value.report, ...bdMonthlyClosedFieldsPhase7(value.report), meta: value.report.meta || bdMonthMeta(monthKey), isClosed: true } : value.report, reasons: value.reasons || [], reasonDetails: value.reasonDetails || [], reasonDetailsTruncated: value.reasonDetailsTruncated === true, evidenceStatus: value.evidenceStatus };
 }
 
@@ -511,5 +515,26 @@ function bdMonthlyReportPage() {
       ] }),
     ] }),
   ] }) });
+}
+function bdCurrentFinanceDetailsV556({report}) {
+  return i.jsxs("div", {role:"status",children:[
+    i.jsx("p",{children:report.resultExplanation}),
+    ...[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].map((text,index)=>i.jsx("p",{children:text},index)),
+    report.payroll==null && report.knownPayrollSubtotal!=null && i.jsx("p",{children:"Учтённый ФОТ по подтверждённым дням: "+bdMoney2(report.knownPayrollSubtotal)+". Общая сумма пока неизвестна."}),
+    report.missingPayrollDates?.length>0 && i.jsx("p",{children:"ФОТ не подтверждён за: "+report.missingPayrollDates.join(", ")})
+  ]});
+}
+function bdHomeCurrentFinanceV556({profile,settings,onNavigate,revision}) {
+  const value=bdUseMonthlyReportV513(bdMonthlyVenueIdPhase7(profile,settings),"current",revision),report=value.report;
+  if(!report)return i.jsx("section",{className:"bd-home-money",role:"status",children:value.error||"Проверяем финансовые данные…"});
+  const result=report.currentFinance?report.resultBeforeCost:report.operatingResult;
+  return i.jsxs("section",{className:"bd-home-money","data-bd-home-money":"current-v556",children:[
+    i.jsx("p",{children:report.currentFinance?"Финансы на "+report.asOfDate:"Финансовый результат · "+bdMonthDisplay(report.meta.key)}),
+    i.jsx("h2",{children:report.currentFinance?"Результат до себестоимости":"Прибыль закрытого месяца"}),
+    i.jsx("strong",{className:"bd-home-money-value",style:result==null?{whiteSpace:"normal",overflowWrap:"anywhere",fontSize:"clamp(20px, 6vw, 28px)",lineHeight:1.2}:undefined,children:result==null?"Недостаточно данных":bdMoney2(result)}),
+    i.jsx("p",{children:"Выручка: "+(report.revenue==null?"Неизвестно":bdMoney2(report.revenue))+" · Начисленный ФОТ: "+(report.payroll==null?"Неизвестно":bdMoney2(report.payroll))}),
+    report.currentFinance&&i.jsx(bdCurrentFinanceDetailsV556,{report}),
+    i.jsx("button",{type:"button",onClick:()=>onNavigate("/reports?month="+report.meta.key),children:"Открыть отчёт"})
+  ]});
 }
 /* bd-monthly-report-v165:end */

@@ -7,6 +7,7 @@ type Runtime = {headers:()=>HeadersInit;venue:()=>number;navigate:(path:string)=
 export function homeFinancialResult(report:Row|null|undefined) {
   const known=(value:unknown)=>(typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value));
   if(!report||report.financeInputsKnown===false)return {value:null,final:false};
+  if(report.currentFinance === true && known(report.resultBeforeCost))return {value:Number(report.resultBeforeCost),final:false};
   if(known(report.operatingResult))return {value:Number(report.operatingResult),final:true};
   // A registered cash subtotal is not an authoritative operating result.
   // Keep it in its existing source view; do not substitute it for UNKNOWN.

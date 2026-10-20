@@ -176,7 +176,7 @@ function operationalInterpretation(component: BusinessHealthComponent): string {
 function zoneInterpretation(component: BusinessHealthComponent, intelligence: AIDoctorIntelligence): { interpretation: string; factors: string[] } {
   if (component.id === "finance") {
     return {
-      interpretation: component.score === null ? "Финансовое состояние не оценено: нет подтверждённой оценки закрытого периода." : `Финансовая оценка: ${intelligence.periods.closedFinance?.label ?? "закрытый период"}. Это не прибыль текущего месяца.`,
+      interpretation: component.score === null ? (component.gaps[0] ?? "Не хватает финансовых данных") : (component.evidence[0] ?? "Финансовая оценка по учтённым данным"),
       factors: [...component.evidence, ...component.gaps].slice(0, 3),
     };
   }
@@ -251,7 +251,7 @@ function assessmentSummary(intelligence: AIDoctorIntelligence, venueId: string, 
   let hint: BusinessHealthSnapshot["assessment"]["hint"] = null;
   const setHint = (label: string, path: string) => { hint = { label, path: path + (path.includes("?") ? "&" : "?") + "venueId=" + encodeURIComponent(venueId) }; };
   const finance = health.components.find(item => item.id === "finance");
-  if (finance?.score != null && finance.score < 55) setHint("Разберите убыток или низкую прибыль закрытого периода", "/finance");
+  if (finance?.score != null && finance.score < 55) setHint("Проверьте финансовый результат и неучтённые расходы", "/finance");
   const positive = (key: keyof typeof paths) => {
     const counter = ops?.inputCounters?.[key];
     return counter?.availability === "AVAILABLE" && counter.evidenceStatus === "COMPLETE" && counter.value !== null && counter.value > 0;
@@ -271,7 +271,7 @@ function assessmentSummary(intelligence: AIDoctorIntelligence, venueId: string, 
   if (coverage) details.push(`Операции: подтверждено ${coverage.measured} из ${coverage.total} применимых составляющих. Вклад в индекс: ${Math.round((ops?.weight ?? 0) * 100) / 100} из 25. Для балла нужны хотя бы две составляющие.`);
   if (coverage?.notApplicable.length) details.push("Оборудование не используется: реестр подтверждённо пуст. Заполнять модуль не требуется.");
   if (ops) details.push("Операции: текущие остатки и открытые происшествия; рабочие дни и ремонты — по сохранённой истории. Месяц закрывать не требуется.", ...ops.evidence, ...ops.gaps);
-  if (intelligence.periods.closedFinance && health.coverage.financeAvailable) details.push(`Финансовая оценка: ${intelligence.periods.closedFinance.label}. Это не прибыль текущего месяца.`);
+  if (intelligence.periods.closedFinance && health.coverage.financeAvailable && !finance?.evidence[0]?.startsWith("На ")) details.push(`Финансовая оценка: ${intelligence.periods.closedFinance.label}. Это не прибыль текущего месяца.`);
   details.push(...health.adjustments);
   return { partial, note: partial ? "Оценка по доступным данным" : "Оценка по всем направлениям", hint, details };
 }

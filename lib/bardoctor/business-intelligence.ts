@@ -667,7 +667,7 @@ function financePeriods(current: JsonRecord, closed: JsonRecord, generatedAt: Da
         status: "closed",
       }
     : null;
-  return { currentPeriod, closedPeriod, currentResult, currentRevenue, currentExpenses };
+  return { currentPeriod, closedPeriod, currentResult, currentRevenue, currentExpenses, isCurrent: current.currentFinance === true, resultAfterCost: numeric(current.resultAfterCost), currentKnown: current.currentFinance === true && current.financeInputsKnown === true, missingInformation: list(current.financeAssessmentInformation ?? current.missingInformation).filter((x): x is string => typeof x === "string") };
 }
 
 function previousMonthKey(monthKey: string): string | null {
@@ -760,9 +760,9 @@ function liveDirection(change: number | null): LivePeriodAnalysis["direction"] {
 
 function liveHeadline(direction: LivePeriodAnalysis["direction"], periodEnd: string): string {
   const month = monthName(periodEnd, true);
-  if (direction === "better") return `${month} идёт лучше сопоставимого периода`;
-  if (direction === "weaker") return `${month} идёт слабее сопоставимого периода`;
-  if (direction === "stable") return "Результат близок к обычному уровню";
+  if (direction === "better") return `Выручка: ${month.toLocaleLowerCase("ru")} выше сопоставимого периода`;
+  if (direction === "weaker") return `Выручка: ${month.toLocaleLowerCase("ru")} ниже сопоставимого периода`;
+  if (direction === "stable") return "Выручка близка к сопоставимому уровню";
   return "Недостаточно сопоставимых данных для динамики";
 }
 
@@ -869,14 +869,14 @@ export function buildLivePeriodAnalysis(input: {
   const currentAverage = currentAggregate?.averageCheck ?? null;
   const moneyResult = money(preliminaryResult, input.currency);
   const financeSummary = direction === "better"
-    ? "Текущий период пока идёт сильнее сопоставимого."
+    ? "Выручка текущего периода выше сопоставимого."
     : direction === "weaker"
-      ? "Текущий период пока идёт слабее сопоставимого."
+      ? "Выручка текущего периода ниже сопоставимого."
       : direction === "stable"
-        ? "Финансовая динамика близка к сопоставимому уровню."
-        : "Текущий денежный результат доступен, но сопоставимой истории для динамики пока недостаточно.";
+        ? "Выручка близка к сопоставимому уровню."
+        : "Для сравнения выручки недостаточно сопоставимой истории.";
   const factors = [
-    moneyResult ? `Предварительный денежный результат: ${moneyResult}` : null,
+    moneyResult ? `${input.current.currentKnown ? "Результат до себестоимости" : "Предварительный денежный результат"}: ${moneyResult}` : null,
     revenuePercent !== null ? `Выручка: ${signedPercent(revenuePercent)} к сопоставимому периоду` : null,
     checksPercent !== null ? `Чеки: ${signedPercent(checksPercent)}` : null,
     averageCheckPercent !== null ? `Средний чек: ${signedPercent(averageCheckPercent)}` : null,
@@ -915,6 +915,8 @@ export function buildLivePeriodAnalysis(input: {
   };
 }
 
+function financeMarginScore(margin:number) { return margin < -10 ? 15 : margin < 0 ? 35 : margin < 5 ? 62 : margin < 15 ? 78 : 90; }
+
 function financeComponent(
   latest: JsonRecord,
   previous: JsonRecord,
@@ -927,19 +929,26 @@ function financeComponent(
     ?? (revenue !== null && revenue > 0 && profit !== null ? rounded(profit / revenue * 100) : null);
   const evidence: string[] = [];
   const gaps: string[] = [];
+  if (current.isCurrent) {
+    const previousProfit=numeric(previous.finalProfit),delta=numeric(comparison.profitDelta)??(profit!==null&&previousProfit!==null?profit-previousProfit:null);
+    const historicalScore=profit!==null&&revenue!==null&&revenue>0?(margin===null?(profit<0?30:68):financeMarginScore(margin))+(delta===null?0:delta>0?6:delta<0?-8:0):null;
+    const currentMargin=current.currentKnown&&current.resultAfterCost!==null&&current.currentRevenue!==null&&current.currentRevenue>0?current.resultAfterCost/current.currentRevenue*100:null;
+    let score=currentMargin===null?null:financeMarginScore(currentMargin);
+    if(historicalScore!==null&&historicalScore<35)score=score===null?historicalScore:Math.min(score,historicalScore);
+    return {id:"finance",label:"Финансы",score,weight:40,confidence:score===null?"low":"medium",evidence:[
+      ...(currentMargin!==null?[`На ${current.currentPeriod?.endDate}: результат с подтверждённой себестоимостью ${current.resultAfterCost}; доля от выручки ${rounded(currentMargin)}%`]:[]),
+      ...(historicalScore!==null&&historicalScore<35?[`Подтверждённый убыток закрытого периода: ${profit}`]:[])],
+      gaps:[...current.missingInformation,...(current.currentRevenue===0?["Нулевая выручка: рентабельность не определяется."]:[]),"Учтены сохранённые расходы; ещё не внесённые начисления не включены. Это не финальная прибыль месяца."]};
+  }
   if (profit === null || revenue === null || revenue <= 0) {
-    return { id: "finance", label: "Финансы", score: null, weight: 40, confidence: "low", evidence, gaps: ["Нет закрытого финансового периода с выручкой и чистой прибылью"] };
+    return { id: "finance", label: "Финансы", score: null, weight: 40, confidence: "low", evidence, gaps: current.missingInformation.length ? current.missingInformation : ["Недостаточно подтверждённых финансовых данных за текущий период"] };
   }
   const closedLabel = current.closedPeriod?.label ?? "Закрытый финансовый период";
   evidence.push(`${closedLabel}: чистая прибыль ${rounded(profit, 2)} при выручке ${rounded(revenue, 2)}`);
   if (margin !== null) evidence.push(`Рентабельность ${rounded(margin)}%`);
   let score = margin === null
     ? profit < 0 ? 30 : 68
-    : margin < -10 ? 15
-      : margin < 0 ? 35
-        : margin < 5 ? 62
-          : margin < 15 ? 78
-            : 90;
+    : financeMarginScore(margin);
   const previousProfit = numeric(previous.finalProfit);
   const profitDelta = numeric(comparison.profitDelta)
     ?? (previousProfit !== null ? profit - previousProfit : null);
@@ -1089,7 +1098,7 @@ function healthFromComponents(
     }
   };
   if (financeScore !== null && financeScore < 35) {
-    applyCap(44, "Серьёзный убыток закрытого периода ограничивает итоговую оценку");
+    applyCap(44, "Подтверждённый финансовый дефицит ограничивает итоговую оценку");
   }
   if (demandScore !== null && demandScore <= 45 && (context?.revenueChangePercent ?? 0) <= -30) {
     applyCap(54, "Сильная просадка спроса и сопоставимой выручки имеет business-wide эффект");

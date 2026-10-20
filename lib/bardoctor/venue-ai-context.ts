@@ -5,6 +5,7 @@ import { contextProvenance } from "./context-provenance";
 import { bindCanonicalContext, scopedSource, type CanonicalInputs, type MetricEvidenceMap } from "./canonical-input-evidence";
 import { aggregateReviews } from "./review-aggregate";
 import { procurementProductSummary } from "./procurement-basis";
+import { currentFinance } from "./current-finance";
 import { readFinanceInputs } from "./finance-inputs";
 import { activeBusinessRow } from "./business-day-rows";
 import type { AuthenticatedAccount } from "./access-control";
@@ -483,7 +484,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
     return Boolean(date && date >= `${currentMonthKey}-01` && date <= today)
       && activeBusinessRow(item);
   });
-  const monthInputs = readFinanceInputs({ venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
+  const monthInputs = currentFinance({ movements: array(store(sources,"bd_stock_movements")?.data), batches: array(store(sources,"bd_sales_batches")?.data), costInputsAvailable: ["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches"].every(key=>{const source=store(sources,key);return !!source&&source.sourceState!=="PARTIAL"&&Array.isArray(source.data)}), profile: sources.accountProfile, venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
     revenues: revenueRows, reports: array(store(sources, "bd_operational_reports_v1")?.data), events: array(store(sources, "bd_sales_events_v1")?.data),
     documents: array(store(sources, "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries, expensesAvailable: !!storedExpenses && storedExpenses.sourceState !== "PARTIAL" && Array.isArray(storedExpenses.data), payrollEntriesAvailable: !!storedPayroll && storedPayroll.sourceState !== "PARTIAL" && Array.isArray(storedPayroll.data) });
   const effectiveRevenue = monthInputs.revenueRows.length ? monthInputs.revenue : null;
@@ -493,7 +494,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
   const effectiveGuests = guestValues.length && guestValues.every(value => value !== null) ? guestValues.reduce<number>((total, value) => total + value!, 0) : null;
   const effectivePayroll = monthInputs.payroll;
   const effectiveExpenses = monthInputs.expenses;
-  const effectiveResult = (effectiveRevenue != null && effectiveExpenses != null ? rounded(effectiveRevenue - effectiveExpenses, 2) : null);
+  const effectiveResult = monthInputs.resultBeforeCost;
   const closedMonths = summariseClosedMonths(sources);
 
   return {
@@ -520,6 +521,13 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       expenses: effectiveExpenses,
       payroll: effectivePayroll,
       result: effectiveResult,
+      currentFinance: true,
+      resultAfterCost: monthInputs.resultAfterCost,
+      financeAssessmentInformation: monthInputs.financeAssessmentInformation,
+      financeInputsKnown: monthInputs.financeInputsKnown,
+      missingInformation: monthInputs.missingInformation,
+      knownPayrollSubtotal: monthInputs.knownPayrollSubtotal,
+      missingPayrollDates: monthInputs.missingPayrollDates,
       sampleSize: currentMonthRows.length,
     },
     last30Days: {

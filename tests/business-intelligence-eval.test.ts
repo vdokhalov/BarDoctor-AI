@@ -638,7 +638,7 @@ test("live Health compares an open month only with the same elapsed days of the 
   assert.equal(result.livePeriod.changes.revenuePercent, 30);
   assert.equal(result.livePeriod.direction, "better");
   assert.match(result.livePeriod.periodLabel, /1–28 августа$/i);
-  assert.match(result.livePeriod.financeSummary, /сильнее сопоставимого/i);
+  assert.match(result.livePeriod.financeSummary, /Выручка.*выше сопоставимого/i);
   assert.ok(result.livePeriod.factors.some((item) => /Предварительный денежный результат/.test(item)));
 });
 

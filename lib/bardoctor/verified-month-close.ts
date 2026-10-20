@@ -1,3 +1,4 @@
+import { currentFinance } from "./current-finance";
 import {readSalesEvents} from './sales-event-storage';
 import {readStockHistory} from "./stock-storage";
 import { derivedInputBelongs } from "./derived-input-scope";
@@ -69,10 +70,10 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   if (!context) return response({ ok: false, code: "UNAVAILABLE" }, 401);
   if (!hasPermission(context.account, "reports.view") || !KEYS.every(key => canReadVenueSource(context.account, key)) || request.method === "POST" && !hasPermission(context.account, "month.close")) return response({ ok: false, code: "ACCESS_DENIED" }, 403);
   const url = new URL(request.url), body = request.method === "POST" ? row(await request.json().catch(() => null)) : {};
-  const monthKey = String(body.monthKey ?? url.searchParams.get("monthKey") ?? "");
+  let monthKey = String(body.monthKey ?? url.searchParams.get("monthKey") ?? "");
   const { venueId, workspaceId, account } = context;
   for (const [key, expected] of Object.entries({ venueId, workspaceId, dataAccountId: account.id })) if ((body[key] ?? url.searchParams.get(key)) != null && Number(body[key] ?? url.searchParams.get(key)) !== expected) return response({ ok: false, code: "UNAVAILABLE" }, 404);
-  if (!/^\d{4}-(?:0[1-9]|1[0-2])$/.test(monthKey)) return response({ ok: false, code: "INVALID_PERIOD" }, 400);
+  if (!(request.method === "GET" && monthKey === "current") && !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(monthKey)) return response({ ok: false, code: "INVALID_PERIOD" }, 400);
   const database = getD1(), asOf = new Date().toISOString();
   // UNION is one SQLite read snapshot, including profile and selected live access.
   const boundarySql = `SELECT json_object('role',vm.role,'permissions',vm.permissions_json,'workspace',v.workspace_id,'dataAccount',v.data_account_id) FROM venues v JOIN workspaces w ON w.id=v.workspace_id AND w.status='active' JOIN venue_memberships vm ON vm.venue_id=v.id AND vm.account_id=? AND vm.status='active' JOIN workspace_memberships wm ON wm.workspace_id=w.id AND wm.account_id=vm.account_id AND wm.status='active' WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND vm.id=?`;
@@ -88,6 +89,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   let stores: Record<string, Row[]>;
   let profile: Row;
   try { profile = row(JSON.parse(profileRow.data_json ?? "{}")); stores = Object.fromEntries(await Promise.all(snapshots.map(async value => { const data = value.key==='bd_sales_events_v1'?await readSalesEvents(database,account.id,value.dataJson):value.key==="bd_stock_movements"?await readStockHistory(database,account.id,value.dataJson):JSON.parse(value.dataJson ?? "[]"); if (!Array.isArray(data)) throw new Error("invalid store"); return [value.key, array(data)]; }))); } catch { return response({ ok: false, code: "MONTH_INPUTS_NEED_REVIEW" }, 422); }
+  if (monthKey === "current") monthKey = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7);
   const closings = stores.bd_month_closings.filter(value => derivedInputBelongs(value, { venueId, workspaceId, dataAccountId: account.id }));
   if (closings.filter(value => value.monthKey === monthKey).length > 1) return response({ ok: false, code: "AMBIGUOUS_MONTH_CLOSING" }, 422);
   const closing = closings.find(value => value.monthKey === monthKey && (value.venueId == null || value.venueId === "primary" || Number(value.venueId) === venueId));
@@ -100,6 +102,16 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   const calculation = calculateVerifiedMonth({ profile, stores, venueId, workspaceId, dataAccountId: account.id, monthKey, asOf });
   const manifest = { version: MONTH_CLOSE_VERSION, scope: { venueId, workspaceId, dataAccountId: account.id }, monthKey, startDate: calculation.startDate, endDate: calculation.endDate, currency: calculation.currency, calculationVersion: MONTH_CLOSE_VERSION, sources: await Promise.all(snapshots.filter(value => value.key !== "bd_month_closings").map(async value => ({ key: value.key, present: value.dataJson != null, updatedAt: value.updatedAt, revision: await monthCloseRevision(value.dataJson) }))), profileRevision: await monthCloseRevision(profileRow.data_json), components: calculation.components };
   const previewRevision = await monthCloseRevision(manifest);
+  if (request.method !== "POST" && url.searchParams.get("view") === "current" && monthKey === venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7)) {
+    const current = currentFinance({ profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
+      revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
+      movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, costInputsAvailable: ["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches"].every(key=>snapshots.some(x=>x.key===key&&x.dataJson!=null)),
+      expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
+      expensesAvailable: snapshots.some(x=>x.key==='bd_finance_expenses'&&x.dataJson!=null), payrollEntriesAvailable: snapshots.some(x=>x.key==='bd_payroll_entries'&&x.dataJson!=null) });
+    const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));
+    const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf}).snapshot;
+    return response({ok:true,report:{...display,...current,inputContract:current},inputManifest:manifest,reasons:current.missing,reasonDetails:[],closureReasons:calculation.reasons,evidenceStatus:"CURRENT"});
+  }
   if (request.method !== "POST") return response({ ok: true, ...calculation, report: calculation.snapshot, inputManifest: manifest, previewRevision, evidenceStatus: "PREVIEW" });
   if (body.previewRevision !== previewRevision) return conflict();
   if (!calculation.eligible) return response({ ok: false, code: "MONTH_NOT_READY", reasons: calculation.reasons }, 422);
