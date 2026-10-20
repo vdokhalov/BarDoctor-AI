@@ -40,7 +40,7 @@ const HTML = `<!doctype html>
       <article><span>Выручка</span><strong id="journal-revenue">—</strong></article><article><span>Чеки</span><strong id="journal-receipts">—</strong></article><article><span>Средний чек</span><strong id="journal-average">—</strong></article>
     </section>
     <p id="journal-metric-note" class="journal-help">По проведённым чекам POS и ручного ввода. Импортные отчёты учитываются отдельно.</p>
-    <link rel="stylesheet" href="/sales-reconciliation.css?v=564"><details class="workspace-card" id="legacy-reconciliation"><summary>Сверить старые продажи с проведёнными партиями</summary>
+    <link rel="stylesheet" href="/sales-reconciliation.css?v=visible-backup"><details class="workspace-card" id="legacy-reconciliation"><summary>Сверить старые продажи с проведёнными партиями</summary>
       <p>Для владельца или управляющего. Нужны подтверждённые данные о том, какие партии полностью покрывают выбранную выручку. Совпадения сумм недостаточно.</p>
       <form id="reconciliation-form">
       <label>С даты <input type="date" id="reconciliation-from" required></label><label>По дату <input type="date" id="reconciliation-to" required></label>
@@ -53,11 +53,17 @@ const HTML = `<!doctype html>
       <label><input type="checkbox" id="reconciliation-coverage" required> Подтверждаю, что выбранные партии полностью покрывают продажи выбранных итогов, без повторного учёта</label>
       <button type="submit">Проверить сверку</button></form>
       <div id="reconciliation-preview" hidden><div id="reconciliation-summary"></div><p>Выручка, чеки, склад и сохранённая себестоимость партий останутся прежними. Будут сохранены связь и основание сверки. Неизвестные расходы других продаж останутся неизвестными.</p>
+      <section aria-labelledby="reconciliation-backup-title"><h3 id="reconciliation-backup-title">Полная резервная копия</h3>
+      <p>Операция: <output id="reconciliation-operation"></output></p><p id="reconciliation-backup-size"></p>
+      <label for="reconciliation-backup-json">Полный JSON без сокращений</label><textarea id="reconciliation-backup-json" readonly rows="14" spellcheck="false" wrap="off"></textarea>
+      <p>Если скачивание недоступно, скопируйте весь JSON в файл и сохраните его. Просмотр или выделение текста сами по себе не сохраняют копию.</p>
+      <button type="button" id="reconciliation-copy">Скопировать полный JSON</button>
+      <button type="button" id="reconciliation-select">Выделить весь JSON для ручного сохранения</button></section>
       <button type="button" id="reconciliation-backup">Скачать исходные данные</button>
-      <label><input type="checkbox" id="reconciliation-backup-saved"> Резервная копия сохранена</label>
+      <label><input type="checkbox" id="reconciliation-backup-saved"> Полный JSON резервной копии сохранён в файл и проверен</label>
       <button type="button" id="reconciliation-apply" disabled>Подтвердить связь</button></div>
       <p id="reconciliation-status" role="status" aria-live="polite"></p>
-    </details><script src="/sales-reconciliation.js?v=preview-bounds" defer></script>
+    </details><script src="/sales-reconciliation.js?v=visible-backup" defer></script>
     <section id="manual-entry" class="workspace-card journal-entry" hidden><h2>Итоги смены</h2><p>Внесите наличные и безналичные продажи. Склад по итоговой сумме не списывается.</p><a class="primary-action" id="manual-sale-link" href="/sales-totals">Ввести итоги смены</a><p><a href="/settings/sales-accounting">Как учитывать продажи →</a></p></section>
     <section id="import-entry" class="journal-entry workspace-card" hidden><h2>Импорт</h2><p>Загрузите внешний отчёт: файл, фото, текст или диктовку. Проверьте сопоставление и складской расход перед проведением.</p><button id="add-sales" class="primary-action" type="button" disabled>Импортировать продажи</button><h3 id="coverage-title" class="sr-only">Обработка импорта</h3><p id="coverage-copy" class="sr-only"></p></section>
     <section id="import-metrics" hidden class="sales-kpis" aria-label="Статус отражения продаж">

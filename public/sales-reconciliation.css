@@ -12,3 +12,6 @@
 #legacy-reconciliation input[type=checkbox] { display: inline-block; width: 20px; height: 20px; min-height: 20px; vertical-align: middle; accent-color: #5946e8; }
 #legacy-reconciliation button { border: 1px solid #dce1eb; background: #fff; color: #302c52; }
 #legacy-reconciliation button[type=submit], #reconciliation-apply { background: #5946e8; color: #fff; border-color: #5946e8; }
+
+#legacy-reconciliation #reconciliation-backup-json { height: 320px; font-family: monospace; font-size: 12px; white-space: pre; overflow: auto; }
+#reconciliation-operation { overflow-wrap: anywhere; }

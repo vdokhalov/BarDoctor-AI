@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {readFileSync,existsSync,mkdirSync} from 'node:fs';
+import {readFileSync,writeFileSync,existsSync,mkdirSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import {createRequire} from 'node:module';
 import {chromium} from 'playwright-core';
@@ -12,16 +12,17 @@ const owner=await r.register('reconciliation-browser@isolated.test'),venueId=own
 r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run('{"currency":"MDL","timezone":"UTC"}',owner.userId);
 const put=(key:string,value:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').run(owner.userId,key,JSON.stringify(value),'2026-10-20T19:00:00Z');
 const revenue={id:'legacy-browser',venueId,date:'2026-10-02',revenue:1000,receipts:10};
-const batch={id:'batch-browser',venueId,shiftId:revenue.id,businessDate:revenue.date,status:'POSTED',costStatus:'FULL',totalTheoreticalCost:180,lines:[{id:'line',salesBatchId:'batch-browser',rawName:'Капучино',menuItemId:'coffee',quantity:20,unit:'порция',processingStatus:'POSTED',currency:'MDL',theoreticalCost:180,recipeSnapshot:{recipeId:'recipe',capturedAt:'2026-10-09T16:00:00Z',ingredients:[{productKey:'coffee',baseQuantityTotal:20,unitCost:9,totalCost:180,costStatus:'KNOWN_VALUE',currency:'MDL'}]}}]};
+const batch={note:'Кириллица  два пробела \n'.repeat(10000)+'END-OF-FULL-CAPTURE',id:'batch-browser',venueId,shiftId:revenue.id,businessDate:revenue.date,status:'POSTED',costStatus:'FULL',totalTheoreticalCost:180,lines:[{id:'line',salesBatchId:'batch-browser',rawName:'Капучино',menuItemId:'coffee',quantity:20,unit:'порция',processingStatus:'POSTED',currency:'MDL',theoreticalCost:180,recipeSnapshot:{recipeId:'recipe',capturedAt:'2026-10-09T16:00:00Z',ingredients:[{productKey:'coffee',baseQuantityTotal:20,unitCost:9,totalCost:180,costStatus:'KNOWN_VALUE',currency:'MDL'}]}}]};
 put('bd_finance_revenue',[revenue]);put('bd_sales_batches',[batch]);
 for(const key of ['bd_sales_documents','bd_sales_events_v1','bd_month_closings','bd_sales_reconciliations_v1','bd_stock_movements'])put(key,[]);
-let loseResponse=false,emptyPreviewOnce=true,previewCalls=0;
+let loseResponse=false,emptyPreviewOnce=true,previewCalls=0;let lastPreview:any=null;
 const server=createServer(async(req,res)=>{try{
  const url=new URL(req.url??'/','http://localhost');let response:Response;
  if(url.pathname==='/api/sales-reconciliation'){
   const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));const body=Buffer.concat(chunks);
   if(body.length&&JSON.parse(body.toString()).action==='preview')previewCalls++;
   response=await (r.api as any).reconcile[req.method??'GET'](new Request(url,{method:req.method,headers:req.headers as HeadersInit,...(body.length?{body}:{})}));
+  if(body.length&&JSON.parse(body.toString()).action==='preview'&&response.status===200)lastPreview=await response.clone().json();
   if(emptyPreviewOnce&&body.length&&JSON.parse(body.toString()).action==='preview'){emptyPreviewOnce=false;res.writeHead(502);res.end();return;}
   if(loseResponse&&body.length&&JSON.parse(body.toString()).action==='apply'&&response.status===201){loseResponse=false;res.writeHead(502,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:false,code:'UPSTREAM_RESPONSE_LOST'}));return;}
  }else if(url.pathname==='/sales-import'){
@@ -48,6 +49,14 @@ try{
  await page.locator('#reconciliation-form button[type=submit]').click();await page.locator('#reconciliation-preview').waitFor({state:'visible'});
  assert.equal(await page.locator('#reconciliation-apply').isDisabled(),true);
  assert.match(await page.locator('#reconciliation-summary').innerText(),/180 MDL/);
+ const visibleBackup=await page.locator('#reconciliation-backup-json').inputValue();assert.equal(visibleBackup,JSON.stringify(lastPreview,null,2));assert.equal(await page.locator('#reconciliation-backup-json').textContent(),visibleBackup);assert.equal(await page.locator('#reconciliation-backup-json').getAttribute('readonly'),'');
+ const full=JSON.parse(visibleBackup);assert.equal(full.backup.before[0].batches[0].note,batch.note);assert.equal(full.backup.before[0].revenue.id,revenue.id);assert.equal(full.previewRevision,lastPreview.previewRevision);assert.equal(full.backupRevision,lastPreview.backupRevision);assert.equal(await page.locator('#reconciliation-operation').innerText(),full.operationId);
+ await page.locator('#reconciliation-backup-saved').check();assert.equal(await page.locator('#reconciliation-apply').isDisabled(),true);await page.locator('#reconciliation-backup-saved').uncheck();
+ await page.locator('#reconciliation-select').click();assert.equal(await page.locator('#reconciliation-apply').isDisabled(),true);
+ assert.equal(await page.locator('#reconciliation-backup-json').evaluate((e:HTMLTextAreaElement)=>e.selectionEnd-e.selectionStart),visibleBackup.length);
+ mkdirSync('/workspace/checkpoint/reconciliation-visible-backup',{recursive:true});writeFileSync('/workspace/checkpoint/reconciliation-visible-backup/manual-backup.json',visibleBackup);assert.deepEqual(JSON.parse(readFileSync('/workspace/checkpoint/reconciliation-visible-backup/manual-backup.json','utf8')),lastPreview);
+ await page.locator('#reconciliation-backup-saved').check();assert.equal(await page.locator('#reconciliation-apply').isDisabled(),false);await page.locator('#reconciliation-backup-saved').uncheck();assert.equal(await page.locator('#reconciliation-apply').isDisabled(),true);
+
  const downloadPromise=page.waitForEvent('download');await page.locator('#reconciliation-backup').click();const download=await downloadPromise;const backup=JSON.parse(readFileSync((await download.path())!,'utf8'));assert.equal(backup.backup.before[0].revenue.revenue,1000);
  await page.locator('#reconciliation-backup-saved').check();
  put('bd_finance_revenue',[{...revenue,revenue:1001}]);await page.locator('#reconciliation-apply').click();await page.getByRole('button',{name:'Проверить результат операции'}).waitFor();
@@ -57,7 +66,7 @@ try{
  assert.equal(r.sqlite.prepare("SELECT count(*) n FROM audit_log WHERE action='legacy_sales.reconcile'").get()!.n,1);
  assert.deepEqual(JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_stock_movements'").get(owner.userId)!.data_json)),[]);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
- mkdirSync('/workspace/checkpoint/reconciliation-preview-recovery',{recursive:true});await page.screenshot({path:'/workspace/checkpoint/reconciliation-preview-recovery/browser-390.png',fullPage:true});
- console.log('PASS: empty preview response preserves form/operation ID and no automatic retry; 390px journal component, selection/preview, backup gate/download, stale preview rejected, uncertain committed response resolved by status, one audit, stock unchanged, no horizontal overflow.');
+ mkdirSync('/workspace/checkpoint/reconciliation-visible-backup',{recursive:true});await page.screenshot({path:'/workspace/checkpoint/reconciliation-visible-backup/browser-390.png',fullPage:true});
+ console.log('PASS: full visible JSON >200KB exact including whitespace/IDs/revisions, manual file save and mandatory export+ack; empty preview response preserves form/operation ID and no automatic retry; 390px journal component, selection/preview, backup gate/download, stale preview rejected, uncertain committed response resolved by status, one audit, stock unchanged, no horizontal overflow.');
  await context.close();
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));r.close();}
