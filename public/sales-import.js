@@ -347,7 +347,7 @@
     var batch = state.batch; if (!batch) return;
     header("Проверка продаж · "+journal.receiptNumber(batch), "ПРОДАЖИ ЗА " + formatDateShort(batch.businessDate).toUpperCase(), batch.status);
     var menu = (state.payload && state.payload.menu) || [];
-    var canMap = state.payload && state.payload.capabilities && state.payload.capabilities.manageMapping;
+    var canMap = batch.source !== "MANUAL_GRID" && state.payload && state.payload.capabilities && state.payload.capabilities.manageMapping;
     var mappingCount = batch.lines.filter(function (line) { return line.errorCode === "NEEDS_MAPPING"; }).length;
     var noRecipeCount = batch.lines.filter(function (line) { return line.errorCode === "NO_RECIPE"; }).length;
     var readyCount = batch.readyLineCount + batch.postedLineCount;
@@ -362,8 +362,8 @@
       editorBody.prepend(table);
       if(warning){warning.innerHTML='<b>'+batch.blockedLineCount+' '+plural(batch.blockedLineCount,'позиция требует','позиции требуют','позиций требуют')+' внимания</b><span>Исправьте выделенные строки. Остальные позиции сохранят свою текущую обработку.</span><button type="button" id="review-import-issues">Перейти к исправлению</button>';editorBody.prepend(warning);}
     }
-    var caps = state.payload && state.payload.capabilities || {}; var editable = ["DRAFT", "READY", "PARTIALLY_BLOCKED"].includes(batch.status);
-    editorFooter.innerHTML = '<div><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы</b><span>Складской расход и себестоимость будут рассчитаны при проведении</span></div><div class="footer-actions">' + (editable ? '<button id="save-preview" class="secondary" type="button">Сохранить черновик</button>' : "") + (batch.postedLineCount && batch.status !== "REVERSED" && caps.reverse ? '<button id="reverse-batch" class="secondary danger-text" type="button">Отменить проведение</button>' : "") + (editable && batch.readyLineCount && caps.post ? '<button id="post-batch" class="primary" type="button">Провести продажи</button>' : "") + '</div>';
+    var caps = state.payload && state.payload.capabilities || {}; var editable = batch.source !== "MANUAL_GRID" && ["DRAFT", "READY", "PARTIALLY_BLOCKED"].includes(batch.status);
+    editorFooter.innerHTML = '<div><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы</b><span>Складской расход и себестоимость будут рассчитаны при проведении</span></div><div class="footer-actions">' + (editable ? '<button id="save-preview" class="secondary" type="button">Сохранить черновик</button>' : "") + (batch.source !== "MANUAL_GRID" && batch.postedLineCount && batch.status !== "REVERSED" && caps.reverse ? '<button id="reverse-batch" class="secondary danger-text" type="button">Отменить проведение</button>' : "") + (editable && batch.readyLineCount && caps.post ? '<button id="post-batch" class="primary" type="button">Провести продажи</button>' : "") + '</div>';
   }
   function mapLine(select) {
     if (!select.value) return;
@@ -508,8 +508,8 @@
       state.payload.shifts=[...(context.shifts || []),...(state.payload.shifts || [])];
       document.getElementById('journal-venue').textContent=context.venueName || 'Ваше заведение';
       document.getElementById('open-cashier').hidden=!context.permissions.post;
-      document.getElementById('manual-sale-link').hidden=!context.permissions.post||!context.workday?.ok;
-      document.querySelector('[data-source="manual"]').hidden=!state.payload.capabilities.create;
+      document.getElementById('manual-sale-link').hidden=false;
+      var legacyManual=document.querySelector('[data-source="manual"]');if(legacyManual)legacyManual.hidden=true;
       var open=context.shifts.filter(function(s){return s.closingStatus==='open';});
       document.getElementById('pos-shift-status').textContent=!context.workday?.ok?'Рабочий день не открыт · откройте его с командой в разделе Смены':open.length?'Открытые кассовые смены: '+open.map(function(s){return s.shiftName;}).join(' · '):'Кассовая смена закрыта · откройте её в кассе';
       var drafts=[];

@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, SalesAccountingError, parseSalesAccounting, assertSalesSource } from "../../../lib/bardoctor/sales-accounting";
 import {readPosOrders} from '../../../lib/bardoctor/pos-order-storage';
 import {readSaleEvent,readSalesEvents,readRecentSalesEvents,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
 import {readSaleStock,saleStockStatements,stockStoreStatements} from "../../../lib/bardoctor/stock-storage";
@@ -22,7 +23,7 @@ import { SALES_EVENT_STORE_KEY, EVENT_REVENUE_SOURCE, planSalesEvent, planRevers
 
 import { menuTaxonomyPresentation, canonicalTaxonomyForAssortment } from "../../../lib/bardoctor/nomenclature-taxonomy";
 
-const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY,OPERATIONAL_REPORT_STORE_KEY];
+const keys = ["bd_assortment_v1","bd_stock_movements",SALES_EVENT_STORE_KEY,"bd_finance_revenue","bd_sales_mappings","bd_sales_warehouse_routes","bd_warehouses","bd_month_closings",POS_ORDER_STORE_KEY,OPERATIONAL_REPORT_STORE_KEY,SALES_ACCOUNTING_KEY];
 const reply = (data: unknown,status=200) => Response.json(data,{ status,headers:{ "Cache-Control":"private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector,revenueRowId?:string,history?:{recent?:boolean;actorId?:number;externalId?:string;shiftId?:string}) {
   const db = getD1(), snapshots = await readStoreSnapshots(db,account.id,keys);
@@ -42,6 +43,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   return { db,snapshots,context,eventRevision:selected.revision, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders:await readPosOrders(db,account.id,snapshots.find(s=>s.key===POS_ORDER_STORE_KEY)?.dataJson,{open:true}) };
 }
 function controlled(error:unknown) {
+  if(error instanceof SalesAccountingError)return reply({ok:false,code:error.code,error:error.message},409);
   if (error instanceof Error && error.message === "SALES_EVENT_MONTH_LOCKED") return reply({ok:false,code:"MONTH_LOCKED",error:"Период продажи или возврата закрыт. Сначала откройте его в мастере закрытия месяца."},423);
   if (error instanceof SyntaxError) return reply({ok:false,code:"SALES_EVENT_STORE_NEEDS_REVIEW",error:"Данные требуют проверки. Ничего не изменено."},409);
   if (error instanceof Error && /^(STOCK_JOURNAL_|SALES_EVENT_|POS_ORDER_|POS_CASH_|POS_SHIFT_|POS_DISCOUNT_)/.test(error.message)) {
@@ -104,6 +106,7 @@ async function command(request:Request):Promise<Response> {
       const plan = await planSalesEvent(c,body.command);
       if (plan.duplicate && !canReadPosSaleHistory(c.actor,plan.event)) return reply({ok:false,code:"ACCESS_DENIED"},403);
       accountingMonth = plan.event.businessDate.slice(0,7);
+      if(!plan.duplicate)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),c.venueId),c.revenues,c.venueId,plan.event.businessDate,"POS");
       result = {ok:true,duplicate:plan.duplicate,event:account.role === "cashier" ? posSalesEventView(plan.event) : plan.event,previewHash:plan.previewHash};
       if (!plan.duplicate) { const gate=posWorkdayGate(workdays,c.venueId,plan.event.businessDate); if(!gate.ok)return reply(gate,409); if(!body.command.shiftId)return reply({ok:false,code:"SALES_EVENT_SHIFT_NOT_FOUND",error:"Откройте связанную кассу рабочего дня."},409); }
       if (body.action === "preview" || plan.duplicate) return reply(result);
@@ -126,6 +129,7 @@ async function command(request:Request):Promise<Response> {
       const active=workdays.filter(row=>row?.venueId===c.venueId&&row.workdayStatus==="OPEN");
       if(body.action==="open_shift"&&!original){const other=c.revenues.find(r=>r.venueId===c.venueId&&r.closingStatus==="open");if(other)return reply({ok:false,code:"SALES_EVENT_SHIFT_ALREADY_OPEN",error:"Сначала закройте кассу «"+String(other.shiftName||other.id)+"» за "+String(other.date)+".",blockingCash:{id:other.id,date:other.date,name:other.shiftName,href:"/cashier?venue="+c.venueId}},409);}
       if(body.action==="open_shift"&&!original&&active.length>1)return reply({ok:false,code:"WORKDAY_NEEDS_REVIEW",error:"Найдены несколько открытых рабочих смен."},409);
+      if(body.action==="open_shift"&&!original)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),c.venueId),c.revenues,c.venueId,String(active[0]?.date??venueDate(c.now,c.timezone)),"POS");
       let revenues=planSalesShift(c,body.action as "open_shift"|"close_shift",body.shiftId,body.name,body.action==="open_shift"?active[0]?.date:undefined);
       if (revenues===c.revenues) {
         if (body.action==="open_shift" && body.openingFloat!==undefined && body.openingFloat!==original?.openingFloat) return reply({ok:false,code:"SALES_EVENT_IDEMPOTENCY_CONFLICT"},409);

@@ -51,6 +51,8 @@
     "/finance/settings": { type: "settings", title: "Настройки финансов", parent: "/finance" },
     "/notifications": { type: "list", title: "Уведомления", parent: "/more" },
     "/cashier": { type: "module", title: "Продажи · Касса", parent: "/sales-import", shell: "standard", bottomNav: true },
+    "/sales-totals": { type: "create", title: "Итоги дня", parent: "/sales-import", shell: "fullscreen", bottomNav: false, headerMode: "owned" },
+    "/settings/sales-accounting": { type: "settings", title: "Учёт продаж", parent: "/settings", shell: "fullscreen", bottomNav: false, headerMode: "owned" },
     "/sales-entry": { type: "list", title: "Продажи", parent: "/sales-import", shell: "fullscreen", bottomNav: false, headerMode: "owned" },
     "/sales-import": { type: "module", title: "Продажи", parent: "/more", shell: "standard", bottomNav: true },
     "/supplier-alternatives": { type: "list", title: "Новые поставщики", parent: "/suppliers" },

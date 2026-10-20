@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, parseSalesAccounting, managedRevenueMutation } from "../../../../lib/bardoctor/sales-accounting";
 import {getD1} from "../../../../db";
 import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
@@ -202,6 +203,11 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
   }
   if (key === "bd_finance_revenue" && eventRevenueMutation(array(before), array(after))) {
     return Response.json({ ok:false, code:"SALES_EVENT_REVENUE_PROTECTED", error:"Выручка продаж изменяется только проведением или полным возвратом продажи. Смену продаж закройте в разделе ввода продаж." },{status:409});
+  }
+  if(key === "bd_finance_revenue") {
+    const state=await getD1().prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?").bind(account.id,SALES_ACCOUNTING_KEY).first<{data_json:string}>();
+    const setting=parseSalesAccounting(state?JSON.parse(state.data_json):null,account.venueId);
+    if(managedRevenueMutation(array(before) as Record<string,unknown>[],array(after) as Record<string,unknown>[],setting))return Response.json({ok:false,code:"MANUAL_TOTALS_PROTECTED",error:"Итоги дня изменяются только через форму ручных итогов с сохранением истории."},{status:409});
   }
   const accountingCurrency = accountingCurrencyFromRestaurantJson(account.restaurantJson);
   if (VENUE_CURRENCY_ARRAY_STORE_KEYS.has(key)) {

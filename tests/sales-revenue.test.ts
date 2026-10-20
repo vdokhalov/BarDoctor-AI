@@ -37,7 +37,7 @@ test("confirmed sales create one daily finance row and aggregate multiple regist
   assert.deepEqual(result.revenueRecord.salesSourceSystems, ["POS", "POS 2"]);
 });
 
-test("POS revenue updates the existing daily shift instead of double-counting it", () => {
+test("POS import cannot silently replace an existing manual daily shift", () => {
   const result = reconcileSalesRevenue({
     revenues: [{
       id: "manual-shift",
@@ -53,15 +53,9 @@ test("POS revenue updates the existing daily shift instead of double-counting it
     document: sale(),
     now: "2026-08-11T10:00:00.000Z",
   });
-  assert.equal(result.ok, true);
-  if (!result.ok) return;
-  assert.equal(result.revenues.length, 1);
-  assert.equal(result.revenueRecord.id, "manual-shift");
-  assert.equal(result.revenueRecord.revenue, 300);
-  assert.equal(result.revenueRecord.receipts, 10);
-  assert.equal(result.revenueRecord.guests, 14);
-  assert.equal(result.revenueRecord.note, "night");
-  assert.deepEqual(result.revenueRecord.staffing, [{ employeeId: "e-1" }]);
+  assert.equal(result.ok, false);
+  if(result.ok)return;
+  assert.equal(result.code,"REVENUE_DATE_CONFLICT");
 });
 
 test("sales document identity prevents duplicate revenue inside reconciliation", () => {

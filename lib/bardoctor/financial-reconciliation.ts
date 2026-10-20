@@ -197,6 +197,13 @@ export function historicalPeriodCost(input: {
   };
   for (const revenue of revenues) {
     const amount = finite(revenue.revenue);
+    if (revenue.revenueSource === "MANUAL_SUMMARY" && revenue.manualTotalsVersion === 1) {
+      const declared = finite(revenue.declaredCost), provenance = row(revenue.costProvenance);
+      if(declared === null || declared < 0 || provenance.basis !== "OWNER_DECLARED" || currency(provenance.currency) !== expectedCurrency || currency(revenue.currency) !== expectedCurrency) reasons.push("DECLARED_SALES_COST_UNKNOWN");
+      else { cost += declared; day(String(revenue.date)).cost += declared; }
+      if(revenues.some(other=>other!==revenue&&other.date===revenue.date))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
+      continue;
+    }
     if (revenue.revenueSource === "sales_documents") {
       const documentIds = Array.isArray(revenue.salesDocumentIds) ? revenue.salesDocumentIds : [];
       for (const document of rows(input.documents).filter(doc => scope(doc, venueId) && documentIds.includes(doc.id))) {

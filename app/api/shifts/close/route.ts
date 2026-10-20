@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, parseSalesAccounting, managedRevenueMutation } from "../../../../lib/bardoctor/sales-accounting";
 import {readSalesEvents} from '../../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory,stockStoreStatements} from "../../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView, workdayPersonnelChanged } from "../../../../lib/bardoctor/management-workday";
@@ -98,13 +99,14 @@ async function postOnce(request: Request): Promise<Response> {
     return Response.json({ ok: false, code: "SHIFT_VENUE_MISMATCH", error: "Смена относится к другому заведению" }, { status: 403 });
   }
   const database = getD1();
-  const casSnapshots = await readStoreSnapshots(database, account.id, [REVENUE_STORE_KEY, WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY, OPERATIONAL_REPORT_STORE_KEY, "bd_cases", "bd_sales_events_v1", "bd_sales_documents"]);
+  const casSnapshots = await readStoreSnapshots(database, account.id, [REVENUE_STORE_KEY, WRITE_OFF_STORE_KEY, ASSORTMENT_STORE_KEY, STOCK_MOVEMENT_STORE_KEY, EXPENSE_STORE_KEY, MONTH_CLOSING_STORE_KEY, OPERATIONAL_REPORT_STORE_KEY, "bd_cases", "bd_sales_events_v1", "bd_sales_documents", SALES_ACCOUNTING_KEY]);
   const read = (key: string, fallback: unknown): unknown => {
     const raw = casSnapshots.find(snapshot => snapshot.key === key)?.dataJson;
     return raw == null ? fallback : JSON.parse(raw);
   };
   try {
     for (const snapshot of casSnapshots) {
+      if(snapshot.key===SALES_ACCOUNTING_KEY)continue;
       if (snapshot.dataJson == null) continue;
       const value = snapshot.key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(database,account.id,snapshot.dataJson)
         : snapshot.key==="bd_sales_events_v1" ? await readSalesEvents(database,account.id,snapshot.dataJson) : JSON.parse(snapshot.dataJson);
@@ -149,6 +151,7 @@ async function postOnce(request: Request): Promise<Response> {
       : 422;
     return Response.json(result, { status });
   }
+  if(managedRevenueMutation(stores.revenues as Record<string,unknown>[],result.revenues as Record<string,unknown>[],parseSalesAccounting(read(SALES_ACCOUNTING_KEY,null),account.venueId)))return Response.json({ok:false,code:"MANUAL_TOTALS_PROTECTED",error:"Выручку внесите через форму итогов дня. Операционные данные сохраняются отдельно."},{status:409});
   if(!canReadManagementWorkday(account)&&[...compareStoreData(stores.revenues,result.revenues),...compareStoreData(stores.reports,result.reports)].some(m=>workdayPersonnelChanged(m.before,m.after)))return Response.json({ok:false,code:"WORKDAY_PERSONNEL_PROTECTED",error:"Нет доступа к изменению команды или ФОТ. Кадровые данные сохранены без изменений."},{status:403});
   if (result.idempotent) {
     return Response.json({

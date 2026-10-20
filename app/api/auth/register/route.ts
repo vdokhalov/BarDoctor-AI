@@ -1,6 +1,7 @@
+import { SALES_ACCOUNTING_KEY, initialSalesAccounting } from "../../../../lib/bardoctor/sales-accounting";
 import { eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
-import { accounts } from "../../../../db/schema";
+import { accounts, domainData, venues } from "../../../../db/schema";
 import {
   authResult,
   ensureOwnerVenue,
@@ -105,6 +106,8 @@ export async function POST(request: Request): Promise<Response> {
       }
     } else {
       await ensureOwnerVenue(account);
+      const [createdVenue]=await getDb().select().from(venues).where(eq(venues.dataAccountId,account.id)).limit(1);
+      if(createdVenue)await getDb().insert(domainData).values({accountId:account.id,storeKey:SALES_ACCOUNTING_KEY,dataJson:JSON.stringify(initialSalesAccounting(createdVenue.id,now,account.id)),updatedAt:now}).onConflictDoNothing();
     }
 
     const token = await issueSession(account);

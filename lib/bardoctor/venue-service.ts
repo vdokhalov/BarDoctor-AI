@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, initialSalesAccounting } from "./sales-accounting";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "../../db";
 import {
@@ -78,11 +79,11 @@ export async function createVenueForOwner(
 
     await db
       .insert(domainData)
-      .values(authoritativeVenueStoreRows({
+      .values([...authoritativeVenueStoreRows({
         dataAccountId,
         venueId: venue.id,
         updatedAt: now,
-      }))
+      }),{accountId:dataAccountId,storeKey:SALES_ACCOUNTING_KEY,dataJson:JSON.stringify(initialSalesAccounting(venue.id,now,actor.actorAccountId)),updatedAt:now}])
       .onConflictDoNothing({ target: [domainData.accountId, domainData.storeKey] });
 
     await reconcileVenueOwnerAccess(venue.id);

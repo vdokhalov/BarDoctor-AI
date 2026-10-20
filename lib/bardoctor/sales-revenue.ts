@@ -47,7 +47,7 @@ export function reconcileSalesRevenue(input: {
   const byId = new Map<string, JsonRecord>();
   for (const value of [...input.salesDocuments, input.document]) {
     const item = record(value);
-    if (!item || item.status !== "confirmed" || item.date !== input.document.date) continue;
+    if (!item || item.status !== "confirmed" || item.date !== input.document.date || input.document.venueId != null && item.venueId != null && item.venueId !== input.document.venueId) continue;
     const id = String(item.id ?? "").trim();
     if (id) byId.set(id, item);
   }
@@ -62,7 +62,7 @@ export function reconcileSalesRevenue(input: {
   const matching = input.revenues
     .map((value, index) => ({ value: record(value), index }))
     .filter((item): item is { value: JsonRecord; index: number } =>
-      Boolean(item.value && item.value.date === input.document.date)
+      Boolean(item.value && item.value.date === input.document.date && (input.document.venueId == null || item.value.venueId == null || item.value.venueId === input.document.venueId))
     );
   if (matching.length > 1) {
     return {
@@ -73,6 +73,7 @@ export function reconcileSalesRevenue(input: {
   }
 
   const previous = matching[0]?.value ?? null;
+  if(previous && previous.revenueSource !== "sales_documents")return {ok:false,code:"REVENUE_DATE_CONFLICT",error:"За эту дату уже сохранена выручка другого источника. Отчёт требует отдельной сверки."};
   const sourceSystems = [...new Set(
     dailyDocuments.map((item) => String(item.sourceSystem ?? "").trim()).filter(Boolean),
   )].sort();
@@ -85,6 +86,8 @@ export function reconcileSalesRevenue(input: {
     revenue,
     receipts: knownChecks.length ? receipts : money(previous?.receipts),
     revenueSource: "sales_documents",
+    currency: input.document.currency,
+    ...(input.document.venueId != null ? {venueId:input.document.venueId} : {}),
     salesDocumentIds,
     salesSourceSystems: sourceSystems,
     createdAt: previous?.createdAt ?? input.now,

@@ -1,3 +1,6 @@
+import { accountingCurrencyFromRestaurantJson } from "../../../../lib/bardoctor/currency";
+import { posMembershipGuard } from "../../../../lib/bardoctor/pos-auth-guard";
+import { SALES_ACCOUNTING_KEY, SalesAccountingError, parseSalesAccounting, assertSalesSource, manualImportReplacement, accountingRows } from "../../../../lib/bardoctor/sales-accounting";
 import {readStockHistory,readSaleStock,stockStoreStatements,stockMovementResponse} from "../../../../lib/bardoctor/stock-storage";
 import { venueTimeFromJson, venueDate } from "../../../../lib/bardoctor/venue-time";
 import { getD1 } from "../../../../db";
@@ -65,6 +68,8 @@ async function postOnce(request: Request): Promise<Response> {
   if (!document.items.length) return Response.json({ ok: false, error: "В отчёте нет проданных позиций" }, { status: 422 });
   if (document.venueId && document.venueId !== account.venueId) return Response.json({ ok: false, code: "SALES_VENUE_MISMATCH", error: "Отчёт относится к другому заведению" }, { status: 403 });
 
+  document.venueId = account.venueId;
+
   const database = getD1();
   const casSnapshots = await readStoreSnapshots(database, account.id, [
     SALES_DOCUMENT_STORE_KEY,
@@ -75,7 +80,7 @@ async function postOnce(request: Request): Promise<Response> {
     STOCK_MOVEMENT_STORE_KEY,
     WAREHOUSE_STORE_KEY,
     MONTH_CLOSING_STORE_KEY,
-    REVENUE_STORE_KEY,
+    REVENUE_STORE_KEY, SALES_ACCOUNTING_KEY, "bd_sales_import_review_v1",
   ]);
   const result = await database.prepare(`
     SELECT store_key, data_json FROM domain_data
@@ -102,9 +107,23 @@ async function postOnce(request: Request): Promise<Response> {
   const warehouses = array(stores.get(WAREHOUSE_STORE_KEY));
   const revenues = array(stores.get(REVENUE_STORE_KEY));
   const closed = closedMonthsFromStore(parse(stores.get(MONTH_CLOSING_STORE_KEY), null));
-  if (closed.has(document.date.slice(0, 7))) return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${document.date.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
+  const setting=parseSalesAccounting(JSON.parse(casSnapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),account.venueId);
   const duplicateDocument = documents.find((value) => record(value).id === document.id);
   if (duplicateDocument) return Response.json({ ok: true, duplicate: true, document: duplicateDocument, documents, assortment, ...stockMovementResponse(stockMovements,stockMovements,false) });
+  const pending=accountingRows(JSON.parse(casSnapshots.find(s=>s.key==="bd_sales_import_review_v1")?.dataJson??"[]"));
+  let replacement: ReturnType<typeof manualImportReplacement> = null;
+  try { replacement=manualImportReplacement({revenues:revenues.map(record),venueId:account.venueId,date:document.date,role:account.role,request:body.replacement,stagedDocument:pending.find(x=>x.id===document.id&&x.status==="AWAITING_RECONCILIATION")?.document,document}); }
+  catch(error){if(error instanceof SalesAccountingError)return Response.json({ok:false,code:error.code,error:error.message},{status:error.code==="ACCESS_DENIED"?403:409});throw error;}
+  try { if(document.currency!==accountingCurrencyFromRestaurantJson(account.restaurantJson))throw new SalesAccountingError("IMPORT_CURRENCY_CONFLICT","Валюта импорта отличается от валюты заведения. Требуется сверка."); if(closed.has(document.date.slice(0,7)))throw new SalesAccountingError("MONTH_LOCKED","Месяц закрыт. Импорт сохранён для сверки после открытия периода."); if(!replacement){assertSalesSource(setting,revenues.map(record),account.venueId,document.date,"IMPORT");
+    if(revenues.some(x=>record(x).date===document.date&&record(x).revenueSource==="sales_documents"))throw new SalesAccountingError("ACCOUNTING_SOURCE_CONFLICT","За день уже есть импортный отчёт. Требуется сверка покрытия.");
+  } } catch(error) {
+    if(!(error instanceof SalesAccountingError))throw error;
+    const existing=pending.find(x=>x.id===document.id);
+    if(existing && JSON.stringify(existing.document)!==JSON.stringify(document))return Response.json({ok:false,code:"IMPORT_REVISION_CONFLICT",error:"Этот импорт уже ожидает сверки с другим содержимым."},{status:409});
+    if(!existing){const staged={id:document.id,venueId:account.venueId,date:document.date,status:"AWAITING_RECONCILIATION",document,conflict:error.code,createdAt:now};
+      await runStoreCasBatch(database,account.id,casSnapshots,[posMembershipGuard(database,account,now),upsertStore(database,account.id,"bd_sales_import_review_v1",[...pending,staged],now),database.prepare("INSERT INTO audit_log(account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(account.id,"bd_sales_import_review_v1","sales_import.staged",document.id,"Импорт для сверки",document.date.slice(0,7),null,JSON.stringify(staged),'["status"]',account.firstName,account.role,"Конфликт источников выручки",now)],now);}
+    return Response.json({ok:false,staged:true,stagedId:document.id,code:error.code,error:"Импорт сохранён для сверки. Выручка и склад не изменены."},{status:409});
+  }
 
   const actor = {
     accountId: account.actorAccountId,
@@ -152,10 +171,14 @@ async function postOnce(request: Request): Promise<Response> {
   });
   if (!posted.ok) return Response.json(posted, { status: 422 });
   const confirmedDocument = { ...document, internalId: document.id, status: "confirmed" as const, confirmedAt: now, createdAt: document.createdAt ?? now, updatedAt: now, salesBatchId: posted.batch.id };
-  const revenue = reconcileSalesRevenue({ revenues, salesDocuments: documents, document: confirmedDocument, now });
+  const revenue = reconcileSalesRevenue({ revenues:replacement?.revenues??revenues, salesDocuments: documents, document: confirmedDocument, now });
   if (!revenue.ok) return Response.json({ ok: false, code: revenue.code, error: revenue.error }, { status: 409 });
+  if(replacement)Object.assign(revenue.revenueRecord,{venueId:account.venueId,sourceReplacementVersion:1,sourceHistory:[{source:"MANUAL_SUMMARY",snapshot:replacement.previous,replacedAt:now,actorId:account.actorAccountId,reason:replacement.reason}]});
   const nextDocuments = [confirmedDocument, ...documents];
   await runStoreCasBatch(database, account.id, casSnapshots, [
+    posMembershipGuard(database,account,now),
+    ...(replacement?[upsertStore(database,account.id,"bd_sales_import_review_v1",pending.map(x=>x.id===document.id?{...x,status:"RECONCILED",resolvedAt:now,resolvedBy:account.actorAccountId}:x),now),
+      database.prepare("INSERT INTO audit_log(account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(account.id,REVENUE_STORE_KEY,"sales_source.replaced",String(replacement.previous.id),"Замена ручных итогов импортом",document.date.slice(0,7),JSON.stringify(replacement.previous),JSON.stringify(revenue.revenueRecord),'["revenueSource","revenue"]',actor.name,actor.role,replacement.reason,now)]:[]),
     upsertStore(database, account.id, SALES_DOCUMENT_STORE_KEY, nextDocuments, now),
     upsertStore(database, account.id, SALES_BATCH_STORE_KEY, posted.batches, now),
     upsertStore(database, account.id, ASSORTMENT_STORE_KEY, posted.assortment, now),

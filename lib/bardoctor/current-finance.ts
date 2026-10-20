@@ -41,7 +41,7 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  return {...value,startDate,endDate,missing,missingPayrollDates,knownPayrollSubtotal,resultBeforeCost,
   result:resultBeforeCost,preliminaryResult:resultBeforeCost,financeInputsKnown:missing.length===0,
   currentFinance:true,asOfDate:endDate,operatingResult:null,isClosed:false,
-  resultAfterCost,costOfGoods:costKnown?history.cost:null,inventoryAdjustmentNet:adjustmentsKnown?history.adjustment:null,financeAssessmentMissing,costReasons:[...history.reasons,...(!sourcesKnown?["COST_SOURCE_UNAVAILABLE"]:[])],
+  resultAfterCost,costBasis:value.revenueRows.some(x=>x.manualTotalsVersion===1)?value.revenueRows.every(x=>x.manualTotalsVersion===1)?"OWNER_DECLARED":"MIXED":"CAPTURED",costOfGoods:costKnown?history.cost:null,inventoryAdjustmentNet:adjustmentsKnown?history.adjustment:null,financeAssessmentMissing,costReasons:[...history.reasons,...(!sourcesKnown?["COST_SOURCE_UNAVAILABLE"]:[])],
   financeAssessmentInformation:[...missing.map(code=>labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
   purchasePayments,cashResult:resultBeforeCost!=null&&purchasePayments!=null?Math.round((resultBeforeCost-purchasePayments)*100)/100:null,
   missingInformation:missing.map(code=>labels[code]??code),

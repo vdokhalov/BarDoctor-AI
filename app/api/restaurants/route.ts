@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, initialSalesAccounting } from "../../../lib/bardoctor/sales-accounting";
 import { eq } from "drizzle-orm";
 import { getD1, getDb } from "../../../db";
 import { accounts, auditLog } from "../../../db/schema";
@@ -47,7 +48,7 @@ export async function POST(request: Request): Promise<Response> {
       SELECT store_key, data_json
       FROM domain_data
       WHERE account_id = ?
-        AND store_key IN ('bd_purchase_documents', 'bd_finance_expenses', 'bd_stock_movements', 'bd_sales_batches', 'bd_payroll')
+        AND store_key IN ('bd_purchase_documents', 'bd_finance_expenses', 'bd_stock_movements', 'bd_sales_batches', 'bd_payroll', 'bd_finance_revenue')
     `).bind(account.id).all<{ store_key: string; data_json: string }>();
     const hasFinancialHistory = (rows.results ?? []).some((row) => {
       try {
@@ -85,6 +86,11 @@ export async function POST(request: Request): Promise<Response> {
     .set({ restaurantJson: JSON.stringify(restaurant), updatedAt })
     .where(eq(accounts.id, account.id));
 
+  if (!before) {
+    await getD1().prepare(`INSERT OR IGNORE INTO domain_data(account_id,store_key,data_json,updated_at)
+      SELECT ?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM domain_data WHERE account_id=? AND store_key IN ('bd_finance_revenue','bd_sales_documents','bd_sales_batches','bd_sales_events_v1') AND data_json NOT IN ('[]','null'))`)
+      .bind(account.id,SALES_ACCOUNTING_KEY,JSON.stringify(initialSalesAccounting(account.venueId,updatedAt,account.actorAccountId)),updatedAt,account.id).run();
+  }
   if (mutations.length > 0) {
     const actorName =
       [account.firstName, account.lastName].filter(Boolean).join(" ") || account.appEmail;

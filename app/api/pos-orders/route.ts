@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, SalesAccountingError, parseSalesAccounting, assertSalesSource } from "../../../lib/bardoctor/sales-accounting";
 import {readPosOrders,posOrderMarker,posOrderStatements} from '../../../lib/bardoctor/pos-order-storage';
 import { preparationOrderView, preparationConfig, preparationKey } from '../../../lib/bardoctor/pos-preparation';
 import {readSaleEvent,readOrderPaymentFacts,salesEventStatements,type EventSelector} from '../../../lib/bardoctor/sales-event-storage';
@@ -18,7 +19,7 @@ import { POS_DISCOUNT_STORE_KEY, parsePosDiscountRules } from "../../../lib/bard
 import { posSalesEventView } from "../../../lib/bardoctor/pos-shift-report";
 import { POS_ORDER_STORE_KEY, parsePosOrders, posOrderViews, posOrderAccountViews, posOrderCancellationDayAllowed, planPosOrder, type PosOrderCommand, type PosOrderContext } from "../../../lib/bardoctor/pos-orders";
 
-const keys = ["bd_inventory_writeoffs","bd_finance_expenses",POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY];
+const keys = ["bd_inventory_writeoffs","bd_finance_expenses",POS_ORDER_STORE_KEY, POS_DISCOUNT_STORE_KEY, "bd_assortment_v1", "bd_stock_movements", SALES_EVENT_STORE_KEY, "bd_finance_revenue", "bd_sales_mappings", "bd_sales_warehouse_routes", "bd_warehouses", "bd_month_closings", OPERATIONAL_REPORT_STORE_KEY, SALES_ACCOUNTING_KEY];
 const reply = (value: unknown, status = 200) => Response.json(value, { status, headers: { "Cache-Control": "private, no-store" } });
 async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateRequest>>>, documentId?:string, selector?:EventSelector) {
   const db = getD1(), snapshots = await readStoreSnapshots(db, account.id, [...keys,preparationKey(account.venueId)]);
@@ -46,6 +47,7 @@ async function load(account: NonNullable<Awaited<ReturnType<typeof authenticateR
   return { db, snapshots, context, eventRevision:selected.revision, stockRevision:stock.revision, workdays:rows(OPERATIONAL_REPORT_STORE_KEY), orders: parsePosOrders(rows(POS_ORDER_STORE_KEY)) };
 }
 function controlled(error: unknown): Response {
+  if(error instanceof SalesAccountingError)return reply({ok:false,code:error.code,error:error.message},409);
   if (error instanceof SyntaxError) return reply({ ok: false, code: "POS_ORDER_STORE_NEEDS_REVIEW", error: "Данные требуют проверки. Ничего не изменено." }, 409);
   if (error instanceof Error && /^(STOCK_JOURNAL_|POS_ORDER_|POS_DISCOUNT_|SALES_EVENT_)/.test(error.message)) {
     const messages: Record<string, string> = {
@@ -107,6 +109,7 @@ async function command(request: Request): Promise<Response> {
   try {
     const { db, snapshots, context, orders, workdays, stockRevision, eventRevision } = await load(account,undefined,{externalId:`pos-order:${body.orderId}`,source:"POS_API"});
     const plan = await planPosOrder(context, orders, body);
+    if(!plan.duplicate){const shift=context.revenues.find(r=>r.id===plan.order.shiftId);if(shift)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),context.venueId),context.revenues,context.venueId,String(shift.date),"POS");}
     const result = { ok: true, duplicate: plan.duplicate, order: preparationOrderView(plan.order), orders: posOrderViews(context, plan.orders).map(preparationOrderView), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
     if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);

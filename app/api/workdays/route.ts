@@ -1,3 +1,4 @@
+import { SALES_ACCOUNTING_KEY, parseSalesAccounting, salesModeForDate } from "../../../lib/bardoctor/sales-accounting";
 import { workdayPersonalSales, staffingWithPersonalSales } from '../../../lib/bardoctor/workday-personal-sales';
 import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import { authenticatedEvidenceContext } from "../../../lib/bardoctor/evidence-resolver";
@@ -16,7 +17,7 @@ import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { stableSalesValue } from "../../../lib/bardoctor/sales-events";
 import { venueDate, venueClock, venueTimeFromJson } from "../../../lib/bardoctor/venue-time";
 type Row=Record<string,unknown>;
-const keys=[OPERATIONAL_REPORT_STORE_KEY,"bd_finance_revenue","bd_sales_events_v1","bd_sales_documents","bd_employees","bd_payroll_rules","bd_finance_gap_reasons","bd_inventory_writeoffs","bd_cases","bd_month_closings"];
+const keys=[OPERATIONAL_REPORT_STORE_KEY,"bd_finance_revenue","bd_sales_events_v1","bd_sales_documents","bd_employees","bd_payroll_rules","bd_finance_gap_reasons","bd_inventory_writeoffs","bd_cases","bd_month_closings",SALES_ACCOUNTING_KEY];
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{"Cache-Control":"private, no-store"}});
 const validDate=(value:unknown):value is string=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
 async function load(request:Request){
@@ -24,9 +25,9 @@ async function load(request:Request){
  if(!canReadManagementWorkday(account))return {error:reply({ok:false,code:"ACCESS_DENIED"},403)};
  const db=getD1(),snapshots=await readStoreSnapshots(db,account.id,keys),scope={venueId:account.venueId,workspaceId:context.workspaceId,dataAccountId:account.id};
  try{
-  const raw=Object.fromEntries(keys.map(key=>[key,JSON.parse(snapshots.find(s=>s.key===key)?.dataJson??(key==="bd_month_closings"?"null":"[]"))]));
+  const raw=Object.fromEntries(keys.map(key=>[key,JSON.parse(snapshots.find(s=>s.key===key)?.dataJson??(key==="bd_month_closings"||key===SALES_ACCOUNTING_KEY?"null":"[]"))]));
   raw.bd_sales_events_v1=await readSalesEvents(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson);
-  for(const key of keys.filter(k=>k!=="bd_month_closings"))if(!Array.isArray(raw[key])||raw[key].some((r:unknown)=>!r||typeof r!=="object"||Array.isArray(r)))throw Error("Invalid store");
+  for(const key of keys.filter(k=>k!=="bd_month_closings"&&k!==SALES_ACCOUNTING_KEY))if(!Array.isArray(raw[key])||raw[key].some((r:unknown)=>!r||typeof r!=="object"||Array.isArray(r)))throw Error("Invalid store");
   const rows=(key:string)=>scopedBusinessRows(raw[key],scope);
   const profile=record(JSON.parse(account.restaurantJson||"{}"));
   const memberships=(await db.prepare('SELECT account_id,employee_id FROM venue_memberships WHERE venue_id=? AND employee_id IS NOT NULL').bind(account.venueId).all<Row>()).results;
@@ -83,7 +84,7 @@ async function command(request:Request):Promise<Response>{
   for(const [field,count] of [["writeoffs",day.operations.writeOffCount],["incidents",day.operations.incidentCount]] as const)if(record(body.confirmations)[field]!== (count?"recorded":"none"))return reply({ok:false,code:"WORKDAY_OPERATIONS_UNCONFIRMED",error:"Проверьте списания и происшествия; если их не было, подтвердите это явно."},422);
  }
  const actor={accountId:c.account.actorAccountId,name:[c.account.firstName,c.account.lastName].filter(Boolean).join(" "),role:c.account.role};
- const next:Row={...previous,id,venueId:c.account.venueId,date,accountingMonth:date.slice(0,7),staffing:normalized,shiftVenueSales,shiftDepartmentSales,workdayStatus:body.action==="close"?"CLOSED":"OPEN",closingStatus:body.action==="close"?"closed":"open",workdayRevision:Number(previous?.workdayRevision||0)+1,workdayPayrollDraft:payroll,workdayOpenedAt:previous?.workdayOpenedAt||c.now,workdayOpenedBy:previous?.workdayOpenedBy||actor,createdAt:previous?.createdAt||c.now,updatedAt:c.now,workdayReceipts:[...receipts,{id:body.operationId,fingerprint}]};
+ const next:Row={...previous,id,venueId:c.account.venueId,date,accountingMonth:date.slice(0,7),staffing:normalized,shiftVenueSales,shiftDepartmentSales,salesModeSnapshot:previous?.salesModeSnapshot??salesModeForDate(parseSalesAccounting(c.raw[SALES_ACCOUNTING_KEY]??null,c.account.venueId),date),workdayStatus:body.action==="close"?"CLOSED":"OPEN",closingStatus:body.action==="close"?"closed":"open",workdayRevision:Number(previous?.workdayRevision||0)+1,workdayPayrollDraft:payroll,workdayOpenedAt:previous?.workdayOpenedAt||c.now,workdayOpenedBy:previous?.workdayOpenedBy||actor,createdAt:previous?.createdAt||c.now,updatedAt:c.now,workdayReceipts:[...receipts,{id:body.operationId,fingerprint}]};
  next.workdayStartTime=previous?.workdayStartTime||body.startTime||venueClock(c.now,c.timezone);
  if(body.action==="close")Object.assign(next,{payrollBreakdown:payroll.payrollBreakdown,workdayClosedAt:c.now,workdayClosedBy:actor,workdayConfirmations:body.confirmations,workdaySummary:{asOf:c.now,revenue:day.revenue,payroll:payroll.payrollBreakdown,team:normalized.map(staff=>({...staff,name:employees.find(e=>e.id===staff.employeeId)?.name||"Сотрудник"})),operations:day.operations,cashShifts:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null}))}});
  else delete next.payrollBreakdown;
