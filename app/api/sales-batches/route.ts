@@ -409,9 +409,9 @@ async function postOnce(request: Request): Promise<Response> {
   if (originalMonth) return Response.json({ ok: false, code: "MONTH_LOCKED", monthKey: originalMonth, error: `Месяц ${originalMonth} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
 
   if (action === "post") {
-    if(before?.source==="MANUAL_GRID" && before.status!=="POSTED")return Response.json({ok:false,code:"MANUAL_ITEMS_REPLACED",error:"Исторический ручной документ доступен для просмотра. Новые итоги вводятся в форме итогов дня."},{status:409});
+    if(before?.source==="MANUAL_GRID" && before.status!=="POSTED")return Response.json({ok:false,code:"MANUAL_ITEMS_REPLACED",error:"Исторический ручной документ доступен для просмотра. Новые итоги вводятся в форме итогов смены."},{status:409});
     const setting=parseSalesAccounting(JSON.parse(casSnapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),account.venueId);
-    if(before && salesModeForDate(setting,before.businessDate)!=="LEGACY")return Response.json({ok:false,code:"ACCOUNTING_BATCH_STAGED",error:"Импорт сохранён. Для этого дня выбран другой источник выручки; проведение требует отдельной сверки."},{status:409});
+    if(before && (setting?.shiftChanges || salesModeForDate(setting,before.businessDate)!=="LEGACY"))return Response.json({ok:false,code:"ACCOUNTING_BATCH_STAGED",error:"Импорт сохранён. Для этого дня выбран другой источник выручки; проведение требует отдельной сверки."},{status:409});
     if (before && stores.closedMonths.has(before.businessDate.slice(0, 7))) {
       return Response.json({ ok: false, code: "MONTH_LOCKED", error: `Месяц ${before.businessDate.slice(0, 7)} закрыт. Сначала откройте его в мастере закрытия месяца.` }, { status: 423 });
     }
@@ -482,7 +482,7 @@ async function postOnce(request: Request): Promise<Response> {
       notes: text(requested.notes ?? body.notes, "", 1_000) || undefined,
     });
     draft.source = text(requested.source ?? body.source, "MANUAL_GRID", 40) as SalesSource;
-    if(draft.source==="MANUAL_GRID")return Response.json({ok:false,code:"MANUAL_ITEMS_REPLACED",error:"Ручной ввод позиций заменён итогами дня. Выберите способ учёта в настройках заведения."},{status:409});
+    if(draft.source==="MANUAL_GRID")return Response.json({ok:false,code:"MANUAL_ITEMS_REPLACED",error:"Ручной ввод позиций заменён итогами смены. Выберите способ учёта в настройках заведения."},{status:409});
     draft.sourceReference = text(requested.sourceReference ?? body.sourceReference, "", 240) || undefined;
     draft.externalBatchId = text(requested.externalBatchId ?? body.externalBatchId, "", 180) || undefined;
   }

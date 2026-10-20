@@ -44,7 +44,7 @@ function contextCheck(c: SalesEventContext) {
   if (new Set(c.events.map(e => e.id)).size !== c.events.length) fail("HISTORY_NEEDS_REVIEW");
 }
 function revenueCheck(c: SalesEventContext, date: string) {
-  if (c.revenues.some(r => scoped(r,c.venueId) && r.date === date && r.revenueSource !== EVENT_REVENUE_SOURCE)) fail("LEGACY_REVENUE_CONFLICT");
+  if (c.revenues.some(r => scoped(r,c.venueId) && r.date === date && r.revenueSource !== EVENT_REVENUE_SOURCE && !(r.revenueSource === "MANUAL_SUMMARY" && r.manualTotalsVersion === 2 && r.accountingScope === "SHIFT" && r.shiftId === r.id && r.salesModeSnapshot === "MANUAL"))) fail("LEGACY_REVENUE_CONFLICT");
 }
 function shift(c: SalesEventContext, shiftId: string, date?: string) {
   const matches = c.revenues.filter(r => r.id === shiftId && r.venueId === c.venueId);
@@ -195,7 +195,7 @@ export function planSalesShift(c: SalesEventContext, action: "open_shift" | "clo
     if (existing.revenueSource !== EVENT_REVENUE_SOURCE || existing.shiftName !== name) fail("IDEMPOTENCY_CONFLICT");
     return c.revenues;
   }
-  if (c.revenues.some(row => row.venueId === c.venueId && row.revenueSource === EVENT_REVENUE_SOURCE && row.closingStatus === "open")) fail("SHIFT_ALREADY_OPEN");
+  if (c.revenues.some(row => row.venueId === c.venueId && row.closingStatus === "open")) fail("SHIFT_ALREADY_OPEN");
   const timezone = canonicalVenueTimezone(c.timezone) || "UTC";
   const date = workdayDate ?? venueDate(c.now, timezone);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0,10)!==date) fail("SHIFT_DATE_INVALID");
@@ -209,7 +209,7 @@ export function eventRevenueMutation(before: unknown[], after: unknown[]): boole
   const incoming = after.filter(v => v && typeof v === "object") as Row[];
   return incoming.some(r => r.revenueSource === EVENT_REVENUE_SOURCE && !managed.some(m => stableSalesValue(m) === stableSalesValue(r)))
     || managed.some(m => incoming.filter(r => stableSalesValue(m) === stableSalesValue(r)).length !== 1)
-    || incoming.some(r => r.revenueSource !== EVENT_REVENUE_SOURCE && managed.some(m => m.date === r.date && (r.venueId == null || r.venueId === m.venueId)));
+    || incoming.some(r => r.revenueSource !== EVENT_REVENUE_SOURCE && !before.some(old=>stableSalesValue(old)===stableSalesValue(r)) && managed.some(m => m.date === r.date && (r.venueId == null || r.venueId === m.venueId)));
 }
 
 export function salesEventDocuments(events: unknown[], venueId: number) {

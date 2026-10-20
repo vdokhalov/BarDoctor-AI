@@ -15,7 +15,7 @@ body[data-sales-accounting]{background:radial-gradient(circle at 50% -10%,rgba(9
 .accounting-badge{display:inline-block;font-size:11px;font-weight:750;color:#5b5ceb;background:#eeebff;border:1px solid #e1dcff;border-radius:9px;padding:6px 10px;margin-bottom:18px}
 #accounting-totals label{display:block;color:#4b536a;font-size:12px;font-weight:700;margin-bottom:17px}
 #accounting-totals label>small{font-weight:450;font-size:10px;color:#8991a5;margin-left:6px}
-#accounting-totals input,#accounting-totals textarea{width:100%;min-width:0;min-height:49px;border:1px solid #dfe3ee;border-radius:13px;padding:12px 14px;background:#fff;color:#252b41;font:inherit;font-weight:500;font-size:16px;margin-top:8px;box-sizing:border-box}
+#accounting-totals input,#accounting-totals select,#accounting-totals textarea{width:100%;min-width:0;min-height:49px;border:1px solid #dfe3ee;border-radius:13px;padding:12px 14px;background:#fff;color:#252b41;font:inherit;font-weight:500;font-size:16px;margin-top:8px;box-sizing:border-box}
 #accounting-totals input::placeholder{color:#8b94ab}#accounting-totals input:focus,#accounting-totals textarea:focus{outline:2px solid #b6afff;border-color:#6558ec}
 .accounting-pair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.accounting-input{display:flex;align-items:center;border:1px solid #dfe3ee;border-radius:13px;background:#fff;margin-top:8px;min-width:0}
 #accounting-totals .accounting-input input{border:0;background:transparent;margin:0;width:100%;min-width:0}.accounting-input>span{padding-right:12px;font-size:11px;color:#737d94;flex-shrink:0}
@@ -31,3 +31,5 @@ body[data-sales-accounting]{background:radial-gradient(circle at 50% -10%,rgba(9
 #accounting-imports{margin-top:28px;border-top:1px solid #e1e5ef;padding-top:20px}#accounting-imports h2{font-size:18px}#accounting-imports article{padding:14px 0;border-bottom:1px solid #e1e5ef}#accounting-imports .accounting-help{margin:10px 0}#import-reason{width:100%;min-height:76px;border:1px solid #dfe3ee;border-radius:13px;padding:12px;margin:8px 0;font:inherit}#import-reason-label{font-size:13px}
 
 body[data-sales-accounting] .accounting-link{color:#5547ef}
+
+#manual-shift-opening .primary{width:100%;min-height:50px}#legacy-schedule-label{display:block;font-size:13px;line-height:1.5;margin:14px 0}

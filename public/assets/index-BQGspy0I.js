@@ -541,7 +541,7 @@ function bdMenuIngestionValue(value){if(value==null)return"—";if(typeof value=
 async function bdMenuIngestionRequest(body){const response=await fetch("/api/menu/ingestion",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let result;try{result=await response.json()}catch{throw new Error("Сервер не ответил. Повторите попытку: подтверждение защищено от дублей.")}if(!response.ok||!result.ok){const error=new Error(result.error||"Не удалось выполнить сверку меню");error.result=result;throw error}return result}
 function bdOperationalFallback(row,rows){if(!row||!["sales_events_v1","sales_documents"].includes(row.revenueSource))return null;const same=rows.filter(r=>r.date===row.date);return{businessDate:row.date,revenue:{amount:same.reduce((sum,r)=>sum+(Number(r.revenue)||0),0),receipts:same.reduce((sum,r)=>sum+(Number(r.receipts)||0),0),readOnly:true,source:"LEGACY_UNKNOWN",status:same.some(r=>r.closingStatus==="open")?"PROVISIONAL":same.every(r=>r.closingStatus==="closed")?"FINAL":"UNKNOWN"}}}
 /* operational-day-phase1a */
-function bdOperationalRevenueCopy(day){const r=day?.revenue;return r?({BARDOC_POS:"Продажи BarDoctor",MANUAL_SUMMARY:"Дневной отчёт",IMPORT:"Импорт продаж",INTEGRATION:"Интеграция",LEGACY_UNKNOWN:"Исторические данные · источник не определён"}[r.source]||"Источник не определён")+" · "+({PROVISIONAL:"Предварительно",FINAL:"Итог",UNKNOWN:"Статус требует проверки"}[r.status]||"Статус требует проверки"):"Источник уточняется"}
+function bdOperationalRevenueCopy(day){const r=day?.revenue;return r?({BARDOC_POS:"Продажи BarDoctor",MANUAL_SUMMARY:"Ручные итоги",MIXED_SHIFTS:"Итоги смен · касса и ручной ввод",IMPORT:"Импорт продаж",INTEGRATION:"Интеграция",LEGACY_UNKNOWN:"Исторические данные · источник не определён"}[r.source]||"Источник не определён")+" · "+({PROVISIONAL:"Предварительно",FINAL:"Итог",UNKNOWN:"Статус требует проверки"}[r.status]||"Статус требует проверки"):"Источник уточняется"}
 function bdOperationalRows(rows,days){const seen=new Set;return rows.map(row=>{const day=days.find(d=>d.businessDate===row.date?.slice(0,10));if(!day)return row;const first=!seen.has(day.businessDate);seen.add(day.businessDate);return{...row,...(first&&day.report?day.report:{}),_bdOperationalDay:day}})}
 /* purchase-units-v421:start */
 /** Purchase accounting category is not a nomenclature taxonomy or inventory kind.
@@ -2364,11 +2364,11 @@ function historicalPeriodCost(input
   };
   for (const revenue of revenues) {
     const amount = finite(revenue.revenue);
-    if (revenue.revenueSource === "MANUAL_SUMMARY" && revenue.manualTotalsVersion === 1) {
+    if (revenue.revenueSource === "MANUAL_SUMMARY" && [1,2].includes(Number(revenue.manualTotalsVersion))) {
       const declared = finite(revenue.declaredCost), provenance = row(revenue.costProvenance);
       if(declared === null || declared < 0 || provenance.basis !== "OWNER_DECLARED" || currency(provenance.currency) !== expectedCurrency || currency(revenue.currency) !== expectedCurrency) reasons.push("DECLARED_SALES_COST_UNKNOWN");
       else { cost += declared; day(String(revenue.date)).cost += declared; }
-      if(revenues.some(other=>other!==revenue&&other.date===revenue.date))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
+      if(revenues.some(other=>other!==revenue&&other.date===revenue.date&&(revenue.manualTotalsVersion!==2||revenue.accountingScope!=="SHIFT"||revenue.shiftId!==revenue.id||!(other.revenueSource==="sales_events_v1"||other.manualTotalsVersion===2&&other.accountingScope==="SHIFT"&&other.shiftId===other.id))))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
       continue;
     }
     if (revenue.revenueSource === "sales_documents") {
@@ -2442,7 +2442,7 @@ function reconcileMonthlyReport(input
   const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
   const authoritative = history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
     || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
-    || rows(input.revenues).some(item => scope(item, input.venueId) && ["sales_events_v1", "sales_documents"].includes(String(item.revenueSource))
+    || rows(input.revenues).some(item => scope(item, input.venueId) && (["sales_events_v1", "sales_documents"].includes(String(item.revenueSource)) || item.manualTotalsVersion === 2 && item.accountingScope === "SHIFT")
       && String(item.date ?? "").slice(0, 7) === input.monthKey)
     || rows(input.events).some(item => Number(item.venueId) === input.venueId && String(item.businessDate ?? "").slice(0, 7) === input.monthKey);
   if (!authoritative) {
@@ -2828,7 +2828,7 @@ const accounting_money_1 = require("./accounting-money");
 const business_day_rows_1 = require("./business-day-rows");
 /** Read model only. Sales facts and the existing Finance projection keep their identities. */
 exports.OPERATIONAL_REPORT_STORE_KEY = "bd_operational_reports_v1";
-exports.REVENUE_SOURCES = ["BARDOC_POS", "MANUAL_SUMMARY", "IMPORT", "INTEGRATION"];
+exports.REVENUE_SOURCES = ["BARDOC_POS", "MANUAL_SUMMARY", "IMPORT", "INTEGRATION", "MIXED_SHIFTS"];
 exports.operationalFields = ["staffing", "payrollBreakdown", "shiftDepartmentSales", "shiftVenueSales", "note", "guests", "writeOffDocumentIds", "writeOffItemCount", "writeOffTotalCost", "incidentIds", "workdayStatus", "workdayRevision", "workdayPayrollDraft", "workdayConfirmations"];
 function operationalData(value) {
     const row = object(value);
@@ -2850,7 +2850,7 @@ function operationalDay(input) {
     const events = (0, business_day_rows_1.uniqueBusinessRows)(input.events ?? []).filter(row => belongs(row) && row.venueId === input.venueId && row.businessDate === input.businessDate);
     const posted = events.filter(row => row.status === "POSTED");
     const eventRows = revenues.filter(row => row.revenueSource === "sales_events_v1");
-    const cashShifts = eventRows.filter(row => ["open", "closed"].includes(String(row.closingStatus)));
+    const cashShifts = revenues.filter(row => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT").filter(row => ["open", "closed"].includes(String(row.closingStatus)));
     const open = cashShifts.some(row => row.closingStatus === "open");
     const documents = rows(input.documents).filter(row => belongs(row) && row.date === input.businessDate && row.status === "confirmed");
     const sources = new Set();
@@ -2876,7 +2876,8 @@ function operationalDay(input) {
         else
             sources.add("LEGACY_UNKNOWN");
     }
-    const source = sources.size === 1 ? [...sources][0] : "LEGACY_UNKNOWN";
+    const mixedShifts = revenues.length > 0 && revenues.every(row => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT" && row.shiftId === row.id);
+    const source = sources.size === 1 ? [...sources][0] : mixedShifts ? "MIXED_SHIFTS" : "LEGACY_UNKNOWN";
     const currencies = new Set([...revenues, ...events].map(row => row.currency).filter(value => value != null));
     const monetaryValue = (row) => input.currency ? (0, accounting_money_1.resolveAccountingMoney)({ value: row, originalAmount: row.revenue, originalCurrency: row.currency ?? input.currency, accountingCurrency: input.currency })?.accountingAmount ?? null : Number(row.revenue);
     const moneyKnown = [...revenues, ...posted].every(row => (0, business_day_rows_1.finiteBusinessNumber)(row.revenue) != null && Number.isFinite(monetaryValue(row)) && monetaryValue(row) != null) && (Boolean(input.currency) || currencies.size <= 1);
@@ -2885,12 +2886,16 @@ function operationalDay(input) {
     const factBacked = eventRows.length === revenues.length && events.every(row => ["POSTED", "REVERSED"].includes(String(row.status)))
         && (events.length > 0 || projectedAmount === 0 && cashShifts.length > 0);
     const eventIdentityMatches = events.every(event => eventRows.some(row => row.id === event.revenueRowId));
-    const consistency = factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
+    const posMatches = eventRows.every(row => {
+        const active = posted.filter(e => e.revenueRowId === row.id);
+        return monetaryValue(row) === money(active.reduce((sum, e) => sum + (monetaryValue(e) ?? 0), 0)) && row.receipts === active.length;
+    });
+    const consistency = mixedShifts ? (eventIdentityMatches && posMatches ? "MATCH" : "MISMATCH") : factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
     const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
-    const receipts = factBacked ? posted.length : revenues.some(row => row.manualTotalsVersion === 1 && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
-    const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row => row.manualTotalsVersion === 1).flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])));
+    const receipts = factBacked ? posted.length : revenues.some(row => [1, 2].includes(Number(row.manualTotalsVersion)) && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
+    const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row => [1, 2].includes(Number(row.manualTotalsVersion))).flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])));
     const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
-    const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
+    const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency === "MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
     const report = rows(input.reports).find(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate)
         ?? revenues.find(row => row.revenueSource !== "sales_events_v1" && ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)));
     const recorded = report?.workdayStatus !== "OPEN" && (report?.closingStatus === "closed" || report?.closedVia === "guided-v17");

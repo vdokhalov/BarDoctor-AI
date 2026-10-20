@@ -29,7 +29,7 @@ export type TraceTarget = { type: "EVIDENCE_RESOURCE"; reference: EvidenceRefere
 export type Finality = "PROVISIONAL" | "FINAL" | "UNKNOWN";
 export type Availability = "AVAILABLE" | "PARTIAL" | "UNAVAILABLE";
 export type EvidenceStatus = "COMPLETE" | "PARTIAL" | "NONE";
-export type RevenueSourceType = "BARDOC_POS" | "MANUAL_SUMMARY" | "IMPORT" | "INTEGRATION" | "LEGACY_UNKNOWN";
+export type RevenueSourceType = "MIXED_SHIFTS" | "BARDOC_POS" | "MANUAL_SUMMARY" | "IMPORT" | "INTEGRATION" | "LEGACY_UNKNOWN";
 export type MenuSourceType = "MANUAL" | "SCAN" | "IMPORT" | "LEGACY_UNKNOWN";
 export type EvidenceDiagnostic =
   | "NO_HISTORICAL_SNAPSHOT" | "PARTIAL_EVIDENCE" | "SOURCE_UNKNOWN"

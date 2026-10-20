@@ -197,11 +197,11 @@ export function historicalPeriodCost(input: {
   };
   for (const revenue of revenues) {
     const amount = finite(revenue.revenue);
-    if (revenue.revenueSource === "MANUAL_SUMMARY" && revenue.manualTotalsVersion === 1) {
+    if (revenue.revenueSource === "MANUAL_SUMMARY" && [1,2].includes(Number(revenue.manualTotalsVersion))) {
       const declared = finite(revenue.declaredCost), provenance = row(revenue.costProvenance);
       if(declared === null || declared < 0 || provenance.basis !== "OWNER_DECLARED" || currency(provenance.currency) !== expectedCurrency || currency(revenue.currency) !== expectedCurrency) reasons.push("DECLARED_SALES_COST_UNKNOWN");
       else { cost += declared; day(String(revenue.date)).cost += declared; }
-      if(revenues.some(other=>other!==revenue&&other.date===revenue.date))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
+      if(revenues.some(other=>other!==revenue&&other.date===revenue.date&&(revenue.manualTotalsVersion!==2||revenue.accountingScope!=="SHIFT"||revenue.shiftId!==revenue.id||!(other.revenueSource==="sales_events_v1"||other.manualTotalsVersion===2&&other.accountingScope==="SHIFT"&&other.shiftId===other.id))))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
       continue;
     }
     if (revenue.revenueSource === "sales_documents") {
@@ -275,7 +275,7 @@ export function reconcileMonthlyReport(input: {
   const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
   const authoritative = history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
     || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
-    || rows(input.revenues).some(item => scope(item, input.venueId) && ["sales_events_v1", "sales_documents"].includes(String(item.revenueSource))
+    || rows(input.revenues).some(item => scope(item, input.venueId) && (["sales_events_v1", "sales_documents"].includes(String(item.revenueSource)) || item.manualTotalsVersion === 2 && item.accountingScope === "SHIFT")
       && String(item.date ?? "").slice(0, 7) === input.monthKey)
     || rows(input.events).some(item => Number(item.venueId) === input.venueId && String(item.businessDate ?? "").slice(0, 7) === input.monthKey);
   if (!authoritative) {

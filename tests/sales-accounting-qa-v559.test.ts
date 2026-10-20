@@ -9,10 +9,11 @@ const route=new URL('../app/api/sales-accounting/route.ts',import.meta.url);
 const req=(body:object)=>new Request('http://local/api/sales-accounting',{method:'POST',body:JSON.stringify(body)});
 test('return to POS preserves historical manual dates across local year boundary',()=>{
  const result=a.planSalesMode({...base,mode:'POS',operationId:'qa-return-pos',now:'2026-12-31T22:30:00Z',timezone:'Europe/Chisinau',reports:[],orders:[]});
- assert.equal(result.change.effectiveDate,'2027-01-02');
+ assert.equal(a.nextSalesMode(result.setting,'2027-01-01'),'POS');
  assert.equal(a.salesModeForDate(result.setting,'2027-01-01'),'MANUAL');
- assert.equal(a.salesModeForDate(result.setting,'2027-01-02'),'POS');
- assert.equal(a.planManualTotals({...base,setting:result.setting}).row.revenue,300);
+ assert.equal(a.salesModeForDate(result.setting,'2027-01-02'),'MANUAL');
+ assert.deepEqual(result.setting.changes,setting.changes);
+ assert.throws(()=>a.planManualTotals({...base,setting:result.setting}),/Выберите смену/);
  assert.throws(()=>a.planSalesMode({...base,setting:result.setting,mode:'MANUAL',operationId:'qa-return-pos',reports:[],orders:[]}),/другого режима/);
 });
 test('invalid numeric inputs fail closed; explicit zeros and omitted optional values remain distinct',()=>{

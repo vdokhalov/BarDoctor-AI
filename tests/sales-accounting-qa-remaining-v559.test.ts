@@ -70,14 +70,14 @@ test('second same-day imported document is staged without changing recognized fa
  assert.equal((f.get(a.SALES_IMPORT_REVIEW_KEY) as unknown[]).length,1);
  }finally{f.close();}
 });
-test('mode effective date follows local date across DST and negative/positive UTC offsets',()=>{
+test('next-session mode does not wait for calendar dates across timezone boundaries',()=>{
  for(const [timezone,instant,expected] of [
  ['Europe/Chisinau','2026-03-28T22:30:00Z','2026-03-30'],
  ['Europe/Chisinau','2026-10-24T21:30:00Z','2026-10-26'],
  ['America/Los_Angeles','2026-10-20T01:00:00Z','2026-10-20'],
  ['Pacific/Kiritimati','2026-10-20T12:00:00Z','2026-10-22']]){
  const p=a.planSalesMode({...base,setting:{...setting,changes:setting.changes.map(x=>({...x,effectiveDate:'2020-01-01',createdAt:'2019-12-31T12:00:00Z'}))},mode:'POS',operationId:'qa-timezone-001',now:instant,timezone,reports:[],orders:[]});
- assert.equal(p.change.effectiveDate,expected,timezone);
+ assert.equal(a.nextSalesMode(p.setting,expected),'POS',timezone);assert.equal(p.setting.changes[0].effectiveDate,'2020-01-01');
  }
 });
 test('import replacement CAS protects a concurrent manual correction and cannot consume stock',async()=>{

@@ -109,7 +109,7 @@ async function command(request: Request): Promise<Response> {
   try {
     const { db, snapshots, context, orders, workdays, stockRevision, eventRevision } = await load(account,undefined,{externalId:`pos-order:${body.orderId}`,source:"POS_API"});
     const plan = await planPosOrder(context, orders, body);
-    if(!plan.duplicate){const shift=context.revenues.find(r=>r.id===plan.order.shiftId);if(shift)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),context.venueId),context.revenues,context.venueId,String(shift.date),"POS");}
+    if(!plan.duplicate){const shift=context.revenues.find(r=>r.id===plan.order.shiftId);if(shift)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),context.venueId),context.revenues,context.venueId,String(shift.date),"POS",String(shift.id));}
     const result = { ok: true, duplicate: plan.duplicate, order: preparationOrderView(plan.order), orders: posOrderViews(context, plan.orders).map(preparationOrderView), ...(plan.event ? { event: posSalesEventView(plan.event) } : {}), ...(plan.previewHash ? { previewHash: plan.previewHash } : {}) };
     if(!plan.duplicate){const shift=context.revenues.find(row=>row.id===plan.order.shiftId&&row.venueId===context.venueId);const gate=posWorkdayGate(workdays,context.venueId,String(shift?.date));if(!gate.ok&&!(body.action==="cancel_order"&&posOrderCancellationDayAllowed(context,plan.order.shiftId,workdays)))return reply(gate,409);}
     if (plan.duplicate || body.action === "preview_payment") return reply(result);

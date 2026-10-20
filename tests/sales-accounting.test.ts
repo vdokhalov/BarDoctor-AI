@@ -14,23 +14,24 @@ import { buildBusinessIntelligence, type BusinessIntelligenceInput } from "../li
 const setting: accounting.SalesAccounting = { version: 1, venueId: 1, changes: [{ id: "manual-enabled", mode: "MANUAL", effectiveDate: "2026-10-01", createdAt: "2026-09-30T10:00:00Z", actorId: 7 }] };
 const base = { setting, venueId: 1, currency: "MDL", date: "2026-10-10", now: "2026-10-20T10:00:00Z", timezone: "Europe/Chisinau",
   role: "owner", actorId: 7, operationId: "manual-save-001", expectedRevision: 0, cash: 100, card: 200, revenues: [], closedMonths: new Set<string>() };
-test("legacy venues remain legacy; new venue defaults POS; timezone controls tomorrow", () => {
+test("legacy venues remain legacy; new venue defaults POS; next session has no calendar delay", () => {
   assert.equal(accounting.salesModeForDate(null, "2026-10-20"), "LEGACY");
   assert.equal(accounting.salesModeForDate(accounting.initialSalesAccounting(1, base.now, 7), "2026-10-20"), "POS");
   const plan = accounting.planSalesMode({ setting: null, venueId: 1, actorId: 7, role: "owner", mode: "MANUAL", operationId: "switch-001",
     now: "2026-10-20T23:30:00Z", timezone: "Europe/Chisinau", revenues: [], reports: [], orders: [] });
-  assert.equal(plan.change.effectiveDate, "2026-10-22");
+  assert.equal(accounting.nextSalesMode(plan.setting, "2026-10-21"), "MANUAL");
   assert.equal(accounting.salesModeForDate(plan.setting, "2026-10-21"), "LEGACY");
-  assert.equal(accounting.salesModeForDate(plan.setting, "2026-10-22"), "MANUAL");
+  assert.equal(accounting.salesModeForDate(plan.setting, "2026-10-22"), "LEGACY");
 });
-test("switch requires owner and closes workday, cash and orders; pending switch cannot rewrite timeline", () => {
+test("next-session selection requires owner but leaves active workday, cash and orders untouched", () => {
   const input = { setting: null, venueId: 1, actorId: 7, role: "owner", mode: "MANUAL", operationId: "switch-001", now: base.now, timezone: "UTC", revenues: [], reports: [], orders: [] };
-  for (const change of [{ role: "manager" }, { reports: [{ venueId: 1, workdayStatus: "OPEN" }] }, { revenues: [{ closingStatus: "open" }] }, { orders: [{ venueId: 1, status: "OPEN" }] }]) {
-    assert.throws(() => accounting.planSalesMode({ ...input, ...change }), accounting.SalesAccountingError);
+  assert.throws(() => accounting.planSalesMode({...input,role:"manager"}),accounting.SalesAccountingError);
+  for (const change of [{ reports: [{ venueId: 1, workdayStatus: "OPEN" }] }, { revenues: [{ closingStatus: "open" }] }, { orders: [{ venueId: 1, status: "OPEN" }] }]) {
+    assert.equal(accounting.planSalesMode({ ...input, ...change }).change.mode,"MANUAL");
   }
   const first = accounting.planSalesMode(input);
   assert.equal(accounting.planSalesMode({ ...input, setting: first.setting }).duplicate, true);
-  assert.throws(() => accounting.planSalesMode({ ...input, setting: first.setting, operationId: "switch-002" }), /уже запланирован/);
+  assert.throws(() => accounting.planSalesMode({ ...input, setting: first.setting, operationId: "switch-002" }), /уже выбран/);
 });
 test("manual total is one revenue row, absent receipts/COGS unknown, explicit zero known", () => {
   const a = accounting.planManualTotals(base);
@@ -147,19 +148,20 @@ test("explicit staged manual replacement is atomic, preserves history and never 
     assert.equal(cost.cost, 0); assert.equal(cost.salesCostKnown, true);
   } finally { f.close(); }
 });
-test("mode switch CAS rechecks an intervening open workday; manager and foreign-venue commands are rejected", async () => {
+test("next-session mode CAS preserves an intervening open workday; manager and foreign-venue commands rejected", async () => {
   const f = openingRuntime(new URL("../app/api/sales-accounting/route.ts", import.meta.url), accounting);
   try {
     const command = { action: "set_mode", venueId: 1, mode: "MANUAL", operationId: "mode-api-001" };
     const request = (body: object) => new Request("http://local/api/sales-accounting", { method: "POST", body: JSON.stringify(body) });
     f.beforeBatch(() => f.put("bd_operational_reports_v1", [{ venueId: 1, date: "2026-10-20", workdayStatus: "OPEN" }]));
     const response = await f.api.POST(request(command));
-    assert.equal(response.status, 409); assert.equal(f.get(accounting.SALES_ACCOUNTING_KEY), null);
+    assert.equal(response.status, 201); assert.equal(accounting.nextSalesMode(f.get(accounting.SALES_ACCOUNTING_KEY) as accounting.SalesAccounting,"2026-10-20"),"MANUAL");
+    assert.equal((f.get("bd_operational_reports_v1") as any[])[0].workdayStatus,"OPEN");
     assert.equal((await f.api.POST(request({ ...command, venueId: 2 }))).status, 409);
     const manager = f.loadRoute(new URL("../app/api/sales-accounting/route.ts", import.meta.url), {
       authenticateRequest: async () => ({ id: 7, venueId: 1, actorAccountId: 8, role: "manager", restaurantJson: '{"currency":"MDL"}' }),
     });
     assert.equal((await manager.POST(request(command))).status, 403);
-    assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log").get()?.n, 0);
+    assert.equal(f.sqlite.prepare("SELECT COUNT(*) AS n FROM audit_log").get()?.n, 1);
   } finally { f.close(); }
 });
