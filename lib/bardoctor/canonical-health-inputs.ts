@@ -1,3 +1,4 @@
+import { normalizeLegacyPayrollEntries } from "./payroll-entry-scope";
 import {readSalesEvents} from './sales-event-storage';
 import {readStockHistory} from "./stock-storage";
 import { bindCanonicalContext } from "./canonical-input-evidence";
@@ -44,6 +45,8 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   const currentAccount = { ...account, ...permissionPayload(boundary.role, typeof boundary.permissions === "string" ? boundary.permissions : null) };
   if (!hasPermission(currentAccount, "analysis.run") || !canReadDiagnosisSources(currentAccount)) return { restricted: true as const };
   const scope = { venueId: account.venueId, workspaceId: Number(boundary.workspaceId), dataAccountId: account.id };
+  let profile: Row = {};
+  try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
   const snapshots = storeSnapshots(rows.results.filter(row => row.data_json != null).map(row => ({ ...row, data_json: row.data_json! })), keys);
   const sources: HealthSource[] = [];
   const stores = new Map<string, StoredVenueValue>();
@@ -60,9 +63,13 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
         const valid = key === "bd_assortment_v1" ? object(raw) && Array.isArray(raw.stockBalances) : Array.isArray(raw) || !HEALTH_OPERATIONS_KEYS.includes(key) && object(raw);
         if (!valid || arrays.some(value => Array.isArray(value) && (value.length > MAX_HEALTH_ROWS || value.some(child => !object(child))))) source.state = "PARTIAL";
         else {
-          source.state = derivedInputBelongs(raw, scope) ? "AVAILABLE" : "PARTIAL";
+          // Reuse Finance's account-local legacy adapter before ownership checks.
+          // Revisions above still describe the original persisted bytes.
+          const scopedRaw = key === "bd_payroll_entries" && Array.isArray(raw)
+            ? normalizeLegacyPayrollEntries(raw, profile, scope) : raw;
+          source.state = derivedInputBelongs(scopedRaw, scope) ? "AVAILABLE" : "PARTIAL";
           // Exclude explicit foreign ownership at every level before summaries.
-          source.data = Array.isArray(raw) ? raw.filter(value => derivedInputBelongs(value, scope)) : object(raw) ? Object.fromEntries(Object.entries(raw).map(([field, value]) => [field, Array.isArray(value) ? value.filter(child => derivedInputBelongs(child, scope)) : derivedInputBelongs(value, scope) ? value : null])) : null;
+          source.data = Array.isArray(scopedRaw) ? scopedRaw.filter(value => derivedInputBelongs(value, scope)) : object(scopedRaw) ? Object.fromEntries(Object.entries(scopedRaw).map(([field, value]) => [field, Array.isArray(value) ? value.filter(child => derivedInputBelongs(child, scope)) : derivedInputBelongs(value, scope) ? value : null])) : null;
           if (key === "bd_guest_reviews" && Array.isArray(source.data)) {
             source.data = await reviewsForCurrentGoogleLocation(account.id, source.data as Row[]);
             source.revision = await revision("REVIEW", key, { sourceRevision: source.revision, selected: source.data });
@@ -73,8 +80,6 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
     } else if (present) source.state = "PARTIAL";
     sources.push(source);
   }
-  let profile: Row = {};
-  try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
   const ingredientMemo = createIngredientReconciliationMemo();
   const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
   await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
