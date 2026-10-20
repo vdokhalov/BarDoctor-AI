@@ -6,6 +6,7 @@ test('Home consumes only authoritative current-month hook and renders zero, miss
  let report=null;const context=vm.createContext({bdMonthlyVenueIdPhase7:()=>1,bdUseMonthlyReportV513:(v,m)=>{assert.equal(v,1);assert.equal(m,'current');return{report,error:null}},bdMoney2:String,bdMonthDisplay:String,i:{jsx:(tag,props)=>typeof tag==='function'?tag(props):props,jsxs:(tag,props)=>typeof tag==='function'?tag(props):props}});assert.ok(from>0&&to>from);vm.runInContext(source.slice(from,to),context);
  const render=()=>text(context.bdHomeCurrentFinanceV556({profile:{},settings:{},onNavigate:()=>{},revision:'stable'}));assert.match(render(),/Проверяем/);
  report={currentFinance:true,asOfDate:'2026-10-20',meta:{key:'2026-10'},resultBeforeCost:0,revenue:90,payroll:90,missingInformation:[],resultExplanation:'Без себестоимости'};assert.match(render(),/Результат до себестоимости.* 0/);assert.doesNotMatch(render(),/Нет расчёта|Предварительн/);
+ assert.equal(context.bdHomeCurrentFinanceV556({profile:{},settings:{},onNavigate:()=>{},revision:'stable'}).children[1].style.color,'inherit');
  report={...report,resultBeforeCost:null,payroll:null,knownPayrollSubtotal:90,missingPayrollDates:['2026-10-19'],missingInformation:['Не полностью известен начисленный ФОТ']};assert.match(render(),/Общая сумма пока неизвестна/);assert.match(render(),/2026-10-19/);assert.match(render(),/ФОТ: Неизвестно/);
  assert.ok(source.includes('i.jsx(bdHomeCurrentFinanceV556,'));assert.ok(!source.includes('i.jsx(bdHomeMoneyCard,{report:j,previousReport:v,onNavigate:g})'));
 });

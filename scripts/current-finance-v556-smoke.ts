@@ -38,7 +38,7 @@ const server = createServer((req, res) => {
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
 const browser=await chromium.launch({executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs,headless:true});
-const out='outputs/current-finance-v556';mkdirSync(out,{recursive:true});const results:unknown[]=[];
+const out=process.env.BD_FINANCE_CONTRAST_ONLY?'outputs/current-finance-contrast':'outputs/current-finance-v556';mkdirSync(out,{recursive:true});const results:unknown[]=[];
 try{
  const user=await runtime.register('current-smoke@isolated.test'),venueId=user.activeVenueId;
  const profile={name:'Current finance local QA',currency:'MDL',timezone:'Europe/Chisinau',workingDays:[1,2,3,4,5,6,7],openTime:'09:00',closeTime:'23:00',areas:['Бар']};
@@ -48,7 +48,7 @@ try{
  put('bd_finance_revenue',revenues);put('bd_sales_events_v1',[{id:'e',venueId,businessDate:'2026-10-19',revenueRowId:'s',status:'POSTED',currency:'MDL',revenue:300,source:'POS_API'}]);
  for(const key of ['bd_finance_expenses','bd_payroll_entries','bd_stock_movements','bd_sales_documents','bd_sales_batches','bd_employees'])put(key,[]);
  put('bd_assortment_v1',salesEventFixture().assortment);
- const scenarios=process.env.BD_FINANCE_UI_CORRECTION_ONLY?['missing-payroll']:['missing-cost','missing-payroll','zero'];
+ const scenarios=process.env.BD_FINANCE_CONTRAST_ONLY?['missing-cost']:process.env.BD_FINANCE_UI_CORRECTION_ONLY?['missing-payroll']:['missing-cost','missing-payroll','zero'];
  for(const width of [390,1280])for(const scenario of scenarios){
   put('bd_operational_reports_v1',[{id:'r',venueId,date:'2026-10-19',closingStatus:'closed',...(scenario==='missing-payroll'?{}:{payrollBreakdown:{total:scenario==='zero'?300:90}})}]);
   const snapshot=()=>JSON.stringify(runtime.sqlite.prepare('SELECT * FROM domain_data ORDER BY account_id,store_key').all());const before=snapshot();
@@ -67,6 +67,20 @@ try{
    if(scenario==='missing-payroll')assert.equal(await home.locator('.bd-home-money-value').evaluate(el=>el.scrollWidth<=el.clientWidth+1 && el.getBoundingClientRect().right<=el.parentElement!.getBoundingClientRect().right),true,'missing-data text fits card');
    await home.screenshot({path:`${out}/${width}-${scenario}-home-card.png`});
    await page.screenshot({path:`${out}/${width}-${scenario}-home.png`,fullPage:true});
+   if(process.env.BD_FINANCE_CONTRAST_ONLY){
+    const contrast=await home.locator('h2').evaluate(`(()=>{const el=document.querySelector('[data-bd-home-money] h2');
+     const heading=getComputedStyle(el),card=getComputedStyle(el.parentElement),overlay=getComputedStyle(el.parentElement,'::after');
+     const rgb=(s)=>s.match(/[\\d.]+/g).map(Number);
+     const fg=rgb(heading.color),stops=Array.from(card.backgroundImage.matchAll(/rgba?\\([^)]+\\)/g),m=>rgb(m[0])),over=rgb(overlay.backgroundColor);
+     const lum=(c)=>c.slice(0,3).map(v=>{const n=v/255;return n<=0.04045?n/12.92:((n+0.055)/1.055)**2.4}).reduce((a,v,i)=>a+v*[.2126,.7152,.0722][i],0);
+     const blend=c=>c.map((v,i)=>i<3?v*(1-(over[3]??1))+over[i]*(over[3]??1):v);
+     const backgrounds=stops.flatMap(c=>[{fg,bg:c},{fg:blend(fg),bg:blend(c)}]);
+     const ratios=backgrounds.map(c=>(Math.max(lum(c.fg),lum(c.bg))+.05)/(Math.min(lum(c.fg),lum(c.bg))+.05));
+     return {color:heading.color,background:card.backgroundImage,overlay:overlay.backgroundColor,minContrast:Math.min(...ratios),samples:ratios.length};
+    })()`);
+    assert.equal(contrast.color,'rgb(255, 255, 255)');assert.ok(contrast.samples>=3&&contrast.minContrast>=4.5,JSON.stringify(contrast));assert.deepEqual(errors,[]);assert.equal(snapshot(),before);
+    results.push({width,scenario,status:'PASS',contrast,loadedAssets});continue;
+   }
    await home.getByRole('button',{name:'Открыть отчёт'}).click();const report=page.locator('[data-bd-monthly-report]');await report.waitFor({timeout:30000});const hero=report.locator('[data-bd-monthly-hero]');await hero.getByText('На 2026-10-20',{exact:true}).waitFor();
    const reportText=await hero.innerText();assert.match(reportText,/Результат до себестоимости/i);assert.match(reportText,/Не подтверждена себестоимость/);
    assert.equal((await hero.locator('.bd-monthly-hero-value-v165').innerText()).replace(/\s/g,''),scenario==='missing-payroll'?'Поканерассчитан':new Intl.NumberFormat('ru-RU',{minimumFractionDigits:2,maximumFractionDigits:2}).format(expected.report.resultBeforeCost!).replace(/\s/g,'')+'MDL');

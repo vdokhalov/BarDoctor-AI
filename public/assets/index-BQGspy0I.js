@@ -2125,7 +2125,7 @@ function bdHomeCurrentFinanceV556({profile,settings,onNavigate,revision}) {
   const result=report.currentFinance?report.resultBeforeCost:report.operatingResult;
   return i.jsxs("section",{className:"bd-home-money","data-bd-home-money":"current-v556",children:[
     i.jsx("p",{children:report.currentFinance?"Финансы на "+report.asOfDate:"Финансовый результат · "+bdMonthDisplay(report.meta.key)}),
-    i.jsx("h2",{children:report.currentFinance?"Результат до себестоимости":"Прибыль закрытого месяца"}),
+    i.jsx("h2",{style:{color:"inherit"},children:report.currentFinance?"Результат до себестоимости":"Прибыль закрытого месяца"}),
     i.jsx("strong",{className:"bd-home-money-value",style:result==null?{whiteSpace:"normal",overflowWrap:"anywhere",fontSize:"clamp(20px, 6vw, 28px)",lineHeight:1.2}:undefined,children:result==null?"Недостаточно данных":bdMoney2(result)}),
     i.jsx("p",{children:"Выручка: "+(report.revenue==null?"Неизвестно":bdMoney2(report.revenue))+" · Начисленный ФОТ: "+(report.payroll==null?"Неизвестно":bdMoney2(report.payroll))}),
     report.currentFinance&&i.jsx(bdCurrentFinanceDetailsV556,{report}),
