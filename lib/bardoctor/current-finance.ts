@@ -3,10 +3,10 @@ import { readFinanceInputs, type FinanceReadInput, financeAmount } from './finan
 import { businessRecord as row, scopedBusinessRows, activeBusinessRow } from './business-day-rows';
 import { venueDate, venueTimeFromJson } from './venue-time';
 
-export type CurrentCostSourceStates = Partial<Record<"bd_sales_events_v1" | "bd_stock_movements" | "bd_sales_documents" | "bd_sales_batches", "AVAILABLE" | "ABSENT" | "UNAVAILABLE">>;
+export type CurrentCostSourceStates = Partial<Record<"bd_sales_events_v1" | "bd_stock_movements" | "bd_sales_documents" | "bd_sales_batches" | "bd_sales_reconciliations_v1", "AVAILABLE" | "ABSENT" | "UNAVAILABLE">>;
 
 /** Recorded current-period result, never purchases-as-COGS or a closed-month profit. */
-export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; movements?: unknown[]; batches?: unknown[]; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
+export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
  const endDate = venueDate(input.asOf, venueTimeFromJson(JSON.stringify(input.profile)).timezone);
  const startDate = endDate.slice(0,7)+'-01';
  const purchasePayment = (x:Record<string,unknown>) => x.category==='inventory' || x.source==='purchase_payment' || x.source==='purchase_document' || x.paymentKind==='supplier_payment';
@@ -24,14 +24,14 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const throughDate = (values:unknown[] = []) => scopedBusinessRows(values,{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId}).filter(x=>{
   const date=String(x.businessDate??x.date??'').slice(0,10);return date>=startDate&&date<=endDate;
  });
- const history=historicalPeriodCost({venueId:input.venueId,monthKey:endDate.slice(0,7),accountingCurrency:input.currency??'',revenues:value.revenueRows,events:throughDate(input.events),documents:throughDate(input.documents),movements:throughDate(input.movements),batches:throughDate(input.batches)});
+ const history=historicalPeriodCost({venueId:input.venueId,monthKey:endDate.slice(0,7),accountingCurrency:input.currency??'',revenues:value.revenueRows,events:throughDate(input.events),documents:throughDate(input.documents),movements:throughDate(input.movements),batches:throughDate(input.batches),reconciliations:throughDate(input.reconciliations)});
  // A confirmed absent unused channel is empty, not a failed/truncated read.
  // Stock history remains required to establish whether adjustments exist.
  const required = new Set<string>(["bd_stock_movements"]);
  if(value.revenueRows.some(x=>x.revenueSource==='sales_events_v1'))required.add('bd_sales_events_v1');
  if(value.revenueRows.some(x=>x.revenueSource==='sales_documents')){required.add('bd_sales_documents');required.add('bd_sales_batches');}
- const sourceKeys = ['bd_sales_events_v1','bd_stock_movements','bd_sales_documents','bd_sales_batches'] as const;
- const sourcesKnown = input.costSourceStates ? sourceKeys.every(key=>input.costSourceStates![key]==='AVAILABLE'||input.costSourceStates![key]==='ABSENT'&&!required.has(key)) : input.costInputsAvailable===true;
+ const sourceKeys = ['bd_sales_events_v1','bd_stock_movements','bd_sales_documents','bd_sales_batches','bd_sales_reconciliations_v1'] as const;
+ const sourcesKnown = input.costSourceStates ? sourceKeys.every(key=>(key==='bd_sales_reconciliations_v1'&&input.costSourceStates![key]==null&&input.reconciliations==null)||input.costSourceStates![key]==='AVAILABLE'||input.costSourceStates![key]==='ABSENT'&&!required.has(key)) : input.costInputsAvailable===true;
  const costKnown=sourcesKnown&&history.salesCostKnown;
  const adjustmentsKnown=sourcesKnown&&history.adjustmentsKnown;
  const assessmentKnown=costKnown&&adjustmentsKnown;

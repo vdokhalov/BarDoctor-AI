@@ -165,10 +165,58 @@ export function salesDocumentRowCost(input: { revenue: unknown; documents: unkno
   return { known: true, cost: costCents / 100, batchIds: [...batchIds], documentIds: documentIds as string[] };
 }
 
+/** Explicit owner/manager attestation remains valid only while captured operands match. */
+export function canonicalReconciliationValue(value: unknown): string {
+  if (Array.isArray(value)) return '[' + value.map(canonicalReconciliationValue).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.entries(value).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>JSON.stringify(k)+':'+canonicalReconciliationValue(v)).join(',') + '}';
+  return JSON.stringify(value) ?? 'null';
+}
+// Operational reports enrich revenue rows at read time. Bind only immutable financial identity/facts.
+export function reconciliationRevenueFacts(row: Row) {
+  return Object.fromEntries(['id','date','revenue','receipts','currency','revenueSource','status','reversedAt','isDraft','manualTotalsVersion','salesDocumentIds'].map(key=>[key,row[key]??null]));
+}
+export function validReconciliationEvidence(value: unknown): boolean {
+  const e = value as Row | null;
+  return Boolean(e && ['PRIMARY_RECORDS','OWNER_RECONCILIATION','SYNTHETIC_FIXTURE'].includes(String(e.kind))
+    && typeof e.reference==='string' && e.reference.trim().length>=10 && e.reference.length<=2000
+    && typeof e.method==='string' && e.method.trim().length>=20 && e.method.length<=4000
+    && e.completeCoverage===true && typeof e.historicalPricesAvailable==='boolean');
+}
+// Account/workspace ownership is checked by the scoped server loaders; also
+// reject a contradictory venue marker anywhere in the persisted attestation.
+function reconciliationVenueBelongs(value: unknown, venueId: number): boolean {
+  if (!value || typeof value !== "object") return true;
+  if (Array.isArray(value)) return value.every(child=>reconciliationVenueBelongs(child,venueId));
+  const source=value as Row;
+  return (source.venueId==null || source.venueId==="primary" || Number(source.venueId)===venueId)
+    && Object.values(source).every(child=>reconciliationVenueBelongs(child,venueId));
+}
+export function reconciledLegacyRowCost(input: { revenue: Row; reconciliation: Row; batches: unknown; venueId: number; accountingCurrency: string }): CostResult {
+  const r = input.reconciliation, before = record(r.before), evidence = r.evidence;
+  if (r.contractVersion !== 1 || r.status !== "CONFIRMED" || r.venueId !== input.venueId
+    || !text(r.operationId) || !text(r.previewRevision) || !validReconciliationEvidence(evidence)
+    || !before || !reconciliationVenueBelongs(r,input.venueId) || !record(before.revenue) || !array(before.batches)
+    || canonicalReconciliationValue(reconciliationRevenueFacts(input.revenue)) !== canonicalReconciliationValue(reconciliationRevenueFacts(row(before.revenue)))
+    || r.date !== input.revenue.date || currency(r.currency) !== currency(input.accountingCurrency)
+    || r.revenueId !== String(input.revenue.id) || input.revenue.revenueSource != null && input.revenue.revenueSource !== "") return fail("RECONCILIATION_INPUT_CHANGED");
+  const originals = array(before.batches)!, batches = array(input.batches);
+  if (!batches || !originals.length || new Set(originals.map(b=>b.id)).size!==originals.length) return fail("RECONCILIATION_INPUT_CHANGED");
+  let total = 0; const ids: string[] = [];
+  for (const original of originals) {
+    const matching = batches.filter(b=>b.id===original.id);
+    if (matching.length!==1 || canonicalReconciliationValue(matching[0])!==canonicalReconciliationValue(original)) return fail("RECONCILIATION_INPUT_CHANGED");
+    const captured = capturedBatchCost(matching[0],input.venueId,String(r.date),input.accountingCurrency);
+    if (!captured.known) return captured;
+    total += captured.cost; ids.push(String(original.id));
+  }
+  if (!sameMoney(total,Number(r.cost))) return fail("RECONCILIATION_INPUT_CHANGED");
+  return {known:true,cost:money(total),batchIds:ids};
+}
+
 export function historicalPeriodCost(input: {
   venueId: number; monthKey: string; accountingCurrency: string;
   revenues: unknown; events: unknown; movements: unknown;
-  documents?: unknown; batches?: unknown;
+  documents?: unknown; batches?: unknown; reconciliations?: unknown;
 }) {
   const { venueId, monthKey } = input;
   const expectedCurrency = currency(input.accountingCurrency);
@@ -214,6 +262,13 @@ export function historicalPeriodCost(input: {
       continue;
     }
     if (revenue.revenueSource !== "sales_events_v1") {
+      const links = rows(input.reconciliations).filter(link=>link.venueId===venueId && link.revenueId===String(revenue.id));
+      if (links.length) {
+        const resolved = links.length===1 ? reconciledLegacyRowCost({revenue,reconciliation:links[0],batches:input.batches,venueId,accountingCurrency:expectedCurrency}) : fail("RECONCILIATION_AMBIGUOUS");
+        if (resolved.known) for (const id of resolved.batchIds) referencedBatches.add(id);
+        addCost(resolved,String(revenue.date));
+        continue;
+      }
       if (amount !== 0 || finite(revenue.receipts) !== 0) reasons.push("HISTORICAL_SALES_COST_MISSING");
       continue;
     }
@@ -268,12 +323,12 @@ export function historicalPeriodCost(input: {
 export function reconcileMonthlyReport(input: {
   report: Row; venueId: number; monthKey: string; snapshots: unknown;
   revenues: unknown; events: unknown; movements: unknown;
-  documents?: unknown; batches?: unknown;
+  documents?: unknown; batches?: unknown; reconciliations?: unknown;
 }): Row {
   const report = input.report;
   const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
   const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
-  const authoritative = history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
+  const authoritative = rows(input.reconciliations).some(link=>link.venueId===input.venueId && String(link.date).slice(0,7)===input.monthKey) || history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
     || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
     || rows(input.revenues).some(item => scope(item, input.venueId) && (["sales_events_v1", "sales_documents"].includes(String(item.revenueSource)) || item.manualTotalsVersion === 2 && item.accountingScope === "SHIFT")
       && String(item.date ?? "").slice(0, 7) === input.monthKey)

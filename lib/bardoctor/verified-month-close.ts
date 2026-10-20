@@ -19,7 +19,7 @@ import { stableSalesValue } from "./sales-events";
 
 type Row = Record<string, unknown>;
 export const MONTH_CLOSE_VERSION = "verified-month-close-v1";
-export const MONTH_CLOSE_INPUT_KEYS = ["bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_sales_batches", "bd_stock_movements", "bd_inventory_snapshots", "bd_finance_expenses", "bd_payroll_entries", "bd_purchase_documents", "bd_finance_settings", "bd_finance_gap_reasons", "bd_inventory_writeoffs", "bd_opening_stock_v1"];
+export const MONTH_CLOSE_INPUT_KEYS = ["bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_sales_batches", "bd_sales_reconciliations_v1", "bd_stock_movements", "bd_inventory_snapshots", "bd_finance_expenses", "bd_payroll_entries", "bd_purchase_documents", "bd_finance_settings", "bd_finance_gap_reasons", "bd_inventory_writeoffs", "bd_opening_stock_v1"];
 const KEYS = [...MONTH_CLOSE_INPUT_KEYS, "bd_month_closings"];
 const array = (value: unknown): Row[] => Array.isArray(value) ? value.map(row) : [];
 const money = (value: number) => Math.round(value * 100) / 100;
@@ -44,8 +44,8 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
   const localDay = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone);
   const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, data.bd_finance_expenses ?? [], snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
-  const report = reconcileMonthlyReport({ report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches });
-  const history = historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches });
+  const report = reconcileMonthlyReport({ report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
+  const history = historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
   const reasons = [...finance.missing, ...history.reasons];
   for (const field of ["taxModel", "utilityModel"]) {
     const model = row(settings[field]);
@@ -105,7 +105,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   if (request.method !== "POST" && url.searchParams.get("view") === "current" && monthKey === venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7)) {
     const current = currentFinance({ profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
-      movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
+      movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, reconciliations: stores.bd_sales_reconciliations_v1, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
       expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
       expensesAvailable: snapshots.some(x=>x.key==='bd_finance_expenses'&&x.dataJson!=null), payrollEntriesAvailable: snapshots.some(x=>x.key==='bd_payroll_entries'&&x.dataJson!=null) });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));

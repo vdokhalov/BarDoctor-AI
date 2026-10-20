@@ -1,0 +1,14 @@
+#legacy-reconciliation { margin: 16px 0; padding: 16px; }
+#legacy-reconciliation summary { font-weight: 650; cursor: pointer; }
+#legacy-reconciliation form, #reconciliation-preview { display: grid; gap: 12px; margin-top: 12px; }
+#legacy-reconciliation label { display: block; margin: 8px 0; }
+#legacy-reconciliation textarea { display: block; width: 100%; min-height: 90px; box-sizing: border-box; }
+#legacy-reconciliation fieldset { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid #dce1eb; border-radius: 12px; }
+#legacy-reconciliation p, #legacy-reconciliation label, #legacy-reconciliation legend { overflow-wrap: anywhere; }
+#legacy-reconciliation button { min-height: 44px; padding: 10px 14px; border-radius: 10px; cursor: pointer; }
+#legacy-reconciliation input[type=checkbox] { margin-right: 8px; }
+#legacy-reconciliation input[type=date] { max-width: 100%; box-sizing: border-box; }
+#reconciliation-preview[hidden] { display: none; }
+#legacy-reconciliation input[type=checkbox] { display: inline-block; width: 20px; height: 20px; min-height: 20px; vertical-align: middle; accent-color: #5946e8; }
+#legacy-reconciliation button { border: 1px solid #dce1eb; background: #fff; color: #302c52; }
+#legacy-reconciliation button[type=submit], #reconciliation-apply { background: #5946e8; color: #fff; border-color: #5946e8; }
