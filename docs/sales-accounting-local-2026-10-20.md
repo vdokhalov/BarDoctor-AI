@@ -29,6 +29,16 @@ Baseline: `70db05fce306c270a438ed91675a724d2c5bc9f0`. Not deployed.
 - Chromium UI at 390×844 and 1280×900: PASS. Mode selection/confirmation, save, reload, correction and explicit staged import replacement exercised against the real route using isolated SQLite. No horizontal overflow or page errors; primary action height 50px. MDL rendered from venue context. This is not physical iPhone or WebKit coverage.
 - `git diff --check` and JS syntax checks passed.
 - Typecheck has only the two pre-existing baseline failures: `business-health-snapshot.ts:372` and `health-partial-operations-v539.test.ts:10`. No new type errors.
-- No full build, full application suite, or CI was run.
+- Final `npm run build`: PASS (exit 0). This runs the repository's production build, versioned-client verification across 5 entrypoints, monthly-navigation artifact verification and Sites Worker artifact validation. No test suite was rerun for this final build; no full CI.
+- Build changed only the tracked canonical client asset, adding the intended manual-cost/receipt/payment/read-only projections. The new static assets and modified navigation/import scripts in `dist/client` match the source bytes.
+- Client: `index-BQGspy0I-92a0c4a81e30.js`, SHA256 `92a0c4a81e30a5bb5cd4532949fe5e3027fe99fda92d2ba2ed2896358dafe841`.
+- Worker `dist/server/index.js` SHA256 `1337a8ee36fbd09981e76b7a602bb33129caac910c4eb51b4821b4d6adc017d8`.
+
+## Evidence scope for the requested guarantees
+
+- Owner-only switching, open day/cash/order guards and next venue-local date: planner assertions plus real API manager denial and CAS race against an intervening open workday. Browser confirms the planned switch.
+- Unknown versus zero COGS: pure financial reader and real API/browser save-reload-correction assertions. Unknown yields no current Finance margin score; explicit zero remains known.
+- No penalty solely for manual mode: the existing Finance margin band gives the manual fixture score 90, and the confirmed closed-loss guard remains critical. No mode-based scoring penalty was added. A full matched-account comparison of every Health component under POS versus manual mode was not performed; this is an explicit evidence gap, not a claimed pass.
+- No warehouse deduction from manual totals: the real API test asserts the stock journal is unchanged, and the writer's CAS batch touches only revenue/settings plus audit. Stock posting is a different, explicitly confirmed import-replacement operation.
 
 Evidence is under `outputs/sales-accounting/`; recovery checkpoints also contain logs and the source patch/bundle. Screenshots are local implementation evidence, not a published release.

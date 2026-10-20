@@ -2364,6 +2364,13 @@ function historicalPeriodCost(input
   };
   for (const revenue of revenues) {
     const amount = finite(revenue.revenue);
+    if (revenue.revenueSource === "MANUAL_SUMMARY" && revenue.manualTotalsVersion === 1) {
+      const declared = finite(revenue.declaredCost), provenance = row(revenue.costProvenance);
+      if(declared === null || declared < 0 || provenance.basis !== "OWNER_DECLARED" || currency(provenance.currency) !== expectedCurrency || currency(revenue.currency) !== expectedCurrency) reasons.push("DECLARED_SALES_COST_UNKNOWN");
+      else { cost += declared; day(String(revenue.date)).cost += declared; }
+      if(revenues.some(other=>other!==revenue&&other.date===revenue.date))reasons.push("DUPLICATE_FINANCIAL_HISTORY");
+      continue;
+    }
     if (revenue.revenueSource === "sales_documents") {
       const documentIds = Array.isArray(revenue.salesDocumentIds) ? revenue.salesDocumentIds : [];
       for (const document of rows(input.documents).filter(doc => scope(doc, venueId) && documentIds.includes(doc.id))) {
@@ -2880,8 +2887,8 @@ function operationalDay(input) {
     const eventIdentityMatches = events.every(event => eventRows.some(row => row.id === event.revenueRowId));
     const consistency = factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
     const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
-    const receipts = factBacked ? posted.length : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
-    const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : []));
+    const receipts = factBacked ? posted.length : revenues.some(row => row.manualTotalsVersion === 1 && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
+    const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row => row.manualTotalsVersion === 1).flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])));
     const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
     const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
     const report = rows(input.reports).find(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate)
@@ -2898,7 +2905,7 @@ function operationalDay(input) {
         payroll: { amount: payrollAmount, basis: payrollAmount == null ? "MISSING" : recorded ? "RECORDED" : "LEGACY_RECORDED" },
         revenue: { amount, sourceIds: revenues.map(row => row.id).filter(id => id != null), grain: "BUSINESS_DAY", currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null), currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN", source, status: report?.workdayStatus === "CLOSED" && !revenues.length ? "FINAL" : status, receipts, payments, asOf: input.asOf,
             updatedAt: [...revenues.map(row => String(row.updatedAt ?? row.createdAt ?? "")), ...events.map(row => String(row.acceptedAt ?? ""))].sort().at(-1) || null,
-            readOnly: events.length > 0 || documents.length > 0 || revenues.some(row => ["sales_events_v1", "sales_documents"].includes(String(row.revenueSource))), consistency },
+            readOnly: events.length > 0 || documents.length > 0 || revenues.some(row => ["sales_events_v1", "sales_documents", "MANUAL_SUMMARY"].includes(String(row.revenueSource))), consistency },
         cashShift: cashShifts.length === 1 ? { id: cashShifts[0].id, status: cashShifts[0].closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: cashShifts[0].openedAt ?? cashShifts[0].createdAt ?? null, closedAt: cashShifts[0].closedAt ?? null } : null,
         cashShifts: cashShifts.map(row => ({ id: row.id, status: row.closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: row.openedAt ?? row.createdAt ?? null, closedAt: row.closedAt ?? null })),
         operations: { team: operationStatus, fot: operationStatus, writeOffs: operationStatus, incidents: operationStatus, writeOffCount: writeOffs.length, incidentCount: incidents.length },
