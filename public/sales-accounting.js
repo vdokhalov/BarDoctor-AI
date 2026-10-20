@@ -119,11 +119,24 @@
   function changeSelection() {
     var next={date:byId("totals-date").value,shift:byId("totals-shift").value};
     if(busy){byId("totals-date").value=renderedDate;byId("totals-shift").value=renderedShift;return;}
-    if(savedFields!==null&&formFields()!==savedFields){pendingSelection=next;byId("totals-date").value=renderedDate;byId("totals-shift").value=renderedShift;byId("accounting-date-confirm").showModal();byId("accounting-date-cancel").focus();}
+    if(savedFields!==null&&formFields()!==savedFields){pendingSelection=next;byId("totals-date").value=renderedDate;byId("totals-shift").value=renderedShift;showUnsavedConfirm(false);}
     else renderDate();
   }
+  function showUnsavedConfirm(leaving) {
+    byId("accounting-date-title").textContent=leaving?"Выйти без сохранения?":"Перейти к другой смене?";
+    byId("accounting-date-copy").textContent="Введённые изменения не сохранены и будут потеряны. Сохранённые итоги останутся без изменений.";
+    byId("accounting-date-confirm").showModal();byId("accounting-date-cancel").focus();
+  }
+  document.addEventListener("click",function(event){
+    var link=event.target.closest?.("a[data-bd-back]");
+    if(!link||document.body.dataset.salesAccounting!=="totals")return;
+    if(busy||savedFields!==null&&formFields()!==savedFields){
+      event.preventDefault();event.stopImmediatePropagation();
+      if(!busy){pendingSelection={href:link.href};showUnsavedConfirm(true);}
+    }
+  },true);
   byId("totals-date").addEventListener("change",changeSelection);byId("totals-shift").addEventListener("change",changeSelection);
-  byId("accounting-date-discard").addEventListener("click",function(){if(!pendingSelection)return;byId("totals-date").value=pendingSelection.date;byId("totals-shift").value=pendingSelection.shift;pendingSelection=null;byId("accounting-date-confirm").close();renderDate();});
+  byId("accounting-date-discard").addEventListener("click",function(){if(!pendingSelection)return;if(pendingSelection.href){var href=pendingSelection.href;pendingSelection=null;byId("accounting-date-confirm").close();location.assign(href);return;}byId("totals-date").value=pendingSelection.date;byId("totals-shift").value=pendingSelection.shift;pendingSelection=null;byId("accounting-date-confirm").close();renderDate();});
   byId("accounting-date-confirm").addEventListener("close",function(){if(!this.open)pendingSelection=null;});
   byId("accounting-totals").addEventListener("input",function(event){if(!["totals-date","totals-shift"].includes(event.target.id)){updateSum();saveRequest=null;}});
   byId("manual-shift-open").addEventListener("click",async function(){

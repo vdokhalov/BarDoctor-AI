@@ -70,7 +70,9 @@
     if(old&&!state.legacy)state.legacy={key:legacyKey,draft:JSON.parse(old),storage:"session"};
   }
   function syncQuickShift(){
-    const current=shift();if(!current)return;
+    const current=shift();if(!current||state.pending||state.legacy)return;
+    // An unbound populated draft has no proven source shift. Keep it for explicit recovery.
+    if(!state.quick.shiftId&&state.quick.lines.length){state.legacy={draft:state.quick,storage:"workspace"};return;}
     if(!state.quick.shiftId){state.quick.shiftId=current.id;return;}
     if(state.quick.shiftId!==current.id){
       state.drafts[state.quick.shiftId]=state.quick;
@@ -100,7 +102,7 @@
     assertCurrentLoad(generation);
     return {generation,data,orders:orders.orders,overview,report,workday};
   }
-  function accept(value) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;syncQuickShift();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
+  function accept(value,restoreWorkspace=false) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;if(restoreWorkspace)restoreLocal();syncQuickShift();if(restoreWorkspace)saveLocal();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
   async function reload(){accept(await load());}
   function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":error.code==="STOCK_EVIDENCE_CAPACITY_REACHED"?"История склада заполнена":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
@@ -419,6 +421,7 @@
     if(action==="retry"){const saved=state.pending;const result=await sendPending();if(result?.report){setReport(result.report);state.view="report";}else if(result?.event){state.orderId=null;state.view="receipts";}else if(saved?.body.action==="create")state.orderId=result?.order.id;render();notice("Результат подтверждён. Операция учтена один раз.");return;}
     if(action==="legacy"){
       const old=state.legacy,draft=old.draft,pending=draft.pending||draft,command=pending.command;
+      if(old.storage==="workspace")throw Error("Исходная смена черновика неизвестна. Черновик сохранён для проверки; автоматический перенос в новую смену запрещён.");
       if(command){
         const result=await request("/api/sales-events?externalId="+encodeURIComponent(command.id));
         const found=result.events.find(e=>e.externalId===command.id&&e.source==="POS_API");
@@ -505,7 +508,7 @@
   document.body.dataset.pane="order";
   void (async()=>{
     try{
-      const value=await load();if(!accept(value))return;restoreLocal();try{const view=JSON.parse(sessionStorage.getItem(storageKey()+":unpaid")||"null");if(view){state.unpaidOrderId=view.orderId;state.unpaidReasons=view.reasons||{}}}catch{}render();
+      const value=await load();if(!accept(value,true))return;try{const view=JSON.parse(sessionStorage.getItem(storageKey()+":unpaid")||"null");if(view){state.unpaidOrderId=view.orderId;state.unpaidReasons=view.reasons||{}}}catch{}render();
       notice(state.pending||state.legacy?"Проверьте сохранённую операцию перед новой оплатой.":"");restoreDialogDraft();
       refreshController=window.bdPosRefresh({load,onSuccess:accept,onError:errorView,isVisible:()=>!document.hidden,canRun:()=>!state.busy&&!navigationLoading&&!state.frozen&&!$("dialog").open&&!state.pending&&!state.legacy&&!/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName||""),intervalMs:15000});refreshController.start();
     }catch(error){errorView(error);}
