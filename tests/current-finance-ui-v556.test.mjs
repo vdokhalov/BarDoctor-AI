@@ -3,7 +3,7 @@ const source=fs.readFileSync(new URL('../public/assets/index-BQGspy0I.js',import
 const from=source.indexOf('function bdCurrentFinanceDetailsV556('),to=source.indexOf('/* bd-monthly-report-v165:end */',from);
 const text=x=>Array.isArray(x)?x.map(text).join(' '):x&&typeof x==='object'?Object.values(x).map(text).join(' '):typeof x==='string'||typeof x==='number'?String(x):'';
 test('Home consumes only authoritative current-month hook and renders zero, missing FOT and subtotal distinctly',()=>{
- let report=null;const context=vm.createContext({bdMonthlyVenueIdPhase7:()=>1,bdUseMonthlyReportV513:(v,m)=>{assert.equal(v,1);assert.equal(m,'current');return{report,error:null}},bdMoney2:String,bdMonthDisplay:String,i:{jsx:(tag,props)=>typeof tag==='function'?tag(props):props,jsxs:(tag,props)=>typeof tag==='function'?tag(props):props}});assert.ok(from>0&&to>from);vm.runInContext(source.slice(from,to),context);
+ let report=null;const context=vm.createContext({bdMonthlyVenueIdPhase7:()=>1,bdUseMonthlyReportV513:(v,m)=>{assert.equal(v,1);assert.equal(m,'current');return{report,error:null}},bdMoney2:String,bdMonthDisplay:String,i:{jsx:(tag,props)=>typeof tag==='function'?tag(props):props,jsxs:(tag,props)=>typeof tag==='function'?tag(props):props}});assert.ok(from>0&&to>from);vm.runInContext(source.slice(source.indexOf('function bdCurrentResultPresentation('),source.indexOf('function bdMonthlyHeroV165('))+source.slice(from,to),context);
  const render=()=>text(context.bdHomeCurrentFinanceV556({profile:{},settings:{},onNavigate:()=>{},revision:'stable'}));assert.match(render(),/Проверяем/);
  report={currentFinance:true,asOfDate:'2026-10-20',meta:{key:'2026-10'},resultBeforeCost:0,revenue:90,payroll:90,missingInformation:[],resultExplanation:'Без себестоимости'};assert.match(render(),/Результат до себестоимости.* 0/);assert.doesNotMatch(render(),/Нет расчёта|Предварительн/);
  assert.equal(context.bdHomeCurrentFinanceV556({profile:{},settings:{},onNavigate:()=>{},revision:'stable'}).children[1].style.color,'inherit');
@@ -24,4 +24,18 @@ test('shift summary names before-cost amounts and excludes unknown values from c
  const unknown=render([shift('a',null)]);
  assert.equal(unknown.children[1].children[4].children[1].children,'Неизвестно');
  assert.equal(unknown.children[2].children[0].children[1].children,'Результат неизвестен');
+});
+test('open month shows canonical after-cost result on Home and report chart, including zero; missing facts and errors stay explicit',()=>{
+ let report={currentFinance:true,isClosed:false,finalProfit:null,operatingResult:null,asOfDate:'2026-10-21',meta:{key:'2026-10'},revenue:31087.4,payroll:9135,costOfGoods:7826.69,resultBeforeCost:21471.65,resultAfterCost:13632.96,inventoryAdjustmentNet:-12,missingInformation:[],financeAssessmentInformation:[],resultExplanation:'Без себестоимости товара; это не чистая прибыль.'},error=null;
+ const context=vm.createContext({bdMonthlyVenueIdPhase7:()=>3389,bdUseMonthlyReportV513:()=>({report,error}),bdMoney2:String,bdMonthDisplay:String,bdMonthlySectionHeaderV165:p=>p,i:{jsx:(tag,p)=>typeof tag==='function'?tag(p):p,jsxs:(tag,p)=>typeof tag==='function'?tag(p):p}});
+ const part=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
+ vm.runInContext(part('function bdCurrentResultPresentation(','function bdMonthlyHeroV165(')+part('function bdMonthlyProfitStructureV165(','function bdMonthlyCostV165(')+source.slice(from,to),context);
+ const home=()=>text(context.bdHomeCurrentFinanceV556({profile:{},settings:{}})),chart=()=>text(context.bdMonthlyProfitStructureV165({report}));
+ assert.match(home(),/Текущий результат после себестоимости.*13632.96/);assert.doesNotMatch(home(),/Без себестоимости|Результат до себестоимости/);assert.match(home(),/месяц ещё не закрыт/);
+ assert.match(chart(),/7826.69/);assert.match(chart(),/Текущий результат после себестоимости.*13632.96/);assert.doesNotMatch(chart(),/Диаграмма появится|Чистая прибыль/);assert.equal(report.operatingResult,null);assert.equal(report.isClosed,false);
+ report={...report,resultAfterCost:0,costOfGoods:0};assert.match(home(),/после себестоимости.* 0/);assert.doesNotMatch(chart(),/Диаграмма появится/);
+ report={...report,resultAfterCost:null,costOfGoods:null,financeAssessmentInformation:['Не подтверждена стоимость продажи']};assert.match(home(),/Результат до себестоимости.*21471.65/);assert.match(chart(),/Не подтверждена стоимость продажи/);
+ report={...report,costOfGoods:7826.69,resultBeforeCost:null,payroll:null,missingInformation:['Не полностью известен начисленный ФОТ']};assert.match(home(),/Недостаточно данных/);assert.match(chart(),/Себестоимость рассчитана.*ФОТ/);
+ error='Проверка недоступна';assert.match(home(),/Проверка недоступна/);assert.doesNotMatch(home(),/21471|13632/);error=null;report=null;assert.match(home(),/Проверяем финансовые данные/);
+ report={currentFinance:false,isClosed:true,operatingResult:100,meta:{key:'2026-09'},revenue:150,payroll:20};assert.match(home(),/Чистая прибыль месяца.*100/);
 });

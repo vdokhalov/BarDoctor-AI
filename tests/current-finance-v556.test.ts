@@ -50,3 +50,10 @@ test('known captured COGS reuses existing margin bands; all cost sources use the
  const later=currentFinance({...input,events:[...input.events,{...f.events[0],...future,id:'future-event'}],movements:[{...future,id:'orphan',type:'sale_consumption',salesBatchId:'future'}],batches:[{...batch,...future,id:'future'}],documents:[{...future,id:'future-doc',status:'confirmed'}]});assert.equal(later.resultAfterCost,known.resultAfterCost);assert.deepEqual(later.costReasons,[]);
  const orphan=currentFinance({...input,movements:[{...future,date:'2026-10-19',businessDate:'2026-10-19',id:'orphan',type:'sale_consumption',salesBatchId:'unknown'}]});assert.equal(orphan.resultAfterCost,null);assert.equal(health(orphan).components.find(x=>x.id==='finance')?.score,null);assert.ok(orphan.costReasons.includes('UNLINKED_SALES_CONSUMPTION'));
 });
+test('current calendar month rolls over in venue timezone without closing or deleting previous history',()=>{
+ const f=fixture();const revenues=[{...f.revenues[0],id:'oct',date:'2026-10-31',revenue:300},{...f.revenues[0],id:'nov',date:'2026-11-01',revenue:500}];
+ const reports=[{...f.reports[0],id:'oct-report',date:'2026-10-31',businessDate:'2026-10-31'},{...f.reports[0],id:'nov-report',date:'2026-11-01',businessDate:'2026-11-01'}];
+ const input={...f,revenues,reports,events:[],latestClosedMonth:{monthKey:'2026-10',finalProfit:100}},before=JSON.stringify(input);
+ const oct=currentFinance({...input,asOf:'2026-10-31T21:59:59Z'}),nov=currentFinance({...input,asOf:'2026-10-31T22:00:00Z'});
+ assert.equal(oct.startDate,'2026-10-01');assert.equal(oct.revenue,300);assert.equal(nov.startDate,'2026-11-01');assert.equal(nov.revenue,500);assert.equal(nov.isClosed,false);assert.equal(JSON.stringify(input),before);
+});
