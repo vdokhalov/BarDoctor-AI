@@ -2,6 +2,10 @@ import {QaCaptureBatchError,classifyCaptureFailure} from './qa-backup-diagnostic
 import {stableSalesValue} from './sales-events';
 import {preparePosOrderMigration,copyPosOrders,activatePosOrders,restartPosOrderMigration,posOrderState} from './pos-order-storage';
 export const QA_SCOPE={accountId:148,venueId:3389} as const;
+// Optional runner metadata is outside this historical QA contract only when this scope has no rows.
+// Keep the stored v3/v4 contract unchanged so existing backup downloads remain readable.
+const runnerExpansion=['journal_migration_runs_v2','journal_migration_log_v2'];
+function runnerExpansionCount(name:string){return name==='journal_migration_runs_v2'?'SELECT count(*) AS count FROM journal_migration_runs_v2 WHERE account_id=148 OR venue_id=3389':'SELECT count(*) AS count FROM journal_migration_log_v2 WHERE run_id IN (SELECT run_id FROM journal_migration_runs_v2 WHERE account_id=148 OR venue_id=3389)'}
 export const BUSINESS_TABLES=['domain_data','audit_log','stock_journals','stock_recipe_snapshots','stock_journal_movements','sales_event_journals','sales_event_records','sales_event_chunks','sales_event_reversals','sales_event_totals','pos_order_journals','pos_order_records','pos_order_components','pos_order_chunks','review_source_events','venue_migration_exports','venue_migration_operations','journal_migration_runs','journal_migration_log','ai_usage_events'] as const;
 const identityTables=new Set('_cf_METADATA _cf_KV __drizzle_migrations d1_migrations accounts venues workspaces sessions google_connections oauth_states integration_secrets integration_credentials integration_ingress_tokens integration_connector_agents notification_preferences notification_devices ai_usage_limits venue_invites venue_memberships workspace_memberships platform_admins platform_admin_rate_limits platform_admin_audit platform_secrets staff_pin_credentials staff_pin_audit staff_pos_devices staff_pos_sessions staff_pos_attempts staff_logins staff_login_sessions staff_login_limits staff_login_leases qa_pos_backup_runs'.split(' '));
 // User-authorized exception: content/schema UNVERIFIED, not asserted to be platform-only.
@@ -9,7 +13,7 @@ export const UNVERIFIED_OUTSIDE_CONTRACT=['__appgarden_migrations'] as const;
 const emptyOnlyTables=['integration_connections','integration_mappings','integration_entity_links','integration_sync_runs','integration_sync_items','integration_field_mapping_templates','integration_ingress_deliveries','invoice_recognition_jobs','notification_jobs','notification_job_events','notification_deliveries'];
 export const QA_BACKUP_CONTRACT={version:'qa3389-business-contract-v3',scope:QA_SCOPE,businessTables:[...BUSINESS_TABLES],profileFields:['id','restaurant_json','competitors_json','review_sources_json','migration_status','migration_summary_json','imported_at'],assetPrefixes:['venues','purchases','sales','catalog','employees'].map(p=>p+'/148/'),emptyOnlyTables,excludedIdentity:[...identityTables].sort(),unverifiedOutsideContract:[...UNVERIFIED_OUTSIDE_CONTRACT],schemaTables:[...BUSINESS_TABLES,...emptyOnlyTables,'accounts','venues','workspaces','qa_pos_backup_runs'].sort()} as const;
 export async function contractSchemaHash(schema:Record<string,unknown>[]){
- for(const entry of schema.filter(e=>e.type==='table')){const name=String(entry.name);if(!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!identityTables.has(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name))backupFail('UNCLASSIFIED_TABLE_'+name)}
+ for(const entry of schema.filter(e=>e.type==='table')){const name=String(entry.name);if(!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!identityTables.has(name)&&!runnerExpansion.includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name))backupFail('UNCLASSIFIED_TABLE_'+name)}
  const present=new Set(schema.filter(e=>e.type==='table').map(e=>String(e.name)));if(QA_BACKUP_CONTRACT.schemaTables.some(name=>!present.has(name)))backupFail('CONTRACT_TABLE_MISSING');
  return backupDigest(stableSalesValue({contract:QA_BACKUP_CONTRACT,schema:schema.filter(e=>(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(String(e.tbl_name)))}));
 }
@@ -32,16 +36,17 @@ export async function qaBackupStatus(db:D1Database,s:QaScope){await authorizeQaB
 /** Read-only advisory census: no payload fields, pause writes, R2, or AI calls. Recheck after pausing in capture. */
 export async function qaBackupPreflight(db:D1Database,s:QaScope){
  await authorizeQaBackup(db,s);const schema=(await db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name").all<Row>()).results;
- const tableNames=schema.filter(e=>e.type==='table').map(e=>String(e.name));const unknownTables=tableNames.filter(name=>!identityTables.has(name)&&!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name));
+ const tableNames=schema.filter(e=>e.type==='table').map(e=>String(e.name));const unknownTables=tableNames.filter(name=>!identityTables.has(name)&&!runnerExpansion.includes(name)&&!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name));
  const missingTables=QA_BACKUP_CONTRACT.schemaTables.filter(name=>!tableNames.includes(name));
  const counts:Record<string,number>={};
- for(const name of [...emptyOnlyTables,'ai_usage_events']){if(!tableNames.includes(name))continue;let statement:D1PreparedStatement;
- if(name==='notification_job_events')statement=db.prepare('SELECT count(*) AS count FROM notification_job_events e JOIN notification_jobs j ON j.id=e.job_id WHERE j.venue_id=3389 OR j.account_id=148');
+ for(const name of [...emptyOnlyTables,...runnerExpansion,'ai_usage_events']){if(!tableNames.includes(name))continue;let statement:D1PreparedStatement;
+ if(runnerExpansion.includes(name))statement=db.prepare(runnerExpansionCount(name));
+ else if(name==='notification_job_events')statement=db.prepare('SELECT count(*) AS count FROM notification_job_events e JOIN notification_jobs j ON j.id=e.job_id WHERE j.venue_id=3389 OR j.account_id=148');
  else{const cols=(await db.prepare(`PRAGMA table_info(${quoted(name)})`).all<{name:string}>()).results.map(c=>c.name);const scopes=[...(cols.includes('data_account_id')?['data_account_id=148']:[]),...(cols.includes('account_id')?['account_id=148']:[]),...(cols.includes('venue_id')?['venue_id=3389']:[])];if(!scopes.length)backupFail('UNCLASSIFIED_TABLE_'+name);statement=db.prepare(`SELECT count(*) AS count FROM ${quoted(name)} WHERE (${scopes.join(' OR ')})`)}
  const count=Number(await statement.first('count'));if(!Number.isSafeInteger(count)||count<0)backupFail('INCOMPLETE_READ');counts[name]=count;
  }
  const conflicts=tableNames.includes('ai_usage_events')?Number(await db.prepare('SELECT count(*) AS count FROM ai_usage_events WHERE (venue_id=3389 OR account_id=148) AND (account_id!=148 OR (venue_id IS NOT NULL AND venue_id!=3389))').first('count')):0;
- await authorizeQaBackup(db,s);const blockers=emptyOnlyTables.filter(name=>(counts[name]??0)>0);
+ await authorizeQaBackup(db,s);const blockers=[...emptyOnlyTables,...runnerExpansion].filter(name=>(counts[name]??0)>0);
  return {scope:QA_SCOPE,contractVersion:QA_BACKUP_CONTRACT.version,checkedAt:new Date().toISOString(),counts,unsupportedNonempty:blockers,unknownTables,missingTables,aiScopeConflicts:conflicts,ready:blockers.length===0&&unknownTables.length===0&&missingTables.length===0&&conflicts===0,advisory:true};
 }
 export function rejectSecrets(value:unknown,path=''){if(Array.isArray(value)){value.forEach(v=>rejectSecrets(v,path));return}if(value&&typeof value==='object'){for(const [k,v] of Object.entries(value)){if(/^(password|password_hash|passwordSalt|passwordIterations|token|token_hash|access_token|refresh_token|secret|apiKey|api_key|authorization|credential|credentials)$/i.test(k)&&v!=null&&v!=='')backupFail('SECRET_REQUIRES_PRIVATE_HANDLING');rejectSecrets(v,path+'.'+k)}}else if(typeof value==='string'&&(value.startsWith('{')||value.startsWith('['))){let parsed;try{parsed=JSON.parse(value)}catch{return}rejectSecrets(parsed,path)}}
@@ -72,6 +77,7 @@ export async function captureQaBusiness(db:D1Database,s:QaScope,bucket:BackupBuc
   if(Number((await guarded(db.prepare(countSql).bind(...bindings),'EMPTY_COUNT'))[0]?.count)!==count||rows.length!==count)backupFail('SOURCE_CHANGED');return rows;
  };
  for(const entry of schema.filter(e=>e.type==='table')){const name=String(entry.name);if(identityTables.has(name)||(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name))continue;const cols=(await db.prepare(`PRAGMA table_info(${quoted(name)})`).all<{name:string}>()).results.map(c=>c.name);
+  if(runnerExpansion.includes(name)){const rows=await guarded(db.prepare(runnerExpansionCount(name)),'EMPTY_COUNT');if(Number(rows[0]?.count)!==0)backupFail('UNSUPPORTED_NONEMPTY_'+name);emptyUnsupported[name]=0;continue}
   if(cols.includes('__qa_cursor__'))backupFail('SCHEMA_RESERVED_COLUMN');
   if(name==='notification_job_events'){const rows=await guarded(db.prepare('SELECT count(*) AS count FROM notification_job_events e JOIN notification_jobs j ON j.id=e.job_id WHERE j.venue_id=3389 OR j.account_id=148'),'EMPTY_COUNT');if(Number(rows[0]?.count)!==0)backupFail('UNSUPPORTED_NONEMPTY_'+name);emptyUnsupported[name]=0;continue}
   if(name==='journal_migration_log'){tables[name]=await boundedRows(name,cols,'run_id IN (SELECT run_id FROM journal_migration_runs WHERE account_id=148 AND venue_id=3389)',[]);tables[name].sort((a,b)=>Number(a.sequence)-Number(b.sequence));continue}

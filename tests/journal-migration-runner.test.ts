@@ -22,7 +22,7 @@ test('runner verifies durable complete backup and resumes after every persisted 
   const before=await s.status();if(before.run!.phase==='COMPLETE')break;
   // Database failure is atomic at each boundary; a new invocation resumes by persisted state.
   const originalBatch=s.db.batch.bind(s.db);let injected=false;
-  s.db.batch=async<T>(statements:D1PreparedStatement[])=>{if(!injected&&statements.some(x=>(x as D1PreparedStatement & {sql:string}).sql.startsWith('UPDATE journal_migration_runs SET phase='))){injected=true;s.r.failDatabase();}return originalBatch<T>(statements);};
+  s.db.batch=async<T>(statements:D1PreparedStatement[])=>{if(!injected&&statements.some(x=>(x as D1PreparedStatement & {sql:string}).sql.startsWith('UPDATE journal_migration_runs_v2 SET phase='))){injected=true;s.r.failDatabase();}return originalBatch<T>(statements);};
   await assert.rejects(s.step(),/injected/);s.db.batch=originalBatch;assert.ok(injected);assert.equal((await s.status()).run!.phase,before.run!.phase);
   const after=await s.step();phases.push(after.run!.phase);
   if(after.run!.paused){assert.throws(()=>s.put('bd_finance_revenue',[]),/PAUSED/);assert.throws(()=>s.put('bd_new_write',[]),/PAUSED/);assert.throws(()=>s.r.sqlite.prepare('DELETE FROM domain_data WHERE account_id=?').run(s.scope.accountId),/PAUSED/);}
@@ -54,7 +54,7 @@ test('crash immediately after either cutover keeps durable pause and resumes wit
 test('stale backup or changed source cannot pause; abort refresh retains previous backup and resumes',async t=>{
  const s=await setup();t.after(s.r.close);const prepared=await s.prepare();s.put('bd_added_after_backup',[]);await assert.rejects(s.step(),/SOURCE_CHANGED/);assert.equal((await s.status()).run!.paused,0);
  await s.api.abortJournalMigration(s.db,s.scope,prepared.run!.run_id);await s.api.refreshJournalBackup(s.db,s.bucket,s.scope,prepared.run!.run_id);assert.equal(s.objects.size,2);
- const run=(await s.status()).run,backup=JSON.parse(s.objects.get(run!.backup_key)!);backup.capturedAt=new Date(Date.now()-16*60000).toISOString();const raw=JSON.stringify(backup),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))),v=>v.toString(16).padStart(2,'0')).join('');s.objects.set(run!.backup_key,raw);s.r.sqlite.prepare('UPDATE journal_migration_runs SET backup_hash=?').run(digest);
+ const run=(await s.status()).run,backup=JSON.parse(s.objects.get(run!.backup_key)!);backup.capturedAt=new Date(Date.now()-16*60000).toISOString();const raw=JSON.stringify(backup),digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))),v=>v.toString(16).padStart(2,'0')).join('');s.objects.set(run!.backup_key,raw);s.r.sqlite.prepare('UPDATE journal_migration_runs_v2 SET backup_hash=?').run(digest);
  await assert.rejects(s.step(),/BACKUP_STALE/);await s.api.abortJournalMigration(s.db,s.scope,run!.run_id);await s.api.refreshJournalBackup(s.db,s.bucket,s.scope,run!.run_id);
  while((await s.status()).run!.phase!=='COMPLETE')await s.step();assert.equal((await s.status()).run!.paused,0);
 });
@@ -104,4 +104,29 @@ test('migration page server denies direct links without active owner membership'
  const other=await s.r.register('other-page@isolated.test');assert.equal((await page.GET(s.r.request(other,'/settings/journal-migration'))).status,200);
  for(const role of ['shift_manager','cashier','employee']){s.r.sqlite.prepare("UPDATE venue_memberships SET role=? WHERE account_id=? AND venue_id=3389").run(role,s.scope.actorId);const response=await page.GET(s.r.request(s.owner,'/settings/journal-migration'));assert.ok([401,403].includes(response.status));assert.doesNotMatch(await response.text(),/id="controls"/);}
  s.r.sqlite.prepare("UPDATE venue_memberships SET role='owner',status='revoked' WHERE account_id=? AND venue_id=3389").run(s.scope.actorId);assert.notEqual((await page.GET(s.r.request(s.owner,'/settings/journal-migration'))).status,200);
+});
+test('existing pre-expand run resumes in original tables; new generation cannot duplicate it',async t=>{
+ const s=await setup();t.after(s.r.close);await s.prepare();
+ // Represent a pre-deploy run without changing any source payload or saved backup.
+ const row=s.r.sqlite.prepare('SELECT * FROM journal_migration_runs_v2').get()!;
+ const logs=s.r.sqlite.prepare('SELECT * FROM journal_migration_log_v2').all();
+ s.r.sqlite.exec('DELETE FROM journal_migration_log_v2; DELETE FROM journal_migration_runs_v2');
+ s.r.sqlite.prepare('INSERT INTO journal_migration_runs VALUES(?,?,?,?,?,?,?,?,?,?)').run(...Object.values(row) as any[]);
+ for(const log of logs)s.r.sqlite.prepare('INSERT INTO journal_migration_log VALUES(?,?,?,?,?,?)').run(...Object.values(log) as any[]);
+ assert.throws(()=>s.r.sqlite.prepare('INSERT INTO journal_migration_runs_v2 VALUES(?,?,?,?,?,?,?,?,?,?)').run(...Object.values(row) as any[]),/RUN_EXISTS/);
+ for(let i=0;i<12&&(await s.status()).run!.phase!=='COMPLETE';i++)await s.step();
+ assert.equal((await s.status()).run!.phase,'COMPLETE');assert.equal(s.r.sqlite.prepare('SELECT count(*) n FROM journal_migration_runs_v2').get()!.n,0);assert.equal(s.objects.size,1);
+ const before=s.r.sqlite.prepare('SELECT * FROM journal_migration_log').all();await s.prepare();await s.step();assert.deepEqual(s.r.sqlite.prepare('SELECT * FROM journal_migration_log').all(),before);
+});
+test('partial expand blocks new runner; retry and atomic prepare failure retain old schema and no duplicate runs',async t=>{
+ const s=await setup();t.after(s.r.close);
+ s.r.sqlite.exec('DROP TRIGGER journal_v2_exclusive_old');
+ await assert.rejects(s.prepare(),/SCHEMA_NOT_READY/);assert.equal(s.objects.size,0);
+ const {readFileSync}=await import('node:fs');const sql=readFileSync('drizzle/0039_general_journal_migration.sql','utf8');s.r.sqlite.exec(sql);s.r.sqlite.exec(sql);
+ const batch=s.db.batch.bind(s.db);let failed=false;
+ s.db.batch=async<T>(statements:D1PreparedStatement[])=>{if(!failed&&statements.some(x=>(x as D1PreparedStatement & {sql:string}).sql.startsWith('INSERT INTO journal_migration_runs_v2('))){failed=true;s.r.failDatabase();}return batch<T>(statements);};
+ await assert.rejects(s.prepare());s.db.batch=batch;assert.equal((await s.status()).run,null);assert.equal(s.r.sqlite.prepare('SELECT count(*) n FROM journal_migration_log_v2').get()!.n,0);
+ await s.prepare();const row=s.r.sqlite.prepare('SELECT * FROM journal_migration_runs_v2').get()!;
+ assert.throws(()=>s.r.sqlite.prepare('INSERT INTO journal_migration_runs VALUES(?,?,?,?,?,?,?,?,?,?)').run(...Object.values(row) as any[]),/RUN_EXISTS/);
+ assert.equal((await s.prepare()).run!.run_id,row.run_id);
 });

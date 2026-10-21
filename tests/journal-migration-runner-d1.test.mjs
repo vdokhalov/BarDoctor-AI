@@ -11,6 +11,8 @@ test('native Worker/D1/R2 runner preserves durable backup and per-venue pause',{
  const before=await db.prepare("SELECT name,sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all();
  await assert.rejects(db.batch([...upgrade.map(sql=>db.prepare(sql)),db.prepare('INSERT INTO missing_upgrade_table VALUES(1)')]));
  assert.deepEqual((await db.prepare("SELECT name,sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all()).results,before.results);
+ // Deploy may stop after any DDL statement: each prefix must be retryable.
+ for(let n=1;n<=upgrade.length;n++){for(const sql of upgrade.slice(0,n))await db.prepare(sql).run();}
  await db.batch(upgrade.map(sql=>db.prepare(sql)));
  assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
  await db.prepare("INSERT INTO accounts(id,chatgpt_email,app_email,first_name) VALUES(1,'events@isolated.test','events@isolated.test','Test')").run();

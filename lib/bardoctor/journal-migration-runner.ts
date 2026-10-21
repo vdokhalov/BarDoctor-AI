@@ -20,7 +20,20 @@ async function authorize(db:D1Database,scope:Scope){
  const row=await db.prepare(`SELECT 1 FROM venues v JOIN venue_memberships m ON m.venue_id=v.id JOIN workspace_memberships w ON w.workspace_id=v.workspace_id AND w.account_id=m.account_id JOIN workspaces ws ON ws.id=v.workspace_id WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND m.account_id=? AND m.role='owner' AND m.status='active' AND w.status='active' AND ws.status='active'`).bind(scope.venueId,scope.accountId,scope.actorId).first();if(!row)fail('OWNER_REQUIRED');
 }
 function ownerGuard(db:D1Database,scope:Scope){return guard(db,`EXISTS(SELECT 1 FROM venues v JOIN venue_memberships m ON m.venue_id=v.id JOIN workspace_memberships w ON w.workspace_id=v.workspace_id AND w.account_id=m.account_id JOIN workspaces ws ON ws.id=v.workspace_id WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND m.account_id=? AND m.role='owner' AND m.status='active' AND w.status='active' AND ws.status='active')`,[scope.venueId,scope.accountId,scope.actorId]);}
-export async function migrationStatus(db:D1Database,scope:Scope){await authorize(db,scope);const run=await db.prepare('SELECT * FROM journal_migration_runs WHERE venue_id=? AND account_id=?').bind(scope.venueId,scope.accountId).first<Run>();return {scope:{venueId:scope.venueId,accountId:scope.accountId},run,stock:await journalState(db,scope),events:await salesEventState(db,scope),log:run?(await db.prepare('SELECT * FROM journal_migration_log WHERE run_id=? ORDER BY sequence').bind(run.run_id).all()).results:[]};}
+// One state machine, two compatible metadata generations. Existing runs never move.
+const metadataDatabases=new WeakSet<object>();
+async function metadataDatabase(db:D1Database,scope:Scope):Promise<D1Database>{
+ if(metadataDatabases.has(db))return db;
+ // A partially applied expand migration must not admit new operations.
+ const guards=await db.prepare("SELECT count(*) n FROM sqlite_schema WHERE type='trigger' AND name IN ('journal_v2_pause_domain_update','journal_v2_pause_domain_insert','journal_v2_pause_domain_delete','journal_v2_pause_profile','journal_v2_pause_venue','journal_v2_pause_venue_delete','journal_v2_qa_pause_journal_migration_runs_v2_insert','journal_v2_qa_pause_journal_migration_runs_v2_update','journal_v2_qa_pause_journal_migration_runs_v2_delete','journal_v2_qa_pause_old_log','journal_v2_qa_pause_old_log_update','journal_v2_qa_pause_old_log_delete','journal_v2_exclusive_old','journal_v2_exclusive_new')").first<{n:number}>();
+ if(guards?.n!==14)fail('SCHEMA_NOT_READY');
+ const old=await db.prepare('SELECT 1 FROM journal_migration_runs WHERE venue_id=? AND account_id=?').bind(scope.venueId,scope.accountId).first();
+ if(old)return db;
+ // Delegate every non-metadata statement and batch unchanged (including CAS and ownership guards).
+ const routed=new Proxy(db,{get(target,key){if(key==='prepare')return (sql:string)=>target.prepare(sql.replace(/\bjournal_migration_runs\b/g,'journal_migration_runs_v2').replace(/\bjournal_migration_log\b/g,'journal_migration_log_v2'));const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+ metadataDatabases.add(routed);return routed;
+}
+export async function migrationStatus(db:D1Database,scope:Scope){await authorize(db,scope);db=await metadataDatabase(db,scope);const run=await db.prepare('SELECT * FROM journal_migration_runs WHERE venue_id=? AND account_id=?').bind(scope.venueId,scope.accountId).first<Run>();return {scope:{venueId:scope.venueId,accountId:scope.accountId},run,stock:await journalState(db,scope),events:await salesEventState(db,scope),log:run?(await db.prepare('SELECT * FROM journal_migration_log WHERE run_id=? ORDER BY sequence').bind(run.run_id).all()).results:[]};}
 async function source(db:D1Database,scope:Scope):Promise<Source>{
  const result=await db.batch([db.prepare('SELECT id,workspace_id,data_account_id,status FROM venues WHERE id=? AND data_account_id=?').bind(scope.venueId,scope.accountId),db.prepare('SELECT restaurant_json FROM accounts WHERE id=?').bind(scope.accountId),db.prepare('SELECT store_key,CASE WHEN SUM(length(CAST(data_json AS BLOB))) OVER ()<=8000000 THEN data_json ELSE NULL END data_json,updated_at FROM domain_data WHERE account_id=? ORDER BY store_key LIMIT 257').bind(scope.accountId)]);
  const venue=result[0].results[0] as Source['venue'],profile=(result[1].results[0] as {restaurant_json:string|null})?.restaurant_json;if(!venue||profile===undefined)fail('SCOPE_FORBIDDEN');const stores=result[2].results as Store[];if(stores.length>256||stores.some(row=>typeof row.data_json!=='string'))fail('SOURCE_CAPACITY');return {venue,profile,stores};
@@ -47,7 +60,7 @@ async function backupRead(bucket:BackupStore,run:Run,scope:Scope){
  if(backup.format!=='bardoctor-journal-backup-v1'||backup.scope.venueId!==scope.venueId||backup.scope.accountId!==scope.accountId||required.some(key=>!Object.hasOwn(backup.required,key)||backup.required[key]!==backup.source.stores.find(row=>row.store_key===key)?.data_json&&!(backup.required[key]===null&&!backup.source.stores.some(row=>row.store_key===key))))fail('BACKUP_INCOMPLETE');return backup;
 }
 export async function prepareJournalMigration(db:D1Database,bucket:BackupStore,scope:Scope){
- await authorize(db,scope);if((await migrationStatus(db,scope)).run)return migrationStatus(db,scope);
+ await authorize(db,scope);db=await metadataDatabase(db,scope);if((await migrationStatus(db,scope)).run)return migrationStatus(db,scope);
  const s=await source(db,scope);if(!Array.isArray(JSON.parse(s.stores.find(r=>r.store_key==='bd_stock_movements')?.data_json??'null'))||!Array.isArray(JSON.parse(s.stores.find(r=>r.store_key==='bd_sales_events_v1')?.data_json??'[]')))fail('LEGACY_REQUIRED');
  validateLegacySource(s);const now=new Date().toISOString(),runId=crypto.randomUUID(),key=`journal-migrations/${scope.accountId}/${scope.venueId}/${runId}/backup.json`;
  const backup:Backup={format:'bardoctor-journal-backup-v1',capturedAt:now,scope:{accountId:scope.accountId,venueId:scope.venueId},source:s,required:Object.fromEntries(required.map(key=>[key,s.stores.find(row=>row.store_key===key)?.data_json??null]))};
@@ -78,7 +91,7 @@ async function verify(db:D1Database,scope:Scope,backup:Backup){
  return current;
 }
 export async function stepJournalMigration(db:D1Database,bucket:BackupStore,scope:Scope,runId:string){
- await authorize(db,scope);const run=(await migrationStatus(db,scope)).run;if(!run||run.run_id!==runId)fail('RUN_CHANGED');if(run.phase==='COMPLETE'||run.phase==='ABORTED')return migrationStatus(db,scope);
+ await authorize(db,scope);db=await metadataDatabase(db,scope);const run=(await migrationStatus(db,scope)).run;if(!run||run.run_id!==runId)fail('RUN_CHANGED');if(run.phase==='COMPLETE'||run.phase==='ABORTED')return migrationStatus(db,scope);
  const backup=await backupRead(bucket,run,scope);
  if(!run.paused&&Date.now()-Date.parse(backup.capturedAt)>15*60_000)fail('BACKUP_STALE');
  if(run.phase==='BACKED_UP'){
@@ -99,14 +112,14 @@ export async function stepJournalMigration(db:D1Database,bucket:BackupStore,scop
  return migrationStatus(db,scope);
 }
 export async function abortJournalMigration(db:D1Database,scope:Scope,runId:string){
- await authorize(db,scope);const {run,stock,events}=await migrationStatus(db,scope);if(!run||run.run_id!==runId)fail('RUN_CHANGED');if(run.phase==='ABORTED')return migrationStatus(db,scope);
+ await authorize(db,scope);db=await metadataDatabase(db,scope);const {run,stock,events}=await migrationStatus(db,scope);if(!run||run.run_id!==runId)fail('RUN_CHANGED');if(run.phase==='ABORTED')return migrationStatus(db,scope);
  if(stock?.state==='active'||events?.state==='active')fail('ROLL_FORWARD_REQUIRED');
  await advance(db,scope,run,'ABORTED',0,{reason:'no journal active; legacy remains authoritative'},[guard(db,"NOT EXISTS(SELECT 1 FROM stock_journals WHERE account_id=? AND state='active') AND NOT EXISTS(SELECT 1 FROM sales_event_journals WHERE account_id=? AND state='active')",[scope.accountId,scope.accountId])]);return migrationStatus(db,scope);
 }
 
 /** Fresh backup after an aborted/stale preparation; previous R2 objects/log entries remain. */
 export async function refreshJournalBackup(db:D1Database,bucket:BackupStore,scope:Scope,runId:string){
- await authorize(db,scope);const {run,stock,events}=await migrationStatus(db,scope);if(!run||run.run_id!==runId)fail('RUN_CHANGED');
+ await authorize(db,scope);db=await metadataDatabase(db,scope);const {run,stock,events}=await migrationStatus(db,scope);if(!run||run.run_id!==runId)fail('RUN_CHANGED');
  if(run.phase!=='ABORTED'||run.paused||stock?.state==='active'||events?.state==='active')fail('ABORT_BEFORE_REFRESH');
  // No step may activate an ABORTED run. Staging can be reset safely on repeated refresh attempts.
  const refreshGuards=()=>[ownerGuard(db,scope),guard(db,"EXISTS(SELECT 1 FROM journal_migration_runs WHERE run_id=? AND phase='ABORTED' AND paused=0 AND revision=?)",[run.run_id,run.revision])];
