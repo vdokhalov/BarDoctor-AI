@@ -1,3 +1,5 @@
+import {continueFinancialRead,financialReadExists,FinancialReadPending,financialReadAccessGuard} from './financial-read-progress';
+import {accountingCurrencyFromProfile} from './currency';
 import { journalMonth } from './journal-period';
 import { venueDate, venueTimeFromJson } from './venue-time';
 import { normalizeLegacyPayrollEntries } from "./payroll-entry-scope";
@@ -87,7 +89,12 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   // history (or honest PARTIAL), retaining stock anchors and historical signals.
   const financePeriod = journalMonth(venueDate(asOf,venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7));
   const financeStores = new Map<string, StoredVenueValue>();
-  for (const key of ['bd_sales_events_v1','bd_stock_movements']) {
+  let financeCostProof:object|undefined, financeNeedsContinuation=false;
+  financePeriod.endExclusive=new Date(Date.parse(venueDate(asOf,venueTimeFromJson(JSON.stringify(profile)).timezone)+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+  const financialStores=Object.fromEntries(snapshots.map(value=>{const raw=JSON.parse(value.dataJson??'[]');return [value.key,Array.isArray(raw)?raw:[]];}));
+  const readInput={scope,period:financePeriod,currency:accountingCurrencyFromProfile(profile)??'',profileJson:profileRow.data_json,snapshots,stores:financialStores,accessGuard:financialReadAccessGuard(database,{dataAccountId:account.id,venueId:account.venueId,actorId:account.actorAccountId,membershipId:account.membershipId,role:boundary.role,permissions:typeof boundary.permissions==='string'?boundary.permissions:null})};
+  financeNeedsContinuation=await financialReadExists(database,readInput);
+  if(!financeNeedsContinuation)for (const key of ['bd_sales_events_v1','bd_stock_movements']) {
     const source=sources.find(source=>source.key===key), snapshot=snapshots.find(snapshot=>snapshot.key===key);
     if (!source || source.state==='RESTRICTED' || !snapshot?.dataJson) continue;
     if (source.state==='AVAILABLE') { financeStores.set(key,stores.get(key)!); continue; }
@@ -99,10 +106,23 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
         ? await readHealthSalesEvents(database,account.id,snapshot.dataJson,scope,undefined,financePeriod)
         : await readHealthStockHistory(database,account.id,snapshot.dataJson,scope,undefined,financePeriod);
       financeStores.set(key,{data,sourceState:'AVAILABLE',updatedAt:snapshot.updatedAt??''});
-    } catch { financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:snapshot.updatedAt??''}); }
+    } catch(error) { if(/READ_LIMIT/.test(String(error)))financeNeedsContinuation=true; financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:snapshot.updatedAt??''}); }
+  }
+  if(financeNeedsContinuation){
+   try{
+    const progress=await continueFinancialRead(database,readInput);
+    if(progress.pending)throw new FinancialReadPending(progress.id,progress.phase,progress.revision);
+    financeCostProof=progress.costProof;
+    financeStores.set('bd_sales_events_v1',{data:progress.events,sourceState:'AVAILABLE',updatedAt:stores.get('bd_sales_events_v1')?.updatedAt??''});
+    financeStores.set('bd_stock_movements',{data:[],sourceState:'AVAILABLE',updatedAt:stores.get('bd_stock_movements')?.updatedAt??''});
+   }catch(error){
+    if(error instanceof FinancialReadPending)throw error;
+    financeCostProof=undefined;
+    for(const key of ['bd_sales_events_v1','bd_stock_movements'])financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:stores.get(key)?.updatedAt??''});
+   }
   }
   const ingredientMemo = createIngredientReconciliationMemo();
-  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { financeStores, ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
+  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { financeCostProof, financeStores, ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
   await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
   const operations = await observedAwait("health.operations", () => buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency }));
   const inputManifest = { contractVersion: 1 as const, scope, financePeriod: {...financePeriod,sources:[...financeStores].map(([key,value])=>({key,state:value.sourceState,revision:sources.find(source=>source.key===key)?.revision,updatedAt:value.updatedAt}))}, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };

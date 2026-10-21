@@ -334,8 +334,13 @@ function bdMonthlyCurrencyBoundaryNoticeV320({ report }) {
 }
 
 async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
-  const response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&view=current&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
-  const value = await response.json();
+  let response, value, previousJob=null, previousRevision=-1;
+  do {
+  response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&view=current&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
+  value = await response.json();
+  if(response.status===202&&value.pending===true&&value.code==="FINANCIAL_READ_PENDING"){if(signal?.aborted)throw new DOMException("Aborted","AbortError");if(typeof value.jobId!=="string"||!Number.isSafeInteger(value.revision)||value.revision<0||previousJob!==null&&(value.jobId!==previousJob||value.revision<=previousRevision))throw new Error("Расчёт не продвинулся. Повторите загрузку.");previousJob=value.jobId;previousRevision=value.revision;continue;}
+  break;
+  } while(true);
   if (!response.ok || !value.ok) throw new Error("Не удалось проверить отчёт. Проверьте доступ и повторите загрузку.");
   const scope = value.inputManifest?.scope || value.closing?.inputManifest?.scope;
   const legacyScope = value.closing && (!value.closing.venueId || value.closing.venueId === "primary" || Number(value.closing.venueId) === venueId);

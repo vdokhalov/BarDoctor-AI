@@ -836,7 +836,7 @@ function bdHealthDetailZonesV332(e){return bdHealthHomeZonesV332(e)}
 function bdHealthZoneActionV334(e,t){if(e.id==="finance")return{path:"/finance",label:"Посмотреть финансы"};if(e.id==="demand")return{path:"/reports",label:"Посмотреть динамику"};if(e.id==="data")return{path:"/data-control",label:"Проверить данные"};if(e.id==="operations"){const n=bdHealthPriorityV332(t,null);return["stock","unclosed-shift","unclosed-shifts","operational-blocker","equipment-recurring"].includes(n.issueKey)&&n.path?{path:n.path,label:n.cta}:null}return null}
 function bdHealthUpdatedV332(e){const t=new Date(e||"");return Number.isNaN(t.getTime())?"Время обновления неизвестно":"Обновлено "+t.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})+" в "+t.toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}
 /* bd-business-health-detail-v377 */
-async function bdFetchBusinessHealthV377(session){const controller=new AbortController;let timeout;try{const deadline=new Promise((resolve,reject)=>{timeout=window.setTimeout(()=>{reject(new Error("Business Health request timed out"));controller.abort()},15000)}),request=fetch("/api/business-health",{headers:ca(session),cache:"no-store",signal:controller.signal}).then(async response=>{let data;try{data=await response.json()}catch{throw new Error("Business Health returned invalid JSON")}return{response,data}});return await Promise.race([request,deadline])}finally{window.clearTimeout(timeout)}}
+async function bdFetchBusinessHealthV377(session){const controller=new AbortController,context=typeof bdBusinessHealthAccountContextV284==="function"?bdBusinessHealthAccountContextV284():null;let timeout,previousJob=null,previousRevision=-1;try{while(true){if(context!==null&&context!==bdBusinessHealthAccountContextV284())throw new Error("Business Health context changed");const deadline=new Promise((resolve,reject)=>{timeout=window.setTimeout(()=>{reject(new Error("Business Health request timed out"));controller.abort()},15000)}),request=fetch("/api/business-health",{headers:ca(session),cache:"no-store",signal:controller.signal}).then(async response=>{let data;try{data=await response.json()}catch{throw new Error("Business Health returned invalid JSON")}return{response,data}});const result=await Promise.race([request,deadline]);window.clearTimeout(timeout);if(result.response.status===202&&result.data?.pending===true&&result.data?.code==="FINANCIAL_READ_PENDING"){if(typeof result.data.jobId!=="string"||!Number.isSafeInteger(result.data.revision)||result.data.revision<0||previousJob!==null&&(result.data.jobId!==previousJob||result.data.revision<=previousRevision))throw new Error("Business Health calculation made no progress");previousJob=result.data.jobId;previousRevision=result.data.revision;continue;}return result}}finally{window.clearTimeout(timeout)}}
 function bdWarmCriticalHomeV349(){if(typeof window>"u"||window.__bdStartupWarmStartedV349)return;const e=Ot();if(!e)return;window.__bdStartupWarmStartedV349=!0,window.__bdStartupBusinessHealthWarmV349=bdFetchBusinessHealthV377(e).then(value=>({ok:!0,value}),error=>({ok:!1,error})),window.__bdStartupFinanceWarmV349=Promise.all(["bd_finance_revenue","bd_finance_expenses","bd_finance_gap_reasons"].map(async t=>{try{return{key:t,data:await Yse(t,e)}}catch(error){return bdHandleFinanceWarmFailurePhase3a5(error)}})).then(rows=>rows.find(row=>row?.availability==="RESTRICTED"||row?.availability==="UNAVAILABLE")||rows).catch(bdHandleFinanceWarmFailurePhase3a5)}
 bdWarmCriticalHomeV349();
 let bdLiveBusinessHealthPromiseV335=null,bdLiveBusinessHealthTimerV335=0,bdLiveBusinessHealthContextV335="";
@@ -1929,8 +1929,13 @@ function bdMonthlyCurrencyBoundaryNoticeV320({ report }) {
 }
 
 async function bdFetchMonthlyReportV513(venueId, monthKey, signal) {
-  const response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&view=current&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
-  const value = await response.json();
+  let response, value, previousJob=null, previousRevision=-1;
+  do {
+  response = await fetch("/api/month-close?monthKey=" + encodeURIComponent(monthKey) + "&view=current&venueId=" + venueId, { method: "GET", cache: "no-store", signal });
+  value = await response.json();
+  if(response.status===202&&value.pending===true&&value.code==="FINANCIAL_READ_PENDING"){if(signal?.aborted)throw new DOMException("Aborted","AbortError");if(typeof value.jobId!=="string"||!Number.isSafeInteger(value.revision)||value.revision<0||previousJob!==null&&(value.jobId!==previousJob||value.revision<=previousRevision))throw new Error("Расчёт не продвинулся. Повторите загрузку.");previousJob=value.jobId;previousRevision=value.revision;continue;}
+  break;
+  } while(true);
   if (!response.ok || !value.ok) throw new Error("Не удалось проверить отчёт. Проверьте доступ и повторите загрузку.");
   const scope = value.inputManifest?.scope || value.closing?.inputManifest?.scope;
   const legacyScope = value.closing && (!value.closing.venueId || value.closing.venueId === "primary" || Number(value.closing.venueId) === venueId);
@@ -2180,7 +2185,8 @@ function bdSalaryEmployeePage(){const[,e]=bt(),[,t]=$f("/salaries/:id"),bdSalary
 const bdBuildMonthlyReportBeforePayroll=bdBuildMonthlyReport;
 bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforePayroll(e,t,n,r,a,s,l),d=bdPayrollEntriesForVenue(e,bdPayrollArrayStore()).filter(M=>M.date.slice(0,7)===t),f=bdPayrollEntryTotals(d),m=n.filter(M=>M.date.slice(0,7)===t).reduce((M,D)=>M+(Number(D.payrollBreakdown?.total??D.payrollBreakdown?.totalPayroll)||0),0),h=r.filter(M=>M.date.slice(0,7)===t&&M.category==="payroll").reduce((M,D)=>M+(Number(D.amount)||0),0),g=m>0?m:h,y=g+f.bonus,j=y-f.deductions,v=j-f.paid,b=y-u.payroll,N=u.operatingResult===null?null:u.operatingResult-b,E=u.resultBeforeCost==null?null:u.resultBeforeCost-b,G=u.cashResult==null?null:u.cashResult-b,_=u.shiftEstimates.map(M=>{const D=n.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)),L=d.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)&&z.type==="bonus").reduce((z,q)=>z+(Number(q.amount)||0),0),q=m>0?D.reduce((z,q)=>z+(Number(q.payrollBreakdown?.total??q.payrollBreakdown?.totalPayroll)||0),0)+L:M.payroll+L,B=q-M.payroll;return{...M,payroll:q,resultBeforeCost:M.resultBeforeCost==null?null:M.resultBeforeCost-B,estimatedResult:M.estimatedResult==null?null:M.estimatedResult-B}});return{...u,payroll:y,payrollBase:g,payrollBonuses:f.bonus,payrollDeductions:f.deductions,payrollNet:j,payrollPaid:f.paid,payrollBalance:v,payrollSource:(m>0?"По составу смен":"По внесённым расходам")+(f.bonus>0?" + премии":""),operatingResult:N,resultBeforeCost:E,cashResult:G,shiftEstimates:_}};
 /* phase7-monthly-financial-model:start */
-const bdMonthlyFinancialModelPhase7=(()=>{// Pure readers of captured financial data. Never consult today's catalogue/prices.
+const bdMonthlyFinancialModelPhase7=(()=>{function periodCostProof(){return undefined;}
+// Pure readers of captured financial data. Never consult today's catalogue/prices.
 
 const row = (value         )      => value && typeof value === "object" && !Array.isArray(value) ? value        : {};
 const rows = (value         )        => Array.isArray(value) ? value.map(row) : [];
@@ -2509,7 +2515,7 @@ function reconcileMonthlyReport(input
  )      {
   const report = input.report;
   const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
-  const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
+  const history = periodCostProof(input.costProof,input.monthKey)??historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
   const authoritative = rows(input.reconciliations).some(link=>link.venueId===input.venueId && String(link.date).slice(0,7)===input.monthKey) || history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
     || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
     || rows(input.revenues).some(item => scope(item, input.venueId) && (["sales_events_v1", "sales_documents"].includes(String(item.revenueSource)) || item.manualTotalsVersion === 2 && item.accountingScope === "SHIFT")
@@ -2894,6 +2900,7 @@ exports.operationalFields = exports.REVENUE_SOURCES = exports.OPERATIONAL_REPORT
 exports.operationalData = operationalData;
 exports.operationalDay = operationalDay;
 exports.operationalDays = operationalDays;
+const financial_period_proof_1 = require("./financial-period-proof");
 const accounting_money_1 = require("./accounting-money");
 const business_day_rows_1 = require("./business-day-rows");
 /** Read model only. Sales facts and the existing Finance projection keep their identities. */
@@ -2958,11 +2965,11 @@ function operationalDay(input) {
     const eventIdentityMatches = events.every(event => eventRows.some(row => row.id === event.revenueRowId));
     const posMatches = eventRows.every(row => {
         const active = posted.filter(e => e.revenueRowId === row.id);
-        return monetaryValue(row) === money(active.reduce((sum, e) => sum + (monetaryValue(e) ?? 0), 0)) && row.receipts === active.length;
+        return monetaryValue(row) === money(active.reduce((sum, e) => sum + (monetaryValue(e) ?? 0), 0)) && row.receipts === active.reduce((n, event) => n + (0, financial_period_proof_1.financialEventCount)(event), 0);
     });
     const consistency = mixedShifts ? (eventIdentityMatches && posMatches ? "MATCH" : "MISMATCH") : factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
     const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
-    const receipts = factBacked ? posted.length : revenues.some(row => [1, 2].includes(Number(row.manualTotalsVersion)) && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
+    const receipts = factBacked ? posted.reduce((n, event) => n + (0, financial_period_proof_1.financialEventCount)(event), 0) : revenues.some(row => [1, 2].includes(Number(row.manualTotalsVersion)) && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
     const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row => [1, 2].includes(Number(row.manualTotalsVersion))).flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])));
     const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
     const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency === "MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";

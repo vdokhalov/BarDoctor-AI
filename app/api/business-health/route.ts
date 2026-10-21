@@ -1,3 +1,4 @@
+import {FinancialReadPending} from '../../../lib/bardoctor/financial-read-progress';
 import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateReadOnlyRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -12,7 +13,7 @@ function noStore(response: Response): Response {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  return noStore(await withInfrastructureErrorBoundary(request, () => readHealth(request)));
+  return noStore(await withInfrastructureErrorBoundary(request, async () => {try{return await readHealth(request);}catch(error){if(error instanceof FinancialReadPending)return Response.json({success:false,pending:true,code:error.message,jobId:error.jobId,phase:error.phase,revision:error.revision},{status:202});throw error;}}));
 }
 
 async function readHealth(request: Request): Promise<Response> {

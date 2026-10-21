@@ -41,11 +41,12 @@ async function hydrate(db:D1Database,scope:JournalScope,row:RecordRow){
  return hydrateParts(scope,row,parts.results);
 }
 /** Bounded chunk reads replace one round trip per event. Keep every integrity check. */
-async function hydratePage(db:D1Database,scope:JournalScope,rows:RecordRow[]){
+async function hydratePage(db:D1Database,scope:JournalScope,rows:RecordRow[],byteLimit?:number){
  const events:SalesEvent[]=[];
  for(let start=0;start<rows.length;start+=40){
   const batch=rows.slice(start,start+40);
-  const parts=await db.prepare(`SELECT event_id,version,ordinal,payload FROM sales_event_chunks WHERE account_id=? AND (${batch.map(()=>'(event_id=? AND version=?)').join(' OR ')}) ORDER BY event_id,version,ordinal`).bind(scope.accountId,...batch.flatMap(row=>[row.event_id,row.version])).all<EventPart&{event_id:string;version:number}>();
+  const parts=await db.prepare(`SELECT event_id,version,ordinal,${byteLimit===undefined?'payload':'CASE WHEN SUM(length(CAST(payload AS BLOB))) OVER ()>? THEN NULL ELSE payload END payload'} FROM sales_event_chunks WHERE account_id=? AND (${batch.map(()=>'(event_id=? AND version=?)').join(' OR ')}) ORDER BY event_id,version,ordinal`).bind(...(byteLimit===undefined?[]:[byteLimit]),scope.accountId,...batch.flatMap(row=>[row.event_id,row.version])).all<EventPart&{event_id:string;version:number}>();
+  if(parts.results.some(part=>typeof part.payload!=='string'))throw Error('SALES_EVENT_READ_LIMIT');
   const grouped=new Map<string,EventPart[]>();
   for(const part of parts.results){const key=JSON.stringify([part.event_id,part.version]);const list=grouped.get(key)||[];list.push(part);grouped.set(key,list);}
   for(const row of batch)events.push(await hydrateParts(scope,row,grouped.get(JSON.stringify([row.event_id,row.version]))||[]));
@@ -123,6 +124,33 @@ async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:st
  if(!current||current.revision!==value.revision||current.state!==state.state)throw new StoreWriteConflictError();
  if(bytes(refs)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
  return refs;
+}
+/** One bounded verified page for resumable financial calculations. No total-period
+ * row/byte cap: the returned cursor continues over every record in the period. */
+export async function financialEventPage(db:D1Database,accountId:number,raw:string,ownership:{venueId:number;workspaceId:number;dataAccountId:number},period:JournalPeriod,after:number|null=null){
+ validateJournalPeriod(period);
+ const value=JSON.parse(raw),scope=await stockScope(db,accountId);
+ if(!marker(value)||scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)fail();
+ const state=await salesEventState(db,scope);
+ if(!state||state.state!=='active'||state.revision!==value.revision)throw new StoreWriteConflictError();
+ if(await db.prepare("SELECT 1 FROM sales_event_records INDEXED BY sales_event_date WHERE account_id=? AND business_date='' LIMIT 1").bind(accountId).first())fail();
+ const singleDay=Date.parse(period.endExclusive)-Date.parse(period.start)===86400000;
+ const candidates=await db.prepare(`SELECT event_id,position,version,payload_hash,chunk_count FROM sales_event_records INDEXED BY sales_event_date WHERE account_id=? AND ${singleDay?'business_date=?':'business_date>=? AND business_date<?'} ${after===null?'':'AND position>?'} ORDER BY position LIMIT 41`).bind(accountId,period.start,...(singleDay?[]:[period.endExclusive]),...(after===null?[]:[after])).all<RecordRow>();
+ const records=candidates.results.slice(0,40);
+ if(!records.length){const current=await salesEventState(db,scope);if(!current||current.state!==state.state||current.revision!==value.revision)throw new StoreWriteConflictError();return {items:[],next:null};}
+ const sizes=await db.prepare(`SELECT event_id,version,COUNT(*) n,SUM(length(CAST(payload AS BLOB))) bytes FROM sales_event_chunks WHERE account_id=? AND (${records.map(()=>'(event_id=? AND version=?)').join(' OR ')}) GROUP BY event_id,version`).bind(accountId,...records.flatMap(r=>[r.event_id,r.version])).all<{event_id:string;version:number;n:number;bytes:number}>();
+ const selected:RecordRow[]=[];let retained=0;
+ for(const record of records){
+  const size=sizes.results.find(s=>s.event_id===record.event_id&&s.version===record.version);
+  if(!size||size.n!==record.chunk_count||size.bytes>2_000_000)throw Error('SALES_EVENT_READ_LIMIT');
+  if(selected.length&&retained+size.bytes>2_000_000)break;
+  selected.push(record);retained+=size.bytes;
+ }
+ const items=await hydratePage(db,scope,selected,2_000_000);
+ for(const event of items)if(!derivedInputBelongs(event,ownership)||!belongsToJournalPeriod(event.businessDate,period))throw Error('SALES_EVENT_SCOPE_MISMATCH');
+ const current=await salesEventState(db,scope);
+ if(!current||current.state!==state.state||current.revision!==value.revision)throw new StoreWriteConflictError();
+ return {items,next:candidates.results.length>selected.length?selected.at(-1)!.position:null};
 }
 export async function readSalesEventBatchReferences(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
  return readProjectedSalesEvents(db,accountId,raw,ownership,limits,event=>({id:event.id,venueId:event.venueId,batch:{id:event.batch.id}}));

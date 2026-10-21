@@ -78,7 +78,13 @@ test('Health and month-close agree after reconciliation with large normalized PO
   put('bd_inventory_snapshots',[]);
 
  });
- const assertUnknown=async(key:string)=>{const value=await health();assert.equal(value.snapshot.inputManifest.sources.find((s:any)=>s.key===key).state,'PARTIAL');const finance=value.context.promptData.performanceHistory.period.inputContract;assert.equal(finance.resultAfterCost,null);assert(finance.costReasons.includes('COST_SOURCE_UNAVAILABLE'));};
+ const assertUnknown=async(key:string)=>{
+  // These corruption fixtures deliberately bypass canonical journal revisions.
+  // Start a fresh verifier for each fixture rather than reuse an earlier proof.
+  r.sqlite.exec('DELETE FROM financial_read_jobs');
+  let value:any;
+  for(let attempt=0;attempt<60;attempt++){try{value=await health();break;}catch(error){if((error as Error).message!=='FINANCIAL_READ_PENDING')throw error;}}
+  assert(value,'verification must terminate with honest UNKNOWN');assert.equal(value.snapshot.inputManifest.sources.find((s:any)=>s.key===key).state,'PARTIAL');const finance=value.context.promptData.performanceHistory.period.inputContract;assert.equal(finance.resultAfterCost,null);assert(finance.costReasons.includes('COST_SOURCE_UNAVAILABLE'));};
  await t.test('nested foreign marker in omitted movement remains unknown',async()=>{const snapshot=r.sqlite.prepare('SELECT snapshot_hash,snapshot_json FROM stock_recipe_snapshots WHERE account_id=? LIMIT 1').get(accountId)!;const bad=JSON.stringify({workspaceId:999999});const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(bad));const hex=Buffer.from(hash).toString('hex');r.sqlite.prepare('INSERT INTO stock_recipe_snapshots(account_id,snapshot_hash,snapshot_json) VALUES(?,?,?)').run(accountId,hex,bad);r.sqlite.prepare('UPDATE stock_journal_movements SET snapshot_hash=? WHERE account_id=? AND snapshot_hash=?').run(hex,accountId,snapshot.snapshot_hash);await assertUnknown('bd_stock_movements');r.sqlite.prepare('UPDATE stock_journal_movements SET snapshot_hash=? WHERE account_id=? AND snapshot_hash=?').run(snapshot.snapshot_hash,accountId,hex);r.sqlite.prepare('DELETE FROM stock_recipe_snapshots WHERE account_id=? AND snapshot_hash=?').run(accountId,hex);});
  await t.test('omitted POS evidence still enforces nested ownership and original byte limit',async()=>{
   const event={id:'legacy-event',venueId,batch:batch('legacy-event-batch','2026-10-20',100),originalMovements:[{workspaceId:999999}]};

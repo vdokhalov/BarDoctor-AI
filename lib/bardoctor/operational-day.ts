@@ -1,3 +1,4 @@
+import {financialEventCount} from './financial-period-proof';
 import { resolveAccountingMoney } from "./accounting-money";
 import { eligibleRevenueRows, uniqueBusinessRows, scopedBusinessRows, finiteBusinessNumber } from "./business-day-rows";
 /** Read model only. Sales facts and the existing Finance projection keep their identities. */
@@ -57,11 +58,11 @@ export function operationalDay(input: OperationalDayInput) {
   const eventIdentityMatches = events.every(event => eventRows.some(row => row.id === event.revenueRowId));
   const posMatches=eventRows.every(row=>{
     const active=posted.filter(e=>e.revenueRowId===row.id);
-    return monetaryValue(row)===money(active.reduce((sum,e)=>sum+(monetaryValue(e)??0),0))&&row.receipts===active.length;
+    return monetaryValue(row)===money(active.reduce((sum,e)=>sum+(monetaryValue(e)??0),0))&&row.receipts===active.reduce((n,event)=>n+financialEventCount(event),0);
   });
   const consistency = mixedShifts ? (eventIdentityMatches&&posMatches?"MATCH":"MISMATCH") : factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
   const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
-  const receipts = factBacked ? posted.length : revenues.some(row=>[1,2].includes(Number(row.manualTotalsVersion))&&row.receipts==null)?null:revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
+  const receipts = factBacked ? posted.reduce((n,event)=>n+financialEventCount(event),0) : revenues.some(row=>[1,2].includes(Number(row.manualTotalsVersion))&&row.receipts==null)?null:revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
   const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row=>[1,2].includes(Number(row.manualTotalsVersion))).flatMap(row=>rows(Array.isArray(row.payments)?row.payments:[])));
   const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
   const status: RevenueStatus = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency==="MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";

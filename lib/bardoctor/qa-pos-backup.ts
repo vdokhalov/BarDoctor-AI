@@ -4,6 +4,10 @@ import {preparePosOrderMigration,copyPosOrders,activatePosOrders,restartPosOrder
 export const QA_SCOPE={accountId:148,venueId:3389} as const;
 // Optional runner metadata is outside this historical QA contract only when this scope has no rows.
 // Keep the stored v3/v4 contract unchanged so existing backup downloads remain readable.
+// Regenerable read caches are not business journals and never restore as
+// authoritative calculations. Keep the historical backup contract hash stable.
+export const DERIVED_READ_TABLES=['financial_read_jobs','financial_read_events','financial_read_movements'] as const;
+const derivedReadTables=new Set<string>(DERIVED_READ_TABLES);
 const runnerExpansion=['journal_migration_runs_v2','journal_migration_log_v2'];
 function runnerExpansionCount(name:string){return name==='journal_migration_runs_v2'?'SELECT count(*) AS count FROM journal_migration_runs_v2 WHERE account_id=148 OR venue_id=3389':'SELECT count(*) AS count FROM journal_migration_log_v2 WHERE run_id IN (SELECT run_id FROM journal_migration_runs_v2 WHERE account_id=148 OR venue_id=3389)'}
 export const BUSINESS_TABLES=['domain_data','audit_log','stock_journals','stock_recipe_snapshots','stock_journal_movements','sales_event_journals','sales_event_records','sales_event_chunks','sales_event_reversals','sales_event_totals','pos_order_journals','pos_order_records','pos_order_components','pos_order_chunks','review_source_events','venue_migration_exports','venue_migration_operations','journal_migration_runs','journal_migration_log','ai_usage_events'] as const;
@@ -13,7 +17,7 @@ export const UNVERIFIED_OUTSIDE_CONTRACT=['__appgarden_migrations'] as const;
 const emptyOnlyTables=['integration_connections','integration_mappings','integration_entity_links','integration_sync_runs','integration_sync_items','integration_field_mapping_templates','integration_ingress_deliveries','invoice_recognition_jobs','notification_jobs','notification_job_events','notification_deliveries'];
 export const QA_BACKUP_CONTRACT={version:'qa3389-business-contract-v3',scope:QA_SCOPE,businessTables:[...BUSINESS_TABLES],profileFields:['id','restaurant_json','competitors_json','review_sources_json','migration_status','migration_summary_json','imported_at'],assetPrefixes:['venues','purchases','sales','catalog','employees'].map(p=>p+'/148/'),emptyOnlyTables,excludedIdentity:[...identityTables].sort(),unverifiedOutsideContract:[...UNVERIFIED_OUTSIDE_CONTRACT],schemaTables:[...BUSINESS_TABLES,...emptyOnlyTables,'accounts','venues','workspaces','qa_pos_backup_runs'].sort()} as const;
 export async function contractSchemaHash(schema:Record<string,unknown>[]){
- for(const entry of schema.filter(e=>e.type==='table')){const name=String(entry.name);if(!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!identityTables.has(name)&&!runnerExpansion.includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name))backupFail('UNCLASSIFIED_TABLE_'+name)}
+ for(const entry of schema.filter(e=>e.type==='table')){const name=String(entry.name);if(!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!identityTables.has(name)&&!runnerExpansion.includes(name)&&!derivedReadTables.has(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name))backupFail('UNCLASSIFIED_TABLE_'+name)}
  const present=new Set(schema.filter(e=>e.type==='table').map(e=>String(e.name)));if(QA_BACKUP_CONTRACT.schemaTables.some(name=>!present.has(name)))backupFail('CONTRACT_TABLE_MISSING');
  return backupDigest(stableSalesValue({contract:QA_BACKUP_CONTRACT,schema:schema.filter(e=>(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(String(e.tbl_name)))}));
 }
@@ -36,7 +40,7 @@ export async function qaBackupStatus(db:D1Database,s:QaScope){await authorizeQaB
 /** Read-only advisory census: no payload fields, pause writes, R2, or AI calls. Recheck after pausing in capture. */
 export async function qaBackupPreflight(db:D1Database,s:QaScope){
  await authorizeQaBackup(db,s);const schema=(await db.prepare("SELECT type,name,tbl_name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY name").all<Row>()).results;
- const tableNames=schema.filter(e=>e.type==='table').map(e=>String(e.name));const unknownTables=tableNames.filter(name=>!identityTables.has(name)&&!runnerExpansion.includes(name)&&!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name));
+ const tableNames=schema.filter(e=>e.type==='table').map(e=>String(e.name));const unknownTables=tableNames.filter(name=>!identityTables.has(name)&&!runnerExpansion.includes(name)&&!derivedReadTables.has(name)&&!(QA_BACKUP_CONTRACT.schemaTables as readonly string[]).includes(name)&&!(UNVERIFIED_OUTSIDE_CONTRACT as readonly string[]).includes(name));
  const missingTables=QA_BACKUP_CONTRACT.schemaTables.filter(name=>!tableNames.includes(name));
  const counts:Record<string,number>={};
  for(const name of [...emptyOnlyTables,...runnerExpansion,'ai_usage_events']){if(!tableNames.includes(name))continue;let statement:D1PreparedStatement;

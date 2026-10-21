@@ -1,3 +1,5 @@
+import {continueFinancialRead,financialReadExists,financialReadAccessGuard} from './financial-read-progress';
+import {periodCostProof} from './financial-period-proof';
 import { currentFinance } from "./current-finance";
 import {readHealthSalesEvents} from './sales-event-storage';
 import {journalMonth} from './journal-period';
@@ -33,7 +35,7 @@ const conflict = () => response({ ok: false, code: "MONTH_CLOSE_INPUTS_CHANGED",
 
 /** Reuse the shipped monthly formula; add the recorded Finance and captured-cost
  * contracts. This is a read calculation, never a new accounting ledger. */
-export function calculateVerifiedMonth(input: { profile: Row; stores: Record<string, Row[]>; venueId: number; workspaceId: number; dataAccountId: number; monthKey: string; asOf: string }) {
+export function calculateVerifiedMonth(input: { profile: Row; stores: Record<string, Row[]>; venueId: number; workspaceId: number; dataAccountId: number; monthKey: string; asOf: string; costProof?:object }) {
   const { profile, stores, venueId, workspaceId, dataAccountId, monthKey, asOf } = input;
   const currency = accountingCurrencyFromProfile(profile);
   const startDate = `${monthKey}-01`, endDate = new Date(Date.UTC(Number(monthKey.slice(0, 4)), Number(monthKey.slice(5)), 0)).toISOString().slice(0, 10);
@@ -45,8 +47,8 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
   const localDay = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone);
   const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, data.bd_finance_expenses ?? [], snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
-  const report = reconcileMonthlyReport({ report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
-  const history = historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
+  const report = reconcileMonthlyReport({ costProof:input.costProof, report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
+  const history = periodCostProof(input.costProof,monthKey)??historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
   const reasons = [...finance.missing, ...history.reasons];
   for (const field of ["taxModel", "utilityModel"]) {
     const model = row(settings[field]);
@@ -89,22 +91,29 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   const snapshots = storeSnapshots(loaded, KEYS);
   let stores: Record<string, Row[]>;
   let profile: Row;
+  let costProof: object|undefined;
   try {
     profile = row(JSON.parse(profileRow.data_json ?? "{}"));
     if (monthKey === "current") monthKey = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7);
     const period = journalMonth(monthKey), scope = {venueId,workspaceId,dataAccountId:account.id};
-    stores = Object.fromEntries(await Promise.all(snapshots.map(async value => {
-      const decoded = JSON.parse(value.dataJson ?? '[]');
-      // Legacy JSON keeps its existing compatibility semantics. Only normalized
-      // journals are selected before hydration. Other stores, including inventory
-      // boundaries and reconciliation operands, retain their complete snapshots.
-      const data = Array.isArray(decoded) ? decoded : value.key==='bd_sales_events_v1'
-        ? await readHealthSalesEvents(database,account.id,value.dataJson,scope,undefined,period)
-        : value.key==='bd_stock_movements'
-          ? await readHealthStockHistory(database,account.id,value.dataJson,scope,undefined,period) : decoded;
-      if (!Array.isArray(data)) throw new Error('invalid store');
-      return [value.key,array(data)];
-    })));
+    const currentView=request.method==='GET'&&url.searchParams.get('view')==='current'&&monthKey===venueDate(asOf,venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7);
+    if(currentView)period.endExclusive=new Date(Date.parse(venueDate(asOf,venueTimeFromJson(JSON.stringify(profile)).timezone)+'T00:00:00Z')+86400000).toISOString().slice(0,10);
+    stores=Object.fromEntries(snapshots.map(value=>{const data=JSON.parse(value.dataJson??'[]');return [value.key,Array.isArray(data)?array(data):[]];}));
+    const readInput={scope,period,currency:accountingCurrencyFromProfile(profile)??'',profileJson:profileRow.data_json,snapshots,stores,accessGuard:financialReadAccessGuard(database,{dataAccountId:account.id,venueId:account.venueId,actorId:account.actorAccountId,membershipId:account.membershipId,role:boundary.role,permissions:typeof boundary.permissions==='string'?boundary.permissions:null})};
+    let resumable=await financialReadExists(database,readInput);
+    if(!resumable)for(const key of ['bd_sales_events_v1','bd_stock_movements']){
+      const snapshot=snapshots.find(value=>value.key===key);if(!snapshot?.dataJson||Array.isArray(JSON.parse(snapshot.dataJson)))continue;
+      try { stores[key]=key==='bd_sales_events_v1'
+        ? await readHealthSalesEvents(database,account.id,snapshot.dataJson,scope,undefined,period)
+        : await readHealthStockHistory(database,account.id,snapshot.dataJson,scope,undefined,period); }
+      catch(error){if(!/READ_LIMIT/.test(String(error)))throw error;resumable=true;}
+    }
+    if(resumable){
+      const progress=await continueFinancialRead(database,readInput);
+      if(progress.pending)return response({ok:false,pending:true,code:'FINANCIAL_READ_PENDING',jobId:progress.id,phase:progress.phase,revision:progress.revision},202);
+      stores.bd_sales_events_v1=progress.events;stores.bd_stock_movements=[];costProof=progress.costProof;
+    }
+
   } catch { return response({ok:false,code:'MONTH_INPUTS_NEED_REVIEW'},422); }
 
   const closings = stores.bd_month_closings.filter(value => derivedInputBelongs(value, { venueId, workspaceId, dataAccountId: account.id }));
@@ -116,17 +125,17 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
     if (request.method === "POST") return verified && closing.previewRevision === body.previewRevision ? response({ ok: true, closing, closings, idempotent: true }) : response({ ok: false, code: "MONTH_ALREADY_CLOSED" }, 409);
     return response({ ok: true, closing, evidenceStatus: verified ? "VERIFIED" : manifest.version === MONTH_CLOSE_VERSION ? "INVALID" : "LEGACY_PARTIAL", report: closing.snapshot });
   }
-  const calculation = calculateVerifiedMonth({ profile, stores, venueId, workspaceId, dataAccountId: account.id, monthKey, asOf });
+  const calculation = calculateVerifiedMonth({ profile, stores, venueId, workspaceId, dataAccountId: account.id, monthKey, asOf, costProof });
   const manifest = { version: MONTH_CLOSE_VERSION, scope: { venueId, workspaceId, dataAccountId: account.id }, monthKey, startDate: calculation.startDate, endDate: calculation.endDate, currency: calculation.currency, calculationVersion: MONTH_CLOSE_VERSION, sources: await Promise.all(snapshots.filter(value => value.key !== "bd_month_closings").map(async value => ({ key: value.key, present: value.dataJson != null, updatedAt: value.updatedAt, revision: await monthCloseRevision(value.dataJson) }))), profileRevision: await monthCloseRevision(profileRow.data_json), components: calculation.components };
   const previewRevision = await monthCloseRevision(manifest);
   if (request.method !== "POST" && url.searchParams.get("view") === "current" && monthKey === venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7)) {
-    const current = currentFinance({ profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
+    const current = currentFinance({ costProof, profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
       movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, reconciliations: stores.bd_sales_reconciliations_v1, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
       expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
       expensesAvailable: snapshots.some(x=>x.key==='bd_finance_expenses'&&x.dataJson!=null), payrollEntriesAvailable: snapshots.some(x=>x.key==='bd_payroll_entries'&&x.dataJson!=null) });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));
-    const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf}).snapshot;
+    const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf,costProof}).snapshot;
     return response({ok:true,report:{...display,...current,inputContract:current},inputManifest:manifest,reasons:current.missing,reasonDetails:[],closureReasons:calculation.reasons,evidenceStatus:"CURRENT"});
   }
   if (request.method !== "POST") return response({ ok: true, ...calculation, report: calculation.snapshot, inputManifest: manifest, previewRevision, evidenceStatus: "PREVIEW" });

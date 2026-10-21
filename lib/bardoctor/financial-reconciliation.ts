@@ -1,3 +1,4 @@
+import {periodCostProof} from './financial-period-proof';
 // Pure readers of captured financial data. Never consult today's catalogue/prices.
 type Row = Record<string, unknown>;
 const row = (value: unknown): Row => value && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
@@ -321,13 +322,13 @@ export function historicalPeriodCost(input: {
 }
 
 export function reconcileMonthlyReport(input: {
-  report: Row; venueId: number; monthKey: string; snapshots: unknown;
+  costProof?:object; report: Row; venueId: number; monthKey: string; snapshots: unknown;
   revenues: unknown; events: unknown; movements: unknown;
   documents?: unknown; batches?: unknown; reconciliations?: unknown;
 }): Row {
   const report = input.report;
   const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
-  const history = historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
+  const history = periodCostProof(input.costProof,input.monthKey)??historicalPeriodCost({ ...input, accountingCurrency: String(report.accountingCurrency ?? "") });
   const authoritative = rows(input.reconciliations).some(link=>link.venueId===input.venueId && String(link.date).slice(0,7)===input.monthKey) || history.reasons.includes("UNLINKED_SALES_CONSUMPTION")
     || opening.phase7PhysicalSnapshot === true || closing.phase7PhysicalSnapshot === true
     || rows(input.revenues).some(item => scope(item, input.venueId) && (["sales_events_v1", "sales_documents"].includes(String(item.revenueSource)) || item.manualTotalsVersion === 2 && item.accountingScope === "SHIFT")

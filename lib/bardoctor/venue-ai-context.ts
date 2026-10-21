@@ -65,6 +65,7 @@ export type StoredVenueValue = {
 export type VenueAIContextSources = {
   /** Independently verified current-period journal inputs; never used for stock proofs. */
   financeStores?: Map<string, StoredVenueValue>;
+  financeCostProof?: object;
   ingredientMemo?: IngredientReconciliationMemo;
   access?: AuthenticatedAccount;
   workspaceId?: number;
@@ -487,7 +488,7 @@ function summariseRevenue(request: JsonRecord, sources: VenueAIContextSources, n
       && activeBusinessRow(item);
   });
   const financeStore = (key: string) => sources.financeStores?.get(key) ?? store(sources,key);
-  const monthInputs = currentFinance({ reconciliations: array(financeStore("bd_sales_reconciliations_v1")?.data), movements: array(financeStore("bd_stock_movements")?.data), batches: array(financeStore("bd_sales_batches")?.data), costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>{const source=financeStore(key);return [key,!source?(sources.access&&!canReadVenueSource(sources.access,key)?"UNAVAILABLE":"ABSENT"):source.sourceState!=="PARTIAL"&&Array.isArray(source.data)?"AVAILABLE":"UNAVAILABLE"]})), profile: sources.accountProfile, venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
+  const monthInputs = currentFinance({ costProof:sources.financeCostProof, reconciliations: array(financeStore("bd_sales_reconciliations_v1")?.data), movements: array(financeStore("bd_stock_movements")?.data), batches: array(financeStore("bd_sales_batches")?.data), costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>{const source=financeStore(key);return [key,!source?(sources.access&&!canReadVenueSource(sources.access,key)?"UNAVAILABLE":"ABSENT"):source.sourceState!=="PARTIAL"&&Array.isArray(source.data)?"AVAILABLE":"UNAVAILABLE"]})), profile: sources.accountProfile, venueId, workspaceId: sources.workspaceId, dataAccountId: sources.access?.id, legacyVenueKeys: [String(sources.accountProfile.id || sources.accountProfile.name || "primary")], currency, asOf: now.toISOString(), startDate: `${currentMonthKey}-01`, endDate: today,
     revenues: revenueRows, reports: array(financeStore( "bd_operational_reports_v1")?.data), events: array(financeStore( "bd_sales_events_v1")?.data),
     documents: array(financeStore( "bd_sales_documents")?.data), expenses: currentMonthExpenses, payrollEntries: currentMonthPayrollEntries, expensesAvailable: !!storedExpenses && storedExpenses.sourceState !== "PARTIAL" && Array.isArray(storedExpenses.data), payrollEntriesAvailable: !!storedPayroll && storedPayroll.sourceState !== "PARTIAL" && Array.isArray(storedPayroll.data) });
   const effectiveRevenue = monthInputs.revenueRows.length ? monthInputs.revenue : null;

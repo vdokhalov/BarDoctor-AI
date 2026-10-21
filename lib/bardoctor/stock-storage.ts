@@ -43,11 +43,11 @@ export async function readHealthStockHistory(db:D1Database,accountId:number,raw:
   for(const movement of value)append(movement);return result;
  }
  if(!stockJournalMarker(value)||!Number.isSafeInteger(value.revision))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
- if(!period){
+ {
   // A full-history consumer remains explicitly PARTIAL beyond its budget.
   // Detect this without hydrating thousands of snapshots before Finance can
   // independently request its current period.
-  const budget=await db.prepare('SELECT COUNT(*) n,COALESCE(SUM(length(CAST(payload_json AS BLOB))),0) bytes FROM (SELECT payload_json FROM stock_journal_movements WHERE account_id=? LIMIT ?)').bind(accountId,limits.rows+1).first<{n:number;bytes:number}>();
+  const budget=await db.prepare(`SELECT COUNT(*) n,COALESCE(SUM(length(CAST(payload_json AS BLOB))),0) bytes FROM (SELECT payload_json FROM stock_journal_movements ${period?'INDEXED BY stock_journal_period':''} WHERE account_id=? ${period?'AND (effective_date>=? AND effective_date<? OR effective_date IS NULL)':''} LIMIT ?)`).bind(accountId,...(period?[period.start,period.endExclusive]:[]),limits.rows+1).first<{n:number;bytes:number}>();
   if(!budget||budget.n>limits.rows||budget.bytes>limits.bytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
  }
  let after:number|null=null;
