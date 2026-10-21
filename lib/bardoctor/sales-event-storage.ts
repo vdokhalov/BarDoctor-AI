@@ -94,14 +94,27 @@ async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:st
  const records=await db.prepare('SELECT event_id,position,version,payload_hash,chunk_count FROM sales_event_records WHERE account_id=? ORDER BY position LIMIT ?').bind(accountId,limits.rows+1).all<RecordRow>();
  if(records.results.length>limits.rows||bytes(records.results)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
  for(const record of records.results){
-  // Each writer chunk contains up to 32000 code points. Reject malformed metadata
-  // and oversized payloads before joining/parsing, then run the original hash,
-  // ordinal, event identity and tenant validation in hydrateParts.
   if(!Number.isSafeInteger(record.chunk_count)||record.chunk_count<1||record.chunk_count>Math.ceil(limits.bytes/32000)+1)throw Error('SALES_EVENT_READ_LIMIT');
-  const parts=await db.prepare('SELECT ordinal,CASE WHEN SUM(length(CAST(payload AS BLOB))) OVER ()>? THEN NULL ELSE payload END payload FROM sales_event_chunks WHERE account_id=? AND event_id=? AND version=? ORDER BY ordinal LIMIT ?').bind(limits.bytes,accountId,record.event_id,record.version,record.chunk_count+1).all<EventPart>();
-  if(parts.results.some(p=>typeof p.payload!=='string')||parts.results.reduce((n,p)=>n+new TextEncoder().encode(p.payload).length,0)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
-  append(await hydrateParts(scope,record,parts.results));
  }
+ // Bound transferred payload for the entire group in SQL. If a group exceeds
+ // the byte budget, split it; never omit an event or weaken individual checks.
+ const hydrateGroup=async(batch:RecordRow[]):Promise<void>=>{
+  const parts=await db.prepare(`SELECT event_id,version,ordinal,
+   CASE WHEN SUM(length(CAST(payload AS BLOB))) OVER ()>? THEN NULL ELSE payload END payload
+   FROM sales_event_chunks WHERE account_id=? AND (${batch.map(()=>'(event_id=? AND version=?)').join(' OR ')})
+   ORDER BY event_id,version,ordinal LIMIT ?`)
+   .bind(limits.bytes,accountId,...batch.flatMap(row=>[row.event_id,row.version]),batch.reduce((n,row)=>n+row.chunk_count,0)+1)
+   .all<EventPart&{event_id:string;version:number}>();
+  if(parts.results.some(p=>typeof p.payload!=='string')){
+   if(batch.length===1)throw Error('SALES_EVENT_READ_LIMIT');
+   const middle=Math.floor(batch.length/2);await hydrateGroup(batch.slice(0,middle));await hydrateGroup(batch.slice(middle));return;
+  }
+  if(parts.results.reduce((n,p)=>n+new TextEncoder().encode(p.payload).length,0)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
+  const grouped=new Map<string,EventPart[]>();
+  for(const part of parts.results){const key=JSON.stringify([part.event_id,part.version]),list=grouped.get(key)??[];list.push(part);grouped.set(key,list);}
+  for(const record of batch)append(await hydrateParts(scope,record,grouped.get(JSON.stringify([record.event_id,record.version]))??[]));
+ };
+ for(let start=0;start<records.results.length;start+=40)await hydrateGroup(records.results.slice(start,start+40));
  const current=await salesEventState(db,scope);
  if(!current||current.revision!==value.revision||current.state!==state.state)throw new StoreWriteConflictError();
  if(bytes(refs)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');

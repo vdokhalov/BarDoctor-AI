@@ -1,3 +1,4 @@
+import {execFileSync} from 'node:child_process';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {lifecycleRuntime} from './helpers/lifecycle-runtime';
 import {HEALTH_OPERATIONS_KEYS} from '../lib/bardoctor/health-operations-inputs';
@@ -5,7 +6,7 @@ import {VENUE_CONTEXT_SOURCES} from '../lib/bardoctor/venue-context-access';
 
 test('Health and month-close agree after reconciliation with large normalized POS and stock history',async t=>{
  const now='2026-10-21T04:56:20Z';
- const r=await lifecycleRuntime({health:'./lib/bardoctor/canonical-health-inputs',month:'./app/api/month-close/route',reconcile:'./app/api/sales-reconciliation/route',events:'./lib/bardoctor/sales-event-storage',stock:'./lib/bardoctor/stock-journal',stockReader:'./lib/bardoctor/stock-storage',database:'./db'},{now});t.after(r.close);
+ const r=await lifecycleRuntime({health:'./lib/bardoctor/canonical-health-inputs',month:'./app/api/month-close/route',reconcile:'./app/api/sales-reconciliation/route',events:'./lib/bardoctor/sales-event-storage',stock:'./lib/bardoctor/stock-journal',stockReader:'./lib/bardoctor/stock-storage',database:'./db'},{now,...(process.env.HEALTH_PROFILE_BASELINE?{plugins:[{name:'profile-baseline',setup(build:any){build.onLoad({filter:/sales-event-storage\.ts$/},()=>({contents:execFileSync('git',['show','5d71df1d36d69e4572c68093d8f84a1ed1dd12a9:lib/bardoctor/sales-event-storage.ts'],{encoding:'utf8'}),loader:'ts'}));}}]}:{})});t.after(r.close);
  const owner=await r.register('health-linked@isolated.test'),venueId=owner.activeVenueId,accountId=owner.userId;
  const workspaceId=Number(r.sqlite.prepare('SELECT workspace_id FROM venues WHERE id=?').get(venueId)!.workspace_id),scope={venueId,workspaceId,dataAccountId:accountId},journal={venueId,accountId},api=r.api as any,db=api.database.getD1();
  const put=(key:string,value:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').run(accountId,key,JSON.stringify(value),now);
@@ -30,7 +31,8 @@ test('Health and month-close agree after reconciliation with large normalized PO
  const account=await api.auth.authenticateReadOnlyRequest(r.request(owner,'/api/business-health'));
  const health=()=>api.health.loadCanonicalHealthInputs(account,now);
  const persisted=()=>JSON.stringify(Object.fromEntries(['domain_data','sales_event_journals','sales_event_records','sales_event_chunks','sales_event_totals','stock_journals','stock_journal_movements','stock_recipe_snapshots'].map(table=>[table,r.sqlite.prepare('SELECT * FROM '+table+' WHERE account_id=? ORDER BY rowid').all(accountId)])));
- const before=persisted(),h=await health(),response=await api.month.GET(r.request(owner,'/api/month-close?monthKey=current&view=current')),m=await response.json();assert.equal(response.status,200);
+ const reads:string[]=[];r.onRead(async sql=>{reads.push(sql);if(process.env.HEALTH_PROFILE_DELAY)await new Promise(resolve=>setTimeout(resolve,Number(process.env.HEALTH_PROFILE_DELAY)));});const started=performance.now();
+ const before=persisted(),h=await health();r.onRead(null);console.log(JSON.stringify({healthReadCount:reads.length,posChunkReads:reads.filter(sql=>sql.includes('FROM sales_event_chunks')).length,stockPageReads:reads.filter(sql=>sql.includes('total_bytes')).length,localMs:Math.round(performance.now()-started)}));if(!process.env.HEALTH_PROFILE_BASELINE)assert.equal(reads.filter(sql=>sql.includes('FROM sales_event_chunks')).length,4);const response=await api.month.GET(r.request(owner,'/api/month-close?monthKey=current&view=current')),m=await response.json();assert.equal(response.status,200);
  const f=h.context.promptData.performanceHistory.period.inputContract;
  for(const key of ['bd_sales_events_v1','bd_stock_movements','bd_sales_batches','bd_sales_reconciliations_v1'])assert.equal(h.snapshot.inputManifest.sources.find((s:any)=>s.key===key).state,'AVAILABLE',key);
  for(const key of ['revenue','payroll','costOfGoods','resultBeforeCost','resultAfterCost','inventoryAdjustmentNet'])assert.equal(f[key],m.report[key],key);
@@ -50,5 +52,11 @@ test('Health and month-close agree after reconciliation with large normalized PO
   r.sqlite.prepare('UPDATE stock_recipe_snapshots SET snapshot_json=? WHERE account_id=? AND snapshot_hash=?').run(snapshot.snapshot_json,accountId,snapshot.snapshot_hash);
  });
  await t.test('hash tampering remains unknown',async()=>{const part=r.sqlite.prepare("SELECT payload FROM sales_event_chunks WHERE account_id=? AND event_id='pos-0' AND ordinal=0").get(accountId)!;r.sqlite.prepare("UPDATE sales_event_chunks SET payload='{}' WHERE account_id=? AND event_id='pos-0' AND ordinal=0").run(accountId);await assertUnknown('bd_sales_events_v1');r.sqlite.prepare("UPDATE sales_event_chunks SET payload=? WHERE account_id=? AND event_id='pos-0' AND ordinal=0").run(part.payload,accountId);});
+ for(const [field,bad] of [['version',1],['chunk_count',1]] as const)await t.test('projected POS '+field+' mismatch remains unknown',async()=>{
+  const previous=r.sqlite.prepare('SELECT '+field+' FROM sales_event_records WHERE account_id=? AND event_id=?').get(accountId,'pos-0')!;
+  r.sqlite.prepare('UPDATE sales_event_records SET '+field+'=? WHERE account_id=? AND event_id=?').run(bad,accountId,'pos-0');await assertUnknown('bd_sales_events_v1');
+  r.sqlite.prepare('UPDATE sales_event_records SET '+field+'=? WHERE account_id=? AND event_id=?').run(previous[field],accountId,'pos-0');
+ });
+ await t.test('projected POS revision race remains unknown',async()=>{let changed=false;r.onRead(sql=>{if(!changed&&sql.includes('FROM sales_event_chunks')){changed=true;r.sqlite.prepare('UPDATE sales_event_journals SET revision=revision+1 WHERE account_id=?').run(accountId);}});await assertUnknown('bd_sales_events_v1');r.onRead(null);r.sqlite.prepare('UPDATE sales_event_journals SET revision=revision-1 WHERE account_id=?').run(accountId);});
  await t.test('journal revision race remains unknown',async()=>{let changed=false;r.onRead(sql=>{if(!changed&&sql.includes('total_bytes')){changed=true;r.sqlite.prepare('UPDATE stock_journals SET revision=revision+1 WHERE account_id=?').run(accountId);}});await assertUnknown('bd_stock_movements');r.onRead(null);r.sqlite.prepare('UPDATE stock_journals SET revision=revision-1 WHERE account_id=?').run(accountId);});
 });
