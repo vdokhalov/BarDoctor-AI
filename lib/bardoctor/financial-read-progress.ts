@@ -37,7 +37,27 @@ export async function continueFinancialRead(db:D1Database,input:FinancialReadInp
  for(let i=1;i<4&&result.pending;i++)result=await advanceFinancialRead(db,input);
  return result;
 }
+class FinancialProgressAdvanced extends Error {
+ constructor(readonly progress:{pending:true;id:string;phase:Job['phase'];revision:number}){super('FINANCIAL_PROGRESS_ADVANCED');}
+}
+async function progressBatch(db:D1Database,input:FinancialReadInput,job:Job,writes:D1PreparedStatement[]){
+ try {
+  await runStoreCasBatch(db,input.scope.dataAccountId,input.snapshots,[boundary(db,input),...(input.accessGuard?[input.accessGuard]:[]),guard(db,job),...writes],new Date().toISOString());
+ }catch(error){
+  if(!(error instanceof StoreWriteConflictError))throw error;
+  const latest=await db.prepare('SELECT id,phase,revision FROM financial_read_jobs WHERE id=? AND account_id=? AND venue_id=?').bind(job.id,input.scope.dataAccountId,input.scope.venueId).first<Job>();
+  if(!latest||latest.revision<=job.revision)throw error;
+  // Only another successful step of this identical source calculation is retryable.
+  // Revalidate every source, owner and profile guard without weakening any guard.
+  await runStoreCasBatch(db,input.scope.dataAccountId,input.snapshots,[boundary(db,input),...(input.accessGuard?[input.accessGuard]:[])],new Date().toISOString());
+  throw new FinancialProgressAdvanced({pending:true,id:latest.id,phase:latest.phase,revision:latest.revision});
+ }
+}
 export async function advanceFinancialRead(db:D1Database,input:FinancialReadInput){
+ try{return await advanceFinancialReadOnce(db,input);}
+ catch(error){if(error instanceof FinancialProgressAdvanced)return error.progress;throw error;}
+}
+async function advanceFinancialReadOnce(db:D1Database,input:FinancialReadInput){
  input=normalizedInput(input);
  const {scope,period,snapshots}=input,accountId=scope.dataAccountId;
  const sourceRevision=await sourceId(input);
@@ -114,13 +134,13 @@ export async function advanceFinancialRead(db:D1Database,input:FinancialReadInpu
  const progressJson=JSON.stringify(aggregate);
  required(aggregate.summaries.length<=Math.max(1,records(input.stores.bd_finance_revenue).length)*31*12);
  writes.push(db.prepare('UPDATE financial_read_jobs SET phase=?,cursor=?,progress_json=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?').bind(phase,next,progressJson,new Date().toISOString(),id,current.revision));
- await runStoreCasBatch(db,accountId,snapshots,[boundary(db,input),...(input.accessGuard?[input.accessGuard]:[]),guard(db,current),...writes],new Date().toISOString());
+ await progressBatch(db,input,current,writes);
  // Never return partial operands as a complete report, even on the final page.
  return {pending:true as const,id,phase,revision:current.revision+1};
 }
 
 async function finishFinancialRead(db:D1Database,input:FinancialReadInput,job:Job){
- if(job.result_json){required(await hash(job.result_json)===job.result_hash);await runStoreCasBatch(db,input.scope.dataAccountId,input.snapshots,[boundary(db,input),...(input.accessGuard?[input.accessGuard]:[]),guard(db,job),...cleanupPage(db,job.id),db.prepare('UPDATE financial_read_jobs SET revision=revision+1 WHERE id=? AND revision=?').bind(job.id,job.revision)],new Date().toISOString());return restoreResult(JSON.parse(job.result_json),input.period.start.slice(0,7));}
+ if(job.result_json){required(await hash(job.result_json)===job.result_hash);await progressBatch(db,input,job,[...cleanupPage(db,job.id),db.prepare('UPDATE financial_read_jobs SET revision=revision+1 WHERE id=? AND revision=?').bind(job.id,job.revision)]);return restoreResult(JSON.parse(job.result_json),input.period.start.slice(0,7));}
  const {scope,period,stores}=input,id=job.id,monthKey=period.start.slice(0,7),cur=currency(input.currency);
  const revenues=selected(input,records(stores.bd_finance_revenue));
  const batches=selected(input,records(stores.bd_sales_batches));
@@ -149,7 +169,7 @@ async function finishFinancialRead(db:D1Database,input:FinancialReadInput,job:Jo
  // Recheck the original source revision immediately before returning trusted
  // server-local facts. A changed marker/profile never yields stale-as-current.
  const result={summaries,history,venueId:scope.venueId,currency:cur},json=JSON.stringify(result);
- await runStoreCasBatch(db,scope.dataAccountId,input.snapshots,[boundary(db,input),...(input.accessGuard?[input.accessGuard]:[]),guard(db,job),db.prepare('UPDATE financial_read_jobs SET result_json=?,result_hash=?,progress_json=NULL,revision=revision+1 WHERE id=? AND revision=?').bind(json,await hash(json),id,job.revision),...cleanupPage(db,id)],new Date().toISOString());
+ await progressBatch(db,input,job,[db.prepare('UPDATE financial_read_jobs SET result_json=?,result_hash=?,progress_json=NULL,revision=revision+1 WHERE id=? AND revision=?').bind(json,await hash(json),id,job.revision),...cleanupPage(db,id)]);
  return restoreResult(result,monthKey);
 }
 
