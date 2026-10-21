@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import ts from 'typescript';
+import { build } from 'esbuild';
+import vm from 'node:vm';
 const root = path.resolve(import.meta.dirname, '..');
 const file = path.join(root, 'public/assets/index-BQGspy0I.js');
 const start = '/* finance-inputs-phase3a6:start */', end = '/* finance-inputs-phase3a6:end */';
@@ -52,15 +53,18 @@ for (const [before, after] of rewrites) {
 source = source.replace(recordedPayrollExpression, draftPayrollExpression);
 // Compile the exact server read helpers for the existing client, rather than
 // maintaining a second financial calculation. No storage writes in this block.
-const modules = new Map();
-function include(name) {
-  if (modules.has(name)) return;
-  const value = fs.readFileSync(path.join(root, 'lib/bardoctor', name + '.ts'), 'utf8');
-  modules.set(name, ts.transpileModule(value, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText);
-  for (const match of value.matchAll(/from "\.\/([^"\n]+)"/g)) include(match[1]);
-}
-include('finance-inputs');
-const domain = `const bdFinanceInputsPhase3a6=(()=>{const modules={${[...modules].map(([key, value]) => `${JSON.stringify(key)}:(module,exports,require)=>{${value}}`).join(',')}},cache={};function require(key){key=key.startsWith('./')?key.slice(2):key;if(!cache[key]){const module={exports:{}};cache[key]=module;modules[key](module,module.exports,require)}return cache[key].exports}return {...require('finance-inputs'),...require('business-day-rows')};})();`;
+const compiled = await build({
+  stdin: {
+    contents: 'export * from "./finance-inputs"; export * from "./business-day-rows";',
+    resolveDir: path.join(root, 'lib/bardoctor'), sourcefile: 'finance-client-entry.ts', loader: 'ts',
+  },
+  bundle: true, platform: 'browser', format: 'iife', target: 'es2022',
+  globalName: 'bdFinanceInputsPhase3a6', write: false,
+});
+const domain = compiled.outputFiles[0].text;
+// Execute the emitted dependency graph before replacing the production asset.
+// A successful TS transform alone does not prove that client imports resolve.
+vm.runInNewContext(domain, {}, { timeout: 1000 });
 const client = `
 bdOperationalRows=function(rows,days){return bdFinanceInputsPhase3a6.revenueRowsWithReports(rows,days)};
 function bdFinanceReadPhase3a6(profile,startDate,endDate,revenues,expenses,settings){return bdFinanceInputsPhase3a6.readFinanceInputs({venueId:bdMonthlyVenueIdPhase7(profile,settings),legacyVenueKeys:[String(profile?.id||profile?.name||"primary")],currency:bdMonthlyAccountingCurrencyV320(profile,settings),asOf:new Date().toISOString(),startDate,endDate,revenues,operationalDayProjection:revenues.map(row=>row._bdOperationalDay).filter(Boolean),reports:bdProcArray("bd_operational_reports_v1"),events:bdProcArray("bd_sales_events_v1"),documents:bdProcArray("bd_sales_documents"),expenses,payrollEntries:bdProcArray("bd_payroll_entries")})}

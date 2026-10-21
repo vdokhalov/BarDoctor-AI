@@ -2570,520 +2570,470 @@ function bdClosedSnapshotValue(e,t,n){return Object.prototype.hasOwnProperty.cal
 bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforeClosure(e,t,n,r,a,s,l),d=bdClosedMonthRecord(s,t);if(!d)return{...u,status:"preliminary",isClosed:!1,closure:null};const f=d.snapshot&&typeof d.snapshot==="object"?d.snapshot:{},m=(h,g)=>bdClosedSnapshotValue(f,h,g),p=m("finalProfit",m("operatingResult",u.operatingResult));return{...u,status:"closed",isClosed:!0,closure:d,closedAt:d.closedAt||null,revenue:m("revenue",u.revenue),receipts:m("receipts",u.receipts),purchases:m("purchases",u.purchases),purchasePayments:m("purchasePayments",m("purchases",u.purchasePayments)),legacyPurchaseExpenses:m("legacyPurchaseExpenses",u.legacyPurchaseExpenses),periodExpenses:m("periodExpenses",u.periodExpenses),expenseBreakdown:m("expenseBreakdown",u.expenseBreakdown),otherExpenses:m("otherExpenses",u.otherExpenses),writeoffs:m("writeoffs",u.writeoffs),payroll:m("payroll",u.payroll),payrollSource:m("payrollSource",u.payrollSource),taxes:m("taxes",u.taxes),taxMode:m("taxMode",u.taxMode),utilities:m("utilities",u.utilities),utilityMode:m("utilityMode",u.utilityMode),openingInventory:m("openingInventory",u.openingInventory),closingInventory:m("closingInventory",u.closingInventory),costOfGoods:m("costOfGoods",u.costOfGoods),cashResult:m("cashResult",u.cashResult),resultBeforeCost:m("resultBeforeCost",u.resultBeforeCost),operatingResult:p,plannedShifts:m("plannedShifts",u.plannedShifts),accountedShifts:m("accountedShifts",u.accountedShifts),expectedShifts:m("expectedShifts",u.expectedShifts),coveragePercent:m("coveragePercent",u.coveragePercent),sections:m("sections",u.sections),...bdMonthlyClosedFieldsPhase7(f)}};
 
 /* finance-inputs-phase3a6:start */
-const bdFinanceInputsPhase3a6=(()=>{const modules={"finance-inputs":(module,exports,require)=>{"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.payrollForOperationalEdit = payrollForOperationalEdit;
-exports.financeAmount = financeAmount;
-exports.revenueRowsWithReports = revenueRowsWithReports;
-exports.readFinanceInputs = readFinanceInputs;
-const accounting_money_1 = require("./accounting-money");
-const currency_1 = require("./currency");
-const operational_day_1 = require("./operational-day");
-const business_day_rows_1 = require("./business-day-rows");
-const round = (value) => Math.round(value * 100) / 100;
-const scope = (rows, input) => (0, business_day_rows_1.scopedBusinessRows)(rows, { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId });
-/** Current rules are an edit estimate. An unrelated save cannot replace the
- * recorded historical breakdown when the underlying staffing/sales is unchanged. */
-function payrollForOperationalEdit(input) {
-    const previous = (0, business_day_rows_1.businessRecord)(input.previous), saved = (0, business_day_rows_1.businessRecord)(previous.payrollBreakdown);
-    const staffing = (value) => (Array.isArray(value) ? value : []).map(business_day_rows_1.businessRecord).map(row => ({ employeeId: row.employeeId, hours: (0, business_day_rows_1.finiteBusinessNumber)(row.hours), personalSales: (0, business_day_rows_1.finiteBusinessNumber)(row.personalSales), units: (0, business_day_rows_1.finiteBusinessNumber)(row.units) })).sort((a, b) => String(a.employeeId).localeCompare(String(b.employeeId)));
-    const departments = (value) => Object.entries((0, business_day_rows_1.businessRecord)(value)).map(([key, value]) => [key, (0, business_day_rows_1.finiteBusinessNumber)(value)]).filter(([, value]) => value != null).sort(([a], [b]) => String(a).localeCompare(String(b)));
-    const sameFacts = previous.date === input.businessDate
-        && JSON.stringify(staffing(previous.staffing)) === JSON.stringify(staffing(input.staffing))
-        && JSON.stringify(departments(previous.shiftDepartmentSales)) === JSON.stringify(departments(input.shiftDepartmentSales))
-        && (0, business_day_rows_1.finiteBusinessNumber)(previous.shiftVenueSales) === (0, business_day_rows_1.finiteBusinessNumber)(input.shiftVenueSales);
-    if (sameFacts && (0, business_day_rows_1.finiteBusinessNumber)(saved.total ?? saved.totalPayroll) != null)
-        return { payrollBreakdown: saved, basis: "RECORDED" };
-    return { payrollBreakdown: input.estimate, basis: input.estimate == null ? "MISSING" : "CURRENT_RULE_ESTIMATE" };
-}
-/** Existing accounting money rules, with missing monetary fields kept unknown. */
-function financeAmount(row, field, currency) {
-    if ((0, business_day_rows_1.finiteBusinessNumber)(row[field]) == null) {
-        const saved = (0, business_day_rows_1.finiteBusinessNumber)(row.accountingAmount);
-        return saved != null && (0, currency_1.normalizeAccountingCurrency)(currency) && (row.accountingCurrency == null || row.accountingCurrency === currency) ? saved : null;
+var bdFinanceInputsPhase3a6 = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
     }
-    const target = (0, currency_1.normalizeAccountingCurrency)(currency);
-    if (!target)
-        return null;
-    // Existing venue-scoped legacy rows predate currency storage; keep the legacy
-    // accounting convention. Explicit foreign currency always needs captured FX.
-    const resolved = (0, accounting_money_1.resolveAccountingMoney)({ value: row, originalAmount: row[field], originalCurrency: row.originalCurrency ?? row.currency ?? target, accountingCurrency: target });
-    return resolved?.accountingAmount ?? null;
-}
-/** Attach a recorded report once per date without changing any session identity. */
-function revenueRowsWithReports(revenues, days) {
-    const seen = new Set();
-    // Preserve the first matching day (including the untagged legacy case),
-    // without scanning the entire calendar for every revenue session.
-    const firstDay = new Map();
-    const scopedDay = new Map();
-    for (const day of days) {
-        if (!firstDay.has(day.businessDate))
-            firstDay.set(day.businessDate, day);
-        const venues = scopedDay.get(day.businessDate) ?? new Map();
-        if (!venues.has(day.venueId))
-            venues.set(day.venueId, day);
-        scopedDay.set(day.businessDate, venues);
-    }
-    return (0, business_day_rows_1.eligibleRevenueRows)(revenues).map(row => {
-        const day = row.venueId == null ? firstDay.get(row.date) : scopedDay.get(row.date)?.get(Number(row.venueId));
-        if (!day)
-            return row;
-        const first = !seen.has(day.businessDate);
-        seen.add(day.businessDate);
-        const result = { ...row, _bdOperationalDay: day, revenueStatus: day.revenue.status, operationalStatus: day.status };
-        // The separate report overrides legacy operational fields. Later sessions
-        // carry neither a second recorded payroll nor a second guest population.
-        if (day.report) {
-            delete result.payrollBreakdown;
-            delete result.staffing;
-            delete result.guests;
-            if (first)
-                Object.assign(result, day.report);
-            else if ((0, business_day_rows_1.finiteBusinessNumber)(day.report.guests) != null)
-                result.guests = 0; // once-per-day report population
-        }
-        result.payrollBasis = first && day.report && day.operations.fot === "RECORDED" ? "RECORDED" : "MISSING";
-        return result;
-    });
-}
-/** One declared metric: revenue minus active recorded expenses and accrued FOT,
- * before COGS, recurring estimates and final closed-month reconciliation. */
-function readFinanceInputs(input) {
-    const revenues = (0, business_day_rows_1.eligibleRevenueRows)(input.revenues, input.venueId, input).filter(row => String(row.date) >= input.startDate && String(row.date) <= input.endDate);
-    const revenuesByDate = new Map();
-    for (const row of revenues) {
-        const group = revenuesByDate.get(row.date) ?? [];
-        group.push(row);
-        revenuesByDate.set(row.date, group);
-    }
-    const projectedByDate = new Map();
-    for (const day of input.operationalDayProjection ?? []) {
-        if (day.venueId === input.venueId && !projectedByDate.has(day.businessDate))
-            projectedByDate.set(day.businessDate, day);
-    }
-    const periodRows = (values = []) => scope(values, input).filter(row => String(row.businessDate ?? row.date) >= input.startDate && String(row.businessDate ?? row.date) <= input.endDate);
-    const days = (0, operational_day_1.operationalDays)({ ...input, revenues, events: periodRows(input.events), documents: periodRows(input.documents), reports: periodRows(input.reports) }).map(day => {
-        // Existing client consumers receive authorized Operational Day metadata,
-        // while internal event/report stores deliberately stay out of bulk sync.
-        // Reuse that read projection only for the exact same source identities and
-        // accounting amount. A stale/different scope cannot certify a new total.
-        const projected = projectedByDate.get(day.businessDate);
-        const dayRows = revenuesByDate.get(day.businessDate) ?? [];
-        const ids = dayRows.map(row => row.id).sort();
-        const amounts = dayRows.map(row => financeAmount(row, "revenue", input.currency));
-        const matches = projected && Array.isArray(projected.revenue.sourceIds) && projected.revenue.currency === input.currency && ids.every(id => id != null)
-            && JSON.stringify([...projected.revenue.sourceIds].sort()) === JSON.stringify(ids)
-            && amounts.every(amount => amount != null) && round(amounts.reduce((sum, amount) => sum + amount, 0)) === projected.revenue.amount;
-        return matches ? projected : day;
-    });
-    const joined = revenueRowsWithReports(revenues, days);
-    const daily = (0, business_day_rows_1.aggregateBusinessDates)(joined.map(row => ({ ...row, revenue: financeAmount(row, "revenue", input.currency), amount: undefined, currency: input.currency })));
-    const excluded = revenues.filter(row => financeAmount(row, "revenue", input.currency) == null).map(row => ({ id: row.id ?? null, kind: "revenue", currency: row.currency ?? null }));
-    const periodExpenses = scope(input.expenses ?? [], input).filter(row => (0, business_day_rows_1.activeBusinessRow)(row) && String(row.accountingMonth ?? String(row.date).slice(0, 7)) >= input.startDate.slice(0, 7) && String(row.accountingMonth ?? String(row.date).slice(0, 7)) <= input.endDate.slice(0, 7) && (!row.date || String(row.date) <= input.endDate));
-    const entries = scope((input.payrollEntries ?? []).map(value => { const row = (0, business_day_rows_1.businessRecord)(value); return row.venueId != null && input.legacyVenueKeys?.includes(String(row.venueId)) ? { ...row, venueId: input.venueId } : row; }), input).filter(row => (0, business_day_rows_1.activeBusinessRow)(row) && String(row.date) >= input.startDate && String(row.date) <= input.endDate);
-    const total = (rows, field) => { const amounts = rows.map(row => financeAmount(row, field, input.currency)); return amounts.some(value => value == null) ? null : round(amounts.reduce((sum, value) => sum + value, 0)); };
-    const revenue = total(revenues, "revenue");
-    // The same authorization boundary applies to every day's recorded payroll.
-    // Resolve it once, preserving the first report per date and its original FX.
-    const scopedReports = scope(input.reports ?? [], input);
-    const reportsByDate = new Map();
-    for (const row of scopedReports)
-        if (!reportsByDate.has(row.date))
-            reportsByDate.set(row.date, row);
-    const legacyPayrollByDate = new Map();
-    for (const row of joined) {
-        if (!legacyPayrollByDate.has(row.date) && (0, business_day_rows_1.finiteBusinessNumber)((0, business_day_rows_1.businessRecord)(row.payrollBreakdown).total ?? (0, business_day_rows_1.businessRecord)(row.payrollBreakdown).totalPayroll) != null)
-            legacyPayrollByDate.set(row.date, row);
-    }
-    const payrollByDay = days.filter(day => day.report != null || revenuesByDate.has(day.businessDate)).map(day => {
-        const saved = day.payroll.amount;
-        // Even a recorded zero wins over expenses and future rule edits.
-        const legacy = legacyPayrollByDate.get(day.businessDate);
-        const amount = saved ?? (0, business_day_rows_1.finiteBusinessNumber)((0, business_day_rows_1.businessRecord)(legacy?.payrollBreakdown).total ?? (0, business_day_rows_1.businessRecord)(legacy?.payrollBreakdown).totalPayroll);
-        const source = day.operations.fot === "RECORDED" && saved != null ? "RECORDED" : amount != null ? "LEGACY_RECORDED" : "MISSING";
-        const original = reportsByDate.get(day.businessDate) ?? revenuesByDate.get(day.businessDate)?.[0] ?? {};
-        const converted = amount == null ? null : financeAmount({ ...original, originalAmount: amount, amount, accountingAmount: undefined }, "amount", input.currency);
-        return { businessDate: day.businessDate, amount: converted, basis: source };
-    });
-    const recordedPresent = payrollByDay.some(day => day.amount != null);
-    const legacyPayrollExpenses = periodExpenses.filter(row => row.category === "payroll");
-    const payrollBase = recordedPresent ? payrollByDay.every(day => day.amount != null) ? round(payrollByDay.reduce((sum, day) => sum + day.amount, 0)) : null
-        : legacyPayrollExpenses.length ? total(legacyPayrollExpenses, "amount") : null;
-    const paid = total(entries.filter(row => row.type === "payment"), "amount");
-    const deductions = total(entries.filter(row => ["order", "fine", "dishware", "other_deduction"].includes(String(row.type)) && (!row.confirmationStatus || row.confirmationStatus === "confirmed")), "amount");
-    const bonus = total(entries.filter(row => row.type === "bonus"), "amount");
-    const payroll = payrollBase != null && bonus != null && input.payrollEntriesAvailable !== false ? round(payrollBase + bonus) : null;
-    const operatingExpenses = input.expensesAvailable === false ? null : total(periodExpenses.filter(row => row.category !== "payroll"), "amount");
-    const expenses = payroll != null && operatingExpenses != null ? round(payroll + operatingExpenses) : null;
-    const preliminaryResult = revenue != null && expenses != null ? round(revenue - expenses) : null;
-    const missing = [...(revenue == null ? ["REVENUE_OR_CURRENCY"] : []), ...(payroll == null ? ["PAYROLL"] : []), ...(operatingExpenses == null ? ["EXPENSES_OR_CURRENCY"] : [])];
-    return { version: "business-day-finance-v1", metric: "recorded_current_result_before_cogs", venueId: input.venueId, currency: input.currency,
-        startDate: input.startDate, endDate: input.endDate, asOf: input.asOf, revenue, payroll, payrollBase, payrollBonuses: bonus, payrollPaid: paid, payrollDeductions: deductions, operatingExpenses, expenses, preliminaryResult,
-        resultStatus: missing.length ? "PARTIAL" : "PROVISIONAL", finality: "PRELIMINARY", missing, excluded, payrollByDay,
-        payrollBasis: recordedPresent ? payrollByDay.every(day => day.basis === "RECORDED") ? "RECORDED" : "LEGACY_RECORDED" : legacyPayrollExpenses.length ? "LEGACY_EXPENSE" : "MISSING",
-        days, daily, revenueRows: joined,
-    };
-}
-},"accounting-money":(module,exports,require)=>{"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.FX_RATE_DIRECTION = void 0;
-exports.roundMoney = roundMoney;
-exports.normalizeMoneyCurrency = normalizeMoneyCurrency;
-exports.resolveAccountingMoney = resolveAccountingMoney;
-exports.lockAccountingMoney = lockAccountingMoney;
-exports.accountingMoneyFields = accountingMoneyFields;
-const currency_1 = require("./currency");
-exports.FX_RATE_DIRECTION = "source_to_accounting";
-function record(value) {
-    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-function finite(value) {
-    const parsed = typeof value === "string"
-        ? Number(value.replace(/[\s\u00a0\u202f]/g, "").replace(",", "."))
-        : Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-}
-function roundMoney(value, precision = 2) {
-    const factor = 10 ** precision;
-    return Math.round((value + Number.EPSILON) * factor) / factor;
-}
-function normalizeMoneyCurrency(value) {
-    return typeof value === "string" ? value.trim().toUpperCase().slice(0, 16) : "";
-}
-function resolveAccountingMoney(input) {
-    const value = record(input.value);
-    const accountingCurrency = (0, currency_1.normalizeAccountingCurrency)(input.accountingCurrency ?? value.accountingCurrency);
-    if (!accountingCurrency)
-        return null;
-    const originalAmount = Math.max(0, finite(input.originalAmount ?? value.originalAmount ?? value.total ?? value.amount) ?? 0);
-    const originalCurrency = normalizeMoneyCurrency(input.originalCurrency ?? value.originalCurrency ?? value.currency);
-    const unresolved = (reason) => ({
-        originalAmount: roundMoney(originalAmount),
-        originalCurrency,
-        accountingAmount: null,
-        accountingCurrency,
-        status: "unresolved",
-        reason,
-    });
-    if (!originalCurrency)
-        return unresolved("missing_original_currency");
-    if (originalCurrency === accountingCurrency) {
-        return {
-            originalAmount: roundMoney(originalAmount),
-            originalCurrency,
-            accountingAmount: roundMoney(originalAmount),
-            accountingCurrency,
-            status: "same_currency",
-        };
-    }
-    const storedCurrency = normalizeMoneyCurrency(value.accountingCurrency ?? input.accountingCurrency);
-    const storedAmount = finite(input.accountingAmount ?? value.accountingAmount ?? value.normalizedAmount);
-    if (storedAmount != null && storedAmount >= 0) {
-        if (storedCurrency !== accountingCurrency)
-            return unresolved("accounting_currency_mismatch");
-        return {
-            originalAmount: roundMoney(originalAmount),
-            originalCurrency,
-            accountingAmount: roundMoney(storedAmount),
-            accountingCurrency,
-            fxRate: finite(input.fxRate ?? value.fxRate ?? value.exchangeRateToAccounting) ?? undefined,
-            fxRateDirection: exports.FX_RATE_DIRECTION,
-            fxEffectiveDate: String(input.fxEffectiveDate ?? value.fxEffectiveDate ?? "") || undefined,
-            fxSource: String(input.fxSource ?? value.fxSource ?? "") || undefined,
-            fxLockedAt: String(input.fxLockedAt ?? value.fxLockedAt ?? "") || undefined,
-            status: "converted",
-        };
-    }
-    const direction = String(input.fxRateDirection ?? value.fxRateDirection ?? exports.FX_RATE_DIRECTION);
-    const rate = finite(input.fxRate ?? value.fxRate ?? value.exchangeRateToAccounting);
-    if (direction === exports.FX_RATE_DIRECTION && rate != null && rate > 0) {
-        return {
-            originalAmount: roundMoney(originalAmount),
-            originalCurrency,
-            accountingAmount: roundMoney(originalAmount * rate),
-            accountingCurrency,
-            fxRate: rate,
-            fxRateDirection: exports.FX_RATE_DIRECTION,
-            fxEffectiveDate: String(input.fxEffectiveDate ?? value.fxEffectiveDate ?? "") || undefined,
-            fxSource: String(input.fxSource ?? value.fxSource ?? "") || undefined,
-            fxLockedAt: String(input.fxLockedAt ?? value.fxLockedAt ?? "") || undefined,
-            status: "converted",
-        };
-    }
-    return unresolved("missing_historical_fx");
-}
-function lockAccountingMoney(input) {
-    const resolved = resolveAccountingMoney({ value: input.value, accountingCurrency: input.accountingCurrency });
-    if (!resolved || resolved.status === "unresolved")
-        return resolved;
-    if (resolved.status === "converted" && input.requireFxProvenance !== false) {
-        if (!resolved.fxEffectiveDate || !resolved.fxSource)
-            return { ...resolved, accountingAmount: null, status: "unresolved", reason: "missing_historical_fx" };
-    }
-    return resolved.status === "converted" && !resolved.fxLockedAt
-        ? { ...resolved, fxLockedAt: input.now }
-        : resolved;
-}
-function accountingMoneyFields(value) {
-    return {
-        originalAmount: value.originalAmount,
-        originalCurrency: value.originalCurrency,
-        accountingAmount: value.accountingAmount,
-        accountingCurrency: value.accountingCurrency,
-        fxRate: value.fxRate,
-        fxRateDirection: value.fxRateDirection,
-        fxEffectiveDate: value.fxEffectiveDate,
-        fxSource: value.fxSource,
-        fxLockedAt: value.fxLockedAt,
-        accountingMoneyStatus: value.status,
-    };
-}
-},"currency":(module,exports,require)=>{"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ACCOUNTING_CURRENCY_LABELS = exports.ACCOUNTING_CURRENCIES = void 0;
-exports.normalizeAccountingCurrency = normalizeAccountingCurrency;
-exports.isAccountingCurrency = isAccountingCurrency;
-exports.accountingCurrencyLabel = accountingCurrencyLabel;
-exports.accountingCurrencyFromProfile = accountingCurrencyFromProfile;
-exports.accountingCurrencyFromRestaurantJson = accountingCurrencyFromRestaurantJson;
-exports.ACCOUNTING_CURRENCIES = [
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // lib/bardoctor/finance-client-entry.ts
+  var finance_client_entry_exports = {};
+  __export(finance_client_entry_exports, {
+    activeBusinessRow: () => activeBusinessRow,
+    aggregateBusinessDates: () => aggregateBusinessDates,
+    businessRecord: () => businessRecord,
+    eligibleRevenueRows: () => eligibleRevenueRows,
+    financeAmount: () => financeAmount,
+    finiteBusinessNumber: () => finiteBusinessNumber,
+    payrollForOperationalEdit: () => payrollForOperationalEdit,
+    readFinanceInputs: () => readFinanceInputs,
+    revenueRowsWithReports: () => revenueRowsWithReports,
+    scopedBusinessRows: () => scopedBusinessRows,
+    uniqueBusinessRows: () => uniqueBusinessRows
+  });
+
+  // lib/bardoctor/currency.ts
+  var ACCOUNTING_CURRENCIES = [
     "MDL",
     "PMR_RUB",
     "RUB",
     "EUR",
     "USD",
     "UAH",
-    "RON",
-];
-exports.ACCOUNTING_CURRENCY_LABELS = {
-    MDL: "MDL",
-    PMR_RUB: "руб. ПМР",
-    RUB: "RUB (российский рубль)",
-    EUR: "EUR",
-    USD: "USD",
-    UAH: "UAH",
-    RON: "RON",
-};
-const ACCOUNTING_CURRENCY_SET = new Set(exports.ACCOUNTING_CURRENCIES);
-function normalizeAccountingCurrency(value) {
-    if (typeof value !== "string")
-        return null;
+    "RON"
+  ];
+  var ACCOUNTING_CURRENCY_SET = new Set(ACCOUNTING_CURRENCIES);
+  function normalizeAccountingCurrency(value) {
+    if (typeof value !== "string") return null;
     const currency = value.trim().toUpperCase();
     return ACCOUNTING_CURRENCY_SET.has(currency) ? currency : null;
-}
-function isAccountingCurrency(value) {
-    return normalizeAccountingCurrency(value) !== null;
-}
-function accountingCurrencyLabel(value) {
-    const currency = normalizeAccountingCurrency(value);
-    return currency ? exports.ACCOUNTING_CURRENCY_LABELS[currency] : "";
-}
-function accountingCurrencyFromProfile(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value))
-        return null;
-    return normalizeAccountingCurrency(value.currency);
-}
-function accountingCurrencyFromRestaurantJson(value) {
-    if (typeof value !== "string" || !value.trim())
-        return null;
-    try {
-        return accountingCurrencyFromProfile(JSON.parse(value));
-    }
-    catch {
-        return null;
-    }
-}
-},"operational-day":(module,exports,require)=>{"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.operationalFields = exports.REVENUE_SOURCES = exports.OPERATIONAL_REPORT_STORE_KEY = void 0;
-exports.operationalData = operationalData;
-exports.operationalDay = operationalDay;
-exports.operationalDays = operationalDays;
-const financial_period_proof_1 = require("./financial-period-proof");
-const accounting_money_1 = require("./accounting-money");
-const business_day_rows_1 = require("./business-day-rows");
-/** Read model only. Sales facts and the existing Finance projection keep their identities. */
-exports.OPERATIONAL_REPORT_STORE_KEY = "bd_operational_reports_v1";
-exports.REVENUE_SOURCES = ["BARDOC_POS", "MANUAL_SUMMARY", "IMPORT", "INTEGRATION", "MIXED_SHIFTS"];
-exports.operationalFields = ["staffing", "payrollBreakdown", "shiftDepartmentSales", "shiftVenueSales", "note", "guests", "writeOffDocumentIds", "writeOffItemCount", "writeOffTotalCost", "incidentIds", "workdayStatus", "workdayRevision", "workdayPayrollDraft", "workdayConfirmations"];
-function operationalData(value) {
-    const row = object(value);
-    return Object.fromEntries(exports.operationalFields.filter(key => row[key] !== undefined).map(key => [key, row[key]]));
-}
-function object(value) { return value && typeof value === "object" && !Array.isArray(value) ? value : {}; }
-function rows(values) { return (values ?? []).map(object); }
-const money = (value) => Math.round(value * 100) / 100;
-const native = new Set(["POS_API", "MANUAL_GRID"]);
-const imports = new Set(["TEXT_IMPORT", "FILE_IMPORT", "IMAGE_IMPORT", "VOICE_IMPORT"]);
-const integrations = new Set(["ONE_C", "LOCAL_CONNECTOR", "OTHER_API"]);
-function factSource(source) {
-    return native.has(String(source)) ? "BARDOC_POS" : imports.has(String(source)) ? "IMPORT"
-        : integrations.has(String(source)) ? "INTEGRATION" : "LEGACY_UNKNOWN";
-}
-function operationalDay(input) {
-    const belongs = (row) => (0, business_day_rows_1.scopedBusinessRows)([row], { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).length > 0;
-    const revenues = (0, business_day_rows_1.eligibleRevenueRows)(input.revenues, input.venueId, input).filter(row => row.date === input.businessDate);
-    const events = (0, business_day_rows_1.uniqueBusinessRows)(input.events ?? []).filter(row => belongs(row) && row.venueId === input.venueId && row.businessDate === input.businessDate);
-    const posted = events.filter(row => row.status === "POSTED");
-    const eventRows = revenues.filter(row => row.revenueSource === "sales_events_v1");
-    const cashShifts = revenues.filter(row => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT").filter(row => ["open", "closed"].includes(String(row.closingStatus)));
-    const open = cashShifts.some(row => row.closingStatus === "open");
-    const documents = rows(input.documents).filter(row => belongs(row) && row.date === input.businessDate && row.status === "confirmed");
-    const sources = new Set();
-    for (const event of events)
-        sources.add(factSource(event.source));
-    for (const row of revenues) {
-        if (row.revenueSource === "sales_events_v1") {
-            const facts = events.filter(event => event.revenueRowId === row.id);
-            if (facts.length)
-                facts.forEach(event => sources.add(factSource(event.source)));
-            else
-                sources.add(Number(row.revenue) === 0 && cashShifts.includes(row) ? "BARDOC_POS" : "LEGACY_UNKNOWN");
-        }
-        else if (row.revenueSource === "sales_documents") {
-            const facts = documents.filter(doc => Array.isArray(row.salesDocumentIds) && row.salesDocumentIds.includes(doc.id));
-            if (facts.length)
-                facts.forEach(doc => sources.add(factSource(doc.sourceSystem)));
-            else
-                sources.add("LEGACY_UNKNOWN");
-        }
-        else if (row.revenueSource === "MANUAL_SUMMARY" || ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)))
-            sources.add("MANUAL_SUMMARY");
-        else
-            sources.add("LEGACY_UNKNOWN");
-    }
-    const mixedShifts = revenues.length > 0 && revenues.every(row => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT" && row.shiftId === row.id);
-    const source = sources.size === 1 ? [...sources][0] : mixedShifts ? "MIXED_SHIFTS" : "LEGACY_UNKNOWN";
-    const currencies = new Set([...revenues, ...events].map(row => row.currency).filter(value => value != null));
-    const monetaryValue = (row) => input.currency ? (0, accounting_money_1.resolveAccountingMoney)({ value: row, originalAmount: row.revenue, originalCurrency: row.currency ?? input.currency, accountingCurrency: input.currency })?.accountingAmount ?? null : Number(row.revenue);
-    const moneyKnown = [...revenues, ...posted].every(row => (0, business_day_rows_1.finiteBusinessNumber)(row.revenue) != null && Number.isFinite(monetaryValue(row)) && monetaryValue(row) != null) && (Boolean(input.currency) || currencies.size <= 1);
-    const projectedAmount = money(revenues.reduce((sum, row) => sum + (monetaryValue(row) ?? 0), 0));
-    const factsAmount = money(posted.reduce((sum, row) => sum + (monetaryValue(row) ?? 0), 0));
-    const factBacked = eventRows.length === revenues.length && events.every(row => ["POSTED", "REVERSED"].includes(String(row.status)))
-        && (events.length > 0 || projectedAmount === 0 && cashShifts.length > 0);
-    const eventIdentityMatches = events.every(event => eventRows.some(row => row.id === event.revenueRowId));
-    const posMatches = eventRows.every(row => {
-        const active = posted.filter(e => e.revenueRowId === row.id);
-        return monetaryValue(row) === money(active.reduce((sum, e) => sum + (monetaryValue(e) ?? 0), 0)) && row.receipts === active.reduce((n, event) => n + (0, financial_period_proof_1.financialEventCount)(event), 0);
-    });
-    const consistency = mixedShifts ? (eventIdentityMatches && posMatches ? "MATCH" : "MISMATCH") : factBacked ? (factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH") : "UNVERIFIED";
-    const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
-    const receipts = factBacked ? posted.reduce((n, event) => n + (0, financial_period_proof_1.financialEventCount)(event), 0) : revenues.some(row => [1, 2].includes(Number(row.manualTotalsVersion)) && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
-    const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row => [1, 2].includes(Number(row.manualTotalsVersion))).flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])));
-    const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
-    const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency === "MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
-    const report = rows(input.reports).find(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate)
-        ?? revenues.find(row => row.revenueSource !== "sales_events_v1" && ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)));
-    const recorded = report?.workdayStatus !== "OPEN" && (report?.closingStatus === "closed" || report?.closedVia === "guided-v17");
-    const operationStatus = recorded ? "RECORDED" : "MISSING";
-    const writeOffs = rows(input.writeOffs).filter(row => belongs(row) && row.date === input.businessDate && row.status !== "cancelled");
-    const incidents = rows(input.incidents).filter(row => belongs(row) && String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10) === input.businessDate);
-    const payroll = object(report?.payrollBreakdown), rawPayroll = payroll.total ?? payroll.totalPayroll;
-    const payrollAmount = report?.workdayStatus === "OPEN" ? null : (0, business_day_rows_1.finiteBusinessNumber)(rawPayroll);
-    const dayStatus = open || report?.workdayStatus === "OPEN" ? "OPERATING" : recorded && payrollAmount != null && (revenues.length && status === "FINAL" || report?.workdayStatus === "CLOSED" && !revenues.length) && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
-    return {
-        venueId: input.venueId, businessDate: input.businessDate,
-        payroll: { amount: payrollAmount, basis: payrollAmount == null ? "MISSING" : recorded ? "RECORDED" : "LEGACY_RECORDED" },
-        revenue: { amount, sourceIds: revenues.map(row => row.id).filter(id => id != null), grain: "BUSINESS_DAY", currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null), currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN", source, status: report?.workdayStatus === "CLOSED" && !revenues.length ? "FINAL" : status, receipts, payments, asOf: input.asOf,
-            updatedAt: [...revenues.map(row => String(row.updatedAt ?? row.createdAt ?? "")), ...events.map(row => String(row.acceptedAt ?? ""))].sort().at(-1) || null,
-            readOnly: events.length > 0 || documents.length > 0 || revenues.some(row => ["sales_events_v1", "sales_documents", "MANUAL_SUMMARY"].includes(String(row.revenueSource))), consistency },
-        cashShift: cashShifts.length === 1 ? { id: cashShifts[0].id, status: cashShifts[0].closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: cashShifts[0].openedAt ?? cashShifts[0].createdAt ?? null, closedAt: cashShifts[0].closedAt ?? null } : null,
-        cashShifts: cashShifts.map(row => ({ id: row.id, status: row.closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: row.openedAt ?? row.createdAt ?? null, closedAt: row.closedAt ?? null })),
-        operations: { team: operationStatus, fot: operationStatus, writeOffs: operationStatus, incidents: operationStatus, writeOffCount: writeOffs.length, incidentCount: incidents.length },
-        report: report ? operationalData(report) : null, status: dayStatus,
-    };
-}
-function operationalDays(input) {
-    const dates = new Set([...rows(input.revenues), ...rows(input.reports), ...rows(input.events), ...rows(input.documents)].filter(row => (0, business_day_rows_1.scopedBusinessRows)([row], { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).length > 0).map(row => String(row.businessDate ?? row.date)).filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)));
-    // Scope/deduplicate history once before partitioning. Global first-identity
-    // selection must precede grouping to preserve duplicates across dates.
-    const partition = (values, field) => {
-        const byDate = new Map();
-        for (const row of values) {
-            const date = field(row), group = byDate.get(date);
-            if (group)
-                group.push(row);
-            else
-                byDate.set(date, [row]);
-        }
-        return byDate;
-    };
-    const revenues = partition((0, business_day_rows_1.eligibleRevenueRows)(input.revenues, input.venueId, input), row => row.date);
-    const events = partition((0, business_day_rows_1.uniqueBusinessRows)(input.events ?? []), row => row.businessDate);
-    const reports = partition(rows(input.reports), row => row.date);
-    const documents = partition(rows(input.documents), row => row.date);
-    const writeOffs = partition(rows(input.writeOffs), row => row.date);
-    const incidents = partition(rows(input.incidents), row => String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10));
-    return [...dates].sort().reverse().map(businessDate => operationalDay({ ...input, businessDate,
-        revenues: revenues.get(businessDate) ?? [], events: events.get(businessDate) ?? [],
-        reports: reports.get(businessDate) ?? [], documents: documents.get(businessDate) ?? [],
-        writeOffs: writeOffs.get(businessDate) ?? [], incidents: incidents.get(businessDate) ?? [],
-    }));
-}
-},"business-day-rows":(module,exports,require)=>{"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.businessRecord = void 0;
-exports.finiteBusinessNumber = finiteBusinessNumber;
-exports.activeBusinessRow = activeBusinessRow;
-exports.uniqueBusinessRows = uniqueBusinessRows;
-exports.scopedBusinessRows = scopedBusinessRows;
-exports.eligibleRevenueRows = eligibleRevenueRows;
-exports.aggregateBusinessDates = aggregateBusinessDates;
-const businessRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
-exports.businessRecord = businessRecord;
-function finiteBusinessNumber(value) {
-    if (value == null || value === "" || typeof value === "boolean")
-        return null;
+  }
+
+  // lib/bardoctor/accounting-money.ts
+  var FX_RATE_DIRECTION = "source_to_accounting";
+  function record(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+  function finite(value) {
     const parsed = typeof value === "string" ? Number(value.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".")) : Number(value);
     return Number.isFinite(parsed) ? parsed : null;
-}
-function activeBusinessRow(value) {
-    const row = (0, exports.businessRecord)(value);
-    return !row.reversedAt && !row.isDraft && !["cancelled", "canceled", "void", "voided", "reversed", "draft"].includes(String(row.status ?? "").toLowerCase());
-}
-function uniqueBusinessRows(values) {
-    const seen = new Set();
-    return values.map(exports.businessRecord).filter(row => {
-        // Idless legacy records are distinct observations, not invented identities.
-        if (row.id == null)
-            return true;
-        const key = JSON.stringify([row.workspaceId ?? null, row.dataAccountId ?? null, row.venueId ?? null, row.id]);
-        if (seen.has(key))
-            return false;
-        seen.add(key);
-        return true;
+  }
+  function roundMoney(value, precision = 2) {
+    const factor = 10 ** precision;
+    return Math.round((value + Number.EPSILON) * factor) / factor;
+  }
+  function normalizeMoneyCurrency(value) {
+    return typeof value === "string" ? value.trim().toUpperCase().slice(0, 16) : "";
+  }
+  function resolveAccountingMoney(input) {
+    const value = record(input.value);
+    const accountingCurrency = normalizeAccountingCurrency(
+      input.accountingCurrency ?? value.accountingCurrency
+    );
+    if (!accountingCurrency) return null;
+    const originalAmount = Math.max(0, finite(
+      input.originalAmount ?? value.originalAmount ?? value.total ?? value.amount
+    ) ?? 0);
+    const originalCurrency = normalizeMoneyCurrency(
+      input.originalCurrency ?? value.originalCurrency ?? value.currency
+    );
+    const unresolved = (reason) => ({
+      originalAmount: roundMoney(originalAmount),
+      originalCurrency,
+      accountingAmount: null,
+      accountingCurrency,
+      status: "unresolved",
+      reason
     });
-}
-function scopedBusinessRows(values, scope) {
-    return uniqueBusinessRows(values).filter(row => Object.entries(scope).every(([key, expected]) => expected == null || row[key] == null || Number(row[key]) === expected));
-}
-function eligibleRevenueRows(values, venueId, boundary = {}) {
-    return scopedBusinessRows(values, { venueId, workspaceId: boundary.workspaceId, dataAccountId: boundary.dataAccountId }).filter(activeBusinessRow);
-}
-function aggregateBusinessDates(values) {
-    const groups = new Map();
-    for (const row of eligibleRevenueRows(values)) {
-        const date = String(row.date ?? row.businessDate ?? row.operatingDate ?? "").slice(0, 10);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date))
-            continue;
-        const key = JSON.stringify([row.workspaceId ?? null, row.dataAccountId ?? null, row.venueId ?? null, date, row.currency ?? row.accountingCurrency ?? null]);
-        groups.set(key, [...(groups.get(key) ?? []), row]);
+    if (!originalCurrency) return unresolved("missing_original_currency");
+    if (originalCurrency === accountingCurrency) {
+      return {
+        originalAmount: roundMoney(originalAmount),
+        originalCurrency,
+        accountingAmount: roundMoney(originalAmount),
+        accountingCurrency,
+        status: "same_currency"
+      };
     }
-    return [...groups.values()].map(rows => {
-        const sum = (keys) => { const values = rows.map(row => finiteBusinessNumber(keys.map(key => row[key]).find(value => value != null))); return values.some(value => value == null) ? null : Math.round(values.reduce((total, value) => total + value, 0) * 100) / 100; };
-        const states = rows.map(row => (0, exports.businessRecord)(row._bdOperationalDay));
-        const revenueStates = rows.map((row, index) => row.revenueStatus ?? (0, exports.businessRecord)(states[index].revenue).status ?? (row.closingStatus === "open" ? "PROVISIONAL" : "UNKNOWN"));
-        const complete = rows.every((row, index) => row.operationalStatus === "COMPLETE" || states[index].status === "COMPLETE");
-        return { date: String(rows[0].date ?? rows[0].businessDate ?? rows[0].operatingDate).slice(0, 10),
-            venueId: rows[0].venueId, workspaceId: rows[0].workspaceId, dataAccountId: rows[0].dataAccountId, currency: rows[0].currency ?? rows[0].accountingCurrency,
-            revenue: sum(["revenue", "amount"]), receipts: sum(["receipts", "checks"]), guests: sum(["guests", "guestCount"]),
-            revenueStatus: revenueStates.includes("PROVISIONAL") ? "PROVISIONAL" : revenueStates.every(value => value === "FINAL") ? "FINAL" : "UNKNOWN",
-            operationalStatus: complete ? "COMPLETE" : "PARTIAL", grain: "BUSINESS_DAY", sourceIds: rows.map(row => row.id).filter(value => value != null),
-        };
+    const storedCurrency = normalizeMoneyCurrency(value.accountingCurrency ?? input.accountingCurrency);
+    const storedAmount = finite(input.accountingAmount ?? value.accountingAmount ?? value.normalizedAmount);
+    if (storedAmount != null && storedAmount >= 0) {
+      if (storedCurrency !== accountingCurrency) return unresolved("accounting_currency_mismatch");
+      return {
+        originalAmount: roundMoney(originalAmount),
+        originalCurrency,
+        accountingAmount: roundMoney(storedAmount),
+        accountingCurrency,
+        fxRate: finite(input.fxRate ?? value.fxRate ?? value.exchangeRateToAccounting) ?? void 0,
+        fxRateDirection: FX_RATE_DIRECTION,
+        fxEffectiveDate: String(input.fxEffectiveDate ?? value.fxEffectiveDate ?? "") || void 0,
+        fxSource: String(input.fxSource ?? value.fxSource ?? "") || void 0,
+        fxLockedAt: String(input.fxLockedAt ?? value.fxLockedAt ?? "") || void 0,
+        status: "converted"
+      };
+    }
+    const direction = String(input.fxRateDirection ?? value.fxRateDirection ?? FX_RATE_DIRECTION);
+    const rate = finite(input.fxRate ?? value.fxRate ?? value.exchangeRateToAccounting);
+    if (direction === FX_RATE_DIRECTION && rate != null && rate > 0) {
+      return {
+        originalAmount: roundMoney(originalAmount),
+        originalCurrency,
+        accountingAmount: roundMoney(originalAmount * rate),
+        accountingCurrency,
+        fxRate: rate,
+        fxRateDirection: FX_RATE_DIRECTION,
+        fxEffectiveDate: String(input.fxEffectiveDate ?? value.fxEffectiveDate ?? "") || void 0,
+        fxSource: String(input.fxSource ?? value.fxSource ?? "") || void 0,
+        fxLockedAt: String(input.fxLockedAt ?? value.fxLockedAt ?? "") || void 0,
+        status: "converted"
+      };
+    }
+    return unresolved("missing_historical_fx");
+  }
+
+  // lib/bardoctor/financial-period-proof.ts
+  var counts = /* @__PURE__ */ new WeakMap();
+  function financialEventCount(event) {
+    return counts.get(event) ?? 1;
+  }
+
+  // lib/bardoctor/business-day-rows.ts
+  var businessRecord = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  function finiteBusinessNumber(value) {
+    if (value == null || value === "" || typeof value === "boolean") return null;
+    const parsed = typeof value === "string" ? Number(value.replace(/[\s\u00a0\u202f]/g, "").replace(",", ".")) : Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  function activeBusinessRow(value) {
+    const row = businessRecord(value);
+    return !row.reversedAt && !row.isDraft && !["cancelled", "canceled", "void", "voided", "reversed", "draft"].includes(String(row.status ?? "").toLowerCase());
+  }
+  function uniqueBusinessRows(values) {
+    const seen = /* @__PURE__ */ new Set();
+    return values.map(businessRecord).filter((row) => {
+      if (row.id == null) return true;
+      const key = JSON.stringify([row.workspaceId ?? null, row.dataAccountId ?? null, row.venueId ?? null, row.id]);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-}
-}},cache={};function require(key){key=key.startsWith('./')?key.slice(2):key;if(!cache[key]){const module={exports:{}};cache[key]=module;modules[key](module,module.exports,require)}return cache[key].exports}return {...require('finance-inputs'),...require('business-day-rows')};})();
+  }
+  function scopedBusinessRows(values, scope2) {
+    return uniqueBusinessRows(values).filter((row) => Object.entries(scope2).every(([key, expected]) => expected == null || row[key] == null || Number(row[key]) === expected));
+  }
+  function eligibleRevenueRows(values, venueId, boundary = {}) {
+    return scopedBusinessRows(values, { venueId, workspaceId: boundary.workspaceId, dataAccountId: boundary.dataAccountId }).filter(activeBusinessRow);
+  }
+  function aggregateBusinessDates(values) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const row of eligibleRevenueRows(values)) {
+      const date = String(row.date ?? row.businessDate ?? row.operatingDate ?? "").slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+      const key = JSON.stringify([row.workspaceId ?? null, row.dataAccountId ?? null, row.venueId ?? null, date, row.currency ?? row.accountingCurrency ?? null]);
+      groups.set(key, [...groups.get(key) ?? [], row]);
+    }
+    return [...groups.values()].map((rows2) => {
+      const sum = (keys) => {
+        const values2 = rows2.map((row) => finiteBusinessNumber(keys.map((key) => row[key]).find((value) => value != null)));
+        return values2.some((value) => value == null) ? null : Math.round(values2.reduce((total, value) => total + value, 0) * 100) / 100;
+      };
+      const states = rows2.map((row) => businessRecord(row._bdOperationalDay));
+      const revenueStates = rows2.map((row, index) => row.revenueStatus ?? businessRecord(states[index].revenue).status ?? (row.closingStatus === "open" ? "PROVISIONAL" : "UNKNOWN"));
+      const complete = rows2.every((row, index) => row.operationalStatus === "COMPLETE" || states[index].status === "COMPLETE");
+      return {
+        date: String(rows2[0].date ?? rows2[0].businessDate ?? rows2[0].operatingDate).slice(0, 10),
+        venueId: rows2[0].venueId,
+        workspaceId: rows2[0].workspaceId,
+        dataAccountId: rows2[0].dataAccountId,
+        currency: rows2[0].currency ?? rows2[0].accountingCurrency,
+        revenue: sum(["revenue", "amount"]),
+        receipts: sum(["receipts", "checks"]),
+        guests: sum(["guests", "guestCount"]),
+        revenueStatus: revenueStates.includes("PROVISIONAL") ? "PROVISIONAL" : revenueStates.every((value) => value === "FINAL") ? "FINAL" : "UNKNOWN",
+        operationalStatus: complete ? "COMPLETE" : "PARTIAL",
+        grain: "BUSINESS_DAY",
+        sourceIds: rows2.map((row) => row.id).filter((value) => value != null)
+      };
+    });
+  }
+
+  // lib/bardoctor/operational-day.ts
+  var operationalFields = ["staffing", "payrollBreakdown", "shiftDepartmentSales", "shiftVenueSales", "note", "guests", "writeOffDocumentIds", "writeOffItemCount", "writeOffTotalCost", "incidentIds", "workdayStatus", "workdayRevision", "workdayPayrollDraft", "workdayConfirmations"];
+  function operationalData(value) {
+    const row = object(value);
+    return Object.fromEntries(operationalFields.filter((key) => row[key] !== void 0).map((key) => [key, row[key]]));
+  }
+  function object(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+  function rows(values) {
+    return (values ?? []).map(object);
+  }
+  var money = (value) => Math.round(value * 100) / 100;
+  var native = /* @__PURE__ */ new Set(["POS_API", "MANUAL_GRID"]);
+  var imports = /* @__PURE__ */ new Set(["TEXT_IMPORT", "FILE_IMPORT", "IMAGE_IMPORT", "VOICE_IMPORT"]);
+  var integrations = /* @__PURE__ */ new Set(["ONE_C", "LOCAL_CONNECTOR", "OTHER_API"]);
+  function factSource(source) {
+    return native.has(String(source)) ? "BARDOC_POS" : imports.has(String(source)) ? "IMPORT" : integrations.has(String(source)) ? "INTEGRATION" : "LEGACY_UNKNOWN";
+  }
+  function operationalDay(input) {
+    const belongs = (row) => scopedBusinessRows([row], { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).length > 0;
+    const revenues = eligibleRevenueRows(input.revenues, input.venueId, input).filter((row) => row.date === input.businessDate);
+    const events = uniqueBusinessRows(input.events ?? []).filter((row) => belongs(row) && row.venueId === input.venueId && row.businessDate === input.businessDate);
+    const posted = events.filter((row) => row.status === "POSTED");
+    const eventRows = revenues.filter((row) => row.revenueSource === "sales_events_v1");
+    const cashShifts = revenues.filter((row) => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT").filter((row) => ["open", "closed"].includes(String(row.closingStatus)));
+    const open = cashShifts.some((row) => row.closingStatus === "open");
+    const documents = rows(input.documents).filter((row) => belongs(row) && row.date === input.businessDate && row.status === "confirmed");
+    const sources = /* @__PURE__ */ new Set();
+    for (const event of events) sources.add(factSource(event.source));
+    for (const row of revenues) {
+      if (row.revenueSource === "sales_events_v1") {
+        const facts = events.filter((event) => event.revenueRowId === row.id);
+        if (facts.length) facts.forEach((event) => sources.add(factSource(event.source)));
+        else sources.add(Number(row.revenue) === 0 && cashShifts.includes(row) ? "BARDOC_POS" : "LEGACY_UNKNOWN");
+      } else if (row.revenueSource === "sales_documents") {
+        const facts = documents.filter((doc) => Array.isArray(row.salesDocumentIds) && row.salesDocumentIds.includes(doc.id));
+        if (facts.length) facts.forEach((doc) => sources.add(factSource(doc.sourceSystem)));
+        else sources.add("LEGACY_UNKNOWN");
+      } else if (row.revenueSource === "MANUAL_SUMMARY" || ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia))) sources.add("MANUAL_SUMMARY");
+      else sources.add("LEGACY_UNKNOWN");
+    }
+    const mixedShifts = revenues.length > 0 && revenues.every((row) => row.revenueSource === "sales_events_v1" || row.manualTotalsVersion === 2 && row.accountingScope === "SHIFT" && row.shiftId === row.id);
+    const source = sources.size === 1 ? [...sources][0] : mixedShifts ? "MIXED_SHIFTS" : "LEGACY_UNKNOWN";
+    const currencies = new Set([...revenues, ...events].map((row) => row.currency).filter((value) => value != null));
+    const monetaryValue = (row) => input.currency ? resolveAccountingMoney({ value: row, originalAmount: row.revenue, originalCurrency: row.currency ?? input.currency, accountingCurrency: input.currency })?.accountingAmount ?? null : Number(row.revenue);
+    const moneyKnown = [...revenues, ...posted].every((row) => finiteBusinessNumber(row.revenue) != null && Number.isFinite(monetaryValue(row)) && monetaryValue(row) != null) && (Boolean(input.currency) || currencies.size <= 1);
+    const projectedAmount = money(revenues.reduce((sum, row) => sum + (monetaryValue(row) ?? 0), 0));
+    const factsAmount = money(posted.reduce((sum, row) => sum + (monetaryValue(row) ?? 0), 0));
+    const factBacked = eventRows.length === revenues.length && events.every((row) => ["POSTED", "REVERSED"].includes(String(row.status))) && (events.length > 0 || projectedAmount === 0 && cashShifts.length > 0);
+    const eventIdentityMatches = events.every((event) => eventRows.some((row) => row.id === event.revenueRowId));
+    const posMatches = eventRows.every((row) => {
+      const active = posted.filter((e) => e.revenueRowId === row.id);
+      return monetaryValue(row) === money(active.reduce((sum, e) => sum + (monetaryValue(e) ?? 0), 0)) && row.receipts === active.reduce((n, event) => n + financialEventCount(event), 0);
+    });
+    const consistency = mixedShifts ? eventIdentityMatches && posMatches ? "MATCH" : "MISMATCH" : factBacked ? factsAmount === projectedAmount && eventIdentityMatches ? "MATCH" : "MISMATCH" : "UNVERIFIED";
+    const amount = moneyKnown ? factBacked ? factsAmount : projectedAmount : null;
+    const receipts = factBacked ? posted.reduce((n, event) => n + financialEventCount(event), 0) : revenues.some((row) => [1, 2].includes(Number(row.manualTotalsVersion)) && row.receipts == null) ? null : revenues.reduce((sum, row) => sum + (Number(row.receipts) || 0), 0);
+    const paymentFacts = posted.flatMap((row) => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter((row) => [1, 2].includes(Number(row.manualTotalsVersion))).flatMap((row) => rows(Array.isArray(row.payments) ? row.payments : [])));
+    const payments = [...new Set(paymentFacts.map((row) => String(row.method)))].map((method) => ({ method, amount: money(paymentFacts.filter((row) => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
+    const status = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency === "MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
+    const report = rows(input.reports).find((row) => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate) ?? revenues.find((row) => row.revenueSource !== "sales_events_v1" && ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)));
+    const recorded = report?.workdayStatus !== "OPEN" && (report?.closingStatus === "closed" || report?.closedVia === "guided-v17");
+    const operationStatus = recorded ? "RECORDED" : "MISSING";
+    const writeOffs = rows(input.writeOffs).filter((row) => belongs(row) && row.date === input.businessDate && row.status !== "cancelled");
+    const incidents = rows(input.incidents).filter((row) => belongs(row) && String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10) === input.businessDate);
+    const payroll = object(report?.payrollBreakdown), rawPayroll = payroll.total ?? payroll.totalPayroll;
+    const payrollAmount = report?.workdayStatus === "OPEN" ? null : finiteBusinessNumber(rawPayroll);
+    const dayStatus = open || report?.workdayStatus === "OPEN" ? "OPERATING" : recorded && payrollAmount != null && (revenues.length && status === "FINAL" || report?.workdayStatus === "CLOSED" && !revenues.length) && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
+    return {
+      venueId: input.venueId,
+      businessDate: input.businessDate,
+      payroll: { amount: payrollAmount, basis: payrollAmount == null ? "MISSING" : recorded ? "RECORDED" : "LEGACY_RECORDED" },
+      revenue: {
+        amount,
+        sourceIds: revenues.map((row) => row.id).filter((id) => id != null),
+        grain: "BUSINESS_DAY",
+        currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null),
+        currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN",
+        source,
+        status: report?.workdayStatus === "CLOSED" && !revenues.length ? "FINAL" : status,
+        receipts,
+        payments,
+        asOf: input.asOf,
+        updatedAt: [...revenues.map((row) => String(row.updatedAt ?? row.createdAt ?? "")), ...events.map((row) => String(row.acceptedAt ?? ""))].sort().at(-1) || null,
+        readOnly: events.length > 0 || documents.length > 0 || revenues.some((row) => ["sales_events_v1", "sales_documents", "MANUAL_SUMMARY"].includes(String(row.revenueSource))),
+        consistency
+      },
+      cashShift: cashShifts.length === 1 ? { id: cashShifts[0].id, status: cashShifts[0].closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: cashShifts[0].openedAt ?? cashShifts[0].createdAt ?? null, closedAt: cashShifts[0].closedAt ?? null } : null,
+      cashShifts: cashShifts.map((row) => ({ id: row.id, status: row.closingStatus === "open" ? "OPEN" : "CLOSED", openedAt: row.openedAt ?? row.createdAt ?? null, closedAt: row.closedAt ?? null })),
+      operations: { team: operationStatus, fot: operationStatus, writeOffs: operationStatus, incidents: operationStatus, writeOffCount: writeOffs.length, incidentCount: incidents.length },
+      report: report ? operationalData(report) : null,
+      status: dayStatus
+    };
+  }
+  function operationalDays(input) {
+    const dates = new Set([...rows(input.revenues), ...rows(input.reports), ...rows(input.events), ...rows(input.documents)].filter((row) => scopedBusinessRows([row], { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId }).length > 0).map((row) => String(row.businessDate ?? row.date)).filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)));
+    const partition = (values, field) => {
+      const byDate = /* @__PURE__ */ new Map();
+      for (const row of values) {
+        const date = field(row), group = byDate.get(date);
+        if (group) group.push(row);
+        else byDate.set(date, [row]);
+      }
+      return byDate;
+    };
+    const revenues = partition(eligibleRevenueRows(input.revenues, input.venueId, input), (row) => row.date);
+    const events = partition(uniqueBusinessRows(input.events ?? []), (row) => row.businessDate);
+    const reports = partition(rows(input.reports), (row) => row.date);
+    const documents = partition(rows(input.documents), (row) => row.date);
+    const writeOffs = partition(rows(input.writeOffs), (row) => row.date);
+    const incidents = partition(rows(input.incidents), (row) => String(row.businessDate ?? row.eventDate ?? row.date).slice(0, 10));
+    return [...dates].sort().reverse().map((businessDate) => operationalDay({
+      ...input,
+      businessDate,
+      revenues: revenues.get(businessDate) ?? [],
+      events: events.get(businessDate) ?? [],
+      reports: reports.get(businessDate) ?? [],
+      documents: documents.get(businessDate) ?? [],
+      writeOffs: writeOffs.get(businessDate) ?? [],
+      incidents: incidents.get(businessDate) ?? []
+    }));
+  }
+
+  // lib/bardoctor/finance-inputs.ts
+  var round = (value) => Math.round(value * 100) / 100;
+  var scope = (rows2, input) => scopedBusinessRows(rows2, { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId });
+  function payrollForOperationalEdit(input) {
+    const previous = businessRecord(input.previous), saved = businessRecord(previous.payrollBreakdown);
+    const staffing = (value) => (Array.isArray(value) ? value : []).map(businessRecord).map((row) => ({ employeeId: row.employeeId, hours: finiteBusinessNumber(row.hours), personalSales: finiteBusinessNumber(row.personalSales), units: finiteBusinessNumber(row.units) })).sort((a, b) => String(a.employeeId).localeCompare(String(b.employeeId)));
+    const departments = (value) => Object.entries(businessRecord(value)).map(([key, value2]) => [key, finiteBusinessNumber(value2)]).filter(([, value2]) => value2 != null).sort(([a], [b]) => String(a).localeCompare(String(b)));
+    const sameFacts = previous.date === input.businessDate && JSON.stringify(staffing(previous.staffing)) === JSON.stringify(staffing(input.staffing)) && JSON.stringify(departments(previous.shiftDepartmentSales)) === JSON.stringify(departments(input.shiftDepartmentSales)) && finiteBusinessNumber(previous.shiftVenueSales) === finiteBusinessNumber(input.shiftVenueSales);
+    if (sameFacts && finiteBusinessNumber(saved.total ?? saved.totalPayroll) != null) return { payrollBreakdown: saved, basis: "RECORDED" };
+    return { payrollBreakdown: input.estimate, basis: input.estimate == null ? "MISSING" : "CURRENT_RULE_ESTIMATE" };
+  }
+  function financeAmount(row, field, currency) {
+    if (finiteBusinessNumber(row[field]) == null) {
+      const saved = finiteBusinessNumber(row.accountingAmount);
+      return saved != null && normalizeAccountingCurrency(currency) && (row.accountingCurrency == null || row.accountingCurrency === currency) ? saved : null;
+    }
+    const target = normalizeAccountingCurrency(currency);
+    if (!target) return null;
+    const resolved = resolveAccountingMoney({ value: row, originalAmount: row[field], originalCurrency: row.originalCurrency ?? row.currency ?? target, accountingCurrency: target });
+    return resolved?.accountingAmount ?? null;
+  }
+  function revenueRowsWithReports(revenues, days) {
+    const seen = /* @__PURE__ */ new Set();
+    const firstDay = /* @__PURE__ */ new Map();
+    const scopedDay = /* @__PURE__ */ new Map();
+    for (const day of days) {
+      if (!firstDay.has(day.businessDate)) firstDay.set(day.businessDate, day);
+      const venues = scopedDay.get(day.businessDate) ?? /* @__PURE__ */ new Map();
+      if (!venues.has(day.venueId)) venues.set(day.venueId, day);
+      scopedDay.set(day.businessDate, venues);
+    }
+    return eligibleRevenueRows(revenues).map((row) => {
+      const day = row.venueId == null ? firstDay.get(row.date) : scopedDay.get(row.date)?.get(Number(row.venueId));
+      if (!day) return row;
+      const first = !seen.has(day.businessDate);
+      seen.add(day.businessDate);
+      const result = { ...row, _bdOperationalDay: day, revenueStatus: day.revenue.status, operationalStatus: day.status };
+      if (day.report) {
+        delete result.payrollBreakdown;
+        delete result.staffing;
+        delete result.guests;
+        if (first) Object.assign(result, day.report);
+        else if (finiteBusinessNumber(day.report.guests) != null) result.guests = 0;
+      }
+      result.payrollBasis = first && day.report && day.operations.fot === "RECORDED" ? "RECORDED" : "MISSING";
+      return result;
+    });
+  }
+  function readFinanceInputs(input) {
+    const revenues = eligibleRevenueRows(input.revenues, input.venueId, input).filter((row) => String(row.date) >= input.startDate && String(row.date) <= input.endDate);
+    const revenuesByDate = /* @__PURE__ */ new Map();
+    for (const row of revenues) {
+      const group = revenuesByDate.get(row.date) ?? [];
+      group.push(row);
+      revenuesByDate.set(row.date, group);
+    }
+    const projectedByDate = /* @__PURE__ */ new Map();
+    for (const day of input.operationalDayProjection ?? []) {
+      if (day.venueId === input.venueId && !projectedByDate.has(day.businessDate)) projectedByDate.set(day.businessDate, day);
+    }
+    const periodRows = (values = []) => scope(values, input).filter((row) => String(row.businessDate ?? row.date) >= input.startDate && String(row.businessDate ?? row.date) <= input.endDate);
+    const days = operationalDays({ ...input, revenues, events: periodRows(input.events), documents: periodRows(input.documents), reports: periodRows(input.reports) }).map((day) => {
+      const projected = projectedByDate.get(day.businessDate);
+      const dayRows = revenuesByDate.get(day.businessDate) ?? [];
+      const ids = dayRows.map((row) => row.id).sort();
+      const amounts = dayRows.map((row) => financeAmount(row, "revenue", input.currency));
+      const matches = projected && Array.isArray(projected.revenue.sourceIds) && projected.revenue.currency === input.currency && ids.every((id) => id != null) && JSON.stringify([...projected.revenue.sourceIds].sort()) === JSON.stringify(ids) && amounts.every((amount) => amount != null) && round(amounts.reduce((sum, amount) => sum + amount, 0)) === projected.revenue.amount;
+      return matches ? projected : day;
+    });
+    const joined = revenueRowsWithReports(revenues, days);
+    const daily = aggregateBusinessDates(joined.map((row) => ({ ...row, revenue: financeAmount(row, "revenue", input.currency), amount: void 0, currency: input.currency })));
+    const excluded = revenues.filter((row) => financeAmount(row, "revenue", input.currency) == null).map((row) => ({ id: row.id ?? null, kind: "revenue", currency: row.currency ?? null }));
+    const periodExpenses = scope(input.expenses ?? [], input).filter((row) => activeBusinessRow(row) && String(row.accountingMonth ?? String(row.date).slice(0, 7)) >= input.startDate.slice(0, 7) && String(row.accountingMonth ?? String(row.date).slice(0, 7)) <= input.endDate.slice(0, 7) && (!row.date || String(row.date) <= input.endDate));
+    const entries = scope((input.payrollEntries ?? []).map((value) => {
+      const row = businessRecord(value);
+      return row.venueId != null && input.legacyVenueKeys?.includes(String(row.venueId)) ? { ...row, venueId: input.venueId } : row;
+    }), input).filter((row) => activeBusinessRow(row) && String(row.date) >= input.startDate && String(row.date) <= input.endDate);
+    const total = (rows2, field) => {
+      const amounts = rows2.map((row) => financeAmount(row, field, input.currency));
+      return amounts.some((value) => value == null) ? null : round(amounts.reduce((sum, value) => sum + value, 0));
+    };
+    const revenue = total(revenues, "revenue");
+    const scopedReports = scope(input.reports ?? [], input);
+    const reportsByDate = /* @__PURE__ */ new Map();
+    for (const row of scopedReports) if (!reportsByDate.has(row.date)) reportsByDate.set(row.date, row);
+    const legacyPayrollByDate = /* @__PURE__ */ new Map();
+    for (const row of joined) {
+      if (!legacyPayrollByDate.has(row.date) && finiteBusinessNumber(businessRecord(row.payrollBreakdown).total ?? businessRecord(row.payrollBreakdown).totalPayroll) != null) legacyPayrollByDate.set(row.date, row);
+    }
+    const payrollByDay = days.filter((day) => day.report != null || revenuesByDate.has(day.businessDate)).map((day) => {
+      const saved = day.payroll.amount;
+      const legacy = legacyPayrollByDate.get(day.businessDate);
+      const amount = saved ?? finiteBusinessNumber(businessRecord(legacy?.payrollBreakdown).total ?? businessRecord(legacy?.payrollBreakdown).totalPayroll);
+      const source = day.operations.fot === "RECORDED" && saved != null ? "RECORDED" : amount != null ? "LEGACY_RECORDED" : "MISSING";
+      const original = reportsByDate.get(day.businessDate) ?? revenuesByDate.get(day.businessDate)?.[0] ?? {};
+      const converted = amount == null ? null : financeAmount({ ...original, originalAmount: amount, amount, accountingAmount: void 0 }, "amount", input.currency);
+      return { businessDate: day.businessDate, amount: converted, basis: source };
+    });
+    const recordedPresent = payrollByDay.some((day) => day.amount != null);
+    const legacyPayrollExpenses = periodExpenses.filter((row) => row.category === "payroll");
+    const payrollBase = recordedPresent ? payrollByDay.every((day) => day.amount != null) ? round(payrollByDay.reduce((sum, day) => sum + day.amount, 0)) : null : legacyPayrollExpenses.length ? total(legacyPayrollExpenses, "amount") : null;
+    const paid = total(entries.filter((row) => row.type === "payment"), "amount");
+    const deductions = total(entries.filter((row) => ["order", "fine", "dishware", "other_deduction"].includes(String(row.type)) && (!row.confirmationStatus || row.confirmationStatus === "confirmed")), "amount");
+    const bonus = total(entries.filter((row) => row.type === "bonus"), "amount");
+    const payroll = payrollBase != null && bonus != null && input.payrollEntriesAvailable !== false ? round(payrollBase + bonus) : null;
+    const operatingExpenses = input.expensesAvailable === false ? null : total(periodExpenses.filter((row) => row.category !== "payroll"), "amount");
+    const expenses = payroll != null && operatingExpenses != null ? round(payroll + operatingExpenses) : null;
+    const preliminaryResult = revenue != null && expenses != null ? round(revenue - expenses) : null;
+    const missing = [...revenue == null ? ["REVENUE_OR_CURRENCY"] : [], ...payroll == null ? ["PAYROLL"] : [], ...operatingExpenses == null ? ["EXPENSES_OR_CURRENCY"] : []];
+    return {
+      version: "business-day-finance-v1",
+      metric: "recorded_current_result_before_cogs",
+      venueId: input.venueId,
+      currency: input.currency,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      asOf: input.asOf,
+      revenue,
+      payroll,
+      payrollBase,
+      payrollBonuses: bonus,
+      payrollPaid: paid,
+      payrollDeductions: deductions,
+      operatingExpenses,
+      expenses,
+      preliminaryResult,
+      resultStatus: missing.length ? "PARTIAL" : "PROVISIONAL",
+      finality: "PRELIMINARY",
+      missing,
+      excluded,
+      payrollByDay,
+      payrollBasis: recordedPresent ? payrollByDay.every((day) => day.basis === "RECORDED") ? "RECORDED" : "LEGACY_RECORDED" : legacyPayrollExpenses.length ? "LEGACY_EXPENSE" : "MISSING",
+      days,
+      daily,
+      revenueRows: joined
+    };
+  }
+  return __toCommonJS(finance_client_entry_exports);
+})();
+
 
 bdOperationalRows=function(rows,days){return bdFinanceInputsPhase3a6.revenueRowsWithReports(rows,days)};
 function bdFinanceReadPhase3a6(profile,startDate,endDate,revenues,expenses,settings){return bdFinanceInputsPhase3a6.readFinanceInputs({venueId:bdMonthlyVenueIdPhase7(profile,settings),legacyVenueKeys:[String(profile?.id||profile?.name||"primary")],currency:bdMonthlyAccountingCurrencyV320(profile,settings),asOf:new Date().toISOString(),startDate,endDate,revenues,operationalDayProjection:revenues.map(row=>row._bdOperationalDay).filter(Boolean),reports:bdProcArray("bd_operational_reports_v1"),events:bdProcArray("bd_sales_events_v1"),documents:bdProcArray("bd_sales_documents"),expenses,payrollEntries:bdProcArray("bd_payroll_entries")})}
