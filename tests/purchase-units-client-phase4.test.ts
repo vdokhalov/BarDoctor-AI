@@ -1,4 +1,5 @@
 import test from "node:test";
+import {parse} from "acorn";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
@@ -23,7 +24,8 @@ function runtime(openQuickCreate = false) {
   assert.ok(start >= 0 && end > start);
   const jsx = (type: string, props: Row): Element => ({ type, props });
   const mapping = source.slice(source.indexOf("function bdInvoiceLineMappingV356"), source.indexOf("function bdInvoiceReviewPriorityV4"));
-  return runInNewContext(source.slice(start, end) + mapping + ";({render:bdPurchaseUnitsV421,preview:bdPurchasePreviewV421,mapping:bdInvoiceLineMappingV356})", {
+  const unitNode=parse(source,{ecmaVersion:"latest",sourceType:"module"}).body.find((node:any)=>node.type==="FunctionDeclaration"&&node.id?.name==="bdAssortmentUnitLabelV293")!;
+  return runInNewContext(source.slice(unitNode.start,unitNode.end)+source.slice(start, end) + mapping + ";({render:bdPurchaseUnitsV421,preview:bdPurchasePreviewV421,mapping:bdInvoiceLineMappingV356})", {
     S: { useState: (value: unknown) => [value === false && openQuickCreate ? true : value, () => {}], useEffect: () => {} },
     bdNomenclatureQuickCreateV336: "quick-create",
     structuredClone, i: { jsx, jsxs: jsx }, bdProcField: "field", bdCatArray: (v: unknown) => Array.isArray(v) ? v : [],
@@ -571,3 +573,13 @@ for (const { unit, packageSize, expectedAmount } of quickCreateCases) {
     } finally { r.close(); }
   });
 }
+
+
+test("purchase display units keep canonical arithmetic while using readable labels",()=>{
+ const api=runtime();
+ for(const [unit,quantity,expected] of [["pcs",2,"2 шт."],["g",1000,"1 кг"],["kg",2,"2 кг"],["ml",1000,"1 л"],["l",2,"2 л"]] as const){
+  const line={id:unit,category:"products",purchaseProductKey:"test",matchedBaseUnit:unit,quantity,unit,unitPrice:10,lineTotal:quantity*10};
+  const tree=api.render({line,onChange:()=>{throw Error("Rendering must not write");}});
+  const status=all(tree).find(e=>e.props.role==="status");assert.ok(status);assert.ok(String(status.props.children).includes("На склад поступит "+expected),String(status.props.children));assert.doesNotMatch(String(status.props.children),/\b(?:pcs|kg|ml|l)\b/);
+ }
+});

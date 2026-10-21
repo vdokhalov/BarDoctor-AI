@@ -12,3 +12,9 @@ test('shared display preserves currency identity for PMR, RUB, EUR and USD',()=>
  const context={window:{},Intl};const start=source.indexOf('/* bd-shared-accounting-money-start */'),end=source.indexOf('/* bd-shared-accounting-money-end */',start);assert.ok(end>start);vm.runInNewContext(source.slice(start,end),context);
  for(const currency of ['PMR_RUB','RUB','EUR','USD']){const result=context.window.bdFormatAccountingMoney(12,currency);if(currency==='PMR_RUB')assert.equal(result,'12 руб. ПМР');else{assert.equal(result,new Intl.NumberFormat('ru-RU',{style:'currency',currency,maximumFractionDigits:2}).format(12));if(currency!=='RUB')assert.doesNotMatch(result,/₽|руб/);}}
 });
+
+test('overview money presentation is scoped and keeps existing currency defaults',()=>{
+ const nodes=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body;
+ const fn=nodes.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='bdProcOverviewV168');const body=source.slice(fn.start,fn.end);assert.ok(body.includes('const bdOverviewMoney='));assert.equal(body.includes('bdProcMoneyV168('),false);
+ const shared=nodes.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='bdProcMoneyV168');assert.ok(source.slice(shared.start,shared.end).includes('new Intl.NumberFormat'),'other screens retain existing helper');
+});

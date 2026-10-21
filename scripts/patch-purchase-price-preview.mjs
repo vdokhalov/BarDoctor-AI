@@ -12,5 +12,13 @@ const body=s.slice(review.start,review.end);
 const calls=(body.match(/(?:bdProcMoney|window\.bdFormatAccountingMoney)\(/g)||[]).length;
 if(calls!==3)throw Error('Purchase review money anchors changed');
 s=s.slice(0,review.start)+body.replaceAll('bdProcMoney(', 'window.bdFormatAccountingMoney(')+s.slice(review.end);
+const overview=parse(s,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='bdProcOverviewV168');
+if(!overview)throw Error('Procurement overview missing');
+let overviewBody=s.slice(overview.start,overview.end);
+if(!overviewBody.includes('const bdOverviewMoney=')){
+ overviewBody=overviewBody.slice(0,overview.body.start-overview.start+1)+'const bdOverviewMoney=(amount,currency="RUB")=>window.bdFormatAccountingMoney(amount,currency);'+overviewBody.slice(overview.body.start-overview.start+1);
+}
+overviewBody=overviewBody.replaceAll('bdProcMoneyV168(', 'bdOverviewMoney(');
+s=s.slice(0,overview.start)+overviewBody+s.slice(overview.end);
 fs.writeFileSync(file,start+'\n'+domain.outputFiles[0].text+component+end+'\n'+s);
 console.log('Read-only purchase price and dish preview applied');
