@@ -15,6 +15,7 @@ edit('vCe',b=>{
  b=b.replace('i.jsx(gCe,{onClear:()=>{l("all"),d("")}},"empty")','bdDepartment?i.jsx("p",{role:"status",children:bdDepartmentValid?"В этом отделе нет сотрудников по выбранным условиям.":"Список отдела недоступен для выбранного заведения."}):i.jsx(gCe,{onClear:()=>{l("all"),d("")}},"empty")');
  return b;
 });
+edit('vCe',b=>b.replace('bdTeamEmployeeCount(e.length)','bdTeamEmployeeCount(bdDepartmentEmployees.length)'));
 edit('bdEmployeeDetailPage',b=>b.replaceAll('"/employees?view=employees"','("/employees"+bdTeamDepartmentQuery())'));
 s=start+`\nfunction bdFilterDepartment(rows,name){return name?rows.filter(row=>row.status!=="dismissed"&&String(row.department||"").trim()===name):rows;}
 function bdTeamDepartmentQuery(){const from=new URLSearchParams(location.search),q=new URLSearchParams({view:"employees"});for(const key of ["department","departmentVenue","q","status","venue"])if(from.has(key))q.set(key,from.get(key));return "?"+q.toString();}
