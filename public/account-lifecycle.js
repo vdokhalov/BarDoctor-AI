@@ -62,7 +62,7 @@
       const add = (label, kind, style) => { const button = node('button', label, style); button.type = 'button'; button.onclick = () => open(kind, venue); actions.append(button); };
       if (venue.status !== 'deleting') add(venue.status === 'archived' ? 'Восстановить' : 'Архивировать', venue.status === 'archived' ? 'restore' : 'archive');
       add(venue.status === 'deleting' ? 'Повторить удаление' : 'Удалить заведение', 'delete', 'danger'); card.append(actions); parent.append(card);
-      if (Number(venue.id) === 3389 && venue.status === 'active' && localStorage.getItem('bd_active_venue_id') === '3389') { const link = node('a', 'Перенос журналов QA3389', 'button'); link.href = '/settings/journal-migration'; card.append(link); }
+      if (venue.status === 'active' && Number(localStorage.getItem('bd_active_venue_id')) === Number(venue.id)) { const link = node('a', 'Перенос журналов заведения', 'button'); link.href = '/settings/journal-migration'; card.append(link); }
     }
   }
   async function load() {

@@ -11,7 +11,7 @@ async function setup(){
  const put=(k:string,v:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES (?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(scope.accountId,k,JSON.stringify(v));
  put('bd_stock_movements',[{id:'receipt',venueId:3389,type:'receipt',productKey:'whisky-stock',date:'2026-09-01',amount:10,unit:'l',costAmount:100,currency:'MDL'},...event.originalMovements]);put('bd_sales_events_v1',[event]);put('bd_finance_revenue',plan.revenues.map(row=>({...row,venueId:3389})));put('bd_assortment_v1',plan.assortment);
  const status=()=>api.migrationStatus(db,scope);const prepare=()=>api.prepareJournalMigration(db,bucket,scope);const step=async()=>{const {run}=await status();return api.stepJournalMigration(db,bucket,scope,run!.run_id);};
- const send=(body:object)=>{const req=r.request(owner,'/api/migration/journals','POST',{venueId:3389,confirmation:'QA3389_JOURNAL_CUTOVER',...body});req.headers.set('Origin','https://isolated.test');return r.api.route.POST(req);};
+ const send=(body:object)=>{const req=r.request(owner,'/api/migration/journals','POST',{venueId:3389,confirmation:'JOURNAL_CUTOVER:3389',...body});req.headers.set('Origin','https://isolated.test');return r.api.route.POST(req);};
  return {r,owner,scope,db,api,bucket,objects,put,status,prepare,step,send,event};
 }
 test('runner verifies durable complete backup and resumes after every persisted boundary with pause across mixed formats',async t=>{
@@ -33,9 +33,9 @@ test('runner verifies durable complete backup and resumes after every persisted 
  assert.deepEqual(await (s.r.api.events as unknown as typeof import('../lib/bardoctor/sales-event-storage')).readSalesEvents(s.db,s.scope.accountId,String(s.r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_sales_events_v1'").get(s.scope.accountId)!.data_json)),[s.event]);
  await assert.rejects(s.api.abortJournalMigration(s.db,s.scope,runId),/ROLL_FORWARD_REQUIRED/);
 });
-test('abort releases only before activation; backup corruption, drift and non-QA scope fail closed',async t=>{
+test('abort releases only before activation; backup corruption, drift and foreign scope fail closed',async t=>{
  const s=await setup();t.after(s.r.close);const prepared=await s.prepare();const original=s.objects.get(prepared.run!.backup_key)!;s.objects.set(prepared.run!.backup_key,'{}');await assert.rejects(s.step(),/BACKUP_CORRUPT/);s.objects.set(prepared.run!.backup_key,original);
- await assert.rejects(s.api.stepJournalMigration(s.db,s.bucket,{...s.scope,venueId:1},prepared.run!.run_id),/SCOPE_FORBIDDEN/);
+ await assert.rejects(s.api.stepJournalMigration(s.db,s.bucket,{...s.scope,venueId:1},prepared.run!.run_id),/SCOPE_FORBIDDEN|OWNER_REQUIRED/);
  await s.step();await s.step();assert.equal((await s.status()).run!.paused,1);
  await s.api.abortJournalMigration(s.db,s.scope,prepared.run!.run_id);assert.equal((await s.status()).run!.paused,0);s.put('bd_finance_revenue',[]);
  assert.equal((await s.send({action:'step',venueId:1,runId:prepared.run!.run_id})).status,403);
@@ -63,7 +63,7 @@ test('owner HTTP controls are scoped and abort racing activation cannot permit a
  const batch=s.db.batch.bind(s.db);let interleaved=false;
  s.db.batch=async<T>(statements:D1PreparedStatement[])=>{if(!interleaved&&statements.some(x=>(x as D1PreparedStatement & {sql:string}).sql.includes("UPDATE stock_journals SET state='active'"))){interleaved=true;await s.api.abortJournalMigration(s.db,s.scope,run!.run_id);}return batch<T>(statements);};
  await assert.rejects(s.step());s.db.batch=batch;assert.equal((await s.status()).run!.phase,'ABORTED');assert.equal((await s.status()).stock!.state,'verified');assert.equal((await s.status()).run!.paused,0);
- const other=await s.r.register('other-runner@isolated.test');const response=await s.r.api.route.GET(s.r.request(other,'/api/migration/journals'));assert.equal(response.status,409);
+ const other=await s.r.register('other-runner@isolated.test');const response=await s.r.api.route.GET(s.r.request(other,'/api/migration/journals'));assert.equal(response.status,200);assert.equal((await response.json() as {run:unknown}).run,null);
  s.r.sqlite.prepare("UPDATE venue_memberships SET role='shift_manager' WHERE account_id=? AND venue_id=3389").run(s.scope.actorId);await assert.rejects(s.api.migrationStatus(s.db,s.scope),/OWNER_REQUIRED/);
 });
 test('stale concurrent refresh cannot delete recreated staging after stock cutover',async t=>{
@@ -96,12 +96,12 @@ test('failed backup readback never creates a run; corruption after first cutover
  while((await s.status()).run!.phase!=='COMPLETE')await s.step();assert.equal((await s.status()).run!.paused,0);
 });
 
-test('migration page server denies direct links outside live QA3389 owner membership',async t=>{
+test('migration page server denies direct links without active owner membership',async t=>{
  const s=await setup();t.after(s.r.close);const page=s.r.api.page;
  assert.equal((await page.GET(new Request('https://isolated.test/settings/journal-migration'))).status,401);
  const cookieRequest=new Request('https://isolated.test/settings/journal-migration',{headers:{cookie:'bd_server_session='+encodeURIComponent(s.owner.token)}});assert.equal((await page.GET(cookieRequest)).status,200);
  const ownerResponse=await page.GET(s.r.request(s.owner,'/settings/journal-migration'));assert.equal(ownerResponse.status,200);assert.match(await ownerResponse.text(),/Создать резервную копию/);assert.equal((await s.status()).run,null);
- const other=await s.r.register('other-page@isolated.test');assert.equal((await page.GET(s.r.request(other,'/settings/journal-migration'))).status,403);
+ const other=await s.r.register('other-page@isolated.test');assert.equal((await page.GET(s.r.request(other,'/settings/journal-migration'))).status,200);
  for(const role of ['shift_manager','cashier','employee']){s.r.sqlite.prepare("UPDATE venue_memberships SET role=? WHERE account_id=? AND venue_id=3389").run(role,s.scope.actorId);const response=await page.GET(s.r.request(s.owner,'/settings/journal-migration'));assert.ok([401,403].includes(response.status));assert.doesNotMatch(await response.text(),/id="controls"/);}
  s.r.sqlite.prepare("UPDATE venue_memberships SET role='owner',status='revoked' WHERE account_id=? AND venue_id=3389").run(s.scope.actorId);assert.notEqual((await page.GET(s.r.request(s.owner,'/settings/journal-migration'))).status,200);
 });

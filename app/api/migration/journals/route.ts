@@ -11,7 +11,7 @@ export async function POST(request:Request){
  const selected=await scope(request);if(!selected)return unauthorized();
  if(request.headers.get('Origin')!==new URL(request.url).origin)return reply({ok:false,code:'ORIGIN_REQUIRED'},403);
  const parsed=await readJsonRequest<{venueId:number;action:string;confirmation:string;runId?:string}>(request,{maxBytes:4096});if(!parsed.ok)return parsed.response;const body=parsed.data;
- if(body.venueId!==3389||selected.venueId!==3389||body.confirmation!=='QA3389_JOURNAL_CUTOVER')return reply({ok:false,code:'JOURNAL_MIGRATION_SCOPE_FORBIDDEN'},403);
+ if(body.venueId!==selected.venueId||body.confirmation!=='JOURNAL_CUTOVER:'+selected.venueId)return reply({ok:false,code:'JOURNAL_MIGRATION_SCOPE_FORBIDDEN'},403);
  const db=getD1(),bucket=(env as unknown as {BUCKET:BackupStore}).BUCKET;
  try{
   if(body.action==='prepare')return reply({ok:true,...await prepareJournalMigration(db,bucket,selected)});

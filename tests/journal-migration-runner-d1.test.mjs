@@ -5,7 +5,14 @@ test('native Worker/D1/R2 runner preserves durable backup and per-venue pause',{
  const compiled=await build({stdin:{contents:entry,loader:'ts',resolveDir:process.cwd()},bundle:true,write:false,format:'esm',platform:'neutral',conditions:['workerd','worker','browser'],external:['cloudflare:workers','node:*'],tsconfigRaw:{}});
  let outbound=0;const mf=new Miniflare({modules:true,script:compiled.outputFiles[0].text,compatibilityDate:'2026-05-15',compatibilityFlags:['nodejs_compat'],d1Databases:{DB:'isolated-runner'},r2Buckets:{BUCKET:'isolated-backup'},outboundService:()=>{outbound++;return new Response(null,{status:502});}});
  try{
- const db=await mf.getD1Database('DB'),schema=new DatabaseSync(':memory:');try{for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())schema.exec(readFileSync('drizzle/'+file,'utf8'));const definitions=schema.prepare("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY rowid").all();for(let i=0;i<definitions.length;i+=30)await db.batch(definitions.slice(i,i+30).map(row=>db.prepare(row.sql)));}finally{schema.close();}
+ const db=await mf.getD1Database('DB'),schema=new DatabaseSync(':memory:');try{for(const file of readdirSync('drizzle').filter(f=>f.endsWith('.sql')&&f<'0039').sort())schema.exec(readFileSync('drizzle/'+file,'utf8'));const definitions=schema.prepare("SELECT sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY rowid").all();for(let i=0;i<definitions.length;i+=30)await db.batch(definitions.slice(i,i+30).map(row=>db.prepare(row.sql)));}finally{schema.close();}
+ // Replay the actual upgrade transaction, including rollback after its last DDL statement.
+ const upgrade=readFileSync('drizzle/0039_general_journal_migration.sql','utf8').split(/;[ \t]*\n/).map(s=>s.trim()).filter(Boolean);
+ const before=await db.prepare("SELECT name,sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all();
+ await assert.rejects(db.batch([...upgrade.map(sql=>db.prepare(sql)),db.prepare('INSERT INTO missing_upgrade_table VALUES(1)')]));
+ assert.deepEqual((await db.prepare("SELECT name,sql FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY name").all()).results,before.results);
+ await db.batch(upgrade.map(sql=>db.prepare(sql)));
+ assert.deepEqual((await db.prepare('PRAGMA foreign_key_check').all()).results,[]);
  await db.prepare("INSERT INTO accounts(id,chatgpt_email,app_email,first_name) VALUES(1,'events@isolated.test','events@isolated.test','Test')").run();
  await db.prepare("INSERT INTO workspaces(id,name,created_by_account_id) VALUES(1,'Test',1)").run();await db.prepare('INSERT INTO venues(id,data_account_id,workspace_id,created_by_account_id) VALUES(3389,1,1,1)').run();
  await db.prepare("INSERT INTO venue_memberships(venue_id,account_id,role) VALUES(3389,1,'owner')").run();await db.prepare("INSERT INTO workspace_memberships(workspace_id,account_id,role) VALUES(1,1,'owner')").run();

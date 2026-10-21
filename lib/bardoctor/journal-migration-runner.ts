@@ -1,5 +1,6 @@
+import {derivedInputBelongs} from './derived-input-scope';
 import type {SalesEvent} from './sales-events';
-/** QA3389 only. Operator steps are bounded; pausing never expires implicitly. */
+/** Explicit owner-controlled migration of the active venue. Operator steps are bounded; pausing never expires implicitly. */
 import {copyLegacyJournal,activateJournal,journalState,journalPage,restartLegacyJournal} from './stock-journal';
 import {copyLegacySalesEvents,activateSalesEvents,salesEventState,salesEventPage,restartLegacySalesEvents} from './sales-event-storage';
 import {stableSalesValue} from './sales-events';
@@ -15,14 +16,28 @@ const hash=async(value:string)=>Array.from(new Uint8Array(await crypto.subtle.di
 function fail(code:string):never{throw Error('JOURNAL_MIGRATION_'+code);}
 function guard(db:D1Database,predicate:string,values:unknown[]){return db.prepare(`INSERT INTO journal_migration_log(run_id,sequence,phase,actor_id,detail,created_at) SELECT '__guard__',NULL,'guard',0,'','' WHERE NOT (${predicate})`).bind(...values);}
 async function authorize(db:D1Database,scope:Scope){
- if(scope.venueId!==3389||!Number.isSafeInteger(scope.accountId)||!Number.isSafeInteger(scope.actorId))fail('SCOPE_FORBIDDEN');
+ if(!Number.isSafeInteger(scope.venueId)||scope.venueId<1||!Number.isSafeInteger(scope.accountId)||!Number.isSafeInteger(scope.actorId))fail('SCOPE_FORBIDDEN');
  const row=await db.prepare(`SELECT 1 FROM venues v JOIN venue_memberships m ON m.venue_id=v.id JOIN workspace_memberships w ON w.workspace_id=v.workspace_id AND w.account_id=m.account_id JOIN workspaces ws ON ws.id=v.workspace_id WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND m.account_id=? AND m.role='owner' AND m.status='active' AND w.status='active' AND ws.status='active'`).bind(scope.venueId,scope.accountId,scope.actorId).first();if(!row)fail('OWNER_REQUIRED');
 }
 function ownerGuard(db:D1Database,scope:Scope){return guard(db,`EXISTS(SELECT 1 FROM venues v JOIN venue_memberships m ON m.venue_id=v.id JOIN workspace_memberships w ON w.workspace_id=v.workspace_id AND w.account_id=m.account_id JOIN workspaces ws ON ws.id=v.workspace_id WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND m.account_id=? AND m.role='owner' AND m.status='active' AND w.status='active' AND ws.status='active')`,[scope.venueId,scope.accountId,scope.actorId]);}
-export async function migrationStatus(db:D1Database,scope:Scope){await authorize(db,scope);const run=await db.prepare('SELECT * FROM journal_migration_runs WHERE venue_id=? AND account_id=?').bind(scope.venueId,scope.accountId).first<Run>();return {run,stock:await journalState(db,scope),events:await salesEventState(db,scope),log:run?(await db.prepare('SELECT * FROM journal_migration_log WHERE run_id=? ORDER BY sequence').bind(run.run_id).all()).results:[]};}
+export async function migrationStatus(db:D1Database,scope:Scope){await authorize(db,scope);const run=await db.prepare('SELECT * FROM journal_migration_runs WHERE venue_id=? AND account_id=?').bind(scope.venueId,scope.accountId).first<Run>();return {scope:{venueId:scope.venueId,accountId:scope.accountId},run,stock:await journalState(db,scope),events:await salesEventState(db,scope),log:run?(await db.prepare('SELECT * FROM journal_migration_log WHERE run_id=? ORDER BY sequence').bind(run.run_id).all()).results:[]};}
 async function source(db:D1Database,scope:Scope):Promise<Source>{
- const result=await db.batch([db.prepare('SELECT id,workspace_id,data_account_id,status FROM venues WHERE id=? AND data_account_id=?').bind(scope.venueId,scope.accountId),db.prepare('SELECT restaurant_json FROM accounts WHERE id=?').bind(scope.accountId),db.prepare('SELECT store_key,data_json,updated_at FROM domain_data WHERE account_id=? ORDER BY store_key').bind(scope.accountId)]);
- const venue=result[0].results[0] as Source['venue'],profile=(result[1].results[0] as {restaurant_json:string|null})?.restaurant_json;if(!venue||profile===undefined)fail('SCOPE_FORBIDDEN');return {venue,profile,stores:result[2].results as Store[]};
+ const result=await db.batch([db.prepare('SELECT id,workspace_id,data_account_id,status FROM venues WHERE id=? AND data_account_id=?').bind(scope.venueId,scope.accountId),db.prepare('SELECT restaurant_json FROM accounts WHERE id=?').bind(scope.accountId),db.prepare('SELECT store_key,CASE WHEN SUM(length(CAST(data_json AS BLOB))) OVER ()<=8000000 THEN data_json ELSE NULL END data_json,updated_at FROM domain_data WHERE account_id=? ORDER BY store_key LIMIT 257').bind(scope.accountId)]);
+ const venue=result[0].results[0] as Source['venue'],profile=(result[1].results[0] as {restaurant_json:string|null})?.restaurant_json;if(!venue||profile===undefined)fail('SCOPE_FORBIDDEN');const stores=result[2].results as Store[];if(stores.length>256||stores.some(row=>typeof row.data_json!=='string'))fail('SOURCE_CAPACITY');return {venue,profile,stores};
+}
+function validateLegacySource(s:Source){
+ const scope={venueId:s.venue.id,workspaceId:s.venue.workspace_id,dataAccountId:s.venue.data_account_id};
+ for(const key of ['bd_stock_movements','bd_sales_events_v1']){
+  const raw=s.stores.find(row=>row.store_key===key)?.data_json??'[]';
+  if(new TextEncoder().encode(raw).length>2000000)fail('SOURCE_CAPACITY');
+  const rows=JSON.parse(raw);if(!Array.isArray(rows))fail('LEGACY_REQUIRED');
+  if(rows.length>20000)fail('SOURCE_CAPACITY');
+  const ids=new Set<string>();
+  for(const row of rows){
+   if(!row||typeof row!=='object'||Array.isArray(row)||!derivedInputBelongs(row,scope))fail('SOURCE_SCOPE');
+   if(row.id!=null){if(typeof row.id!=='string'||!row.id||ids.has(row.id))fail('SOURCE_ID');ids.add(row.id);}
+  }
+ }
 }
 function sourceGuards(db:D1Database,scope:Scope,s:Source){
  return [ownerGuard(db,scope),guard(db,'EXISTS(SELECT 1 FROM accounts WHERE id=? AND restaurant_json IS ?)',[scope.accountId,s.profile]),guard(db,'EXISTS(SELECT 1 FROM venues WHERE id=? AND workspace_id=? AND data_account_id=? AND status=?)',[s.venue.id,s.venue.workspace_id,s.venue.data_account_id,s.venue.status]),guard(db,'(SELECT count(*) FROM domain_data WHERE account_id=?)=?',[scope.accountId,s.stores.length]),...s.stores.map(row=>guard(db,'EXISTS(SELECT 1 FROM domain_data WHERE account_id=? AND store_key=? AND data_json=? AND updated_at IS ?)',[scope.accountId,row.store_key,row.data_json,row.updated_at]))];
@@ -32,9 +47,9 @@ async function backupRead(bucket:BackupStore,run:Run,scope:Scope){
  if(backup.format!=='bardoctor-journal-backup-v1'||backup.scope.venueId!==scope.venueId||backup.scope.accountId!==scope.accountId||required.some(key=>!Object.hasOwn(backup.required,key)||backup.required[key]!==backup.source.stores.find(row=>row.store_key===key)?.data_json&&!(backup.required[key]===null&&!backup.source.stores.some(row=>row.store_key===key))))fail('BACKUP_INCOMPLETE');return backup;
 }
 export async function prepareJournalMigration(db:D1Database,bucket:BackupStore,scope:Scope){
- await authorize(db,scope);if((await migrationStatus(db,scope)).run)fail('RUN_EXISTS');
+ await authorize(db,scope);if((await migrationStatus(db,scope)).run)return migrationStatus(db,scope);
  const s=await source(db,scope);if(!Array.isArray(JSON.parse(s.stores.find(r=>r.store_key==='bd_stock_movements')?.data_json??'null'))||!Array.isArray(JSON.parse(s.stores.find(r=>r.store_key==='bd_sales_events_v1')?.data_json??'[]')))fail('LEGACY_REQUIRED');
- const now=new Date().toISOString(),runId=crypto.randomUUID(),key=`journal-migrations/3389/${runId}/backup.json`;
+ validateLegacySource(s);const now=new Date().toISOString(),runId=crypto.randomUUID(),key=`journal-migrations/${scope.accountId}/${scope.venueId}/${runId}/backup.json`;
  const backup:Backup={format:'bardoctor-journal-backup-v1',capturedAt:now,scope:{accountId:scope.accountId,venueId:scope.venueId},source:s,required:Object.fromEntries(required.map(key=>[key,s.stores.find(row=>row.store_key===key)?.data_json??null]))};
  const raw=JSON.stringify(backup),digest=await hash(raw);await bucket.put(key,raw);const check=await bucket.get(key);if(!check||await hash(await check.text())!==digest)fail('BACKUP_NOT_DURABLE');
  await db.batch([...sourceGuards(db,scope,s),db.prepare("INSERT INTO journal_migration_runs(venue_id,account_id,run_id,phase,backup_key,backup_hash,created_at,updated_at) VALUES (?,?,?,'BACKED_UP',?,?,?,?)").bind(scope.venueId,scope.accountId,runId,key,digest,now,now),db.prepare("INSERT INTO journal_migration_log VALUES (?,0,'BACKED_UP',?,?,?)").bind(runId,scope.actorId,JSON.stringify({backupHash:digest,storeCount:s.stores.length}),now)]);
@@ -96,9 +111,9 @@ export async function refreshJournalBackup(db:D1Database,bucket:BackupStore,scop
  // No step may activate an ABORTED run. Staging can be reset safely on repeated refresh attempts.
  const refreshGuards=()=>[ownerGuard(db,scope),guard(db,"EXISTS(SELECT 1 FROM journal_migration_runs WHERE run_id=? AND phase='ABORTED' AND paused=0 AND revision=?)",[run.run_id,run.revision])];
  await restartLegacyJournal(db,scope,refreshGuards());await restartLegacySalesEvents(db,scope,refreshGuards());
- const s=await source(db,scope),now=new Date().toISOString();
+ const s=await source(db,scope),now=new Date().toISOString();validateLegacySource(s);
  const backup:Backup={format:'bardoctor-journal-backup-v1',capturedAt:now,scope:{accountId:scope.accountId,venueId:scope.venueId},source:s,required:Object.fromEntries(required.map(key=>[key,s.stores.find(row=>row.store_key===key)?.data_json??null]))};
- const raw=JSON.stringify(backup),digest=await hash(raw),key=`journal-migrations/3389/${runId}/backup-${run.revision}-${crypto.randomUUID()}.json`;
+ const raw=JSON.stringify(backup),digest=await hash(raw),key=`journal-migrations/${scope.accountId}/${scope.venueId}/${runId}/backup-${run.revision}-${crypto.randomUUID()}.json`;
  await bucket.put(key,raw);const checked=await bucket.get(key);if(!checked||await hash(await checked.text())!==digest)fail('BACKUP_NOT_DURABLE');
  await advance(db,scope,run,'BACKED_UP',0,{backupHash:digest,previousBackup:run.backup_key},[...sourceGuards(db,scope,s),db.prepare('UPDATE journal_migration_runs SET backup_key=?,backup_hash=? WHERE run_id=?').bind(key,digest,runId)]);
  return migrationStatus(db,scope);
