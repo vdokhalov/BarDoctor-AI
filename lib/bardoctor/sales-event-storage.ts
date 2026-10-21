@@ -1,3 +1,4 @@
+import {type JournalPeriod, validateJournalPeriod, belongsToJournalPeriod} from './journal-period';
 import {derivedInputBelongs} from './derived-input-scope';
 import {stockScope} from './stock-storage';
 import type {JournalScope} from './stock-journal';
@@ -71,13 +72,15 @@ export async function readSalesEvents(db:D1Database,accountId:number,raw:string|
 /** Read bounded projections for reconciliation and Health. Validate one captured event at a
  * time instead of retaining the entire expanded POS history in request memory.
  * Raw journal marker/revision still belongs to the caller's CAS snapshot. */
-async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits:{rows:number;bytes:number},project:(event:SalesEvent)=>T){
+async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits:{rows:number;bytes:number},project:(event:SalesEvent)=>T,period?:JournalPeriod){
+ if(period)validateJournalPeriod(period);
  const value=JSON.parse(raw??'[]'),refs:T[]=[];
  const bytes=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)).length;let referenceBytes=2;
  const scope=await stockScope(db,accountId);
  if(scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)throw Error('SALES_EVENT_SCOPE_MISMATCH');
  const append=(event:SalesEvent)=>{
   if(!derivedInputBelongs(event,ownership))throw Error('SALES_EVENT_SCOPE_MISMATCH');
+  if(period&&!Array.isArray(value)&&!belongsToJournalPeriod(event.businessDate,period))fail();
   if(!event||typeof event.batch?.id!=='string'||!event.batch.id)fail();
   const ref=project(event);
   referenceBytes+=bytes(ref)+(refs.length?1:0);if(referenceBytes>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
@@ -91,7 +94,8 @@ async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:st
  if(!marker(value))fail();
  const state=await salesEventState(db,scope);
  if(!state||!['active','verified'].includes(state.state)||state.revision!==value.revision)throw new StoreWriteConflictError();
- const records=await db.prepare('SELECT event_id,position,version,payload_hash,chunk_count FROM sales_event_records WHERE account_id=? ORDER BY position LIMIT ?').bind(accountId,limits.rows+1).all<RecordRow>();
+ const records=await db.prepare(`SELECT event_id,position,version,payload_hash,chunk_count FROM ${period?`(SELECT * FROM sales_event_records INDEXED BY sales_event_date WHERE account_id=? AND business_date>=? AND business_date<?
+  UNION ALL SELECT * FROM sales_event_records INDEXED BY sales_event_date WHERE account_id=? AND business_date='')`:'sales_event_records'} WHERE account_id=? ORDER BY position LIMIT ?`).bind(...(period?[accountId,period.start,period.endExclusive,accountId]:[]),accountId,limits.rows+1).all<RecordRow>();
  if(records.results.length>limits.rows||bytes(records.results)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
  for(const record of records.results){
   if(!Number.isSafeInteger(record.chunk_count)||record.chunk_count<1||record.chunk_count>Math.ceil(limits.bytes/32000)+1)throw Error('SALES_EVENT_READ_LIMIT');
@@ -125,10 +129,10 @@ export async function readSalesEventBatchReferences(db:D1Database,accountId:numb
 }
 /** Health never reads originalMovements. Keep complete batch cost captures,
  * prices and operational fields; check all original nested ownership first. */
-export async function readHealthSalesEvents(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+export async function readHealthSalesEvents(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000},period?:JournalPeriod){
  return readProjectedSalesEvents(db,accountId,raw,ownership,limits,event=>{
   const {originalMovements,...projection}=event;return projection;
- });
+ },period);
 }
 export async function readSaleEvent(db:D1Database,accountId:number,raw:string|null|undefined,selector:EventSelector,revenueRowId?:string){
  const value=JSON.parse(raw??'[]');if(Array.isArray(value))return {events:value as SalesEvent[],revision:null};if(!marker(value))fail();

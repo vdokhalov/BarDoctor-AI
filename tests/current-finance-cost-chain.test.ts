@@ -45,6 +45,8 @@ try{
  const live=await lifecycleRuntime({month:'./app/api/month-close/route'},{now});
  try{
   const user=await live.register('cost-chain@isolated.test');assert.equal(user.activeVenueId,1);
+  // Import the legacy fixture as a pre-existing account; fresh defaults are tested separately.
+  for(const table of ['stock_journals','sales_event_journals'])live.sqlite.prepare('DELETE FROM '+table+' WHERE account_id=?').run(user.userId);
   live.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify(profile),user.userId);
   for(const[key,value]of Object.entries(stores))live.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES(?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(user.userId,key,JSON.stringify(value));
   const snapshot=()=>JSON.stringify(live.sqlite.prepare('SELECT * FROM domain_data ORDER BY account_id,store_key').all());const before=snapshot();

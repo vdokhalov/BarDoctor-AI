@@ -1,3 +1,4 @@
+import {type JournalPeriod, validateJournalPeriod} from './journal-period';
 /** Normalized journal primitives. Schema installation never activates migration.
  * Every query is scoped by authenticated data account AND its venue. */
 import {storeCasGuard,StoreWriteConflictError,type StoreSnapshot} from './store-cas';
@@ -56,7 +57,8 @@ export async function journalPage(db:D1Database,scope:JournalScope,after:number|
 /** Verified Health page bounded by cumulative encoded payload size in SQL.
  * Metadata beyond the byte budget is retained only to continue at the last
  * verified position; it is never silently treated as complete history. */
-export async function boundedJournalPage(db:D1Database,scope:JournalScope,after:number,revision:number,maxBytes:number){
+export async function boundedJournalPage(db:D1Database,scope:JournalScope,after:number|null,revision:number,maxBytes:number,period?:JournalPeriod){
+ if(period)validateJournalPeriod(period);
  const before=await journalState(db,scope);
  if(!before||!['active','verified'].includes(before.state)||before.revision!==revision)throw new StoreWriteConflictError();
  const result=await db.prepare(`SELECT position,snapshot_hash,bytes,total_bytes,
@@ -65,9 +67,10 @@ export async function boundedJournalPage(db:D1Database,scope:JournalScope,after:
   FROM (SELECT *,SUM(bytes) OVER (ORDER BY position) total_bytes FROM
    (SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json,
     length(CAST(m.payload_json AS BLOB))+COALESCE(length(CAST(s.snapshot_json AS BLOB)),0) bytes
-    FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash
-    WHERE m.account_id=? AND m.position>? ORDER BY m.position LIMIT 51)) ORDER BY position`)
-  .bind(maxBytes,maxBytes,scope.accountId,after).all<{position:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null;bytes:number;total_bytes:number}>();
+    FROM ${period?`(SELECT * FROM stock_journal_movements INDEXED BY stock_journal_period WHERE account_id=? AND effective_date>=? AND effective_date<?
+      UNION ALL SELECT * FROM stock_journal_movements INDEXED BY stock_journal_period WHERE account_id=? AND effective_date IS NULL)`:'stock_journal_movements'} m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash
+    WHERE m.account_id=? ${after===null?'':'AND m.position>?'} ORDER BY m.position LIMIT 51)) ORDER BY position`)
+  .bind(maxBytes,maxBytes,...(period?[scope.accountId,period.start,period.endExclusive,scope.accountId]:[]),scope.accountId,...(after===null?[]:[after])).all<{position:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null;bytes:number;total_bytes:number}>();
  const current=await journalState(db,scope);
  if(!current||current.revision!==revision||current.state!==before.state)throw new StoreWriteConflictError();
  if(result.results[0]?.bytes>maxBytes)throw Error('STOCK_JOURNAL_READ_LIMIT');

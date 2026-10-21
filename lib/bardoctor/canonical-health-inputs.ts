@@ -1,3 +1,5 @@
+import { journalMonth } from './journal-period';
+import { venueDate, venueTimeFromJson } from './venue-time';
 import { normalizeLegacyPayrollEntries } from "./payroll-entry-scope";
 import {readHealthSalesEvents} from './sales-event-storage';
 import {readHealthStockHistory} from "./stock-storage";
@@ -81,11 +83,29 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
     if (present && !stores.has(key)) stores.set(key, {data:null,sourceState:"PARTIAL",updatedAt:source.updatedAt??""});
     sources.push(source);
   }
+  // Current finance has a period contract. Other consumers still receive full
+  // history (or honest PARTIAL), retaining stock anchors and historical signals.
+  const financePeriod = journalMonth(venueDate(asOf,venueTimeFromJson(JSON.stringify(profile)).timezone).slice(0,7));
+  const financeStores = new Map<string, StoredVenueValue>();
+  for (const key of ['bd_sales_events_v1','bd_stock_movements']) {
+    const source=sources.find(source=>source.key===key), snapshot=snapshots.find(snapshot=>snapshot.key===key);
+    if (!source || source.state==='RESTRICTED' || !snapshot?.dataJson) continue;
+    if (source.state==='AVAILABLE') { financeStores.set(key,stores.get(key)!); continue; }
+    try {
+      // Legacy arrays keep their existing bounds. Only normalized journals can
+      // be selected before hydration, without omitting any current-period row.
+      const raw=JSON.parse(snapshot.dataJson); if(Array.isArray(raw))continue;
+      const data=key==='bd_sales_events_v1'
+        ? await readHealthSalesEvents(database,account.id,snapshot.dataJson,scope,undefined,financePeriod)
+        : await readHealthStockHistory(database,account.id,snapshot.dataJson,scope,undefined,financePeriod);
+      financeStores.set(key,{data,sourceState:'AVAILABLE',updatedAt:snapshot.updatedAt??''});
+    } catch { financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:snapshot.updatedAt??''}); }
+  }
   const ingredientMemo = createIngredientReconciliationMemo();
-  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
+  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { financeStores, ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
   await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
   const operations = await observedAwait("health.operations", () => buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency }));
-  const inputManifest = { contractVersion: 1 as const, scope, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };
+  const inputManifest = { contractVersion: 1 as const, scope, financePeriod: {...financePeriod,sources:[...financeStores].map(([key,value])=>({key,state:value.sourceState,revision:sources.find(source=>source.key===key)?.revision,updatedAt:value.updatedAt}))}, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };
   const inputRevision = await revision("OPERATIONAL_REPORT", "business-health-inputs", { inputManifest, operations, costEpisodes:rows.results.filter(row=>row.store_key.startsWith(costPrefix)), localDate: operations.counters.unclosedShifts.window });
   const intelligence = buildBusinessIntelligenceFromVenueContext({ venueId: account.venueId, context, canonicalOperations: operations });
   const memoryRows = (key:string) => {

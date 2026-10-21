@@ -1,3 +1,4 @@
+import {type JournalPeriod, belongsToJournalPeriod} from './journal-period';
 import {derivedInputBelongs} from './derived-input-scope';
 import type {StockMovement} from './inventory';
 /** Explicit compatibility boundary. Raw CAS snapshots are never decoded or changed. */
@@ -24,13 +25,14 @@ export async function readStockHistory(db:D1Database,accountId:number,raw:string
 }
 /** Only duplicated recipe snapshots are omitted, after integrity/scope checks.
  * Health readers use movement quantity/cost/link fields, never recipeSnapshot. */
-export async function readHealthStockHistory(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+export async function readHealthStockHistory(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000},period?:JournalPeriod){
  const value=JSON.parse(raw??'[]'),scope=await stockScope(db,accountId);
  if(scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)throw Error('STOCK_JOURNAL_SCOPE_MISMATCH');
  const size=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)).length;
  const result:Record<string,unknown>[]=[];let retained=2;
  const append=(movement:Record<string,unknown>)=>{
   if(!movement||typeof movement!=='object'||Array.isArray(movement)||!derivedInputBelongs(movement,ownership))throw Error('STOCK_JOURNAL_SCOPE_MISMATCH');
+  if(period&&!Array.isArray(value)&&!belongsToJournalPeriod(movement.businessDate??movement.date,period))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
   const {recipeSnapshot,...projection}=movement;
   retained+=size(projection)+(result.length?1:0);
   if(result.length>=limits.rows||retained>limits.bytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
@@ -41,8 +43,15 @@ export async function readHealthStockHistory(db:D1Database,accountId:number,raw:
   for(const movement of value)append(movement);return result;
  }
  if(!stockJournalMarker(value)||!Number.isSafeInteger(value.revision))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
- let after=-1;
- while(true){const page=await boundedJournalPage(db,scope,after,value.revision,limits.bytes);for(const movement of page.items)append(movement);if(page.next===null)break;after=page.next;}
+ if(!period){
+  // A full-history consumer remains explicitly PARTIAL beyond its budget.
+  // Detect this without hydrating thousands of snapshots before Finance can
+  // independently request its current period.
+  const budget=await db.prepare('SELECT COUNT(*) n,COALESCE(SUM(length(CAST(payload_json AS BLOB))),0) bytes FROM (SELECT payload_json FROM stock_journal_movements WHERE account_id=? LIMIT ?)').bind(accountId,limits.rows+1).first<{n:number;bytes:number}>();
+  if(!budget||budget.n>limits.rows||budget.bytes>limits.bytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
+ }
+ let after:number|null=null;
+ while(true){const page=await boundedJournalPage(db,scope,after,value.revision,limits.bytes,period);for(const movement of page.items)append(movement);if(page.next===null)break;after=page.next;}
  return markNormalizedStockHistory(result);
 }
 /** Only actual changed rows are written; historical omissions never delete evidence. */
