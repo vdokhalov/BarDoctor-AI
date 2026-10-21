@@ -19,6 +19,7 @@ if(!overviewBody.includes('const bdOverviewMoney=')){
  overviewBody=overviewBody.slice(0,overview.body.start-overview.start+1)+'const bdOverviewMoney=(amount,currency="RUB")=>window.bdFormatAccountingMoney(amount,currency);'+overviewBody.slice(overview.body.start-overview.start+1);
 }
 overviewBody=overviewBody.replaceAll('bdProcMoneyV168(', 'bdOverviewMoney(');
+overviewBody=overviewBody.replace('i.jsx("strong",{children:bdOverviewMoney(e.kpi.purchaseTotal','i.jsx("strong",{style:{whiteSpace:"normal",overflow:"visible",textOverflow:"clip",overflowWrap:"anywhere",fontSize:"24px",lineHeight:1.2},children:bdOverviewMoney(e.kpi.purchaseTotal');
 s=s.slice(0,overview.start)+overviewBody+s.slice(overview.end);
 fs.writeFileSync(file,start+'\n'+domain.outputFiles[0].text+component+end+'\n'+s);
 console.log('Read-only purchase price and dish preview applied');
