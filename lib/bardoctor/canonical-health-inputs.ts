@@ -82,6 +82,12 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
         }
       } catch { source.state = "PARTIAL"; }
     } else if (present) source.state = "PARTIAL";
+    else if (['bd_finance_expenses','bd_payroll_entries'].includes(key)) {
+      // Only a confirmed absence in the authorized snapshot is an empty ledger.
+      // Existing null/truncated/malformed sources remain PARTIAL above.
+      source.state='AVAILABLE';source.data=[];
+      stores.set(key,{data:[],sourceState:'AVAILABLE',updatedAt:''});
+    }
     if (present && !stores.has(key)) stores.set(key, {data:null,sourceState:"PARTIAL",updatedAt:source.updatedAt??""});
     sources.push(source);
   }
