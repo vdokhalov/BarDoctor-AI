@@ -95,6 +95,8 @@
   function queryScreen(url) {
     var path = url.pathname;
     var query = url.searchParams;
+    /* department-context */
+    if (/^\/employees\/[^/]+$/.test(path) && query.has("department")) { var teamQuery = new URLSearchParams({view:"employees"}); ["department","departmentVenue","q","status","venue"].forEach(function(key){if(query.has(key))teamQuery.set(key,query.get(key));}); return {type:"detail",title:"Сотрудник",parent:"/employees?"+teamQuery.toString()}; }
     if ((path === "/cases" || /^\/cases\/[^/]+$/.test(path) && path !== "/cases/add") && query.has("workday")) {
       var workday = query.get("workday") || "", venue = query.get("workdayVenue") || "";
       var validShift = /^\d{4}-\d{2}-\d{2}$/.test(workday) && /^[1-9]\d*$/.test(venue);
