@@ -1,3 +1,4 @@
+import {freshVenueJournalStatements} from './fresh-venue-journals';
 import { hasPosSession, authenticatePosRequest } from './staff-pin-session';
 import { ensureAuthSchema } from "./auth-schema";
 export { ensureAuthSchema } from "./auth-schema";
@@ -274,8 +275,9 @@ function venueName(account: Account): string {
   return venueIdentityFromJson(account.restaurantJson).name;
 }
 
-export async function ensureOwnerVenue(account: Account): Promise<void> {
+export async function ensureOwnerVenue(account: Account, freshSignup = false): Promise<void> {
   if (!account.ownsVenue) return;
+  freshSignup = freshSignup || account.migrationStatus === "initializing_normalized";
   const db = getDb();
   const now = new Date().toISOString();
   let [venue] = await db
@@ -296,6 +298,7 @@ export async function ensureOwnerVenue(account: Account): Promise<void> {
       d1.prepare(`INSERT INTO venues(workspace_id,data_account_id,status,created_by_account_id,updated_at)
         SELECT last_insert_rowid(),id,'active',id,? FROM accounts WHERE id=? AND owns_venue=1 AND account_kind='user'
         AND NOT EXISTS(SELECT 1 FROM venues WHERE data_account_id=?)`).bind(now, account.id, account.id),
+      ...(freshSignup?[...freshVenueJournalStatements(d1,account.id,account.id,now),d1.prepare("UPDATE accounts SET migration_status='server_authoritative' WHERE id=? AND migration_status='initializing_normalized'").bind(account.id)]:[]),
     ]);
     [venue] = await db.select().from(venues).where(eq(venues.dataAccountId, account.id)).limit(1);
     if (!venue) return;

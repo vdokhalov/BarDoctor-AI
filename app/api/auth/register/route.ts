@@ -1,5 +1,5 @@
 import { SALES_ACCOUNTING_KEY, initialSalesAccounting } from "../../../../lib/bardoctor/sales-accounting";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "../../../../db";
 import { accounts, domainData, venues } from "../../../../db/schema";
 import {
@@ -90,7 +90,7 @@ export async function POST(request: Request): Promise<Response> {
         accountKind: "user",
         role: invite?.role ?? "owner",
         ownsVenue: !invite,
-        migrationStatus: "server_authoritative",
+        migrationStatus: invite ? "server_authoritative" : "initializing_normalized",
         updatedAt: now,
       })
       .returning();
@@ -105,9 +105,11 @@ export async function POST(request: Request): Promise<Response> {
         );
       }
     } else {
-      await ensureOwnerVenue(account);
+      try {
+      await ensureOwnerVenue(account, true);
       const [createdVenue]=await getDb().select().from(venues).where(eq(venues.dataAccountId,account.id)).limit(1);
       if(createdVenue)await getDb().insert(domainData).values({accountId:account.id,storeKey:SALES_ACCOUNTING_KEY,dataJson:JSON.stringify(initialSalesAccounting(createdVenue.id,now,account.id)),updatedAt:now}).onConflictDoNothing();
+      } catch(error) { await getDb().delete(accounts).where(and(eq(accounts.id,account.id),eq(accounts.migrationStatus,"initializing_normalized"))); throw error; }
     }
 
     const token = await issueSession(account);

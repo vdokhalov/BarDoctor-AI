@@ -1,6 +1,7 @@
+import {freshVenueJournalStatements} from './fresh-venue-journals';
 import { SALES_ACCOUNTING_KEY, initialSalesAccounting } from "./sales-accounting";
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../../db";
+import { getDb, getD1 } from "../../db";
 import {
   accounts,
   domainData,
@@ -66,16 +67,12 @@ export async function createVenueForOwner(
       .returning({ id: accounts.id });
     dataAccountId = dataAccount.id;
 
-    const [venue] = await db
-      .insert(venues)
-      .values({
-        workspaceId,
-        dataAccountId,
-        status: "active",
-        createdByAccountId: actor.actorAccountId,
-        updatedAt: now,
-      })
-      .returning();
+    const d1=getD1();
+    await d1.batch([
+      d1.prepare("INSERT INTO venues(workspace_id,data_account_id,status,created_by_account_id,updated_at) VALUES (?,?,'active',?,?)").bind(workspaceId,dataAccountId,actor.actorAccountId,now),
+      ...freshVenueJournalStatements(d1,dataAccountId,actor.actorAccountId,now),
+    ]);
+    const [venue]=await db.select().from(venues).where(eq(venues.dataAccountId,dataAccountId)).limit(1);
 
     await db
       .insert(domainData)
