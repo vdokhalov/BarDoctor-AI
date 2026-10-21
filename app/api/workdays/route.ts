@@ -43,6 +43,12 @@ export async function GET(request:Request){
  const localDate=venueDate(c.now,c.timezone),clock=venueClock(c.now,c.timezone),overnight=typeof c.profile.openTime==="string"&&typeof c.profile.closeTime==="string"&&c.profile.closeTime<=c.profile.openTime&&clock<c.profile.closeTime,defaultDate=overnight?new Date(Date.parse(localDate+"T12:00:00Z")-86400000).toISOString().slice(0,10):localDate;
  const open=c.rows(keys[0]).find(r=>r.workdayStatus==="OPEN"),query=new URL(request.url).searchParams.get("date"),date=query||String(open?.date||defaultDate);
  if(!validDate(date))return reply({ok:false,code:"DATE_INVALID"},400);
+ if(new URL(request.url).searchParams.get("view")==="incidents"){
+  if(!hasPermission(c.account,"incidents.view"))return reply({ok:false,code:"ACCESS_DENIED"},403);
+  if(new URL(request.url).searchParams.get("venue")!==String(c.account.venueId))return reply({ok:false,code:"VENUE_CHANGED",error:"Выберите заведение этой смены, затем откройте происшествия снова."},409);
+  const incidents=c.rows("bd_cases").filter(row=>String(row.businessDate??row.eventDate??row.date).slice(0,10)===date);
+  return reply({ok:true,venueId:c.account.venueId,date,incidents});
+ }
  const report=c.rows(keys[0]).find(r=>r.date===date),rules=c.rows(keys[5]);
  return reply({ok:true,personalSales:report?.workdayStatus==="CLOSED"?null:personalSales(c,date),openingBlockers:openingBlockers(c),venueId:c.account.venueId,date,timezone:c.timezone,startTime:venueClock(c.now,c.timezone),day:projection(c,date),cashSessions:c.rows(keys[1]).filter(r=>r.date===date&&r.revenueSource==="sales_events_v1").map(r=>({id:r.id,name:r.shiftName,status:r.closingStatus,cash:record(r.closingReport).cash??null})),workday:report?.workdayStatus?report:null,legacyReport:Boolean(!report?.workdayStatus&&(report||projection(c,date).report)),canManage:hasPermission(c.account,"shifts.manage"),employees:c.rows(keys[4]).map(e=>({id:e.id,name:e.name,position:e.position||"",customPositionLabel:e.customPositionLabel||"",active:e.active!==false&&!e.archived&&(!e.status||e.status==="active"),requirements:workdayPayrollRequirements(e,rules)}))});
 }

@@ -95,6 +95,12 @@
   function queryScreen(url) {
     var path = url.pathname;
     var query = url.searchParams;
+    if ((path === "/cases" || /^\/cases\/[^/]+$/.test(path) && path !== "/cases/add") && query.has("workday")) {
+      var workday = query.get("workday") || "", venue = query.get("workdayVenue") || "";
+      var validShift = /^\d{4}-\d{2}-\d{2}$/.test(workday) && /^[1-9]\d*$/.test(venue);
+      var shiftQuery = new URLSearchParams({ venue: venue, workday: workday, month: workday.slice(0, 7) });
+      return { type: path === "/cases" ? "list" : "detail", title: path === "/cases" ? "Происшествия смены · " + workday : "Происшествие смены", parent: !validShift ? "/shifts" : path === "/cases" ? "/shifts?" + shiftQuery : "/cases" + url.search };
+    }
     // The URL owns write-off forms/details and their nested confirmations.
     // A second transient history entry can race Close and reopen a prior
     // document after React has already unmounted the unsaved form.
