@@ -1,0 +1,36 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {lifecycleRuntime} from './helpers/lifecycle-runtime';
+import {createHash} from 'node:crypto';
+test('owner current-tenant handler requires confirmation and origin; verified download is scoped, cancellable and revocable',async t=>{
+ const objects=new Map<string,string>(),gets:string[]=[];
+ const bucket={async put(key:string,value:string){objects.set(key,value);},async get(key:string){gets.push(key);const value=objects.get(key);return value===undefined?null:{size:Buffer.byteLength(value),etag:createHash('sha256').update(value).digest('hex'),async text(){return value}};},async list({prefix}:{prefix:string}){return {objects:[],truncated:false};}};
+ const r=await lifecycleRuntime({route:'./app/api/business-backup/route'},{bindings:{BUCKET:bucket}});t.after(r.close);
+ const owner=await r.register('owner-backup@isolated.test'),other=await r.register('foreign-backup@isolated.test'),api=r.api as any;
+ const request=(user=owner,body?:any,origin=true,url='/api/business-backup')=>{const value=r.request(user,url,body?'POST':'GET',body);if(body&&origin)value.headers.set('Origin',new URL(value.url).origin);return value;};
+ const command={accountId:owner.userId,venueId:owner.activeVenueId,confirmation:'CURRENT_VENUE_BUSINESS_BACKUP'};
+ assert.equal((await api.route.POST(request(owner,{...command,action:'prepare'},false))).status,403);
+ assert.equal((await api.route.POST(request(other,{...command,action:'prepare'}))).status,403);
+ assert.equal((await api.route.POST(request(owner,{...command,confirmation:'',action:'prepare'}))).status,403);
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM venue_business_backup_runs').get()!.n,0);
+ r.failDatabase();assert.equal((await api.route.POST(request(owner,{...command,action:'prepare'}))).status,409);assert.equal(r.sqlite.prepare('SELECT count(*) n FROM venue_business_backup_runs').get()!.n,0);
+ const call=async(body:any)=>{const response=await api.route.POST(request(owner,{...command,...body}));const value=await response.json();assert.equal(response.status,200,JSON.stringify(value));return value;};
+ let state=await call({action:'prepare'}),steps=0;
+ while(state.run.phase==='CAPTURE'){state=await call({action:'resume',runId:state.run.run_id});assert(++steps<30);}
+ assert.equal(state.run.paused,0);
+ assert.equal((await api.route.POST(request(owner,{...command,action:'restore',runId:state.run.run_id}))).status,400);
+ const rootResponse=await api.route.GET(request(owner,undefined,true,'/api/business-backup?download=1'));assert.equal(rootResponse.status,200);const root=await rootResponse.json();
+ const url='/api/business-backup?attachment=1&venueId='+owner.activeVenueId+'&accountId='+owner.userId+'&runId='+state.run.run_id+'&hash='+root.hash;
+ assert.equal((await api.route.GET(request(other,undefined,true,url))).status,403);
+ const download=await api.route.GET(request(owner,undefined,true,url));assert.equal(download.status,200);assert.match(download.headers.get('Content-Disposition'),/attachment/);assert.equal(download.headers.get('Cache-Control'),'private, no-store');
+ let reader=download.body.getReader();const header=JSON.parse(new TextDecoder().decode((await reader.read()).value));assert.equal(header.hash,root.hash);
+ const readCount=gets.length;await reader.cancel();assert.equal(gets.length,readCount);
+ reader=(await api.route.GET(request(owner,undefined,true,url))).body.getReader();await reader.read();
+ r.sqlite.prepare("UPDATE venue_memberships SET role='manager' WHERE venue_id=? AND account_id=?").run(owner.activeVenueId,owner.userId);
+ await assert.rejects(reader.read(),/DOWNLOAD_INTERRUPTED/);
+ assert.equal((await api.route.GET(request(owner,undefined,true,url))).status,403);
+ r.sqlite.prepare("UPDATE venue_memberships SET role='owner' WHERE venue_id=? AND account_id=?").run(owner.activeVenueId,owner.userId);
+ const response=await api.route.GET(request(owner,undefined,true,url)),frames=(await response.text()).trim().split('\n').map((line:string)=>JSON.parse(line));
+ assert.equal(frames.length,root.manifest.parts.length+1);
+ assert.equal(r.sqlite.prepare('SELECT count(*) n FROM venue_business_backup_runs').get()!.n,1);
+});
