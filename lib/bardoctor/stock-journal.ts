@@ -53,6 +53,28 @@ export async function journalPage(db:D1Database,scope:JournalScope,after:number|
  const current=await journalState(db,scope);if(!current||current.revision!==j.revision||current.state!==j.state)throw new StoreWriteConflictError();
  const items=rows.results.slice(0,limit);return {revision:j.revision,items:await Promise.all(items.map(hydrate)),next:rows.results.length>limit?items.at(-1)!.position:null};
 }
+/** Verified Health page bounded by cumulative encoded payload size in SQL.
+ * Metadata beyond the byte budget is retained only to continue at the last
+ * verified position; it is never silently treated as complete history. */
+export async function boundedJournalPage(db:D1Database,scope:JournalScope,after:number,revision:number,maxBytes:number){
+ const before=await journalState(db,scope);
+ if(!before||!['active','verified'].includes(before.state)||before.revision!==revision)throw new StoreWriteConflictError();
+ const result=await db.prepare(`SELECT position,snapshot_hash,bytes,total_bytes,
+  CASE WHEN total_bytes<=? THEN payload_json END payload_json,
+  CASE WHEN total_bytes<=? THEN snapshot_json END snapshot_json
+  FROM (SELECT *,SUM(bytes) OVER (ORDER BY position) total_bytes FROM
+   (SELECT m.position,m.payload_json,m.snapshot_hash,s.snapshot_json,
+    length(CAST(m.payload_json AS BLOB))+COALESCE(length(CAST(s.snapshot_json AS BLOB)),0) bytes
+    FROM stock_journal_movements m LEFT JOIN stock_recipe_snapshots s ON s.account_id=m.account_id AND s.snapshot_hash=m.snapshot_hash
+    WHERE m.account_id=? AND m.position>? ORDER BY m.position LIMIT 51)) ORDER BY position`)
+  .bind(maxBytes,maxBytes,scope.accountId,after).all<{position:number;payload_json:string;snapshot_hash:string|null;snapshot_json:string|null;bytes:number;total_bytes:number}>();
+ const current=await journalState(db,scope);
+ if(!current||current.revision!==revision||current.state!==before.state)throw new StoreWriteConflictError();
+ if(result.results[0]?.bytes>maxBytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
+ const selected=result.results.slice(0,50).filter(row=>row.total_bytes<=maxBytes);
+ const items=await Promise.all(selected.map(hydrate));
+ return {items,next:result.results.length>selected.length?selected.at(-1)!.position:null};
+}
 /** Resume a bounded batch against the exact unchanged legacy source. No cutover. */
 export async function copyLegacyJournal(db:D1Database,scope:JournalScope,limit=25){
  if(!Number.isSafeInteger(limit)||limit<1||limit>25)fail();

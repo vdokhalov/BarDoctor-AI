@@ -1,6 +1,7 @@
+import {derivedInputBelongs} from './derived-input-scope';
 import type {StockMovement} from './inventory';
 /** Explicit compatibility boundary. Raw CAS snapshots are never decoded or changed. */
-import {journalState,journalPage,journalPosition,appendJournalStatements,updateJournalStatements,JOURNAL_FORMAT,type JournalScope} from './stock-journal';
+import {boundedJournalPage,journalState,journalPage,journalPosition,appendJournalStatements,updateJournalStatements,JOURNAL_FORMAT,type JournalScope} from './stock-journal';
 import {markNormalizedStockHistory,isNormalizedStockHistory} from './stock-retention';
 import {StoreWriteConflictError} from './store-cas';
 const saleRevisions=new WeakMap<object,number>();
@@ -20,6 +21,29 @@ export async function readStockHistory(db:D1Database,accountId:number,raw:string
  const scope=await stockScope(db,accountId),items:Record<string,unknown>[]=[];let cursor:number|null=null,bytes=2;
  do{const page=await journalPage(db,scope,cursor,500,value.revision);items.push(...page.items);bytes+=new TextEncoder().encode(JSON.stringify(page.items)).length;if(items.length>(limits.rows??Infinity)||bytes>(limits.bytes??Infinity))throw Error("STOCK_JOURNAL_READ_LIMIT");cursor=page.next;}while(cursor!==null);
  return markNormalizedStockHistory(items) as StockMovement[];
+}
+/** Only duplicated recipe snapshots are omitted, after integrity/scope checks.
+ * Health readers use movement quantity/cost/link fields, never recipeSnapshot. */
+export async function readHealthStockHistory(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+ const value=JSON.parse(raw??'[]'),scope=await stockScope(db,accountId);
+ if(scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)throw Error('STOCK_JOURNAL_SCOPE_MISMATCH');
+ const size=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)).length;
+ const result:Record<string,unknown>[]=[];let retained=2;
+ const append=(movement:Record<string,unknown>)=>{
+  if(!movement||typeof movement!=='object'||Array.isArray(movement)||!derivedInputBelongs(movement,ownership))throw Error('STOCK_JOURNAL_SCOPE_MISMATCH');
+  const {recipeSnapshot,...projection}=movement;
+  retained+=size(projection)+(result.length?1:0);
+  if(result.length>=limits.rows||retained>limits.bytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
+  result.push(projection);
+ };
+ if(Array.isArray(value)){
+  if(value.length>limits.rows||size(value)>limits.bytes)throw Error('STOCK_JOURNAL_READ_LIMIT');
+  for(const movement of value)append(movement);return result;
+ }
+ if(!stockJournalMarker(value)||!Number.isSafeInteger(value.revision))throw Error('STOCK_JOURNAL_NEEDS_REVIEW');
+ let after=-1;
+ while(true){const page=await boundedJournalPage(db,scope,after,value.revision,limits.bytes);for(const movement of page.items)append(movement);if(page.next===null)break;after=page.next;}
+ return markNormalizedStockHistory(result);
 }
 /** Only actual changed rows are written; historical omissions never delete evidence. */
 export async function stockStoreStatements(db:D1Database,accountId:number,key:string,value:unknown,now:string):Promise<D1PreparedStatement[]>{

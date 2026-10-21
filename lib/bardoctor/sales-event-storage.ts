@@ -68,18 +68,18 @@ export async function readSalesEvents(db:D1Database,accountId:number,raw:string|
  do{const page=await salesEventPage(db,scope,value.revision,after,100,selector);events.push(...page.items);bytes+=new TextEncoder().encode(JSON.stringify(page.items)).length;if(events.length>(limits.rows??Infinity)||bytes>(limits.bytes??Infinity))throw Error('SALES_EVENT_READ_LIMIT');if(page.next===null)break;after=page.next;}while(true);
  return events;
 }
-/** Read only batch references for reconciliation. Validate one captured event at a
+/** Read bounded projections for reconciliation and Health. Validate one captured event at a
  * time instead of retaining the entire expanded POS history in request memory.
  * Raw journal marker/revision still belongs to the caller's CAS snapshot. */
-export async function readSalesEventBatchReferences(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
- const value=JSON.parse(raw??'[]'),refs:{id:string;venueId:number;batch:{id:string}}[]=[];
+async function readProjectedSalesEvents<T>(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits:{rows:number;bytes:number},project:(event:SalesEvent)=>T){
+ const value=JSON.parse(raw??'[]'),refs:T[]=[];
  const bytes=(v:unknown)=>new TextEncoder().encode(JSON.stringify(v)).length;let referenceBytes=2;
  const scope=await stockScope(db,accountId);
  if(scope.venueId!==ownership.venueId||accountId!==ownership.dataAccountId)throw Error('SALES_EVENT_SCOPE_MISMATCH');
  const append=(event:SalesEvent)=>{
   if(!derivedInputBelongs(event,ownership))throw Error('SALES_EVENT_SCOPE_MISMATCH');
   if(!event||typeof event.batch?.id!=='string'||!event.batch.id)fail();
-  const ref={id:event.id,venueId:event.venueId,batch:{id:event.batch.id}};
+  const ref=project(event);
   referenceBytes+=bytes(ref)+(refs.length?1:0);if(referenceBytes>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
   refs.push(ref);
  };
@@ -106,6 +106,16 @@ export async function readSalesEventBatchReferences(db:D1Database,accountId:numb
  if(!current||current.revision!==value.revision||current.state!==state.state)throw new StoreWriteConflictError();
  if(bytes(refs)>limits.bytes)throw Error('SALES_EVENT_READ_LIMIT');
  return refs;
+}
+export async function readSalesEventBatchReferences(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+ return readProjectedSalesEvents(db,accountId,raw,ownership,limits,event=>({id:event.id,venueId:event.venueId,batch:{id:event.batch.id}}));
+}
+/** Health never reads originalMovements. Keep complete batch cost captures,
+ * prices and operational fields; check all original nested ownership first. */
+export async function readHealthSalesEvents(db:D1Database,accountId:number,raw:string|null|undefined,ownership:{venueId:number;workspaceId:number;dataAccountId:number},limits={rows:10000,bytes:2000000}){
+ return readProjectedSalesEvents(db,accountId,raw,ownership,limits,event=>{
+  const {originalMovements,...projection}=event;return projection;
+ });
 }
 export async function readSaleEvent(db:D1Database,accountId:number,raw:string|null|undefined,selector:EventSelector,revenueRowId?:string){
  const value=JSON.parse(raw??'[]');if(Array.isArray(value))return {events:value as SalesEvent[],revision:null};if(!marker(value))fail();
