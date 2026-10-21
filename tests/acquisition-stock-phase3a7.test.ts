@@ -42,15 +42,12 @@ test('same-clock anchor records actual prior identities; legacy ambiguous bounda
  const input={...scope,balance:{productKey:'p',current:8,unit:'l',lastInventoryDocumentId:'count'},movements,counts:[anchor],openings:[]};
  assert.equal(stockQuantityEvidence(input).evidenceComplete,true);assert.equal(stockQuantityEvidence({...input,counts:[{...anchor,anchorBoundary:undefined}]}).evidenceComplete,false);
 });
-test('bounded retention pins rare applicable receipt, active anchor and contributing facts; refuses required overflow',()=>{
- const balance={venueId:1,productKey:'p',unit:'l',current:5,checkedAt:'2026-10-01T00:00:00.000Z',quantityAnchorAt:'2026-10-01T00:00:00.000Z',lastInventoryDocumentId:'count'};
- const old=Array.from({length:19998},(_,i)=>({id:'o'+i,productKey:'untracked'}));
- const rare=receipt('rare','2026-09-01',{createdAt:'2026-09-01T00:00:00.000Z'}),anchor=receipt('anchor',undefined,{type:'inventory_adjustment',sourceDocumentId:'count',createdAt:balance.checkedAt});
- const values=[receipt('new'),...old,rare,anchor];const source=JSON.stringify(values),kept=retainStockMovements(values,{stockBalances:[balance]});
- assert.equal(kept.length,20000);assert.ok(kept.some(row=>row.id==='rare'));assert.ok(kept.some(row=>row.id==='anchor'));assert.equal(cost(kept).movementId,'new');assert.equal(JSON.stringify(values),source);
- const required=Array.from({length:20001},(_,i)=>receipt('required'+i));assert.throws(()=>retainStockMovements(required,{stockBalances:[balance]}),StockEvidenceCapacityError);
- assert.throws(()=>retainStockMovements([receipt('large',undefined,{payload:'x'.repeat(MAX_STOCK_MOVEMENT_BYTES)})],{stockBalances:[balance]}),StockEvidenceCapacityError);
- const afterCount=receipt('after',undefined,{type:'sale_consumption',amount:-1});assert.ok(retainStockMovements([afterCount,...values],{stockBalances:[balance]}).some(row=>row.id==='after'));
+test('legacy history capacity refuses eviction even before anchors or for untracked rows',()=>{
+ const balance={venueId:1,productKey:'p',quantityAnchorAt:at};
+ const values=Array.from({length:20001},(_,i)=>({id:'old'+i,productKey:'untracked',type:'sale_consumption',createdAt:'2026-09-01T00:00:00Z'}));
+ const before=JSON.stringify(values);assert.throws(()=>retainStockMovements(values,{stockBalances:[balance]}),StockEvidenceCapacityError);assert.equal(JSON.stringify(values),before);
+ const small=[receipt('old'),{id:'opaque',unknown:{preserve:true}}];assert.equal(retainStockMovements(small),small);
+ assert.throws(()=>retainStockMovements([receipt('large',undefined,{payload:'я'.repeat(MAX_STOCK_MOVEMENT_BYTES/2)})],{stockBalances:[balance]}),StockEvidenceCapacityError);
 });
 test('valuation null is unknown, subtotal is explicitly partial; known zero and no-stock zero are real zero',()=>{
  const input={balances:[{productKey:'p',current:2,unit:'l'}],venueId:1,accountingCurrency:'MDL',asOf:at};
@@ -81,14 +78,13 @@ test('actual purchase writer: acquisition document/line/conversion/receipt/cost/
  r.permissions([]);r.sqlite.prepare("UPDATE venue_memberships SET status='revoked' WHERE venue_id=? AND account_id=?").run(r.venueId,r.member.userId);assert.equal((await r.resolve(basis.reference,r.member)).response.status,401);
 });
 
-test('real purchase writer at 20k preserves rare acquisition; required overflow returns 409 before any CAS/audit write',async t=>{
- const r=await stockRuntime();t.after(r.close);const first=await r.confirm('rare-x','pcs',1,20);assert.ok(first.response.ok);
- const rare=(r.get('bd_stock_movements') as StockRow[])[0],rareKey=String(rare.productKey);
- const filler=Array.from({length:19999},(_,i)=>({...rare,id:'optional-'+i,productKey:'unused',productName:'Unused QA item',status:'cancelled',reversedAt:'2026-10-02T10:00:00.000Z',sourceDocumentId:'unused-'+i}));r.put('bd_stock_movements',[...filler,rare]);
- const unrelated=await r.confirm('unrelated-y','l',1,40);assert.ok(unrelated.response.ok,JSON.stringify(unrelated.body));const movements=r.get('bd_stock_movements') as StockRow[];
- assert.ok(movements.length<=20000);assert.ok(Buffer.byteLength(JSON.stringify(movements))<=MAX_STOCK_MOVEMENT_BYTES);assert.ok(movements.some(row=>row.id===rare.id));assert.equal(resolvedEvidence((await r.resolve(r.reference('COST_BASIS',rareKey))).body).projection.value,20);
- const required=Array.from({length:20000},(_,i)=>({...rare,id:'required-'+i,sourceDocumentId:'required-doc-'+i}));r.put('bd_stock_movements',required);const before=r.snapshot();
- const refused=await r.confirm('overflow','pcs',1,30);assert.equal(refused.response.status,409);assert.equal(refused.body.code,'STOCK_EVIDENCE_CAPACITY_REACHED');assert.deepEqual(r.snapshot(),before,'Capacity refusal leaves accepted data, timestamps and audit unchanged');
+test('real purchase writer refuses optional-history overflow without CAS/audit or balance changes',async t=>{
+ const r=await stockRuntime();t.after(r.close);assert.ok((await r.confirm('rare-x','pcs',1,20)).response.ok);
+ const rare=(r.get('bd_stock_movements') as StockRow[])[0];
+ for(const filler of [Array.from({length:19999},(_,i)=>({id:'old'+i,productKey:'unused',status:'cancelled'})),[{id:'huge-old',productKey:'unused',payload:'x'.repeat(MAX_STOCK_MOVEMENT_BYTES-Buffer.byteLength(JSON.stringify(rare))-200)}]]){
+  assert.ok(Buffer.byteLength(JSON.stringify([...filler,rare]))<MAX_STOCK_MOVEMENT_BYTES);r.put('bd_stock_movements',[...filler,rare]);const before=r.snapshot();
+  const refused=await r.confirm('overflow','pcs',1,30);assert.equal(refused.response.status,409);assert.equal(refused.body.code,'STOCK_EVIDENCE_CAPACITY_REACHED');assert.deepEqual(r.snapshot(),before);
+ }
 });
 
 test('procurement canonical IDs, comparable captured packages, chronology and separate source price/currency',()=>{
