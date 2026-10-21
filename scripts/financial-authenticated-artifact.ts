@@ -79,6 +79,7 @@ try {
   const homeText=await home.innerText();assert.match(homeText,/3[ \u00a0\u202f]?476[,.]00/);
   await page.screenshot({path:out+'/home.png',fullPage:true});
   await page.goto(base+'/finance');await page.waitForLoadState('networkidle');assert.equal(await page.getByText('BarDoctor не завершил загрузку',{exact:false}).count(),0);
+  const finance=page.locator('[data-bd-finance-result-month="current-v573"]');await finance.waitFor({timeout:30000});const financeText=await finance.innerText();assert.match(financeText,/Текущий результат после себестоимости/);assert.match(financeText,/3[ \u00a0\u202f]?476[,.]00/);assert.doesNotMatch(financeText,/Чистая прибыль|ещё не рассчитана/);await finance.screenshot({path:out+'/finance-card.png'});
   await page.goto(base+'/reports?month=2026-10');const report=page.locator('[data-bd-monthly-report]');await report.waitFor({timeout:30000});
   await report.getByText('Результат после себестоимости',{exact:false}).first().waitFor({timeout:30000});
   const reportText=await report.innerText();assert.match(reportText,/3[ \u00a0\u202f]?476[,.]00/);
@@ -88,7 +89,7 @@ try {
   for(const x of complete){assert.equal(x.data.report.revenue,4010);assert.equal(x.data.report.costOfGoods,534);assert.equal(x.data.report.resultAfterCost,3476);assert.equal(x.data.report.receipts,401);}
   assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);assert.deepEqual(failures,[]);assert.equal(business(),before,'UI preserves business records');
   const assetPath='dist/client'+new URL(assets[0]).pathname,sha=execFileSync('git',['rev-parse','HEAD']).toString().trim();
-  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:4010,receipts:401,cost:534,result:3476,homeText,reportText,unchanged:true};
-  writeFileSync(out+'/results.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify({...evidence,homeText:undefined,reportText:undefined}));
+  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:4010,receipts:401,cost:534,result:3476,homeText,financeText,reportText,unchanged:true};
+  writeFileSync(out+'/results.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify({...evidence,homeText:undefined,financeText:undefined,reportText:undefined}));
  }catch(error){writeFileSync(out+'/failure.txt',await page.locator('body').innerText());writeFileSync(out+'/responses.json',JSON.stringify(replies,null,2));throw error}finally{await context.close()}
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}
