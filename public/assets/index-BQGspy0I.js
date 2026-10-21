@@ -1,3 +1,219 @@
+/* purchase-price-preview:start */
+"use strict";
+var bdPurchasePricePreviewDomain = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // lib/bardoctor/purchase-price-preview.ts
+  var purchase_price_preview_exports = {};
+  __export(purchase_price_preview_exports, {
+    purchasePricePreview: () => purchasePricePreview
+  });
+
+  // lib/bardoctor/stock-units.ts
+  var definitions = {
+    pcs: { dimension: "COUNT", canonicalUnit: "pcs", factor: 1 },
+    l: { dimension: "VOLUME", canonicalUnit: "l", factor: 1 },
+    ml: { dimension: "VOLUME", canonicalUnit: "l", factor: 1e-3 },
+    kg: { dimension: "WEIGHT", canonicalUnit: "kg", factor: 1 },
+    g: { dimension: "WEIGHT", canonicalUnit: "kg", factor: 1e-3 }
+  };
+  function physicalUnit(value) {
+    const unit = String(value ?? "").trim().toLowerCase().replace(/\.$/, "");
+    if (["pcs", "piece", "pieces", "\u0448\u0442", "\u0448\u0442\u0443\u043A\u0430", "\u0448\u0442\u0443\u043A\u0438", "\u0448\u0442\u0443\u043A"].includes(unit)) return "pcs";
+    if (["l", "\u043B", "\u043B\u0438\u0442\u0440", "\u043B\u0438\u0442\u0440\u0430", "\u043B\u0438\u0442\u0440\u043E\u0432"].includes(unit)) return "l";
+    if (["ml", "\u043C\u043B", "\u043C\u0438\u043B\u043B\u0438\u043B\u0438\u0442\u0440", "\u043C\u0438\u043B\u043B\u0438\u043B\u0438\u0442\u0440\u0430", "\u043C\u0438\u043B\u043B\u0438\u043B\u0438\u0442\u0440\u043E\u0432"].includes(unit)) return "ml";
+    if (["kg", "\u043A\u0433", "\u043A\u0438\u043B\u043E\u0433\u0440\u0430\u043C\u043C", "\u043A\u0438\u043B\u043E\u0433\u0440\u0430\u043C\u043C\u0430", "\u043A\u0438\u043B\u043E\u0433\u0440\u0430\u043C\u043C\u043E\u0432"].includes(unit)) return "kg";
+    if (["g", "\u0433", "\u0433\u0440", "\u0433\u0440\u0430\u043C\u043C", "\u0433\u0440\u0430\u043C\u043C\u0430", "\u0433\u0440\u0430\u043C\u043C\u043E\u0432"].includes(unit)) return "g";
+    return null;
+  }
+  function canonicalStockUnit(value) {
+    const unit = physicalUnit(value);
+    return unit ? definitions[unit].canonicalUnit : null;
+  }
+  function finite(value) {
+    if (value == null || typeof value === "string" && !value.trim() || typeof value === "boolean") return null;
+    const result = Number(typeof value === "string" ? value.trim().replace(",", ".") : value);
+    return Number.isFinite(result) ? result : null;
+  }
+  function convertStockQuantity(quantity, from, to) {
+    const amount = finite(quantity);
+    const source = physicalUnit(from);
+    const target = physicalUnit(to);
+    if (amount === null || !source || !target || definitions[source].dimension !== definitions[target].dimension) return null;
+    const result = amount * definitions[source].factor / definitions[target].factor;
+    return Number.isFinite(result) ? Math.round(result * 1e12) / 1e12 : null;
+  }
+  function normalizePurchaseQuantity(input, templates = []) {
+    const fail = (error) => ({ ok: false, code: "PURCHASE_CONVERSION_NEEDS_REVIEW", error });
+    const quantity = finite(input.quantity);
+    const price = finite(input.price);
+    const stockUnit = canonicalStockUnit(input.stockUnit);
+    if (quantity === null || quantity <= 0 || price === null || price < 0 || !stockUnit) {
+      return fail("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0431\u043E\u043B\u044C\u0448\u0435 \u043D\u0443\u043B\u044F, \u0446\u0435\u043D\u0443 \u0438 \u0435\u0434\u0438\u043D\u0438\u0446\u0443 \u0441\u043A\u043B\u0430\u0434\u0441\u043A\u043E\u0433\u043E \u0443\u0447\u0451\u0442\u0430.");
+    }
+    let content = input.packageContent;
+    let source = content ? "explicit_package" : "direct";
+    if (input.templateId) {
+      const matches = templates.filter((template) => template.id === input.templateId && template.venueId === input.venueId && template.nomenclatureId === input.nomenclatureId);
+      if (!Number.isSafeInteger(input.venueId) || !(Number(input.venueId) > 0) || !input.nomenclatureId || matches.length !== 1 || content) {
+        return fail("\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u0438\u043D \u0448\u0430\u0431\u043B\u043E\u043D \u0443\u043F\u0430\u043A\u043E\u0432\u043A\u0438 \u044D\u0442\u043E\u0433\u043E \u0442\u043E\u0432\u0430\u0440\u0430 \u0438 \u0437\u0430\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043B\u0438\u0431\u043E \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u0432\u0440\u0443\u0447\u043D\u0443\u044E.");
+      }
+      content = { quantity: matches[0].size, unit: matches[0].unit };
+      source = "template_snapshot";
+    }
+    const contentQuantity = content ? finite(content.quantity) : 1;
+    const contentUnit = physicalUnit(content ? content.unit : input.unit);
+    if (contentQuantity === null || contentQuantity <= 0 || !contentUnit) {
+      return fail("\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u0443\u043F\u0430\u043A\u043E\u0432\u043A\u0438. \u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \u0438 \u0444\u0438\u0437\u0438\u0447\u0435\u0441\u043A\u0443\u044E \u0435\u0434\u0438\u043D\u0438\u0446\u0443 \u0432\u043D\u0443\u0442\u0440\u0438.");
+    }
+    const factor = convertStockQuantity(contentQuantity, contentUnit, stockUnit);
+    if (factor === null || factor <= 0) return fail("\u0415\u0434\u0438\u043D\u0438\u0446\u0430 \u043F\u0440\u0438\u0445\u043E\u0434\u0430 \u043D\u0435\u0441\u043E\u0432\u043C\u0435\u0441\u0442\u0438\u043C\u0430 \u0441\u043E \u0441\u043A\u043B\u0430\u0434\u0441\u043A\u043E\u0439 \u0435\u0434\u0438\u043D\u0438\u0446\u0435\u0439 \u0442\u043E\u0432\u0430\u0440\u0430.");
+    const canonicalQuantity = Math.round(quantity * factor * 1e12) / 1e12;
+    const computedTotal = quantity * price;
+    const suppliedTotal = input.totalCost === void 0 ? computedTotal : finite(input.totalCost);
+    if (suppliedTotal === null || suppliedTotal < 0 || !Number.isFinite(computedTotal) || !Number.isFinite(canonicalQuantity) || canonicalQuantity <= 0 || Math.abs(suppliedTotal - computedTotal) > Math.max(0.01, Math.abs(computedTotal) * 1e-8)) {
+      return fail("\u041A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E \xD7 \u0446\u0435\u043D\u0430 \u0434\u043E\u043B\u0436\u043D\u043E \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u0442\u044C \u0441 \u0441\u0443\u043C\u043C\u043E\u0439 \u0441\u0442\u0440\u043E\u043A\u0438; \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0432\u0432\u0435\u0434\u0451\u043D\u043D\u044B\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F.");
+    }
+    return { ok: true, snapshot: {
+      version: 4,
+      input: {
+        quantity,
+        unit: String(input.unit ?? ""),
+        price,
+        ...content ? { packageContent: { quantity: contentQuantity, unit: contentUnit } } : {}
+      },
+      canonicalQuantity,
+      canonicalUnit: stockUnit,
+      conversionFactor: factor,
+      normalizedUnitCost: suppliedTotal / canonicalQuantity,
+      totalCost: suppliedTotal,
+      provenance: {
+        source,
+        ...input.templateId ? { templateId: input.templateId } : {},
+        ...input.venueId ? { venueId: input.venueId } : {},
+        ...input.nomenclatureId ? { nomenclatureId: input.nomenclatureId } : {}
+      }
+    } };
+  }
+
+  // lib/bardoctor/purchase-price-preview.ts
+  var finite2 = (v) => typeof v === "number" && Number.isFinite(v);
+  var money = (v) => Math.round((v + Number.EPSILON) * 100) / 100;
+  function purchasePricePreview(draft, analytics) {
+    const prices = [], nextByKey = /* @__PURE__ */ new Map();
+    for (const line of Array.isArray(draft.items) ? draft.items : []) {
+      if (!["products", "alcohol", "food", "consumables", "hookah", "household"].includes(line.category || "products")) continue;
+      const ref = line.purchaseProductKey || line.nomenclatureId;
+      const candidates = (analytics.nomenclatureCosts || []).filter((r) => ref && (r.productKey === ref || r.nomenclatureItemId === ref));
+      const previous = candidates.length === 1 ? candidates[0] : null;
+      const row = { id: line.id, name: line.name || "\u041F\u043E\u0437\u0438\u0446\u0438\u044F", productKey: previous?.productKey || ref, known: false, previous: null, next: null, currency: draft.currency, unit: null, reason: "" };
+      const conversion = normalizePurchaseQuantity({ quantity: line.quantity, unit: line.unit, price: line.unitPrice, totalCost: line.lineTotal, stockUnit: previous?.unit || line.matchedBaseUnit || line.packageContent?.unit || line.unit, packageContent: line.packageContent });
+      if (conversion.ok) {
+        row.next = conversion.snapshot.normalizedUnitCost;
+        row.unit = conversion.snapshot.canonicalUnit;
+      }
+      if (!conversion.ok) row.reason = "\u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043A\u043E\u043B\u0438\u0447\u0435\u0441\u0442\u0432\u043E, \u0446\u0435\u043D\u0443, \u0435\u0434\u0438\u043D\u0438\u0446\u0443 \u0438 \u0444\u0430\u0441\u043E\u0432\u043A\u0443.";
+      else if (!previous?.complete || previous.costBasisMethod !== "latest_confirmed_receipt" || !finite2(previous.unitPrice) || !previous.purchaseDocumentId) row.reason = "\u041D\u0435\u0442 \u043D\u0430\u0434\u0451\u0436\u043D\u043E\u0439 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0435\u0439 \u0437\u0430\u043A\u0443\u043F\u043E\u0447\u043D\u043E\u0439 \u0446\u0435\u043D\u044B.";
+      else if (previous.purchaseDocumentId === draft.id) row.reason = "\u041D\u0443\u0436\u043D\u0430 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u0437\u0430\u043A\u0443\u043F\u043A\u0430, \u043E\u0442\u043B\u0438\u0447\u043D\u0430\u044F \u043E\u0442 \u044D\u0442\u043E\u0433\u043E \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430.";
+      else if (!draft.currency || previous.currency !== draft.currency) row.reason = "\u0412\u0430\u043B\u044E\u0442\u044B \u0446\u0435\u043D \u0440\u0430\u0437\u043B\u0438\u0447\u0430\u044E\u0442\u0441\u044F \u0438\u043B\u0438 \u043D\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u044B.";
+      else {
+        const factor = convertStockQuantity(1, row.unit, previous.unit);
+        if (factor === null) row.reason = "\u0415\u0434\u0438\u043D\u0438\u0446\u044B \u0446\u0435\u043D \u043D\u0435\u0441\u043E\u043F\u043E\u0441\u0442\u0430\u0432\u0438\u043C\u044B.";
+        else {
+          row.previous = previous.unitPrice * factor;
+          row.previousDate = previous.purchaseDate || previous.priceDate;
+          row.known = true;
+          row.delta = row.next - row.previous;
+          row.percent = row.previous === 0 ? null : row.delta / row.previous * 100;
+        }
+      }
+      if (row.known && String(draft.date).slice(0, 10) < String(row.previousDate).slice(0, 10)) {
+        row.known = false;
+        row.reason = "\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442 \u0440\u0430\u043D\u044C\u0448\u0435 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0435\u0439 \u0437\u0430\u043A\u0443\u043F\u043A\u0438: \u0432\u043B\u0438\u044F\u043D\u0438\u0435 \u043D\u0430 \u0442\u0435\u043A\u0443\u0449\u0443\u044E \u0441\u0435\u0431\u0435\u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u044C \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E.";
+      }
+      if (row.productKey) {
+        const existing = nextByKey.get(row.productKey);
+        if (existing && (existing.next !== row.next || existing.unit !== row.unit || !existing.known || !row.known)) {
+          existing.known = false;
+          existing.reason = "\u041D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0442\u0440\u043E\u043A \u0442\u043E\u0432\u0430\u0440\u0430 \u0441 \u0440\u0430\u0437\u043D\u044B\u043C\u0438 \u0438\u043B\u0438 \u043D\u0435\u043F\u043E\u043B\u043D\u044B\u043C\u0438 \u0446\u0435\u043D\u0430\u043C\u0438.";
+          row.known = false;
+          row.reason = existing.reason;
+        }
+        nextByKey.set(row.productKey, row);
+      }
+      prices.push(row);
+    }
+    const dishes = [];
+    for (const item of analytics.menuItems || []) {
+      const ingredients = Array.isArray(item.ingredientRows) ? item.ingredientRows : [];
+      if (!ingredients.some((r) => nextByKey.has(r.productKey))) continue;
+      const result = { id: item.id, name: item.name, known: false, previous: null, next: null, currency: item.costCurrency, reason: "\u041D\u0435\u0442 \u043F\u043E\u043B\u043D\u043E\u0439 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043D\u043D\u043E\u0439 \u0442\u0435\u0445\u043A\u0430\u0440\u0442\u044B \u0438 \u0441\u0442\u043E\u0438\u043C\u043E\u0441\u0442\u0438 \u0432\u0441\u0435\u0445 \u0438\u043D\u0433\u0440\u0435\u0434\u0438\u0435\u043D\u0442\u043E\u0432." };
+      if (item.recipeCostStatus !== "UNKNOWN" && finite2(item.recipeCost) && item.techCardStatus === "approved" && ingredients.length && ingredients.every((r) => r.complete && finite2(r.cost) && finite2(r.amount))) {
+        let total = 0, valid = true;
+        for (const ingredient of ingredients) {
+          const next = nextByKey.get(ingredient.productKey);
+          if (!next) {
+            total += ingredient.cost;
+            continue;
+          }
+          const amount = convertStockQuantity(ingredient.amount, ingredient.unit, next.unit);
+          if (!next.known || amount === null || next.currency !== item.costCurrency || ingredient.currency !== item.costCurrency) {
+            valid = false;
+            result.reason = next.reason || "\u0415\u0434\u0438\u043D\u0438\u0446\u044B \u0438\u043B\u0438 \u0432\u0430\u043B\u044E\u0442\u0430 \u0438\u043D\u0433\u0440\u0435\u0434\u0438\u0435\u043D\u0442\u0430 \u043D\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u044B.";
+            break;
+          }
+          total += money(amount * next.next);
+        }
+        if (valid) {
+          result.known = true;
+          result.previous = item.recipeCost;
+          result.next = money(total);
+          result.delta = money(result.next - result.previous);
+          result.reason = "";
+        }
+      }
+      dishes.push(result);
+    }
+    return { prices, dishes };
+  }
+  return __toCommonJS(purchase_price_preview_exports);
+})();
+function BdPurchasePricePreview({ draft }) {
+  const scope = Pt(Wm), [snapshot, setSnapshot] = S.useState(null), [error, setError] = S.useState(""), [retry, setRetry] = S.useState(0);
+  S.useEffect(() => {
+    const controller = new AbortController(), venue = localStorage.getItem("bd_active_venue_id");
+    setSnapshot(null);
+    setError("");
+    fetch("/api/assortment/overview", { headers: ca(Ot()), credentials: "include", cache: "no-store", signal: controller.signal }).then(async (response) => {
+      const result2 = await response.json();
+      if (!response.ok || !result2.ok || !result2.analytics || String(result2.venueId) !== String(venue)) throw Error("\u041F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u0446\u0435\u043D\u0430 \u0438 \u0432\u043B\u0438\u044F\u043D\u0438\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B.");
+      if (!controller.signal.aborted) setSnapshot({ scope, id: draft.id, analytics: result2.analytics });
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setError(cause.message);
+    });
+    return () => controller.abort();
+  }, [scope, draft.id, retry]);
+  const ready = snapshot?.scope === scope && snapshot?.id === draft.id, result = ready ? bdPurchasePricePreviewDomain.purchasePricePreview({ ...draft, items: draft.items.map((line) => ({ ...line, packageContent: bdPurchaseContentV421(line) || void 0 })) }, snapshot.analytics) : null;
+  const amount = (value, currency, unit) => value == null ? "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E" : value.toLocaleString("ru", { maximumFractionDigits: 4 }) + " " + currency + (unit ? " / " + ({ kg: "\u043A\u0433", l: "\u043B", pcs: "\u0448\u0442." }[unit] || unit) : "");
+  return /* @__PURE__ */ S.createElement("section", { "data-purchase-price-preview": true, className: "bd-procurement-review-note", "aria-live": "polite" }, /* @__PURE__ */ S.createElement("strong", null, "\u0426\u0435\u043D\u0430 \u0438 \u0432\u043B\u0438\u044F\u043D\u0438\u0435 \u0434\u043E \u043F\u0440\u043E\u0432\u0435\u0434\u0435\u043D\u0438\u044F"), /* @__PURE__ */ S.createElement("p", null, "\u041F\u0440\u0435\u0434\u0432\u0430\u0440\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0439 \u0440\u0430\u0441\u0447\u0451\u0442 \u043F\u043E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u043C \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043D\u043D\u044B\u043C \u0437\u0430\u043A\u0443\u043F\u043A\u0430\u043C. \u041E\u0441\u0442\u0430\u0442\u043A\u0438 \u0438 \u0438\u0441\u0442\u043E\u0440\u0438\u044F \u043D\u0435 \u043C\u0435\u043D\u044F\u044E\u0442\u0441\u044F."), !ready ? /* @__PURE__ */ S.createElement("p", null, error || "\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u0435\u043C \u0442\u0435\u043A\u0443\u0449\u0438\u0435 \u0446\u0435\u043D\u044B\u2026") : /* @__PURE__ */ S.createElement(S.Fragment, null, /* @__PURE__ */ S.createElement("ul", null, result.prices.map((row) => /* @__PURE__ */ S.createElement("li", { key: row.id }, /* @__PURE__ */ S.createElement("b", null, row.name), ": ", amount(row.previous, row.currency, row.unit), " \u2192 ", amount(row.next, row.currency, row.unit), row.known ? /* @__PURE__ */ S.createElement("span", null, " \xB7 ", row.delta > 0 ? "+" : "", amount(row.delta, row.currency, row.unit), row.percent != null ? " (" + (row.percent > 0 ? "+" : "") + row.percent.toFixed(1) + "%)" : "", " \xB7 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0430\u044F \u0446\u0435\u043D\u0430 \u043E\u0442 ", row.previousDate) : /* @__PURE__ */ S.createElement("p", null, row.reason)))), /* @__PURE__ */ S.createElement("details", { open: true }, /* @__PURE__ */ S.createElement("summary", null, "\u0412\u043B\u0438\u044F\u043D\u0438\u0435 \u043D\u0430 \u0441\u0432\u044F\u0437\u0430\u043D\u043D\u044B\u0435 \u0431\u043B\u044E\u0434\u0430"), result.dishes.length ? /* @__PURE__ */ S.createElement("ul", null, result.dishes.map((row) => /* @__PURE__ */ S.createElement("li", { key: row.id }, /* @__PURE__ */ S.createElement("b", null, row.name), ": ", row.known ? /* @__PURE__ */ S.createElement("span", null, amount(row.previous, row.currency), " \u2192 ", amount(row.next, row.currency), " \u0437\u0430 \u043F\u0440\u043E\u0434\u0430\u0436\u0443") : /* @__PURE__ */ S.createElement("span", null, "\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E. ", row.reason)))) : /* @__PURE__ */ S.createElement("p", null, "\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043D\u043D\u044B\u0435 \u0441\u0432\u044F\u0437\u0438 \u0441 \u0431\u043B\u044E\u0434\u0430\u043C\u0438 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u0412\u043B\u0438\u044F\u043D\u0438\u0435 \u043D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u043E."))), error && /* @__PURE__ */ S.createElement("button", { type: "button", onClick: () => setRetry((n) => n + 1) }, "\u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u0440\u0430\u0441\u0447\u0451\u0442"));
+}
+/* purchase-price-preview:end */
 /* shift-cases:start */
 function bdUseShiftCases() {
   const search = ste(), scope = Pt(Wm), query = new URLSearchParams(search), enabled = query.has("workday"), date = query.get("workday") || "", venue = query.get("workdayVenue") || "";
@@ -3730,7 +3946,7 @@ function bdPurchaseReview({draft:e,suppliers:t,onChange:n,onCancel:r,onConfirm:a
         isOpen&&i.jsxs("div",{className:"bd-receiving-line-editor-v357",children:[i.jsx(bdProcField,{label:"Название в документе",children:i.jsx("input",{value:line.name,onChange:event=>u(line.id,{name:event.target.value}),placeholder:"Название товара"})}),e.documentType!=="price_list"&&i.jsx(bdInvoiceLineMappingV356,{line,supplierId:e.supplierId,supplierName:e.supplierName,documentId:e.id,onSelect:patch=>u(line.id,patch)}),i.jsx(bdPurchaseUnitsV421,{line,onChange:patch=>u(line.id,patch)}),i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:bdPurchaseContentV421(line)?"Цена упаковки":"Цена за единицу",children:i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:line.unitPrice??"",onChange:event=>{const value=event.target.value;u(line.id,{unitPrice:value,costStatus:value===""?"UNKNOWN":Number(value)===0?"KNOWN_ZERO":"KNOWN"})}})}),i.jsx(bdProcField,{label:"Сумма строки",children:i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:line.lineTotal??"",onChange:event=>{const value=event.target.value;u(line.id,{lineTotal:value,costStatus:value===""?"UNKNOWN":Number(value)===0?"KNOWN_ZERO":"KNOWN"})}})})]}),i.jsxs("div",{className:"bd-receiving-line-actions-v357",children:[i.jsx("button",{type:"button",className:"danger",onClick:()=>{l("items",e.items.filter(item=>item.id!==line.id));bdSetActiveLineV357(null)},children:"Удалить позицию"}),state.tone==="ready"&&bdAttentionLinesV357.length>0&&i.jsx("button",{type:"button",onClick:bdNextAttentionV357,children:"К следующей проблеме →"})]})]})
       ]},line.id)} )}),
       i.jsx("button",{type:"button",className:"bd-procurement-secondary bd-receiving-add-line-v357",onClick:f,children:"+ Добавить позицию"}),
-      e.documentType!=="price_list"&&i.jsxs("section",{className:"bd-receiving-totals-v357",children:[i.jsxs("div",{children:[i.jsx("span",{children:"Сумма позиций"}),i.jsx("strong",{children:bdProcMoney(d,e.currency)})]}),i.jsxs("div",{children:[i.jsx("span",{children:"Итог документа"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.total,onChange:event=>l("total",Number(event.target.value)||0),"aria-label":"Итог документа"})]}),i.jsxs("div",{children:[i.jsx("span",{children:"НДС / налог"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.vat||"",onChange:event=>l("vat",Number(event.target.value)||0),placeholder:"0","aria-label":"НДС или налог"})]}),bdTotalMismatchV357&&i.jsx("button",{type:"button",onClick:m,children:"Принять сумму позиций как итог"})]})
+      e.documentType!=="price_list"&&i.jsx(BdPurchasePricePreview,{draft:e}),e.documentType!=="price_list"&&i.jsxs("section",{className:"bd-receiving-totals-v357",children:[i.jsxs("div",{children:[i.jsx("span",{children:"Сумма позиций"}),i.jsx("strong",{children:bdProcMoney(d,e.currency)})]}),i.jsxs("div",{children:[i.jsx("span",{children:"Итог документа"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.total,onChange:event=>l("total",Number(event.target.value)||0),"aria-label":"Итог документа"})]}),i.jsxs("div",{children:[i.jsx("span",{children:"НДС / налог"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.vat||"",onChange:event=>l("vat",Number(event.target.value)||0),placeholder:"0","aria-label":"НДС или налог"})]}),bdTotalMismatchV357&&i.jsx("button",{type:"button",onClick:m,children:"Принять сумму позиций как итог"})]})
     ]}),
     i.jsxs("footer",{className:"bd-procurement-sheet-actions bd-receiving-actions-v357",children:[i.jsx("button",{type:"button",className:"bd-procurement-secondary",disabled:s,onClick:r,children:e.status==="confirmed"?"Закрыть":"Не сохранять"}),i.jsxs("div",{children:[i.jsx("small",{children:bdCanPostV357?e.status==="confirmed"?"Изменения будут пересчитаны":"Склад и себестоимость обновятся после проведения":bdBlockingTextV357}),i.jsx("button",{type:"button",className:"bd-procurement-primary",disabled:s||!bdCanPostV357,onClick:a,children:s?"Сохраняю…":e.status==="confirmed"?"Сохранить изменения":e.documentType==="price_list"?"Сохранить прайс":"Провести приход"})]})]})
   ]})})

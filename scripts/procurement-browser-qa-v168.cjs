@@ -916,7 +916,7 @@ async function phase4ConversionFlow(browser, viewport) {
   store.close();
 }
 
-(async () => {
+if (require.main === module) (async () => {
   browserPath = await resolveBrowserExecutable(browserPath);
   assert.ok(fs.existsSync(browserPath), `Browser executable not found: ${browserPath}`);
   try {
@@ -996,3 +996,5 @@ async function phase4ConversionFlow(browser, viewport) {
   console.log(JSON.stringify(summary, null, 2));
   if (!summary.passed) process.exit(1);
 })();
+
+module.exports = {openPage, procurementTab, closeSheet};
