@@ -33,6 +33,7 @@ async function openPage(browser, {
   viewport = { width: 393, height: 852 },
   name,
   setupRoutes,
+  fixtureContent = fixtureSource,
 }) {
   const context = await browser.newContext({
     viewport,
@@ -42,7 +43,7 @@ async function openPage(browser, {
     locale: "ru-RU",
     timezoneId: "Europe/Chisinau",
   });
-  await context.addInitScript({ content: fixtureSource });
+  await context.addInitScript({ content: fixtureContent });
   await context.route("**/procurement-qa-v168.js*", (route) => route.fulfill({
     status: 200,
     contentType: "application/javascript",
