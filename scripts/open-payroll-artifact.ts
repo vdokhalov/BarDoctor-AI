@@ -78,13 +78,13 @@ try {
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});page.on('response',r=>{if(/index-BQGspy0I.*\.js/.test(r.url()))assets.push(r.url());});
  try {
   await page.goto(base+'/home');const home=page.locator('[data-bd-home-money="current-v556"]');await home.waitFor({timeout:30000});
-  await home.getByText('результат после себестоимости',{exact:false}).waitFor({timeout:30000});
+  await home.getByText('Прибыль за месяц',{exact:false}).waitFor({timeout:30000});
   const homeText=await home.innerText();assert.match(homeText,/40[,.]00/);
   await page.screenshot({path:out+'/home.png',fullPage:true});
   await page.goto(base+'/finance');await page.waitForLoadState('networkidle');assert.equal(await page.getByText('BarDoctor не завершил загрузку',{exact:false}).count(),0);
-  const finance=page.locator('[data-bd-finance-result-month="current-v573"]');await finance.waitFor({timeout:30000});const financeText=await finance.innerText();assert.match(financeText,/Предварительный результат после себестоимости/);assert.match(financeText,/40[,.]00/);assert.doesNotMatch(financeText,/Чистая прибыль|ещё не рассчитана/);assert.match(financeText,/Подтверждено за дни/);await finance.screenshot({path:out+'/finance-card.png'});
+  const finance=page.locator('[data-bd-finance-result-month="current-v573"]');await finance.waitFor({timeout:30000});const financeText=await finance.innerText();assert.match(financeText,/Прибыль за месяц/);assert.match(financeText,/40[,.]00/);assert.doesNotMatch(financeText,/Чистая прибыль|ещё не рассчитана/);assert.match(financeText,/Смена ещё открыта. Сумма может измениться/);assert.equal(await finance.locator('details').getAttribute('open'),null);assert.ok(await finance.getByText('Как рассчитано',{exact:true}).isVisible());await finance.locator('summary').click();assert.match(await finance.innerText(),/Зарплата всего/);await finance.locator('summary').click();await finance.screenshot({path:out+'/finance-card.png'});
   await page.goto(base+'/reports?month=2026-10');const report=page.locator('[data-bd-monthly-report]');await report.waitFor({timeout:30000});
-  await report.getByText('результат после себестоимости',{exact:false}).first().waitFor({timeout:30000});
+  await report.getByText('Прибыль за месяц',{exact:false}).first().waitFor({timeout:30000});
   const reportText=await report.innerText();assert.match(reportText,/40[,.]00/);
   await page.screenshot({path:out+'/report.png',fullPage:true});
   const pending=replies.filter(x=>x.status===202);for(const x of pending)assert.equal(x.data.report,undefined);

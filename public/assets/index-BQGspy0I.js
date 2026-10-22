@@ -1998,7 +1998,7 @@ function bdCurrentResultPresentation(report) {
   const afterCost=report.currentFinance&&known(report.costOfGoods)&&known(after);
   return {afterCost,estimated,costKnown:known(report.costOfGoods),payroll:estimated?report.provisionalPayroll:report.payroll,
     value:report.currentFinance?(afterCost?after:known(before)?before:null):known(report.operatingResult)?report.operatingResult:null,
-    label:report.currentFinance?(estimated?(afterCost?"Предварительный результат после себестоимости":"Предварительный результат до себестоимости"):(afterCost?"Текущий результат после себестоимости":"Результат до себестоимости")):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
+    label:report.currentFinance?(afterCost?(after<0?"Убыток за месяц":"Прибыль за месяц"):"Результат до себестоимости"):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
     explanation:estimated?report.provisionalExplanation:afterCost?"Выручка за вычетом учтённых расходов, начисленного ФОТ и подтверждённой себестоимости, с учётом складских корректировок. Это текущий результат по внесённым данным; месяц ещё не закрыт.":report.resultExplanation
   };
 }
@@ -2490,13 +2490,25 @@ function bdMonthlyReportPage() {
     ] }),
   ] }) });
 }
+function bdCurrentFinancePeriod(report) {
+  const date=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value))?String(value).split("-").reverse().join("."):String(value||"");
+  return date(report.startDate||String(report.asOfDate||"").slice(0,7)+"-01")+" — "+date(report.endDate||report.asOfDate);
+}
+function bdCurrentFinanceNotice({report}) {
+  const result=bdCurrentResultPresentation(report),open=result.estimated||report.days?.some(day=>day.status==="OPERATING");
+  const missing=(report.missing||[]).filter(code=>!(result.estimated&&code==="PAYROLL"));
+  const labels={PAYROLL:"Не хватает данных о зарплате",EXPENSES_OR_CURRENCY:"Не хватает данных о расходах",REVENUE_OR_CURRENCY:"Не хватает данных о выручке",NO_CURRENT_ACTIVITY:"В этом месяце ещё нет рабочих дней"};
+  return i.jsxs("div",{role:"status",children:[open&&i.jsx("p",{children:"Смена ещё открыта. Сумма может измениться"}),...missing.map(code=>i.jsx("p",{children:labels[code]||"Не хватает данных для расчёта"},code)),!result.afterCost&&i.jsx("p",{children:result.costKnown?"Не все расходы учтены — прибыль пока неизвестна":"Себестоимость пока неизвестна — это ещё не прибыль"})]});
+}
 function bdCurrentFinanceDetailsV556({report}) {
-  return i.jsxs("div", {role:"status",children:[
-    i.jsx("p",{children:bdCurrentResultPresentation(report).explanation}),
-    ...[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].map((text,index)=>i.jsx("p",{children:text},index)),
-    report.payroll==null && report.provisionalPayroll==null && report.knownPayrollSubtotal!=null && i.jsx("p",{children:"Учтённый ФОТ по подтверждённым дням: "+bdMoney2(report.knownPayrollSubtotal)+". Общая сумма пока неизвестна."}),
-    report.provisionalPayroll!=null && i.jsx("p",{children:"ФОТ предварительно: "+bdMoney2(report.provisionalPayroll)+". Подтверждено за дни: "+bdMoney2(report.knownPayrollSubtotal??0)+"; расчёт открытых смен: "+bdMoney2(report.estimatedPayrollSubtotal)+"; премии: "+bdMoney2(report.payrollBonuses)+"."}),
-    report.missingPayrollDates?.length>0 && i.jsx("p",{children:"ФОТ не подтверждён за: "+report.missingPayrollDates.join(", ")})
+  const plain=text=>String(text||"").replace(/ФОТ/g,"зарплаты");
+  return i.jsxs("details", {style:{marginTop:12},children:[
+    i.jsx("summary",{style:{cursor:"pointer",fontWeight:600},children:"Как рассчитано"}),
+    i.jsx("p",{children:plain(bdCurrentResultPresentation(report).explanation)}),
+    report.provisionalPayroll!=null&&i.jsx("p",{children:"Зарплата всего: "+bdMoney2(report.provisionalPayroll)+". За завершённые дни: "+bdMoney2(report.knownPayrollSubtotal??0)+"; за открытые смены: "+bdMoney2(report.estimatedPayrollSubtotal)+"; премии: "+bdMoney2(report.payrollBonuses)+"."}),
+    ...[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].filter(text=>text!==bdCurrentResultPresentation(report).explanation).map((text,index)=>i.jsx("p",{children:plain(text)},index)),
+    report.payroll==null&&report.provisionalPayroll==null&&report.knownPayrollSubtotal!=null&&i.jsx("p",{children:"Зарплата за завершённые дни: "+bdMoney2(report.knownPayrollSubtotal)+". Общая сумма пока неизвестна."}),
+    report.missingPayrollDates?.length>0&&i.jsx("p",{children:"Зарплата ещё не подтверждена за: "+report.missingPayrollDates.join(", ")})
   ]});
 }
 function bdHomeCurrentFinanceV556({profile,settings,onNavigate,revision}) {
@@ -2504,10 +2516,10 @@ function bdHomeCurrentFinanceV556({profile,settings,onNavigate,revision}) {
   if(value.error||!report)return i.jsx("section",{className:"bd-home-money",role:value.error?"alert":"status",children:value.error||"Проверяем финансовые данные…"});
   const presentation=bdCurrentResultPresentation(report),result=presentation.value;
   return i.jsxs("section",{className:"bd-home-money","data-bd-home-money":"current-v556",children:[
-    i.jsx("p",{children:report.currentFinance?"Финансы на "+report.asOfDate:"Финансовый результат · "+bdMonthDisplay(report.meta.key)}),
+    i.jsx("p",{children:report.currentFinance?bdCurrentFinancePeriod(report):"Финансовый результат · "+bdMonthDisplay(report.meta.key)}),
     i.jsx("h2",{style:{color:"inherit"},children:presentation.label}),
     i.jsx("strong",{className:"bd-home-money-value",style:result==null?{whiteSpace:"normal",overflowWrap:"anywhere",fontSize:"clamp(20px, 6vw, 28px)",lineHeight:1.2}:undefined,children:result==null?"Недостаточно данных":bdMoney2(result)}),
-    i.jsx("p",{children:"Выручка: "+(report.revenue==null?"Неизвестно":bdMoney2(report.revenue))+(presentation.estimated?" · ФОТ предварительно: ":" · Начисленный ФОТ: ")+(presentation.payroll==null?"Неизвестно":bdMoney2(presentation.payroll))}),
+    report.currentFinance&&i.jsx(bdCurrentFinanceNotice,{report}),
     report.currentFinance&&i.jsx(bdCurrentFinanceDetailsV556,{report}),
     i.jsx("button",{type:"button",onClick:()=>onNavigate("/reports?month="+report.meta.key),children:"Открыть отчёт"})
   ]});
@@ -3488,13 +3500,15 @@ function bdFinanceFinalReasonV160(e,t){if(!t)return"Нет финансовых 
 /* finance-current-result-v573:start */
 function bdFinanceCurrentResultV573({report,onContinue}) {
   const result=bdCurrentResultPresentation(report);
-  const reasons=[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].filter(text=>text!==result.explanation);
-  const levels=[{key:'cash',label:'После оплат поставщикам',value:report.cashResult,caption:result.estimated?'Ожидает подтверждения ФОТ':'С начисленным ФОТ; не денежный поток'},
-    {key:'current',label:result.label,value:result.value,caption:result.value===null?'Недостаточно данных':'По внесённым данным на '+report.asOfDate}];
   return i.jsxs('section',{'data-bd-finance-result-month':'current-v573',className:'bd-finance-result-v160',children:[
-    i.jsxs('header',{children:[i.jsx('p',{children:'Финансы на '+report.asOfDate}),i.jsx('span',{className:'bd-finance-result-state '+(result.value===null?'pending':'ready'),children:result.value===null?'Недостаточно данных':result.estimated?'Предварительный результат':'Текущий результат'})]}),
-    i.jsx('div',{className:'bd-finance-result-flow',children:levels.map(level=>i.jsx('div',{className:'bd-finance-result-level-wrap',children:i.jsxs('article',{'data-bd-finance-result-level':level.key,'aria-label':level.label,className:'bd-finance-result-level '+(level.value==null?'muted':level.value>=0?'positive':'negative'),children:[i.jsx('span',{children:level.label}),i.jsx('strong',{style:{whiteSpace:'normal',overflow:'visible',textOverflow:'clip',fontSize:level.value==null?'16px':undefined},children:level.value==null?'Неизвестно':bdMoney2(level.value)}),i.jsx('small',{children:level.caption})]})},level.key))}),
-    i.jsxs('div',{className:'bd-finance-result-footer',style:{display:'block'},children:[i.jsxs('div',{style:{display:'block',minWidth:0},children:[i.jsx('p',{children:result.explanation}),report.provisionalPayroll!=null&&i.jsx('p',{children:'ФОТ предварительно: '+bdMoney2(report.provisionalPayroll)+'. Подтверждено за дни: '+bdMoney2(report.knownPayrollSubtotal??0)+'; расчёт открытых смен: '+bdMoney2(report.estimatedPayrollSubtotal)+'; премии: '+bdMoney2(report.payrollBonuses)+'.'}),...reasons.map(reason=>i.jsx('p',{children:reason},reason))]}),i.jsx('button',{type:'button',onClick:onContinue,children:'Закрытие месяца'})]})
+    i.jsx('header',{children:i.jsx('p',{children:bdCurrentFinancePeriod(report)})}),
+    i.jsxs('article',{'data-bd-finance-result-level':'current','aria-label':result.label,style:{padding:'12px 0'},children:[
+      i.jsx('h2',{style:{fontSize:20,lineHeight:1.3,margin:'0 0 8px'},children:result.label}),
+      i.jsx('strong',{style:{display:'block',fontSize:32,lineHeight:1.2,color:result.value==null?'inherit':result.value<0?'#b42318':'#16713b'},children:result.value==null?'Недостаточно данных':bdMoney2(result.value)}),
+      i.jsx(bdCurrentFinanceNotice,{report})
+    ]}),
+    i.jsx(bdCurrentFinanceDetailsV556,{report}),
+    i.jsx('button',{type:'button',style:{marginTop:16},onClick:onContinue,children:'Закрытие месяца'})
   ]});
 }
 /* finance-current-result-v573:end */
