@@ -144,3 +144,16 @@ User chose the entire lower illustration sliding left→right as ONE transparent
 Twelve new native launch PNGsv537 and all launch references use initial state WITHOUT lower illustration. Full390×844 and393×852 initialHTML states are pixel-identical to their new nativePNG. Six viewport/origin scenarios retain title coordinates,error0px. Native capture explicitly freezes initial offscreen group; it does NOT use reduced-motion final state. Reduced-motion shows the complete static illustration immediately and disables entrance/exit animation; relative to native initial state this adds static elements, never hides a previously shown final illustration. PhysicaliPhone/OS caches/compositor unverified.
 
 Scoped4PASS + actual local root→Home1PASS. Root trace verifies only one common entrance animation (zero before readiness),identity scale/rotation,no moving-layer clip,opacity1,decoded base. Visible minimum retained; actual busy-app trace1511.1ms to fade,205.6ms exit. Standalone fixtures model navigator flag/fullscreen origin contract, not real iOS. First/middle/end of normal-speed recording inspected. Video uses actual app Home with isolated demo fixture data,not production. CharsetUTF-8 verified, readable final text. No full suite/remoteCI/deployment.
+
+
+## Finance reference implementation — 2026-10-22 (local, unpublished)
+
+Reference: Library libfile_8c75c9572d7c819183eddfcf8d713ca3 v0, materialized and visually inspected at /workspace/finance-reference/reference.png. The reference is a design, not production evidence.
+
+Implemented its continuous hierarchy, large signed monthly result, separate currency, two-column revenue/expense summary, compact exact expense breakdown and report action. Existing application navigation/chrome is retained. Closing the month remains a secondary action in the calculation details. Values are dynamic; purchases are not counted again as expenses. Missing data stays unknown.
+
+Visual inspection: real emitted authenticated local UI at 390, 820 and 1280px; profit, loss, zero and unknown states. No horizontal overflow. Mobile delivery is a 390x1040 viewport showing the complete main block; functional mobile checks also use 390x844. Library implementation screenshot: libfile_4a3b933cc7d88191a6ba01677c3764cd v4. Reference remains separate.
+
+Evidence: outputs/open-payroll-artifact/results.json and screenshots. Real report CTA clicked successfully with selected October query retained. No JavaScript/console/request failures in scoped harness. Business snapshot unchanged. Seven targeted presentation/breakdown tests passed. Full build passed; final versioned asset verification passed. Two typecheck errors remain and were reproduced on production v582 baseline: business-health-snapshot.ts:372 (status union) and health-partial-operations-v539.test.ts:10 (counter cast).
+
+No blocking visual issue observed in this scoped review. This is not a full application audit; unrelated external/AI panels are excluded by the existing fixture harness. No production writes or publication.

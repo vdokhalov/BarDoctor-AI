@@ -9,7 +9,17 @@ const patched=anchor+'if(e?.currentFinance)return bdFinanceCurrentResultV573({re
 const from=s.indexOf(start);
 if(from>=0){const to=s.indexOf(end,from);if(to<from)throw Error('Finance current result boundary missing');s=s.slice(0,from)+s.slice(to+end.length).replace(/^\n/,'');}
 s=s.replace(patched,anchor);
-if(process.argv.includes('--restore')){fs.writeFileSync(file,s.replace(after,before));process.exit(0);}
+if(process.argv.includes('--restore')){
+ s=s.replace('function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey,currentFinance=false}){','function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey}){');
+ s=s.replace('children:n.filter(row=>!currentFinance||row.key!=="close").map(r=>','children:n.map(r=>');
+ s=s.replace('i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,currentFinance:monthlyReport?.currentFinance,onCloseMonth:','i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,onCloseMonth:');
+ s=s.replace('monthlyReport?.currentFinance&&i.jsx("h1",{className:"bd-finance-current-title",children:"Финансы"}),','');
+ const original='monthlyReport&&i.jsx(bdFinanceReadinessV160,{report:monthlyReport,coverage,missingDates,onMissing:missingDates.length?()=>setGapDate(missingDates[0].date):null,onInventory:()=>navigate("/warehouse?add=inventory"),onContinue:bdFinanceOpenMonthCloseV160,onReport:()=>navigate("/reports?month="+encodeURIComponent(monthKey))})';
+ s=s.replace('monthlyReport?.currentFinance?i.jsxs("details",{className:"bd-finance-month-review",children:[i.jsx("summary",{children:"Полнота месяца"}),'+original+']}):'+original,original);
+ s=s.replace('if(verified.report?.currentFinance&&!verified.error)return null;','');
+ for(const name of ['bdFinanceKpisV160','bdFinanceSummaryV160'])s=s.replace(new RegExp('(function '+name+'\\(\\{report:([a-zA-Z]+)[^]*?\\)\\{)if\\(\\2\\?\\.currentFinance\\)return null;'),'$1');
+ fs.writeFileSync(file,s.replace(after,before));process.exit(0);
+}
 if(s.split(anchor).length!==2)throw Error('Unique Finance current result anchor required');
 s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
 if(!s.includes(after)){if(s.split(before).length!==2)throw Error('Unique Home finance anchor required');s=s.replace(before,after);}
@@ -31,4 +41,7 @@ const quickStart=s.indexOf(quickNew),quickEnd=s.indexOf('\nfunction ',quickStart
 if(quickStart<0||quickEnd<0)throw Error('Quick actions anchor missing');
 let quickBody=s.slice(quickStart,quickEnd);quickBody=quickBody.replace('children:n.map(r=>','children:n.filter(row=>!currentFinance||row.key!=="close").map(r=>');s=s.slice(0,quickStart)+quickBody+s.slice(quickEnd);
 s=s.replace('i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,onCloseMonth:','i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,currentFinance:monthlyReport?.currentFinance,onCloseMonth:');
+const monthNav='i.jsxs("nav",{className:"bd-finance-month-v160"';
+const title='monthlyReport?.currentFinance&&i.jsx("h1",{className:"bd-finance-current-title",children:"Финансы"}),';
+if(!s.includes(title+monthNav)){if(!s.includes(monthNav))throw Error('Month navigation anchor missing');s=s.replace(monthNav,title+monthNav);}
 fs.writeFileSync(file,s);

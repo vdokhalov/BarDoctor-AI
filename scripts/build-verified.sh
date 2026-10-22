@@ -282,6 +282,7 @@ node "${script_dir}/patch-curated-doctor-phase4c.mjs"
 node "${script_dir}/patch-health-inputs-phase3a9.mjs"
 node "${script_dir}/patch-production-recovery-v496.mjs"
 node "${script_dir}/patch-recipe-ingredient-v511.mjs"
+node "${script_dir}/patch-current-finance-v556.mjs" --restore
 node "${script_dir}/patch-qa-audit-v513.mjs"
 node "${script_dir}/patch-warehouse-document.mjs"
 node "${script_dir}/patch-splash-v529.mjs"

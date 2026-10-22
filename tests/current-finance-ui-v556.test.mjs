@@ -42,7 +42,7 @@ test('open month shows canonical after-cost result on Home and report chart, inc
 test('saved open-shift estimate is labelled on all current displays; missing and zero stay distinct',()=>{
  const context=vm.createContext({bdMoney2:String,bdMonthlySectionHeaderV165:p=>p,i:{jsx:(tag,p)=>typeof tag==='function'?tag(p):p,jsxs:(tag,p)=>typeof tag==='function'?tag(p):p}});
  const part=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
- vm.runInContext(part('function bdCurrentResultPresentation(','function bdMonthlyHeroV165(')+part('function bdMonthlyProfitStructureV165(','function bdMonthlyCostV165(')+source.slice(from,to)+part('function bdFinanceCurrentResultV573(','/* finance-current-result-v573:end */'),context);
+ vm.runInContext(part('function bdCurrentResultPresentation(','function bdMonthlyHeroV165(')+part('function bdMonthlyProfitStructureV165(','function bdMonthlyCostV165(')+source.slice(from,to)+part('function bdCurrentExpenseRows(','/* finance-current-result-v573:end */'),context);
  let r={currentFinance:true,costOfGoods:20,resultAfterCost:null,resultBeforeCost:null,provisionalResultBeforeCost:70,provisionalResultAfterCost:40,provisionalPayroll:20,knownPayrollSubtotal:10,estimatedPayrollSubtotal:10,payrollBonuses:0,provisionalExplanation:'Предварительно: расчёт открытой смены',revenue:100};
  for(const render of [()=>text(context.bdFinanceCurrentResultV573({report:r})),()=>text(context.bdMonthlyProfitStructureV165({report:r}))]){assert.match(render(),/Прибыль за месяц.*40/);assert.doesNotMatch(render(),/Чистая прибыль/);}
  r={...r,provisionalResultAfterCost:-40};assert.equal(context.bdCurrentResultPresentation(r).label,"Убыток за месяц");
