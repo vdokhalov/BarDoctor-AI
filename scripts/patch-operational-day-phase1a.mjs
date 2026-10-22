@@ -30,6 +30,7 @@ fn('bdWarehousePage',s=>{
  return s;
 });
 fn('bdShiftsPage',s=>{
+ s=s.replace('children:closedRecords.length','children:records.reduce((count,row)=>count+(row._bdOperationalDay?.report?.workdayStatus?Number(row._bdOperationalDay.closedWorkShiftCount||0):bdShiftRecordKindV156(row)==="closed"?1:0),0)');
  s=s.replaceAll('date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day','...current.workday,date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day').replaceAll('...current.workday,...current.workday,','...current.workday,');
  s=s.replaceAll('date:current.date,_bdOperationalDay:current.day','...current.workday,date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day');
  s=replace(s,'{revenue,gapReasons,upsertDailyRevenue}=Ur(),','{revenue:bdRawShiftRevenue,operationalDays:bdShiftDays=[],gapReasons,upsertDailyRevenue}=Ur(),revenue=S.useMemo(()=>{const workdays=bdShiftDays.filter(day=>day.report?.workdayStatus);return [...bdRawShiftRevenue.filter(row=>!workdays.some(day=>day.businessDate===row.date?.slice(0,10))),...workdays.map(day=>({id:"operational-report:"+day.venueId+":"+day.businessDate,date:day.businessDate,revenue:day.revenue.amount,receipts:day.revenue.receipts,...day.report,_bdOperationalDay:day}))]},[bdRawShiftRevenue,bdShiftDays]),');

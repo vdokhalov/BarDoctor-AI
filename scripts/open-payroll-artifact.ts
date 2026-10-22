@@ -125,11 +125,13 @@ try {
    await page.goto(base+'/home');await page.locator('.bd-home-health-zone-v332').filter({hasText:'Финансы'}).getByText('90',{exact:true}).waitFor({timeout:30000});
    if(sequential){
     await page.goto(base+'/shifts?venue='+venueId+'&workday=2026-10-22');
+    await page.waitForFunction(()=>document.querySelector('.bd-shifts-summary>div strong')?.textContent==='2');
     await page.getByRole('button',{name:'Открыть следующую смену',exact:true}).click();
     const next=page.locator('[data-workday-state="NEW"]');await next.locator('[data-workday-group] summary').first().click();await next.locator('[data-workday-person] input').count();
     await next.locator('.bd-workday-picker input[type="checkbox"]').first().check();
     await next.getByRole('button',{name:'Открыть смену',exact:true}).click();await page.locator('[data-workday-state="OPEN"]').waitFor();
     await page.reload();await page.locator('[data-workday-state="OPEN"]').waitFor();
+    await page.locator('.bd-shifts-summary').getByText('Закрыто смен',{exact:true}).waitFor();await page.waitForFunction(()=>document.querySelector('.bd-shifts-summary>div strong')?.textContent==='2');
     await page.screenshot({path:out+'/sequential-open.png'});
     const reports=JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'bd_operational_reports_v1')!.data_json));
     const same=reports.filter((x:any)=>x.date==='2026-10-22');assert.equal(same.length,2);assert.equal(same.filter((x:any)=>x.workdayStatus==='OPEN').length,1);

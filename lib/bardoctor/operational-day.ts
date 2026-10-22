@@ -78,6 +78,7 @@ export function operationalDay(input: OperationalDayInput) {
   const dayStatus = open || report?.workdayStatus === "OPEN" ? "OPERATING" : recorded && payrollAmount != null && (revenues.length && status === "FINAL" || report?.workdayStatus === "CLOSED" && !revenues.length) && consistency !== "MISMATCH" ? "COMPLETE" : "AWAITING_OPERATIONAL_DATA";
   return {
     venueId: input.venueId, businessDate: input.businessDate,
+    closedWorkShiftCount: new Set(rows(input.reports).filter(row=>belongs(row)&&row.date===input.businessDate&&row.workdayStatus==="CLOSED"&&typeof row.id==="string").map(row=>row.id)).size,
     payroll: { amount: payrollAmount, basis: payrollAmount == null ? "MISSING" : recorded ? "RECORDED" : "LEGACY_RECORDED" },
     revenue: { amount, sourceIds: revenues.map(row => row.id).filter(id => id != null), grain: "BUSINESS_DAY", currency: input.currency ?? (currencies.size === 1 ? [...currencies][0] : null), currencyStatus: moneyKnown ? currencies.size ? "KNOWN" : "LEGACY" : "UNKNOWN", source, status: report?.workdayStatus === "CLOSED" && !revenues.length ? "FINAL" : status, receipts, payments, asOf: input.asOf,
       updatedAt: [...revenues.map(row => String(row.updatedAt ?? row.createdAt ?? "")), ...events.map(row => String(row.acceptedAt ?? ""))].sort().at(-1) || null,
