@@ -39,3 +39,12 @@ test('open month shows canonical after-cost result on Home and report chart, inc
  error='Проверка недоступна';assert.match(home(),/Проверка недоступна/);assert.doesNotMatch(home(),/21471|13632/);error=null;report=null;assert.match(home(),/Проверяем финансовые данные/);
  report={currentFinance:false,isClosed:true,operatingResult:100,meta:{key:'2026-09'},revenue:150,payroll:20};assert.match(home(),/Чистая прибыль месяца.*100/);
 });
+test('saved open-shift estimate is labelled on all current displays; missing and zero stay distinct',()=>{
+ const context=vm.createContext({bdMoney2:String,bdMonthlySectionHeaderV165:p=>p,i:{jsx:(tag,p)=>typeof tag==='function'?tag(p):p,jsxs:(tag,p)=>typeof tag==='function'?tag(p):p}});
+ const part=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
+ vm.runInContext(part('function bdCurrentResultPresentation(','function bdMonthlyHeroV165(')+part('function bdMonthlyProfitStructureV165(','function bdMonthlyCostV165(')+part('function bdFinanceCurrentResultV573(','/* finance-current-result-v573:end */'),context);
+ let r={currentFinance:true,costOfGoods:20,resultAfterCost:null,resultBeforeCost:null,provisionalResultBeforeCost:70,provisionalResultAfterCost:40,provisionalPayroll:20,knownPayrollSubtotal:10,estimatedPayrollSubtotal:10,payrollBonuses:0,provisionalExplanation:'Предварительно: расчёт открытой смены',revenue:100};
+ for(const render of [()=>text(context.bdFinanceCurrentResultV573({report:r})),()=>text(context.bdMonthlyProfitStructureV165({report:r}))]){assert.match(render(),/Предварительный результат после себестоимости.*40/);assert.doesNotMatch(render(),/Чистая прибыль/);}
+ r={...r,provisionalResultAfterCost:0};assert.equal(context.bdCurrentResultPresentation(r).value,0);
+ r={...r,provisionalResultBeforeCost:null,provisionalResultAfterCost:null};assert.equal(context.bdCurrentResultPresentation(r).value,null);assert.equal(context.bdCurrentResultPresentation(r).estimated,false);
+});

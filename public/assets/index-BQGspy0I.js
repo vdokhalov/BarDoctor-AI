@@ -2,7 +2,6 @@
 function bdFilterDepartment(rows,name){return name?rows.filter(row=>row.status!=="dismissed"&&String(row.department||"").trim()===name):rows;}
 function bdTeamDepartmentQuery(){const from=new URLSearchParams(location.search),q=new URLSearchParams({view:"employees"});for(const key of ["department","departmentVenue","q","status","venue"])if(from.has(key))q.set(key,from.get(key));return "?"+q.toString();}
 /* team-department:end */
-
 /* purchase-price-preview:start */
 "use strict";
 var bdPurchasePricePreviewDomain = (() => {
@@ -1993,11 +1992,14 @@ function bdMonthlySectionHeaderV165({ title, caption, action, actionLabel }) {
 // Presentation only: never recompute COGS or turn a current result into a closed-month profit.
 function bdCurrentResultPresentation(report) {
   const known=value=>typeof value==="number"&&Number.isFinite(value);
-  const afterCost=report.currentFinance&&known(report.costOfGoods)&&known(report.resultAfterCost);
-  return {afterCost,costKnown:known(report.costOfGoods),
-    value:report.currentFinance?(afterCost?report.resultAfterCost:known(report.resultBeforeCost)?report.resultBeforeCost:null):known(report.operatingResult)?report.operatingResult:null,
-    label:report.currentFinance?(afterCost?"Текущий результат после себестоимости":"Результат до себестоимости"):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
-    explanation:afterCost?"Выручка за вычетом учтённых расходов, начисленного ФОТ и подтверждённой себестоимости, с учётом складских корректировок. Это текущий результат по внесённым данным; месяц ещё не закрыт.":report.resultExplanation
+  const estimated=report.currentFinance&&!known(report.resultBeforeCost)&&known(report.provisionalResultBeforeCost);
+  const before=estimated?report.provisionalResultBeforeCost:report.resultBeforeCost;
+  const after=estimated?report.provisionalResultAfterCost:report.resultAfterCost;
+  const afterCost=report.currentFinance&&known(report.costOfGoods)&&known(after);
+  return {afterCost,estimated,costKnown:known(report.costOfGoods),payroll:estimated?report.provisionalPayroll:report.payroll,
+    value:report.currentFinance?(afterCost?after:known(before)?before:null):known(report.operatingResult)?report.operatingResult:null,
+    label:report.currentFinance?(estimated?(afterCost?"Предварительный результат после себестоимости":"Предварительный результат до себестоимости"):(afterCost?"Текущий результат после себестоимости":"Результат до себестоимости")):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
+    explanation:estimated?report.provisionalExplanation:afterCost?"Выручка за вычетом учтённых расходов, начисленного ФОТ и подтверждённой себестоимости, с учётом складских корректировок. Это текущий результат по внесённым данным; месяц ещё не закрыт.":report.resultExplanation
   };
 }
 
@@ -2038,10 +2040,10 @@ function bdMonthlyExecutiveV165({ report }) {
   const metrics = [
     { key: "revenue", label: "Выручка", value: report.revenue },
     { key: "cogs", label: "Себестоимость проданного", value: report.costOfGoods },
-    { key: "payroll", label: "ФОТ", value: report.payroll },
+    { key: "payroll", label: bdCurrentResultPresentation(report).estimated?"ФОТ, предварительно":"ФОТ", value: bdCurrentResultPresentation(report).payroll },
     { key: "expenses", label: "Прочие расходы", value: otherCosts },
     { key: "recurring", label: "Налоги + коммунальные", value: report.taxes == null || report.utilities == null ? null : Number(report.taxes) + Number(report.utilities) },
-    { key: "profit", label: report.currentFinance?"Текущий результат после себестоимости":"Чистая прибыль", value: report.currentFinance?(bdCurrentResultPresentation(report).afterCost?report.resultAfterCost:null):report.operatingResult, accent: true },
+    { key: "profit", label: report.currentFinance?bdCurrentResultPresentation(report).label:"Чистая прибыль", value: report.currentFinance?(bdCurrentResultPresentation(report).afterCost?bdCurrentResultPresentation(report).value:null):report.operatingResult, accent: true },
   ];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-executive-v165", children: [
     i.jsx(bdMonthlySectionHeaderV165, { title: "Ключевые показатели", caption: "Финансовый итог без двойного вычитания закупок" }),
@@ -2087,7 +2089,7 @@ function bdMonthlyChainV165({ report }) {
   const steps = [
     { key: "cash", label: "После оплат поставщикам", value: report.cashResult },
     { key: "before", label: "До себестоимости", value: report.resultBeforeCost },
-    { key: "final", label: report.currentFinance?"Текущий результат после себестоимости":"Чистая прибыль", value: report.currentFinance?(bdCurrentResultPresentation(report).afterCost?report.resultAfterCost:null):report.operatingResult, final: true },
+    { key: "final", label: report.currentFinance?bdCurrentResultPresentation(report).label:"Чистая прибыль", value: report.currentFinance?(bdCurrentResultPresentation(report).afterCost?bdCurrentResultPresentation(report).value:null):report.operatingResult, final: true },
   ];
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-chain-v165", children: [
     i.jsx(bdMonthlySectionHeaderV165, { title: "Финансовая цепочка", caption: "Три существующих результата в одной последовательности" }),
@@ -2112,14 +2114,14 @@ function bdMonthlyProfitStructureV165({ report }) {
   const values = [
     { key: "revenue", label: "Выручка", amount: Number(report.revenue || 0), tone: "revenue" },
     { key: "cogs", label: "Себестоимость проданного", amount: report.costOfGoods == null ? null : Number(report.costOfGoods), tone: "cost" },
-    { key: "payroll", label: "ФОТ", amount: Number(report.payroll || 0), tone: "payroll" },
+    { key: "payroll", label: presentation.estimated?"ФОТ, предварительно":"ФОТ", amount: presentation.payroll, tone: "payroll" },
     { key: "other", label: "Прочие расходы и списания", amount: Number(report.otherExpenses || 0) + Number(report.writeoffs || 0), tone: "other" },
     { key: "recurring", label: "Налоги и коммунальные", amount: Number(report.taxes || 0) + Number(report.utilities || 0), tone: "recurring" },
     ...(report.costBasis === "historical_sales_snapshots" ? [{ key: "inventory", label: Number(report.inventoryLoss) < 0 ? "Излишки инвентаризации (− расход)" : "Потери инвентаризации", amount: report.inventoryLoss, tone: Number(report.inventoryLoss) < 0 ? "profit" : "other" }] : []),
     { key: "profit", label: "Чистая прибыль", amount: report.operatingResult, tone: Number(report.operatingResult || 0) >= 0 ? "profit" : "loss" },
   ];
   if(report.currentFinance&&typeof report.inventoryAdjustmentNet==="number"&&Number.isFinite(report.inventoryAdjustmentNet))values.splice(values.length-1,0,{key:"inventory",label:"Складские корректировки (расход + / доход −)",amount:-report.inventoryAdjustmentNet,tone:"other"});
-  if(report.currentFinance){const profit=values.find(row=>row.key==="profit");profit.label="Текущий результат после себестоимости";profit.amount=result;profit.tone=result>=0?"profit":"loss";}
+  if(report.currentFinance){const profit=values.find(row=>row.key==="profit");profit.label=presentation.label;profit.amount=result;profit.tone=result>=0?"profit":"loss";}
   const scale = Math.max(1, Number(report.revenue || 0), ...values.map((entry) => Math.abs(Number(entry.amount || 0))));
   if (result == null) {
     return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-empty-v165", children: [
@@ -2188,12 +2190,12 @@ function bdMonthlyExpensesV165({ report, period, navigate }) {
 }
 
 function bdMonthlyPayrollRecurringV165({ report, period, navigate }) {
-  const payrollRatio = bdMonthlyRatioV165(report.payroll, report.revenue);
+  const payrollPresentation=bdCurrentResultPresentation(report),payrollRatio = bdMonthlyRatioV165(payrollPresentation.payroll, report.revenue);
   return i.jsxs("div", { className: "bd-monthly-two-column-v165", children: [
     i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-payroll-v165", children: [
       i.jsx(bdMonthlySectionHeaderV165, { title: "ФОТ", caption: report.payrollSource, action: () => navigate("/salaries?return=finance&month=" + period), actionLabel: "Зарплаты" }),
       i.jsxs("div", { className: "bd-monthly-highlight-v165", children: [
-        i.jsxs("span", { children: [i.jsx("small", { children: "Начисленный ФОТ" }), i.jsx("strong", { children: bdMoney2(report.payroll) })] }),
+        i.jsxs("span", { children: [i.jsx("small", { children: payrollPresentation.estimated?"ФОТ, предварительно":"Начисленный ФОТ" }), i.jsx("strong", { children: payrollPresentation.payroll==null?"Неизвестно":bdMoney2(payrollPresentation.payroll) })] }),
         i.jsx("b", { children: bdMonthlyRatioLabelV165(payrollRatio) }),
       ] }),
       Number(report.payrollBonuses || 0) > 0 && i.jsx(bdReportLine, { label: "В том числе премии", value: bdMoney2(report.payrollBonuses) }),
@@ -2492,7 +2494,8 @@ function bdCurrentFinanceDetailsV556({report}) {
   return i.jsxs("div", {role:"status",children:[
     i.jsx("p",{children:bdCurrentResultPresentation(report).explanation}),
     ...[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].map((text,index)=>i.jsx("p",{children:text},index)),
-    report.payroll==null && report.knownPayrollSubtotal!=null && i.jsx("p",{children:"Учтённый ФОТ по подтверждённым дням: "+bdMoney2(report.knownPayrollSubtotal)+". Общая сумма пока неизвестна."}),
+    report.payroll==null && report.provisionalPayroll==null && report.knownPayrollSubtotal!=null && i.jsx("p",{children:"Учтённый ФОТ по подтверждённым дням: "+bdMoney2(report.knownPayrollSubtotal)+". Общая сумма пока неизвестна."}),
+    report.provisionalPayroll!=null && i.jsx("p",{children:"ФОТ предварительно: "+bdMoney2(report.provisionalPayroll)+". Подтверждено за дни: "+bdMoney2(report.knownPayrollSubtotal??0)+"; расчёт открытых смен: "+bdMoney2(report.estimatedPayrollSubtotal)+"; премии: "+bdMoney2(report.payrollBonuses)+"."}),
     report.missingPayrollDates?.length>0 && i.jsx("p",{children:"ФОТ не подтверждён за: "+report.missingPayrollDates.join(", ")})
   ]});
 }
@@ -2504,7 +2507,7 @@ function bdHomeCurrentFinanceV556({profile,settings,onNavigate,revision}) {
     i.jsx("p",{children:report.currentFinance?"Финансы на "+report.asOfDate:"Финансовый результат · "+bdMonthDisplay(report.meta.key)}),
     i.jsx("h2",{style:{color:"inherit"},children:presentation.label}),
     i.jsx("strong",{className:"bd-home-money-value",style:result==null?{whiteSpace:"normal",overflowWrap:"anywhere",fontSize:"clamp(20px, 6vw, 28px)",lineHeight:1.2}:undefined,children:result==null?"Недостаточно данных":bdMoney2(result)}),
-    i.jsx("p",{children:"Выручка: "+(report.revenue==null?"Неизвестно":bdMoney2(report.revenue))+" · Начисленный ФОТ: "+(report.payroll==null?"Неизвестно":bdMoney2(report.payroll))}),
+    i.jsx("p",{children:"Выручка: "+(report.revenue==null?"Неизвестно":bdMoney2(report.revenue))+(presentation.estimated?" · ФОТ предварительно: ":" · Начисленный ФОТ: ")+(presentation.payroll==null?"Неизвестно":bdMoney2(presentation.payroll))}),
     report.currentFinance&&i.jsx(bdCurrentFinanceDetailsV556,{report}),
     i.jsx("button",{type:"button",onClick:()=>onNavigate("/reports?month="+report.meta.key),children:"Открыть отчёт"})
   ]});
@@ -3485,13 +3488,13 @@ function bdFinanceFinalReasonV160(e,t){if(!t)return"Нет финансовых 
 /* finance-current-result-v573:start */
 function bdFinanceCurrentResultV573({report,onContinue}) {
   const result=bdCurrentResultPresentation(report);
-  const reasons=[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])];
-  const levels=[{key:'cash',label:'После оплат поставщикам',value:report.cashResult,caption:'С начисленным ФОТ; не денежный поток'},
+  const reasons=[...new Set([...(report.missingInformation||[]),...(report.financeAssessmentInformation||[])])].filter(text=>text!==result.explanation);
+  const levels=[{key:'cash',label:'После оплат поставщикам',value:report.cashResult,caption:result.estimated?'Ожидает подтверждения ФОТ':'С начисленным ФОТ; не денежный поток'},
     {key:'current',label:result.label,value:result.value,caption:result.value===null?'Недостаточно данных':'По внесённым данным на '+report.asOfDate}];
   return i.jsxs('section',{'data-bd-finance-result-month':'current-v573',className:'bd-finance-result-v160',children:[
-    i.jsxs('header',{children:[i.jsx('p',{children:'Финансы на '+report.asOfDate}),i.jsx('span',{className:'bd-finance-result-state '+(result.value===null?'pending':'ready'),children:result.value===null?'Недостаточно данных':'Текущий результат'})]}),
-    i.jsx('div',{className:'bd-finance-result-flow',children:levels.map(level=>i.jsx('div',{className:'bd-finance-result-level-wrap',children:i.jsxs('article',{'data-bd-finance-result-level':level.key,'aria-label':level.label,className:'bd-finance-result-level '+(level.value==null?'muted':level.value>=0?'positive':'negative'),children:[i.jsx('span',{children:level.label}),i.jsx('strong',{children:level.value==null?'Неизвестно':bdMoney2(level.value)}),i.jsx('small',{children:level.caption})]})},level.key))}),
-    i.jsxs('div',{className:'bd-finance-result-footer',children:[i.jsxs('div',{children:[i.jsx('p',{children:result.explanation}),...reasons.map(reason=>i.jsx('p',{children:reason},reason))]}),i.jsx('button',{type:'button',onClick:onContinue,children:'Закрытие месяца'})]})
+    i.jsxs('header',{children:[i.jsx('p',{children:'Финансы на '+report.asOfDate}),i.jsx('span',{className:'bd-finance-result-state '+(result.value===null?'pending':'ready'),children:result.value===null?'Недостаточно данных':result.estimated?'Предварительный результат':'Текущий результат'})]}),
+    i.jsx('div',{className:'bd-finance-result-flow',children:levels.map(level=>i.jsx('div',{className:'bd-finance-result-level-wrap',children:i.jsxs('article',{'data-bd-finance-result-level':level.key,'aria-label':level.label,className:'bd-finance-result-level '+(level.value==null?'muted':level.value>=0?'positive':'negative'),children:[i.jsx('span',{children:level.label}),i.jsx('strong',{style:{whiteSpace:'normal',overflow:'visible',textOverflow:'clip',fontSize:level.value==null?'16px':undefined},children:level.value==null?'Неизвестно':bdMoney2(level.value)}),i.jsx('small',{children:level.caption})]})},level.key))}),
+    i.jsxs('div',{className:'bd-finance-result-footer',style:{display:'block'},children:[i.jsxs('div',{style:{display:'block',minWidth:0},children:[i.jsx('p',{children:result.explanation}),report.provisionalPayroll!=null&&i.jsx('p',{children:'ФОТ предварительно: '+bdMoney2(report.provisionalPayroll)+'. Подтверждено за дни: '+bdMoney2(report.knownPayrollSubtotal??0)+'; расчёт открытых смен: '+bdMoney2(report.estimatedPayrollSubtotal)+'; премии: '+bdMoney2(report.payrollBonuses)+'.'}),...reasons.map(reason=>i.jsx('p',{children:reason},reason))]}),i.jsx('button',{type:'button',onClick:onContinue,children:'Закрытие месяца'})]})
   ]});
 }
 /* finance-current-result-v573:end */

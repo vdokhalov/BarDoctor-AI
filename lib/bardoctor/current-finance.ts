@@ -1,3 +1,5 @@
+import { derivedInputBelongs } from './derived-input-scope';
+import { finiteBusinessNumber } from './business-day-rows';
 import {periodCostProof} from './financial-period-proof';
 import { historicalPeriodCost } from "./financial-reconciliation";
 import { readFinanceInputs, type FinanceReadInput, financeAmount } from './finance-inputs';
@@ -37,15 +39,44 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const adjustmentsKnown=sourcesKnown&&history.adjustmentsKnown;
  const assessmentKnown=costKnown&&adjustmentsKnown;
  const resultAfterCost=resultBeforeCost!=null&&assessmentKnown?Math.round((resultBeforeCost-history.cost+history.adjustment)*100)/100:null;
+ // A saved COMPLETE workday calculation is an estimate, never recorded payroll.
+ // Reuse only scoped OPEN reports whose sales base has not changed. Closing,
+ // missing staffing, malformed drafts and changed sales still fail closed.
+ const estimatedPayrollDays=value.payrollByDay.filter(day=>day.amount==null).map(day=>{
+  const reports=scopedBusinessRows(input.reports??[],{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId}).filter(x=>x.date===day.businessDate);
+  const report=reports.length===1?reports[0]:null;
+  const draft=row(report?.workdayPayrollDraft),breakdown=row(draft.payrollBreakdown);
+  const operation=value.days.find(x=>x.businessDate===day.businessDate);
+  const staffing=Array.isArray(report?.staffing)?report.staffing.map(row):[];
+  const ids=staffing.map(x=>String(x.employeeId??''));
+  const perEmployee=row(breakdown.perEmployee),amount=finiteBusinessNumber(breakdown.total);
+  const base=finiteBusinessNumber(report?.shiftVenueSales);
+  const salesUnchanged=operation?.revenue.amount!=null && (base===operation.revenue.amount || base==null&&operation.revenue.amount===0);
+  const valid=report?.workdayStatus==='OPEN'&&derivedInputBelongs(report,{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId})&&draft.status==='COMPLETE'&&draft.basis==='CURRENT_RULE_ESTIMATE'
+   &&Array.isArray(draft.missing)&&draft.missing.length===0&&salesUnchanged&&operation?.revenue.consistency!=='MISMATCH'
+   &&ids.length>0&&ids.every(Boolean)&&new Set(ids).size===ids.length&&Object.keys(perEmployee).length===ids.length
+   &&ids.every(id=>finiteBusinessNumber(perEmployee[id])!=null)&&amount!=null
+   &&Math.round(ids.reduce((sum,id)=>sum+Number(perEmployee[id]),0)*100)===Math.round(amount*100);
+  return {businessDate:day.businessDate,amount:valid?financeAmount({...report,amount,accountingAmount:undefined},'amount',input.currency):null,basis:'SAVED_WORKDAY_ESTIMATE' as const};
+ });
+ const estimatesKnown=estimatedPayrollDays.length>0&&estimatedPayrollDays.every(x=>x.amount!=null);
+ const estimatedPayrollSubtotal=estimatesKnown?Math.round(estimatedPayrollDays.reduce((sum,x)=>sum+x.amount!,0)*100)/100:null;
+ const provisionalPayroll=estimatesKnown&&value.payrollBonuses!=null&&input.payrollEntriesAvailable!==false
+  ?Math.round(((knownPayrollSubtotal??0)+estimatedPayrollSubtotal!+value.payrollBonuses)*100)/100:null;
+ const provisionalResultBeforeCost=provisionalPayroll!=null&&value.revenue!=null&&value.operatingExpenses!=null&&missing.every(x=>x==='PAYROLL')
+  ?Math.round((value.revenue-provisionalPayroll-value.operatingExpenses)*100)/100:null;
+ const provisionalResultAfterCost=provisionalResultBeforeCost!=null&&assessmentKnown?Math.round((provisionalResultBeforeCost-history.cost+history.adjustment)*100)/100:null;
+ const provisionalExplanation=provisionalPayroll!=null?'Предварительно: учтён сохранённый расчёт зарплаты открытых смен. Он ещё не подтверждён и может измениться. После изменения продаж или состава команды нужен новый расчёт смены.':null;
  const financeAssessmentMissing=[...missing,...(!assessmentKnown?['CAPTURED_COST_INCOMPLETE']:[])];
  const labels:Record<string,string>={REVENUE_OR_CURRENCY:'Не подтверждена выручка или её валюта',PAYROLL:'Не полностью известен начисленный ФОТ',EXPENSES_OR_CURRENCY:'Не полностью известны расходы или их валюта',NO_CURRENT_ACTIVITY:'Нет учтённых рабочих дней за текущий период'};
  return {...value,startDate,endDate,missing,missingPayrollDates,knownPayrollSubtotal,resultBeforeCost,
+  provisionalPayroll,estimatedPayrollSubtotal,estimatedPayrollDays,provisionalResultBeforeCost,provisionalResultAfterCost,provisionalExplanation,
   result:resultBeforeCost,preliminaryResult:resultBeforeCost,financeInputsKnown:missing.length===0,
   currentFinance:true,asOfDate:endDate,operatingResult:null,isClosed:false,
   resultAfterCost,costBasis:value.revenueRows.some(x=>[1,2].includes(Number(x.manualTotalsVersion)))?value.revenueRows.every(x=>[1,2].includes(Number(x.manualTotalsVersion)))?"OWNER_DECLARED":"MIXED":"CAPTURED",costOfGoods:costKnown?history.cost:null,inventoryAdjustmentNet:adjustmentsKnown?history.adjustment:null,financeAssessmentMissing,costReasons:[...history.reasons,...(!sourcesKnown?["COST_SOURCE_UNAVAILABLE"]:[])],
-  financeAssessmentInformation:[...missing.map(code=>labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
+  financeAssessmentInformation:[...missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
   purchasePayments,cashResult:resultBeforeCost!=null&&purchasePayments!=null?Math.round((resultBeforeCost-purchasePayments)*100)/100:null,
-  missingInformation:missing.map(code=>labels[code]??code),
+  missingInformation:missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),
   resultExplanation:'Выручка − учтённые расходы − начисленный ФОТ. Без себестоимости товара и ещё не внесённых начислений; это не чистая прибыль.',
  };
 }
