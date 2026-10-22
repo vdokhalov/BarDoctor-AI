@@ -13,4 +13,22 @@ if(process.argv.includes('--restore')){fs.writeFileSync(file,s.replace(after,bef
 if(s.split(anchor).length!==2)throw Error('Unique Finance current result anchor required');
 s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
 if(!s.includes(after)){if(s.split(before).length!==2)throw Error('Unique Home finance anchor required');s=s.replace(before,after);}
+// Current-month summary owns current uncertainty. Keep closure checks secondary.
+const currentStatus='function bdFinanceCanonicalStatusV515({verified,monthKey,venueId}){';
+s=s.replace(currentStatus+'if(verified.report?.currentFinance&&!verified.error)return null;',currentStatus);
+if(s.includes(currentStatus))s=s.replace(currentStatus,currentStatus+'if(verified.report?.currentFinance&&!verified.error)return null;');
+for(const name of ['bdFinanceKpisV160','bdFinanceSummaryV160']){
+ const re=new RegExp('(function '+name+'\\(\\{report:([a-zA-Z]+)[^]*?\\)\\{)');
+ const match=s.match(re);if(match){const guard='if('+match[2]+'?.currentFinance)return null;';s=s.replace(match[1]+guard,match[1]);s=s.replace(match[1],match[1]+guard);}
+}
+const ready='monthlyReport&&i.jsx(bdFinanceReadinessV160,{report:monthlyReport,coverage,missingDates,onMissing:missingDates.length?()=>setGapDate(missingDates[0].date):null,onInventory:()=>navigate("/warehouse?add=inventory"),onContinue:bdFinanceOpenMonthCloseV160,onReport:()=>navigate("/reports?month="+encodeURIComponent(monthKey))})';
+const wrapped='monthlyReport?.currentFinance?i.jsxs("details",{className:"bd-finance-month-review",children:[i.jsx("summary",{children:"Полнота месяца"}),'+ready+']}):'+ready;
+if(!s.includes(wrapped)){if(!s.includes(ready))throw Error('Finance readiness anchor missing');s=s.replace(ready,wrapped);}
+const quick='function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey}){';
+const quickNew='function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey,currentFinance=false}){';
+s=s.replace(quick,quickNew);
+const quickStart=s.indexOf(quickNew),quickEnd=s.indexOf('\nfunction ',quickStart+quickNew.length);
+if(quickStart<0||quickEnd<0)throw Error('Quick actions anchor missing');
+let quickBody=s.slice(quickStart,quickEnd);quickBody=quickBody.replace('children:n.map(r=>','children:n.filter(row=>!currentFinance||row.key!=="close").map(r=>');s=s.slice(0,quickStart)+quickBody+s.slice(quickEnd);
+s=s.replace('i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,onCloseMonth:','i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,currentFinance:monthlyReport?.currentFinance,onCloseMonth:');
 fs.writeFileSync(file,s);

@@ -47,7 +47,7 @@ function bdCurrentResultPresentation(report) {
   const afterCost=report.currentFinance&&known(report.costOfGoods)&&known(after);
   return {afterCost,estimated,costKnown:known(report.costOfGoods),payroll:estimated?report.provisionalPayroll:report.payroll,
     value:report.currentFinance?(afterCost?after:known(before)?before:null):known(report.operatingResult)?report.operatingResult:null,
-    label:report.currentFinance?(afterCost?(after<0?"Убыток за месяц":"Прибыль за месяц"):"Результат до себестоимости"):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
+    label:report.currentFinance?(afterCost?(after<0?"Убыток за месяц":"Прибыль за месяц"):known(before)?"Результат до себестоимости":"Прибыль за месяц"):report.isClosed?"Чистая прибыль месяца":"Предварительный результат месяца",
     explanation:estimated?report.provisionalExplanation:afterCost?"Выручка за вычетом учтённых расходов, начисленного ФОТ и подтверждённой себестоимости, с учётом складских корректировок. Это текущий результат по внесённым данным; месяц ещё не закрыт.":report.resultExplanation
   };
 }
