@@ -28,7 +28,7 @@ import { observedAwait } from "./request-observability";
 
 type Row = Record<string, unknown>;
 const object = (v: unknown): v is Row => Boolean(v && typeof v === "object" && !Array.isArray(v));
-export const HEALTH_INPUT_KEYS = [...new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(), ...HEALTH_OPERATIONS_KEYS, "bd_tasks", "bd_action_tasks", "bd_decisions"])];
+export const HEALTH_INPUT_KEYS = [...new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(), ...HEALTH_OPERATIONS_KEYS, "bd_payroll_rules", "bd_finance_gap_reasons", "bd_tasks", "bd_action_tasks", "bd_decisions"])];
 
 /** One SELECT snapshot of existing sources, profile and live scope/permissions.
  * No body inputs, new persistence, history reconstruction or source mutation. */

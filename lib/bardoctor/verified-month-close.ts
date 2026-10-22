@@ -23,6 +23,7 @@ import { stableSalesValue } from "./sales-events";
 type Row = Record<string, unknown>;
 export const MONTH_CLOSE_VERSION = "verified-month-close-v1";
 export const MONTH_CLOSE_INPUT_KEYS = ["bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_sales_batches", "bd_sales_reconciliations_v1", "bd_stock_movements", "bd_inventory_snapshots", "bd_finance_expenses", "bd_payroll_entries", "bd_purchase_documents", "bd_finance_settings", "bd_finance_gap_reasons", "bd_inventory_writeoffs", "bd_opening_stock_v1"];
+const ESTIMATE_KEYS=["bd_employees","bd_payroll_rules"];
 const KEYS = [...MONTH_CLOSE_INPUT_KEYS, "bd_month_closings"];
 const array = (value: unknown): Row[] => Array.isArray(value) ? value.map(row) : [];
 const money = (value: number) => Math.round(value * 100) / 100;
@@ -81,14 +82,15 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
   // UNION is one SQLite read snapshot, including profile and selected live access.
   const boundarySql = `SELECT json_object('role',vm.role,'permissions',vm.permissions_json,'workspace',v.workspace_id,'dataAccount',v.data_account_id) FROM venues v JOIN workspaces w ON w.id=v.workspace_id AND w.status='active' JOIN venue_memberships vm ON vm.venue_id=v.id AND vm.account_id=? AND vm.status='active' JOIN workspace_memberships wm ON wm.workspace_id=w.id AND wm.account_id=vm.account_id AND wm.status='active' WHERE v.id=? AND v.data_account_id=? AND v.status='active' AND vm.id=?`;
   const boundaryArgs = [account.actorAccountId, venueId, account.id, account.membershipId];
-  const result = await database.prepare(`SELECT store_key,data_json,updated_at FROM domain_data WHERE account_id=? AND store_key IN (${KEYS.map(() => "?").join(",")}) UNION ALL SELECT '__profile__',restaurant_json,updated_at FROM accounts WHERE id=? UNION ALL SELECT '__access__',(${boundarySql}),NULL`).bind(account.id, ...KEYS, account.id, ...boundaryArgs).all<{ store_key: string; data_json: string; updated_at: string | null }>();
+  const readKeys=[...KEYS,...(request.method==='GET'&&url.searchParams.get('view')==='current'?ESTIMATE_KEYS.filter(key=>canReadVenueSource(account,key)):[])];
+  const result = await database.prepare(`SELECT store_key,data_json,updated_at FROM domain_data WHERE account_id=? AND store_key IN (${readKeys.map(() => "?").join(",")}) UNION ALL SELECT '__profile__',restaurant_json,updated_at FROM accounts WHERE id=? UNION ALL SELECT '__access__',(${boundarySql}),NULL`).bind(account.id, ...readKeys, account.id, ...boundaryArgs).all<{ store_key: string; data_json: string; updated_at: string | null }>();
   const loaded = result.results ?? [], profileRow = loaded.find(value => value.store_key === "__profile__"), boundaryRow = loaded.find(value => value.store_key === "__access__");
   if (!profileRow || !boundaryRow?.data_json) return response({ ok: false, code: "UNAVAILABLE" }, 401);
   const boundary = row(JSON.parse(boundaryRow.data_json));
   if (!isAccessRole(boundary.role)) return response({ ok: false, code: "UNAVAILABLE" }, 401);
   const currentAccount = { ...account, ...permissionPayload(boundary.role, typeof boundary.permissions === "string" ? boundary.permissions : null) };
   if (!hasPermission(currentAccount, "reports.view") || !KEYS.every(key => canReadVenueSource(currentAccount, key)) || request.method === "POST" && !hasPermission(currentAccount, "month.close")) return response({ ok: false, code: "ACCESS_DENIED" }, 403);
-  const snapshots = storeSnapshots(loaded, KEYS);
+  const snapshots = storeSnapshots(loaded, readKeys);
   let stores: Record<string, Row[]>;
   let profile: Row;
   let costProof: object|undefined;
@@ -136,7 +138,8 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
       const source=loaded.find(value=>value.store_key===key);
       return !source || source.data_json!=null&&Array.isArray(JSON.parse(source.data_json));
     };
-    const current = currentFinance({ costProof, profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
+    const estimateAvailable=ESTIMATE_KEYS.every(key=>canReadVenueSource(currentAccount,key)&&loaded.some(x=>x.store_key===key&&Array.isArray(JSON.parse(x.data_json))));
+    const current = currentFinance({ payrollEstimateSources:estimateAvailable?{employees:stores.bd_employees,rules:stores.bd_payroll_rules,gaps:stores.bd_finance_gap_reasons??[]}:undefined, costProof, profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
       movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, reconciliations: stores.bd_sales_reconciliations_v1, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
       expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),

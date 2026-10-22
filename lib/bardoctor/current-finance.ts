@@ -1,3 +1,4 @@
+import { calculateWorkdayPayroll, workdayPayrollRequirements } from './workday-payroll';
 import { derivedInputBelongs } from './derived-input-scope';
 import { finiteBusinessNumber } from './business-day-rows';
 import {periodCostProof} from './financial-period-proof';
@@ -9,7 +10,7 @@ import { venueDate, venueTimeFromJson } from './venue-time';
 export type CurrentCostSourceStates = Partial<Record<"bd_sales_events_v1" | "bd_stock_movements" | "bd_sales_documents" | "bd_sales_batches" | "bd_sales_reconciliations_v1", "AVAILABLE" | "ABSENT" | "UNAVAILABLE">>;
 
 /** Recorded current-period result, never purchases-as-COGS or a closed-month profit. */
-export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
+export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; payrollEstimateSources?: {employees: unknown[]; rules: unknown[]; gaps: unknown[]}; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
  const endDate = venueDate(input.asOf, venueTimeFromJson(JSON.stringify(input.profile)).timezone);
  const startDate = endDate.slice(0,7)+'-01';
  const purchasePayment = (x:Record<string,unknown>) => x.category==='inventory' || x.source==='purchase_payment' || x.source==='purchase_document' || x.paymentKind==='supplier_payment';
@@ -39,25 +40,40 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const adjustmentsKnown=sourcesKnown&&history.adjustmentsKnown;
  const assessmentKnown=costKnown&&adjustmentsKnown;
  const resultAfterCost=resultBeforeCost!=null&&assessmentKnown?Math.round((resultBeforeCost-history.cost+history.adjustment)*100)/100:null;
- // A saved COMPLETE workday calculation is an estimate, never recorded payroll.
- // Reuse only scoped OPEN reports whose sales base has not changed. Closing,
- // missing staffing, malformed drafts and changed sales still fail closed.
+ // Recalculate an OPEN workday from the current authorized rule snapshot, never recorded payroll.
+ // Saved staffing is required; the saved total is never reused. Closing,
+ // missing facts, malformed drafts and unavailable rules still fail closed.
+ const estimateScope={venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId};
+ const estimateSources=input.payrollEstimateSources;
+ const employees=scopedBusinessRows(estimateSources?.employees??[],estimateScope);
+ const rules=scopedBusinessRows(estimateSources?.rules??[],estimateScope);
  const estimatedPayrollDays=value.payrollByDay.filter(day=>day.amount==null).map(day=>{
-  const reports=scopedBusinessRows(input.reports??[],{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId}).filter(x=>x.date===day.businessDate);
+  const reports=scopedBusinessRows(input.reports??[],estimateScope).filter(x=>x.date===day.businessDate);
   const report=reports.length===1?reports[0]:null;
-  const draft=row(report?.workdayPayrollDraft),breakdown=row(draft.payrollBreakdown);
+  const draft=row(report?.workdayPayrollDraft);
   const operation=value.days.find(x=>x.businessDate===day.businessDate);
   const staffing=Array.isArray(report?.staffing)?report.staffing.map(row):[];
   const ids=staffing.map(x=>String(x.employeeId??''));
-  const perEmployee=row(breakdown.perEmployee),amount=finiteBusinessNumber(breakdown.total);
   const base=finiteBusinessNumber(report?.shiftVenueSales);
   const salesUnchanged=operation?.revenue.amount!=null && (base===operation.revenue.amount || base==null&&operation.revenue.amount===0);
-  const valid=report?.workdayStatus==='OPEN'&&derivedInputBelongs(report,{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId})&&draft.status==='COMPLETE'&&draft.basis==='CURRENT_RULE_ESTIMATE'
-   &&Array.isArray(draft.missing)&&draft.missing.length===0&&salesUnchanged&&operation?.revenue.consistency!=='MISMATCH'
-   &&ids.length>0&&ids.every(Boolean)&&new Set(ids).size===ids.length&&Object.keys(perEmployee).length===ids.length
-   &&ids.every(id=>finiteBusinessNumber(perEmployee[id])!=null)&&amount!=null
-   &&Math.round(ids.reduce((sum,id)=>sum+Number(perEmployee[id]),0)*100)===Math.round(amount*100);
-  return {businessDate:day.businessDate,amount:valid?financeAmount({...report,amount,accountingAmount:undefined},'amount',input.currency):null,basis:'SAVED_WORKDAY_ESTIMATE' as const};
+  // Automatic personal-sales attribution needs membership/payment facts outside
+  // this financial snapshot. Never substitute a stale saved personal-sales sum.
+  const factsKnown=staffing.every(staff=>{
+   const employee=employees.find(e=>e.id===staff.employeeId);
+   if(!employee)return false;
+   const needs=workdayPayrollRequirements(employee,rules);
+   return !(needs.personalSales&&(staff.personalSalesSource==='AUTO'||finiteBusinessNumber(staff.personalSales)==null))
+    && (!needs.departments.length||salesUnchanged);
+  });
+  const valid=report?.workdayStatus==='OPEN'&&derivedInputBelongs(report,estimateScope)&&draft.status==='COMPLETE'
+   &&Array.isArray(draft.missing)&&draft.missing.length===0&&operation?.revenue.consistency!=='MISMATCH'
+   &&ids.length>0&&ids.every(Boolean)&&new Set(ids).size===ids.length&&estimateSources!=null
+   &&derivedInputBelongs(estimateSources,estimateScope)&&factsKnown;
+  const estimate=valid?calculateWorkdayPayroll({date:day.businessDate,staffing,employees,rules,profile:input.profile,
+   revenues:scopedBusinessRows(input.revenues,estimateScope),gaps:scopedBusinessRows(estimateSources!.gaps,estimateScope),venueId:input.venueId,
+   shiftVenueSales:operation?.revenue.amount,shiftDepartmentSales:report?.shiftDepartmentSales}):null;
+  const amount=estimate?.status==='COMPLETE'?finiteBusinessNumber(row(estimate.payrollBreakdown).total):null;
+  return {businessDate:day.businessDate,amount:amount==null?null:financeAmount({...report,amount,accountingAmount:undefined},'amount',input.currency),basis:'CURRENT_RULE_ESTIMATE' as const};
  });
  const estimatesKnown=estimatedPayrollDays.length>0&&estimatedPayrollDays.every(x=>x.amount!=null);
  const estimatedPayrollSubtotal=estimatesKnown?Math.round(estimatedPayrollDays.reduce((sum,x)=>sum+x.amount!,0)*100)/100:null;
@@ -66,9 +82,9 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const provisionalResultBeforeCost=provisionalPayroll!=null&&value.revenue!=null&&value.operatingExpenses!=null&&missing.every(x=>x==='PAYROLL')
   ?Math.round((value.revenue-provisionalPayroll-value.operatingExpenses)*100)/100:null;
  const provisionalResultAfterCost=provisionalResultBeforeCost!=null&&assessmentKnown?Math.round((provisionalResultBeforeCost-history.cost+history.adjustment)*100)/100:null;
- const provisionalExplanation=provisionalPayroll!=null?'Предварительно: учтён сохранённый расчёт зарплаты открытых смен. Он ещё не подтверждён и может измениться. После изменения продаж или состава команды нужен новый расчёт смены.':null;
+ const provisionalExplanation=provisionalPayroll!=null?'Предварительно: зарплата открытых смен рассчитана по текущим ставкам, внесённым часам и доступным данным о продажах. Она ещё не подтверждена и может измениться.':null;
  const financeAssessmentMissing=[...missing,...(!assessmentKnown?['CAPTURED_COST_INCOMPLETE']:[])];
- const labels:Record<string,string>={REVENUE_OR_CURRENCY:'Не подтверждена выручка или её валюта',PAYROLL:'Не полностью известен начисленный ФОТ',EXPENSES_OR_CURRENCY:'Не полностью известны расходы или их валюта',NO_CURRENT_ACTIVITY:'Нет учтённых рабочих дней за текущий период'};
+ const labels:Record<string,string>={REVENUE_OR_CURRENCY:'Не подтверждена выручка или её валюта',PAYROLL:'Нет полного актуального расчёта ФОТ: проверьте ставки, часы и данные продаж открытых смен',EXPENSES_OR_CURRENCY:'Не полностью известны расходы или их валюта',NO_CURRENT_ACTIVITY:'Нет учтённых рабочих дней за текущий период'};
  return {...value,startDate,endDate,missing,missingPayrollDates,knownPayrollSubtotal,resultBeforeCost,
   provisionalPayroll,estimatedPayrollSubtotal,estimatedPayrollDays,provisionalResultBeforeCost,provisionalResultAfterCost,provisionalExplanation,
   result:resultBeforeCost,preliminaryResult:resultBeforeCost,financeInputsKnown:missing.length===0,
