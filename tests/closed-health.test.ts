@@ -5,7 +5,7 @@ import {VENUE_CONTEXT_SOURCES} from '../lib/bardoctor/venue-context-access';
 import {HEALTH_OPERATIONS_KEYS} from '../lib/bardoctor/health-operations-inputs';
 const HEALTH_INPUT_KEYS=[...new Set([...Object.values(VENUE_CONTEXT_SOURCES).flat(),...HEALTH_OPERATIONS_KEYS])];
 async function setup(){
- const r=await lifecycleRuntime({workdays:'./app/api/workdays/route',health:'./app/api/business-health/route'}, {now:'2026-10-22T12:00:00Z'});
+ const r=await lifecycleRuntime({sales:'./app/api/sales-events/route',workdays:'./app/api/workdays/route',health:'./app/api/business-health/route'}, {now:'2026-10-22T12:00:00Z'});
  const owner=await r.register('closed-health@isolated.test'),venue=owner.activeVenueId;
  const put=(key:string,data:unknown)=>r.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').run(owner.userId,key,JSON.stringify(data),'2026-10-22T10:00:00Z');
  for(const key of HEALTH_INPUT_KEYS.filter(k=>!['bd_sales_events_v1','bd_stock_movements'].includes(k)))put(key,key==='bd_assortment_v1'?{stockBalances:[],nomenclature:[]}:[]);
@@ -74,3 +74,47 @@ test('overnight capture keeps business date; old-month closure never reconstruct
 });
 test('backdated closure without a historical snapshot leaves Health unavailable',async t=>{const r=await setup();t.after(r.close);r.setNow('2026-11-02T12:00:00Z');assert.equal((await r.post(r.closeCommand)).status,201);assert.equal((await r.read()).code,'HEALTH_NO_SNAPSHOT');});
 test('shift manager close maintains owner snapshot without granting analysis or returning sources',async t=>{const r=await setup();t.after(r.close);r.sqlite.prepare("UPDATE venue_memberships SET role='shift_manager' WHERE venue_id=? AND account_id=?").run(r.venue,r.owner.userId);const reply=await r.post(r.closeCommand);assert.equal(reply.status,201);const body=await reply.json() as any;assert.equal(body.intelligence,undefined);assert.equal(body.health,undefined);assert.ok(r.get('__bd_closed_health_v1__:'+r.venue));assert.equal((await r.api.health.GET(r.request())).status,403);});
+test('sequential same-date shifts preserve first report, isolate revenue and update Health once',async t=>{
+ const r=await setup();t.after(r.close);assert.equal((await r.post(r.closeCommand)).status,201);
+ const first=r.get('bd_operational_reports_v1')[0],health=await r.read();
+ const open={action:'open_next',operationId:'next-same-date',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]};
+ const response=await r.post(open);assert.equal(response.status,201,JSON.stringify(await response.clone().json()));const second=(await response.json() as any).workday;
+ assert.notEqual(second.id,first.id);assert.equal(second.workdaySequence,2);assert.equal(second.workdayPayrollDraft.payrollBreakdown.total,10);
+ assert.deepEqual(r.get('bd_operational_reports_v1')[0],first);assert.deepEqual(await r.read(),health);assert.equal((await r.post(open)).status,200);
+ assert.equal((await r.post({...open,operationId:'another'})).status,409);
+ const get=await r.api.workdays.GET(r.request(undefined));assert.equal((await get.json() as any).workday.id,second.id);
+ const close={...r.closeCommand,operationId:'second-close',workdayId:second.id,expectedRevision:1};
+ r.setNow('2026-10-22T16:00:00Z');const closed=await r.post(close);assert.equal(closed.status,201,JSON.stringify(await closed.clone().json()));
+ assert.deepEqual(r.get('bd_operational_reports_v1')[0],first);assert.equal((await r.post(close)).status,200);
+ const updated=await r.read();assert.equal(updated.success,true);assert.match(updated.data.businessHealth.components.find((x:any)=>x.id==='finance').evidence.join(' '),/60/);
+ assert.notEqual(updated.generatedAt,health.generatedAt);
+});
+test('sequential concurrent open requests commit at most one and replay stays exact',async t=>{
+ const r=await setup();t.after(r.close);assert.equal((await r.post(r.closeCommand)).status,201);const first=r.get('bd_operational_reports_v1')[0];
+ const body={action:'open_next',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]};
+ const replies=await Promise.all([r.post({...body,operationId:'race1'}),r.post({...body,operationId:'race2'})]);
+ assert.deepEqual(replies.map(x=>x.status).sort(),[201,409]);const rows=r.get('bd_operational_reports_v1');assert.equal(rows.filter((x:any)=>x.workdayStatus==='OPEN').length,1);assert.deepEqual(rows[0],first);
+ assert.equal((await r.post({...r.closeCommand,operationId:'wrong-close',expectedRevision:1})).status,409);
+});
+test('sequential cash linkage and percentage plus hours exclude first-shift sales',async t=>{
+ const r=await setup();t.after(r.close);assert.equal((await r.post(r.closeCommand)).status,201);const first=r.get('bd_operational_reports_v1')[0];
+ r.put('bd_payroll_rules',[{id:'r',venueId:r.venue,blocks:[{enabled:true,type:'hourly_rate',amount:2},{enabled:true,type:'venue_sales_percent',percent:10}]}]);
+ const opened=await r.post({action:'open_next',operationId:'pct-next',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e',hours:3}]});assert.equal(opened.status,201);const second=(await opened.json() as any).workday;
+ const cash=await r.api.sales.POST(r.request({venueId:r.venue,action:'open_shift',shiftId:'second-cash',name:'Second cash',openingFloat:0}));assert.equal(cash.status,201,JSON.stringify(await cash.clone().json()));
+ const rows=r.get('bd_finance_revenue');assert.equal(rows.find((x:any)=>x.id==='second-cash').workdayId,second.id);
+ const event=JSON.parse(String(r.sqlite.prepare('SELECT payload FROM sales_event_chunks LIMIT 1').get()!.payload));event.id=event.externalId=event.fingerprint='second-sale';event.revenueRowId='second-cash';event.revenue=60;event.batch.id='second-sale';event.batch.lines[0].salesBatchId='second-sale';const payload=JSON.stringify(event);
+ r.sqlite.prepare('INSERT INTO sales_event_records(account_id,event_id,position,external_id,source,business_date,revenue_row_id,fingerprint,payload_hash,chunk_count) VALUES(?,?,?,?,?,?,?,?,?,1)').run(r.owner.userId,event.id,1,event.id,'POS_API','2026-10-22','second-cash',event.id,createHash('sha256').update(payload).digest('hex'));r.sqlite.prepare('INSERT INTO sales_event_chunks(account_id,event_id,version,ordinal,payload) VALUES(?,?,0,0,?)').run(r.owner.userId,event.id,payload);
+ r.put('bd_finance_revenue',rows.map((x:any)=>x.id==='second-cash'?{...x,revenue:60,receipts:1,closingStatus:'closed'}:x));
+ const team=await r.post({action:'team',operationId:'pct-team',workdayId:second.id,expectedRevision:1,staffing:[{employeeId:'e',hours:3}]});assert.equal(team.status,201);const body=await team.json() as any;assert.equal(body.workday.workdayPayrollDraft.payrollBreakdown.total,12);assert.equal(body.workday.shiftVenueSales,60);
+ const closed=await r.post({...r.closeCommand,operationId:'pct-close',workdayId:second.id,expectedRevision:2});assert.equal(closed.status,201,JSON.stringify(await closed.clone().json()));assert.deepEqual(r.get('bd_operational_reports_v1')[0],first);
+});
+test('sequential guards protect closed month, selected history and other tenant',async t=>{
+ const r=await setup();t.after(r.close);assert.equal((await r.post(r.closeCommand)).status,201);const first=r.get('bd_operational_reports_v1')[0];
+ const unknown=await r.api.workdays.GET(r.request(undefined));assert.equal((await unknown.json() as any).workday.id,first.id);
+ const other=await r.register('sequential-other@test.example');const foreign=await r.api.workdays.GET(r.request(undefined,other));assert.equal((await foreign.json() as any).workday,null);
+ assert.equal((await r.post({action:'open_next',date:'2026-10-21',operationId:'past',workdayId:first.id,expectedRevision:0,staffing:[{employeeId:'e'}]})).status,409);
+ r.put('bd_month_closings',[{venueId:r.venue,monthKey:'2026-10',status:'closed'}]);
+ assert.equal((await r.post({action:'open_next',operationId:'month-lock',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]})).status,423);
+ // Closed history is never reopened through team/close or new-date open.
+ assert.equal((await r.post({action:'team',operationId:'mutate-closed',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]})).status>=400,true);assert.deepEqual(r.get('bd_operational_reports_v1')[0],first);
+});

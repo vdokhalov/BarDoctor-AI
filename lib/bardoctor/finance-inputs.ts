@@ -118,7 +118,10 @@ export function readFinanceInputs(input: FinanceReadInput) {
     const source = day.operations.fot === "RECORDED" && saved != null ? "RECORDED" : amount != null ? "LEGACY_RECORDED" : "MISSING";
     const original = reportsByDate.get(day.businessDate) ?? revenuesByDate.get(day.businessDate)?.[0] ?? {};
     const converted = amount == null ? null : financeAmount({ ...original, originalAmount: amount, amount, accountingAmount: undefined }, "amount", input.currency);
-    return { businessDate: day.businessDate, amount: converted, basis: source };
+    const completed=scopedReports.filter(r=>r.date===day.businessDate&&r.workdayStatus==="CLOSED");
+    const savedParts=completed.map(r=>financeAmount({...r,amount:record(r.payrollBreakdown).total,accountingAmount:undefined},"amount",input.currency));
+    const recordedAmount=converted??(completed.length&&savedParts.every(n=>n!=null)?round(savedParts.reduce<number>((sum,n)=>sum+n!,0)):null);
+    return { businessDate: day.businessDate, amount: converted, recordedAmount, basis: source };
   });
   const recordedPresent = payrollByDay.some(day => day.amount != null);
   const legacyPayrollExpenses = periodExpenses.filter(row => row.category === "payroll");

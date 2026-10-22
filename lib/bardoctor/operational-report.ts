@@ -14,7 +14,9 @@ export async function saveOperationalReport(input: {
   if (day.revenue.consistency === "MISMATCH") return { ok: false as const, code: "OPERATIONAL_DAY_REVENUE_NEEDS_REVIEW", error: "Продажи и финансовая выручка расходятся. Ничего не изменено; требуется проверка данных." };
   const protectedRevenue = day.revenue.readOnly || input.current.reports.map(row).some(report => report.venueId === input.venueId && report.date === date && Boolean(report.workdayStatus));
   if (protectedRevenue && input.request.sectionsVersion !== 1) return { ok: false as const, code: "SALES_EVENT_REVENUE_PROTECTED", error: "Выручка поступает из продаж. Откройте обновлённый отчёт для отдельного сохранения операционных данных." };
-  const reportId = `operational-report:${input.venueId}:${date}`;
+  const same=input.current.reports.map(row).filter(r=>r.venueId===input.venueId&&r.date===date);
+  if(same.length>1&&!revenueInput.workdayId)return {ok:false as const,code:"WORKDAY_ID_REQUIRED",error:"Откройте операции нужной рабочей смены."};
+  const reportId = String(revenueInput.workdayId??same.find(r=>r.workdayStatus)?.id??`operational-report:${input.venueId}:${date}`);
   const previous = input.current.reports.map(row).find(report => report.id === reportId);
   // Workday lifecycle and payroll are owned by the scoped workday command. The
   // existing editor remains the owner of write-offs/incidents, not a bypass.
@@ -28,6 +30,8 @@ export async function saveOperationalReport(input: {
   const revenueConflict = protectedRevenue && ["revenue", "receipts", "payments", "zoneRevenue"].some(key => revenueInput[key] !== undefined);
   const sections = { revenue: { status: revenueConflict ? "REJECTED" : protectedRevenue ? "READ_ONLY" : "SAVED", ...(revenueConflict ? { code: "SALES_EVENT_REVENUE_PROTECTED", error: "Выручка и чеки поступают из продаж. Операционные данные сохранены отдельно." } : {}) }, operations: { status: "SAVED" } };
   if (receipt) return { ok: true as const, idempotent: true, shiftId: String(previous?.shiftId ?? reportId), revenueRecord: { ...revenueInput, ...operationalData(previous), operationalSaved: true }, ...input.current, writeOffDocuments: [], warnings: [], sections, operationalReport: previous! };
+  if(previous?.workdayStatus==="CLOSED")return {ok:false as const,code:"WORKDAY_CLOSED",error:"Закрытая рабочая смена доступна только для просмотра."};
+  if(revenueInput.workdayId&&(!previous||previous.venueId!==input.venueId||previous.date!==date))return {ok:false as const,code:"WORKDAY_NOT_FOUND",error:"Рабочая смена не найдена."};
   const incidentInputs = input.request.incidents === undefined ? [] : input.request.incidents;
   if (!Array.isArray(incidentInputs) || incidentInputs.length > 100 || incidentInputs.some(value => !String(row(value).title ?? "").trim())) return { ok: false as const, code: "SHIFT_INCIDENT_INVALID", error: "Укажите название каждого происшествия" };
   // The existing planner supplies the exact warehouse operation. For fact-backed

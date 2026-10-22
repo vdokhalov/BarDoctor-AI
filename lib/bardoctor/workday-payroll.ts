@@ -21,10 +21,10 @@ export function workdaySalaryDivisor(profile:Row,date:string,revenues:Row[],gaps
 }
 /** Enabled-block arithmetic with per-employee monetary rounding to kopecks.
  * Unlike the legacy editor, this new path refuses to certify missing inputs. */
-export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employees:unknown[];rules:unknown[];profile:Row;revenues:Row[];gaps:Row[];venueId:number;shiftVenueSales?:unknown;shiftDepartmentSales?:unknown;previous?:unknown}) {
+export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employees:unknown[];rules:unknown[];profile:Row;revenues:Row[];gaps:Row[];venueId:number;shiftVenueSales?:unknown;shiftDepartmentSales?:unknown;previous?:unknown;priorReports?:Row[]}) {
   const employees=scopedBusinessRows(input.employees,{venueId:input.venueId}),rules=scopedBusinessRows(input.rules,{venueId:input.venueId});
   const missing:{employeeId:unknown;field:string;message:string}[]=[];
-  const divisor=workdaySalaryDivisor(input.profile,input.date,input.revenues,input.gaps),perEmployee:Record<string,number>={},perDepartment:Record<string,number>={};
+  const divisor=workdaySalaryDivisor(input.profile,input.date,input.revenues,input.gaps),perEmployee:Record<string,number>={},perDepartment:Record<string,number>={},monthlySalaryByEmployee:Record<string,number>={};
   if(!input.staffing.length)missing.push({employeeId:null,field:"team",message:"Выберите работавших сотрудников"});
   for(const staff of input.staffing){
     const employee=employees.find(e=>e.id===staff.employeeId),rule=rules.find(r=>r.id===employee?.payrollRuleId);
@@ -39,7 +39,12 @@ export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employ
       if(["monthly_salary","shift_rate","hourly_rate","per_unit","manual_bonus","manual_adjustment"].includes(String(b.type))&&amount==null){add("rule","Сумма в правиле оплаты требует проверки");continue;}
       if(["personal_sales_percent","department_sales_percent","venue_sales_percent"].includes(String(b.type))&&percent==null){add("rule","Процент в правиле оплаты требует проверки");continue;}
       switch(b.type){
-        case "monthly_salary":sum+=amount!/divisor;break;
+        case "monthly_salary": {
+          const prior=(input.priorReports??[]).filter(r=>r.venueId===input.venueId&&r.date===input.date&&r.workdayStatus==="CLOSED"&&Array.isArray(r.staffing)&&r.staffing.some(s=>record(s).employeeId===staff.employeeId));
+          if(prior.some(r=>!record(r.payrollBreakdown).monthlySalaryByEmployee)){add("rule","Нужно проверить уже начисленный оклад за этот день");break;}
+          const already=prior.reduce((n,r)=>n+Number(record(record(r.payrollBreakdown).monthlySalaryByEmployee)[String(staff.employeeId)]||0),0);
+          const allocation=Math.max(0,amount!/divisor-already);sum+=allocation;monthlySalaryByEmployee[String(staff.employeeId)]=(monthlySalaryByEmployee[String(staff.employeeId)]||0)+allocation;break;
+        }
         case "shift_rate":case "manual_bonus":case "manual_adjustment":sum+=amount!;break;
         case "hourly_rate":sum+=amount!*fact("hours",staff.hours);break;
         case "per_unit":sum+=amount!*fact("units",staff.units);break;
@@ -54,7 +59,7 @@ export function calculateWorkdayPayroll(input:{date:string;staffing:Row[];employ
     const value=Math.round((sum+Number.EPSILON)*100)/100;perEmployee[String(staff.employeeId)]=value;const department=String(employee.department||"Без отдела");perDepartment[department]=Math.round(((perDepartment[department]||0)+value)*100)/100;
   }
   if(!Number.isFinite(Object.values(perEmployee).reduce((sum,value)=>sum+value,0)))missing.push({employeeId:null,field:"calculation",message:"Сумма ФОТ требует проверки"});
-  const estimate=missing.length?undefined:{perEmployee,perDepartment,total:Math.round(Object.values(perEmployee).reduce((sum,value)=>sum+value,0)*100)/100,monthlySalaryShiftsInMonth:divisor};
+  const estimate=missing.length?undefined:{perEmployee,perDepartment,monthlySalaryByEmployee,total:Math.round(Object.values(perEmployee).reduce((sum,value)=>sum+value,0)*100)/100,monthlySalaryShiftsInMonth:divisor};
   const result=payrollForOperationalEdit({previous:input.previous,businessDate:input.date,staffing:input.staffing,shiftDepartmentSales:input.shiftDepartmentSales,shiftVenueSales:input.shiftVenueSales,estimate});
   const recorded=result.basis==="RECORDED";
   return {status:recorded||!missing.length?"COMPLETE":"INCOMPLETE",missing:recorded?[]:missing,notes:recorded&&missing.length?["Сохранённый ФОТ сохранён без пересчёта; текущие правила или исходные данные требуют проверки"]:[],payrollBreakdown:result.payrollBreakdown??null,basis:result.basis};

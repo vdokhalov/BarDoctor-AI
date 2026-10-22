@@ -50,3 +50,10 @@ test('Health uses current rule snapshot too; unavailable rules cannot reuse save
  const read=()=>((buildVenueAIContextFromSources('diagnosis',{accountProfile:{...f.profile,venueId:1},stores,financeCostProof:f.costProof,now:new Date(f.asOf)}).promptData.performanceHistory.period as any).inputContract);
  assert.equal(read().provisionalResultAfterCost,40);f.payrollEstimateSources.rules[0].blocks[0].amount=20;assert.equal(read().provisionalResultAfterCost,30);stores.delete('bd_payroll_rules');assert.equal(read().provisionalResultAfterCost,null);
 });
+test('same-date recorded and open shifts keep current month payroll separate then aggregate once',()=>{
+ const f=fixture();f.reports[0]={...f.reports[0],date:'2026-10-22',workdayStatus:'CLOSED',workdaySequence:1};f.reports[1].workdaySequence=2;
+ f.revenues[0]={...f.revenues[0],date:'2026-10-22',workdayId:'r1'} as any;f.revenues[1]={...f.revenues[1],workdayId:'r2'} as any;
+ const open=currentFinance(f);assert.equal(open.knownPayrollSubtotal,10);assert.equal(open.estimatedPayrollSubtotal,10);assert.equal(open.provisionalPayroll,20);assert.equal(open.provisionalResultAfterCost,40);
+ f.reports[1]={...f.reports[1],workdayStatus:'CLOSED',closingStatus:'closed',payrollBreakdown:{total:10}};const closed=currentFinance(f);assert.equal(closed.payroll,20);assert.equal(closed.resultAfterCost,40);
+ assert.deepEqual(currentFinance(f),closed);
+});

@@ -100,7 +100,7 @@ export function posOrderCancellationDayAllowed(c: SalesEventContext, shiftId: st
 function cancellationDayAllowed(c:SalesEventContext,shift:Record<string,unknown>,workdays:Record<string,unknown>[]){
   const days=workdays.filter(row=>row.venueId===c.venueId);
   if(shift.closingStatus==="closed")return true;
-  if(posWorkdayGate(workdays,c.venueId,String(shift.date)).ok)return true;
+  if(posWorkdayGate(workdays,c.venueId,String(shift.date),shift.workdayId).ok)return true;
   const sameDate=days.filter(row=>row.date===shift.date);
   return shift.closingStatus==="open"&&sameDate.length===1&&sameDate[0].workdayStatus==="CLOSED"&&!days.some(row=>row.workdayStatus==="OPEN");
 }
@@ -114,9 +114,9 @@ export function posOrderAccountViews(c: SalesEventContext, orders: PosOrder[], w
     if(order.status!=="OPEN")return order;
     const matches=shifts.get(order.shiftId)||[],shift=matches.length===1?matches[0]:null;
     const valid=shift&&validAccountShift(c,shift);
-    const sourceDays=shift?daysByDate.get(shift.date)||[]:[];
+    const sourceDays=shift?(daysByDate.get(shift.date)||[]).filter(day=>shift.workdayId?day.id===shift.workdayId:Number(day.workdaySequence||1)===1):[];
     const ambiguous=!valid||shift.closingStatus==="open"&&(openCash.length!==1||openDays.length>1||sourceDays.length!==1||!["OPEN","CLOSED"].includes(String(sourceDays[0].workdayStatus)));
-    const group=ambiguous?"REVIEW":shift.closingStatus==="open"&&openDays.length===1&&openDays[0].date===shift.date?"CURRENT":"PAST";
+    const group=ambiguous?"REVIEW":shift.closingStatus==="open"&&openDays.length===1&&openDays[0].id===sourceDays[0]?.id?"CURRENT":"PAST";
     let cancelCode=canCancel?null:"POS_ORDER_ACCESS_DENIED";
     if(canCancel){try{assertUnpaidOrderCancellation(c,order,index);}catch(error){cancelCode=error instanceof Error?error.message:"POS_ORDER_STORE_NEEDS_REVIEW";}}
     if(!cancelCode&&shift){if(!dayEligibility.has(order.shiftId))dayEligibility.set(order.shiftId,cancellationDayAllowed(c,shift,workdays));if(!dayEligibility.get(order.shiftId))cancelCode="POS_ORDER_WORKDAY_REQUIRED";}

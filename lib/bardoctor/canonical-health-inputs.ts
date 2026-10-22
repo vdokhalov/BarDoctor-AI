@@ -136,7 +136,7 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   if (closedWorkday) {
     const key='bd_operational_reports_v1', source=sources.find(x=>x.key===key);
     if (!source || source.state!=='AVAILABLE' || !Array.isArray(source.data) || !derivedInputBelongs(closedWorkday,scope)) return {restricted:true as const};
-    const values=source.data.map((value:unknown)=>object(value)&&(value.id===closedWorkday.id||value.date===closedWorkday.date)?closedWorkday:value);
+    const values=source.data.map((value:unknown)=>object(value)&&value.id===closedWorkday.id?closedWorkday:value);
     source.data=values; source.revision=await revision('OPERATIONAL_REPORT',key,values);
     stores.set(key,{data:values,sourceState:'AVAILABLE',updatedAt:asOf});
     financeStores.set(key,{data:values,sourceState:'AVAILABLE',updatedAt:asOf});

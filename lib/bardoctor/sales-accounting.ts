@@ -85,7 +85,7 @@ export function planManualShift(input: {setting:SalesAccounting|null;venueId:num
   if(!input.setting?.shiftChanges)fail("ACCOUNTING_SHIFT_SETUP_REQUIRED","Подтвердите режим следующей смены в настройках.");
   if([...input.revenues,...input.orders].some(x=>belongsToVenue(x,input.venueId)&&(x.closingStatus==="open"||x.status==="OPEN")))fail("ACCOUNTING_OPEN_PERIOD","Сначала закройте текущую смену и незавершённые заказы.");
   assertSalesSource(input.setting,input.revenues,input.venueId,date,"MANUAL");
-  const row:Row={id,shiftId:id,venueId:input.venueId,date,accountingMonth:date.slice(0,7),currency:input.currency,timezone:input.timezone,
+  const row:Row={id,shiftId:id,workdayId:days[0].id,venueId:input.venueId,date,accountingMonth:date.slice(0,7),currency:input.currency,timezone:input.timezone,
     shiftName:`Ручная смена ${input.revenues.filter(x=>belongsToVenue(x,input.venueId)&&x.date===date&&isSalesSession(x)).length+1} · ${date}`,accountingScope:"SHIFT",salesModeSnapshot:"MANUAL",modeOperationId:input.setting!.shiftChanges!.at(-1)!.id,
     revenueSource:MANUAL_REVENUE_SOURCE,manualTotalsVersion:2,manualRevision:0,manualRevisions:[],revenue:null,receipts:null,declaredCost:null,payments:[],
     openingOperationId:input.operationId,openedAt:input.now,openedBy:input.actorId,createdAt:input.now,updatedAt:input.now,closingStatus:"open",
@@ -153,7 +153,7 @@ export function planManualTotals(input: {
   const session=input.shiftId?input.revenues.find(x=>x.id===input.shiftId&&x.venueId===input.venueId&&x.date===input.date):undefined;
   if(input.shiftId&&(!session||!isSalesSession(session)||session.manualTotalsVersion!==2))fail("ACCOUNTING_SHIFT_NOT_FOUND","Выберите ручную смену.");
   if(!input.shiftId && input.setting?.shiftChanges)fail("ACCOUNTING_SHIFT_REQUIRED","Выберите смену. Исторические дневные итоги доступны только для просмотра.");
-  if(session && input.reports?.some(x=>belongsToVenue(x,input.venueId)&&x.date===input.date&&x.workdayStatus==="CLOSED"))fail("WORKDAY_CLOSED","Рабочий день закрыт. Итоги сохранены без изменений.");
+  if(session && input.reports?.some(x=>belongsToVenue(x,input.venueId)&&(session.workdayId?x.id===session.workdayId:x.date===input.date&&Number(x.workdaySequence||1)===1)&&x.workdayStatus==="CLOSED"))fail("WORKDAY_CLOSED","Рабочий день закрыт. Итоги сохранены без изменений.");
   if(session && input.orders?.some(x=>belongsToVenue(x,input.venueId)&&x.status==="OPEN"))fail("ACCOUNTING_OPEN_PERIOD","Сначала завершите открытые заказы.");
   assertSalesSource(input.setting, input.revenues, input.venueId, input.date, "MANUAL", input.shiftId);
   if (!session && salesModeForDate(input.setting, input.date) !== "MANUAL") fail("ACCOUNTING_MANUAL_NOT_ENABLED", "Для этого дня ручной ввод итогов не включён.");

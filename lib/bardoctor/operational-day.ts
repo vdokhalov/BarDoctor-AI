@@ -1,3 +1,4 @@
+import {aggregateShiftReports} from "./work-shifts";
 import {financialEventCount} from './financial-period-proof';
 import { resolveAccountingMoney } from "./accounting-money";
 import { eligibleRevenueRows, uniqueBusinessRows, scopedBusinessRows, finiteBusinessNumber } from "./business-day-rows";
@@ -66,7 +67,7 @@ export function operationalDay(input: OperationalDayInput) {
   const paymentFacts = posted.flatMap(row => rows(Array.isArray(row.payments) ? row.payments : [])).concat(revenues.filter(row=>[1,2].includes(Number(row.manualTotalsVersion))).flatMap(row=>rows(Array.isArray(row.payments)?row.payments:[])));
   const payments = [...new Set(paymentFacts.map(row => String(row.method)))].map(method => ({ method, amount: money(paymentFacts.filter(row => row.method === method).reduce((sum, row) => sum + (Number(row.amount) || 0), 0)) }));
   const status: RevenueStatus = open ? "PROVISIONAL" : !moneyKnown ? "UNKNOWN" : factBacked || mixedShifts && consistency==="MATCH" || source === "MANUAL_SUMMARY" || documents.length ? "FINAL" : "UNKNOWN";
-  const report = rows(input.reports).find(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate)
+  const report = aggregateShiftReports(rows(input.reports).filter(row => belongs(row) && row.venueId === input.venueId && row.date === input.businessDate))
     ?? revenues.find(row => row.revenueSource !== "sales_events_v1" && ["guided-v17", "canonical-writeoff-v272"].includes(String(row.closedVia)));
   const recorded = report?.workdayStatus !== "OPEN" && (report?.closingStatus === "closed" || report?.closedVia === "guided-v17");
   const operationStatus = recorded ? "RECORDED" : "MISSING";

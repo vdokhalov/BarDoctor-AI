@@ -108,7 +108,7 @@ async function command(request:Request):Promise<Response> {
       accountingMonth = plan.event.businessDate.slice(0,7);
       if(!plan.duplicate)assertSalesSource(parseSalesAccounting(JSON.parse(snapshots.find(s=>s.key===SALES_ACCOUNTING_KEY)?.dataJson??"null"),c.venueId),c.revenues,c.venueId,plan.event.businessDate,"POS",String(plan.event.revenueRowId));
       result = {ok:true,duplicate:plan.duplicate,event:account.role === "cashier" ? posSalesEventView(plan.event) : plan.event,previewHash:plan.previewHash};
-      if (!plan.duplicate) { const gate=posWorkdayGate(workdays,c.venueId,plan.event.businessDate); if(!gate.ok)return reply(gate,409); if(!body.command.shiftId)return reply({ok:false,code:"SALES_EVENT_SHIFT_NOT_FOUND",error:"Откройте связанную кассу рабочего дня."},409); }
+      if (!plan.duplicate) { const gate=posWorkdayGate(workdays,c.venueId,plan.event.businessDate,c.revenues.find(r=>r.id===plan.event.revenueRowId)?.workdayId); if(!gate.ok)return reply(gate,409); if(!body.command.shiftId)return reply({ok:false,code:"SALES_EVENT_SHIFT_NOT_FOUND",error:"Откройте связанную кассу рабочего дня."},409); }
       if (body.action === "preview" || plan.duplicate) return reply(result);
       if (!body.previewHash || body.previewHash !== plan.previewHash) return reply({ok:false,code:"SALES_EVENT_PREVIEW_CHANGED",error:"Цена, рецептура или условия продажи изменились. Проверьте продажу ещё раз."},409);
       updates=[[keys[0],plan.assortment],[keys[1],plan.movements],[keys[2],plan.events],[keys[3],plan.revenues]];
@@ -138,10 +138,9 @@ async function command(request:Request):Promise<Response> {
       }
       if (body.action==="open_shift") {
         const date=revenues.find(row=>row.id===body.shiftId&&row.venueId===c.venueId)?.date;
-        const gate=posWorkdayGate(workdays,c.venueId,String(date));if(!gate.ok)return reply(gate,409);
-        if(workdays.some(row=>row?.venueId===c.venueId&&row.date===date&&row.workdayStatus==="CLOSED"))return reply({ok:false,code:"WORKDAY_CLOSED",error:"Рабочий день за эту дату уже закрыт. Новую кассовую смену открыть нельзя."},409);
+        const gate=posWorkdayGate(workdays,c.venueId,String(date),null);if(!gate.ok)return reply(gate,409);
         if (body.openingFloat!==undefined) posDiscountCents(body.openingFloat);
-        revenues=revenues.map(row=>row.id===body.shiftId ? {...row,accountingScope:"SHIFT",salesModeSnapshot:"POS",shiftId:row.id,openingFloat:body.openingFloat??null}:row);
+        revenues=revenues.map(row=>row.id===body.shiftId ? {...row,workdayId:gate.workdayId,accountingScope:"SHIFT",salesModeSnapshot:"POS",shiftId:row.id,openingFloat:body.openingFloat??null}:row);
       } else {
         if (body.actualCash!==undefined) posDiscountCents(body.actualCash);
         revenues=revenues.map(row=>row.id===body.shiftId ? {...row,actualCash:body.actualCash??null}:row);

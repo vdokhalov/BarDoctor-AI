@@ -10,6 +10,7 @@ import { lifecycleRuntime } from "../tests/helpers/lifecycle-runtime";
 import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
 import { barDoctorResponse } from "../app/bar-doctor-response";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
+const sequential=process.env.BD_SEQUENTIAL_QA==='1';
 const fixedTime = "2026-10-22T12:00:00Z";
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
 const runtime = await lifecycleRuntime({ monthClose:"./app/api/month-close/route", workdays:"./app/api/workdays/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route", health: "./app/api/business-health/route", context: "./lib/bardoctor/venue-ai-context", expenses: "./app/api/expenses/route" }, { now: fixedTime });
@@ -46,7 +47,7 @@ const server = createServer((req, res) => {
 await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
 const base = "http://127.0.0.1:" + (server.address() as { port: number }).port;
 const browser=await chromium.launch({executablePath:await resolveBrowserExecutable(chromium.executablePath()),args:chromiumArgs,headless:true});
-const out='outputs/open-payroll-artifact';mkdirSync(out,{recursive:true});
+const out=sequential?'outputs/sequential-shifts-artifact':'outputs/open-payroll-artifact';mkdirSync(out,{recursive:true});
 try {
  const user=await runtime.register('artifact-owner@isolated.test'),accountId=user.userId,venueId=user.activeVenueId,n=2,now=fixedTime;
  const profile={name:'Тестовое заведение',currency:'PMR_RUB',timezone:'UTC',workingDays:[1,2,3,4,5,6,7]};
@@ -122,13 +123,25 @@ try {
    const stored=JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'__bd_closed_health_v1__:'+venueId)!.data_json));
    assert.equal(JSON.parse(stored.payload).data.businessHealth.components.find((x:any)=>x.id==='finance').score,90);
    await page.goto(base+'/home');await page.locator('.bd-home-health-zone-v332').filter({hasText:'Финансы'}).getByText('90',{exact:true}).waitFor({timeout:30000});
-   assert.equal((await command({action:'open',date:'2026-10-23',operationId:'health-open-next',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+   if(sequential){
+    await page.goto(base+'/shifts?venue='+venueId+'&workday=2026-10-22');
+    await page.getByRole('button',{name:'Открыть следующую смену',exact:true}).click();
+    const next=page.locator('[data-workday-state="NEW"]');await next.locator('[data-workday-group] summary').first().click();await next.locator('[data-workday-person] input').count();
+    await next.locator('.bd-workday-picker input[type="checkbox"]').first().check();
+    await next.getByRole('button',{name:'Открыть смену',exact:true}).click();await page.locator('[data-workday-state="OPEN"]').waitFor();
+    await page.reload();await page.locator('[data-workday-state="OPEN"]').waitFor();
+    await page.screenshot({path:out+'/sequential-open.png'});
+    const reports=JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'bd_operational_reports_v1')!.data_json));
+    const same=reports.filter((x:any)=>x.date==='2026-10-22');assert.equal(same.length,2);assert.equal(same.filter((x:any)=>x.workdayStatus==='OPEN').length,1);
+    await page.getByRole('combobox',{name:'Рабочая смена'}).selectOption('open-report');await page.locator('[data-workday-state="CLOSED"]').waitFor();await page.screenshot({path:out+'/sequential-history.png',fullPage:true});
+    await page.goto(base+'/home');
+   }else assert.equal((await command({action:'open',date:'2026-10-23',operationId:'health-open-next',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
    await page.reload();await page.locator('.bd-home-health-zone-v332').filter({hasText:'Финансы'}).getByText('90',{exact:true}).waitFor({timeout:30000});
    assert.equal(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'__bd_closed_health_v1__:'+venueId)!.data_json),JSON.stringify(stored));
    assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);
   }
   const assetPath='dist/client'+new URL(assets[0]).pathname,sha=execFileSync('git',['rev-parse','HEAD']).toString().trim();
-  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:100,receipts:2,cost:20,provisionalResult:40,rateChangeResult:30,widths:[390,820,1280],states:['profit','loss','zero','unknown'],homeText,financeText,reportText,readOnlyChecksUnchanged:true,closedHealthLifecycle:process.env.BD_CLOSED_HEALTH_QA==='1',unchanged:process.env.BD_CLOSED_HEALTH_QA!=='1'};
+  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:100,receipts:2,cost:20,provisionalResult:40,rateChangeResult:30,widths:[390,820,1280],states:['profit','loss','zero','unknown'],homeText,financeText,reportText,readOnlyChecksUnchanged:true,sequentialSameDay:sequential,closedHealthLifecycle:process.env.BD_CLOSED_HEALTH_QA==='1',unchanged:process.env.BD_CLOSED_HEALTH_QA!=='1'};
   writeFileSync(out+'/results.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify({...evidence,homeText:undefined,financeText:undefined,reportText:undefined}));
  }catch(error){writeFileSync(out+'/failure.txt',await page.locator('body').innerText());writeFileSync(out+'/responses.json',JSON.stringify(replies,null,2));throw error}finally{await context.close()}
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}

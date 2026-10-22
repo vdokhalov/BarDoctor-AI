@@ -30,6 +30,8 @@ fn('bdWarehousePage',s=>{
  return s;
 });
 fn('bdShiftsPage',s=>{
+ s=s.replaceAll('date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day','...current.workday,date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day').replaceAll('...current.workday,...current.workday,','...current.workday,');
+ s=s.replaceAll('date:current.date,_bdOperationalDay:current.day','...current.workday,date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day');
  s=replace(s,'{revenue,gapReasons,upsertDailyRevenue}=Ur(),','{revenue:bdRawShiftRevenue,operationalDays:bdShiftDays=[],gapReasons,upsertDailyRevenue}=Ur(),revenue=S.useMemo(()=>{const workdays=bdShiftDays.filter(day=>day.report?.workdayStatus);return [...bdRawShiftRevenue.filter(row=>!workdays.some(day=>day.businessDate===row.date?.slice(0,10))),...workdays.map(day=>({id:"operational-report:"+day.venueId+":"+day.businessDate,date:day.businessDate,revenue:day.revenue.amount,receipts:day.revenue.receipts,...day.report,_bdOperationalDay:day}))]},[bdRawShiftRevenue,bdShiftDays]),');
  s=replace(s,'i.jsxs("section",{className:"bd-shifts-context "+contextModel.tone','false&&i.jsxs("section",{className:"bd-shifts-context "+contextModel.tone');
  s=replace(s,'onClick:()=>setViewing(item),children:[i.jsxs("div",{className:"bd-shift-card-head"','onClick:()=>{if(item.row?.workdayStatus){window.dispatchEvent(new CustomEvent("bd:workday-select",{detail:{date:item.date}}));window.scrollTo({top:0,behavior:"smooth"})}else setViewing(item)},children:[i.jsxs("div",{className:"bd-shift-card-head"');
@@ -41,7 +43,7 @@ fn('bdShiftsPage',s=>{
  s=replace(s,'const linkedShift=params.get("shift");if(linkedShift){','const linkedShift=params.get("shift"),linkKey=params.get("venue")+":"+linkedShift;if(!linkedShift)bdConsumedShiftLink.current=null;if(linkedShift){if(bdConsumedShiftLink.current===linkKey)return;');
  s=replace(s,'if(linkedItem){setViewing(linkedItem)','if(linkedItem){bdConsumedShiftLink.current=linkKey;setViewing(linkedItem)');
  s=s.replace('if(activeOperationalDay){contextModel.title="Кассовая смена открыта";contextModel.detail="Выручка поступает из продаж · Предварительно";contextModel.actionLabel=canManage?"Заполнить операционные данные":null;}\n','');
- s=replace(s,'i.jsx(bdCashierEntry,{onNavigate:navigate}),i.jsxs("div",{className:"bd-shifts-layout"','i.jsx(bdCashierEntry,{onNavigate:navigate}),i.jsx(BdWorkdayFlow,{profile,onNavigate:navigate,onOperations:current=>{setViewing(null);setEditing({...revenue.find(row=>row.date?.slice(0,10)===current.date),date:current.date,_bdOperationalDay:current.day});setSheet("revenue")}}),i.jsxs("div",{className:"bd-shifts-layout"');
+ s=replace(s,'i.jsx(bdCashierEntry,{onNavigate:navigate}),i.jsxs("div",{className:"bd-shifts-layout"','i.jsx(bdCashierEntry,{onNavigate:navigate}),i.jsx(BdWorkdayFlow,{profile,onNavigate:navigate,onOperations:current=>{setViewing(null);setEditing({...revenue.find(row=>row.date?.slice(0,10)===current.date),...current.workday,date:current.date,workdayId:current.workday?.id,_bdOperationalDay:current.day});setSheet("revenue")}}),i.jsxs("div",{className:"bd-shifts-layout"');
  s=replace(s,'const saved=upsertDailyRevenue(values,editing?.id);','if(values?.operationalSaved){toast({variant:"success",title:"Операционные данные сохранены",description:"Команда, ФОТ, списания и происшествия сохранены."});closeSheet();return}const saved=upsertDailyRevenue(values,editing?.id);');
  s=replace(s,'setEditing(date?{date}:void 0);','setEditing(date?revenue.find(row=>row.date?.slice(0,10)===date)||{date}:void 0);');
  s=replace(s,'setEditing(todayState?.operatingDate?{date:todayState.operatingDate}:void 0);','setEditing(todayState?.operatingDate?revenue.find(row=>row.date?.slice(0,10)===todayState.operatingDate)||{date:todayState.operatingDate}:void 0);');
@@ -65,6 +67,8 @@ fn('bdShiftViewV156',s=>{
 });
 fn('bdShiftCloseApiV272',s=>replace(s,'r.assortment&&Vm','r.revenues&&Vm("bd_finance_revenue",r.revenues),r.incidents&&Vm("bd_cases",r.incidents),setTimeout(()=>["bd_finance_revenue","bd_cases"].forEach(a=>window.dispatchEvent(new CustomEvent("bd:store-updated",{detail:{storeKey:a}}))),0),r.assortment&&Vm'));
 fn('PAe',s=>{
+ s=s.replace('bdDay=(e?.date===f?e?._bdOperationalDay:null)||s.find','bdDay=s.find');
+ s=s.replace('return{date:f,revenue:Z,receipts:R,','return{date:f,workdayId:e?.workdayId,revenue:Z,receipts:R,');
  s=s.replaceAll('(bdInitialDay?.revenue?.readOnly||bdInitialDay?.report?.workdayStatus)?bdInitialDay.revenue.','bdInitialDay?.revenue?.readOnly?bdInitialDay.revenue.').replace('bdRevenueReadOnly=!!(bdDay?.revenue?.readOnly||bdDay?.report?.workdayStatus)','bdRevenueReadOnly=!!bdDay?.revenue?.readOnly').replace('||(e?.date?.slice(0,10)===f?bdInitialDay:null)','');
  s=s.replace(/const bdInitialDay=[^\n]*;\n/,'');
  s=s.replace('bdDay=s.find(row=>row.date?.slice(0,10)===f)?._bdOperationalDay,bdRevenueReadOnly=!!bdDay?.revenue?.readOnly,activeEmployees=S.useMemo','activeEmployees=S.useMemo');
@@ -88,11 +92,15 @@ fn('PAe',s=>{
  s=replace(s,'c===0&&i.jsxs("div",','c===0&&bdRevenueReadOnly&&i.jsxs("section",{"data-bd-pos-revenue":"readonly",className:"rounded-2xl border p-4",children:[i.jsx("strong",{children:bdShiftMoney(bdDay.revenue.amount)}),i.jsx("p",{children:bdOperationalRevenueCopy(bdDay)}),i.jsx("p",{children:"Выручка, чеки и оплаты поступают из проведённых продаж."})]}),c===0&&!bdRevenueReadOnly&&i.jsxs("div",');
  s=replace(s,'!e?.id&&i.jsx("button",{type:"button",onClick:addWriteoff','(!e?.id||bdRevenueReadOnly)&&i.jsx("button",{type:"button",onClick:addWriteoff');
  s=replace(s,'children:e?.id?"Редактирование смены":"Ежедневное закрытие смены"','children:bdRevenueReadOnly?"Операционные данные дня":e?.id?"Редактирование смены":"Ежедневное закрытие смены"');
+ s=s.replace('const bdInitialDay=(s.find','const bdInitialDay=e?._bdOperationalDay||(s.find').replace('bdDay=s.find(row=>row.date?.slice(0,10)===f)?._bdOperationalDay','bdDay=(e?.date===f?e?._bdOperationalDay:null)||s.find(row=>row.date?.slice(0,10)===f)?._bdOperationalDay');
+
  return s;
 });
 // Existing operations editor stays responsible for write-offs/incidents; workday
 // attendance and payroll are owned by the scoped server command above.
 fn('PAe',s=>{
+ s=s.replace('bdDay=(e?.date===f?e?._bdOperationalDay:null)||s.find','bdDay=s.find');
+ s=s.replace('return{date:f,revenue:Z,receipts:R,','return{date:f,workdayId:e?.workdayId,revenue:Z,receipts:R,');
  s=s.replace('[c,setStep]=S.useState(0)','[c,setStep]=S.useState(bdInitialDay?.report?.workdayStatus?2:0)');
  s=s.replaceAll('bdInitialDay?.revenue?.readOnly?bdInitialDay.revenue.','(bdInitialDay?.revenue?.readOnly||bdInitialDay?.report?.workdayStatus)?bdInitialDay.revenue.');
  s=s.replace('bdRevenueReadOnly=!!bdDay?.revenue?.readOnly','bdRevenueReadOnly=!!(bdDay?.revenue?.readOnly||bdDay?.report?.workdayStatus)');
@@ -105,4 +113,5 @@ fn('PAe',s=>{
  return s;
 });
 source=patchReceiptCost(source);
-parse(source,{ecmaVersion:'latest',sourceType:'module'});fs.writeFileSync(path,source);console.log('Operational Day Phase 1A applied');
+parse(source,{ecmaVersion:'latest',sourceType:'module'});
+fs.writeFileSync(path,source);console.log('Operational Day Phase 1A applied');

@@ -1,3 +1,4 @@
+import {shiftRevenues} from "./work-shifts";
 import { calculateWorkdayPayroll, workdayPayrollRequirements } from './workday-payroll';
 import { derivedInputBelongs } from './derived-input-scope';
 import { finiteBusinessNumber } from './business-day-rows';
@@ -19,8 +20,8 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const missing=[...value.missing];
  if(!value.days.length)missing.push('NO_CURRENT_ACTIVITY');
  const missingPayrollDates=value.payrollByDay.filter(x=>x.amount==null).map(x=>x.businessDate);
- const knownDays=value.payrollByDay.filter(x=>x.amount!=null);
- const knownPayrollSubtotal=knownDays.length?Math.round(knownDays.reduce((sum,x)=>sum+x.amount!,0)*100)/100:null;
+ const knownDays=value.payrollByDay.filter(x=>x.recordedAmount!=null);
+ const knownPayrollSubtotal=knownDays.length?Math.round(knownDays.reduce((sum,x)=>sum+x.recordedAmount!,0)*100)/100:null;
  const paymentRows=scopedBusinessRows(expenses,{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId}).filter(x=>activeBusinessRow(x)&&purchasePayment(x)&&String(x.date)>=startDate&&String(x.date)<=endDate);
  const paymentAmounts=paymentRows.map(x=>financeAmount(x,'amount',input.currency));
  const purchasePayments=input.expensesAvailable===false||paymentAmounts.some(x=>x==null)?null:paymentAmounts.reduce<number>((sum,x)=>sum+x!,0);
@@ -49,9 +50,14 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const rules=scopedBusinessRows(estimateSources?.rules??[],estimateScope);
  const estimatedPayrollDays=value.payrollByDay.filter(day=>day.amount==null).map(day=>{
   const reports=scopedBusinessRows(input.reports??[],estimateScope).filter(x=>x.date===day.businessDate);
-  const report=reports.length===1?reports[0]:null;
+  const openReports=reports.filter(r=>r.workdayStatus==="OPEN");
+  const report=openReports.length===1&&reports.every(r=>["OPEN","CLOSED"].includes(String(r.workdayStatus)))?openReports[0]:null;
   const draft=row(report?.workdayPayrollDraft);
-  const operation=value.days.find(x=>x.businessDate===day.businessDate);
+  const wholeDay=value.days.find(x=>x.businessDate===day.businessDate);
+  const selected=report?shiftRevenues(scopedBusinessRows(input.revenues,estimateScope),reports,report):[];
+  const amounts=selected.map(r=>financeAmount(r,'revenue',input.currency));
+  const shiftAmount=amounts.every(n=>n!=null)?Math.round(amounts.reduce<number>((sum,n)=>sum+n!,0)*100)/100:null;
+  const operation=wholeDay?{...wholeDay,revenue:{...wholeDay.revenue,amount:shiftAmount}}:undefined;
   const staffing=Array.isArray(report?.staffing)?report.staffing.map(row):[];
   const ids=staffing.map(x=>String(x.employeeId??''));
   const base=finiteBusinessNumber(report?.shiftVenueSales);
@@ -71,7 +77,7 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
    &&derivedInputBelongs(estimateSources,estimateScope)&&factsKnown;
   const estimate=valid?calculateWorkdayPayroll({date:day.businessDate,staffing,employees,rules,profile:input.profile,
    revenues:scopedBusinessRows(input.revenues,estimateScope),gaps:scopedBusinessRows(estimateSources!.gaps,estimateScope),venueId:input.venueId,
-   shiftVenueSales:operation?.revenue.amount,shiftDepartmentSales:report?.shiftDepartmentSales}):null;
+   shiftVenueSales:operation?.revenue.amount,shiftDepartmentSales:report?.shiftDepartmentSales,priorReports:reports.filter(r=>r.workdayStatus==="CLOSED")}):null;
   const amount=estimate?.status==='COMPLETE'?finiteBusinessNumber(row(estimate.payrollBreakdown).total):null;
   return {businessDate:day.businessDate,amount:amount==null?null:financeAmount({...report,amount,accountingAmount:undefined},'amount',input.currency),basis:'CURRENT_RULE_ESTIMATE' as const};
  });

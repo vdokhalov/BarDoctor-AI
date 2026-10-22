@@ -32,7 +32,7 @@ export async function GET(request: Request) {
       legacyPending: !setting?.shiftChanges ? setting?.changes.find(x=>x.effectiveDate>today)??null : null,
       shiftChanges: setting?.shiftChanges ?? [],
       activeWorkday: accountingRows(read("bd_operational_reports_v1",[])).filter(x=>x.venueId===account.venueId&&x.workdayStatus==="OPEN").map(x=>({id:x.id,date:x.date})),
-      closedDates: accountingRows(read("bd_operational_reports_v1",[])).filter(x=>x.venueId===account.venueId&&x.workdayStatus==="CLOSED").map(x=>x.date),
+      closedDates: accountingRows(read("bd_operational_reports_v1",[])).filter(x=>x.venueId===account.venueId&&x.workdayStatus==="CLOSED"&&!accountingRows(read("bd_operational_reports_v1",[])).some(r=>r.venueId===account.venueId&&r.date===x.date&&r.workdayStatus==="OPEN")).map(x=>x.date),
       canManage: account.role === "owner",
       occupiedDates: account.role === "owner" ? accountingRows(read("bd_finance_revenue",[])).filter(x => (x.venueId == null || x.venueId === account.venueId) && x.revenueSource !== "MANUAL_SUMMARY").map(x => x.date) : [],
       pendingImports: account.role === "owner" ? accountingRows(read("bd_sales_import_review_v1",[])).filter(x=>x.venueId===account.venueId&&x.status==="AWAITING_RECONCILIATION").map(x=>({id:x.id,date:x.date,totalRevenue:(x.document as Record<string,unknown>).totalRevenue,currency:(x.document as Record<string,unknown>).currency})) : [],
