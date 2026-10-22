@@ -160,3 +160,6 @@ No blocking visual issue observed in this scoped review. This is not a full appl
 
 ### Purchase summary follow-up
 Moved the complete expense breakdown (including stock shortage) into “Как рассчитано”. Purchases are a separate monthly indicator, not a component of expenses. The authoritative report flags invalid/foreign-unconverted purchase totals as unknown for this display; profit formulas are unchanged. Local canonical fixture: purchases120, revenue100, expenses60, profit40; prior September999 and future November888 purchases excluded. Compiled UI additionally checks missing purchase amount, unconverted EUR and known zero, preserving profit40 and the business snapshot. Delivery viewport390x844.
+
+### Scope correction — screenshot version6
+Compared actual saved v4 and v5 screenshots. Restored the v4 visible COGS/payroll/writeoff rows and heading; only stock adjustment stays in details. Purchases occupy the following separate row with a small divider/gap. Same totals/formulas. Real 390/820/1280 UI checks pass, including visible retained rows, hidden shortage until disclosure, monthly purchases120, profit40, unknown/zero purchases and report navigation. Seven presentation tests and emitted artifact validation passed. Screenshot Library version6, 390x1040. No publication.
