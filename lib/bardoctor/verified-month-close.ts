@@ -1,3 +1,4 @@
+import {financeDocumentScope} from './finance-documents';
 import {continueFinancialRead,financialReadExists,financialReadAccessGuard} from './financial-read-progress';
 import {periodCostProof} from './financial-period-proof';
 import { currentFinance } from "./current-finance";
@@ -125,7 +126,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
     const manifest = row(closing.inputManifest);
     const verified = manifest.version === MONTH_CLOSE_VERSION && closing.snapshotRevision === await monthCloseRevision(closing.snapshot) && closing.manifestRevision === await monthCloseRevision(manifest) && row(manifest.scope).venueId === venueId && row(manifest.scope).workspaceId === workspaceId && row(manifest.scope).dataAccountId === account.id && manifest.monthKey === monthKey;
     if (request.method === "POST") return verified && closing.previewRevision === body.previewRevision ? response({ ok: true, closing, closings, idempotent: true }) : response({ ok: false, code: "MONTH_ALREADY_CLOSED" }, 409);
-    return response({ ok: true, closing, evidenceStatus: verified ? "VERIFIED" : manifest.version === MONTH_CLOSE_VERSION ? "INVALID" : "LEGACY_PARTIAL", report: closing.snapshot });
+    return response({ ok: true, closing, evidenceStatus: verified ? "VERIFIED" : manifest.version === MONTH_CLOSE_VERSION ? "INVALID" : "LEGACY_PARTIAL", report: {...row(closing.snapshot),documentScope:verified?financeDocumentScope(row(closing.snapshot),manifest):null} });
   }
   const calculation = calculateVerifiedMonth({ profile, stores, venueId, workspaceId, dataAccountId: account.id, monthKey, asOf, costProof });
   const manifest = { version: MONTH_CLOSE_VERSION, scope: { venueId, workspaceId, dataAccountId: account.id }, monthKey, startDate: calculation.startDate, endDate: calculation.endDate, currency: calculation.currency, calculationVersion: MONTH_CLOSE_VERSION, sources: await Promise.all(snapshots.filter(value => value.key !== "bd_month_closings").map(async value => ({ key: value.key, present: value.dataJson != null, updatedAt: value.updatedAt, revision: await monthCloseRevision(value.dataJson) }))), profileRevision: await monthCloseRevision(profileRow.data_json), components: calculation.components };
@@ -146,9 +147,9 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
       expensesAvailable: optionalCollectionAvailable('bd_finance_expenses'), payrollEntriesAvailable: optionalCollectionAvailable('bd_payroll_entries') });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));
     const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf,costProof}).snapshot;
-    return response({ok:true,report:{...display,...current,inputContract:current},inputManifest:manifest,reasons:current.missing,reasonDetails:[],closureReasons:calculation.reasons,evidenceStatus:"CURRENT"});
+    return response({ok:true,report:{...display,...current,inputContract:current,documentScope:financeDocumentScope({...display,...current},manifest)},inputManifest:manifest,reasons:current.missing,reasonDetails:[],closureReasons:calculation.reasons,evidenceStatus:"CURRENT"});
   }
-  if (request.method !== "POST") return response({ ok: true, ...calculation, report: calculation.snapshot, inputManifest: manifest, previewRevision, evidenceStatus: "PREVIEW" });
+  if (request.method !== "POST") return response({ ok: true, ...calculation, report: {...calculation.snapshot,documentScope:financeDocumentScope(calculation.snapshot,manifest)}, inputManifest: manifest, previewRevision, evidenceStatus: "PREVIEW" });
   if (body.previewRevision !== previewRevision) return conflict();
   if (!calculation.eligible) return response({ ok: false, code: "MONTH_NOT_READY", reasons: calculation.reasons }, 422);
   const next = { ...closing, id: closing?.id ?? `${venueId}:${monthKey}`, venueId, monthKey, status: "closed", createdAt: closing?.createdAt ?? asOf, updatedAt: asOf, closedAt: asOf, closedBy: account.actorAccountId, snapshot: calculation.snapshot, inputManifest: manifest, previewRevision, manifestRevision: previewRevision, snapshotRevision: await monthCloseRevision(calculation.snapshot) };

@@ -9,7 +9,17 @@ const patched=anchor+'if(e?.currentFinance)return bdFinanceCurrentResultV573({re
 const from=s.indexOf(start);
 if(from>=0){const to=s.indexOf(end,from);if(to<from)throw Error('Finance current result boundary missing');s=s.slice(0,from)+s.slice(to+end.length).replace(/^\n/,'');}
 s=s.replace(patched,anchor);
+const documentLinks=[
+ ['function k(){window.bdNavigateBack(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}))}', 'function k(){const back=bdFinanceDocumentReturnUrl();if(back){window.location.assign(back);return;}window.bdNavigateBack(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}))}'],
+ ['function close(){if(dirty&&!busy&&!window.confirm("Есть несохранённые значения. Закрыть без сохранения?"))return;a()}', 'function close(){if(dirty&&!busy&&!window.confirm("Есть несохранённые значения. Закрыть без сохранения?"))return;const back=bdFinanceDocumentReturnUrl();if(back){window.location.assign(back);return;}a()}'],
+ ['i.jsx(bdAccountingHeader, { title: "Месячный отчёт"', 'report&&i.jsx(BdFinanceDocuments,{report}),i.jsx(bdAccountingHeader, { title: "Месячный отчёт"'],
+ ['value: bdMoney2(report.writeoffs)','value: i.jsx(BdFinanceDocumentAmount,{report,kind:"writeoffs",children:bdMoney2(report.writeoffs)})'],
+ ['value: report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss)','value: i.jsx(BdFinanceDocumentAmount,{report,kind:"stock",children:report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss)})'],
+ ['children: entry.amount === null ? "—" : bdMoney2(entry.amount)','children: entry.key === "inventory" && entry.amount !== null ? i.jsx(BdFinanceDocumentAmount,{report,kind:"stock",children:bdMoney2(entry.amount)}) : entry.amount === null ? "—" : bdMoney2(entry.amount)'],
+];
+for(const [original,linked] of documentLinks)s=s.replaceAll(linked,original);
 if(process.argv.includes('--restore')){
+ s=s.replace('children:[i.jsx(BdFinanceDocumentReturn,{}),bdManagementStockContextPhase4b.banner','children:[bdManagementStockContextPhase4b.banner');
  s=s.replace('function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey,currentFinance=false}){','function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey}){');
  s=s.replace('children:n.filter(row=>!currentFinance||row.key!=="close").map(r=>','children:n.map(r=>');
  s=s.replace('i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,currentFinance:monthlyReport?.currentFinance,onCloseMonth:','i.jsx(bdFinanceQuickActionsV160,{navigate,monthKey,onCloseMonth:');
@@ -20,8 +30,10 @@ if(process.argv.includes('--restore')){
  for(const name of ['bdFinanceKpisV160','bdFinanceSummaryV160'])s=s.replace(new RegExp('(function '+name+'\\(\\{report:([a-zA-Z]+)[^]*?\\)\\{)if\\(\\2\\?\\.currentFinance\\)return null;'),'$1');
  fs.writeFileSync(file,s.replace(after,before));process.exit(0);
 }
+for(const [original,linked] of documentLinks)s=s.replaceAll(original,linked);
+s=s.replace('children:[bdManagementStockContextPhase4b.banner','children:[i.jsx(BdFinanceDocumentReturn,{}),bdManagementStockContextPhase4b.banner');
 if(s.split(anchor).length!==2)throw Error('Unique Finance current result anchor required');
-s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
+s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/finance-documents.fragment.txt',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
 if(!s.includes(after)){if(s.split(before).length!==2)throw Error('Unique Home finance anchor required');s=s.replace(before,after);}
 // Current-month summary owns current uncertainty. Keep closure checks secondary.
 const currentStatus='function bdFinanceCanonicalStatusV515({verified,monthKey,venueId}){';

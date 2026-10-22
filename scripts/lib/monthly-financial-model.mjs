@@ -73,6 +73,12 @@ export function patchMonthlyFragment(input) {
   // The owned generated fragment has one canonical newline format. Comparing
   // multiline patches against a CRLF checkout must not insert their rows twice.
   let source = input.replace(/\r\n/g, "\n");
+  // Read-only drilldown wrappers do not alter the financial model's owned labels.
+  const drilldowns = [
+    ['i.jsx(BdFinanceDocumentAmount,{report,kind:"writeoffs",children:bdMoney2(report.writeoffs)})','bdMoney2(report.writeoffs)'],
+    ['i.jsx(BdFinanceDocumentAmount,{report,kind:"stock",children:report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss)})','report.inventoryLoss == null ? "Пока недоступна" : bdMoney2(report.inventoryLoss)'],
+  ].filter(([wrapped]) => source.includes(wrapped));
+  for (const [wrapped, plain] of drilldowns) source = source.replaceAll(wrapped, plain);
   const historical = 'report.costBasis === "historical_sales_snapshots"';
   const replacements = [
     ['title: "Готовность отчёта", caption: "Что мешает финальному закрытию"', 'title: "Полнота данных смен", caption: "Процент относится только к сменам. Условия закрытия месяца — ниже."', "shift coverage meaning"],
@@ -108,6 +114,7 @@ export function patchMonthlyFragment(input) {
       `children: ${historical} ? "Результат смены учитывает сохранённую себестоимость её продаж, расходы и инвентаризацию за день. Постоянные расходы распределяются по существующим правилам." : "Результат смены — управленческая оценка на основе существующего распределения месячной себестоимости и постоянных расходов."`, "shift result explanation"],
   ];
   for (const [before, after, label] of replacements) source = replaceState(source, before, after, label);
+  for (const [wrapped, plain] of drilldowns) source = source.replaceAll('value: '+plain, 'value: '+wrapped);
   return source;
 }
 
