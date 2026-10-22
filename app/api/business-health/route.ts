@@ -1,8 +1,8 @@
+import {readClosedHealth} from '../../../lib/bardoctor/closed-health';
 import {FinancialReadPending} from '../../../lib/bardoctor/financial-read-progress';
 import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateReadOnlyRequest, unauthorized } from "../../../lib/bardoctor/auth";
-import { loadCanonicalHealthInputs } from "../../../lib/bardoctor/canonical-health-inputs";
 import { withInfrastructureErrorBoundary } from "../../../lib/bardoctor/request-observability";
 
 
@@ -28,25 +28,6 @@ async function readHealth(request: Request): Promise<Response> {
 
   if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
-  const canonical = await loadCanonicalHealthInputs(account);
-  if (!canonical) return noStore(unauthorized());
-  if (canonical.restricted) return restrictedVenueContext();
-  const { context, intelligence, snapshot } = canonical;
-
-  return noStore(Response.json({
-    success: true,
-    generatedAt: snapshot.generatedAt,
-    context: {
-      venueId: account.venueId,
-      dataAccountId: account.id,
-      version: context.version,
-      sourceUpdatedAt: snapshot.dataFreshness.latestUpdatedAt,
-    },
-    data: {
-      contextVersion: context.version,
-      intelligence,
-      businessHealth: intelligence.businessHealth,
-      businessHealthSnapshot: snapshot,
-    },
-  }));
+  const saved=await readClosedHealth(account);
+  return noStore(Response.json(saved??{success:false,code:'HEALTH_NO_SNAPSHOT'}));
 }

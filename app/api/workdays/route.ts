@@ -1,3 +1,4 @@
+import {prepareClosedHealth,FinancialReadPending} from '../../../lib/bardoctor/closed-health';
 import { SALES_ACCOUNTING_KEY, parseSalesAccounting, salesModeForDate } from "../../../lib/bardoctor/sales-accounting";
 import { workdayPersonalSales, staffingWithPersonalSales } from '../../../lib/bardoctor/workday-personal-sales';
 import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
@@ -12,7 +13,7 @@ import { OPERATIONAL_REPORT_STORE_KEY, operationalDay } from "../../../lib/bardo
 import { accountingCurrencyFromRestaurantJson } from "../../../lib/bardoctor/currency";
 import { closedMonthsFromStore } from "../../../lib/bardoctor/data-trust";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
-import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
+import { readStoreSnapshots, storeCasGuard, runStoreCasBatch, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import { posMembershipGuard } from "../../../lib/bardoctor/pos-auth-guard";
 import { stableSalesValue } from "../../../lib/bardoctor/sales-events";
 import { venueDate, venueClock, venueTimeFromJson } from "../../../lib/bardoctor/venue-time";
@@ -20,13 +21,20 @@ type Row=Record<string,unknown>;
 const keys=[OPERATIONAL_REPORT_STORE_KEY,"bd_finance_revenue","bd_sales_events_v1","bd_sales_documents","bd_employees","bd_payroll_rules","bd_finance_gap_reasons","bd_inventory_writeoffs","bd_cases","bd_month_closings",SALES_ACCOUNTING_KEY];
 const reply=(data:unknown,status=200)=>Response.json(data,{status,headers:{"Cache-Control":"private, no-store"}});
 const validDate=(value:unknown):value is string=>typeof value==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
-async function load(request:Request){
+async function load(request:Request,commandDate?:string){
  const context=await authenticatedEvidenceContext(request);if(!context)return {error:unauthorized()};const account=context.account;
  if(!canReadManagementWorkday(account))return {error:reply({ok:false,code:"ACCESS_DENIED"},403)};
  const db=getD1(),snapshots=await readStoreSnapshots(db,account.id,keys),scope={venueId:account.venueId,workspaceId:context.workspaceId,dataAccountId:account.id};
  try{
   const raw=Object.fromEntries(keys.map(key=>[key,JSON.parse(snapshots.find(s=>s.key===key)?.dataJson??(key==="bd_month_closings"||key===SALES_ACCOUNTING_KEY?"null":"[]"))]));
-  raw.bd_sales_events_v1=await readSalesEvents(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson);
+  const timezone=venueTimeFromJson(account.restaurantJson).timezone,now=new Date().toISOString();
+  const requested=commandDate||new URL(request.url).searchParams.get('date');
+  const openReport=Array.isArray(raw[keys[0]])?raw[keys[0]].find((r:Row)=>r.venueId===account.venueId&&r.workdayStatus==='OPEN'):null;
+  const config=record(JSON.parse(account.restaurantJson||'{}')),clock=venueClock(now,timezone),today=venueDate(now,timezone);
+  const overnight=typeof config.openTime==='string'&&typeof config.closeTime==='string'&&config.closeTime<=config.openTime&&clock<config.closeTime;
+  const defaultDate=overnight?new Date(Date.parse(today+'T12:00:00Z')-86400000).toISOString().slice(0,10):today;
+  const eventDate=requested&&validDate(requested)?requested:String(openReport?.date||defaultDate);
+  raw.bd_sales_events_v1=await readSalesEvents(db,account.id,snapshots.find(s=>s.key==='bd_sales_events_v1')?.dataJson,{date:eventDate});
   for(const key of keys.filter(k=>k!=="bd_month_closings"&&k!==SALES_ACCOUNTING_KEY))if(!Array.isArray(raw[key])||raw[key].some((r:unknown)=>!r||typeof r!=="object"||Array.isArray(r)))throw Error("Invalid store");
   const rows=(key:string)=>scopedBusinessRows(raw[key],scope);
   const profile=record(JSON.parse(account.restaurantJson||"{}"));
@@ -54,9 +62,10 @@ export async function GET(request:Request){
 }
 export async function POST(request:Request){return withStoreCasRetries(request,command);}
 async function command(request:Request):Promise<Response>{
- const c=await load(request);if(c.error)return c.error;
- if(!hasPermission(c.account,"shifts.manage"))return reply({ok:false,code:"ACCESS_DENIED"},403);
  const parsed=await readJsonRequest<Row>(request,{maxBytes:100_000});if(!parsed.ok)return parsed.response;const body=parsed.data;
+ const c=await load(request,validDate(body.date)?body.date:undefined);if(c.error)return c.error;
+ if(!hasPermission(c.account,"shifts.manage"))return reply({ok:false,code:"ACCESS_DENIED"},403);
+
  if(body.venueId!==c.account.venueId)return reply({ok:false,code:"VENUE_CHANGED"},409);
  if(!validDate(body.date)||!["open","team","preview","close"].includes(String(body.action))||typeof body.operationId!=="string"||!body.operationId.trim()||body.operationId.length>120||!Number.isSafeInteger(body.expectedRevision)||Number(body.expectedRevision)<0)return reply({ok:false,code:"WORKDAY_COMMAND_INVALID"},422);
  const date=body.date,id=`operational-report:${c.account.venueId}:${date}`,reports=c.rows(keys[0]),previous=reports.find(r=>r.id===id||r.date===date);
@@ -96,5 +105,10 @@ async function command(request:Request):Promise<Response>{
  else delete next.payrollBreakdown;
  const updated=(c.raw[keys[0]] as Row[]).filter(r=>r!==previous&&!(r.id===id&&r.venueId===c.account.venueId));updated.push(next);
  const statements=[posMembershipGuard(c.db,c.account,c.now),c.db.prepare('INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES (?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at').bind(c.account.id,keys[0],JSON.stringify(updated),c.now),c.db.prepare('INSERT INTO audit_log(account_id,store_key,action,entity_id,entity_label,month_key,before_json,after_json,changed_fields_json,actor_name,actor_role,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(c.account.id,keys[0],"workday."+body.action,id,"Рабочая смена "+date,date.slice(0,7),JSON.stringify(previous||null),JSON.stringify(next),'["workdayStatus","staffing","payrollBreakdown"]',actor.name,actor.role,"Подтверждённая операция рабочей смены",c.now)];
- await runStoreCasBatch(c.db,c.account.id,c.snapshots,statements,c.now);return reply({ok:true,workday:next,payroll},201);
+ let health:Awaited<ReturnType<typeof prepareClosedHealth>>=null;
+ if(body.action==='close')try{health=await prepareClosedHealth(c.account,next,c.snapshots,c.now);}catch(error){if(error instanceof FinancialReadPending)return reply({ok:true,pending:true,code:'HEALTH_CLOSE_PENDING'},202);throw error;}
+ const snapshots=[...c.snapshots,...(health?.snapshots??[]).filter(x=>!c.snapshots.some(y=>y.key===x.key))];
+ if(health)statements.push(...health.statements);
+ const guards=[];for(let offset=0;offset<snapshots.length;offset+=16)guards.push(storeCasGuard(c.db,c.account.id,snapshots.slice(offset,offset+16),c.now));
+ await runStoreCasBatch(c.db,c.account.id,[],[...guards,...statements],c.now);return reply({ok:true,workday:next,payroll},201);
 }

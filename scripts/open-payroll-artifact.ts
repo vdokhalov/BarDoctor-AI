@@ -15,6 +15,7 @@ const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
 const runtime = await lifecycleRuntime({ monthClose:"./app/api/month-close/route", workdays:"./app/api/workdays/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route", health: "./app/api/business-health/route", context: "./lib/bardoctor/venue-ai-context", expenses: "./app/api/expenses/route" }, { now: fixedTime });
 const replies:any[]=[];const failures:any[]=[];const excludedRoutes=['/api/management/cost-signals','/api/opportunities','/api/competitors/me','/api/reviews/home'];
 const pendingHandlers = new Set<Promise<void>>();
+let simulatedClosePreparation=process.env.BD_CLOSED_HEALTH_QA==='1';const closeOperationIds:string[]=[];
 async function handleRequest(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url || "/", "http://localhost"), chunks = [];
@@ -23,6 +24,7 @@ async function handleRequest(req: IncomingMessage, res: ServerResponse) {
     const routes: Record<string, string> = { "/api/month-close":"monthClose", "/api/workdays":"workdays", "/api/sales-events": "sales", "/api/operational-days": "days", "/api/shifts/close": "close", "/api/auth/bootstrap": "bootstrap", "/api/users/me": "usersMe", "/api/restaurants/me": "restaurantMe", "/api/venues": "venues", "/api/store": "store", "/api/assortment/overview": "overview", "/api/write-offs": "writeOffs", "/api/business-health": "health", "/api/expenses": "expenses" };
     const name = key ? "storeKey" : routes[url.pathname];
     let response: Response;
+    if(name==='workdays'&&req.method==='POST'&&body.length){const command=JSON.parse(body.toString());if(command.action==='close'){closeOperationIds.push(command.operationId);if(simulatedClosePreparation){simulatedClosePreparation=false;res.writeHead(202,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:true,pending:true,code:'HEALTH_CLOSE_PENDING'}));return;}}}
     if(excludedRoutes.includes(url.pathname)){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({ok:false,success:false,code:'LOCAL_SCOPE_EXCLUDED'}));return;}
     if (name && apiDelay) await new Promise(done => setTimeout(done, apiDelay));
     if (name) response = await runtime.api[name][req.method || "GET"](new Request(url, { method: req.method, headers: req.headers as HeadersInit, ...(body.length ? { body } : {}) }), { params: Promise.resolve({ key }) } as never);
@@ -104,8 +106,23 @@ try {
   for(const purchase of [{total:null,currency:'PMR_RUB',label:'Неизвестно'},{total:120,currency:'EUR',label:'Неизвестно'},{total:0,currency:'PMR_RUB',label:'0,00'}]){
    runtime.sqlite.prepare('UPDATE domain_data SET data_json=? WHERE account_id=? AND store_key=?').run(JSON.stringify([{...stores.bd_purchase_documents[0],...purchase}]),accountId,'bd_purchase_documents');const beforeRead=business();await page.goto(base+'/finance');const value=page.locator('[data-bd-current-purchases]');await value.getByText(purchase.label,{exact:true}).waitFor({timeout:30000});assert.equal(replies.filter(x=>x.status===200&&x.data.report).at(-1).data.report.provisionalResultAfterCost,40);assert.equal(business(),beforeRead);
   }
+  if(process.env.BD_CLOSED_HEALTH_QA==='1'){
+   const cashReply=await runtime.api.sales.POST(runtime.request(user,'/api/sales-events','POST',{venueId,action:'close_shift',shiftId:'open',actualCash:0}));assert.equal(cashReply.status,201,JSON.stringify(await cashReply.clone().json()));
+   const command=async(body:object)=>runtime.api.workdays.POST(runtime.request(user,'/api/workdays','POST',{venueId,date:'2026-10-22',...body}));
+   assert.equal((await command({action:'team',operationId:'health-team',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+   await page.goto(base+'/shifts?venue='+venueId+'&workday=2026-10-22');const flow=page.locator('[data-workday-state="OPEN"]');await flow.waitFor({timeout:30000});await flow.getByRole('button',{name:'Перейти к закрытию',exact:true}).click();
+   for(const label of ['Списания · не было','Происшествия · не было','Команда и расчёт ФОТ · проверены'])await flow.getByRole('checkbox',{name:label,exact:true}).check();
+   await flow.getByRole('button',{name:'Закрыть смену',exact:true}).click();await page.locator('[data-workday-state="CLOSED"]').waitFor({timeout:30000});assert.equal(closeOperationIds.length,2);assert.equal(closeOperationIds[0],closeOperationIds[1]);
+   const stored=JSON.parse(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'__bd_closed_health_v1__:'+venueId)!.data_json));
+   assert.equal(JSON.parse(stored.payload).data.businessHealth.components.find((x:any)=>x.id==='finance').score,90);
+   await page.goto(base+'/home');await page.locator('.bd-home-health-zone-v332').filter({hasText:'Финансы'}).getByText('90',{exact:true}).waitFor({timeout:30000});
+   assert.equal((await command({action:'open',date:'2026-10-23',operationId:'health-open-next',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+   await page.reload();await page.locator('.bd-home-health-zone-v332').filter({hasText:'Финансы'}).getByText('90',{exact:true}).waitFor({timeout:30000});
+   assert.equal(String(runtime.sqlite.prepare('SELECT data_json FROM domain_data WHERE account_id=? AND store_key=?').get(accountId,'__bd_closed_health_v1__:'+venueId)!.data_json),JSON.stringify(stored));
+   assert.deepEqual(errors,[]);assert.deepEqual(consoleErrors,[]);
+  }
   const assetPath='dist/client'+new URL(assets[0]).pathname,sha=execFileSync('git',['rev-parse','HEAD']).toString().trim();
-  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:100,receipts:2,cost:20,provisionalResult:40,rateChangeResult:30,widths:[390,820,1280],states:['profit','loss','zero','unknown'],homeText,financeText,reportText,unchanged:true};
+  const evidence={status:'PASS',sourceSHA:sha,asset:assetPath,assetSHA256:createHash('sha256').update(readFileSync(assetPath)).digest('hex'),errors,consoleErrors,failures,excludedRoutes,continuationResponses:pending.length,completeResponses:complete.length,revenue:100,receipts:2,cost:20,provisionalResult:40,rateChangeResult:30,widths:[390,820,1280],states:['profit','loss','zero','unknown'],homeText,financeText,reportText,readOnlyChecksUnchanged:true,closedHealthLifecycle:process.env.BD_CLOSED_HEALTH_QA==='1',unchanged:process.env.BD_CLOSED_HEALTH_QA!=='1'};
   writeFileSync(out+'/results.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify({...evidence,homeText:undefined,financeText:undefined,reportText:undefined}));
  }catch(error){writeFileSync(out+'/failure.txt',await page.locator('body').innerText());writeFileSync(out+'/responses.json',JSON.stringify(replies,null,2));throw error}finally{await context.close()}
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}

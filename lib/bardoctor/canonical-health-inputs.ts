@@ -32,9 +32,9 @@ export const HEALTH_INPUT_KEYS = [...new Set([...Object.values(VENUE_CONTEXT_SOU
 
 /** One SELECT snapshot of existing sources, profile and live scope/permissions.
  * No body inputs, new persistence, history reconstruction or source mutation. */
-export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, asOf = new Date().toISOString()) {
+export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, asOf = new Date().toISOString(), closedWorkday?: Row) {
   const database = getD1();
-  const keys = HEALTH_INPUT_KEYS.filter(key => canReadVenueSource(account, key));
+  const keys = closedWorkday ? HEALTH_INPUT_KEYS : HEALTH_INPUT_KEYS.filter(key => canReadVenueSource(account, key));
   const costPrefix = `${COST_EPISODE_PREFIX}${account.venueId}:`;
   const rows = await database.prepare(`SELECT store_key, CASE WHEN length(data_json)>? THEN NULL ELSE data_json END data_json,updated_at FROM domain_data WHERE account_id=? AND store_key IN (${keys.map(() => "?").join(",") || "NULL"})
     UNION ALL SELECT store_key,data_json,updated_at FROM (SELECT store_key,CASE WHEN length(data_json)>65536 THEN NULL ELSE data_json END data_json,updated_at FROM domain_data WHERE account_id=? AND store_key>=? AND store_key<? AND CASE WHEN json_valid(data_json) THEN json_extract(data_json,'$.condition')='ACTIVE' ELSE 0 END ORDER BY store_key LIMIT 26)
@@ -47,7 +47,11 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   const boundary = JSON.parse(boundaryRow.data_json) as Row;
   if (!Number.isSafeInteger(boundary.workspaceId) || !isAccessRole(boundary.role)) return null;
   const currentAccount = { ...account, ...permissionPayload(boundary.role, typeof boundary.permissions === "string" ? boundary.permissions : null) };
-  if (!hasPermission(currentAccount, "analysis.run") || !canReadDiagnosisSources(currentAccount)) return { restricted: true as const };
+  if (closedWorkday ? !hasPermission(currentAccount,'shifts.manage')||!hasPermission(currentAccount,'team.view') : !hasPermission(currentAccount, "analysis.run") || !canReadDiagnosisSources(currentAccount)) return { restricted: true as const };
+  // Internal derived calculation only: a permitted close may maintain the
+  // owner's snapshot. No expanded sources or analysis permission are returned
+  // to the closing actor; final persistence rechecks actual membership.
+  const sourceAccess=closedWorkday?{...currentAccount,...permissionPayload('owner',null)}:currentAccount;
   const scope = { venueId: account.venueId, workspaceId: Number(boundary.workspaceId), dataAccountId: account.id };
   let profile: Row = {};
   try { const raw: unknown = JSON.parse(profileRow.data_json ?? "{}"); if (object(raw)) profile = raw; } catch { /* unknown profile */ }
@@ -58,7 +62,7 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
   for (const key of HEALTH_INPUT_KEYS) {
     const snapshot = snapshots.find(row => row.key === key), present = rows.results.some(row => row.store_key === key);
     const source: HealthSource = { key, state: "UNAVAILABLE", revision: null, updatedAt: snapshot?.updatedAt ?? null, data: null };
-    if (!canReadVenueSource(currentAccount, key)) { source.state = "RESTRICTED"; source.updatedAt = null; sources.push(source); continue; }
+    if (!canReadVenueSource(sourceAccess, key)) { source.state = "RESTRICTED"; source.updatedAt = null; sources.push(source); continue; }
     source.revision = await revision("OPERATIONAL_REPORT", key, { present, dataJson: snapshot?.dataJson ?? null, updatedAt: source.updatedAt });
     if (snapshot?.dataJson != null) {
       try {
@@ -127,8 +131,18 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
     for(const key of ['bd_sales_events_v1','bd_stock_movements'])financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:stores.get(key)?.updatedAt??''});
    }
   }
+  // Server-only projection used before atomic workday close. Persisted source
+  // snapshots remain unchanged and are CAS-checked together with the close.
+  if (closedWorkday) {
+    const key='bd_operational_reports_v1', source=sources.find(x=>x.key===key);
+    if (!source || source.state!=='AVAILABLE' || !Array.isArray(source.data) || !derivedInputBelongs(closedWorkday,scope)) return {restricted:true as const};
+    const values=source.data.map((value:unknown)=>object(value)&&(value.id===closedWorkday.id||value.date===closedWorkday.date)?closedWorkday:value);
+    source.data=values; source.revision=await revision('OPERATIONAL_REPORT',key,values);
+    stores.set(key,{data:values,sourceState:'AVAILABLE',updatedAt:asOf});
+    financeStores.set(key,{data:values,sourceState:'AVAILABLE',updatedAt:asOf});
+  }
   const ingredientMemo = createIngredientReconciliationMemo();
-  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { financeCostProof, financeStores, ingredientMemo, access: currentAccount, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
+  const context = await observedAwait("health.context", () => buildVenueAIContextFromSources("diagnosis", { financeCostProof, financeStores, ingredientMemo, access: sourceAccess, workspaceId: scope.workspaceId, accountProfile: profile, accountUpdatedAt: profileRow.updated_at, stores, now: new Date(asOf) }));
   await observedAwait("health.evidence", () => bindCanonicalContext(context, scope, stores));
   const operations = await observedAwait("health.operations", () => buildHealthOperationsInputs({ sources, ...scope, profile, asOf, currency: context.accountingCurrency }));
   const inputManifest = { contractVersion: 1 as const, scope, financePeriod: {...financePeriod,sources:[...financeStores].map(([key,value])=>({key,state:value.sourceState,revision:sources.find(source=>source.key===key)?.revision,updatedAt:value.updatedAt}))}, sources: sources.map(source => ({ key: source.key, state: source.state, revision: source.revision, updatedAt: source.updatedAt })), profileRevision: await revision("OPERATIONAL_REPORT", "__profile__", profileRow.data_json) };

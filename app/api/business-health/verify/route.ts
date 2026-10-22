@@ -1,3 +1,4 @@
+import {readClosedHealth} from '../../../../lib/bardoctor/closed-health';
 import { authenticateReadOnlyRequest, unauthorized } from "../../../../lib/bardoctor/auth";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
 import { loadCanonicalHealthInputs } from "../../../../lib/bardoctor/canonical-health-inputs";
@@ -33,5 +34,5 @@ export async function GET(request: Request): Promise<Response> {
     resolutionAuthority:"CANONICAL_SERVER_REREAD",causalClaim:"NONE",target:result==='ACTIVE'&&canAct?current?.target ?? null:null,
     context:kind==='day'&&fact&&'businessDate' in fact?{businessDate:fact.businessDate}:kind==='stock'&&fact&&'productKey' in fact?{productKey:fact.productKey,warehouseKey:fact.warehouseKey,unit:fact.unit}:null,
     message:result==='CONDITION_CLEARED'?"Проверено по текущим источникам: исходное условие проблемы устранено.":result==='ACTIVE'?"Проблема ещё существует. Открытие экрана или сохранение без изменения условия её не закрывает.":result==='NOT_APPLICABLE'?"Исходный объект больше не доступен для этой проверки. Исправление не подтверждено.":"Источников недостаточно для подтверждения исправления. Повторите проверку."},
-    data:{businessHealthSnapshot:canonical.snapshot,intelligence:canonical.intelligence}});
+    data:(await readClosedHealth(account))?.data??{}});
 }
