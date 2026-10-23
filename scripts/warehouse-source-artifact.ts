@@ -86,6 +86,18 @@ try {
   const original=base+'/warehouse?venue='+venueId+'&tab=movements&q='+encodeURIComponent('Молоко');
   await page.goto(original);
   await page.getByRole('button',{name:'Закупка',exact:true}).waitFor({timeout:30000});
+  for(const width of [390,820,1280]){
+   await page.setViewportSize({width,height:844});
+   const filters=page.locator('.bd-warehouse-movement-filters-v275');
+   await filters.scrollIntoViewIfNeeded();
+   const layout=await filters.evaluate(el=>({display:getComputedStyle(el).display,gap:getComputedStyle(el).gap,buttons:Array.from(el.querySelectorAll('button')).map(b=>{const r=b.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,text:b.textContent,whiteSpace:getComputedStyle(b).whiteSpace}}),overflow:document.documentElement.scrollWidth>innerWidth}));
+   assert.equal(layout.display,'flex');assert.equal(layout.gap,'8px');assert.equal(layout.overflow,false,JSON.stringify(layout));
+   for(let i=0;i<layout.buttons.length;i++){const a=layout.buttons[i];assert(a.x>=0&&a.right<=width);for(const b of layout.buttons.slice(i+1)){if(Math.abs(a.y-b.y)<2)assert(b.x-a.right>=7);else assert(b.y-a.bottom>=7);}}
+   assert.notEqual(await page.getByRole('button',{name:'Обновить движения',exact:true}).evaluate(el=>getComputedStyle(el).borderStyle),'none');
+   await page.waitForTimeout(250);
+   await page.screenshot({path:out+'/controls-'+width+'.png',fullPage:false});
+  }
+  await page.setViewportSize({width:390,height:844});
   await page.locator('.bd-warehouse-movement-list article').first().evaluate(el=>el.scrollIntoView({block:'start'}));
   await page.screenshot({path:out+'/mobile-movements.png',fullPage:false});
   await page.getByRole('button',{name:'Закупка',exact:true}).click();
