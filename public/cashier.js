@@ -4,7 +4,7 @@
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
-  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:new URLSearchParams(location.search).get("view")==="orders"?"orders":"cashier",unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:["orders","receipts"].includes(new URLSearchParams(location.search).get("view"))?new URLSearchParams(location.search).get("view"):"cashier",historyMode:new URLSearchParams(location.search).get("history")==="cancelled"?"cancelled":"paid",historyLimit:20,unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,dialogDraft=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
   const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_pos_identity"),localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
@@ -284,7 +284,20 @@
   }
   const paymentLabel=e=>(e.payments||[]).map(p=>({CASH:"Наличные",CARD_EXTERNAL:"Карта · внешний терминал"})[p.method]||"Не указан").join(", ")||"Не указан";
   function receiptRows(events){return events.map(e=>`<button class="receipt-row" data-receipt="${esc(e.id)}"><span><strong>${esc(time(e.acceptedAt))} · ${e.tableNumber?"Стол "+esc(e.tableNumber):"Быстрая продажа"}</strong><small>${esc(e.orderActor?.name||e.actor?.name||"Автор неизвестен")} · ${esc(paymentLabel(e))}</small></span><strong>${esc(money(e.revenue))} ${icon("chevron-right")}</strong></button>`).join("");}
-  function renderReceipts(){ $("receipts-view").innerHTML=`<h2>Оплаченные чеки</h2><p class="muted">${senior()?"Последние чеки заведения":"Только созданные или оплаченные вами чеки"} · до 100 последних записей</p><section class="panel">${receiptRows(state.data.events.filter(e=>e.status==="POSTED"))||'<p class="empty">Оплаченных чеков пока нет.</p>'}</section>`; }
+  function cancelledOrders(){return state.orders.filter(o=>o.venueId===state.data.venueId&&o.status==="CANCELLED"&&!o.salesEventId&&!o.paidAt).sort((a,b)=>(Date.parse(b.cancelledAt)||0)-(Date.parse(a.cancelledAt)||0)||a.id.localeCompare(b.id));}
+  function cancellationFact(order){const ops=(order.operations||[]).filter(op=>op.action==="cancel_order");return ops.length===1?ops[0]:null;}
+  function cancellationDate(order){return Number.isFinite(Date.parse(order.cancelledAt))?date(order.cancelledAt):"Время не сохранено";}
+  function renderReceipts(){
+    const cancelled=state.historyMode==="cancelled",orders=cancelledOrders();
+    const picker=`<label class="history-picker"><select id="receipt-history" aria-label="История кассы"><option value="paid" ${cancelled?"":"selected"}>Оплаченные чеки</option><option value="cancelled" ${cancelled?"selected":""}>Отменённые заказы</option></select></label>`;
+    if(!cancelled){$("receipts-view").innerHTML=`<h2>История</h2>${picker}<p class="muted">${senior()?"Последние чеки заведения":"Только созданные или оплаченные вами чеки"} · до 100 последних записей</p><section class="panel">${receiptRows(state.data.events.filter(e=>e.status==="POSTED"))||'<p class="empty">Оплаченных чеков пока нет.</p>'}</section>`;return;}
+    $("receipts-view").innerHTML=`<h2>История</h2>${picker}<section class="panel">${orders.slice(0,state.historyLimit).map(o=>{const fact=cancellationFact(o);return `<button class="receipt-row cancelled-order-row" data-cancelled-order="${esc(o.id)}"><span><strong>Стол ${esc(o.tableNumber)} · ${esc(cancellationDate(o))}</strong><small>${esc(fact?.details?.reason||"Причина не сохранена")}</small></span><strong>${esc(money(pricing(o),accountCurrency(o)))} ${icon("chevron-right")}</strong></button>`;}).join("")||'<p class="empty">Отменённых заказов пока нет.</p>'}</section>${orders.length>state.historyLimit?'<button data-action="more-cancelled">Показать ещё</button>':""}`;
+  }
+  function showCancelledOrder(id){
+    const order=cancelledOrders().find(o=>o.id===id);if(!order)return;
+    const fact=cancellationFact(order),currency=accountCurrency(order);
+    dialog("Отменённый заказ",`<p class="muted">Стол ${esc(order.tableNumber)} · ${esc(cancellationDate(order))}</p>${order.lines.map(line=>`<div class="cash-row"><span>${esc(line.name)} × ${line.quantity}</span><strong>${esc(money(line.total,line.currency))}</strong></div>`).join("")||'<p>Состав не сохранён.</p>'}<p class="total">Сумма заказа <strong>${esc(money(pricing(order),currency))}</strong></p><h3>Причина отмены</h3><p class="cancel-reason">${esc(fact?.details?.reason||"Причина не сохранена")}</p><p class="muted">Отменил: ${esc(fact?.actor?.name||"Сотрудник не указан")}</p><details><summary>Номер заказа</summary><p class="long-id">${esc(order.id)}</p></details>`,null);
+  }
   function metrics(s,detail=false){return `<div class="metrics ${detail?"detail-metrics":""}"><div class="metric"><small>Открытых столов</small><strong>${s.openTableCount}</strong>${detail?`<p>${esc(money(s.openNetAmount))} не оплачено</p>`:""}</div><div class="metric"><small>${detail?"Оплаченных чеков":"Неоплаченные счета"}</small><strong>${detail?s.paidCheckCount:esc(amount(s.openNetAmount))}</strong>${detail?`<p>${esc(money(s.paidNetAmount))}</p>`:`<p>${esc(currency())}</p>`}</div><div class="metric"><small>Оплаченных чеков</small><strong>${s.paidCheckCount}</strong></div><div class="metric"><small>Оплачено</small><strong>${esc(amount(s.paidNetAmount))}</strong><p>${esc(currency())}</p></div></div>`;}
   function freshness(){return `<p class="fresh ${state.stale?"stale":""}">${state.stale?"Данные устарели · ":""}Обновлено ${state.lastSuccess?esc(time(new Date(state.lastSuccess))):"—"} · каждые 15 сек.</p>`;}
   function renderOverview(){
@@ -484,6 +497,8 @@
       }else{state.quick.lines=state.quick.lines.filter(l=>l.id!==button.dataset.cancelLine);saveLocal();render();}}
       else if(button.dataset.waiter!==undefined){state.waiter=button.dataset.waiter;state.detailTab="tables";render();window.scrollTo({top:0,behavior:"instant"});}
       else if(button.dataset.detail){state.detailTab=button.dataset.detail;render();}
+      else if(button.dataset.cancelledOrder)showCancelledOrder(button.dataset.cancelledOrder);
+      else if(button.dataset.action==="more-cancelled"){state.historyLimit+=20;renderReceipts();}
       else if(button.dataset.receipt)showReceipt(button.dataset.receipt);
       else if(button.dataset.rule)showRule(button.dataset.rule);
       else if(button.dataset.action)await handleAction(button.dataset.action);
@@ -494,6 +509,7 @@
     if(event.target.id==="quick-comment"){state.quick.comment=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
   });
   document.addEventListener("change",event=>{
+    if(event.target.id==="receipt-history"){state.historyMode=event.target.value==="cancelled"?"cancelled":"paid";state.historyLimit=20;const url=new URL(location.href);url.searchParams.set("view","receipts");url.searchParams.set("history",state.historyMode);history.replaceState(null,"",url);renderReceipts();}
     if(event.target.id==="shift-picker")void working(async()=>{if(state.pending||state.legacy)throw Error("Сначала проверьте сохранённую операцию.");saveLocal();localStorage.setItem(shiftSelectionKey(),event.target.value);syncQuickShift();saveLocal();render();});
     if(event.target.name==="method"&&!selectedOrder()){state.quick.method=event.target.value;try{saveLocal();}catch(error){errorView(error);}}
     if(event.target.id==="menu-department"){state.department=event.target.value;state.category="all";state.subcategory="all";renderCashier();}
