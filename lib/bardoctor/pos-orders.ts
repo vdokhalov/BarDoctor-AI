@@ -323,6 +323,7 @@ export async function planPosOrder(c: PosOrderContext, existing: PosOrder[], com
       if(!sent.has(target.id)&&command.stockDecision==="WRITE_OFF")fail("STOCK_SNAPSHOT_REQUIRED");
       const removed = command.quantity ?? target.quantity;
       if(sent.has(target.id)){
+        details.cancelledLine = { ...target, quantity: removed, total: target.pricingUnavailable ? null : Math.round(target.unitPrice * removed * 100) / 100 };
         assertUnpaidOrderCancellation(c,order);
         const ticket=cancellationTicket(order,target.id,removed,command.operationId,String(details.reason),c.now,c.actor);
         ticket.stockDecision=command.stockDecision;
