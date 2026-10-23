@@ -86,6 +86,8 @@ try {
   const original=base+'/warehouse?venue='+venueId+'&tab=movements&q='+encodeURIComponent('Молоко');
   await page.goto(original);
   await page.getByRole('button',{name:'Закупка',exact:true}).waitFor({timeout:30000});
+  await page.getByRole('heading',{name:'Движение товара',exact:true}).waitFor();
+  assert.equal(await page.getByText('Каждый приход, расход и корректировка с источником',{exact:true}).count(),0);
   for(const width of [390,820,1280]){
    await page.setViewportSize({width,height:844});
    const filters=page.locator('.bd-warehouse-movement-filters-v275');

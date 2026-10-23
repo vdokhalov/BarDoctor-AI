@@ -5,6 +5,7 @@ const file='public/assets/index-BQGspy0I.js',start='/* warehouse-document:start 
 let source=readFileSync(file,'utf8');const at=source.indexOf(start);if(at>=0){const to=source.indexOf(end,at);if(to<0)throw Error('Incomplete warehouse document module');source=source.slice(0,at)+source.slice(to+end.length).replace(/^\n/,'');}
 const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id?.name==='bdWarehousePage');if(!node)throw Error('Warehouse page missing');let page=source.slice(node.start,node.end);
 const patches=[
+ ['i.jsx("h3",{children:"Движения товара"}),i.jsx("p",{children:"Каждый приход, расход и корректировка с источником"})','i.jsx("h3",{children:"Движение товара"})'],
  ['[bdWarehouseMovementFilterV275Value,bdSetWarehouseMovementFilterV275]=S.useState("all")','[bdWarehouseMovementFilterV275Value,bdSetWarehouseMovementFilterV275]=S.useState(()=>window.bdReadNavigationQuery("movementFilter","all"))'],
  ['function L(){const B=bdWarehouseRecord', 'S.useEffect(()=>{const params=new URLSearchParams(o);bdSetWarehouseMovementFilterV275(params.get("movementFilter")||"all")},[o]);function L(){const B=bdWarehouseRecord'],
  ['onClick:()=>bdSetWarehouseMovementFilterV275(B[0])','onClick:()=>{bdSetWarehouseMovementFilterV275(B[0]);window.bdSyncNavigationQuery({movementFilter:B[0]==="all"?null:B[0]})}'],
