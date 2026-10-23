@@ -4044,3 +4044,20 @@ main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-nomenclature-l
 [data-warehouse-document-status] button + button { margin-left: 8px; }
 
 .bd-warehouse-movement-filters-v275 select { min-height: 40px; width: 220px; padding-right: 28px; border-radius: 12px; cursor: pointer; }
+
+/* Source actions must not consume the product-name column on small screens. */
+@media (max-width: 640px) {
+  .bd-warehouse-movement-list article,
+  .bd-warehouse-movement-list article:has(.bd-writeoff-movement-link-v271) {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: start;
+  }
+  .bd-warehouse-movement-list article > .bd-warehouse-movement-icon { grid-column: 1; grid-row: 1; }
+  .bd-warehouse-movement-list article > div:first-of-type { grid-column: 2; grid-row: 1; }
+  .bd-warehouse-movement-list article > div:nth-of-type(2) { grid-column: 2; grid-row: 2; text-align: left; }
+  .bd-warehouse-movement-list article > div:nth-of-type(2) b,
+  .bd-warehouse-movement-list article > div:nth-of-type(2) small { display: block; }
+  .bd-warehouse-movement-list article > span:has(.bd-writeoff-movement-link-v271),
+  .bd-warehouse-movement-list article > .bd-writeoff-movement-link-v271 { grid-column: 2; grid-row: 3; justify-self: start; }
+  .bd-warehouse-movement-list strong { overflow-wrap: break-word; word-break: normal; }
+}

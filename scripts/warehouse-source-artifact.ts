@@ -70,7 +70,7 @@ try {
  runtime.sqlite.exec('COMMIT');if(n>10000)assert(Buffer.byteLength(JSON.stringify(events))>2_000_000);
  const adjustment={productName:'Молоко',amount:-1,unit:'l',date,id:'shortage',sourceDocumentId:'count-doc',venueId,productKey:'product',type:'inventory_adjustment',businessDate:date,costAmount:-10,currency:'PMR_RUB',costStatus:'KNOWN_VALUE'};insertMovement.run(accountId,-100,adjustment.id,'product',adjustment.type,date,null,JSON.stringify(adjustment));
  const receipt={id:'receipt',venueId,productKey:'product',productName:'Молоко',type:'receipt',date,businessDate:date,amount:12,unit:'l',costAmount:120,currency:'PMR_RUB',sourceDocumentId:'purchase'};insertMovement.run(accountId,-101,receipt.id,'product',receipt.type,date,null,JSON.stringify(receipt));
- const legacy={...receipt,id:'legacy-production',date:'2026-09-01',businessDate:'2026-09-01',type:'production',amount:0,costAmount:0,sourceDocumentId:null};insertMovement.run(accountId,-102,legacy.id,'product',legacy.type,date,null,JSON.stringify(legacy));
+ const legacy={...receipt,id:'legacy-production',productName:'Молоко пастеризованное для приготовления напитков и блюд',date:'2026-09-01',businessDate:'2026-09-01',type:'production',amount:0,costAmount:0,sourceDocumentId:null};insertMovement.run(accountId,-102,legacy.id,'product',legacy.type,date,null,JSON.stringify(legacy));
  const stores={bd_purchase_documents:[{id:'purchase',documentNumber:'TEST-001',supplierName:'Тестовый поставщик',items:[{id:'line',name:'Молоко',quantity:12,unit:'l',price:10,total:120}],venueId,date,status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:120},{id:'old-purchase',venueId,date:'2026-09-30',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:999},{id:'future-purchase',venueId,date:'2026-11-01',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:888}],bd_finance_revenue:[{id:'shift',venueId,date,revenueSource:'sales_events_v1',revenue:n*50,receipts:n,currency:'PMR_RUB',closingStatus:'closed'}],bd_operational_reports_v1:[{id:'report',venueId,date,closingStatus:'closed',payrollBreakdown:{total:10}}],bd_finance_expenses:[{id:'writeoff',venueId,date,category:'writeoff',amount:6,currency:'PMR_RUB',sourceDocumentId:'writeoff-doc',source:'write_off_document'},{id:'writeoff2',venueId,date,category:'writeoff',amount:4,currency:'PMR_RUB'}],bd_employees:[{id:"e",venueId,name:"Сотрудник",payrollRuleId:"rule"}],bd_payroll_rules:[{id:"rule",venueId,blocks:[{enabled:true,type:"shift_rate",amount:10}]}],bd_payroll_entries:[],bd_sales_batches:[],bd_sales_documents:[],bd_sales_reconciliations_v1:[]};
  (stores.bd_finance_revenue as any[]).push({id:'open',venueId,date:'2026-10-22',revenueSource:'sales_events_v1',revenue:0,receipts:0,currency:'PMR_RUB',closingStatus:'open'});
  (stores.bd_operational_reports_v1 as any[]).push({id:'open-report',venueId,date:'2026-10-22',workdayStatus:'OPEN',shiftVenueSales:0,staffing:[{employeeId:'e'}],workdayPayrollDraft:{status:'COMPLETE',basis:'CURRENT_RULE_ESTIMATE',missing:[],payrollBreakdown:{total:10,perEmployee:{e:10}}}});
@@ -99,6 +99,17 @@ try {
    const bounds=await dropdown.boundingBox();assert(bounds&&bounds.x>=0&&bounds.x+bounds.width<=width);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.notEqual(await page.getByRole('button',{name:'Обновить движения',exact:true}).evaluate(el=>getComputedStyle(el).borderStyle),'none');
+   if(width===390){
+    const rows=page.locator('.bd-warehouse-movement-list article');
+    for(const row of await rows.all()){
+     const title=row.locator('strong');const box=await title.boundingBox();assert(box&&box.width>150);
+     if(await title.innerText()==='Молоко')assert(box.height<22,'short name must remain one line');
+     const name=row.locator('div').first(),amount=row.locator('div').nth(1);
+     const n=await name.boundingBox(),a=await amount.boundingBox();assert(n&&a&&a.y>=n.y+n.height,'amount overlaps name');
+    }
+    const long=rows.filter({hasText:'Молоко пастеризованное'}).locator('strong');const b=await long.boundingBox();assert(b&&b.height>22);
+    assert.equal(await long.evaluate(el=>{const node=el.firstChild!;return Array.from((el.textContent||'').matchAll(/\S+/g)).every(m=>{const range=document.createRange();range.setStart(node,m.index!);range.setEnd(node,m.index!+m[0].length);return range.getClientRects().length===1;});}),true,'words must not split');
+   }
    await page.waitForTimeout(250);
    await page.screenshot({path:out+'/controls-'+width+'.png',fullPage:false});
   }
