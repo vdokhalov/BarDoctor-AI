@@ -450,8 +450,9 @@ function bdMonthlyReasonLinkV515(path, monthKey, venueId) {
   url.searchParams.set("month", monthKey); url.searchParams.set("venue", String(venueId)); url.hash = "";
   return url.pathname + url.search;
 }
-function bdMonthlyPendingReasonsV513({ reasons = [], reasonDetails = [], reasonDetailsTruncated = false, monthKey, venueId }) {
-  const codes = [...new Set(reasons.filter(code => typeof code === "string" && code.length))];
+function bdMonthlyPendingReasonsV513({ reasons = [], reasonDetails = [], reasonDetailsTruncated = false, monthKey, venueId, emptyPeriod = false }) {
+  const codes = [...new Set(reasons.filter(code => typeof code === "string" && code.length && !(emptyPeriod && code === "PAYROLL")))];
+  if (emptyPeriod && codes.length === 1 && codes[0] === "INVENTORY_BOUNDARY_UNKNOWN") return i.jsxs("details", { className: "bd-monthly-card-v165", "data-bd-empty-month-closing": true, children: [i.jsx("summary", { children: "Условия закрытия месяца" }), i.jsx("p", { children: "Для закрытия месяца нужны остатки на начало и конец." })] });
   if (!codes.length) return null;
   return i.jsxs("section", { "data-bd-monthly-reasons": "v515", "data-bd-monthly-blockers": "v515", role: "status", className: "bd-monthly-card-v165", children: [
     i.jsx("h3", { children: "Почему итоговая прибыль недоступна" }),
@@ -510,7 +511,7 @@ function bdMonthlyReportPage() {
     i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance?month=" + period + "&venue=" + bdMonthlyVenueIdPhase7(profile, settings), right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
       i.jsx("nav", { className: "bd-monthly-period-v165", "aria-label": "Выбор месяца", children: months.map((month) => i.jsx("button", { type: "button", onClick: () => setPeriod(month), className: period === month ? "is-active" : "", children: bdMonthDisplay(month) }, month)) }),
-      report && i.jsx(bdMonthlyPendingReasonsV513, { reasons: verified.reasons, reasonDetails: verified.reasonDetails, reasonDetailsTruncated: verified.reasonDetailsTruncated, monthKey: period, venueId: bdMonthlyVenueIdPhase7(profile, settings) }),
+      report && i.jsx(bdMonthlyPendingReasonsV513, { emptyPeriod: report.emptyPeriod === true, reasons: verified.reasons, reasonDetails: verified.reasonDetails, reasonDetailsTruncated: verified.reasonDetailsTruncated, monthKey: period, venueId: bdMonthlyVenueIdPhase7(profile, settings) }),
       !report ? i.jsxs("section", { role: verified.error ? "alert" : "status", children: [i.jsx("p", { children: verified.error || "Проверяем данные месяца…" }), verified.error && i.jsx("button", { type: "button", onClick: verified.retry, children: "Повторить" })] }) : hasFinancialData ? i.jsxs(i.Fragment, { children: [
         ["LEGACY_PARTIAL", "INVALID"].includes(verified.evidenceStatus) && i.jsx("p", { role: "status", children: "Показан сохранённый исторический отчёт. Полнота и происхождение его исходных данных не подтверждены; суммы не пересчитаны." }),
         i.jsx(bdMonthlyHeroV165, { report, previous }),
