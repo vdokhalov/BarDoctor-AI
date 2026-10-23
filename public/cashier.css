@@ -28,3 +28,5 @@ nav button[aria-pressed=true]:hover{background:var(--soft);color:var(--accent)}#
 .history-picker{max-width:320px;margin-bottom:18px}.cancelled-order-row small,.cancel-reason{white-space:normal;overflow-wrap:anywhere}.cancelled-order-row>strong{white-space:nowrap}
 /* Cancellation history is read-only; its header already has a Close button. */
 #dialog[data-cancel-history] .dialog-actions{display:none}
+
+#dialog[data-cancel-restriction] .dialog-actions{display:none}
