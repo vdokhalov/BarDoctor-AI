@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('scripts/fragments/payroll-loading.fragment.txt','utf8'),ctx);
+test('no ready state before both authoritative sources complete, including warm cache',()=>{for(const a of [undefined,null,'loading','ready'])for(const b of [undefined,null,'loading','ready'])assert.equal(ctx.bdPayrollLoadState(a,b),a==='ready'&&b==='ready'?'ready':'loading');});
+test('either source failure is explicit, never zero or empty',()=>{for(const status of [undefined,'loading','ready','error']){assert.equal(ctx.bdPayrollLoadState('error',status),'error');assert.equal(ctx.bdPayrollLoadState(status,'error'),'error');}});
+test('retry moves through loading and only then accepts successful zero or nonzero data',()=>{assert.equal(ctx.bdPayrollLoadState('ready','error'),'error');assert.equal(ctx.bdPayrollLoadState('ready','loading'),'loading');assert.equal(ctx.bdPayrollLoadState('ready','ready'),'ready');});

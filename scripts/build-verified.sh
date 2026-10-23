@@ -19,6 +19,7 @@ if [[ ! -x "${vinext}" ]]; then
 fi
 
 echo "Running bounded vinext build..."
+node "${script_dir}/patch-payroll-loading.mjs" --restore
 node "${script_dir}/patch-expense-scope.mjs" --restore
 node "${script_dir}/patch-closed-health.mjs" --restore
 node "${script_dir}/patch-current-finance-v556.mjs" --restore
@@ -297,6 +298,7 @@ node "${script_dir}/patch-team-department.mjs"
 node "${script_dir}/patch-closed-health.mjs"
 node "${script_dir}/patch-expense-scope.mjs"
 node "${script_dir}/patch-inventory-search-context.mjs"
+node "${script_dir}/patch-payroll-loading.mjs"
 node "${script_dir}/finalize-versioned-client-asset-v385.mjs"
 node "${script_dir}/verify-versioned-client-asset-v379.mjs"
 node "${script_dir}/verify-monthly-navigation-artifact-v518.mjs"
