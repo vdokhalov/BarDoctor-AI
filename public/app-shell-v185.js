@@ -192,6 +192,11 @@
   }
 
   function navigateBack(config) {
+    var related = new URL(window.location.href);
+    if (related.pathname === "/catalog" && !related.searchParams.has("itemId") && related.searchParams.get("returnTo") === "nomenclature" && window.bdNavigationContract && window.bdNavigate) {
+      window.bdNavigate(window.bdNavigationContract.parent(related.href), { replace: true });
+      return;
+    }
     var embeddedFrame = document.querySelector("main[data-bd-app-main] > iframe");
     var embeddedParent = null;
     if (embeddedFrame && embeddedFrame.contentWindow) {

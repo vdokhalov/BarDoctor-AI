@@ -113,7 +113,16 @@
       return { type: "fullscreen", title: "Инвентаризация", parent: clean(url, ["inventory", "add"]), shell: "fullscreen-owned", bottomNav: false, headerMode: "owned" };
     }
     if (path === "/warehouse" && query.has("product")) return { type: "sheet", title: "Карточка товара", parent: clean(url, ["product"]), headerMode: "underlay" };
+    if (path === "/nomenclature" && query.has("item")) return {type:"sheet",title:"Карточка номенклатуры",parent:clean(url,["item"]),headerMode:"underlay"};
     if (path === "/catalog" && query.has("itemId")) return { type: "sheet", title: "Позиция меню", parent: clean(url, ["itemId"]), headerMode: "underlay" };
+    if (path === "/catalog" && query.get("returnTo") === "nomenclature") {
+      var relatedQuery = new URLSearchParams();
+      if (query.get("returnItem")) relatedQuery.set("item", query.get("returnItem"));
+      if (/^[1-9]\d*$/.test(query.get("venue") || "")) relatedQuery.set("venue", query.get("venue"));
+      if (["all","structure","attention","taxonomy","archive"].includes(query.get("returnView"))) relatedQuery.set("view", query.get("returnView"));
+      if (query.has("returnQ")) relatedQuery.set("q", query.get("returnQ"));
+      return {type:"list",title:"Ассортимент и техкарты",parent:"/nomenclature"+(relatedQuery.size?"?"+relatedQuery.toString():"")};
+    }
     if (path === "/notifications" && query.get("view") && query.get("view") !== "overview") {
       var categoryTitles = { critical: "Критические события", incident: "Критические события", shifts: "Смены", shift: "Смены", tasks: "Поручения", task: "Поручения", finance: "Финансы", equipment: "Оборудование", calendar: "Календарь возможностей" };
       var view = query.get("view");
