@@ -35,7 +35,33 @@ export function createWarehouseDocumentClient(React:typeof import('react'),runti
   </div>;
   return {active:enabled,documentScoped:documentId!==null,items:value.status==='error'?[]:value.items,notice};
  }
- return {useDocument,read};
+ function SourceLink({movement,navigate}:{movement:Item;navigate:(url:string)=>void}){
+  const [busy,setBusy]=React.useState(false),[error,setError]=React.useState('');
+  const controller=React.useRef<AbortController|null>(null),venue=runtime.venue(),identity=runtime.identity();
+  React.useEffect(()=>()=>controller.current?.abort(),[movement.id,venue,identity]);
+  async function open(){
+   if(controller.current&&!controller.current.signal.aborted)return;
+   const request=new AbortController();controller.current=request;setBusy(true);setError('');
+   try{
+    const headers=new Headers(runtime.headers());headers.set('X-Venue-Id',String(venue));
+    const {response,value}=await readCanonicalJson<{ok:boolean;venueId:number;movementId:string;href:string}>('/api/inventory/movements/source?'+new URLSearchParams({movementId:String(movement.id)}),headers,request.signal);
+    if(request.signal.aborted||runtime.venue()!==venue||runtime.identity()!==identity)return;
+    if(!response.ok||!value.ok||value.venueId!==venue||value.movementId!==movement.id)throw Error('Исходный документ недоступен.');
+    const target=new URL(value.href,window.location.origin);
+    if(target.origin!==window.location.origin||!['/warehouse','/suppliers'].includes(target.pathname)||target.searchParams.get('venue')!==String(venue))throw Error('Исходный документ недоступен.');
+    target.searchParams.set('stockReturn',window.location.pathname+window.location.search);
+    navigate(target.pathname+target.search);
+   }catch{if(!request.signal.aborted&&runtime.venue()===venue&&runtime.identity()===identity)setError('Исходный документ недоступен.');}
+   finally{request.abort();if(runtime.venue()===venue&&runtime.identity()===identity)setBusy(false);}
+  }
+  return <span><button type="button" className="bd-writeoff-movement-link-v271" disabled={busy} onClick={open}>{busy?'Открываем…':movement.type==='receipt'?'Закупка':'Инвентаризация'}</button>{error&&<span role="alert">{error}</span>}</span>;
+ }
+ return {useDocument,read,SourceLink};
 }
 
 export {writeoffSourceLabel,writeoffLocationLabel,menuSectionLabel} from '../display-consistency';
+
+export function stockReturnUrl(search:string,origin:string,venue:number):string|null{
+ const params=new URLSearchParams(search),back=params.get('stockReturn');if(!back||params.get('venue')!==String(venue))return null;
+ try{const url=new URL(back,origin);return url.origin===origin&&url.pathname==='/warehouse'&&url.searchParams.get('tab')==='movements'&&url.searchParams.get('venue')===String(venue)?url.pathname+url.search:null;}catch{return null;}
+}
