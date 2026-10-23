@@ -70,6 +70,7 @@ try {
  runtime.sqlite.exec('COMMIT');if(n>10000)assert(Buffer.byteLength(JSON.stringify(events))>2_000_000);
  const adjustment={productName:'Молоко',amount:-1,unit:'l',date,id:'shortage',sourceDocumentId:'count-doc',venueId,productKey:'product',type:'inventory_adjustment',businessDate:date,costAmount:-10,currency:'PMR_RUB',costStatus:'KNOWN_VALUE'};insertMovement.run(accountId,-100,adjustment.id,'product',adjustment.type,date,null,JSON.stringify(adjustment));
  const receipt={id:'receipt',venueId,productKey:'product',productName:'Молоко',type:'receipt',date,businessDate:date,amount:12,unit:'l',costAmount:120,currency:'PMR_RUB',sourceDocumentId:'purchase'};insertMovement.run(accountId,-101,receipt.id,'product',receipt.type,date,null,JSON.stringify(receipt));
+ const legacy={...receipt,id:'legacy-production',date:'2026-09-01',businessDate:'2026-09-01',type:'production',amount:0,costAmount:0,sourceDocumentId:null};insertMovement.run(accountId,-102,legacy.id,'product',legacy.type,date,null,JSON.stringify(legacy));
  const stores={bd_purchase_documents:[{id:'purchase',documentNumber:'TEST-001',supplierName:'Тестовый поставщик',items:[{id:'line',name:'Молоко',quantity:12,unit:'l',price:10,total:120}],venueId,date,status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:120},{id:'old-purchase',venueId,date:'2026-09-30',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:999},{id:'future-purchase',venueId,date:'2026-11-01',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:888}],bd_finance_revenue:[{id:'shift',venueId,date,revenueSource:'sales_events_v1',revenue:n*50,receipts:n,currency:'PMR_RUB',closingStatus:'closed'}],bd_operational_reports_v1:[{id:'report',venueId,date,closingStatus:'closed',payrollBreakdown:{total:10}}],bd_finance_expenses:[{id:'writeoff',venueId,date,category:'writeoff',amount:6,currency:'PMR_RUB',sourceDocumentId:'writeoff-doc',source:'write_off_document'},{id:'writeoff2',venueId,date,category:'writeoff',amount:4,currency:'PMR_RUB'}],bd_employees:[{id:"e",venueId,name:"Сотрудник",payrollRuleId:"rule"}],bd_payroll_rules:[{id:"rule",venueId,blocks:[{enabled:true,type:"shift_rate",amount:10}]}],bd_payroll_entries:[],bd_sales_batches:[],bd_sales_documents:[],bd_sales_reconciliations_v1:[]};
  (stores.bd_finance_revenue as any[]).push({id:'open',venueId,date:'2026-10-22',revenueSource:'sales_events_v1',revenue:0,receipts:0,currency:'PMR_RUB',closingStatus:'open'});
  (stores.bd_operational_reports_v1 as any[]).push({id:'open-report',venueId,date:'2026-10-22',workdayStatus:'OPEN',shiftVenueSales:0,staffing:[{employeeId:'e'}],workdayPayrollDraft:{status:'COMPLETE',basis:'CURRENT_RULE_ESTIMATE',missing:[],payrollBreakdown:{total:10,perEmployee:{e:10}}}});
@@ -92,9 +93,11 @@ try {
    await page.setViewportSize({width,height:844});
    const filters=page.locator('.bd-warehouse-movement-filters-v275');
    await filters.scrollIntoViewIfNeeded();
-   const layout=await filters.evaluate(el=>({display:getComputedStyle(el).display,gap:getComputedStyle(el).gap,buttons:Array.from(el.querySelectorAll('button')).map(b=>{const r=b.getBoundingClientRect();return {x:r.x,y:r.y,right:r.right,bottom:r.bottom,width:r.width,text:b.textContent,whiteSpace:getComputedStyle(b).whiteSpace}}),overflow:document.documentElement.scrollWidth>innerWidth}));
-   assert.equal(layout.display,'flex');assert.equal(layout.gap,'8px');assert.equal(layout.overflow,false,JSON.stringify(layout));
-   for(let i=0;i<layout.buttons.length;i++){const a=layout.buttons[i];assert(a.x>=0&&a.right<=width);for(const b of layout.buttons.slice(i+1)){if(Math.abs(a.y-b.y)<2)assert(b.x-a.right>=7);else assert(b.y-a.bottom>=7);}}
+   const dropdown=page.getByRole('combobox',{name:'Операции склада'});
+   assert.equal(await dropdown.inputValue(),'all');assert.equal(await dropdown.locator('option').count(),6);
+   assert.equal(await dropdown.locator('option[value="production"]').count(),0);
+   const bounds=await dropdown.boundingBox();assert(bounds&&bounds.x>=0&&bounds.x+bounds.width<=width);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    assert.notEqual(await page.getByRole('button',{name:'Обновить движения',exact:true}).evaluate(el=>getComputedStyle(el).borderStyle),'none');
    await page.waitForTimeout(250);
    await page.screenshot({path:out+'/controls-'+width+'.png',fullPage:false});
@@ -123,7 +126,7 @@ try {
   await page.getByRole('button',{name:'Закупка',exact:true}).click();
   await page.getByRole('alert').filter({hasText:'Исходный документ недоступен.'}).waitFor();assert.equal(page.url(),original);
   await page.unroute('**/api/inventory/movements/source?*');
-  await page.locator('.bd-warehouse-movement-filters-v275').getByRole('button',{name:'Закупки',exact:true}).click();
+  await page.getByRole('combobox',{name:'Операции склада'}).selectOption('purchases');
   await page.waitForURL(/movementFilter=purchases/);
   const filtered=page.url();assert.equal(await page.getByRole('button',{name:'Инвентаризация',exact:true}).count(),0);
   await page.getByRole('button',{name:'Закупка',exact:true}).click();await page.locator('.bd-proc-sheet-v168').waitFor();
@@ -133,6 +136,11 @@ try {
   await page.goBack();await page.locator('.bd-proc-sheet-v168').waitFor();
   await page.goForward();await page.getByRole('button',{name:'Закупка',exact:true}).waitFor();
   assert.equal(page.url(),filtered);
+  await page.getByRole('combobox',{name:'Операции склада'}).selectOption('all');
+  await page.waitForURL(original);await page.getByRole('button',{name:'Инвентаризация',exact:true}).waitFor();
+  await page.goto(original+'&movementFilter=production');
+  await page.waitForURL(original);await page.getByText('Загружено движений: 7',{exact:true}).waitFor();assert.equal(await page.locator('.bd-warehouse-movement-list article').count(),7);assert.equal(await page.getByRole('combobox',{name:'Операции склада'}).inputValue(),'all');
+  await page.getByRole('button',{name:'Инвентаризация',exact:true}).waitFor();
   let releaseSource:()=>void=()=>{};
   await page.route('**/api/inventory/movements/source?*',async route=>{await new Promise<void>(resolve=>{releaseSource=resolve});await route.fulfill({status:200,json:{ok:true,venueId,movementId:'receipt',href:'/suppliers?venue='+venueId+'&documentId=purchase'}}).catch(()=>{});});
   await page.getByRole('button',{name:'Закупка',exact:true}).click();await page.getByRole('button',{name:'Открываем…'}).waitFor();

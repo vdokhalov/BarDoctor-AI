@@ -4019,7 +4019,7 @@ main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-nomenclature-l
   padding: 8px 0 12px;
   max-width: 100%;
 }
-.bd-warehouse-movement-filters-v275 button,
+.bd-warehouse-movement-filters-v275 select,
 [data-warehouse-document-status] button {
   min-height: 36px;
   padding: 8px 13px;
@@ -4042,3 +4042,5 @@ main[data-bd-warehouse-version="compact-tree-v240"] .bd-warehouse-nomenclature-l
 [data-warehouse-document-status] { margin: 0 0 12px; }
 [data-warehouse-document-status] p { margin: 0 0 8px; font-size: 13px; color: #626c80; }
 [data-warehouse-document-status] button + button { margin-left: 8px; }
+
+.bd-warehouse-movement-filters-v275 select { min-height: 40px; width: 220px; padding-right: 28px; border-radius: 12px; cursor: pointer; }

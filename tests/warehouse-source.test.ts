@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {lifecycleRuntime} from './helpers/lifecycle-runtime';
-import {stockReturnUrl} from '../lib/bardoctor/client/warehouse-document';
+import {stockReturnUrl,normalizeMovementFilter} from '../lib/bardoctor/client/warehouse-document';
 test('source navigation resolves exact confirmed documents in normalized and legacy history without mutation',async()=>{
  const r=await lifecycleRuntime({source:'./app/api/inventory/movements/source/route'});
  try{
@@ -29,4 +29,9 @@ test('return context preserves exact filters and rejects foreign venue, external
  assert.equal(stockReturnUrl(search,'https://local.test',7),back);
  assert.equal(stockReturnUrl(search,'https://local.test',8),null);
  for(const value of ['https://evil.test'+back,'/warehouse?venue=8&tab=movements','/suppliers?venue=7','/warehouse?venue=7&tab=counts'])assert.equal(stockReturnUrl('?venue=7&stockReturn='+encodeURIComponent(value),'https://local.test',7),null);
+});
+
+test('removed or unrecognized filter selects all, without a legacy-only hidden selection',()=>{
+ for(const value of [null,'all','production','unknown',''])assert.equal(normalizeMovementFilter(value),'all');
+ for(const value of ['purchases','sales','inventory','writeoffs','transfers'])assert.equal(normalizeMovementFilter(value),value);
 });

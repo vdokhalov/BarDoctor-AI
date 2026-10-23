@@ -65,3 +65,5 @@ export function stockReturnUrl(search:string,origin:string,venue:number):string|
  const params=new URLSearchParams(search),back=params.get('stockReturn');if(!back||params.get('venue')!==String(venue))return null;
  try{const url=new URL(back,origin);return url.origin===origin&&url.pathname==='/warehouse'&&url.searchParams.get('tab')==='movements'&&url.searchParams.get('venue')===String(venue)?url.pathname+url.search:null;}catch{return null;}
 }
+
+export function normalizeMovementFilter(value:string|null):string{return value&&["purchases","sales","writeoffs","inventory","transfers"].includes(value)?value:"all";}
