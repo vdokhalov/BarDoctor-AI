@@ -1034,3 +1034,52 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Payroll content follows the available shell width, including tablet shells. */
+.bd-payroll-main-v164 {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+.bd-payroll-main-v164 > *,
+.bd-payroll-directory-body-v164,
+.bd-payroll-row-values-v164 > span { min-width: 0; }
+.bd-payroll-tools-v164 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.bd-payroll-person-copy-v164 > strong,
+.bd-payroll-row-values-v164 b,
+.bd-payroll-summary-metric-v164 strong {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+@media (max-width: 1023px) {
+  .bd-payroll-main-v164 { grid-template-columns: minmax(0, 1fr); }
+  .bd-payroll-actions-v164 { position: static; grid-column: auto; grid-row: auto; }
+  .bd-payroll-tools-v164 { grid-template-columns: minmax(0, 1fr); }
+  .bd-payroll-summary-grid-v164 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 0; }
+  .bd-payroll-summary-metric-v164:nth-child(2) { border-right: 0; }
+  .bd-payroll-summary-metric-v164 strong { font-size: 17px; }
+  .bd-payroll-summary-metric-v164 span { font-size: 11px; }
+  .bd-payroll-directory-head-v164 { display: none; }
+  .bd-payroll-employee-row-v164 {
+    grid-template-columns: minmax(0, 1fr) 16px;
+    gap: 12px 8px;
+    padding: 14px;
+  }
+  .bd-payroll-person-v164 { grid-column: 1; grid-row: 1; }
+  .bd-payroll-person-copy-v164 > strong { font-size: 14px; }
+  .bd-payroll-row-chevron-v164 { grid-column: 2; grid-row: 1 / span 2; }
+  .bd-payroll-row-values-v164 { grid-column: 1; grid-row: 2; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .bd-payroll-row-values-v164 > span { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: baseline; }
+  .bd-payroll-row-values-v164 small { display: block; font-size: 12px; text-align: left; white-space: nowrap; }
+  .bd-payroll-row-values-v164 b,
+  .bd-payroll-row-values-v164 .balance b,
+  .bd-payroll-row-values-v164 .settled b { font-size: 14px; }
+}
+@media (min-width: 1024px) {
+  .bd-payroll-main-v164 { grid-template-columns: minmax(0, 1fr) minmax(250px, .42fr); }
+  .bd-payroll-directory-head-v164,
+  .bd-payroll-employee-row-v164 { grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) 17px; }
+  .bd-payroll-directory-head-v164 > span:nth-child(2) > span { white-space: nowrap; }
+}
