@@ -688,6 +688,16 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
+
+
+
+
+
+
 function BdRecordedWorkdayPayroll() {
   const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
     try {
@@ -2451,6 +2461,7 @@ function bdUseMonthlyReportV513(venueId, monthKey, revision) {
 const bdMonthlyReasonCatalogV515 = {
   REVENUE_OR_CURRENCY: ["Выручка или валюта части операций не подтверждена.", "/finance", "Проверить выручку"],
   PAYROLL: ["Не все начисления зарплаты подтверждены.", "/salaries", "Проверить зарплаты"],
+  EXPENSE_DATE_UNKNOWN: ["У расхода не указана корректная дата. Прибыль пока неизвестна.", null, null],
   EXPENSES_OR_CURRENCY: ["Суммы или валюта части расходов не определены.", "/finance?view=expenses", "Проверить расходы"],
   ACCOUNTING_CURRENCY_UNKNOWN: ["Не определена валюта управленческого учёта.", "/finance/settings", "Проверить настройки"],
   BATCH_CAPTURE_MISSING: ["Нет полного сохранённого снимка себестоимости проведённого пакета продаж.", "/sales-import", "Проверить пакет продаж"],
@@ -2519,16 +2530,16 @@ function bdMonthlyPendingReasonsV513({ reasons = [], reasonDetails = [], reasonD
     i.jsx("h3", { children: "Почему итоговая прибыль недоступна" }),
     i.jsx("ul", { children: codes.map(code => {
       const known = bdMonthlyReasonCatalogV515[code];
-      const href = bdMonthlyReasonLinkV515(known?.[1] || "/data-control?tab=journal", monthKey, venueId);
+      const href = code==="EXPENSE_DATE_UNKNOWN"?null:bdMonthlyReasonLinkV515(known?.[1] || "/data-control?tab=journal", monthKey, venueId);
       const details = Array.isArray(reasonDetails) ? reasonDetails.filter(detail => detail && detail.code === code) : [];
       return i.jsxs("li", { style: { margin: "12px 0", overflowWrap: "anywhere" }, children: [
         i.jsx("p", { children: known?.[0] || "Неподтверждённое условие расчёта: " + code }),
         href && i.jsx("a", { href, children: known?.[2] || "Проверить данные" }),
         details.length > 0 && i.jsx("ul", { children: details.map((detail, index) => {
-          const target = bdMonthlyReasonLinkV515(detail.href || known?.[1] || "/data-control?tab=journal", monthKey, venueId);
+          const target = code==="EXPENSE_DATE_UNKNOWN"?null:bdMonthlyReasonLinkV515(detail.href || known?.[1] || "/data-control?tab=journal", monthKey, venueId);
           const date = typeof detail.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(detail.date) ? detail.date : null;
           const sourceName = { bd_payroll_entries: "Зарплатная операция", bd_finance_revenue: "Выручка рабочего дня", bd_operational_reports_v1: "Операционный отчёт", bd_sales_events_v1: "Продажа POS", bd_sales_documents: "Документ продажи", bd_sales_batches: "Пакет расхода продаж", bd_inventory_snapshots: "Остатки", bd_stock_movements: "Движение склада", bd_inventory_writeoffs: "Списание", bd_opening_stock_v1: "Начальные запасы", bd_purchase_documents: "Закупка", bd_finance_expenses: "Расход", bd_finance_settings: "Финансовые настройки" }[detail.sourceKey] || "Источник";
-          return i.jsxs("li", { children: [date ? sourceName + " от " + date + (detail.outsidePeriod ? " — за пределами выбранного месяца. " : ". ") : sourceName + " требует проверки. ", target && i.jsx("a", { href: target, children: "Открыть источник" })] }, code + ":" + index);
+          return i.jsxs("li", { children: [code==="EXPENSE_DATE_UNKNOWN" ? "Расход"+(detail.recordId?" № "+detail.recordId:" без номера")+": проверьте дату." : date ? sourceName + " от " + date + (detail.outsidePeriod ? " — за пределами выбранного месяца. " : ". ") : sourceName + " требует проверки. ", target && i.jsx("a", { href: target, children: "Открыть источник" })] }, code + ":" + index);
         }) }),
       ] }, code);
     }) }),
@@ -2567,7 +2578,7 @@ function bdMonthlyReportPage() {
     }
     return null;
   }, [profile, period, revenue, expenses, snapshots, settings, gapReasons, months]);
-  const hasFinancialData = report && (report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0);
+  const hasFinancialData = report && !report.expenseDateIssues?.length && (report.revenue > 0 || report.periodExpenses > 0 || report.payroll > 0 || report.unconvertedForeignCurrencyCount > 0);
   return i.jsx(nt, { showBottomNav: true, className: "pb-32", children: i.jsxs($e, { className: "pt-0", children: [
     report&&i.jsx(BdFinanceDocuments,{report}),i.jsx(bdAccountingHeader, { title: "Месячный отчёт", back: "/finance?month=" + period + "&venue=" + bdMonthlyVenueIdPhase7(profile, settings), right: i.jsx("button", { type: "button", onClick: () => navigate("/finance/settings"), className: "text-[13px] font-bold text-primary", children: "Настройки" }) }),
     i.jsx("main", { "data-bd-monthly-report": "v165", className: "bd-monthly-report-v165", children: [
@@ -2594,7 +2605,7 @@ function bdMonthlyReportPage() {
           i.jsx("button", { type: "button", onClick: () => navigate("/finance"), className: "is-primary", children: "Финансы" }),
         ] }),
       ] }) : i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-empty-v165 bd-monthly-no-data-v165", children: [
-        i.jsx("span", { children: "Месяц без финансовых данных" }),
+        i.jsx("span", { children: report.expenseDateIssues?.length ? "Нужна проверка расходов" : "Месяц без финансовых данных" }),
         i.jsx("h2", { children: "Отчёт пока не сформирован" }),
         i.jsx("p", { children: report.emptyPeriod === true ? "За этот месяц пока нет внесённых операций." : "Недостаточно данных для отчёта за этот месяц." }),
         i.jsx("button", { type: "button", onClick: () => navigate("/finance"), children: "Открыть финансы" }),
@@ -2609,7 +2620,7 @@ function bdCurrentFinancePeriod(report) {
 function bdCurrentFinanceNotice({report}) {
   const result=bdCurrentResultPresentation(report),open=result.estimated||report.days?.some(day=>day.status==="OPERATING");
   const missing=(report.missing||[]).filter(code=>!(result.estimated&&code==="PAYROLL"));
-  const labels={PAYROLL:"Не хватает данных о зарплате",EXPENSES_OR_CURRENCY:"Не хватает данных о расходах",REVENUE_OR_CURRENCY:"Не хватает данных о выручке",NO_CURRENT_ACTIVITY:"В этом месяце ещё нет рабочих дней"};
+  const labels={EXPENSE_DATE_UNKNOWN:"У расхода не указана корректная дата",PAYROLL:"Не хватает данных о зарплате",EXPENSES_OR_CURRENCY:"Не хватает данных о расходах",REVENUE_OR_CURRENCY:"Не хватает данных о выручке",NO_CURRENT_ACTIVITY:"В этом месяце ещё нет рабочих дней"};
   return i.jsxs("div",{role:"status",children:[open&&i.jsx("p",{children:"Смена ещё открыта. Сумма может измениться"}),...missing.map(code=>i.jsx("p",{children:labels[code]||"Не хватает данных для расчёта"},code)),!result.afterCost&&i.jsx("p",{children:result.costKnown?"Не все расходы учтены — прибыль пока неизвестна":"Себестоимость пока неизвестна — это ещё не прибыль"})]});
 }
 function bdCurrentFinanceDetailsV556({report}) {

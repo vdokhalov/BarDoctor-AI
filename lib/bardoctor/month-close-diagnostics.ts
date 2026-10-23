@@ -1,3 +1,5 @@
+import {validExpenseDate} from "./expense-date";
+import {activeBusinessRow,scopedBusinessRows} from "./business-day-rows";
 import { derivedInputBelongs } from './derived-input-scope';
 import { businessRecord as row } from './business-day-rows';
 
@@ -49,6 +51,8 @@ export function monthCloseReasonDetails(input: { reasons: string[]; stores: Reco
         const issue = scopeIssue(value, input.scope);
         if (issue) Object.assign(result[result.length - 1], { scopeField: issue.field, scopeKind: issue.kind });
       }
+    } else if (code === 'EXPENSE_DATE_UNKNOWN') {
+      for(const value of scopedBusinessRows((input.stores.bd_finance_expenses??[]).map(value=>value.venueId==='primary'?{...value,venueId:input.scope.venueId}:value),input.scope))if(activeBusinessRow(value)&&!validExpenseDate(value.date))add(code,'bd_finance_expenses',value);
     } else if (code === 'PAYROLL') {
       for (const day of input.payrollByDay.filter(day => day.amount == null)) add(code, 'bd_operational_reports_v1', undefined, day.businessDate);
     } else if (code === 'REVENUE_NOT_FINAL') {
