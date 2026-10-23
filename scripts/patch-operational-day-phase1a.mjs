@@ -11,6 +11,9 @@ function fn(name,change){const ast=parse(source,{ecmaVersion:'latest',sourceType
 function replace(s,from,to){if(s.includes(to))return s;if(!s.includes(from))throw Error('Missing Phase 1A anchor: '+from.slice(0,100));return s.replace(from,to);}
 const fragment=fs.readFileSync('scripts/fragments/operational-day-phase1a.fragment.txt','utf8');
 fn('Ur',()=>fragment.slice(fragment.indexOf('function Ur(')).trim());
+if(!source.includes('function BdLegacyShiftPayroll('))fn('QAe',s=>s.replace('function QAe(', 'function BdLegacyShiftPayroll('));
+const payrollView=transformSync(fs.readFileSync('scripts/fragments/workday-payroll-view.jsx','utf8'),{loader:'jsx',jsxFactory:'S.createElement',jsxFragment:'S.Fragment'}).code;
+for(const node of parse(payrollView,{ecmaVersion:'latest',sourceType:'module'}).body.filter(n=>n.type==='FunctionDeclaration')){const code=payrollView.slice(node.start,node.end);if(source.includes('function '+node.id.name+'('))fn(node.id.name,()=>code);else source=code+'\n'+source;}
 const workdayFlow=transformSync(fs.readFileSync('scripts/fragments/workday-flow.jsx','utf8').replace('export function BdWorkdayFlow','function BdWorkdayFlow'),{loader:'jsx',jsxFactory:'S.createElement',jsxFragment:'S.Fragment'}).code.trim();
 if(source.includes('function BdWorkdayFlow('))fn('BdWorkdayFlow',()=>workdayFlow);else source=workdayFlow+'\n'+source;
 for(const name of ['bdManagementWorkday','bdOperationalFallback','bdOperationalRevenueCopy','bdOperationalRows']){const code=fragment.split(/\r?\n/).find(line=>line.startsWith('function '+name+'('));if(source.includes('function '+name+'('))fn(name,()=>code);else source=code+'\n'+source;}if(!source.includes(marker))source=marker+'\n'+source;
