@@ -1,3 +1,4 @@
+import { changedInvalidEquipmentPlans } from "../../../../lib/bardoctor/equipment-plan-validation";
 import { SALES_ACCOUNTING_KEY, parseSalesAccounting, managedRevenueMutation } from "../../../../lib/bardoctor/sales-accounting";
 import {getD1} from "../../../../db";
 import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
@@ -446,6 +447,11 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
       { ok: false, code: "ACCESS_DENIED", error: "Недостаточно прав для этого изменения" },
       { status: 403 },
     );
+  }
+
+  if (key === "bd_equipment") {
+    const issues = changedInvalidEquipmentPlans(before, after);
+    if (issues.length) return Response.json({ok:false,code:"MAINTENANCE_DATE_REQUIRED",error:"Укажите дату обслуживания",issues},{status:422});
   }
 
   if (key === "bd_month_closings" && requiresExplicitPeriodReopen(before, after)) {
