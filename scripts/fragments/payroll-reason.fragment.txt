@@ -1,0 +1,20 @@
+function bdPayrollProblem(report,records,venue,month){
+ if(!report||report.payroll!=null&&report.payrollBalance!=null)return null;
+ const days=report.inputContract?.payrollByDay;if(!Array.isArray(days))return {text:"Не хватает данных для расчёта."};
+ const dates=days.filter(d=>d.amount==null&&String(d.businessDate).slice(0,7)===month).map(d=>d.businessDate);
+ if(!dates.length)return {text:report.inputContract.payrollBase!=null?"Проверьте суммы и валюту начислений.":"Не хватает данных для расчёта."};
+ const rows=records.filter(r=>String(r.venueId)===String(venue)&&dates.includes(r.date));
+ const candidates=rows.filter(r=>r.workdayStatus==="OPEN"||r.payrollBreakdown?.total==null&&r.payrollBreakdown?.totalPayroll==null);
+ if(dates.length!==1||candidates.length!==1||!candidates[0].id)return {date:dates.length===1?dates[0]:null,text:dates.length>1?"Не хватает данных по нескольким сменам.":"Не сохранён расчёт зарплаты за "+dates[0].slice(8,10)+"."+dates[0].slice(5,7)+"."};
+ const row=candidates[0],date=row.date,label=date.slice(8,10)+"."+date.slice(5,7);
+ return {text:row.workdayStatus==="OPEN"?"Смена "+label+" ещё открыта.":"Не сохранён расчёт зарплаты за "+label+".",id:String(row.id),date,venue:String(venue),month};
+}
+function bdPayrollProblemView({report,month}){
+ const venue=bdMonthlyVenueIdPhase7(null,null),problem=bdPayrollProblem(report,bdProcArray("bd_operational_reports_v1"),venue,month),key=problem?.date?String(venue)+":"+month+":"+(problem.id||problem.date):"",[detail,setDetail]=S.useState(null);
+ S.useEffect(()=>{if(!key)return;const controller=new AbortController;fetch('/api/workdays?'+new URLSearchParams({date:problem.date,...(problem.id?{workdayId:problem.id}:{})}),{credentials:'include',cache:'no-store',headers:ca(Ot()),signal:controller.signal}).then(r=>r.ok?r.json():null).then(r=>{if(controller.signal.aborted||!r?.ok||String(r.venueId)!==String(venue)||r.date!==problem.date||!r.workday?.id)return;const exact=problem.id?String(r.workday.id)===problem.id:r.shifts?.length===1||r.workday.workdayStatus==='OPEN'&&r.shifts?.filter(x=>x.status==='OPEN').length===1;if(!exact)return;const missing=[],staff=r.workday.staffing||[];if(r.workday.workdayStatus==='OPEN'){if(!staff.length)missing.push({field:'team'});for(const person of staff){const employee=r.employees?.find(e=>e.id===person.employeeId);if(!employee){missing.push({field:'employee'});continue}if(!employee.requirements?.rulePresent)missing.push({field:'rule'});if(employee.requirements?.hours&&person.hours==null)missing.push({field:'hours'});}}setDetail({key,missing,id:String(r.workday.id),open:r.workday.workdayStatus==='OPEN'})}).catch(()=>{});return()=>controller.abort()},[key]);
+ if(!problem)return null;
+ const fields=detail?.key===key?detail.missing.map(m=>m.field):[],names={team:"Не указаны сотрудники смены.",employee:"Сотрудник смены не найден.",rule:"Проверьте оплату сотрудника.",hours:"Не указаны часы работы.",personalSales:"Не указаны продажи сотрудника.",departmentSales:"Не указаны продажи отдела.",venueSales:"Не указана выручка смены.",units:"Не указано количество работ."};
+ const distinct=[...new Set(fields)],resolved=detail?.key===key?detail:null,text=distinct.length===1&&names[distinct[0]]||distinct.length>1&&"Проверьте данные сотрудников смены."||resolved?.open&&("Смена "+problem.date.slice(8,10)+"."+problem.date.slice(5,7)+" ещё открыта.")||problem.text;
+ const back='/salaries?'+new URLSearchParams({venue:String(venue),month}),href=resolved?.id?'/shifts?'+new URLSearchParams({venue:String(venue),month,workday:problem.date,workdayId:resolved.id,payrollReturn:back}):null;
+ return i.jsxs('div',{'data-payroll-problem':true,style:{padding:'12px 16px',fontSize:14},children:[i.jsx('p',{children:text}),href&&i.jsx('a',{href,onClick:e=>{e.preventDefault();window.bdNavigate(href)},style:{display:'inline-block',padding:'10px 0',textDecoration:'underline'},children:'Посмотреть смену'})]});
+}
