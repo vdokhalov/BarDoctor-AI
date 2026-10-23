@@ -176,6 +176,15 @@
     return !/^\/(login|register|forgot-password|join|setup|venues\/new)(\/|$)/.test(window.location.pathname);
   }
 
+  function releaseSheetHistory() {
+    var panel = document.querySelector("[data-bd-venue-sheet] [role=dialog]");
+    var state = window.history.state;
+    if (!panel || !panel.dataset.bdTransientId || !state || state.bdTransientLayer !== panel.dataset.bdTransientId) return;
+    // The destination owns the next history entry. Removing this sheet must
+    // not issue a delayed back() after the create form has opened.
+    window.history.replaceState(Object.assign({}, state, { bdTransientLayer: null, bdTransientVersion: null }), "", window.location.href);
+  }
+
   function closeSheet() {
     var sheet = document.querySelector("[data-bd-venue-sheet]");
     if (sheet) sheet.remove();
@@ -289,6 +298,7 @@
     if (addVenue) addVenue.addEventListener("click", function (event) {
       if (typeof window.bdNavigate !== "function") return;
       event.preventDefault();
+      releaseSheetHistory();
       closeSheet();
       window.bdNavigate("/venues/new");
     });
