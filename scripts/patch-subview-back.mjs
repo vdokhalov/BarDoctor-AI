@@ -1,0 +1,5 @@
+import fs from 'node:fs';const path='public/assets/index-BQGspy0I.js';let s=fs.readFileSync(path,'utf8');const restore=process.argv.includes('--restore');
+function change(a,b){const x=restore?b:a,y=restore?a:b;if(s.includes(x))s=s.replace(x,y);else if(!restore&&!s.includes(y))throw Error('Subview anchor missing: '+x.slice(0,100));}
+for(const name of ['Integrations','Notifications'])change('function bd'+name+'Page(){return i.jsx(bdEmbeddedPage,','function bd'+name+'Page(){return i.jsx(bdSubviewEmbeddedPage,');
+change('let b;\n      try{b=new URL(r.location.href)}catch{return}', 'if(r.bdOuterSubviewSync)return;\n      let b;\n      try{b=new URL(r.location.href)}catch{return}');
+const start='/* subview-back:start */',end='/* subview-back:end */';if(s.includes(start))s=s.slice(0,s.indexOf(start))+s.slice(s.indexOf(end)+end.length);if(!restore)s=s.replace('function bdIntegrationsPage(){',start+fs.readFileSync('scripts/fragments/subview-back.fragment.txt','utf8')+end+'function bdIntegrationsPage(){');fs.writeFileSync(path,s);
