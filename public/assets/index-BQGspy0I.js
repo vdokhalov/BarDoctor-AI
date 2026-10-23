@@ -1982,6 +1982,7 @@ function bdMonthlyReportLegacyPage(){const[,e]=bt(),{profile:t}=Un(),{revenue:n,
 
 /* bd-monthly-report-v165:start */
 function bdMonthlyRatioV165(value, total) {
+  if (typeof value !== "number" || typeof total !== "number") return null;
   const numerator = Number(value);
   const denominator = Number(total);
   if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator <= 0) return null;
@@ -2082,7 +2083,7 @@ function bdMonthlyExecutiveV165({ report }) {
       i.jsx("span", { children: metric.label }),
       i.jsx("strong", { children: metric.value === null ? "—" : bdMoney2(metric.value) }),
       metric.key === "cogs" && report.costOfGoods !== null && i.jsx("small", { children: bdMonthlyRatioLabelV165(bdMonthlyRatioV165(report.costOfGoods, report.revenue)) + " от выручки" }),
-      metric.key === "payroll" && i.jsx("small", { children: bdMonthlyRatioLabelV165(bdMonthlyRatioV165(report.payroll, report.revenue)) + " от выручки" }),
+      metric.key === "payroll" && i.jsx("small", { children: bdMonthlyRatioLabelV165(bdMonthlyRatioV165(metric.value, report.revenue)) + " от выручки" }),
     ] }, metric.key)) }),
   ] });
 }

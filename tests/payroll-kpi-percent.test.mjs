@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {parse} from 'acorn';
+const source=fs.readFileSync('scripts/fragments/monthly-report-v165.fragment.txt','utf8');const names=['bdMonthlyRatioV165','bdMonthlyRatioLabelV165','bdCurrentResultPresentation','bdMonthlyExecutiveV165'];
+const selected=parse(source,{ecmaVersion:'latest'}).body.filter(n=>n.type==='FunctionDeclaration'&&names.includes(n.id.name)).map(n=>source.slice(n.start,n.end)).join('\n');
+const element=(type,props,key)=>({type,props,key});const ctx=vm.createContext({i:{jsx:element,jsxs:element},bdMonthlySectionHeaderV165:()=>null,bdMoney2:n=>String(n)});vm.runInContext(selected,ctx);
+const card=report=>ctx.bdMonthlyExecutiveV165({report}).props.children[1].props.children.find(n=>n.key==='payroll').props.children;
+const text=nodes=>nodes.filter(Boolean).map(n=>n.props.children).join('|');
+test('provisional payroll card percentage uses displayed30, not null confirmed payroll',()=>{const report={currentFinance:true,payroll:null,provisionalPayroll:30,resultBeforeCost:null,provisionalResultBeforeCost:60,provisionalResultAfterCost:30,costOfGoods:20,revenue:100};const before=JSON.stringify(report);assert.equal(text(card(report)),'ФОТ, предварительно|30|30% от выручки');assert.equal(JSON.stringify(report),before);});
+test('confirmed and known-zero payroll use the same amount as the card',()=>{assert.equal(text(card({payroll:30,revenue:100})),'ФОТ|30|30% от выручки');assert.equal(text(card({payroll:0,revenue:100})),'ФОТ|0|0% от выручки');});
+test('unknown payroll or zero/unknown revenue never display misleading zero percent',()=>{for(const [value,total] of [[null,100],[undefined,100],[30,0],[30,null],[30,undefined],[NaN,100],[30,Infinity],['',100]])assert.equal(ctx.bdMonthlyRatioLabelV165(ctx.bdMonthlyRatioV165(value,total)),'—');assert.match(text(card({payroll:null,revenue:100})),/— от выручки/);});

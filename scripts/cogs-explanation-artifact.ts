@@ -11,6 +11,7 @@ import { salesEventFixture } from "../tests/helpers/sales-event-fixture";
 import { barDoctorResponse } from "../app/bar-doctor-response";
 const require = createRequire(import.meta.url), { resolveBrowserExecutable, chromiumArgs } = require("./browser-runtime.cjs");
 const sequential=process.env.BD_SEQUENTIAL_QA==='1';
+const payrollPercentQA=process.env.BD_PAYROLL_PERCENT_QA==='1';
 const fixedTime = "2026-10-22T12:00:00Z";
 const apiDelay = Number(process.env.BD_OPERATIONAL_API_DELAY || 0);
 const runtime = await lifecycleRuntime({ documents:"./app/api/finance/documents/route", counts:"./app/api/inventory/counts/route", monthClose:"./app/api/month-close/route", workdays:"./app/api/workdays/route", sales: "./app/api/sales-events/route", days: "./app/api/operational-days/route", close: "./app/api/shifts/close/route", usersMe: "./app/api/users/me/route", restaurantMe: "./app/api/restaurants/me/route", store: "./app/api/store/route", storeKey: "./app/api/store/[key]/route", overview: "./app/api/assortment/overview/route", writeOffs: "./app/api/write-offs/route", health: "./app/api/business-health/route", context: "./lib/bardoctor/venue-ai-context", expenses: "./app/api/expenses/route" }, { now: fixedTime });
@@ -69,7 +70,7 @@ try {
  }
  runtime.sqlite.exec('COMMIT');if(n>10000)assert(Buffer.byteLength(JSON.stringify(events))>2_000_000);
  const adjustment={id:'shortage',sourceDocumentId:'count-doc',venueId,productKey:'product',type:'inventory_adjustment',businessDate:date,costAmount:-10,currency:'PMR_RUB',costStatus:'KNOWN_VALUE'};insertMovement.run(accountId,-100,adjustment.id,'product',adjustment.type,date,null,JSON.stringify(adjustment));
- const stores={bd_purchase_documents:[{id:'purchase',venueId,date,status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:120},{id:'old-purchase',venueId,date:'2026-09-30',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:999},{id:'future-purchase',venueId,date:'2026-11-01',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:888}],bd_finance_revenue:[{id:'shift',venueId,date,revenueSource:'sales_events_v1',revenue:n*50,receipts:n,currency:'PMR_RUB',closingStatus:'closed'}],bd_operational_reports_v1:[{id:'report',venueId,date,closingStatus:'closed',payrollBreakdown:{total:10}}],bd_finance_expenses:[{id:'writeoff',venueId,date,category:'writeoff',amount:6,currency:'PMR_RUB',sourceDocumentId:'writeoff-doc',source:'write_off_document'},{id:'writeoff2',venueId,date,category:'writeoff',amount:4,currency:'PMR_RUB'}],bd_employees:[{id:"e",venueId,name:"Сотрудник",payrollRuleId:"rule"}],bd_payroll_rules:[{id:"rule",venueId,blocks:[{enabled:true,type:"shift_rate",amount:10}]}],bd_payroll_entries:[],bd_sales_batches:[],bd_sales_documents:[],bd_sales_reconciliations_v1:[]};
+ const stores={bd_purchase_documents:[{id:'purchase',venueId,date,status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:120},{id:'old-purchase',venueId,date:'2026-09-30',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:999},{id:'future-purchase',venueId,date:'2026-11-01',status:'confirmed',expenseCategory:'food',documentType:'invoice',currency:'PMR_RUB',total:888}],bd_finance_revenue:[{id:'shift',venueId,date,revenueSource:'sales_events_v1',revenue:n*50,receipts:n,currency:'PMR_RUB',closingStatus:'closed'}],bd_operational_reports_v1:[{id:'report',venueId,date,closingStatus:'closed',payrollBreakdown:{total:10}}],bd_finance_expenses:[{id:'writeoff',venueId,date,category:'writeoff',amount:6,currency:'PMR_RUB',sourceDocumentId:'writeoff-doc',source:'write_off_document'},{id:'writeoff2',venueId,date,category:'writeoff',amount:4,currency:'PMR_RUB'}],bd_employees:[{id:"e",venueId,name:"Сотрудник",payrollRuleId:"rule"}],bd_payroll_rules:[{id:"rule",venueId,blocks:[{enabled:true,type:"shift_rate",amount:payrollPercentQA?20:10}]}],bd_payroll_entries:[],bd_sales_batches:[],bd_sales_documents:[],bd_sales_reconciliations_v1:[]};
  (stores.bd_finance_revenue as any[]).push({id:'open',venueId,date:'2026-10-22',revenueSource:'sales_events_v1',revenue:0,receipts:0,currency:'PMR_RUB',closingStatus:'open'});
  (stores.bd_operational_reports_v1 as any[]).push({id:'open-report',venueId,date:'2026-10-22',workdayStatus:'OPEN',shiftVenueSales:0,staffing:[{employeeId:'e'}],workdayPayrollDraft:{status:'COMPLETE',basis:'CURRENT_RULE_ESTIMATE',missing:[],payrollBreakdown:{total:10,perEmployee:{e:10}}}});
  for(const [key,value] of Object.entries(stores))runtime.sqlite.prepare('INSERT INTO domain_data(account_id,store_key,data_json) VALUES(?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json').run(accountId,key,JSON.stringify(value));
@@ -85,6 +86,8 @@ try {
   await page.goto(base+'/reports?month=2026-10&venue='+venueId);
   const block=page.locator('.bd-monthly-cost-v165');await block.waitFor({timeout:30000});
   await block.getByText('20 руб. ПМР',{exact:true}).first().waitFor({timeout:30000});
+  const payrollCard=page.locator('.bd-monthly-kpi-grid-v165 article').filter({hasText:'ФОТ, предварительно'});
+  if(payrollPercentQA){assert.match(await payrollCard.innerText(),/30 руб\. ПМР/);assert.match(await payrollCard.innerText(),/30% от выручки/);await page.locator('.bd-monthly-payroll-v165').getByText('30%',{exact:true}).waitFor();await payrollCard.screenshot({path:out+'/payroll-percent.png'});}
   const original=await block.innerText();
   assert.match(await block.innerText(),/По сохранённым продажам, с учётом возвратов/);
   await block.getByText('Остатки и закупки',{exact:true}).click();
@@ -102,8 +105,9 @@ try {
   await page.waitForFunction(()=>!document.querySelector('.bd-monthly-cost-v165'),undefined,{timeout:10000});
   await page.goto(base+'/reports?month=2026-10&venue='+venueId);await block.getByText('По сохранённым продажам, с учётом возвратов.',{exact:true}).waitFor({timeout:30000});
   assert.equal(JSON.stringify(replies.filter(x=>x.status===200).at(-1)?.data.report),validReport);
+  if(payrollPercentQA){assert.match(await payrollCard.innerText(),/30% от выручки/);assert.equal(replies.filter(x=>x.status===200).at(-1).data.report.provisionalResultAfterCost,30);}
   assert.equal(business(),before);assert.deepEqual(errors,[]);
-  writeFileSync(out+'/evidence.json',JSON.stringify({type:'actual compiled implementation, unpublished',original,preview:await block.innerText(),amount:20,unchanged:true,errors},null,2));
+  writeFileSync(out+'/evidence.json',JSON.stringify({type:'actual compiled implementation, unpublished',original,preview:await block.innerText(),amount:20,payrollPercentQA,unchanged:true,errors},null,2));
   console.log('COGS preview ready');
  }finally{await context.close()}
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}
