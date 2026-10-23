@@ -133,6 +133,7 @@
     if (path === "/suppliers" && query.has("supplierId")) return { type: "sheet", title: "Поставщик", parent: clean(url, ["supplierId", "edit"]), headerMode: "underlay" };
     if (path === "/suppliers" && query.has("compareKey")) return { type: "sheet", title: "Сравнение предложений", parent: clean(url, ["compareKey"]), headerMode: "underlay" };
     if (path === "/suppliers" && query.get("create") === "1") return { type: "create", title: "Новая покупка", parent: clean(url, ["create", "returnTo"]), headerMode: "underlay" };
+    if (path === "/finance" && query.has("paymentId")) return { type: "sub-detail", title: query.has("paymentDocument") ? "Закупка" : "Платёж поставщику", parent: clean(url, query.has("paymentDocument") ? ["paymentDocument"] : ["paymentId", "paymentDocument"]), headerMode: "underlay" };
     if (path === "/finance" && ["closeShift", "addExpense", "repairEquipmentId"].some(function (key) { return query.has(key); })) return { type: "create", title: query.has("addExpense") ? "Новый расход" : query.has("repairEquipmentId") ? "Расход на оборудование" : "Закрытие смены", parent: clean(url, ["closeShift", "addExpense", "repairEquipmentId"]), headerMode: "underlay" };
     if (path === "/shifts" && query.has("closeShift")) return { type: "create", title: "Закрытие смены", parent: clean(url, ["closeShift"]), headerMode: "underlay" };
     if (path === "/tasks" && query.get("new") === "1") return { type: "create", title: "Новое поручение", parent: clean(url, ["new", "title", "responsible"]), headerMode: "underlay" };
