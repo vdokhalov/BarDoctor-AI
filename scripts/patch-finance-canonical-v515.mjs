@@ -6,7 +6,7 @@ const marker = '/* finance-canonical-v515 */';
 const status = `${marker}
 function bdFinanceCanonicalStatusV515({verified,monthKey,venueId}){
   if(!verified.report)return i.jsxs("section",{"data-bd-finance-canonical-status":"v515",role:verified.error?"alert":"status",children:[i.jsx("p",{children:verified.error||"Проверяем данные месяца…"}),verified.error&&i.jsx("button",{type:"button",onClick:verified.retry,children:"Повторить"})]});
-  return i.jsxs(i.Fragment,{children:[["LEGACY_PARTIAL","INVALID"].includes(verified.evidenceStatus)&&i.jsx("p",{role:"status",children:"Показан сохранённый исторический отчёт. Полнота и происхождение исходных данных не подтверждены; суммы не пересчитаны."}),i.jsx(bdMonthlyPendingReasonsV513,{reasons:verified.reasons,reasonDetails:verified.reasonDetails,reasonDetailsTruncated:verified.reasonDetailsTruncated,monthKey,venueId})]});
+  return i.jsxs(i.Fragment,{children:[["LEGACY_PARTIAL","INVALID"].includes(verified.evidenceStatus)&&i.jsx("p",{role:"status",children:"Показан сохранённый исторический отчёт. Полнота и происхождение исходных данных не подтверждены; суммы не пересчитаны."}),i.jsx(bdMonthlyPendingReasonsV513,{emptyPeriod:verified.report.emptyPeriod===true,reasons:verified.reasons,reasonDetails:verified.reasonDetails,reasonDetailsTruncated:verified.reasonDetailsTruncated,monthKey,venueId})]});
 }
 `;
 function replaceOne(source, before, after) {
@@ -46,6 +46,12 @@ export function patchFinanceCanonicalV515(source) {
     'i.jsx(bdMonthClosingLauncher,{settings:financeSettings,report:monthlyReport,revenues:monthRevenue,expenses:monthExpenses,monthKey,navigate})',
     'monthlyReport&&i.jsx(bdMonthClosingLauncher,{settings:financeSettings,report:monthlyReport,revenues:monthRevenue,expenses:monthExpenses,monthKey,navigate},monthKey)');
   if(!source.includes(marker))source=replaceOne(source,'function BAe(){',status+'function BAe(){');
+  source=replaceOne(source,
+    'i.jsx(bdMonthlyPendingReasonsV513,{reasons:verified.reasons',
+    'i.jsx(bdMonthlyPendingReasonsV513,{emptyPeriod:verified.report.emptyPeriod===true,reasons:verified.reasons');
+  source=replaceOne(source,
+    'function bdFinanceReadinessV160({report:e,coverage:t,missingDates:n,onMissing:r,onInventory:a,onContinue:s,onReport:l}){if(!e)return null;',
+    'function bdFinanceReadinessV160({report:e,coverage:t,missingDates:n,onMissing:r,onInventory:a,onContinue:s,onReport:l}){if(!e||e.emptyPeriod===true)return null;');
   return source;
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
