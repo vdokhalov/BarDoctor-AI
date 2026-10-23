@@ -43,10 +43,14 @@ const engine = process.env.BD_QA_ENGINE === "webkit" ? "webkit" : "chromium";
 const browser = engine === "webkit" ? await webkit.launch({ headless: true }) : await chromium.launch({ executablePath: process.env.BD_QA_BROWSER || await resolveBrowserExecutable(chromium.executablePath()), headless: true, args: chromiumArgs });
 try {
  const owner=runtime.user,venueId=runtime.venueId;
- runtime.seed('bd_finance_expenses',[{id:'rent-17',venueId,date:null,category:'rent',amount:30,currency:'MDL'}]);
+ runtime.seed('bd_finance_revenue',[{id:'sep-manual',venueId,date:'2026-09-02',revenueSource:'MANUAL_SUMMARY',manualTotalsVersion:1,revenue:100,receipts:2,currency:'MDL',closingStatus:'closed',declaredCost:20,costProvenance:{basis:'OWNER_DECLARED',currency:'MDL'}}]);
+ runtime.seed('bd_operational_reports_v1',[{id:'sep-report',venueId,date:'2026-09-02',closingStatus:'closed',payrollBreakdown:{total:10}}]);
+ runtime.seed('bd_inventory_snapshots',[{id:'open',venueId,date:'2026-09-01',currency:'MDL',total:100,sections:{bar:100}},{id:'end',venueId,date:'2026-10-01',currency:'MDL',total:80,sections:{bar:80}}]);
+ runtime.seed('bd_finance_expenses',[{id:'rent-17',description:'Аренда помещения',venueId,date:null,category:'rent',amount:30,currency:'MDL'}]);
+ const check=await(await runtime.get()).json() as any;assert.deepEqual(check.reasons,['EXPENSE_DATE_UNKNOWN']);
  const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({owner,venueId})=>{localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);localStorage.setItem('bd_active_venue_id',String(venueId));},{owner,venueId});
  const page=await context.newPage(),errors:string[]=[],writes:string[]=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(r.method()==='POST'&&!r.url().includes('/api/auth/bootstrap'))writes.push(r.url());});
- for(const month of ['2026-09','2026-10','2026-09']){await page.goto(base+'/reports?venue='+venueId+'&month='+month);await page.getByText('Расход № rent-17: проверьте дату.',{exact:true}).waitFor();assert.equal(await page.getByText('Месяц без финансовых данных',{exact:true}).count(),0);}
- await page.reload();await page.getByText('Расход № rent-17: проверьте дату.',{exact:true}).waitFor();mkdirSync('outputs/expense-date',{recursive:true});await page.screenshot({path:'outputs/expense-date/report-390.png',fullPage:true});
+ for(const month of ['2026-09','2026-10','2026-09']){await page.goto(base+'/reports?venue='+venueId+'&month='+month);await page.getByText(/Аренда помещения.*30.*проверьте дату/).waitFor();assert.equal(await page.getByText('Месяц без финансовых данных',{exact:true}).count(),0);}
+ await page.reload();await page.getByText(/Аренда помещения.*30.*проверьте дату/).waitFor();mkdirSync('outputs/expense-date',{recursive:true});await page.screenshot({path:'outputs/expense-date/report-390.png',fullPage:true});await page.getByRole('button',{name:'Открыть финансы',exact:true}).scrollIntoViewIfNeeded();const bottom=await page.getByRole('button',{name:'Открыть финансы',exact:true}).boundingBox();assert.ok(bottom&&bottom.y+bottom.height<760,'bottom action reachable above navigation');
  assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);console.log('PASS malformed expense compiled UI reload/period/record identity, no writes');await context.close();
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}
