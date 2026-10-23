@@ -683,6 +683,11 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
+
 function BdRecordedWorkdayPayroll() {
   const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
     try {
@@ -2591,7 +2596,7 @@ function bdMonthlyReportPage() {
       ] }) : i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-empty-v165 bd-monthly-no-data-v165", children: [
         i.jsx("span", { children: "Месяц без финансовых данных" }),
         i.jsx("h2", { children: "Отчёт пока не сформирован" }),
-        i.jsx("p", { children: "Добавьте выручку завершённой смены или расходы выбранного месяца. BarDoctor покажет результат без подстановки фиктивных значений." }),
+        i.jsx("p", { children: report.emptyPeriod === true ? "За этот месяц пока нет внесённых операций." : "Недостаточно данных для отчёта за этот месяц." }),
         i.jsx("button", { type: "button", onClick: () => navigate("/finance"), children: "Открыть финансы" }),
       ] }),
     ] }),

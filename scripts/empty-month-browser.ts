@@ -46,7 +46,7 @@ try {
  const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({owner,venueId})=>{localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);localStorage.setItem('bd_active_venue_id',String(venueId));},{owner,venueId});
  const page=await context.newPage(),errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/reports?venue='+venueId+'&month=2026-09');await page.getByText('Месяц без финансовых данных',{exact:true}).waitFor();
- assert.equal(await page.locator('[data-bd-monthly-blockers]').count(),0);await page.getByText('Условия закрытия месяца',{exact:true}).waitFor();
+ await page.getByText('За этот месяц пока нет внесённых операций.',{exact:true}).waitFor();assert.equal(await page.getByText(/фиктивных значений|Добавьте выручку завершённой смены/).count(),0);assert.equal(await page.locator('[data-bd-monthly-blockers]').count(),0);await page.getByText('Условия закрытия месяца',{exact:true}).waitFor();
  mkdirSync('outputs/empty-month',{recursive:true});await page.screenshot({path:'outputs/empty-month/empty-390.png',fullPage:true});
  await page.reload();await page.getByText('Месяц без финансовых данных',{exact:true}).waitFor();assert.equal(await page.locator('[data-bd-monthly-blockers]').count(),0);
  await page.goto(base+'/reports?venue='+venueId+'&month=2026-10');await page.locator('[data-bd-monthly-report]').waitFor();assert.equal(await page.getByText('Месяц без финансовых данных',{exact:true}).count(),0);
