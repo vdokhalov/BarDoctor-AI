@@ -26,3 +26,5 @@ nav button[aria-pressed=true]:hover{background:var(--soft);color:var(--accent)}#
 #notice:empty{display:none}.unpaid-group.panel,.unpaid-detail>.panel{margin:0}.unpaid-history{line-height:1.45}.unpaid-history p{margin:6px 0 0}.unpaid-detail .badge.past{background:#fff4df;color:#995111}.unpaid-detail .badge.review{background:#fff0e6;color:#995111}
 
 .history-picker{max-width:320px;margin-bottom:18px}.cancelled-order-row small,.cancel-reason{white-space:normal;overflow-wrap:anywhere}.cancelled-order-row>strong{white-space:nowrap}
+/* Cancellation history is read-only; its header already has a Close button. */
+#dialog[data-cancel-history] .dialog-actions{display:none}
