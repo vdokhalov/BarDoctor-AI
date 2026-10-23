@@ -4,10 +4,29 @@
   const $=id=>document.getElementById(id), esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
   const uuid=()=>crypto.randomUUID(), icon=name=>`<img class="icon" src="/integration-icons/${name}.svg" alt="">`;
   const labels={owner:"Владелец",manager:"Управляющий",shift_manager:"Администратор",cashier:"Кассир",waiter:"Официант",barista:"Бариста",bartender:"Бармен"};
-  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,view:["orders","receipts"].includes(new URLSearchParams(location.search).get("view"))?new URLSearchParams(location.search).get("view"):"cashier",historyMode:new URLSearchParams(location.search).get("history")==="cancelled"?"cancelled":"paid",historyLimit:20,unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
+  const state={data:null,orders:[],rules:[],overview:null,report:null,reportLastSuccess:null,workday:null,adminActionsOpen:false,noticeKind:null,reportId:null,reportContextReady:false,view:["orders","receipts","report"].includes(new URLSearchParams(location.search).get("view"))?new URLSearchParams(location.search).get("view"):"cashier",historyMode:new URLSearchParams(location.search).get("history")==="cancelled"?"cancelled":"paid",historyLimit:20,unpaidOrderId:null,unpaidReasons:{},orderId:null,waiter:null,detailTab:"tables",category:"all",department:"all",subcategory:"all",search:"",busy:false,frozen:false,drafts:{},quick:{id:uuid(),lines:[],comment:""},pending:null,legacy:null,lastSuccess:null,stale:false};
   let dialogSubmit=null,dialogDraft=null,refreshController,navigationGeneration=0,navigationLoading=false,loadGeneration=0;
   const notice=(message,kind="operation")=>{state.noticeKind=kind;$("notice").textContent=message;}, identity=()=>[localStorage.getItem("bd_pos_identity"),localStorage.getItem("bd_session"),localStorage.getItem("bd_session_token")].join(":"), initialIdentity=identity();
   const selectedVenue=()=>new URLSearchParams(location.search).get("venue")||localStorage.getItem("bd_active_venue_id"), initialVenue=selectedVenue();
+  const reportContextKey=data=>`bd_cash_report_context_v1:${data.actor.accountId}:${data.venueId}`;
+  function restoreReportContext(data,fromHistory=false){
+    const params=new URLSearchParams(location.search);let saved={};
+    if(!fromHistory&&!params.has('view'))try{saved=JSON.parse(sessionStorage.getItem(reportContextKey(data))||'{}');}catch{}
+    const view=params.get('view')||saved.view||'cashier',id=params.get('reportShift')||saved.reportId||null;
+    state.view=['cashier','orders','receipts','report'].includes(view)?view:'cashier';
+    if(state.reportId!==id)setReport(null);state.reportId=id;state.reportContextReady=true;
+  }
+  function persistReportContext(push=false){
+    if(!state.data||state.frozen)return;
+    const url=new URL(location.href);url.searchParams.set('view',state.view);
+    if(state.reportId)url.searchParams.set('reportShift',state.reportId);else url.searchParams.delete('reportShift');
+    try{sessionStorage.setItem(reportContextKey(state.data),JSON.stringify({view:state.view,reportId:state.reportId}));}catch{}
+    if(url.href!==location.href)history[push?'pushState':'replaceState'](history.state,'',url);
+    try{if(window.parent!==window&&window.parent.location.origin===location.origin&&window.parent.location.pathname==='/cashier'){
+      const outer=new URL(window.parent.location.href);outer.searchParams.set('view',state.view);if(state.reportId)outer.searchParams.set('reportShift',state.reportId);else outer.searchParams.delete('reportShift');window.parent.history.replaceState(window.parent.history.state,'',outer);
+    }}catch{}
+  }
+  window.addEventListener('popstate',()=>{if(state.frozen||!state.data)return;restoreReportContext(state.data,true);void changeView(state.view,false);});
   const money=(amount,currency=state.data?.currency)=>amount==null?"Неизвестно":window.bdFormatAccountingMoney(amount,currency);
   const amount=value=>value==null?"—":new Intl.NumberFormat("ru-RU",{maximumFractionDigits:2}).format(value);
   const currency=()=>state.data?.currency==="PRB"?"руб. ПМР":state.data?.currency||"";
@@ -19,7 +38,7 @@
   const shift=()=>selectedShift(state.data), selectedOrder=()=>state.orders.find(o=>o.id===state.orderId&&o.status==="OPEN"), activeOrders=()=>state.orders.filter(o=>o.status==="OPEN" && o.shiftId===shift()?.id);
   const storageKey=()=>`bd_pos_workspace_v2:${state.data.actor.accountId}:${state.data.venueId}`;
   function clearView(name){const view=$(name+"-view");view.replaceChildren();view.hidden=true;}
-  function setReport(report){if(state.report?.businessDate!==report?.businessDate)state.workday=null;state.report=report;state.reportLastSuccess=report?Date.now():null;}
+  function setReport(report){if(state.report?.businessDate!==report?.businessDate)state.workday=null;state.report=report;if(report)state.reportId=report.shiftId;state.reportLastSuccess=report?Date.now():null;}
   function reconcileAccess(){
     if(!state.data?.permissions.managementDay){state.workday=null;document.querySelectorAll("[data-management-workday]").forEach(node=>node.remove());}
     if(!senior()){
@@ -89,20 +108,24 @@
       return data;
     });
     const [data,orders]=await Promise.all([dataPromise,read("/api/pos-orders")]);
-    if(data.venueId!==orders.venueId)throw Error("Заведение изменилось. Обновите кассу.");
-    const current=selectedShift(data),management=["owner","manager","shift_manager"].includes(data.actor.role),reportId=state.report?.shiftId||data.shifts.at(-1)?.id;
+    if(data.venueId!==orders.venueId||(initialVenue&&String(data.venueId)!==String(initialVenue)))throw Error("Заведение изменилось. Обновите кассу.");
+    if(!state.reportContextReady){restoreReportContext(data);view=state.view;}
+    const current=selectedShift(data),management=["owner","manager","shift_manager"].includes(data.actor.role),reportId=state.reportId||state.report?.shiftId||data.shifts.at(-1)?.id;
+    const reportAllowed=!!reportId&&data.shifts.some(s=>s.id===reportId);
     const [overview,reportResult,days]=await Promise.all([
       view==="overview"&&management&&current?read("/api/pos-overview?shiftId="+encodeURIComponent(current.id)):null,
-      view==="report"&&management&&reportId&&(state.report?.status!=="closed"||state.report.shiftId!==reportId)?read("/api/sales-events?reportShiftId="+encodeURIComponent(reportId)):null,
+      view==="report"&&management&&reportAllowed&&(state.report?.status!=="closed"||state.report.shiftId!==reportId)?read("/api/sales-events?reportShiftId="+encodeURIComponent(reportId)):null,
       data.permissions.managementDay&&["report","overview"].includes(view)?read("/api/operational-days"):null
     ]);
-    const report=reportResult?.report,businessDate=view==="report"?(report||state.report)?.businessDate:view==="overview"?current?.date:null;
+    const report=view==="report"&&!reportAllowed?null:reportResult?.report;
+    if(report&&(report.shiftId!==reportId||(report.venueId!=null&&String(report.venueId)!==String(data.venueId))))throw Error("Ответ относится к другой смене. Обновите отчёт.");
+    const businessDate=view==="report"?(report||state.report)?.businessDate:view==="overview"?current?.date:null;
     if(days&&days.venueId!==data.venueId)throw Error("Заведение изменилось. Обновите кассу.");
     const workday=days?.days.find(day=>day.businessDate===businessDate)||null;
     assertCurrentLoad(generation);
     return {generation,data,orders:orders.orders,overview,report,workday};
   }
-  function accept(value,restoreWorkspace=false) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;if(restoreWorkspace)restoreLocal();syncQuickShift();if(restoreWorkspace)saveLocal();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
+  function accept(value,restoreWorkspace=false) { if(state.frozen||value.generation!==loadGeneration)return false;if(identity()!==initialIdentity||selectedVenue()!==initialVenue){clearSensitive("Контекст изменился. Обновите кассу.");return false;}state.data=value.data;if(restoreWorkspace)restoreLocal();syncQuickShift();if(restoreWorkspace)saveLocal();state.orders=value.orders;if(state.orderId&&!selectedOrder())state.orderId=null;state.overview=value.overview;if(value.report!==undefined)setReport(value.report);state.workday=value.workday||null;reconcileAccess();if(state.view==="report"&&state.report)state.reportId=state.report.shiftId;persistReportContext(false);state.lastSuccess=Date.now();state.stale=false;$("connection").textContent="На связи";if(state.noticeKind==="connection")notice("");render();return true; }
   async function reload(){accept(await load());}
   function errorView(error){if(error.stale)return;state.stale=true;$("connection").textContent=error.network?"Нет соединения":error.code==="STOCK_EVIDENCE_CAPACITY_REACHED"?"История склада заполнена":"Данные устарели";notice(error.message,error.network&&!state.pending&&!state.legacy?"connection":"operation");if(state.data)render();}
   async function working(task) {
@@ -317,7 +340,7 @@
   }
   function renderReport(){
     const r=state.report;
-    const picker=`<div class="toolbar"><select id="report-picker" aria-label="Выберите смену"><option value="">Выберите смену</option>${state.data.shifts.map(s=>`<option value="${esc(s.id)}" ${r?.shiftId===s.id?"selected":""}>${esc(s.shiftName)} · ${esc(s.date)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"}</option>`).join("")}</select></div>`;
+    const picker=`<div class="toolbar"><select id="report-picker" aria-label="Выберите смену"><option value="">Выберите смену</option>${state.data.shifts.map(s=>`<option value="${esc(s.id)}" ${(state.reportId||r?.shiftId)===s.id?"selected":""}>${esc(s.shiftName)} · ${esc(s.date)} · ${s.closingStatus==="closed"?"Закрыта":"Открыта"}</option>`).join("")}</select></div>`;
     if(!r){$("report-view").innerHTML=picker+'<p class="empty">Выберите смену для просмотра отчёта.</p>';return;}
     const m=n=>money(n,r.currency),avg=r.totals.paidReceipts?r.totals.paidRevenue/r.totals.paidReceipts:null,cash=r.payments.find(p=>p.method==="CASH"),card=r.payments.find(p=>p.method==="CARD_EXTERNAL"),proportion=r.totals.paidRevenue>0?cash.paidRevenue/r.totals.paidRevenue*100:0;
     const cashRows=[["На начало",r.cash.openingFloat],["Наличные продажи",r.cash.salesRevenue],["Внесения",r.cash.cashIn],["Выдачи",r.cash.cashOut],["Инкассация",r.cash.safeDrop],["Ожидается",r.cash.expected],["Пересчитано",r.cash.actual]];
@@ -325,9 +348,9 @@
     $("cash-proportion").style.width=proportion+"%";$("card-proportion").style.width=(r.totals.paidRevenue>0?card.paidRevenue/r.totals.paidRevenue*100:0)+"%";
   }
   function renderDiscounts(){ $("discounts-view").innerHTML=`<div class="section-head"><div><h2>Настройка скидок</h2><p class="muted">Одна скидка на весь счёт, без накопления. Процент или фиксированная сумма.</p></div><button class="primary" data-action="new-rule">Создать</button></div><div class="rule-list">${state.rules.map(r=>`<div class="rule"><div><strong>${esc(r.name)}</strong><small>${r.kind==="PERCENT"?esc(r.value)+"%":esc(money(r.value))} · ${r.active?"Активна":"Выключена"}</small></div><button data-rule="${esc(r.id)}">Изменить</button></div>`).join("")||'<p class="empty">Правила скидок ещё не созданы.</p>'}</div>`; }
-  async function changeView(view){
+  async function changeView(view,persist=true){
     if(state.frozen||state.busy||["overview","report","discounts"].includes(view)&&!senior())return;
-    const generation=++navigationGeneration;state.view=view;state.waiter=null;state.filterWaiter="";
+    const generation=++navigationGeneration;++loadGeneration;state.view=view;if(persist)persistReportContext(true);state.waiter=null;state.filterWaiter="";
     navigationLoading=["overview","report","discounts"].includes(view);render();window.scrollTo({top:0,behavior:"instant"});
     if(!navigationLoading)return;
     $("connection").textContent="Обновляем данные…";
@@ -515,7 +538,7 @@
     if(event.target.id==="menu-department"){state.department=event.target.value;state.category="all";state.subcategory="all";renderCashier();}
     if(event.target.id==="menu-subcategory"){state.subcategory=event.target.value;renderCashier();}
     if(event.target.id==="waiter-filter"){state.filterWaiter=event.target.value;renderOverview();}
-    if(event.target.id==="report-picker"&&event.target.value)void working(async()=>{setReport((await request("/api/sales-events?reportShiftId="+encodeURIComponent(event.target.value))).report);await reload();});
+    if(event.target.id==="report-picker"&&event.target.value){state.reportId=event.target.value;setReport(null);persistReportContext(true);void changeView("report",false);}
   });
   window.addEventListener("storage",event=>{if(["bd_pos_identity","bd_session","bd_session_token","bd_active_venue_id",state.data?storageKey():"",state.data?shiftSelectionKey():""].includes(event.key))clearSensitive("Аккаунт, заведение, смена или черновик изменились в другой вкладке. Обновите кассу.");});
   document.addEventListener("visibilitychange",()=>{if(!document.hidden)void refreshController?.refresh(true);});
