@@ -666,8 +666,21 @@ function bdCashierEntryHref(){const venue=localStorage.getItem("bd_active_venue_
 function bdCashierEntry({onNavigate}){return typeof window.bdHasClientPermission==="function"&&window.bdHasClientPermission("sales.view")?i.jsx("button",{type:"button",className:"bd-more-quick-v166","data-bd-cashier-entry":true,onClick:()=>onNavigate(bdCashierEntryHref()),children:"Касса · столы, заказы и оплата"}):null}
 
 
-const bdOwnerUATFixesV285="owner-uat-v285";function BdRecordedWorkdayPayroll() {
-  const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = route?.id || "", date = params.get("workdayDate") || "", venue = params.get("venue") || "", key = String(scope) + ":" + id + ":" + date + ":" + venue;
+const bdOwnerUATFixesV285="owner-uat-v285";
+
+
+
+
+
+
+function BdRecordedWorkdayPayroll() {
+  const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
+    try {
+      return decodeURIComponent(route?.id || "");
+    } catch {
+      return "";
+    }
+  })(), date = params.get("workdayDate") || "", venue = params.get("venue") || "", key = String(scope) + ":" + id + ":" + date + ":" + venue;
   const [state, setState] = S.useState(null);
   const allowed = window.bdHasClientPermission?.("shifts.view") && window.bdHasClientPermission?.("team.view");
   S.useEffect(() => {
@@ -761,7 +774,7 @@ function BdWorkdayFlow({ onOperations, onNavigate, profile }) {
     const response = await fetch("/api/workdays" + (!body ? "?" + new URLSearchParams({ ...date ? { date } : {}, ...readShift ? { workdayId: readShift } : {} }).toString() : ""), { method: body ? "POST" : "GET", credentials: "include", cache: "no-store", headers: { ...ca(Ot()), ...body ? { "Content-Type": "application/json" } : {} }, signal, ...body ? { body: JSON.stringify(body) } : {} });
     const result = await response.json();
     if (!response.ok || !result.ok) {
-      const e = Error(result.error || ({ ACCESS_DENIED: "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0440\u0430\u0431\u043E\u0447\u0435\u0439 \u0441\u043C\u0435\u043D\u0435", WORKDAY_NOT_OPEN: "\u0420\u0430\u0431\u043E\u0447\u0430\u044F \u0441\u043C\u0435\u043D\u0430 \u0443\u0436\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430", MONTH_LOCKED: "\u041C\u0435\u0441\u044F\u0446 \u0437\u0430\u043A\u0440\u044B\u0442", WORKDAY_TEAM_REQUIRED: "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432", WORKDAY_CASH_OPEN: "\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043A\u0440\u043E\u0439\u0442\u0435 \u043A\u0430\u0441\u0441\u0443", WORKDAY_PAYROLL_INCOMPLETE: "\u0417\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0440\u0430\u0441\u0447\u0451\u0442\u0430 \u0424\u041E\u0422" }[result.code] || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0447\u0443\u044E \u0441\u043C\u0435\u043D\u0443"));
+      const e = Error(result.error || ({ ACCESS_DENIED: "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A \u0440\u0430\u0431\u043E\u0447\u0435\u0439 \u0441\u043C\u0435\u043D\u0435", WORKDAY_NOT_OPEN: "\u0420\u0430\u0431\u043E\u0447\u0430\u044F \u0441\u043C\u0435\u043D\u0430 \u0443\u0436\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430", MONTH_LOCKED: "\u041C\u0435\u0441\u044F\u0446 \u0437\u0430\u043A\u0440\u044B\u0442", WORKDAY_TEAM_REQUIRED: "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432", WORKDAY_CASH_OPEN: "\u0421\u043D\u0430\u0447\u0430\u043B\u0430 \u0437\u0430\u043A\u0440\u043E\u0439\u0442\u0435 \u043A\u0430\u0441\u0441\u0443", WORKDAY_PAYROLL_INCOMPLETE: "\u0417\u0430\u043F\u043E\u043B\u043D\u0438\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0440\u0430\u0441\u0447\u0451\u0442\u0430 \u0424\u041E\u0422" }[result.code] || (body ? "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0447\u0443\u044E \u0441\u043C\u0435\u043D\u0443" : "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0440\u0430\u0431\u043E\u0447\u0443\u044E \u0441\u043C\u0435\u043D\u0443")));
       e.status = response.status;
       throw e;
     }
@@ -850,7 +863,7 @@ function BdWorkdayFlow({ onOperations, onNavigate, profile }) {
         setSelectedShift("");
         setNextShift(false);
         setDate(e.detail.date);
-        window.bdSyncNavigationQuery({ workday: e.detail.date, shift: null });
+        window.bdSyncNavigationQuery({ workday: e.detail.date, workdayId: null, shift: null });
       }
     };
     window.addEventListener("bd:workday-select", select);
@@ -927,6 +940,7 @@ function BdWorkdayFlow({ onOperations, onNavigate, profile }) {
       setSelectedShift("");
       setNextShift(false);
       setDate(e.target.value);
+      window.bdSyncNavigationQuery({ workday: e.target.value, workdayId: null, shift: null });
     }
   } })), current.shifts?.length > 1 && !nextShift && /* @__PURE__ */ S.createElement("select", { "aria-label": "\u0420\u0430\u0431\u043E\u0447\u0430\u044F \u0441\u043C\u0435\u043D\u0430", value: current.workday?.id || "", disabled: dirty || locked, onChange: (e) => {
     setSelectedShift(e.target.value);

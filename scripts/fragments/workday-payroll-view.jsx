@@ -5,7 +5,7 @@ function bdWorkdayPayrollHref(work,venue,date){
 }
 function QAe(){const params=new URLSearchParams(location.search);return params.has('workdayDate')?<BdRecordedWorkdayPayroll/>:<BdLegacyShiftPayroll/>}
 function BdRecordedWorkdayPayroll(){
- const [,route]=$f('/finance/shift/:id/payroll'),[,navigate]=bt(),scope=Pt(Wm),params=new URLSearchParams(location.search),id=route?.id||'',date=params.get('workdayDate')||'',venue=params.get('venue')||'',key=String(scope)+':'+id+':'+date+':'+venue;
+ const [,route]=$f('/finance/shift/:id/payroll'),[,navigate]=bt(),scope=Pt(Wm),params=new URLSearchParams(location.search),id=(()=>{try{return decodeURIComponent(route?.id||'')}catch{return ''}})(),date=params.get('workdayDate')||'',venue=params.get('venue')||'',key=String(scope)+':'+id+':'+date+':'+venue;
  const [state,setState]=S.useState(null);const allowed=window.bdHasClientPermission?.('shifts.view')&&window.bdHasClientPermission?.('team.view');
  S.useEffect(()=>{const controller=new AbortController;setState(null);if(!allowed)return()=>controller.abort();
  fetch('/api/workdays?'+new URLSearchParams({date,workdayId:id}),{headers:ca(Ot()),credentials:'include',cache:'no-store',signal:controller.signal}).then(async response=>{const data=await response.json();if(!response.ok||!data.ok||String(data.venueId)!==venue||data.workday?.id!==id||data.workday?.date!==date||data.workday?.workdayStatus!=='CLOSED')throw Error('Сохранённый расчёт этой смены недоступен');if(!controller.signal.aborted)setState({key,data});}).catch(error=>{if(!controller.signal.aborted)setState({key,error:error.message});});return()=>controller.abort();
