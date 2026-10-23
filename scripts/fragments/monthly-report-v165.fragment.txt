@@ -222,7 +222,7 @@ function bdMonthlyExpensesV165({ report, period, navigate }) {
   const max = Math.max(1, ...rows.map((row) => Math.abs(Number(row.amount || 0))));
   const visible = rows.slice(0, 4);
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-expenses-v165", children: [
-    i.jsx(bdMonthlySectionHeaderV165, { title: "Расходы", caption: "Оплаты поставщикам и остальные денежные расходы", action: () => navigate("/finance?month=" + period + "&view=expenses"), actionLabel: "Все категории" }),
+    i.jsx(bdMonthlySectionHeaderV165, { title: "Оплаты и прочие расходы", caption: "Без зарплаты, налогов, коммунальных услуг и списаний", action: () => navigate("/finance?month=" + period + "&view=expenses"), actionLabel: "Записи" }),
     i.jsxs("div", { className: "bd-monthly-highlight-v165", children: [
       i.jsxs("span", { children: [i.jsx("small", { children: "Расходы за период" }), i.jsx("strong", { children: bdMoney2(report.periodExpenses) })] }),
       i.jsx("b", { children: rows.length + " кат." }),

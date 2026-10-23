@@ -1,0 +1,19 @@
+function bdExpenseScope(row){
+  if(!row||row.reversedAt||row.isDraft||["cancelled","canceled","void","voided","reversed","draft"].includes(String(row.status||"").toLowerCase()))return null;
+  if(Boolean(row.sourceDocumentId||row.purchaseId)&&["purchase_payment","purchase_document"].includes(row.source)||Boolean(row.sourceDocumentId||row.purchaseId)&&row.paymentKind==="supplier_payment")return "payments";
+  return ({writeoff:"writeoffs",payroll:"payroll",taxes:"taxes",utilities:"utilities"})[row.category]||"payments";
+}
+function bdExpenseSourceLabel(row){return ({write_off_document:"Документ списания",purchase_document:"Закупочный документ",purchase_payment:"Оплата поставщику",manual:"Вручную"})[row?.source]||"Не указан";}
+function bdFinanceScopedExpenseRecords({records,equipment,documents,canManage,onView,onDelete,report}){
+  const groups=[['payments','Оплаты и прочие расходы'],['writeoffs','Списания'],['payroll','Зарплата'],['taxes','Налоги'],['utilities','Коммунальные услуги']];
+  return i.jsx(i.Fragment,{children:groups.map(([key,label])=>{
+    const rows=records.filter(row=>bdExpenseScope(row)===key);
+    if(key!=='payments'&&!rows.length)return null;
+    return i.jsxs('section',{'data-bd-expense-scope':key,children:[
+      i.jsxs('h3',{style:{display:'flex',justifyContent:'space-between',gap:12,fontSize:14,fontWeight:700,margin:'16px 0 8px'},children:[label,key==='payments'&&i.jsx('span',{children:report?bdMoney2(report.periodExpenses):'—'})]}),
+      key==='payments'&&i.jsx('p',{className:'bd-monthly-empty-copy-v165',children:'Без зарплаты, налогов, коммунальных услуг и списаний.'}),
+      key==='payments'&&report&&i.jsx('div',{children:(report.expenseBreakdown||[]).map(row=>i.jsx(bdReportLine,{label:row.label,value:bdMoney2(row.amount)},row.label))}),
+      rows.length?i.jsx(bdFinanceExpenseRecordsV160,{records:rows,equipment,documents,canManage,onView,onDelete}):i.jsx('p',{className:'bd-monthly-empty-copy-v165',children:report?.periodExpenses===0?'За этот месяц записей нет.':'Нет доступных записей для расшифровки.'})
+    ]},key);
+  })});
+}
