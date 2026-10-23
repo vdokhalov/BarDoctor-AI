@@ -3,6 +3,22 @@ import fs from "node:fs";
 const assetPath = new URL("../public/assets/index-BQGspy0I.js", import.meta.url);
 let source = fs.readFileSync(assetPath, "utf8");
 
+// Warehouse context is URL-owned, so reload and history restore the same view.
+if (source.includes('function bdWarehousePage(){')) {
+ const start=source.indexOf('function bdWarehousePage(){');
+ // Anchors are unique to the warehouse component; do not touch other modules.
+ const oldSearch='[v,b]=S.useState(()=>window.bdReadNavigationQuery("q",""))';
+ const search='v=new URLSearchParams(o).get("q")||"",b=value=>e(bdWarehouseNavigationUrlV247({q:value||null}),{replace:!0})';
+ const oldGroup='[bdWarehouseGroupMode,bdSetWarehouseGroupMode]=S.useState("sections")';
+ const group='bdWarehouseGroupMode=["sections","categories","subcategories","list"].includes(new URLSearchParams(o).get("group"))?new URLSearchParams(o).get("group"):"sections",bdSetWarehouseGroupMode=value=>e(bdWarehouseNavigationUrlV247({group:value==="sections"?null:value}))';
+ let tail=source.slice(start);
+ if(tail.includes(oldSearch))tail=tail.replace(oldSearch,search);
+ if(tail.includes(oldGroup))tail=tail.replace(oldGroup,group);
+ tail=tail.replace('tab:f==="stock"?null:f,q:v||null,valuation:', 'tab:f==="stock"?null:f,valuation:').replace('[f,v,bdWarehouseValuationOnly]','[f,bdWarehouseValuationOnly]');
+ source=source.slice(0,start)+tail;
+ fs.writeFileSync(assetPath,source);
+}
+
 if (source.includes("bdWarehouseNavigationUrlV247")) {
   console.log("Navigation contract v247 already patched");
   process.exit(0);
