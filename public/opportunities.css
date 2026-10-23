@@ -17,3 +17,5 @@
 @media(min-width:1024px){html[data-bd-embedded] body{padding-left:0}}
 .calendar-summary{scrollbar-width:none}.calendar-summary::-webkit-scrollbar{display:none}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+
+.recommendation-grid .timing-past{color:var(--muted,#697086)}

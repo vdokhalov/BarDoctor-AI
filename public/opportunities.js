@@ -91,7 +91,11 @@
   }
 
   function calendarSummary() {
-    return shared ? shared.summary(state.calendar) : { events: [], nearest: null, nearestDays: null, highCount: 0, periodDays: 0 };
+    var summary=shared ? shared.summary(state.calendar) : { events: [], nearest: null, nearestDays: null, highCount: 0, periodDays: 0 };
+    summary.nearest=summary.events.find(function(event){return !eventTiming(event).past;})||null;
+    var remaining=summary.nearest?eventTiming(summary.nearest).remaining:null;
+    summary.nearestDays=remaining===null?null:Math.max(0,remaining);
+    return summary;
   }
   function renderSummary() {
     var summary = calendarSummary();
@@ -169,11 +173,13 @@
     });
     return block;
   }
+  function eventTiming(event) { return window.bdOpportunityTiming.project(event,state.restaurant.timezone); }
   function recommendationBlock(event) {
     var grid = element("div", "recommendation-grid");
     [["Формат", "format"], ["Предложение", "offer"], ["Продвижение", "promotion"], ["Операции", "operations"]].forEach(function (item) {
       var node = element("div");
-      node.append(element("b", "", item[0]), element("span", "", (event.recommendation || {})[item[1]] || "—"));
+      node.append(element("b", "", item[0]));
+      window.bdOpportunityTiming.advice((event.recommendation || {})[item[1]],eventTiming(event)).forEach(function(part){node.appendChild(element("span",part.status?"timing-past":"",part.text+(part.status?" — "+part.status:"")));});
       grid.appendChild(node);
     });
     return grid;
@@ -213,6 +219,7 @@
     var copy = element("div", "event-copy");
     copy.append(element("h3", "", event.title), element("p", "event-reason", event.summary || event.scoreReason));
     var category = element("span", "event-category " + event.category); category.append(element("i"), document.createTextNode(categoryLabel(event.category))); copy.appendChild(category);
+    var timing=eventTiming(event);if(timing.past)copy.appendChild(element("small","timing-past","Событие прошло"));else if(timing.remaining===0)copy.appendChild(element("small","","Сегодня"));
     var score = renderScore(event);
     var contextual = element("button", "contextual-action " + (event.decision === "planned" ? "selected" : event.decision === "watching" ? "watching" : ""), event.decision === "planned" ? "Запланировано" : event.decision === "watching" ? "Следим" : "Запланировать"); contextual.type = "button";
     if (event.decision === "planned" || event.decision === "watching") contextual.setAttribute("aria-pressed", "true");
@@ -229,7 +236,7 @@
     );
     if ((event.risks || []).length) content.appendChild(detailBlock("Риски", textList(event.risks, "risks")));
     content.append(
-      detailBlock("Срок решения", element("p", "", event.recommendation && event.recommendation.decisionDeadline ? date(event.recommendation.decisionDeadline, { day: "numeric", month: "long", year: "numeric" }) : "Срок не задан")),
+      detailBlock("Срок решения", element("p", "", event.recommendation && event.recommendation.decisionDeadline ? date(event.recommendation.decisionDeadline, { day: "numeric", month: "long", year: "numeric" }) + (timing.deadlineState ? " · " + timing.deadlineState : "") : "Срок не задан")),
       detailBlock("Уведомления", element("p", "", notificationCopy(event))),
       detailBlock("Источники", sourceBlock(event))
     );
@@ -323,5 +330,9 @@
       else { state.bootstrapping = false; render(); showNotice(error.message || "Не удалось открыть календарь.", "warning"); }
     }
   }
+  var timingDay=null;
+  function refreshTiming(){var next=window.bdOpportunityTiming.today(state.restaurant.timezone);if(state.calendar&&next!==timingDay){timingDay=next;var expanded=Array.from(document.querySelectorAll(".event-card:has(details[open])")).map(function(card){return card.id;});renderSummary();renderEvents();expanded.forEach(function(id){var card=document.getElementById(id);if(card)card.querySelector("details").open=true;});}}
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)refreshTiming();});
+  setInterval(refreshTiming,60000);
   initialise();
 })();
