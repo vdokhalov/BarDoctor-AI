@@ -1472,3 +1472,6 @@
     letter-spacing: -0.035em;
   }
 }
+
+/* Existing catalog archive, shared with nomenclature. */
+.bd-position-archive{padding:20px 16px 100px;max-width:900px;margin:auto}.bd-position-archive h2{font-size:20px;font-weight:700;margin-bottom:16px}.bd-position-archive input{width:100%;padding:12px;border:1px solid #dce2e8;border-radius:12px;background:white;margin-bottom:16px}.bd-position-archive p{margin:12px 0;color:#526174}.bd-archive-list article{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid #e3e8ee}.bd-archive-list strong{min-width:0;overflow-wrap:anywhere;font-size:15px}.bd-position-archive button{border:1px solid #dce2e8;background:#fff;border-radius:10px;padding:10px 12px;color:#224b89;font-weight:600;flex-shrink:0}.bd-position-archive button:disabled{opacity:.6}.bd-position-archive .bd-archive-back{margin-top:20px}@media(max-width:450px){.bd-archive-list article{align-items:flex-start;flex-direction:column;gap:10px}}
