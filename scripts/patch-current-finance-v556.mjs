@@ -10,6 +10,7 @@ const from=s.indexOf(start);
 if(from>=0){const to=s.indexOf(end,from);if(to<from)throw Error('Finance current result boundary missing');s=s.slice(0,from)+s.slice(to+end.length).replace(/^\n/,'');}
 s=s.replace(patched,anchor);
 const documentLinks=[
+ ['function bdMonthlyCostV165({ report }) {','function bdMonthlyCostV165({ report }) {if(!bdCogsExplanation(report).inventory)return bdMonthlyCostSourceV588({report});'],
  ['function k(){window.bdNavigateBack(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}))}', 'function k(){const back=bdFinanceDocumentReturnUrl();if(back){window.location.assign(back);return;}window.bdNavigateBack(bdWarehouseNavigationUrlV247({writeoff:null,tab:"writeoffs"}))}'],
  ['function close(){if(dirty&&!busy&&!window.confirm("Есть несохранённые значения. Закрыть без сохранения?"))return;a()}', 'function close(){if(dirty&&!busy&&!window.confirm("Есть несохранённые значения. Закрыть без сохранения?"))return;const back=bdFinanceDocumentReturnUrl();if(back){window.location.assign(back);return;}a()}'],
  ['i.jsx(bdAccountingHeader, { title: "Месячный отчёт"', 'report&&i.jsx(BdFinanceDocuments,{report}),i.jsx(bdAccountingHeader, { title: "Месячный отчёт"'],
@@ -33,7 +34,7 @@ if(process.argv.includes('--restore')){
 for(const [original,linked] of documentLinks)s=s.replaceAll(original,linked);
 s=s.replace('children:[bdManagementStockContextPhase4b.banner','children:[i.jsx(BdFinanceDocumentReturn,{}),bdManagementStockContextPhase4b.banner');
 if(s.split(anchor).length!==2)throw Error('Unique Finance current result anchor required');
-s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/finance-documents.fragment.txt',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
+s=s.replace(anchor,start+'\n'+fs.readFileSync(new URL('./fragments/cogs-explanation.fragment.txt',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('./fragments/finance-documents.fragment.txt',import.meta.url),'utf8')+'\n'+fs.readFileSync(new URL('./fragments/finance-current-result.fragment.txt',import.meta.url),'utf8')+end+'\n'+patched);
 if(!s.includes(after)){if(s.split(before).length!==2)throw Error('Unique Home finance anchor required');s=s.replace(before,after);}
 // Current-month summary owns current uncertainty. Keep closure checks secondary.
 const currentStatus='function bdFinanceCanonicalStatusV515({verified,monthKey,venueId}){';

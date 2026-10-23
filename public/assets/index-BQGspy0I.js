@@ -2170,7 +2170,7 @@ function bdMonthlyProfitStructureV165({ report }) {
   ] });
 }
 
-function bdMonthlyCostV165({ report }) {
+function bdMonthlyCostV165({ report }) {if(!bdCogsExplanation(report).inventory)return bdMonthlyCostSourceV588({report});
   const ratio = bdMonthlyRatioV165(report.costOfGoods, report.revenue);
   return i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-cost-v165", children: [
     i.jsx(bdMonthlySectionHeaderV165, { title: "Себестоимость и остатки", caption: "Проданный товар по данным выбранного заведения" }),
@@ -3553,6 +3553,34 @@ function bdFinancePluralV160(e,t,n,r){const a=Math.abs(Number(e))%100,s=a%10;ret
 function bdFinanceOpenMonthCloseV160(){const e=document.querySelector('[data-bd-finance-close-host="v160"]>button');e&&e.click()}
 function bdFinanceFinalReasonV160(e,t){if(!t)return"Нет финансовых данных за выбранный месяц";if(e.isClosed)return"Показан сохранённый итог закрытого месяца";if(e.operatingResult!=null)return"Расчёт готов по проверенным данным — завершите закрытие месяца";return"Итог не подтверждён — причины проверки показаны ниже"}
 /* finance-current-result-v573:start */
+function bdCogsExplanation(report){
+ const finite=value=>typeof value==='number'&&Number.isFinite(value),known=finite(report.costOfGoods),basis=report.costBasis;
+ const sales=['CAPTURED','historical_sales_snapshots'].includes(basis),manual=basis==='OWNER_DECLARED',mixed=basis==='MIXED';
+ // Untagged legacy reports expose the original inventory calculation explicitly.
+ const inventory=!basis&&!report.currentFinance&&(known||report.costOfGoods===null)&&finite(report.rawCostOfGoods)&&(!known||Math.abs(report.costOfGoods-report.rawCostOfGoods)<.005)&&[report.openingInventory,report.purchases,report.closingInventory,report.writeoffs].every(finite)&&Math.abs(report.rawCostOfGoods-(report.openingInventory+report.purchases-report.closingInventory-report.writeoffs))<.005;
+ let text=inventory?'Начальные остатки + закупки − конечные остатки − списания':sales?'По сохранённым продажам, с учётом возвратов.':manual?'По суммам, внесённым вручную.':mixed?'По сохранённым продажам и суммам, внесённым вручную.':'Источник расчёта не указан.';
+ if(!known)text=inventory?'Для расчёта не хватает подтверждённых данных.':sales||mixed?'Себестоимость части продаж пока неизвестна.':'Себестоимость пока неизвестна.';
+ else if(report.costOfGoods===0)text='Себестоимость за период — 0. '+text;
+ return {known,inventory,text};
+}
+function bdMonthlyCostSourceV588({report}){
+ const source=bdCogsExplanation(report),money=value=>typeof value==='number'&&Number.isFinite(value)?bdMoney2(value):'Не внесены';
+ return i.jsxs('section',{className:'bd-monthly-card-v165 bd-monthly-cost-v165',children:[
+ i.jsx(bdMonthlySectionHeaderV165,{title:'Себестоимость и остатки',caption:'Проданный товар по данным выбранного заведения'}),
+ i.jsxs('div',{className:'bd-monthly-highlight-v165',children:[i.jsxs('span',{children:[i.jsx('small',{children:'Себестоимость проданного'}),i.jsx('strong',{children:source.known?bdMoney2(report.costOfGoods):'Пока недоступна'})]}),i.jsx('b',{children:bdMonthlyRatioLabelV165(bdMonthlyRatioV165(report.costOfGoods,report.revenue))})]}),
+ i.jsx('p',{className:'bd-monthly-formula-v165',children:source.text}),
+ i.jsxs('details',{className:'bd-monthly-details-v165',children:[i.jsx('summary',{children:'Остатки и закупки'}),i.jsxs('div',{children:[
+ i.jsx(bdReportLine,{label:'Остатки на начало',value:money(report.openingInventory)}),
+ i.jsx(bdReportLine,{label:'Закупки',value:money(report.purchases)}),
+ i.jsx(bdReportLine,{label:'Остатки на конец',value:money(report.closingInventory)}),
+ i.jsx(bdReportLine,{label:'Списания',value:i.jsx(BdFinanceDocumentAmount,{report,kind:'writeoffs',children:money(report.writeoffs)})}),
+ typeof report.inventoryAdjustmentNet==='number'&&i.jsx(bdReportLine,{label:'Складские корректировки',value:i.jsx(BdFinanceDocumentAmount,{report,kind:'stock',children:money(-report.inventoryAdjustmentNet)})}),
+ report.costBasis==='historical_sales_snapshots'&&i.jsx(bdReportLine,{label:'Инвентаризация: потери (+), излишки (−)',value:i.jsx(BdFinanceDocumentAmount,{report,kind:'stock',children:money(report.inventoryLoss)})}),
+ report.costBasis==='historical_sales_snapshots'&&i.jsx(bdReportLine,{label:'Переоценка остатков (не расход)',value:money(report.inventoryRevaluation)}),
+ ...(report.sections||[]).map(section=>i.jsxs('article',{className:'bd-monthly-section-math-v165',children:[i.jsx('strong',{children:section.section}),i.jsx('p',{children:'Начало '+money(section.opening)+' · закупки '+money(section.purchases)+' · конец '+money(section.closing)+' · списания '+money(section.writeoffs)})]},section.section))
+ ]})]})]});
+}
+
 function bdFinanceDocumentUrl(report,kind){const url=new URL(window.location.href);url.searchParams.set('month',report.documentScope?.month||report.meta?.key);url.searchParams.set('venue',String(report.documentScope?.venueId||''));url.searchParams.set('financeDocuments',kind);return url.pathname+url.search;}
 function BdFinanceDocumentAmount({report,kind,children}){return report.documentScope?i.jsx('a',{href:bdFinanceDocumentUrl(report,kind),style:{color:'inherit',textDecoration:'underline',textUnderlineOffset:4},'aria-label':kind==='writeoffs'?'Документы списаний':'Документы складских корректировок',children}):children;}
 function bdFinanceDocumentReturnUrl(){const p=new URLSearchParams(window.location.search),back=p.get('financeReturn');if(!back)return null;try{const u=new URL(back,window.location.origin);return u.origin===window.location.origin&&['/finance','/reports'].includes(u.pathname)&&u.searchParams.get('venue')===p.get('venue')?u.pathname+u.search:null;}catch{return null;}}
