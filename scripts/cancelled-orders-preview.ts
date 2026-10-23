@@ -54,6 +54,16 @@ try{
  await post('sales',{action:'open_shift',shiftId:'test-shift',name:'Тестовая смена'});
  const created=await post('orders',{action:'create',orderId:'test-order-001',operationId:'create-test',expectedRevision:0,shiftId:'test-shift',tableNumber:'3',lines:[{id:'line',menuItemId:'beer',quantity:1}]});
  await post('orders',{action:'cancel_order',orderId:'test-order-001',operationId:'cancel-test',expectedRevision:created.order.revision,reason:'Гость передумал до приготовления'});
+ const nativeOrders:any=await (await runtime.api.orders.GET(runtime.request(owner,'/api/pos-orders'))).json();
+ assert.equal(nativeOrders.orders.length,1);const saved=nativeOrders.orders[0];
+ assert.equal(saved.shiftId,'test-shift');assert.equal(saved.cancelledAt,fixedTime);
+ assert.equal(saved.operations.at(-1).details.reason,'Гость передумал до приготовления');
+ assert.equal(saved.operations.at(-1).actor.accountId,owner.userId);
+ const other=await runtime.register('other-history@isolated.test');
+ const otherOrders:any=await (await runtime.api.orders.GET(runtime.request(other,'/api/pos-orders'))).json();
+ assert.equal(otherOrders.orders.length,0);
+ const wrong=runtime.request(other,'/api/pos-orders');wrong.headers.set('X-Venue-Id',String(venueId));
+ const rejected=await runtime.api.orders.GET(wrong);assert.equal(rejected.status,401);const isolated:any=await rejected.json();assert.equal(isolated.orders,undefined);
  const snapshot=()=>JSON.stringify({domain:runtime.sqlite.prepare('SELECT * FROM domain_data ORDER BY account_id,store_key').all(),orders:runtime.sqlite.prepare('SELECT * FROM pos_order_records ORDER BY order_id').all(),stock:runtime.sqlite.prepare('SELECT * FROM stock_journal_movements ORDER BY position').all()});const before=snapshot();
  const context=await browser.newContext({viewport:{width:390,height:844}});
  await context.addInitScript(({owner,venueId})=>{localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);localStorage.setItem('bd_active_venue_id',String(venueId));},{owner,venueId});
@@ -69,6 +79,29 @@ try{
  await page.reload();await page.getByRole('button',{name:/Стол 3.*50/}).waitFor();
  await page.getByRole('combobox',{name:'История кассы'}).selectOption('paid');
  await page.getByText('Оплаченных чеков пока нет.',{exact:true}).waitFor();
+ // Local response-contract variants; never written to fixture storage.
+ const variants=[saved,{...saved,id:'old',shiftId:'older-shift',tableNumber:'8',cancelledAt:'2026-09-30T23:30:00Z',operations:[]},
+ {...saved,id:'foreign',venueId:venueId+999,tableNumber:'FOREIGN'},
+ {...saved,id:'paid',status:'PAID',paidAt:fixedTime,tableNumber:'PAID'},
+ {...saved,id:'payment-linked',salesEventId:'paid-event',tableNumber:'LINKED'}];
+ await page.route('**/api/pos-orders',route=>route.fulfill({json:{...nativeOrders,orders:variants}}));
+ await page.goto(base+'/cashier?embedded=1&venue='+venueId+'&view=receipts&history=cancelled');
+ await page.getByRole('button',{name:/Стол 8/}).waitFor();
+ assert.equal(await page.locator('[data-cancelled-order]').count(),2);
+ await page.getByRole('button',{name:/Стол 8/}).click();
+ await page.getByText('Причина не сохранена',{exact:true}).last().waitFor();
+ await page.getByText('Отменил: Сотрудник не указан',{exact:true}).waitFor();
+ assert.match(await page.locator('#dialog-content').innerText(),/30.09.2026/);
+ await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+ await page.unroute('**/api/pos-orders');
+ let release!:()=>void;const gate=new Promise<void>(done=>release=done);
+ let arrived!:()=>void;const seen=new Promise<void>(done=>arrived=done);
+ await page.route('**/api/pos-orders',async route=>{arrived();await gate;await route.fulfill({json:nativeOrders});});
+ await page.reload({waitUntil:'domcontentloaded'});await seen;
+ await page.evaluate(()=>{localStorage.setItem('bd_active_venue_id','999999');window.dispatchEvent(new StorageEvent('storage',{key:'bd_active_venue_id'}));});
+ release();await page.waitForTimeout(150);
+ assert.equal(await page.locator('[data-cancelled-order]').count(),0);
+ assert.equal(await page.locator('#dialog').evaluate((d:HTMLDialogElement)=>d.open),false);
  assert.equal(snapshot(),before);assert.deepEqual(errors,[]);
- writeFileSync(out+'/results.json',JSON.stringify({status:'PASS',fixture:'local test account; one saved unpaid cancellation; no paid sales',errors,unchanged:true,scenarios:['saved cancellation reason, amount and lines visible','details','reload','paid receipts stay empty']},null,2));console.log('PASS cancelled orders preview');await context.close();
+ writeFileSync(out+'/results.json',JSON.stringify({status:'PASS',fixture:'local test account; one saved unpaid cancellation; no paid sales',errors,unchanged:true,scenarios:['saved cancellation reason, amount and lines visible','details','reload','paid receipts stay empty','native tenant isolation and persisted actor/time/shift','past shift/date retained; foreign and paid-linked excluded','missing audit fields remain unknown','late response after venue change discarded']},null,2));console.log('PASS cancelled orders preview');await context.close();
 }finally{await browser.close();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}
