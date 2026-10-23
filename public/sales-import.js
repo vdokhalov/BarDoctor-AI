@@ -8,6 +8,36 @@
   var sourceDialog = document.getElementById("source-dialog");
   var confirmDialog = document.getElementById("confirm-dialog");
 
+  var journalKeys=['query','from','to','shift','actor','payment','source','status'];
+  var initialJournalIdentity=journalIdentity(),journalGeneration=0;
+  function journalIdentity(){return [localStorage.getItem('bd_session'),localStorage.getItem('bd_active_venue_id')].join(':');}
+  function journalStorageKey(){return 'bd_sales_journal_context_v1:'+initialJournalIdentity;}
+  function syncJournalParent(){
+    try{if(window.parent!==window && window.parent.location.origin===location.origin && window.parent.location.pathname==='/sales-import'){
+      var parentUrl=new URL(window.parent.location.href),own=new URL(location.href);
+      journalKeys.concat(['batch']).forEach(function(k){var name=k==='batch'?k:'j_'+k,value=own.searchParams.get(name);if(value)parentUrl.searchParams.set(name,value);else parentUrl.searchParams.delete(name);});
+      window.parent.history.replaceState(window.parent.history.state,'',parentUrl);
+    }}catch{}
+  }
+  function restoreJournalFilters(useSaved){
+    var url=new URL(location.href),saved={};
+    if(useSaved&&!journalKeys.some(function(k){return url.searchParams.has('j_'+k);}))try{saved=JSON.parse(sessionStorage.getItem(journalStorageKey())||'{}');}catch{}
+    journalKeys.forEach(function(k){var node=document.getElementById('journal-'+k),value=url.searchParams.get('j_'+k)??saved[k]??'';
+      if((k==='from'||k==='to')&&value&&!/^\d{4}-\d{2}-\d{2}$/.test(value))value='';if(value&&(k==='shift'||k==='actor')&&!Array.from(node.options).some(function(o){return o.value===String(value);}))node.add(new Option(k==='shift'?'Выбранная смена':'Выбранный сотрудник',String(value)));node.value=String(value);
+    });
+  }
+  function saveJournalFilters(push){
+    if(journalIdentity()!==initialJournalIdentity)return;
+    var values=journalFilters(),url=new URL(location.href);journalKeys.forEach(function(k){if(values[k])url.searchParams.set('j_'+k,values[k]);else url.searchParams.delete('j_'+k);});
+    try{sessionStorage.setItem(journalStorageKey(),JSON.stringify(values));}catch{}
+    if(url.href!==location.href)history[push?'pushState':'replaceState'](history.state,'',url);
+    syncJournalParent();
+  }
+  function clearJournalContext(){
+    ++journalGeneration;state.payload=null;state.batch=null;state.pos=null;setDirty(false);if(editor.open)editor.close();if(sourceDialog.open)sourceDialog.close();editorBody.replaceChildren();document.getElementById('batch-list').replaceChildren();['journal-metrics','journal-metric-note','import-quality','import-metrics','pos-drafts'].forEach(function(id){document.getElementById(id).hidden=true;});
+    notice('Заведение или аккаунт изменились. Обновите журнал.','error');
+  }
+  window.addEventListener('storage',function(e){if(['bd_active_venue_id','bd_session','bd_session_token'].includes(e.key))clearJournalContext();});
   function h(value) {
     return String(value == null ? "" : value).replace(/[&<>\"']/g, function (char) {
       return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char];
@@ -123,6 +153,7 @@
       : "Загрузите итоги смены — BarDoctor сам разложит позиции по техкартам и покажет складской расход до проведения.";
     document.body.classList.toggle("has-sales-documents", Boolean((payload.batches || []).length));
     renderJournalOptions();
+    restoreJournalFilters(!state.journalRestored);state.journalRestored=true;saveJournalFilters(false);
     renderJournal();
     renderQuality(payload.dataQuality || { issues: [] });
     document.getElementById("add-sales").hidden = !(payload.capabilities && payload.capabilities.create);
@@ -145,21 +176,24 @@
     }).join("") : hasDocuments ? '<div class="quality-ok"><img src="/integration-icons/circle-check.svg" alt=""> Нет нерешённых ошибок</div>' : '';
   }
   function load() {
+    var generation=++journalGeneration;
+    if(journalIdentity()!==initialJournalIdentity || (new URL(location.href).searchParams.get('venue') && new URL(location.href).searchParams.get('venue')!==localStorage.getItem('bd_active_venue_id'))){clearJournalContext();return Promise.resolve();}
     notice("Загружаем журнал…", "info");
     var venue=localStorage.getItem("bd_active_venue_id"),email=localStorage.getItem("bd_session");
     // Both read models have independent handlers; preserve rendering/identity guards.
     var posContext = request('/api/sales-events');
     posContext.catch(function () {}); // loadPosContext reports its own controlled error.
     return request("/api/sales-batches").then(function (data) {
-      if(venue!==localStorage.getItem("bd_active_venue_id")||email!==localStorage.getItem("bd_session"))return;
+      if(generation!==journalGeneration||journalIdentity()!==initialJournalIdentity)return;
+      if(String(data.venueId)!==String(venue)){clearJournalContext();return;}
       state.payload = data;
       window.bdVenueTime.context(data);
       renderHome();
       notice("", "");
-      loadPosContext(posContext);
+      loadPosContext(posContext,generation);
       var requested = new URL(location.href).searchParams.get("batch");
-      if (requested && !editor.open) openBatch(requested);
-    }).catch(function (error) { notice(error.message, "error"); document.getElementById("journal-count").textContent="Журнал недоступен. Нажмите «Обновить», чтобы повторить."; });
+      if (requested && !editor.open) openBatch(requested,true);
+    }).catch(function (error) { if(generation!==journalGeneration||journalIdentity()!==initialJournalIdentity)return;notice(error.message, "error"); document.getElementById("journal-count").textContent="Журнал недоступен. Нажмите «Обновить», чтобы повторить."; });
   }
 
   function setDirty(value) {
@@ -167,9 +201,9 @@
     var panel = editor.querySelector(".editor-panel");
     if (panel) panel.dataset.bdUnsavedChanges = String(value);
   }
-  function showEditor() {
+  function showEditor(restoring) {
     if (!editor.open) editor.showModal();
-    if (!(history.state && history.state.salesEditor)) history.pushState({ salesEditor: true }, "", location.href);
+    if (!restoring && !(history.state && history.state.salesEditor)) history.pushState({ ...history.state,salesEditor: true }, "", location.href);
   }
   function closeEditor(force) {
     if (state.editorHistoryClosing && !force) return;
@@ -182,6 +216,7 @@
     state.editorHistoryClosing = false;
     setDirty(false); state.batch = null; state.mode = "preview";
     if (editor.open) editor.close();
+    if(!force){var url=new URL(location.href);url.searchParams.delete("batch");history.replaceState({...history.state,salesEditor:false},"",url);syncJournalParent();}
   }
   function header(title, kicker, status) {
     document.getElementById("editor-title").textContent = title;
@@ -315,9 +350,10 @@
       .then(function (data) { setDirty(false); state.batch = data.batch; renderPreview(); return load(); })
       .catch(function (error) { notice(error.message, "error"); }).finally(function () { setBusy(false); });
   }
-  function openBatch(id) {
+  function openBatch(id,restoring) {
     var batch = (state.payload && state.payload.batches || []).find(function (item) { return item.id === id; }); if (!batch) return;
-    state.batch = batch; state.mode = "preview"; if(batch.readOnly) renderEventDocument(batch); else renderPreview(); showEditor();
+    state.batch = batch; state.mode = "preview"; if(batch.readOnly) renderEventDocument(batch); else renderPreview(); showEditor(restoring);
+    var url=new URL(location.href);url.searchParams.set("batch",id);history.replaceState(history.state,"",url);syncJournalParent();
   }
   function renderEventDocument(batch) {
     header(journal.receiptNumber(batch), "ДОКУМЕНТ ПРОДАЖИ", batch.status);
@@ -457,7 +493,7 @@
   });
   if (window.visualViewport) window.visualViewport.addEventListener("resize", function () { document.body.classList.toggle("sales-keyboard-open", window.visualViewport.height < window.innerHeight * .72); });
   window.addEventListener("beforeunload", function (event) { if (state.dirty) { event.preventDefault(); event.returnValue = ""; } });
-  window.addEventListener("popstate", function () { if (sourceDialog.open) sourceDialog.close(); else if (editor.open) closeEditor(true); });
+  window.addEventListener("popstate", function () { if (sourceDialog.open) sourceDialog.close();if(editor.open)closeEditor(true);restoreJournalFilters(false);saveJournalFilters(false);renderJournal();var batch=new URL(location.href).searchParams.get("batch");if(batch)openBatch(batch,true); });
   sourceDialog.addEventListener("close", function () { if (history.state && history.state.salesSource) history.replaceState({}, "", location.href); });
   editor.addEventListener("cancel", function (event) { event.preventDefault(); closeEditor(false); });
   var journal = window.bdSalesJournal;
@@ -495,11 +531,13 @@
     shift.innerHTML='<option value="">Все смены</option><option value="NONE">Без смены</option>'+ids.map(function(id){return '<option value="'+h(id)+'">'+h(journal.shiftName({shiftId:id},shifts))+'</option>';}).join('');shift.value=selected;
     var actors=new Map(batches.map(function(b){return [journal.actorKey(b),journal.actor(b)];}));
     employee.innerHTML='<option value="">Все сотрудники</option>'+[...actors].map(function(entry){return '<option value="'+h(entry[0])+'">'+h(entry[1])+'</option>';}).join('');employee.value=selectedActor;
+    restoreJournalFilters(false);
   }
-  async function loadPosContext(pendingContext) {
+  async function loadPosContext(pendingContext,generation) {
     var venue=localStorage.getItem('bd_active_venue_id'),email=localStorage.getItem('bd_session');
     try {
       var context=await pendingContext;
+      if(generation!==journalGeneration||journalIdentity()!==initialJournalIdentity)return;
       if(venue!==localStorage.getItem('bd_active_venue_id')||email!==localStorage.getItem('bd_session')||String(context.venueId)!==String(state.payload?.venueId))return;
       state.pos=context;
       var cashEntry=document.getElementById("open-cashier"),needsDay=!context.workday?.ok&&context.permissions.managementDay;cashEntry.textContent=needsDay?"Открыть рабочий день в Сменах":"Открыть кассу";cashEntry.href=(needsDay?"/shifts":"/cashier")+"?venue="+encodeURIComponent(context.venueId);
@@ -531,8 +569,8 @@
     } catch {document.getElementById('pos-shift-status').textContent='Не удалось прочитать кассовую смену или сохранённый заказ. Откройте кассу для проверки.';}
   }
   document.querySelectorAll('[data-sales-view]').forEach(function(node){node.onclick=function(){selectSalesView(node.dataset.salesView);};});
-  document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.addEventListener('input',renderJournal);});
-  document.getElementById('journal-reset').onclick=function(){document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.value='';});renderJournal();};
+  document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.addEventListener('input',function(){saveJournalFilters(true);renderJournal();});});
+  document.getElementById('journal-reset').onclick=function(){document.querySelectorAll('.journal-filters input,.journal-filters select').forEach(function(node){node.value='';});saveJournalFilters(true);renderJournal();};
   document.addEventListener('bd:sales-before-navigate',function(event){var link=event.detail.control?.closest('[data-resume-shift]');if(link&&state.pos){try{localStorage.setItem('bd_pos_shift_v1:'+state.pos.actor.accountId+':'+state.pos.venueId,link.dataset.resumeShift);}catch{event.preventDefault();notice('Не удалось выбрать сохранённую смену. Откройте кассу и выберите её вручную.','error');}}});
   selectSalesView(salesView);
 

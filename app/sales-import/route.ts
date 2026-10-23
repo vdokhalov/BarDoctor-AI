@@ -19,7 +19,7 @@ const HTML = `<!doctype html>
   <link rel="stylesheet" href="/sales-journal.css?v=sales-scroll-stability">
   <script src="/pos-draft.js?v=pos1-hardening" defer></script>
   <script src="/sales-journal.js?v=sales-scroll-stability" defer></script>
-  <script src="/sales-import.js?v=sales-scroll-stability" defer></script>
+  <script src="/sales-import.js?v=journal-context-1" defer></script>
 </head>
 <body data-bd-parent-route="/more" data-sales-experience="v278">
   <header class="sales-topbar">
