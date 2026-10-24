@@ -210,7 +210,10 @@
         : "Добавьте отзывы вручную, импортируйте файл или подключите Google."));
     } else {
       topicItems.slice(0, 8).forEach(function (item) {
-        topics.appendChild(node("span", "topic-chip " + (item.negative > item.positive ? "negative" : ""), (topicLabels[item.topic] || item.topic) + " · " + number(item.count)));
+        var chip=node("details", "topic-chip " + (item.negative > item.positive ? "negative" : ""));
+        chip.appendChild(node("summary", "", (topicLabels[item.topic] || item.topic) + " · " + number(item.count) + (item.unknown ? " · Тональность не подтверждена" : "")));
+        (item.evidence || []).forEach(function(e){chip.appendChild(reviewEvidenceLink(e));});
+        topics.appendChild(chip);
       });
     }
     renderDoctor();
@@ -380,6 +383,7 @@
     }
     values.forEach(function (review) {
       var item = node("article", "review-item");
+      item.id = "review-" + encodeURIComponent(review.id);
       var date = node("div", "review-item-date");
       date.appendChild(node("span", "", readableDate(review.publishedAt || review.date, false)));
       if (review.ingestionMethod === "file_import") date.appendChild(node("span", "", "Импорт"));
@@ -421,14 +425,36 @@
     });
   }
 
+  function reviewEvidenceLink(e) {
+    var link=node("a", "review-evidence-link", "«" + e.quote + "»");
+    link.href="#review-"+encodeURIComponent(e.reviewId);
+    link.addEventListener("click", function () {
+      state.search=""; state.source="all"; state.filter="all";
+      document.getElementById("review-search").value="";
+      renderFilters(); renderReviewList();
+    });
+    return link;
+  }
+
   function renderDoctor() {
     var root = document.getElementById("reviews-doctor");
     root.textContent = "";
-    if (!state.doctor) return;
-    var recommendations = Array.isArray(state.doctor.recommendations) ? state.doctor.recommendations : [];
-    if (!recommendations.length) return;
+    var snapshot = state.layer && state.layer.doctorSnapshot;
+    if (snapshot && snapshot.status === "stale") { root.appendChild(node("p", "honest-state", "Отзывы изменились. Анализ устарел.")); return; }
+    if (!state.doctor) { root.appendChild(node("p", "honest-state", "Сохранённого анализа пока нет.")); return; }
+    var details = Array.isArray(state.doctor.recommendationDetails) ? state.doctor.recommendationDetails : [];
+    if (!details.length) {
+      root.appendChild(node("p", "honest-state", state.doctor.evidenceStatus === "unverified" ? "Жалобы не подтверждены цитатами." : "Подтверждённых рекомендаций пока нет.")); return;
+    }
     root.appendChild(node("h3", "doctor-heading", "Что делать дальше"));
-    recommendations.slice(0, 4).forEach(function (item) { root.appendChild(node("div", "doctor-item", item)); });
+    details.slice(0, 4).forEach(function (item) {
+      var card=node("div", "doctor-item", item.title);
+      (item.evidence || []).forEach(function (e) {
+        var link=reviewEvidenceLink(e);
+        var line=node("div", "");line.appendChild(link);card.appendChild(line);
+      });
+      root.appendChild(card);
+    });
   }
 
   function renderAll() {
@@ -602,7 +628,7 @@
     if (state.analysisAttempted || !canManageReviews()) return;
     state.analysisAttempted = true;
     var venueAtStart = currentVenueId();
-    var pending = reviews().filter(function (review) { return review.aiStatus === "pending"; }).slice(0, 25);
+    var pending = reviews().filter(function (review) { return review.aiStatus !== "done" || !Array.isArray(review.topicEvidence); }).slice(0, 25);
     if (!pending.length) return loadDoctorSummary();
     try {
       var analyzed = await api("/api/reviews/analyze", {
@@ -625,11 +651,6 @@
     if (state.doctorAttempted || !canManageReviews() || !summary().total) return;
     state.doctorAttempted = true;
     var venueAtStart = currentVenueId();
-    var cacheKey = "bd_review_doctor::" + currentVenueId() + "::" + (state.layer.updatedAt || "unknown");
-    try {
-      var cached = JSON.parse(sessionStorage.getItem(cacheKey) || "null");
-      if (cached) { state.doctor = cached; renderDoctor(); return; }
-    } catch { /* no-op */ }
     try {
       var data = summary();
       var result = await api("/api/reviews/doctor-summary", {
@@ -650,10 +671,10 @@
       });
       if (venueAtStart !== currentVenueId()) return;
       state.doctor = result.data || null;
-      if (state.doctor) sessionStorage.setItem(cacheKey, JSON.stringify(state.doctor));
+      if (result.snapshot) state.layer.doctorSnapshot = result.snapshot;
       renderDoctor();
     } catch {
-      // The deterministic summary remains available when the AI provider is offline.
+      showMessage("Не удалось сохранить анализ. Повторите попытку.", true);
     }
   }
 
@@ -697,7 +718,8 @@
       state.analysisAttempted = false;
       state.doctorAttempted = false;
       state.doctor = null;
-      try { state.doctor = JSON.parse(sessionStorage.getItem("bd_review_doctor::" + currentVenueId() + "::" + (state.layer.updatedAt || "unknown")) || "null"); } catch { /* Saved summaries remain optional. */ }
+      var saved = state.layer.doctorSnapshot;
+      if (saved && saved.status === "current") state.doctor = saved.data;
       renderAll();
       aiButton.disabled = state.aiRunning || !canManageReviews();
       loading.classList.add("hidden");
@@ -714,7 +736,7 @@
     }
   }
 
-  var aiButton = node("button", "", "Запустить AI-анализ отзывов");
+  var aiButton = node("button", "source-action", "Запустить AI-анализ отзывов");
   aiButton.type = "button";
   aiButton.id = "reviews-explicit-ai";
   document.getElementById("reviews-analysis-state").parentNode.appendChild(aiButton);

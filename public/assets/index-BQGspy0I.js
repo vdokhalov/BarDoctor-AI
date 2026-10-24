@@ -918,6 +918,26 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 function BdRecordedWorkdayPayroll() {
   const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
     try {
@@ -2941,6 +2961,10 @@ function bdPayrollEmployeeRowV164({row:e,onOpen:t}){const n=e.summary,r=Math.abs
 
 
 
+
+
+
+
 /* payroll-loading:start */
 function bdPayrollLoadState(sync,operational){return sync==="error"||operational==="error"?"error":sync==="ready"&&operational==="ready"?"ready":"loading"}
 function bdPayrollLoadingPage({state,month,context,back}){return i.jsx(nt,{showBottomNav:true,className:"pb-32",children:i.jsx($e,{className:"pt-0",children:i.jsxs("div",{className:"bd-payroll-page-v164",children:[i.jsx(bdSalaryHeaderV164,{title:"Зарплаты",context,back}),i.jsx("main",{className:"bd-payroll-main-v164",children:i.jsxs("section",{className:"bd-payroll-summary-v164",style:{padding:16},"data-bd-payroll-load":state,role:state==="error"?"alert":"status",children:[i.jsx("strong",{children:bdMonthDisplay(month)}),i.jsx("p",{style:{marginTop:12},children:state==="error"?"Не удалось загрузить зарплаты.":"Загружаем зарплаты…"}),state==="error"&&i.jsx("button",{type:"button",onClick:()=>window.location.reload(),style:{marginTop:12,minHeight:44},children:"Повторить"})]})})]})})})}
@@ -3875,7 +3899,7 @@ bdWarehouseMoney=function(value,currency){return value==null?"Неизвестн
 
 /* stock-basis-phase3a7:end */
 /* derived-metrics-phase3a8:start */
-"use strict";var bdReviewAggregatePhase3a8=(()=>{var u=Object.defineProperty;var S=Object.getOwnPropertyDescriptor;var b=Object.getOwnPropertyNames;var w=Object.prototype.hasOwnProperty;var k=(e,n)=>{for(var o in n)u(e,o,{get:n[o],enumerable:!0})},A=(e,n,o,s)=>{if(n&&typeof n=="object"||typeof n=="function")for(let r of b(n))!w.call(e,r)&&r!==o&&u(e,r,{get:()=>n[r],enumerable:!(s=S(n,r))||s.enumerable});return e};var R=e=>A(u({},"__esModule",{value:!0}),e);var x={};k(x,{aggregateReviews:()=>m,reviewMetricBuckets:()=>M,reviewMetricRating:()=>y});var C=e=>e&&typeof e=="object"&&!Array.isArray(e)?e:{},v=e=>Math.round(e*100)/100;function y(e){if(e==null||e===""||typeof e=="boolean")return null;let n=typeof e=="number"?e:Number(String(e).trim().replace(",","."));return Number.isFinite(n)&&n>=1&&n<=5?n:null}function m(e,n){let o=e.map(C).filter(t=>{let i=String(t.publishedAt??t.date??""),a=(p,h)=>{let d=/^\d{4}-\d{2}-\d{2}$/.test(p)?i.slice(0,10):i;return h?d>=p:d<=p};return(!n?.start||a(n.start,!0))&&(!n?.end||a(n.end,!1))}),s=o.map(t=>y(t.rating)).filter(t=>t!=null),r=o.filter(t=>t.aiStatus==="done"&&["positive","neutral","negative"].includes(String(t.sentiment))),c={positive:0,neutral:0,negative:0},l=new Map;for(let t of r){c[t.sentiment]++;for(let i of new Set((Array.isArray(t.topics)?t.topics:[]).filter(a=>typeof a=="string").map(a=>String(a).trim()).filter(Boolean))){let a=l.get(i)??{topic:i,count:0,positive:0,negative:0};a.count++,t.sentiment==="positive"&&a.positive++,t.sentiment==="negative"&&a.negative++,l.set(i,a)}}let g=[...l.values()].sort((t,i)=>i.count-t.count||t.topic.localeCompare(i.topic)),f=g.filter(t=>t.negative>0).sort((t,i)=>i.negative-t.negative||t.topic.localeCompare(i.topic));return{contractVersion:"review-aggregate-v1",total:o.length,rated:s.length,averageRating:s.length?v(s.reduce((t,i)=>t+i,0)/s.length):null,analyzed:r.length,pendingAnalysis:o.filter(t=>["pending","analyzing"].includes(String(t.aiStatus))).length,failedAnalysis:o.filter(t=>t.aiStatus==="failed").length,sentiment:c,negativeDenominator:r.length,negativeShare:r.length?v(c.negative/r.length*100)/100:null,topics:g,complaints:f,compliments:g.filter(t=>t.positive>0).sort((t,i)=>i.positive-t.positive||t.topic.localeCompare(i.topic)),recurringComplaints:f.filter(t=>t.negative>=2),inputIds:o.map(t=>String(t.id??t.deduplicationKey??"")).sort()}}function M(e,n=new Date,o=30){let s=c=>new Date(c).toISOString().slice(0,10),r=n.getTime()-o*864e5;return{current:m(e,{start:s(r),end:s(n.getTime())}),previous:m(e,{start:s(r-o*864e5),end:s(r-864e5)})}}return R(x);})();
+"use strict";var bdReviewAggregatePhase3a8=(()=>{var f=Object.defineProperty;var k=Object.getOwnPropertyDescriptor;var b=Object.getOwnPropertyNames;var A=Object.prototype.hasOwnProperty;var R=(t,n)=>{for(var i in n)f(t,i,{get:n[i],enumerable:!0})},x=(t,n,i,c)=>{if(n&&typeof n=="object"||typeof n=="function")for(let r of b(n))!A.call(t,r)&&r!==i&&f(t,r,{get:()=>n[r],enumerable:!(c=k(n,r))||c.enumerable});return t};var E=t=>x(f({},"__esModule",{value:!0}),t);var M={};R(M,{aggregateReviews:()=>v,reviewMetricBuckets:()=>C,reviewMetricRating:()=>S});var w=t=>t&&typeof t=="object"&&!Array.isArray(t)?t:{},I=new Set(["staff","kitchen","bar","music","hookah","cleanliness","wait_time","price","atmosphere","other"]),q=new Set(["positive","negative","neutral"]);function y(t,n){let i=w(t),c=typeof i.text=="string"?i.text:"";if(n===void 0&&i.analysisText!==void 0&&i.analysisText!==c)return[];let r=n===void 0?i.topicEvidence:n,u=[];for(let p of Array.isArray(r)?r:[]){let o=w(p);o.reviewId!==i.id||!I.has(o.topic)||!q.has(o.sentiment)||typeof o.quote!="string"||!o.quote.trim()||!c.includes(o.quote)||u.some(m=>m.topic===o.topic&&m.sentiment===o.sentiment&&m.quote===o.quote)||u.push({reviewId:i.id,topic:o.topic,sentiment:o.sentiment,quote:o.quote})}return u.filter(p=>!u.some(o=>o.topic===p.topic&&o.quote===p.quote&&o.sentiment!==p.sentiment))}var T=t=>t&&typeof t=="object"&&!Array.isArray(t)?t:{},h=t=>Math.round(t*100)/100;function S(t){if(t==null||t===""||typeof t=="boolean")return null;let n=typeof t=="number"?t:Number(String(t).trim().replace(",","."));return Number.isFinite(n)&&n>=1&&n<=5?n:null}function v(t,n){let i=t.map(T).filter(e=>{let s=String(e.publishedAt??e.date??""),d=(a,g)=>{let l=/^\d{4}-\d{2}-\d{2}$/.test(a)?s.slice(0,10):s;return g?l>=a:l<=a};return(!n?.start||d(n.start,!0))&&(!n?.end||d(n.end,!1))}),c=i.map(e=>S(e.rating)).filter(e=>e!=null),r=i.filter(e=>e.aiStatus==="done"&&["positive","neutral","negative"].includes(String(e.sentiment))),u={positive:0,neutral:0,negative:0},p=new Map;for(let e of r){u[e.sentiment]++;let s=y(e);for(let d of new Set([...Array.isArray(e.topics)?e.topics:[],...s.map(a=>a.topic)].filter(a=>typeof a=="string").map(a=>String(a).trim()).filter(Boolean))){let a=p.get(d)??{topic:d,count:0,positive:0,negative:0,unknown:0,evidence:[]};a.count++;let g=s.filter(l=>l.topic===d);g.some(l=>l.sentiment==="positive")&&a.positive++,g.some(l=>l.sentiment==="negative")&&a.negative++,g.length||a.unknown++,a.evidence.push(...g),p.set(d,a)}}let o=[...p.values()].sort((e,s)=>s.count-e.count||e.topic.localeCompare(s.topic)),m=o.filter(e=>e.negative>0).sort((e,s)=>s.negative-e.negative||e.topic.localeCompare(s.topic));return{contractVersion:"review-aggregate-v1",total:i.length,rated:c.length,averageRating:c.length?h(c.reduce((e,s)=>e+s,0)/c.length):null,analyzed:r.length,pendingAnalysis:i.filter(e=>["pending","analyzing"].includes(String(e.aiStatus))).length,failedAnalysis:i.filter(e=>e.aiStatus==="failed").length,sentiment:u,negativeDenominator:r.length,negativeShare:r.length?h(u.negative/r.length*100)/100:null,topicEvidenceIncomplete:o.some(e=>e.unknown>0),topics:o,complaints:m,compliments:o.filter(e=>e.positive>0).sort((e,s)=>s.positive-e.positive||e.topic.localeCompare(s.topic)),recurringComplaints:m.filter(e=>e.negative>=2),inputIds:i.map(e=>String(e.id??e.deduplicationKey??"")).sort()}}function C(t,n=new Date,i=30){let c=u=>new Date(u).toISOString().slice(0,10),r=n.getTime()-i*864e5;return{current:v(t,{start:c(r),end:c(n.getTime())}),previous:v(t,{start:c(r-i*864e5),end:c(r-864e5)})}}return E(M);})();
 
 
 XS=function(reviews){return bdReviewAggregatePhase3a8.aggregateReviews(reviews).averageRating};
@@ -4026,6 +4050,10 @@ function bdFinanceSummaryV160({report:e,hasData:t,onExpenses:n,onPayroll:r,onRev
 function bdFinanceWeekV160({week:e,range:t,schedule:n,completed:r,scheduled:a,onOpen:s}){const l=e.hasRevenueData,u=e.avgReceipt!==null?e.avgReceipt:null;return i.jsxs("button",{type:"button",className:"bd-finance-week-v160",onClick:s,children:[i.jsxs("header",{children:[i.jsxs("div",{children:[i.jsx("p",{children:"Текущая неделя · "+t}),i.jsx("small",{children:"График: "+n})]}),i.jsx(Br,{size:18,"aria-hidden":!0})]}),i.jsx("div",{children:[{label:"Выручка",value:l?Mn(e.revenue):"—"},{label:"Средний чек",value:u!==null?Mn(u):"—"},{label:"Списания",value:bdMoney2(e.writeoffs??0)},{label:"Смены",value:r+" из "+a}].map(d=>i.jsxs("span",{children:[i.jsx("small",{children:d.label}),i.jsx("strong",{children:d.value})]},d.label))})]})}
 function bdFinanceRevenueRecordsV160({records:e,profile:t,shiftResults:n,canManage:r,navigate:a,onView:s,onDelete:l}){return e.length===0?i.jsx("div",{className:"bd-finance-detail-empty",children:"Нет записей о выручке за этот месяц."}):i.jsx(qe,{mode:"popLayout",children:e.map(u=>{const d=Ym(u),f=t?Jle(u,t):null,m=n.get(u.date.slice(0,10))??null;return i.jsxs(W.div,{layout:!0,initial:{opacity:0,y:6},animate:{opacity:1,y:0},exit:{opacity:0},className:"bd-finance-record-v160",children:[i.jsxs("button",{type:"button",className:"bd-finance-record-main",onClick:()=>s({type:"revenue",record:u}),children:[i.jsx("strong",{children:sg(u.date)}),i.jsxs("span",{children:[Mn(u.revenue)," · ",u.receipts," ",bdFinancePluralV160(u.receipts,"чек","чека","чеков"),d!==null?" · средний чек "+Mn(d):"",u.guests!==void 0?" · "+u.guests+" гостей":""]}),f&&i.jsxs("small",{children:["ФОТ ",Mn(f.totalPayroll),f.payrollPercentOfRevenue!==null?" · "+f.payrollPercentOfRevenue+"% от выручки":""]}),m&&i.jsxs("em",{"data-bd-shift-result":"period-v4",children:["Результат до себестоимости ",bdMoney2(m.resultBeforeCost)]}),u.note&&i.jsx("small",{children:u.note})]}),i.jsxs("div",{className:"bd-finance-record-actions",children:[f&&i.jsx("button",{type:"button",onClick:()=>a("/finance/shift/"+u.id+"/payroll"),"aria-label":"Открыть аудит ФОТ",children:i.jsx($d,{size:16,"aria-hidden":!0})}),r&&i.jsx("button",{type:"button",onClick:()=>l({type:"revenue",id:u.id}),"aria-label":"Удалить запись о выручке",children:i.jsx(Ra,{size:16,"aria-hidden":!0})})]})]},u.id)})})}
 function bdFinanceExpenseRecordsV160({records:e,equipment:t,documents:n,canManage:r,onView:a,onDelete:s}){return e.length===0?i.jsx("div",{className:"bd-finance-detail-empty",children:"Нет записей о расходах за этот месяц."}):i.jsx(qe,{mode:"popLayout",children:e.map(l=>{const u=l.category==="repairs"&&l.equipmentId?t.find(v=>v.id===l.equipmentId):void 0,bdLinkedDocument=l.sourceDocumentId?n.find(v=>v.id===l.sourceDocumentId):void 0,bdCanManageFinance=r,f=l.category==="other"?l.customCategoryLabel||"Прочее":Lg[l.category],m=bdLinkedDocument?.supplierName||l.description||f,g=[sg(l.date),f,bdLinkedDocument?.supplierName&&m!==bdLinkedDocument.supplierName?bdLinkedDocument.supplierName:null,l.area].filter(Boolean).join(" · ");return i.jsxs(W.div,{layout:!0,initial:{opacity:0,y:4},animate:{opacity:1,y:0},exit:{opacity:0},className:"bd-finance-record-v160 expense",children:[i.jsxs("button",{type:"button",className:"bd-finance-record-main",onClick:()=>a({type:"expense",record:l}),children:[i.jsxs("span",{className:"bd-finance-record-copy",children:[i.jsx("strong",{children:m}),i.jsx("span",{children:g}),l.category==="repairs"&&i.jsx("small",{className:u?"":"warning",children:u?u.name:"Оборудование не выбрано"}),bdLinkedDocument&&i.jsx("small",{children:bdProcDocLabel(bdLinkedDocument.documentType)+" · "+(bdLinkedDocument.items?.length||0)+" "+bdProcPluralV168(bdLinkedDocument.items?.length||0,"позиция","позиции","позиций")})]}),i.jsx("b",{children:Mn(l.amount)}),i.jsx(Br,{size:16,"aria-hidden":!0})]}),!bdLinkedDocument&&bdCanManageFinance&&i.jsx("button",{type:"button",className:"bd-finance-record-delete",onClick:()=>s({type:"expense",id:l.id}),"aria-label":"Удалить расход",children:i.jsx(Ra,{size:16,"aria-hidden":!0})})]},l.id)})})}
+
+
+
+
 
 
 
@@ -5502,6 +5530,38 @@ function cEe(){return i.jsx(uK,{client:sEe,children:i.jsx(Zoe,{children:i.jsx(Vs
 const bdPurchasePracticalQaV211="v211";
 
 const bdFinancePurchaseGroupsV212="v212";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

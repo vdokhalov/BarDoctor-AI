@@ -1,3 +1,4 @@
+import { normalizeReviewAnalysis, reviewInputSignature } from "./review-evidence";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "./store-cas";
 import { desc, eq } from "drizzle-orm";
 import { getDb, getD1 } from "../../db";
@@ -169,6 +170,7 @@ export async function loadReviewLayer(account: AuthenticatedAccount) {
     reviews: stored.reviews,
     summary: reviewLayerSummary(currentReviews as CanonicalReview[]),
     updatedAt: stored.updatedAt,
+    doctorSnapshot: await readReviewDoctorSnapshot(account, currentReviews),
     sourceEvents: events.map((event) => ({
       id: event.id,
       source: event.source,
@@ -192,18 +194,11 @@ export async function applyReviewAnalysis(
     const id = reviewText(value.id, "", 240);
     const review = byId.get(id);
     if (!review) continue;
-    const sentiment = reviewText(value.sentiment).toLocaleLowerCase("en");
-    const topics = Array.isArray(value.topics)
-      ? value.topics.map((topic) => reviewText(topic, "", 80)).filter(Boolean).slice(0, 20)
-      : [];
-    if (!["positive", "neutral", "negative"].includes(sentiment)) {
-      review.aiStatus = "failed";
-    } else {
-      review.aiStatus = "done";
-      review.sentiment = sentiment;
-      review.topics = topics;
-      review.aiSummary = reviewOptionalText(value.summary ?? value.aiSummary, 2_000);
-    }
+    // The analyze response must still describe this exact source text.
+    if (value.analysisText !== review.text) continue;
+    const normalized = normalizeReviewAnalysis(review, value);
+    Object.assign(review, normalized);
+    delete review.aiSummary;
     review.updatedAt = now;
     updated += 1;
   }
@@ -223,4 +218,36 @@ export function accountReviewTenant(account: Account, venueId: number): ReviewTe
     actorName: "Integration Layer",
     actorRole: "integration",
   };
+}
+
+const doctorKey = (venueId: number) => `bd_review_doctor_v2:${venueId}`;
+export async function reviewAnalysisInput(account: AuthenticatedAccount) {
+ const stored = await storedReviews(account.id, account.venueId, true);
+ const { reviewsForCurrentGoogleLocation } = await import("./review-sources");
+ const reviews = await reviewsForCurrentGoogleLocation(account.id, stored.reviews);
+ return {reviews, signature: reviewInputSignature(reviews)};
+}
+async function readReviewDoctorSnapshot(account: AuthenticatedAccount, reviews: unknown[]) {
+ const [saved] = await readStoreSnapshots(getD1(), account.id, [doctorKey(account.venueId)]);
+ if(!saved?.dataJson)return {status:'absent'};
+ const snapshot=JSON.parse(saved.dataJson);
+ if(snapshot.venueId!==account.venueId)return {status:'absent'};
+ return {...snapshot,status:snapshot.inputSignature===reviewInputSignature(reviews)?'current':'stale'};
+}
+export async function saveReviewDoctorSnapshot(account: AuthenticatedAccount, signature: string, data: unknown) {
+ const keys=[REVIEW_STORE_KEY,doctorKey(account.venueId)];
+ const snapshots=await readStoreSnapshots(getD1(),account.id,keys);
+ const binding=await getD1().prepare("SELECT google_account_id, google_location_id FROM google_connections WHERE account_id=?").bind(account.id).first<{google_account_id:string|null;google_location_id:string|null}>();
+ const current=await reviewAnalysisInput(account);
+ if(current.signature!==signature)throw new Error('Отзывы изменились. Повторите анализ.');
+ const previous=snapshots[1]?.dataJson?JSON.parse(snapshots[1].dataJson):null;
+ if(previous?.inputSignature===signature && JSON.stringify(previous.data)===JSON.stringify(data))return previous;
+ const now=new Date().toISOString(),snapshot={venueId:account.venueId,inputSignature:signature,generatedAt:now,data};
+ const bindingGuard=getD1().prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at)
+ SELECT ?, '__bd_review_binding_guard__', NULL, ? WHERE NOT (
+ (?=0 AND NOT EXISTS(SELECT 1 FROM google_connections WHERE account_id=?)) OR
+ (?=1 AND EXISTS(SELECT 1 FROM google_connections WHERE account_id=? AND google_account_id IS ? AND google_location_id IS ?)))`)
+ .bind(account.id,now,binding?1:0,account.id,binding?1:0,account.id,binding?.google_account_id??null,binding?.google_location_id??null);
+ await runStoreCasBatch(getD1(),account.id,snapshots,[bindingGuard,getD1().prepare(`INSERT INTO domain_data(account_id,store_key,data_json,updated_at) VALUES(?,?,?,?) ON CONFLICT(account_id,store_key) DO UPDATE SET data_json=excluded.data_json,updated_at=excluded.updated_at`).bind(account.id,doctorKey(account.venueId),JSON.stringify(snapshot),now)],now);
+ return snapshot;
 }

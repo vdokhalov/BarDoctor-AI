@@ -1,3 +1,5 @@
+import { normalizeReviewAnalysis, groundedReviewSummary, reviewEvidenceCatalog } from "./review-evidence";
+import { reviewAnalysisInput, saveReviewDoctorSnapshot } from "./review-layer";
 import { RECOMMENDATION_METRIC_IDS as CANONICAL_METRIC_IDS } from "./recommendation-outcomes";
 import type { ContextProvenance } from "./context-provenance";
 import type { EvidenceReference } from "./evidence-contracts";
@@ -1635,12 +1637,15 @@ export async function handleSmart(request: Request): Promise<Response> {
 }
 
 async function reviewAnalyze(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
-  const reviews = Array.isArray(body.reviews) ? body.reviews : [];
+  const requested = Array.isArray(body.reviews) ? body.reviews : [];
+  const input = await reviewAnalysisInput(account);
+  const ids = new Set(requested.map(value => text(asRecord(value)?.id)));
+  const reviews = input.reviews.filter(review => ids.has(String(review.id)));
   if (reviews.length === 0 || reviews.length > 25) {
     throw new AIServiceError("Передайте от 1 до 25 отзывов.", 400);
   }
   const venueContext = await loadVenueAIContext(account, "reviews", body);
-  const system = `Проанализируй отзывы гостей ресторана. Для каждого верни sentiment positive|neutral|negative, topics из staff,kitchen,bar,music,hookah,cleanliness,wait_time,price,atmosphere,other, краткое русское summary и mentionedStaff только для явно названных людей. Не выдумывай имена. Верни только JSON: {"results":[{"id":"...","sentiment":"neutral","topics":["other"],"summary":"...","mentionedStaff":[]}]}.`;
+  const system = `Проанализируй отзывы гостей ресторана. Для каждого верни общую sentiment positive|neutral|negative и topicEvidence: отдельную тональность каждой явно упомянутой темы staff,kitchen,bar,music,hookah,cleanliness,wait_time,price,atmosphere,other. Для каждой темы приведи точную непрерывную цитату из исходного текста и reviewId. Тональность темы определяется только её цитатой, не общей оценкой. В смешанном отзыве похвала кухне остаётся positive даже при жалобе на ожидание. Не угадывай отсутствующие темы, не перефразируй цитаты; учитывай отрицания. Верни только JSON: {"results":[{"id":"...","sentiment":"neutral","topicEvidence":[{"reviewId":"...","topic":"kitchen","sentiment":"positive","quote":"точная цитата"}]}]}.`;
   const raw = await aiText({
     accountId: account.id,
     observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
@@ -1661,92 +1666,28 @@ async function reviewAnalyze(account: AuthenticatedAccount, body: JsonRecord): P
     const source = asRecord(review) ?? {};
     const id = text(source.id);
     const item = generated.get(id) ?? {};
-    const topics = textArray(item.topics, 6).filter((topic) => REVIEW_TOPICS.has(topic));
-    return {
-      id,
-      sentiment: validChoice(item.sentiment, SENTIMENTS, "neutral"),
-      topics: topics.length ? topics : ["other"],
-      summary: text(item.summary, "Отзыв сохранён без подробного резюме."),
-      mentionedStaff: textArray(item.mentionedStaff, 5),
-    };
+    return normalizeReviewAnalysis(source, item);
   });
   return Response.json({ success: true, data: { results } });
 }
 
 async function reviewDoctorSummary(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {
-  const insights = asRecord(body.insights);
-  if (!insights) throw new AIServiceError("Сводка отзывов обязательна.", 400);
-  const venueContext = await loadVenueAIContext(account, "reviews", body);
-  const evidenceCatalog = buildReviewEvidenceCatalog(body, venueContext);
-  const sentiment = asRecord(insights.sentiment) ?? {};
-  if (Number(sentiment.total ?? 0) < 3) {
-    const basisSummary = evidenceCatalog[0]?.fact ?? "Для устойчивого вывода нужно не менее трёх отзывов";
-    return Response.json({
-      success: true,
-      data: {
-        improved: [], worsened: [], topTopics: [], recurringProblems: [], implicatedStaff: [],
-        recommendations: [`Добавьте больше отзывов, чтобы AI Doctor мог сделать содержательный разбор. — Основание: ${basisSummary}`],
-        recommendationDetails: [{
-          recommendationId: "reviews-more-data",
-          title: "Добавьте больше отзывов, чтобы AI Doctor мог сделать содержательный разбор.",
-          basisSummary,
-          evidence: evidenceCatalog.slice(0, 1),
-          requiresVerification: true,
-        }],
-      },
+  const input = await reviewAnalysisInput(account);
+  const evidenceCatalog = reviewEvidenceCatalog(input.reviews);
+  let parsed: unknown = {recommendations:[]};
+  if (evidenceCatalog.some(e => e.sentiment === "negative")) {
+    const raw = await aiText({
+      accountId: account.id,
+      observability: {actorAccountId:account.actorAccountId,venueId:account.venueId,feature:"reviews"},
+      system: `Предложи короткие действия только по отрицательным темам отзывов. Позитив не превращай в жалобу. Каждое действие: title, topic, evidenceIds из каталога именно этой темы и только с sentiment negative. Не придумывай количество жалоб, цитаты, людей или факты. Если оснований нет, recommendations пуст. JSON {"recommendations":[{"title":"...","topic":"wait_time","evidenceIds":["точный id"]}]}.`,
+      maxTokens:2000,
+      messages:[{role:"user",content:jsonForPrompt({evidenceCatalog},36000)}],
     });
+    parsed=parseAIJson<unknown>(raw);
   }
-  const system = `Ты — аналитик отзывов ресторана. На русском языке выдели улучшения, ухудшения, главные темы, повторяющиеся проблемы и конкретные рекомендации. В implicatedStaff включай только имена, присутствующие во входном staffMentions. Каждая рекомендация обязана ссылаться на 1–3 точных id из evidenceCatalog; если фактов недостаточно, рекомендуй проверку гипотезы. Верни только JSON: {"improved":[],"worsened":[],"topTopics":[],"recurringProblems":[],"implicatedStaff":[],"recommendations":[{"recommendationId":"...","title":"...","basisSummary":"...","evidenceIds":["точный id"]}]}.`;
-  const raw = await aiText({
-    accountId: account.id,
-    observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "reviews" },
-    system,
-    maxTokens: 2_000,
-    messages: [{
-      role: "user",
-      content: jsonForPrompt({
-        reviewInput: body,
-        venueContext: venueAIContextForPrompt(venueContext),
-        evidenceCatalog,
-      }, 36_000),
-    }],
-  });
-  const result = asRecord(parseAIJson<unknown>(raw)) ?? {};
-  const allowedStaff = new Set(
-    (Array.isArray(body.staffMentions) ? body.staffMentions : [])
-      .map((item) => text(asRecord(item)?.name))
-      .filter(Boolean),
-  );
-  const recommendationDetails = (Array.isArray(result.recommendations) ? result.recommendations : [])
-    .map((value, index) => {
-      const item = asRecord(value);
-      const title = item ? text(item.title) : text(value);
-      if (!title) return null;
-      const evidence = item ? actionEvidence(item, evidenceCatalog) : evidenceCatalog.slice(0, 2);
-      return {
-        recommendationId: item ? text(item.recommendationId, `reviews-${index + 1}`) : `reviews-${index + 1}`,
-        title: title.slice(0, 180),
-        basisSummary: item
-          ? text(item.basisSummary, `Основано на ${evidence.length} фактах из отзывов`)
-          : `Основано на ${evidence.length} фактах из отзывов`,
-        evidence,
-        requiresVerification: evidence.some((entry) => entry.id === "reviews:insufficient"),
-      };
-    })
-    .filter((item): item is NonNullable<typeof item> => Boolean(item))
-    .slice(0, 8);
-  return Response.json({
-    success: true,
-    data: {
-      improved: textArray(result.improved, 8),
-      worsened: textArray(result.worsened, 8),
-      topTopics: textArray(result.topTopics, 8),
-      recurringProblems: textArray(result.recurringProblems, 8),
-      implicatedStaff: textArray(result.implicatedStaff, 8).filter((name) => allowedStaff.has(name)),
-      recommendations: recommendationDetails.map((item) => `${item.title} — Основание: ${item.basisSummary}`),
-      recommendationDetails,
-    },
-  });
+  const data=groundedReviewSummary(parsed,input.reviews);
+  const snapshot=await saveReviewDoctorSnapshot(account,input.signature,data);
+  return Response.json({success:true,data,snapshot:{...snapshot,status:"current"}});
 }
 
 async function reviewReply(account: AuthenticatedAccount, body: JsonRecord): Promise<Response> {

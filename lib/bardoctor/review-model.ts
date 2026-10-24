@@ -360,6 +360,8 @@ export function mergeReviewRecords(
         delete candidate.sentiment;
         delete candidate.topics;
         delete candidate.aiSummary;
+        delete candidate.topicEvidence;
+        delete candidate.analysisText;
         updated += 1;
         changes.push({ action: "update", before, after: candidate });
       } else {

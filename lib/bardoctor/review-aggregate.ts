@@ -1,3 +1,4 @@
+import { reviewTopicEvidence } from "./review-evidence";
 type Row = Record<string, unknown>;
 const row = (value: unknown): Row => value && typeof value === "object" && !Array.isArray(value) ? value as Row : {};
 const round = (value: number) => Math.round(value * 100) / 100;
@@ -21,14 +22,18 @@ export function aggregateReviews(values: unknown[], window?: { start?: string; e
   const ratings = reviews.map(review => reviewMetricRating(review.rating)).filter((rating): rating is number => rating != null);
   const analyzed = reviews.filter(review => review.aiStatus === "done" && ["positive", "neutral", "negative"].includes(String(review.sentiment)));
   const sentiment = { positive: 0, neutral: 0, negative: 0 };
-  const topics = new Map<string, { topic: string; count: number; positive: number; negative: number }>();
+  const topics = new Map<string, { topic: string; count: number; positive: number; negative: number; unknown: number; evidence: ReturnType<typeof reviewTopicEvidence> }>();
   for (const review of analyzed) {
     sentiment[review.sentiment as keyof typeof sentiment]++;
-    for (const topic of new Set((Array.isArray(review.topics) ? review.topics : []).filter(value => typeof value === "string").map(value => String(value).trim()).filter(Boolean))) {
-      const item = topics.get(topic) ?? { topic, count: 0, positive: 0, negative: 0 };
+    const evidence = reviewTopicEvidence(review);
+    for (const topic of new Set([...(Array.isArray(review.topics) ? review.topics : []), ...evidence.map(e => e.topic)].filter(value => typeof value === "string").map(value => String(value).trim()).filter(Boolean))) {
+      const item = topics.get(topic) ?? { topic, count: 0, positive: 0, negative: 0, unknown: 0, evidence: [] };
       item.count++;
-      if (review.sentiment === "positive") item.positive++;
-      if (review.sentiment === "negative") item.negative++;
+      const matches = evidence.filter(e => e.topic === topic);
+      if (matches.some(e => e.sentiment === "positive")) item.positive++;
+      if (matches.some(e => e.sentiment === "negative")) item.negative++;
+      if (!matches.length) item.unknown++;
+      item.evidence.push(...matches);
       topics.set(topic, item);
     }
   }
@@ -40,6 +45,7 @@ export function aggregateReviews(values: unknown[], window?: { start?: string; e
     analyzed: analyzed.length, pendingAnalysis: reviews.filter(review => ["pending", "analyzing"].includes(String(review.aiStatus))).length,
     failedAnalysis: reviews.filter(review => review.aiStatus === "failed").length,
     sentiment, negativeDenominator: analyzed.length, negativeShare: analyzed.length ? round(sentiment.negative / analyzed.length * 100) / 100 : null,
+    topicEvidenceIncomplete: sorted.some(topic => topic.unknown > 0),
     topics: sorted, complaints, compliments: sorted.filter(topic => topic.positive > 0).sort((a, b) => b.positive - a.positive || a.topic.localeCompare(b.topic)),
     recurringComplaints: complaints.filter(topic => topic.negative >= 2),
     inputIds: reviews.map(review => String(review.id ?? review.deduplicationKey ?? "")).sort(),

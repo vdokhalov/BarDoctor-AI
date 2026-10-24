@@ -19,8 +19,13 @@ for (const [label, ratings, average, rated] of [['5,null', [5, null], 5, 1], ['a
  assert.equal(aggregate.averageRating, average); assert.equal(aggregate.rated, rated); assert.equal(summary.averageRating, average); assert.equal(summary.analyzed, 0); assert.equal(aggregate.negativeShare, null);
 });
 test('G12 analyzed denominator, repeated compliments and complaints, pending sentiment excluded', () => {
- const values = [review(5,{aiStatus:'done',sentiment:'positive',topics:['service','service']}),review(null,{aiStatus:'done',sentiment:'positive',topics:['service']}),review(1,{aiStatus:'done',sentiment:'negative',topics:['wait']}),review(2,{aiStatus:'done',sentiment:'negative',topics:['wait']}),review(1,{sentiment:'negative',topics:['service']})];
- const result=aggregateReviews(values);assert.equal(result.analyzed,4);assert.equal(result.pendingAnalysis,1);assert.equal(result.negativeDenominator,4);assert.equal(result.negativeShare,.5);assert.deepEqual(result.recurringComplaints.map(item=>[item.topic,item.negative]),[['wait',2]]);assert.equal(result.compliments[0].positive,2);assert.equal(result.topics.find(item=>item.topic==='service')!.count,2);
+ const aspect = (rating: number | null, topic: string, sentiment: string) => {
+  const value=review(rating,{aiStatus:'done',sentiment,topics:[topic],text:'Exact fixture quote'});
+  return {...value,topicEvidence:[{reviewId:value.id,topic,sentiment,quote:'Exact fixture quote'}]};
+ };
+ const values = [aspect(5,'staff','positive'),aspect(null,'staff','positive'),aspect(1,'wait_time','negative'),aspect(2,'wait_time','negative'),review(1,{sentiment:'negative',topics:['staff']})];
+ const result=aggregateReviews(values);assert.equal(result.analyzed,4);assert.equal(result.pendingAnalysis,1);assert.equal(result.negativeDenominator,4);assert.equal(result.negativeShare,.5);assert.deepEqual(result.recurringComplaints.map(item=>[item.topic,item.negative]),[['wait_time',2]]);assert.equal(result.compliments[0].positive,2);assert.equal(result.topics.find(item=>item.topic==='staff')!.count,2);
+
  assert.equal(aggregateReviews(values,{start:'2026-10-01',end:'2026-10-31'}).averageRating,null);
 });
 test('G12 selected Google A/B and legacy unbound stay separate from manual population', () => {

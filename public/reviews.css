@@ -160,3 +160,8 @@
 @media (min-width: 1024px) {
   .reviews-page { padding-bottom: 58px; }
 }
+
+/* Evidence stays inside the existing topic controls. */
+details.topic-chip { display: block; max-width: 100%; box-sizing: border-box; }
+details.topic-chip summary { cursor: pointer; }
+.review-evidence-link { display: block; margin-top: 5px; overflow-wrap: anywhere; font-weight: 500; }
