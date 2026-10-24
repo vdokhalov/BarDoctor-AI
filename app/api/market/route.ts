@@ -1,3 +1,4 @@
+import { marketFailureDiagnostic, type MarketStage } from "../../../lib/bardoctor/market-diagnostics";
 import { filterMarketEvidence, linkedMarketSources, marketCandidateEligible } from "../../../lib/bardoctor/market-source-relevance";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
@@ -409,6 +410,8 @@ export async function POST(request: Request): Promise<Response> {
     ));
   }
   const casSnapshots = await readStoreSnapshots(getD1(), account.id, [MARKET_KEY]);
+  const diagnosticRequestId = crypto.randomUUID();
+  let diagnosticStage: MarketStage = "request";
   try {
     const rawBody = await request.text();
     if (new TextEncoder().encode(rawBody).byteLength > 30_000) {
@@ -434,6 +437,7 @@ export async function POST(request: Request): Promise<Response> {
         stale: marketAnalysisIsStale(previousAnalysis),
       }));
     }
+    diagnosticStage = "context";
     const venueContext = await loadVenueAIContext(account, "market", body);
 
     const address = text(body.address, text(restaurant.address), 240);
@@ -491,6 +495,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
 
 Найди реальные ближайшие заведения сходного и альтернативного формата, особенности района, подтверждённые сигналы аудитории и экономики. На основе этого сформируй возможности, риски, ориентиры цен, локальный маркетинг и 5–7 действий. Данные собственного заведения не выдавай за публичные факты.`;
 
+    diagnosticStage = "provider";
     const web = await openAIWebSearch({
       accountId: account.id,
       observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "market" },
@@ -514,7 +519,10 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         previousConfirmed.set(competitorKey(item), item);
       }
     }
-    const relevant = filterMarketEvidence(parseAIJson<unknown>(web.text), web.sources, {city,country,region});
+    diagnosticStage = "format";
+    const parsed = parseAIJson<unknown>(web.text);
+    diagnosticStage = "evidence";
+    const relevant = filterMarketEvidence(parsed, web.sources, {city,country,region});
     const analysis = normaliseMarketResult(relevant.result, relevant.sources);
     const nextCompetitors = Array.isArray(analysis.competitors) ? analysis.competitors : [];
     analysis.competitors = nextCompetitors.filter((value) => {
@@ -563,6 +571,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
       deletedCompetitorNames: [...deletedCompetitorNames],
     };
 
+    diagnosticStage = "save";
     await saveAnalysis(account.id, payload, casSnapshots);
 
     if (address || latitude !== null || longitude !== null) {
@@ -572,6 +581,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         ...(latitude !== null ? { lat: latitude } : {}),
         ...(longitude !== null ? { lng: longitude } : {}),
       };
+      diagnosticStage = "profile";
       await getDb()
         .update(accounts)
         .set({ restaurantJson: JSON.stringify(nextRestaurant), updatedAt: generatedAt })
@@ -580,6 +590,11 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
 
     return noStore(Response.json({ ok: true, data: payload, stale: false }));
   } catch (error) {
-    return noStore(aiErrorResponse(error));
+    const response = aiErrorResponse(error);
+    try {
+      console.error(JSON.stringify(marketFailureDiagnostic(error, diagnosticStage, response.status, diagnosticRequestId)));
+      response.headers.set("X-BD-Market-Request-Id", diagnosticRequestId);
+    } catch { /* Diagnostics must not replace the original response. */ }
+    return noStore(response);
   }
 }

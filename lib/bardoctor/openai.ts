@@ -1,3 +1,4 @@
+import { markWebSearchFailure } from './market-diagnostics';
 import { getIntegrationValue } from "./integration-secrets";
 import { runtimeEnv } from "./runtime-env";
 import {
@@ -403,9 +404,9 @@ export async function openAIWebSearch(input: {
       }),
       signal: AbortSignal.timeout(120_000),
     });
-  } catch {
+  } catch (error) {
     await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "error", errorCode: "network" });
-    throw new AIServiceError("Не удалось соединиться с OpenAI. Повторите запрос позже.", 502);
+    throw markWebSearchFailure(new AIServiceError("Не удалось соединиться с OpenAI. Повторите запрос позже.", 502), error instanceof Error && error.name === "TimeoutError" ? "PROVIDER_TIMEOUT" : "PROVIDER_NETWORK");
   }
 
   if (response.ok) {
@@ -418,7 +419,7 @@ export async function openAIWebSearch(input: {
       }>;
     };
     const text = responseText(payload);
-    if (!text) throw new AIServiceError("OpenAI вернул пустой ответ.", 502);
+    if (!text) throw markWebSearchFailure(new AIServiceError("OpenAI вернул пустой ответ.", 502), "PROVIDER_EMPTY");
     await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "success", payload });
     return { text, sources: responseWebSources(payload), model: configuredModel };
   }
@@ -426,7 +427,7 @@ export async function openAIWebSearch(input: {
   const primaryCode = await providerErrorCode(response);
   await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "error", errorCode: primaryCode || `http_${response.status}` });
   // Fail closed: a fallback model would bypass the declared single-request/tool budget.
-  throw new AIServiceError(providerErrorMessage(response.status, primaryCode), response.status >= 500 ? 502 : response.status);
+  throw markWebSearchFailure(new AIServiceError(providerErrorMessage(response.status, primaryCode), response.status >= 500 ? 502 : response.status), "PROVIDER_HTTP", response.status);
 }
 
 export async function openAIText(input: OpenAITextInput): Promise<string> {
