@@ -24,6 +24,13 @@ test('native market route gates a fresh search, retains exact decisions, reads h
   const response=await r.api.market.POST(r.request(owner,'/api/market','POST',{}));const body=await response.json() as any;assert.equal(response.status,200,JSON.stringify(body));
   const current=(await read()).analysis;if(process.env.EX12_BASELINE){assert.equal(current.competitors.length,2);assert.equal(current.sources.length,2);assert.match(current.competitorSummary,/Drive/);return;}assert.equal(current.competitors.length,1);assert.equal(current.competitors[0].name,'Luna');assert.equal(current.competitors[0].confirmed,true);assert.deepEqual(current.sources,[good]);assert.deepEqual(current.opportunities,[]);assert.doesNotMatch(current.competitorSummary,/Drive/);
   assert.deepEqual((await read()).analysis,current);assert.equal((await read(other)).analysis,null);assert.equal(provider.calls,1);
+  const unknown={title:'Rosa restaurant official site',url:'https://rosa.md/'};
+  provider.response={model:'local-fixture',sources:[good,unknown],text:JSON.stringify({competitors:[{name:'Luna',sourceUrls:[good.url]},{name:'Rosa',city:'Бендеры',country:'MD',sourceUrls:[unknown.url],rating:'5'}],pricing:[{item:'Lunch',range:'50',sourceUrls:[unknown.url]}]})};
+  assert.equal((await r.api.market.POST(r.request(owner,'/api/market','POST',{}))).status,200);
+  const mixed=(await read()).analysis,unverified=mixed.competitors.find((x:any)=>x.name==='Rosa');
+  assert.equal(unverified.evidenceStatus,'city_unverified');assert.equal(unverified.confirmed,false);assert.equal(unverified.rating,'');assert.deepEqual(mixed.pricing,[]);
+  const refused=await r.api.market.PATCH(r.request(owner,'/api/market','PATCH',{action:'set-competitor-confirmed',competitorKey:unverified.key,confirmed:true}));
+  assert.equal(refused.status,400);assert.match((await refused.json() as any).error,/Город не подтверждён/);assert.deepEqual((await read()).analysis,mixed,'rejected confirmation makes no write');
   // A changed geographic scope cannot inherit an old owner confirmation by name.
   r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({...profile,city:'Lyon',country:'France'}),owner.userId);
   provider.response={model:'local-fixture',sources:[{title:'Cafe Luna Lyon France',url:good.url.replace('.md','.fr')}],text:JSON.stringify({competitors:[{name:'Luna',key:'luna|'+good.url,sourceUrls:[good.url.replace('.md','.fr')]}]})};

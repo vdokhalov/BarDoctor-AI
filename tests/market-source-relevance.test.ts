@@ -24,11 +24,11 @@ test('city in brand alone or query string is not an address',()=>{
  assert.equal(marketSourceRelevant(source('Cafe Luna Moldova','https://guide.md/luna?q=Бендеры'),target,'Luna'),false);
 });
 test('model-provided category or location cannot supply missing source evidence',()=>{
- const s=source('Luna official website','https://luna.example/');assert.deepEqual(filterMarketEvidence({competitors:[candidate('Luna',s,{city:'Бендеры',country:'Молдова',evidence:'Ресторан в Бендерах'})]},[s],target).result.competitors,[]);
+ const s=source('Luna official website','https://luna.example/');const rows=filterMarketEvidence({competitors:[candidate('Luna',s,{city:'Бендеры',country:'Молдова',evidence:'Ресторан в Бендерах'})]},[s],target).result.competitors as any[];assert.equal(rows[0].evidenceStatus,'venue_unverified');assert.equal(rows[0].confirmed,false);assert.equal(rows[0].evidence,'Заведение не подтверждено');
 });
 test('explicit conflicting country beats a matching city and local ccTLD',()=>{assert.equal(marketSourceRelevant(source('Cafe Luna Бендеры Russia'),target,'Luna'),false);});
 test('contradictory candidate city cannot borrow a valid source',()=>{const s=source('Cafe Luna Бендеры Moldova');assert.deepEqual(filterMarketEvidence({competitors:[candidate('Luna',s,{city:'Бельцы'})]},[s],target).result.competitors,[]);});
-test('source about another establishment cannot be attached by name-independent URL allowlist',()=>{const s=source('Cafe Luna Бендеры Moldova');assert.deepEqual(filterMarketEvidence({competitors:[candidate('Other',s)]},[s],target).result.competitors,[]);});
+test('source about another establishment cannot be attached by name-independent URL allowlist',()=>{const s=source('Cafe Luna Бендеры Moldova');const rows=filterMarketEvidence({competitors:[candidate('Other',s)]},[s],target).result.competitors as any[];assert.equal(rows[0].evidenceStatus,'venue_unverified');assert.deepEqual(rows[0].sourceUrls,[]);});
 test('no location or missing country cannot distinguish homonyms',()=>{const s=source('Cafe Luna Paris');assert.equal(marketSourceRelevant(s,{city:'Paris',country:''},'Luna'),false);assert.equal(marketSourceRelevant(s,{city:'',country:'MD'},'Luna'),false);});
 test('unrelated or unused web search sources do not inflate evidence list',()=>{
  const good=source('Cafe Luna Бендеры Moldova'),bad=source('Bender dating application','https://app.example/'),unused=source('Cafe Other Бендеры Moldova','https://guide.md/other');const out=filterMarketEvidence({competitors:[candidate('Luna',good)],opportunities:[{title:'Fake market fact',sourceUrls:[bad.url]}],location:{summary:'Dating is market evidence',sourceUrls:[bad.url]}},[good,bad,unused],target);assert.deepEqual(out.sources,[good]);assert.deepEqual(out.result.opportunities,[]);assert.equal((out.result.location as any).summary,'Недостаточно местных источников.');
@@ -51,4 +51,37 @@ test('a country domain does not locate a business or override explicit valid cou
 test('final source list follows retained normalized records, not pre-limit or deleted candidates',()=>{
  const one=source('Cafe One Бендеры Moldova'),two=source('Cafe Two Бендеры Moldova','https://guide.md/two');
  assert.deepEqual(linkedMarketSources({competitors:[{sourceUrls:[one.url]}]},[one,two]),[one]);
+});
+test('missing city stays a candidate, distinct from a conflicting address',()=>{
+ const unknown=source('Luna restaurant — official website','https://luna.md/'),foreign=source('Other Cafe — Balti, Moldova','https://other.md/');
+ const result=filterMarketEvidence({competitors:[candidate('Luna',unknown,{city:'Бендеры',country:'MD',evidence:'Модель утверждает адрес',rating:'5',strengths:['Лидер рынка']}),candidate('Other',foreign)]},[unknown,foreign],target);
+ const rows=result.result.competitors as any[];assert.equal(rows.length,1);assert.equal(rows[0].evidenceStatus,'city_unverified');assert.equal(rows[0].evidence,'Город не подтверждён');assert.equal(rows[0].rating,'');assert.deepEqual(rows[0].strengths,[]);assert.equal(rows[0].confirmed,false);
+});
+test('mixed output preserves useful candidates but only local linked sources support conclusions',()=>{
+ const good=source('Cafe Luna Бендеры Moldova'),unknown=source('Rosa restaurant','https://rosa.md/'),foreign=source('Drive Pub — Balti, Moldova','https://drive.md/');
+ const out=filterMarketEvidence({competitors:[candidate('Luna',good),candidate('Rosa',unknown),candidate('Drive Pub',foreign)],opportunities:[{title:'Местный рынок',sourceUrls:[good.url]},{title:'Rosa лидер',sourceUrls:[unknown.url]},{title:'Drive Pub дешевле',sourceUrls:[good.url]}]},[good,unknown,foreign],target);
+ assert.deepEqual((out.result.competitors as any[]).map(x=>x.evidenceStatus),['local','city_unverified']);assert.deepEqual((out.result.opportunities as any[]).map(x=>x.title),['Местный рынок']);assert.equal(out.sources.length,2);
+});
+test('all unknown preserves candidate names, without local conclusions or scores',()=>{
+ const s=source('Luna restaurant','https://luna.md/');const out=filterMarketEvidence({competitors:[candidate('Luna',s)],pricing:[{item:'Lunch',range:'50',sourceUrls:[s.url]}]},[s],target);
+ assert.equal((out.result.competitors as any[]).length,1);assert.deepEqual(out.result.pricing,[]);assert.equal((out.result.competitors as any[])[0].score,null);
+});
+test('same names in different cities cannot merge geography or borrowing sources',()=>{
+ const a=source('Cafe Luna — Бендеры, Moldova'),b=source('Cafe Luna — Balti, Moldova','https://guide.md/balti/luna');
+ assert.equal((filterMarketEvidence({competitors:[candidate('Luna',a),candidate('Luna',b)]},[a,b],target).result.competitors as any[]).length,1);
+ assert.deepEqual(filterMarketEvidence({competitors:[{name:'Luna',sourceUrls:[a.url,b.url]}]},[a,b],target).result.competitors,[]);
+});
+test('unverified entries remain in candidate count but never count as confirmed, including forged flags',async()=>{
+ const {readFileSync}=await import('node:fs'),{runInNewContext}=await import('node:vm');const sandbox:any={window:{},localStorage:{getItem:()=>null},Date,Set};
+ runInNewContext(readFileSync('public/competitor-market-client-v329.js','utf8'),sandbox);
+ const result=sandbox.window.bdCompetitorMarketClientV329.summary({competitors:[{key:'a',confirmed:true,evidenceStatus:'local'},{key:'b',confirmed:true,evidenceStatus:'city_unverified'},{key:'c',confirmed:false,evidenceStatus:'venue_unverified'}]});
+ assert.equal(result.foundCount,3);assert.equal(result.confirmedCount,1);assert.equal(result.candidateCount,2);
+});
+test('a dating event at a restaurant is not confused with a dating application',()=>{assert.ok(marketSourceRelevant(source('Rosa restaurant: speed dating, Бендеры Moldova','https://rosa.example/event'),target,'Rosa'));});
+test('unverified candidates cannot enter downstream confirmed market context',async()=>{
+ const {buildVenueAIContextFromSources}=await import('../lib/bardoctor/venue-ai-context');
+ const unknown={name:'Unknown',confirmed:true,evidenceStatus:'city_unverified'},known={name:'Local',confirmed:true,evidenceStatus:'local'};
+ const build=(external?:any)=>buildVenueAIContextFromSources('diagnosis',{accountProfile:{name:'Local fixture'},stores:new Map([['bd_market_analysis_v1',{data:{competitors:[unknown,known]},updatedAt:'2026-10-24'}]]),external,now:new Date('2026-10-24T12:00:00Z')});
+ const stored=build();assert.deepEqual((stored.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
+ const supplied=build({confirmedCompetitors:[unknown,known]});assert.deepEqual((supplied.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
 });

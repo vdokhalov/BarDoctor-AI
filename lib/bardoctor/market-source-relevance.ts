@@ -19,55 +19,65 @@ function countryInfo(country:string){
  return {code,aliases:[...new Set(names.map(marketEvidenceWords).filter(x=>x.length>2))]};
 }
 const horeca=/\b(?:restaurant|restoran|restaurante|restaurantele|cafe|caffe|cafenea|cafeneaua|kafe|pub|bar|bistro|pizzeria|pizzeriya|hotel|otel|gostinitsa|nightclub|club|klub|coffee|coffeeshop|bakery|pekarnya|stolovaya)\b/;
-const irrelevant=/\b(?:dating|znakomstva|znakomstv|znakomst v|tinder|software|download|prilozhenie|igra|video game)\b/;
+const irrelevant=/\b(?:dating app|dating application|dating service|tinder|software|download|prilozhenie|video game)\b/;
 const marketTopic=/\b(?:population|naselenie|tourism|turizm|tourist|travel|traffic|transport|economy|economic|ekonomika|income|dohod|statistics|statistika|municipality|municipal|primaria|council|events|festival|festivali)\b/;
 function metadata(source:OpenAIWebSource){
  try{const u=new URL(source.url);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return null;
  return {title:marketEvidenceWords(source.title),path:marketEvidenceWords(decodeURIComponent(u.pathname)),host:u.hostname.toLowerCase(),text:marketEvidenceWords(source.title+' '+decodeURIComponent(u.pathname))};}catch{return null;}
 }
-/** A relevance gate, not verification of prices, ratings or the page contents.
- * Provider source metadata is all this flow retains. Insufficient metadata must
- * fail closed; no model-supplied city/category is treated as independent proof. */
-export function marketSourceRelevant(source:OpenAIWebSource,location:MarketLocation,name?:string):boolean{
- const m=metadata(source),city=marketEvidenceWords(location.city),region=marketEvidenceWords(location.region??''),country=countryInfo(location.country);
- if(!m||!city||!string(location.country)||irrelevant.test(m.text))return false;
- // A city appearing only inside the business name is not location evidence.
- const entity=marketEvidenceWords(name??'');
+export type MarketEvidenceStatus='local'|'city_unverified'|'venue_unverified';
+export function marketCandidateEligible(value:unknown){const item=row(value);return !!item&&(!item.evidenceStatus||item.evidenceStatus==='local');}
+function sourceAssessment(source:OpenAIWebSource,location:MarketLocation,name?:string){
+ const m=metadata(source),city=marketEvidenceWords(location.city),region=marketEvidenceWords(location.region??''),country=countryInfo(location.country),entity=marketEvidenceWords(name??'');
+ if(!m)return {status:'unknown' as const,entity:false,named:false};
+ const named=Boolean(entity&&contains(m.text,entity)),venue=named&&horeca.test(m.text);
+ if(irrelevant.test(m.text))return {status:'irrelevant' as const,entity:named,named};
  const geoText=entity?m.text.split(entity).join(' '):m.text;
- if(!contains(geoText,city))return false;
- if(region&&region!==city&&!contains(geoText,region))return false;
- // A national domain may describe any country. It is not an address.
- const countryPresent=country.aliases.some(alias=>contains(geoText,alias));
- if(!countryPresent)return false;
- // Explicit country conflicts override a matching city.
- if(countryGroups.some(g=>g[0]!==country.code&&g.slice(1).some(v=>contains(m.title,marketEvidenceWords(v)))))return false;
- // Explicit address city supplied by the source, unlike loose word overlap.
+ const conflictCountry=Boolean(location.country)&&countryGroups.some(g=>g[0]!==country.code&&g.slice(1).some(v=>contains(m.title,marketEvidenceWords(v))));
  const explicit=source.title.match(/(?:^|[\s,;|])(?:city|город|г\.|oraș|oras|localitate)\s*[:=]\s*([^,;|—–]+)/iu);
- if(explicit&&!contains(marketEvidenceWords(explicit[1]),city))return false;
  const located=source.title.match(/(?:restaurant|restoran|ресторан|cafe|café|кафе|pub|bar|бар)\b.{0,40}?\s(?:in|в|din)\s+([^,;|—–]+)/iu);
- if(located&&!contains(marketEvidenceWords(located[1]),city))return false;
- if(name){if(!entity||!contains(m.text,entity)||!horeca.test(m.text))return false;}
- else if(!horeca.test(m.text)&&!marketTopic.test(m.text))return false;
- return true;
+ // Recognize a source's explicit "Name — City, Country" address, without a city dictionary.
+ const address=source.title.split(/[|—–]/).map(x=>x.trim()).slice(1).map(x=>x.split(',').map(y=>y.trim())).find(parts=>parts.length>=2&&country.aliases.some(alias=>contains(marketEvidenceWords(parts.slice(1).join(' ')),alias)));
+ const tail=marketEvidenceWords(source.title.split(/[|—–]/).slice(1).at(-1)??'');
+ const tailCountry=country.aliases.find(alias=>tail.endsWith(' '+alias));
+ const addressCity=tailCountry?tail.slice(0,-tailCountry.length).trim():undefined;
+ const statedCity=explicit?.[1]??located?.[1]??address?.[0]??addressCity;
+ const conflictCity=Boolean(city&&statedCity&&!contains(marketEvidenceWords(statedCity),city));
+ if(conflictCountry||conflictCity)return {status:'conflict' as const,entity:named,named};
+ const geographic=Boolean(city&&location.country&&contains(geoText,city)&&(!region||region===city||contains(geoText,region))&&country.aliases.some(alias=>contains(geoText,alias)));
+ const topical=name?venue:horeca.test(m.text)||marketTopic.test(m.text);
+ return {status:geographic&&topical?'local' as const:'unknown' as const,entity:venue,named};
 }
+/** Source metadata is evidence of relevance, not verification of page contents.
+ * Missing location and contradictory location are deliberately different states. */
+export function marketSourceRelevant(source:OpenAIWebSource,location:MarketLocation,name?:string){return sourceAssessment(source,location,name).status==='local';}
 
 export function filterMarketEvidence(raw:unknown,sources:OpenAIWebSource[],location:MarketLocation){
  const input=row(raw)??{},byUrl=new Map(sources.map(s=>[s.url,s]));
- const links=(value:unknown,name?:string)=>[...new Set(strings(value))].filter(url=>{const source=byUrl.get(url);return source&&marketSourceRelevant(source,location,name)});
- const competitors=(Array.isArray(input.competitors)?input.competitors:[]).map(row).filter((v):v is Row=>!!v&&!!string(v.name)).flatMap(v=>{
+ const links=(value:unknown)=>[...new Set(strings(value))].filter(url=>{const source=byUrl.get(url);return source&&marketSourceRelevant(source,location)});
+ const candidates=(Array.isArray(input.competitors)?input.competitors:[]).map(row).filter((v):v is Row=>!!v&&!!string(v.name));
+ const competitors=candidates.flatMap(v=>{
   const claimedCity=string(v.city),claimedCountry=string(v.country);
-  if(claimedCity&&marketEvidenceWords(claimedCity)!==marketEvidenceWords(location.city))return [];
-  if(claimedCountry){const expected=countryInfo(location.country),claimed=countryInfo(claimedCountry);if(expected.code&&claimed.code?expected.code!==claimed.code:!expected.aliases.some(a=>claimed.aliases.includes(a)))return [];}
-  const sourceUrls=links(v.sourceUrls,string(v.name));
-  return sourceUrls.length?[{...v,key:undefined,sourceUrls,confirmed:false}]:[];
+  if(location.city&&claimedCity&&marketEvidenceWords(claimedCity)!==marketEvidenceWords(location.city))return [];
+  if(location.country&&claimedCountry){const expected=countryInfo(location.country),claimed=countryInfo(claimedCountry);if(expected.code&&claimed.code?expected.code!==claimed.code:!expected.aliases.some(a=>claimed.aliases.includes(a)))return [];}
+  if(irrelevant.test(marketEvidenceWords(string(v.name)+' '+string(v.category))))return [];
+  const cited=[...new Set(strings(v.sourceUrls))].flatMap(url=>{const source=byUrl.get(url);return source&&metadata(source)?[{source,...sourceAssessment(source,location,string(v.name))}]:[]});
+  if(cited.some(s=>s.entity&&(s.status==='conflict'||s.status==='irrelevant')))return [];
+  const local=cited.filter(s=>s.status==='local'),venue=cited.filter(s=>s.entity&&s.status==='unknown');
+  const evidenceStatus:MarketEvidenceStatus=local.length?'local':venue.length?'city_unverified':'venue_unverified';
+  const retained=local.length?local:venue.length?venue:cited.filter(s=>s.status==='unknown'&&s.named);
+  return [{...v,name:v.name,key:undefined,evidenceStatus,sourceUrls:retained.map(s=>s.source.url),confirmed:false,...(evidenceStatus==='local'?{}:{evidence:evidenceStatus==='city_unverified'?'Город не подтверждён':'Заведение не подтверждено',distance:'',rating:'',strengths:[],gaps:[],score:null,relevanceScore:null})}];
  });
- const result:Row={assumptions:input.assumptions,competitors,competitorSummary:competitors.length?'Найдены заведения для проверки.':'Недостаточно источников о заведениях в этом городе.'};
+ const blockedNames=candidates.filter(v=>!competitors.some(c=>c.name===v.name&&c.evidenceStatus==='local')).map(v=>marketEvidenceWords(string(v.name)));
+ const mentionsUnproven=(v:Row)=>{const text=marketEvidenceWords(Object.entries(v).filter(([k])=>k!=='sourceUrls').map(([,value])=>JSON.stringify(value)).join(' '));return blockedNames.some(name=>contains(text,name));};
+ const localCount=competitors.filter(c=>c.evidenceStatus==='local').length;
+ const result:Row={assumptions:input.assumptions,competitors,competitorSummary:localCount?'Найдены местные заведения для проверки.':competitors.length?'Город кандидатов требует проверки.':'Недостаточно источников о заведениях в этом городе.'};
  for(const key of ['location','audience','economy','positioning']){
   const section=row(input[key])??{},sourceUrls=links(section.sourceUrls);
-  result[key]=sourceUrls.length?{...section,sourceUrls}:{summary:'Недостаточно местных источников.',signals:[],segments:[],sourceUrls:[]};
+  result[key]=sourceUrls.length&&!mentionsUnproven(section)?{...section,sourceUrls}:{summary:'Недостаточно местных источников.',signals:[],segments:[],sourceUrls:[]};
  }
  for(const key of ['opportunities','risks','pricing','marketing','actions'])result[key]=(Array.isArray(input[key])?input[key]:[]).map(row).filter((v):v is Row=>!!v).flatMap(v=>{
-  const sourceUrls=links(v.sourceUrls);return sourceUrls.length?[{...v,sourceUrls}]:[];
+  const sourceUrls=links(v.sourceUrls);return sourceUrls.length&&!mentionsUnproven(v)?[{...v,sourceUrls}]:[];
  });
  return {result,sources:linkedMarketSources(result,sources)};
 }

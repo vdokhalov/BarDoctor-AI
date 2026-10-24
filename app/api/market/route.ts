@@ -1,4 +1,4 @@
-import { filterMarketEvidence, linkedMarketSources } from "../../../lib/bardoctor/market-source-relevance";
+import { filterMarketEvidence, linkedMarketSources, marketCandidateEligible } from "../../../lib/bardoctor/market-source-relevance";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
 import { getDb, getD1 } from "../../../db";
@@ -162,12 +162,13 @@ function normaliseMarketResult(
       name: text(item.name, "Без названия", 160),
       category: text(item.category, "Заведение", 100),
       relation: RELATIONS.has(text(item.relation)) ? text(item.relation) : "alternative",
-      distance: text(item.distance, "Расстояние не подтверждено", 100),
+      distance: marketCandidateEligible(item) ? text(item.distance, "Расстояние не подтверждено", 100) : "",
       rating: text(item.rating, "", 40),
       evidence: text(item.evidence, "Публичных данных недостаточно", 700),
       strengths: textList(item.strengths, 5),
       gaps: textList(item.gaps, 5),
       sourceUrls: sourced(item.sourceUrls),
+      evidenceStatus: item.evidenceStatus,
       confirmed: false,
     }));
 
@@ -382,6 +383,7 @@ export async function PATCH(request: Request): Promise<Response> {
       const item = record(value);
       if (!item || competitorKey(item) !== key) return value;
       found = true;
+      if(body.confirmed && !marketCandidateEligible(item))throw new AIServiceError(item.evidenceStatus==="city_unverified"?"Город не подтверждён.":"Заведение не подтверждено.",400);
       return {
         ...item,
         key,
@@ -456,7 +458,7 @@ export async function POST(request: Request): Promise<Response> {
 - каждого названного конкурента связывай с источником именно об этом заведении в указанном городе и стране; соседний город не является тем же городом;
 - одноимённое приложение, бренд или город в другой стране не являются местным заведением; исключай явные противоречия;
 - в sourceUrls каждого вывода и действия указывай только источники, на которых он основан; не добавляй фоновые ссылки;
-- если заголовок и URL не позволяют установить город, страну и принадлежность заведения к общепиту, не включай его в список; неизвестное не подменяй предположением;
+- если город или принадлежность заведения не подтверждены, сохрани возможного кандидата без выдуманного адреса; не используй его для выводов о местном рынке; явно другой город и нерелевантные объекты исключай;
 - не приписывай конкурентам недостатки без публичного подтверждения;
 - отделяй наблюдаемый факт от аналитической гипотезы;
 - если данных нет, прямо напиши об этом;
@@ -521,7 +523,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         && !deletedCompetitorNames.has(competitorNameKey(item));
     }).map((value) => {
       const item = record(value) ?? {};
-      const previous = previousConfirmed.get(competitorKey(item));
+      const previous = marketCandidateEligible(item) ? previousConfirmed.get(competitorKey(item)) : undefined;
       return {
         ...item,
         confirmed: Boolean(previous),
@@ -531,7 +533,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     const generatedAt = new Date().toISOString();
     const detectedChanges = deriveMarketChanges({
       previous: previousAnalysis,
-      nextCompetitors: Array.isArray(analysis.competitors) ? analysis.competitors : [],
+      nextCompetitors: Array.isArray(analysis.competitors) ? analysis.competitors.filter(marketCandidateEligible) : [],
       detectedAt: generatedAt,
     });
     const changesByCompetitor = new Map<string, JsonRecord[]>();
@@ -542,7 +544,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     }
     analysis.competitors = (Array.isArray(analysis.competitors) ? analysis.competitors : []).map((value) => {
       const item = record(value) ?? {};
-      return { ...item, changes: changesByCompetitor.get(text(item.name).toLocaleLowerCase("ru")) ?? [] };
+      return { ...item, changes: marketCandidateEligible(item) ? changesByCompetitor.get(text(item.name).toLocaleLowerCase("ru")) ?? [] : [] };
     });
     const payload = {
       version: 1,

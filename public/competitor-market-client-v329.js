@@ -59,7 +59,7 @@
 
   function changes(analysis) {
     var direct = Array.isArray(analysis && analysis.detectedChanges) ? analysis.detectedChanges.filter(Boolean) : [];
-    if (direct.length) return direct;
+    if (direct.length) return direct.filter(function(change){return !competitors(analysis).some(function(item){return !eligible(item)&&(item.key===change.competitorKey||item.name===change.competitorName);});});
     var merged = [];
     competitors(analysis).forEach(function (competitor) {
       (Array.isArray(competitor.changes) ? competitor.changes : []).forEach(function (change) {
@@ -69,6 +69,8 @@
     return merged;
   }
 
+  function eligible(item) { return !item.evidenceStatus || item.evidenceStatus === "local"; }
+
   function summary(analysis) {
     var rows = competitors(analysis);
     var changeRows = changes(analysis).slice().sort(function (left, right) {
@@ -77,8 +79,8 @@
     return {
       competitors: rows,
       foundCount: rows.length,
-      confirmedCount: rows.filter(function (item) { return item.confirmed === true; }).length,
-      candidateCount: rows.filter(function (item) { return item.confirmed !== true; }).length,
+      confirmedCount: rows.filter(function (item) { return item.confirmed === true && eligible(item); }).length,
+      candidateCount: rows.filter(function (item) { return item.confirmed !== true || !eligible(item); }).length,
       changes: changeRows,
       attentionCount: changeRows.filter(function (item) { return item.status !== "dismissed" && item.status !== "resolved"; }).length,
       latestChange: changeRows[0] || null,
@@ -87,6 +89,7 @@
   }
 
   window.bdCompetitorMarketClientV329 = {
+    eligible: eligible,
     acquireRefreshLease: acquireRefreshLease,
     changes: changes,
     competitors: competitors,

@@ -1,3 +1,4 @@
+import { marketCandidateEligible } from "./market-source-relevance";
 import { contextProvenance, type ContextProvenance } from "./context-provenance";
 import { aggregateReviews, reviewMetricRating } from "./review-aggregate";
 import { hasPermission, type AuthenticatedAccount } from "./access-control";
@@ -142,7 +143,7 @@ function confirmedCompetitors(value: unknown, legacy = false): ConfirmedCompetit
   const competitors = Array.isArray(root?.competitors) ? root.competitors : [];
   return competitors
     .map(record)
-    .filter((item): item is JsonRecord => Boolean(item && item.confirmed === true && string(item.name)))
+    .filter((item): item is JsonRecord => Boolean(item && item.confirmed === true && marketCandidateEligible(item) && string(item.name)))
     .map((item) => ({
       provenance: contextProvenance(item, legacy ? "accounts.competitorsJson" : MARKET_KEY, legacy),
       key: competitorKey(item),

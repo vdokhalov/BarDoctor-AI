@@ -1,3 +1,4 @@
+import { marketCandidateEligible } from "./market-source-relevance";
 import {readSalesEvents} from './sales-event-storage';
 import {readStockHistory} from "./stock-storage";
 import { derivedInputBelongs } from "./derived-input-scope";
@@ -961,8 +962,8 @@ function summariseSeasonality(request: JsonRecord, sources: VenueAIContextSource
 function summariseMarket(sources: VenueAIContextSources) {
   const marketStore = store(sources, "bd_market_analysis_v1");
   const market = record(marketStore?.data);
-  const externalCompetitors = array(sources.external?.confirmedCompetitors).map(record);
-  const storedCompetitors = array(market.competitors).map(record).filter((item) => item.confirmed === true);
+  const externalCompetitors = array(sources.external?.confirmedCompetitors).map(record).filter(marketCandidateEligible);
+  const storedCompetitors = array(market.competitors).map(record).filter((item) => item.confirmed === true && marketCandidateEligible(item));
   const competitors = externalCompetitors.length ? externalCompetitors : storedCompetitors;
   return {
     available: competitors.length > 0 || Object.keys(market).length > 0,
