@@ -973,6 +973,11 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
+
 function BdRecordedWorkdayPayroll() {
   const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
     try {
@@ -3008,6 +3013,7 @@ function bdPayrollEmployeeRowV164({row:e,onOpen:t}){const n=e.summary,r=Math.abs
 
 
 
+
 /* payroll-loading:start */
 function bdPayrollLoadState(sync,operational){return sync==="error"||operational==="error"?"error":sync==="ready"&&operational==="ready"?"ready":"loading"}
 function bdPayrollLoadingPage({state,month,context,back}){return i.jsx(nt,{showBottomNav:true,className:"pb-32",children:i.jsx($e,{className:"pt-0",children:i.jsxs("div",{className:"bd-payroll-page-v164",children:[i.jsx(bdSalaryHeaderV164,{title:"Зарплаты",context,back}),i.jsx("main",{className:"bd-payroll-main-v164",children:i.jsxs("section",{className:"bd-payroll-summary-v164",style:{padding:16},"data-bd-payroll-load":state,role:state==="error"?"alert":"status",children:[i.jsx("strong",{children:bdMonthDisplay(month)}),i.jsx("p",{style:{marginTop:12},children:state==="error"?"Не удалось загрузить зарплаты.":"Загружаем зарплаты…"}),state==="error"&&i.jsx("button",{type:"button",onClick:()=>window.location.reload(),style:{marginTop:12,minHeight:44},children:"Повторить"})]})})]})})})}
@@ -4093,6 +4099,7 @@ function bdFinanceSummaryV160({report:e,hasData:t,onExpenses:n,onPayroll:r,onRev
 function bdFinanceWeekV160({week:e,range:t,schedule:n,completed:r,scheduled:a,onOpen:s}){const l=e.hasRevenueData,u=e.avgReceipt!==null?e.avgReceipt:null;return i.jsxs("button",{type:"button",className:"bd-finance-week-v160",onClick:s,children:[i.jsxs("header",{children:[i.jsxs("div",{children:[i.jsx("p",{children:"Текущая неделя · "+t}),i.jsx("small",{children:"График: "+n})]}),i.jsx(Br,{size:18,"aria-hidden":!0})]}),i.jsx("div",{children:[{label:"Выручка",value:l?Mn(e.revenue):"—"},{label:"Средний чек",value:u!==null?Mn(u):"—"},{label:"Списания",value:bdMoney2(e.writeoffs??0)},{label:"Смены",value:r+" из "+a}].map(d=>i.jsxs("span",{children:[i.jsx("small",{children:d.label}),i.jsx("strong",{children:d.value})]},d.label))})]})}
 function bdFinanceRevenueRecordsV160({records:e,profile:t,shiftResults:n,canManage:r,navigate:a,onView:s,onDelete:l}){return e.length===0?i.jsx("div",{className:"bd-finance-detail-empty",children:"Нет записей о выручке за этот месяц."}):i.jsx(qe,{mode:"popLayout",children:e.map(u=>{const d=Ym(u),f=t?Jle(u,t):null,m=n.get(u.date.slice(0,10))??null;return i.jsxs(W.div,{layout:!0,initial:{opacity:0,y:6},animate:{opacity:1,y:0},exit:{opacity:0},className:"bd-finance-record-v160",children:[i.jsxs("button",{type:"button",className:"bd-finance-record-main",onClick:()=>s({type:"revenue",record:u}),children:[i.jsx("strong",{children:sg(u.date)}),i.jsxs("span",{children:[Mn(u.revenue)," · ",u.receipts," ",bdFinancePluralV160(u.receipts,"чек","чека","чеков"),d!==null?" · средний чек "+Mn(d):"",u.guests!==void 0?" · "+u.guests+" гостей":""]}),f&&i.jsxs("small",{children:["ФОТ ",Mn(f.totalPayroll),f.payrollPercentOfRevenue!==null?" · "+f.payrollPercentOfRevenue+"% от выручки":""]}),m&&i.jsxs("em",{"data-bd-shift-result":"period-v4",children:["Результат до себестоимости ",bdMoney2(m.resultBeforeCost)]}),u.note&&i.jsx("small",{children:u.note})]}),i.jsxs("div",{className:"bd-finance-record-actions",children:[f&&i.jsx("button",{type:"button",onClick:()=>a("/finance/shift/"+u.id+"/payroll"),"aria-label":"Открыть аудит ФОТ",children:i.jsx($d,{size:16,"aria-hidden":!0})}),r&&i.jsx("button",{type:"button",onClick:()=>l({type:"revenue",id:u.id}),"aria-label":"Удалить запись о выручке",children:i.jsx(Ra,{size:16,"aria-hidden":!0})})]})]},u.id)})})}
 function bdFinanceExpenseRecordsV160({records:e,equipment:t,documents:n,canManage:r,onView:a,onDelete:s}){return e.length===0?i.jsx("div",{className:"bd-finance-detail-empty",children:"Нет записей о расходах за этот месяц."}):i.jsx(qe,{mode:"popLayout",children:e.map(l=>{const u=l.category==="repairs"&&l.equipmentId?t.find(v=>v.id===l.equipmentId):void 0,bdLinkedDocument=l.sourceDocumentId?n.find(v=>v.id===l.sourceDocumentId):void 0,bdCanManageFinance=r,f=l.category==="other"?l.customCategoryLabel||"Прочее":Lg[l.category],m=bdLinkedDocument?.supplierName||l.description||f,g=[sg(l.date),f,bdLinkedDocument?.supplierName&&m!==bdLinkedDocument.supplierName?bdLinkedDocument.supplierName:null,l.area].filter(Boolean).join(" · ");return i.jsxs(W.div,{layout:!0,initial:{opacity:0,y:4},animate:{opacity:1,y:0},exit:{opacity:0},className:"bd-finance-record-v160 expense",children:[i.jsxs("button",{type:"button",className:"bd-finance-record-main",onClick:()=>a({type:"expense",record:l}),children:[i.jsxs("span",{className:"bd-finance-record-copy",children:[i.jsx("strong",{children:m}),i.jsx("span",{children:g}),l.category==="repairs"&&i.jsx("small",{className:u?"":"warning",children:u?u.name:"Оборудование не выбрано"}),bdLinkedDocument&&i.jsx("small",{children:bdProcDocLabel(bdLinkedDocument.documentType)+" · "+(bdLinkedDocument.items?.length||0)+" "+bdProcPluralV168(bdLinkedDocument.items?.length||0,"позиция","позиции","позиций")})]}),i.jsx("b",{children:Mn(l.amount)}),i.jsx(Br,{size:16,"aria-hidden":!0})]}),!bdLinkedDocument&&bdCanManageFinance&&i.jsx("button",{type:"button",className:"bd-finance-record-delete",onClick:()=>s({type:"expense",id:l.id}),"aria-label":"Удалить расход",children:i.jsx(Ra,{size:16,"aria-hidden":!0})})]},l.id)})})}
+
 
 
 
@@ -5479,6 +5486,7 @@ function bdPrepareEmbeddedPage(e,t){
     a.documentElement.dataset.bdOuterHistoryBound="true";
     const d=function(v){return v.pathname==="/data-control"&&v.searchParams.has("event")||v.pathname==="/integrations"&&(v.searchParams.has("view")&&v.searchParams.get("view")!=="overview"||v.searchParams.has("flow")&&v.searchParams.get("flow")!=="overview")||v.pathname==="/notifications"&&v.searchParams.has("view")&&v.searchParams.get("view")!=="overview"},f=function(v){
       if(r.bdOuterSubviewSync)return;
+      if(r.bdOuterSubviewSync)return;
       let b;
       try{b=new URL(r.location.href)}catch{return}
       b.searchParams.delete("embedded");
@@ -5487,7 +5495,7 @@ function bdPrepareEmbeddedPage(e,t){
       const j=b.pathname+b.search+b.hash,k=g.pathname+g.search+g.hash;
       if(j===k)return;
       const q=d(g),z=d(b);
-      if(q&&!z&&v==="replace"){window.history.back();return}
+      if(q&&!z&&v==="replace"&&g.pathname!=="/data-control"){window.history.back();return}
       if(v==="push"||!q&&z){
         if(typeof window.bdNavigate==="function")window.bdNavigate(j);
         else{window.history.pushState(window.history.state,"",j);window.dispatchEvent(new PopStateEvent("popstate",{state:window.history.state}))}
@@ -5508,6 +5516,7 @@ function bdPrepareEmbeddedPage(e,t){
     if(f.tagName==="A"&&(f.target==="_blank"||f.hasAttribute("download")))return;
     const m=f.tagName==="A"?f.getAttribute("href"):f.getAttribute("data-route");
     if(!m)return;
+    if(s==="/reviews"&&m.startsWith("#review-"))return;
     let h;
     try{h=new URL(m,r.location.href)}catch{return}
     if(h.origin!==r.location.origin)return;
@@ -5546,7 +5555,7 @@ function bdEmbeddedPage({source:e,title:t,search:querySearch}){
 }
 function bdMarketPage(){return i.jsx(bdEmbeddedPage,{source:"/market",title:"Анализ рынка и конкурентов"})}
 function bdOpportunitiesPage(){return i.jsx(bdEmbeddedPage,{source:"/opportunities",title:"Календарь возможностей"})}
-function bdDataControlPage(){const search=ste();return i.jsx(bdEmbeddedPage,{source:"/data-control",title:"Контроль данных",search})}function bdTeamAccessPage(){return i.jsx(bdEmbeddedPage,{source:"/team-access",title:"Роли и доступ"})}
+function bdDataControlPage(){const search=ste();return i.jsx(bdSubviewEmbeddedPage,{source:"/data-control",title:"Контроль данных",search})}function bdTeamAccessPage(){return i.jsx(bdEmbeddedPage,{source:"/team-access",title:"Роли и доступ"})}
 /* subview-back:start *//* Only integrations and notifications: the outer URL owns the selected subview. */
 function bdSubviewEmbeddedPage({source,title}){
  const [,navigate]=bt(),search=ste(),venueContext=bdUseProcVenueContextV168(),frame=S.useRef(null),params=new URLSearchParams(search);
@@ -5561,7 +5570,7 @@ function bdSubviewEmbeddedPage({source,title}){
 }
 /* subview-back:end */function bdIntegrationsPage(){return i.jsx(bdSubviewEmbeddedPage,{source:"/integrations",title:"Интеграции BarDoctor"})}
 function bdNotificationsPage(){return i.jsx(bdSubviewEmbeddedPage,{source:"/notifications",title:"Уведомления BarDoctor"})}
-function bdReviewsPage(){return i.jsx(bdEmbeddedPage,{source:"/reviews",title:"Отзывы гостей"})}
+function bdReviewsPage(){return i.jsx(bdSubviewEmbeddedPage,{source:"/reviews",title:"Отзывы гостей"})}
 /* sales-navigation-performance:start */
 function bdSalesFrameSource(previous,requested,frame){if(previous&&frame){try{const current=new URL(frame.contentWindow.location.href),target=new URL(requested,window.location.origin);current.searchParams.sort();target.searchParams.sort();if(current.href===target.href)return previous}catch{}}return requested}
 function bdSalesPosPage(){const[,navigate]=bt(),path=window.location.pathname,search=ste(),query=new URLSearchParams(search);query.set("embedded","1");const requested=path+"?"+query.toString()+window.location.hash,frame=S.useRef(null),initial=S.useRef(requested),outer=S.useRef(requested);S.useLayoutEffect(()=>{const previous=outer.current;if(previous===requested)return;outer.current=requested;const next=bdSalesFrameSource(previous,requested,frame.current);if(next!==previous&&frame.current)frame.current.src=next},[requested]);return i.jsx(nt,{showBottomNav:!0,children:i.jsx("iframe",{ref:frame,src:initial.current,title:"Продажи и склад","data-bd-sales-surface":"true",onLoad:event=>bdPrepareEmbeddedPage(event,navigate),style:{display:"block",width:"100%",height:"calc(100dvh - var(--bd-header-total,64px) - 78px - env(safe-area-inset-bottom,0px))",border:0,background:"#f5f6fb"}})})}
@@ -5580,6 +5589,14 @@ function cEe(){return i.jsx(uK,{client:sEe,children:i.jsx(Zoe,{children:i.jsx(Vs
 const bdPurchasePracticalQaV211="v211";
 
 const bdFinancePurchaseGroupsV212="v212";
+
+
+
+
+
+
+
+
 
 
 

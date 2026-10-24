@@ -802,6 +802,9 @@
     });
     window.addEventListener("popstate", function () {
       activateTab(new URLSearchParams(window.location.search).get("tab") || "overview", true);
+      byId("event-detail").classList.add("hidden");
+      document.body.classList.remove("detail-open");
+      openRequestedEvent();
     });
   }
 

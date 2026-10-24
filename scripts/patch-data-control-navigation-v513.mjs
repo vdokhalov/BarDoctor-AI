@@ -8,7 +8,7 @@ const reactiveFrame = 'function bdEmbeddedPage({source:e,title:t,search:querySea
 
 export function patchDataControlNavigation(source) {
   for (const [before, after] of [[originalPage, reactivePage], [originalFrame, reactiveFrame]]) {
-    if (source.includes(after)) continue;
+    if (source.includes(after) || after === reactivePage && source.includes(reactivePage.replace("bdEmbeddedPage", "bdSubviewEmbeddedPage"))) continue;
     const index = source.indexOf(before);
     if (index < 0 || source.indexOf(before, index + before.length) >= 0) throw new Error('Data Control navigation patch target missing or not unique');
     source = source.slice(0, index) + after + source.slice(index + before.length);

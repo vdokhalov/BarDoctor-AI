@@ -7,7 +7,7 @@ const bundle=fs.readFileSync('public/assets/index-BQGspy0I.js','utf8');
 const patched=patchDataControlNavigation(bundle);
 function fixture(){
  let search='?venue=3389',subscriptions=0;
- const context=vm.createContext({URLSearchParams,window:{location:{search:'?venue=3389',hash:''}},ste:()=>{subscriptions++;return search;},bt:()=>[null,()=>{}],nt:'shell',bdPrepareEmbeddedPage:()=>{},i:{jsx:(type,props)=>({type,props})}});
+ const context=vm.createContext({URLSearchParams,window:{location:{search:'?venue=3389',hash:''}},ste:()=>{subscriptions++;return search;},bt:()=>[null,()=>{}],nt:'shell',bdSubviewEmbeddedPage:()=>{},bdPrepareEmbeddedPage:()=>{},i:{jsx:(type,props)=>({type,props})}});
  const start=patched.indexOf('function bdEmbeddedPage('),end=patched.indexOf('function bdTeamAccessPage',start);
  vm.runInContext(patched.slice(start,end),context);
  return {context,setSearch:value=>{search=value;},subscriptions:()=>subscriptions,render:()=>{const page=context.bdDataControlPage();return context.bdEmbeddedPage(page.props).props.children.props;}};

@@ -428,13 +428,28 @@
   function reviewEvidenceLink(e) {
     var link=node("a", "review-evidence-link", "«" + e.quote + "»");
     link.href="#review-"+encodeURIComponent(e.reviewId);
-    link.addEventListener("click", function () {
-      state.search=""; state.source="all"; state.filter="all";
-      document.getElementById("review-search").value="";
-      renderFilters(); renderReviewList();
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      var url=new URL(window.location.href);url.hash=link.hash;
+      history.pushState(history.state,"",url.pathname+url.search+url.hash);
+      showRequestedReview();
     });
     return link;
   }
+
+  function showRequestedReview() {
+    var id;
+    try { id=decodeURIComponent(window.location.hash.slice(1)); } catch { return; }
+    if(!id.startsWith("review-") || !reviews().some(function(review){return "review-"+review.id===id;}))return;
+    var target=document.getElementById("review-"+encodeURIComponent(id.slice(7)));
+    if(!target){state.search="";state.source="all";state.filter="all";
+      document.getElementById("review-search").value="";
+      document.getElementById("review-source-select").value="all";
+      renderFilters();renderReviewList();target=document.getElementById("review-"+encodeURIComponent(id.slice(7)));}
+    if(target)target.scrollIntoView({block:"center"});
+  }
+  window.addEventListener("popstate",showRequestedReview);
+  window.addEventListener("hashchange",showRequestedReview);
 
   function renderDoctor() {
     var root = document.getElementById("reviews-doctor");
@@ -724,6 +739,7 @@
       aiButton.disabled = state.aiRunning || !canManageReviews();
       loading.classList.add("hidden");
       content.classList.remove("hidden");
+      showRequestedReview();
       // Loading saved reviews never starts paid AI.
     } catch (problem) {
       if (problem && problem.name === "AbortError") return;
