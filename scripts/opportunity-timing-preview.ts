@@ -18,8 +18,18 @@ if(process.env.BASELINE_CALENDAR){assert.ok(!(await page.locator('#halloween').i
 const check=async()=>{assert.match(await page.locator('#halloween').innerText(),/Тизер за 30 дней — Срок прошёл/);assert.match(await page.locator('#halloween').innerText(),/полная программа за 14 дней — Срок прошёл/);assert.match(await page.locator('#halloween').innerText(),/16 сентября 2026 г. · Срок прошёл/);assert.equal(await page.locator('#summary-nearest-value').innerText(),'8 дней');};await check();
 await page.locator('#halloween .recommendation-grid').scrollIntoViewIfNeeded();await page.screenshot({path:'outputs/opportunity-timing/calendar-390.png'});await page.reload();await page.locator('#halloween summary').click();await check();
 await page.clock.setFixedTime(new Date('2026-10-24T12:00:00Z'));await page.reload();await page.locator('#halloween summary').click();assert.equal(await page.locator('#summary-nearest-value').innerText(),'7 дней');assert.ok(!(await page.locator('#halloween .event-copy').innerText()).includes('Событие прошло'));
+
+for(const [instant,label] of [
+ ['2026-10-24T20:59:59Z','7 дней'],['2026-10-24T21:00:00Z','6 дней'],
+ ['2026-10-25T00:59:59Z','6 дней'],['2026-10-25T01:00:00Z','6 дней'],
+ ['2026-10-25T21:59:59Z','6 дней'],['2026-10-25T22:00:00Z','5 дней']
+]){
+ await page.clock.setFixedTime(new Date(instant));await page.clock.fastForward(60000);
+ assert.equal(await page.locator('#summary-nearest-value').innerText(),label,instant);
+ assert.equal(await page.locator('#halloween details').evaluate((el:HTMLDetailsElement)=>el.open),true);
+}
 await page.clock.setFixedTime(new Date('2026-10-30T23:30:00Z'));await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));assert.equal(await page.locator('#summary-nearest-value').innerText(),'Сегодня');await page.reload();await page.locator('#halloween summary').click();assert.equal(await page.locator('#summary-nearest-value').innerText(),'Сегодня');
 await page.clock.setFixedTime(new Date('2026-11-01T12:00:00Z'));await page.reload();await page.locator('#halloween summary').click();assert.match(await page.locator('#halloween').innerText(),/Событие прошло/);assert.equal(await page.locator('#summary-nearest-value').innerText(),'—');
 await page.clock.setFixedTime(new Date('2026-08-01T12:00:00Z'));await page.reload();await page.locator('#halloween summary').click();assert.ok(!(await page.locator('#halloween').innerText()).includes('Срок прошёл'));
-assert.equal(writes,0);assert.equal(await page.evaluate(()=>(window as any).__bdUnexpectedWrites||0),0);console.log('PASS compiled calendar: saved plan, reload, venue midnight, past, distant; no API writes or AI calls');}
+assert.equal(writes,0);assert.equal(await page.evaluate(()=>(window as any).__bdUnexpectedWrites||0),0);console.log('PASS compiled calendar: saved plan, reload, venue midnight and DST timer refresh, past, distant; no API writes or AI calls');}
 }finally{await browser.close();server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));}
