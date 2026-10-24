@@ -1,3 +1,4 @@
+import { filterMarketEvidence, linkedMarketSources } from "../../../lib/bardoctor/market-source-relevance";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
 import { getDb, getD1 } from "../../../db";
@@ -215,6 +216,7 @@ function normaliseMarketResult(
       priority: PRIORITIES.has(text(item.priority)) ? text(item.priority) : "medium",
       days: Math.max(1, Math.min(90, Math.round(number(item.days) ?? 7))),
       why: text(item.why, "Связано с локальным рынком заведения", 500),
+      sourceUrls: sourced(item.sourceUrls),
     }));
 
   return {
@@ -451,7 +453,10 @@ export async function POST(request: Request): Promise<Response> {
 
 Правила достоверности:
 - не выдумывай названия, рейтинги, цены, расстояния, аудиторию или экономические показатели;
-- каждого названного конкурента подтверждай открытым источником;
+- каждого названного конкурента связывай с источником именно об этом заведении в указанном городе и стране; соседний город не является тем же городом;
+- одноимённое приложение, бренд или город в другой стране не являются местным заведением; исключай явные противоречия;
+- в sourceUrls каждого вывода и действия указывай только источники, на которых он основан; не добавляй фоновые ссылки;
+- если заголовок и URL не позволяют установить город, страну и принадлежность заведения к общепиту, не включай его в список; неизвестное не подменяй предположением;
 - не приписывай конкурентам недостатки без публичного подтверждения;
 - отделяй наблюдаемый факт от аналитической гипотезы;
 - если данных нет, прямо напиши об этом;
@@ -459,7 +464,7 @@ export async function POST(request: Request): Promise<Response> {
 - цены указывай в валюте найденного источника и не конвертируй без основания.
 
 Верни ТОЛЬКО валидный JSON без markdown по схеме:
-{"location":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"audience":{"summary":"...","segments":[{"name":"...","behaviour":"...","need":"..."}],"sourceUrls":["https://..."]},"economy":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"positioning":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"competitorSummary":"...","competitors":[{"name":"...","category":"...","relation":"direct|indirect|alternative","distance":"... или не подтверждено","rating":"... или пусто","evidence":"что подтверждено","strengths":["..."],"gaps":["только подтвержденное"],"sourceUrls":["https://..."]}],"opportunities":[{"title":"...","why":"...","impact":"...","sourceUrls":["https://..."]}],"risks":[{"title":"...","why":"...","mitigation":"...","sourceUrls":["https://..."]}],"pricing":[{"item":"...","range":"...","logic":"...","sourceUrls":["https://..."]}],"marketing":[{"channel":"...","idea":"...","kpi":"...","sourceUrls":["https://..."]}],"actions":[{"title":"...","priority":"high|medium|low","days":7,"why":"..."}],"assumptions":["что не подтверждено или требует внутренних данных"]}`;
+{"location":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"audience":{"summary":"...","segments":[{"name":"...","behaviour":"...","need":"..."}],"sourceUrls":["https://..."]},"economy":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"positioning":{"summary":"...","signals":["..."],"sourceUrls":["https://..."]},"competitorSummary":"...","competitors":[{"name":"...","city":"город из источника","country":"страна из источника","category":"...","relation":"direct|indirect|alternative","distance":"... или не подтверждено","rating":"... или пусто","evidence":"что подтверждено","strengths":["..."],"gaps":["только подтвержденное"],"sourceUrls":["https://..."]}],"opportunities":[{"title":"...","why":"...","impact":"...","sourceUrls":["https://..."]}],"risks":[{"title":"...","why":"...","mitigation":"...","sourceUrls":["https://..."]}],"pricing":[{"item":"...","range":"...","logic":"...","sourceUrls":["https://..."]}],"marketing":[{"channel":"...","idea":"...","kpi":"...","sourceUrls":["https://..."]}],"actions":[{"title":"...","priority":"high|medium|low","days":7,"why":"...","sourceUrls":["https://..."]}],"assumptions":["что не подтверждено или требует внутренних данных"]}`;
 
     const prompt = `Проведи локальный рыночный анализ для заведения.
 
@@ -500,15 +505,15 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     const deletedCompetitorKeys = new Set(textList(previousAnalysis?.deletedCompetitorKeys, 100));
     const deletedCompetitorNames = new Set(textList(previousAnalysis?.deletedCompetitorNames, 100));
     const previousConfirmed = new Map<string, JsonRecord>();
-    const previousConfirmedByName = new Map<string, JsonRecord>();
+    const sameLocation = previousAnalysis?.locationSignature === marketLocationSignature({ address, city, region, country, latitude, longitude, focus });
     for (const value of Array.isArray(previousAnalysis?.competitors) ? previousAnalysis.competitors : []) {
       const item = record(value);
-      if (item?.confirmed === true) {
+      if (sameLocation && item?.confirmed === true) {
         previousConfirmed.set(competitorKey(item), item);
-        previousConfirmedByName.set(competitorNameKey(item), item);
       }
     }
-    const analysis = normaliseMarketResult(parseAIJson<unknown>(web.text), web.sources);
+    const relevant = filterMarketEvidence(parseAIJson<unknown>(web.text), web.sources, {city,country,region});
+    const analysis = normaliseMarketResult(relevant.result, relevant.sources);
     const nextCompetitors = Array.isArray(analysis.competitors) ? analysis.competitors : [];
     analysis.competitors = nextCompetitors.filter((value) => {
       const item = record(value) ?? {};
@@ -516,8 +521,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         && !deletedCompetitorNames.has(competitorNameKey(item));
     }).map((value) => {
       const item = record(value) ?? {};
-      const previous = previousConfirmed.get(competitorKey(item))
-        ?? previousConfirmedByName.get(competitorNameKey(item));
+      const previous = previousConfirmed.get(competitorKey(item));
       return {
         ...item,
         confirmed: Boolean(previous),
@@ -552,7 +556,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
       model: web.model,
       ...analysis,
       detectedChanges,
-      sources: web.sources,
+      sources: linkedMarketSources(analysis, relevant.sources),
       deletedCompetitorKeys: [...deletedCompetitorKeys],
       deletedCompetitorNames: [...deletedCompetitorNames],
     };
