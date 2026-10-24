@@ -62,6 +62,37 @@ try{
  const path='/cashier?embedded=1&venue='+venueId+'&view=receipts&history=cancelled';await page.goto(base+path);await page.getByRole('button',{name:/Стол 3.*15/}).waitFor();assert.equal(await page.locator('[data-cancelled-order]').count(),2);await page.getByRole('button',{name:/Стол 3.*15/}).click();await page.getByRole('heading',{name:'Отменённое блюдо',exact:true}).waitFor();await page.locator('#dialog .cash-row span').getByText('Вода × 1',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Отмена',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Закрыть',exact:true}).count(),1);await page.getByText('Не списывать',{exact:true}).first().waitFor();await page.locator('#dialog .cancellation-chain > summary').click();await page.locator('#dialog .cancellation-chain').getByText('Пустой заказ',{exact:true}).waitFor();assert.equal(await page.locator('#dialog .cancellation-chain article').count(),3);await page.screenshot({path:out+'/detail-390.png'});const deep=page.url();await page.reload();await page.locator('#dialog .cash-row span').getByText('Вода × 1',{exact:true}).waitFor();await page.getByRole('button',{name:'Закрыть',exact:true}).click();await page.waitForURL(url=>!url.searchParams.has('cancelledOrder'));await page.reload();assert.equal(await page.locator('#dialog').evaluate((d:HTMLDialogElement)=>d.open),false);await page.goto(deep);await page.locator('#dialog .cash-row span').getByText('Вода × 1',{exact:true}).waitFor();await page.getByRole('button',{name:'Закрыть',exact:true}).click();
  const finalRow=page.locator('[data-cancelled-order="test-order-001"]');await finalRow.click();await page.getByRole('heading',{name:'Отменённый заказ',exact:true}).waitFor();await page.locator('#dialog-content > .cancel-reason').getByText('Пустой заказ',{exact:true}).waitFor();assert.equal(await page.getByText('Позиций нет.',{exact:true}).count(),1);assert.ok(!(await page.locator('#dialog-content').innerText()).includes('Сумма отмены'));
  const finalUrl=page.url();await page.reload();await page.getByRole('heading',{name:'Отменённый заказ',exact:true}).waitFor();await page.locator('#dialog .cancellation-chain > summary').click();assert.equal(await page.locator('#dialog .cancellation-chain article').count(),3);await page.screenshot({path:out+'/final-390.png'});await page.getByRole('button',{name:'Закрыть',exact:true}).click();await page.goto(finalUrl);await page.getByRole('heading',{name:'Отменённый заказ',exact:true}).waitFor();await page.getByRole('button',{name:'Закрыть',exact:true}).click();
- const legacy=structuredClone(saved);delete legacy.operations.find((op:any)=>op.action==='cancel_item').details.cancelledLine;await page.route('**/api/pos-orders',route=>route.fulfill({json:{...nativeOrders,orders:[legacy]}}));await page.goto(deep);await page.locator('#dialog .cash-row span').getByText('Вода × 1',{exact:true}).waitFor();assert.match(await page.locator('#dialog-content').innerText(),/Сумма отмены\s+—/);assert.ok(!(await page.locator('#dialog-content').innerText()).includes('Состав не сохранён'));await page.screenshot({path:out+'/legacy-390.png'});await page.getByRole('button',{name:'Закрыть',exact:true}).click();await page.unroute('**/api/pos-orders');
+ const legacy=structuredClone(saved);delete legacy.operations.find((op:any)=>op.action==='cancel_item').details.cancelledLine;await page.route('**/api/pos-orders',route=>route.fulfill({json:{...nativeOrders,orders:[legacy]}}));await page.goto(deep);await page.locator('#dialog .cash-row span').getByText('Вода × 1',{exact:true}).waitFor();assert.match(await page.locator('#dialog-content').innerText(),/Сумма не сохранена/);assert.ok(!(await page.locator('#dialog-content').innerText()).includes('Состав не сохранён'));await page.screenshot({path:out+'/legacy-390.png'});await page.getByRole('button',{name:'Закрыть',exact:true}).click();await page.unroute('**/api/pos-orders');
+
+ const zero=structuredClone(saved);zero.operations.find((op:any)=>op.action==='cancel_item').details.cancelledLine.total=0;
+ for(const width of [390,820,1280]){
+  await page.setViewportSize({width,height:844});
+  for(const [name,fixture,expected] of [['known',saved,'15'],['unknown',legacy,'Сумма не сохранена'],['zero',zero,'0']] as const){
+   await page.route('**/api/pos-orders',route=>route.fulfill({json:{...nativeOrders,orders:[fixture]}}));
+   await page.goto(deep);await page.getByRole('heading',{name:'Отменённое блюдо',exact:true}).waitFor();
+   assert.ok((await page.locator('#dialog .total').innerText()).includes(expected));
+   assert.equal(await page.locator('#dialog-content').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+   await page.screenshot({path:out+'/'+name+'-'+width+'.png'});
+   await page.reload();await page.getByRole('heading',{name:'Отменённое блюдо',exact:true}).waitFor();
+   assert.ok((await page.locator('#dialog .total').innerText()).includes(expected));
+   await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+   await page.locator('[data-cancelled-order]').first().waitFor();
+   assert.equal(await page.locator('#dialog').evaluate((d:HTMLDialogElement)=>d.open),false);
+   await page.unroute('**/api/pos-orders');
+  }
+ }
+
+ const mixed=structuredClone(saved),extra=structuredClone(mixed.preparationTickets.find((t:any)=>t.kind==='CANCELLATION'));
+ extra.id='legacy-second';extra.batchId='missing-second';mixed.preparationTickets.push(extra);
+ await page.route('**/api/pos-orders',route=>route.fulfill({json:{...nativeOrders,orders:[mixed]}}));
+ for(const width of [390,820,1280]){
+  await page.setViewportSize({width,height:844});await page.goto(base+path);
+  await page.getByRole('button',{name:/Стол 3.*15/}).waitFor();
+  assert.equal(await page.locator('[data-cancelled-order]').count(),3);
+  await page.getByRole('button',{name:/Стол 3.*Сумма не сохранена/}).waitFor();
+  assert.equal(await page.locator('#receipts-view').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
+  await page.screenshot({path:out+'/mixed-'+width+'.png'});
+ }
+ await page.unroute('**/api/pos-orders');
  assert.equal(snapshot(),before);assert.deepEqual(errors,[]);assert.deepEqual(readWrites,[]);console.log(JSON.stringify({pass:true,checks:['final order reason separate from item reason','all saved tickets with unique IDs','final closure reload/direct link','native confirmed cancellation and empty order closure','saved name quantity reason stock decision','new captured price15','legacy unknown price remains unknown','reload/deep link/close','no read-side writes'],out}));await context.close();
 }finally{await browser.close();server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await Promise.allSettled(pendingHandlers);runtime.close();}

@@ -311,7 +311,7 @@
   function receiptRows(events){return events.map(e=>`<button class="receipt-row" data-receipt="${esc(e.id)}"><span><strong>${esc(time(e.acceptedAt))} · ${e.tableNumber?"Стол "+esc(e.tableNumber):"Быстрая продажа"}</strong><small>${esc(e.orderActor?.name||e.actor?.name||"Автор неизвестен")} · ${esc(paymentLabel(e))}</small></span><strong>${esc(money(e.revenue))} ${icon("chevron-right")}</strong></button>`).join("");}
   function cancelledOrders(){return window.bdPosCancellationHistory(state.orders,state.data.venueId);}
   function cancellationFact(order){return order.fact;}
-  function cancellationMoney(order){return order.amount==null?"—":money(order.amount,order.currency);}
+  function cancellationMoney(order){return order.amount==null?(order.amountNotSaved?"Сумма не сохранена":"—"):money(order.amount,order.currency);}
   function cancellationDate(order){return Number.isFinite(Date.parse(order.cancelledAt))?date(order.cancelledAt):"Время не сохранено";}
   function renderReceipts(){
     const cancelled=state.historyMode==="cancelled",orders=cancelledOrders();
@@ -328,7 +328,7 @@
   function showCancelledOrder(id){
     const order=cancelledOrders().find(o=>o.id===id);if(!order)return;
     const fact=cancellationFact(order),url=new URL(location.href);url.searchParams.set("cancelledOrder",id);history.replaceState(null,"",url);
-    dialog(order.kind==="item"?"Отменённое блюдо":"Отменённый заказ",`<p class="muted">Стол ${esc(order.tableNumber)} · ${esc(cancellationDate(order))}</p>${order.lines.map(line=>`<div class="cash-row"><span>${esc(line.name||"Название не сохранено")} × ${esc(line.quantity)}</span><strong>${line.total==null?"—":esc(money(line.total,line.currency))}</strong></div>`).join("")||'<p>Позиций нет.</p>'}${order.lines.length?`<p class="total">Сумма отмены <strong>${esc(cancellationMoney(order))}</strong></p>`:''}<h3>Причина отмены</h3><p class="cancel-reason">${esc(fact?.details?.reason||"Причина не сохранена")}</p>${order.kind==="item"?`<p><strong>${order.stockDecision==="NO_WRITE_OFF"?"Не списывать":order.stockDecision==="WRITE_OFF"?"Списать со склада":"Решение о списании не сохранено"}</strong></p>`:""}<p class="muted">Отменил: ${esc(fact?.actor?.name||"Сотрудник не указан")}</p>${cancellationChain(order)}<details><summary>Номер заказа</summary><p class="long-id">${esc(order.orderId)}</p></details>`,null);
+    dialog(order.kind==="item"?"Отменённое блюдо":"Отменённый заказ",`<p class="muted">Стол ${esc(order.tableNumber)} · ${esc(cancellationDate(order))}</p>${order.lines.map(line=>`<div class="cash-row"><span>${esc(line.name||"Название не сохранено")} × ${esc(line.quantity)}</span><strong>${line.total==null?"—":esc(money(line.total,line.currency))}</strong></div>`).join("")||'<p>Позиций нет.</p>'}${order.lines.length?`<p class="total">${order.amountNotSaved?"":"Сумма отмены "}<strong>${esc(cancellationMoney(order))}</strong></p>`:''}<h3>Причина отмены</h3><p class="cancel-reason">${esc(fact?.details?.reason||"Причина не сохранена")}</p>${order.kind==="item"?`<p><strong>${order.stockDecision==="NO_WRITE_OFF"?"Не списывать":order.stockDecision==="WRITE_OFF"?"Списать со склада":"Решение о списании не сохранено"}</strong></p>`:""}<p class="muted">Отменил: ${esc(fact?.actor?.name||"Сотрудник не указан")}</p>${cancellationChain(order)}<details><summary>Номер заказа</summary><p class="long-id">${esc(order.orderId)}</p></details>`,null);
     $("dialog").dataset.cancelHistory=id;
 
   }

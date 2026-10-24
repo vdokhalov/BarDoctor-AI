@@ -28,3 +28,26 @@ test('multiple positions remain distinguishable through partial then complete or
  const events=history(final.orders,1).find((r:any)=>r.kind==='order').history;
  assert.equal(events[0].lines.length,2);assert.deepEqual(Array.from(events.filter((e:any)=>e.kind==='item'),(e:any)=>e.lines[0].lineId),['line','line2']);assert.equal(events.at(-1).reason,'Весь заказ отменён');
 });
+
+test('missing historical amount is explicit; zero, invalid and conflicting evidence are different',async()=>{
+ const {c,ready}=await confirmed(),r=await planPosOrder(c,ready.orders,cut);
+ const snapshot=r.order.operations.at(-1)!.details.cancelledLine as any;
+ assert.equal(history(r.orders,1)[0].amountNotSaved,false);
+ snapshot.total=0;assert.equal(history(r.orders,1)[0].amount,0);assert.equal(history(r.orders,1)[0].amountNotSaved,false);
+ snapshot.total=-1;assert.equal(history(r.orders,1)[0].amount,null);assert.equal(history(r.orders,1)[0].amountNotSaved,false);
+ snapshot.total=null;assert.equal(history(r.orders,1)[0].amountNotSaved,true);
+ snapshot.total=15;snapshot.quantity=99;assert.equal(history(r.orders,1)[0].amountNotSaved,false);
+ delete r.order.operations.at(-1)!.details.cancelledLine;assert.equal(history(r.orders,1)[0].amountNotSaved,true);
+ r.order.operations.push({...r.order.operations.at(-1)!,details:{cancelledLine:snapshot}});assert.equal(history(r.orders,1)[0].amountNotSaved,false);
+});
+test('whole-order missing amount, empty final cancellation and mixed known history stay distinct',()=>{
+ const base={id:'whole',venueId:1,status:'CANCELLED',lines:[{name:'Вода',quantity:1,currency:'PMR_RUB'}],operations:[]};
+ assert.equal(history([base],1)[0].amountNotSaved,true);
+ assert.equal(history([{...base,lines:[]}],1)[0].amountNotSaved,false);
+ const zero={...base,id:'zero',lines:[{...base.lines[0],total:0}]};
+ const rows=history([base,zero],1);
+ assert.equal(rows.find((r:any)=>r.id==='whole').amountNotSaved,true);
+ assert.equal(rows.find((r:any)=>r.id==='zero').amount,0);
+ assert.equal(rows.find((r:any)=>r.id==='zero').amountNotSaved,false);
+ assert.equal(history([base,zero],2).length,0);
+});
