@@ -1,3 +1,4 @@
+import { supplierProcurementTargets } from "../../../lib/bardoctor/supplier-procurement-targets";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
 import { and, eq } from "drizzle-orm";
 import { getDb, getD1 } from "../../../db";
@@ -8,7 +9,6 @@ import { AIServiceError, aiErrorResponse, parseAIJson } from "../../../lib/bardo
 import { openAIWebSearch, type OpenAIWebSource } from "../../../lib/bardoctor/openai";
 import { readJsonRequest } from "../../../lib/bardoctor/http";
 import {
-  isPackagedProcurementItem,
   isSameSupplierMenuProduct,
   isSupplierProcurementSource,
   normalSupplierTargetKey,
@@ -159,13 +159,8 @@ function normalise(raw: unknown, sources: OpenAIWebSource[], previous: JsonRecor
   return rebuildCoverage({ version: STORE_VERSION, generatedAt: new Date().toISOString(), summary: text(root.summary, `Найдено конкретных предложений: ${alternatives.length}.`, 900), alternatives, sources: combinedSources, deletedIds: [...deleted], scannedSegments, totalSegments: totalPasses, targetCount: targetNames.length, coveredTargetCount: Math.max(0, targetNames.length - allUncoveredTargets.length), uncoveredTargets, lastSegment: segmentId, targetSignature: supplierTargetSignature(targetNames) }, targetNames, totalPasses);
 }
 
-async function procurementTargets(accountId: number): Promise<string[]> {
-  const assortment = record(await loadStore(accountId, "bd_assortment_v1")) ?? {};
-  const menuItems = (Array.isArray(assortment.menuItems) ? assortment.menuItems : []).map(record).filter(Boolean).filter(item => item?.active !== false).slice(0, 180);
-  return [...new Set(menuItems
-    .filter(item => isPackagedProcurementItem(`${text(item?.name, "", 160)} ${text(item?.category, "", 100)}`))
-    .map(item => text(item?.name, "", 160))
-    .filter(Boolean))];
+async function procurementTargets(accountId: number, venueId: number): Promise<string[]> {
+  return supplierProcurementTargets(await loadStore(accountId, "bd_assortment_v1"), venueId);
 }
 
 function searchPlan(targetNames: string[]): Array<{ id: string; label: string }> {
@@ -182,7 +177,7 @@ export async function GET(request: Request): Promise<Response> {
   if (!account) return noStore(unauthorized());
   if (!hasPermission(account, "inventory.view")) return noStore(Response.json({ ok: false, error: "Раздел поставщиков недоступен" }, { status: 403 }));
   const stored = record(await loadStore(account.id, STORE_KEY));
-  const targetNames = await procurementTargets(account.id);
+  const targetNames = await procurementTargets(account.id, account.venueId);
   const plan = searchPlan(targetNames);
   const data = stored ? rebuildCoverage(stored, targetNames, plan.length) : null;
   return noStore(Response.json({ ok: true, data, searchPlan: plan, restaurant: account.restaurantJson ? JSON.parse(account.restaurantJson) : null }));
@@ -198,7 +193,7 @@ export async function PATCH(request: Request): Promise<Response> {
     if (!parsed.ok) return noStore(parsed.response);
     const body = parsed.data;
     const stored = record(await loadStore(account.id, STORE_KEY));
-    const targetNames = await procurementTargets(account.id);
+    const targetNames = await procurementTargets(account.id, account.venueId);
     const plan = searchPlan(targetNames);
     const current = stored ? rebuildCoverage(stored, targetNames, plan.length) : null;
     if (!current) throw new AIServiceError("Сначала запустите поиск поставщиков.", 404);
@@ -228,12 +223,10 @@ export async function POST(request: Request): Promise<Response> {
     const restaurant = account.restaurantJson ? record(JSON.parse(account.restaurantJson)) ?? {} : {};
     const assortment = record(await loadStore(account.id, "bd_assortment_v1")) ?? {};
     const documents = Array.isArray(await loadStore(account.id, "bd_purchase_documents")) ? await loadStore(account.id, "bd_purchase_documents") as unknown[] : [];
-    const menuItems = (Array.isArray(assortment.menuItems) ? assortment.menuItems : []).map(record).filter(Boolean).filter(item => item?.active !== false).slice(0, 180).map(item => ({ name: text(item?.name, "", 160), category: text(item?.category, "", 100), department: text(item?.department, "other", 40), type: text(item?.type, "composite", 30), salePrice: numeric(item?.salePrice), plannedSales: numeric(item?.plannedSales) }));
     const purchases = documents.map(record).filter(Boolean).flatMap(doc => (Array.isArray(doc?.items) ? doc.items : []).map(record).filter(Boolean).map(item => ({ name: text(item?.name, "", 160), brand: text(item?.brand, "", 100), packageSize: text(item?.packageSize, "", 80), unitPrice: numeric(item?.unitPrice), supplier: text(doc?.supplierName, "", 160), currency: text(doc?.currency, "", 12), date: text(doc?.date, "", 20) }))).slice(-120);
     const city = text(restaurant.city, "", 120), region = text(restaurant.region, "", 120), country = text(restaurant.country, "", 120);
     const stored = record(await loadStore(account.id, STORE_KEY));
-    const procurementMenuItems = menuItems.filter(item => isPackagedProcurementItem(`${item.name} ${item.category}`)).map(item => item.name);
-    const targetNames = [...new Set(procurementMenuItems.filter(Boolean))].slice(0, 180);
+    const targetNames = supplierProcurementTargets(assortment, account.venueId);
     const previous = body.reset === true || text(stored?.targetSignature, "", 20_000) !== supplierTargetSignature(targetNames)
       ? { deletedIds: stored?.deletedIds ?? [] }
       : stored;
