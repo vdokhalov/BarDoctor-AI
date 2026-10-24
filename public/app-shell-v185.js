@@ -236,7 +236,26 @@
   class BdAppHeader extends HTMLElement {
     syncAction(config) {
       var trailing = this.querySelector(".bd-app-header-trailing");
-      if (!trailing || trailing.querySelector(".bd-app-header-action")) return;
+      if (!trailing) return;
+      // Equipment routes commit their React content after the URL changes.
+      // Reconcile the proxy with the current source rather than retaining a
+      // detached list button (or a previous card's edit handler).
+      if (window.location.pathname === "/equipment" || (config.screenType === "detail" && /^\/equipment\/[^/]+$/.test(window.location.pathname))) {
+        var selector = window.location.pathname === "/equipment"
+          ? ".bd-eq-add-icon-v167"
+          : "[data-bd-equipment-detail] .bd-eq-detail-header-v167 button[aria-label=\"Редактировать\"]";
+        var source = document.querySelector(selector);
+        var previous = trailing.querySelector(".bd-app-header-action");
+        if (previous && previous._equipmentSource === source && source && source.isConnected) return;
+        if (previous) previous.remove();
+        if (source && source.isConnected) {
+          var proxy = makeIconButton(source);
+          proxy._equipmentSource = source;
+          trailing.appendChild(proxy);
+        }
+        return;
+      }
+      if (trailing.querySelector(".bd-app-header-action")) return;
       var action = explicitAction(config);
       if (!action && config.variant === "detail") action = genericAction();
       if (action) trailing.appendChild(action.nodeType ? makeIconButton(action) : makeIconButton(null, action));
