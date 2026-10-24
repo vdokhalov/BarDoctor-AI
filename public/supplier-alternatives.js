@@ -368,7 +368,7 @@
     setTitle("Новые поставщики", true);
     $("#refresh").hidden = false;
     if (!currentData) {
-      root.append(emptyState("Предложения ещё не найдены", "BarDoctor проверит точные позиции активного ассортимента и сохранит найденные предложения на сервере.", "Запустить поиск", runFullSearch));
+      root.append(emptyState("Предложения ещё не найдены", "BarDoctor проверит закупаемые товары из номенклатуры и сохранит найденные предложения на сервере.", "Запустить поиск", runFullSearch));
       return;
     }
     var positionGroups = groups();

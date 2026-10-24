@@ -54,8 +54,9 @@ function variantTokens(value: string): string[] {
 }
 
 export function isSameSupplierMenuProduct(target: string, candidate: string): boolean {
-  const required = productTokens(target);
-  const candidateTokens = new Set(productTokens(candidate));
+  const distinctive = productTokens(target);
+  const required = distinctive.length ? distinctive : normalSupplierTargetKey(target).split(" ").filter(token => token.length > 2 && !/^\d/.test(token));
+  const candidateTokens = new Set(distinctive.length ? productTokens(candidate) : normalSupplierTargetKey(candidate).split(" "));
   const targetVariants = new Set(variantTokens(target));
   const candidateVariants = variantTokens(candidate);
   return required.length > 0
