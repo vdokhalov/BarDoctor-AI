@@ -85,3 +85,28 @@ test('unverified candidates cannot enter downstream confirmed market context',as
  const stored=build();assert.deepEqual((stored.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
  const supplied=build({confirmedCompetitors:[unknown,known]});assert.deepEqual((supplied.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
 });
+
+test('a local source for another venue cannot support a named claim, even if both candidates are local',()=>{
+ const luna=source('Cafe Luna Бендеры Moldova','https://guide.md/luna'),rosa=source('Cafe Rosa Бендеры Moldova','https://guide.md/rosa');
+ const out=filterMarketEvidence({competitors:[candidate('Luna',luna),candidate('Rosa',rosa)],actions:[{title:'Luna дешевле',sourceUrls:[rosa.url]},{title:'Rosa: проверить меню',sourceUrls:[rosa.url]}],location:{summary:'Luna лидер',sourceUrls:[rosa.url]}},[luna,rosa],target);
+ assert.deepEqual((out.result.actions as any[]).map(x=>x.title),['Rosa: проверить меню']);
+ assert.equal((out.result.location as any).sourceUrls.length,0);
+});
+test('a shared source must name every business in a comparative claim',()=>{
+ const shared=source('Cafe Luna and Cafe Rosa Бендеры Moldova','https://guide.md/both'),single=source('Cafe Luna Бендеры Moldova','https://guide.md/luna');
+ const out=filterMarketEvidence({competitors:[candidate('Luna',shared),candidate('Rosa',shared)],pricing:[{item:'Luna и Rosa',sourceUrls:[single.url,shared.url]}]},[shared,single],target);
+ assert.deepEqual((out.result.pricing as any[])[0].sourceUrls,[single.url,shared.url]);
+});
+test('provider source-verification claims never pass through as verified assumptions',()=>{
+ const s=source('Luna official site');const raw={assumptions:['Выбраны только подтверждённые местные страницы; меню прочитано'],competitors:[candidate('Luna',s)]};
+ const before=JSON.stringify(raw),out=filterMarketEvidence(raw,[s],target);
+ assert.deepEqual(out.result.assumptions,['Сопоставлены названия и ссылки. Содержание страниц не проверено.']);
+ assert.equal((out.result.competitors as any[])[0].evidenceStatus,'venue_unverified');
+ assert.equal(JSON.stringify(raw),before);
+});
+
+test('separate sources may jointly support the identities in a comparison',()=>{
+ const a=source('Cafe Luna Бендеры Moldova','https://guide.md/a'),b=source('Cafe Rosa Бендеры Moldova','https://guide.md/b');
+ const result=filterMarketEvidence({competitors:[candidate('Luna',a),candidate('Rosa',b)],actions:[{title:'Luna и Rosa: сравнить меню',sourceUrls:[a.url,b.url]}]},[a,b],target);
+ assert.deepEqual((result.result.actions as any[])[0].sourceUrls,[a.url,b.url]);
+});

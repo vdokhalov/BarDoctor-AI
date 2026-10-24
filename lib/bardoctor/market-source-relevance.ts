@@ -70,14 +70,22 @@ export function filterMarketEvidence(raw:unknown,sources:OpenAIWebSource[],locat
  });
  const blockedNames=candidates.filter(v=>!competitors.some(c=>c.name===v.name&&c.evidenceStatus==='local')).map(v=>marketEvidenceWords(string(v.name)));
  const mentionsUnproven=(v:Row)=>{const text=marketEvidenceWords(Object.entries(v).filter(([k])=>k!=='sourceUrls').map(([,value])=>JSON.stringify(value)).join(' '));return blockedNames.some(name=>contains(text,name));};
+ // A city-wide source cannot substantiate a claim about a named business.
+ const claimLinks=(value:Row)=>{
+  const text=marketEvidenceWords(Object.entries(value).filter(([key])=>key!=='sourceUrls').map(([,v])=>JSON.stringify(v)).join(' '));
+  const names=candidates.filter(v=>contains(text,marketEvidenceWords(string(v.name)))).map(v=>string(v.name));
+  const urls=links(value.sourceUrls);
+  if(!names.every(name=>urls.some(url=>marketSourceRelevant(byUrl.get(url)!,location,name))))return [];
+  return urls.filter(url=>names.length===0||names.some(name=>marketSourceRelevant(byUrl.get(url)!,location,name)));
+ };
  const localCount=competitors.filter(c=>c.evidenceStatus==='local').length;
- const result:Row={assumptions:input.assumptions,competitors,competitorSummary:localCount?'Найдены местные заведения для проверки.':competitors.length?'Город кандидатов требует проверки.':'Недостаточно источников о заведениях в этом городе.'};
+ const result:Row={assumptions:['Сопоставлены названия и ссылки. Содержание страниц не проверено.'],competitors,competitorSummary:localCount?'Найдены местные заведения для проверки.':competitors.length?'Город кандидатов требует проверки.':'Недостаточно источников о заведениях в этом городе.'};
  for(const key of ['location','audience','economy','positioning']){
-  const section=row(input[key])??{},sourceUrls=links(section.sourceUrls);
+  const section=row(input[key])??{},sourceUrls=claimLinks(section);
   result[key]=sourceUrls.length&&!mentionsUnproven(section)?{...section,sourceUrls}:{summary:'Недостаточно местных источников.',signals:[],segments:[],sourceUrls:[]};
  }
  for(const key of ['opportunities','risks','pricing','marketing','actions'])result[key]=(Array.isArray(input[key])?input[key]:[]).map(row).filter((v):v is Row=>!!v).flatMap(v=>{
-  const sourceUrls=links(v.sourceUrls);return sourceUrls.length&&!mentionsUnproven(v)?[{...v,sourceUrls}]:[];
+  const sourceUrls=claimLinks(v);return sourceUrls.length&&!mentionsUnproven(v)?[{...v,sourceUrls}]:[];
  });
  return {result,sources:linkedMarketSources(result,sources)};
 }

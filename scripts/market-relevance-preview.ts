@@ -49,13 +49,30 @@ try{
  const good={title:'Cafe Luna — Бендеры Moldova',url:'https://luna.example/venue'},unknown={title:'Rosa restaurant official site',url:'https://rosa.example/'},foreign={title:'Drive Pub — Balti, Moldova',url:'https://drive.example/'};
  const build=(onlyUnknown=false)=>{const raw={competitors:[...(!onlyUnknown?[{name:'Luna',sourceUrls:[good.url],category:'Кафе'}]:[]),{name:'Rosa',sourceUrls:[unknown.url],category:'Ресторан',city:'Бендеры'},{name:'Drive Pub',sourceUrls:[foreign.url],category:'Бар'}],opportunities:[{title:'Rosa лидер местного рынка',sourceUrls:[unknown.url]}]};const out=filterMarketEvidence(raw,[good,unknown,foreign],{city:'Бендеры',country:'Молдова'});return {version:1,generatedAt:'2026-10-24T12:00:00Z',...out.result,sources:out.sources,competitors:(out.result.competitors as any[]).map((x,i)=>({...x,key:'fixture-'+i}))};};
  let analysis=build(),writes=0;
+ const oldClaim='Выбраны только подтверждённые местные страницы';
+ (analysis as any).assumptions=[oldClaim];
+ const savedText=JSON.stringify(analysis);
  const context=await browser.newContext({viewport:{width:390,height:844}});await context.addInitScript(({owner,venueId})=>{localStorage.setItem('bd_session',owner.email);localStorage.setItem('bd_session_token',owner.token);localStorage.setItem('bd_active_venue_id',String(venueId))},{owner,venueId});const page=await context.newPage();page.setDefaultTimeout(20000);const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/market',route=>{if(route.request().method()!=='GET'){writes++;return route.fulfill({status:403,body:'No writes in preview'});}return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,analysis,restaurant:{name:'Тестовый рынок',city:'Бендеры',country:'Молдова'},stale:false})});});
  await page.goto(base+'/market?embedded=1&venue='+venueId);const cards=page.locator('.competitor-item');await page.getByText('Город не подтверждён',{exact:false}).first().waitFor();assert.equal(await cards.count(),2);assert.equal(await page.getByText('Drive Pub',{exact:true}).count(),0);assert.equal(await page.locator('#confirmed-count').innerText(),'0');
  const rosa=cards.filter({hasText:'Rosa'});await rosa.click();await page.locator('#detail-title').getByText('Rosa',{exact:true}).waitFor();assert.equal(await page.locator('[data-confirm]').count(),0);assert.ok((await page.locator('#detail-status').innerText()).includes('Город не подтверждён'));
  await page.locator('#detail-close').click();await page.reload();await page.getByText('Город не подтверждён',{exact:false}).first().waitFor();
+ await page.locator('#full-analysis > summary').click();
+ assert.ok((await page.locator('#full-analysis').innerText()).includes('Ссылки не подтверждают содержание страниц'));
+ assert.equal(await page.getByText(oldClaim,{exact:true}).isVisible(),false);
+ await page.locator('#assumptions-content summary').click();
+ await page.getByText(oldClaim,{exact:true}).waitFor();
+ assert.equal(JSON.stringify(analysis),savedText,'saved analysis stays unchanged');
+ await page.locator('#assumptions-content summary').click();
+ await page.locator('#sources-card').getByRole('link',{name:/Cafe Luna/}).waitFor();
+ await page.locator('#full-analysis > summary').click();
  const out=resolve('outputs/market-relevance');mkdirSync(out,{recursive:true});await page.locator('#competitors-card').scrollIntoViewIfNeeded();await page.screenshot({path:out+'/mixed-390.png'});
- for(const width of [820,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);await page.screenshot({path:out+'/mixed-'+width+'.png'});}
+ for(const width of [390,820,1280]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);await page.screenshot({path:out+'/mixed-'+width+'.png'});
+ await page.locator('#full-analysis > summary').click();
+ await page.locator('#full-analysis').scrollIntoViewIfNeeded();
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+ await page.screenshot({path:out+'/analysis-'+width+'.png'});
+ await page.locator('#full-analysis > summary').click();}
  analysis=build(true);await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.competitor-item').length===1);assert.equal(await page.locator('#confirmed-count').innerText(),'0');assert.ok(!(await page.locator('#opportunities-card').innerText()).includes('лидер'));
  assert.equal(writes,0);assert.deepEqual(errors,[]);console.log(JSON.stringify({pass:true,checks:['mixed local/unverified/foreign','no unverified confirm action','reload','all unknown retained','no unknown local conclusions','390/820/1280 overflow','no business writes'],out}));await context.close();
 }finally{await browser.close();server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await Promise.all([...pendingHandlers]);await runtime.close()}
