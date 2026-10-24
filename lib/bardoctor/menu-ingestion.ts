@@ -7,7 +7,7 @@ export const MENU_INGESTION_STORE_KEY = "bd_menu_ingestion_v1";
 export const MENU_SOURCES = ["MANUAL", "SCAN", "IMPORT"] as const;
 export type MenuSource = typeof MENU_SOURCES[number];
 type Row = Record<string, unknown>;
-export type DraftLine = { id: string; item: Row; targetId: string | null; base: Row | null; decision: "pending" | "apply" | "skip"; reviewed: boolean; activeRecipeId?: string };
+export type DraftLine = { sourceCurrency?: string | null; id: string; item: Row; targetId: string | null; base: Row | null; decision: "pending" | "apply" | "skip"; reviewed: boolean; activeRecipeId?: string };
 export type MenuDraft = { version: 1; id: string; venueId: number; source: MenuSource; revision: number; status: "DRAFT" | "VALIDATED" | "CONFIRMED" | "CANCELLED"; rows: DraftLine[]; createdAt: string; updatedAt: string; validationHash?: string; confirmedAt?: string; resultIds?: string[]; provenance?: { sourceFileIds: string[]; sourceUrl?: string; name?: string } };
 export type DiffLine = { id: string; name: string; status: "ADDED" | "CHANGED" | "UNCHANGED" | "CONFLICT" | "INVALID" | "SKIPPED"; targetId: string | null; before: Row | null; after: Row; changes: { field: string; before: unknown; after: unknown }[]; issues: string[]; decision: DraftLine["decision"] };
 const fields = ["name", "salePrice", "currency", "sectionId", "taxonomyCategoryId", "subcategoryId", "groupId", "subgroupId", "department", "category", "consumptionMode", "type", "active", "plannedSales", "readyProduct", "saleSize"];
@@ -37,12 +37,13 @@ export function menuDraft(input: { id: string; source: MenuSource; venueId: numb
   const menu = rows(input.assortment.menuItems).filter(row => sameVenue(row, input.venueId));
   return { version: 1, id: input.id, source: input.source, venueId: input.venueId, revision: 1, status: "DRAFT", createdAt: input.now, updatedAt: input.now, rows: input.items.map((value, index) => {
     const raw = object(value), item = pick({ ...raw, ...object(raw.reviewInput) });
+    if (input.source !== "MANUAL" && !("currency" in item)) item.currency = "";
     // IDs from recognition belong to its response, not to the canonical menu.
     const byId = input.source !== "SCAN" ? menu.filter(row => row.id === raw.id) : [];
     const byName = menu.filter(row => nameKey(row.name) === nameKey(item.name));
     const base = byId.length === 1 ? byId[0] : input.source !== "MANUAL" && byName.length === 1 ? byName[0] : null;
     const candidates = byId.length ? byId : byName;
-    return { id: `${input.id}:${index}`, item: { ...item, id: base?.id || `menu:${input.id}:${index}`, venueId: input.venueId, ...(raw.confidence != null ? { confidence: raw.confidence } : {}), ...(raw.warnings != null ? { warnings: raw.warnings } : {}), ...(candidates.length > 1 ? { matchingConflict: true } : {}), ...(input.source === "MANUAL" && raw.baseline && stable(editorBaseline(raw.baseline, input.assortment)) !== stable(editorBaseline(base, input.assortment)) ? { staleInput: true } : {}) }, targetId: base ? String(base.id) : null, base: base ? structuredClone(base) : null, decision: input.source === "MANUAL" ? "apply" : "pending", reviewed: input.source === "MANUAL", activeRecipeId: text(raw.activeRecipeId) || undefined };
+    return { ...(input.source !== "MANUAL" ? { sourceCurrency: text(item.currency) || null } : {}), id: `${input.id}:${index}`, item: { ...item, id: base?.id || `menu:${input.id}:${index}`, venueId: input.venueId, ...(raw.confidence != null ? { confidence: raw.confidence } : {}), ...(raw.warnings != null ? { warnings: raw.warnings } : {}), ...(candidates.length > 1 ? { matchingConflict: true } : {}), ...(input.source === "MANUAL" && raw.baseline && stable(editorBaseline(raw.baseline, input.assortment)) !== stable(editorBaseline(base, input.assortment)) ? { staleInput: true } : {}) }, targetId: base ? String(base.id) : null, base: base ? structuredClone(base) : null, decision: input.source === "MANUAL" ? "apply" : "pending", reviewed: input.source === "MANUAL", activeRecipeId: text(raw.activeRecipeId) || undefined };
   }) };
 }
 export function editMenuDraft(draft: MenuDraft, changes: unknown[], now: string): MenuDraft {
@@ -104,8 +105,9 @@ export function validateMenuDraft(draft: MenuDraft, assortment: Row, currency: s
     if (!nonnegativeNumber(price)) issues.push("Укажите корректную неотрицательную цену."); else item.salePrice = Number(price);
     if (item.plannedSales != null && !nonnegativeNumber(item.plannedSales)) issues.push("План продаж должен быть неотрицательным числом.");
     else if (item.plannedSales != null) item.plannedSales = Number(item.plannedSales);
-    if (!currency || (item.currency && item.currency !== currency)) issues.push("Валюта должна совпадать с валютой учёта заведения.");
-    item.currency = currency;
+    if (!currency) issues.push("Укажите валюту заведения.");
+    else if (!text(item.currency) || draft.source !== "MANUAL" && !text(input.currency)) issues.push("Укажите валюту цены.");
+    else if (item.currency !== currency) issues.push("Валюта цены отличается от валюты заведения. Проверьте цену и валюту.");
     const section = taxonomy.sections.find(node => node.id === item.sectionId && node.active);
     const category = taxonomy.categories.find(node => node.id === item.taxonomyCategoryId && node.active && node.parentId === section?.id);
     const subcategory = item.subcategoryId ? taxonomy.subcategories.find(node => node.id === item.subcategoryId && node.active && node.parentId === category?.id) : null;
@@ -141,5 +143,5 @@ export function validateMenuDraft(draft: MenuDraft, assortment: Row, currency: s
   }
   const untouched = scoped.filter(row => !draft.rows.some(line => line.targetId === String(row.id) && line.decision !== "skip"));
   const duplicateIds = duplicateMenuItemIds(after);
-  return { ok: !duplicateIds.length && diff.every(line => !["CONFLICT", "INVALID"].includes(line.status)), diff, untouched: untouched.map(row => ({ id: row.id, name: row.name })), duplicateIds, after, taxonomy };
+  return { currency, ok: !duplicateIds.length && diff.every(line => !["CONFLICT", "INVALID"].includes(line.status)), diff, untouched: untouched.map(row => ({ id: row.id, name: row.name })), duplicateIds, after, taxonomy };
 }

@@ -55,7 +55,7 @@ async function command(request: Request): Promise<Response> {
     await runStoreCasBatch(db, account.id, snapshots, statements, now);
     return null;
   };
-  const preview = (value: MenuDraft) => { const result = validateMenuDraft(value, assortment, currency, now); return { ok: result.ok, diff: result.diff, untouched: result.untouched, duplicateIds: result.duplicateIds, taxonomy: result.taxonomy }; };
+  const preview = (value: MenuDraft) => { const result = validateMenuDraft(value, assortment, currency, now); return { currency: result.currency, ok: result.ok, diff: result.diff, untouched: result.untouched, duplicateIds: result.duplicateIds, taxonomy: result.taxonomy }; };
   if (body.action === "create") {
     if (!MENU_SOURCES.includes(body.source as MenuSource) || !Array.isArray(body.items) || !body.items.length || body.items.length > 350 || body.items.some(row => !row || typeof row !== "object" || Array.isArray(row))) return fail("DRAFT_INPUT_INVALID", "Выберите источник и передайте от 1 до 350 позиций.", 422);
     const id = typeof body.draftId === "string" && /^[a-zA-Z0-9:_-]{8,100}$/.test(body.draftId) ? body.draftId : null;

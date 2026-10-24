@@ -191,7 +191,7 @@ export function normalizeMenuImport(
   } = {},
 ): MenuImportDraft {
   const raw = record(value);
-  const fallbackCurrency = text(raw.currency, "RUB", 8).toUpperCase();
+  const fallbackCurrency = text(raw.currency, "", 8).toUpperCase();
   const rawItems = Array.isArray(raw.menuItems)
     ? raw.menuItems
     : Array.isArray(raw.items)
@@ -200,6 +200,7 @@ export function normalizeMenuImport(
   const menuItems = rawItems.slice(0, 350).map((value) => {
     const item = record(value);
     const sourceInput = { ...item, ...record(item.reviewInput) };
+    const sourceCurrency = Object.hasOwn(sourceInput, "currency") ? text(sourceInput.currency, "", 8).toUpperCase() : fallbackCurrency;
     const sourcePrice = sourceInput.salePrice ?? sourceInput.price;
     const validNumber = (value: unknown) => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && number(value, -1) >= 0;
     const reviewInput = {
@@ -219,7 +220,7 @@ export function normalizeMenuImport(
       category,
       name,
       salePrice: Math.round(nonNegative(item.salePrice ?? item.price) * 100) / 100,
-      currency: text(item.currency, fallbackCurrency, 8).toUpperCase(),
+      currency: sourceCurrency,
       ...(() => {
         if (menuItemType(item.type) === "service") return {};
         const explicit = normalizeManualMenuSaleSize(
@@ -430,7 +431,7 @@ export function mergeMenuImportParts(value: unknown): {
     currencyCounts.set(part.currency, (currencyCounts.get(part.currency) ?? 0) + 1);
   }
   const currency = [...currencyCounts.entries()]
-    .sort((left, right) => right[1] - left[1])[0]?.[0] ?? "RUB";
+    .sort((left, right) => right[1] - left[1])[0]?.[0] ?? "";
   const confidenceWeight = parts.reduce(
     (sum, part) => sum + Math.max(1, part.menuItems.length),
     0,
