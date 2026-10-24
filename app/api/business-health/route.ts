@@ -28,6 +28,8 @@ async function readHealth(request: Request): Promise<Response> {
 
   if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
-  const saved=await refreshClosedHealth(account);
-  return noStore(Response.json(saved??{success:false,code:'HEALTH_NO_SNAPSHOT'}));
+  let recoveryReason='UNCHANGED';
+  const saved=await refreshClosedHealth(account,undefined,reason=>{recoveryReason=reason;});
+  const payload=saved??{success:false,code:'HEALTH_NO_SNAPSHOT'};
+  return noStore(Response.json(new URL(request.url).searchParams.get('diagnostics')==='1'?{...payload,recovery:{reason:recoveryReason}}:payload));
 }

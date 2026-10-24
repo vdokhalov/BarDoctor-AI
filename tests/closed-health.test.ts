@@ -212,3 +212,34 @@ test('future stock movements prevent recovery rather than silently using later b
 test('recovery does not create another tenant capture',async t=>{
  const r=await missedCapture();t.after(r.close);const other=await r.register('recovery-other@isolated.test');const response=await r.api.health.GET(r.request(undefined,other));assert.equal((await response.json() as any).code,'HEALTH_NO_SNAPSHOT');assert.deepEqual(r.get(r.key),r.previous);
 });
+async function prematurelyClosed24(){
+ const r=await setup();assert.equal((await r.post(r.closeCommand)).status,201);
+ r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:'MDL',timezone:'Europe/Chisinau',name:'Local test'}),r.owner.userId);
+ r.setNow('2026-10-23T16:41:00Z');assert.equal((await r.post({action:'open',date:'2026-10-23',operationId:'exact-open23',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),{id:'cash23',venueId:r.venue,date:'2026-10-23',revenueSource:'sales_events_v1',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL'}]);
+ assert.equal((await r.post({...r.closeCommand,date:'2026-10-23',operationId:'exact-close23',expectedRevision:1})).status,201);const key='__bd_closed_health_v1__:'+r.venue,previous=r.get(key);
+ r.setNow('2026-10-24T18:00:00Z');assert.equal((await r.post({action:'open',date:'2026-10-24',operationId:'exact-open24',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),...[24,25,26].map(day=>({id:'cash'+day,venueId:r.venue,date:'2026-10-'+day,revenueSource:'sales_events_v1',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL',closedAt:'2026-10-23T17:40:20.150Z'}))]);
+ assert.equal((await r.post({...r.closeCommand,date:'2026-10-24',operationId:'exact-close24',expectedRevision:1})).status,201);
+ const timestamps={workdayOpenedAt:'2026-10-23T17:28:46.390Z',workdayClosedAt:'2026-10-23T17:40:59.781Z'};
+ r.put('bd_operational_reports_v1',[...r.get('bd_operational_reports_v1').map((row:any)=>row.date==='2026-10-24'?{...row,...timestamps}:row),...[25,26].map(day=>({id:'future-'+day,venueId:r.venue,date:'2026-10-'+day,workdayStatus:'CLOSED',workdayRevision:3,workdaySequence:1,payrollBreakdown:{total:0},...timestamps}))]);r.put(key,previous);
+ return {...r,key,previous};
+}
+async function diagnosticHealth(r:Awaited<ReturnType<typeof setup>>){const request=r.request();return await(await r.api.health.GET(new Request(request.url+'?diagnostics=1',{headers:request.headers}))).json() as any;}
+test('exact early-close timestamps: arrived 24 October recovers, future 25/26 excluded, old 23 capture replaced honestly',async t=>{
+ const r=await prematurelyClosed24();t.after(r.close);assert.equal(JSON.parse(r.previous.payload).generatedAt,'2026-10-23T16:41:00.000Z');
+ const reports=r.get('bd_operational_reports_v1'),cash=r.get('bd_finance_revenue');
+ const result=await diagnosticHealth(r);assert.equal(result.recovery.reason,'REFRESHED');assert.equal(result.generatedAt,'2026-10-24T18:00:00.000Z');assert.equal(result.data.businessHealthSnapshot.closedWorkdayDate,'2026-10-24');assert.equal(result.data.businessHealthSnapshot.closedWorkdayClosedAt,'2026-10-23T17:40:59.781Z');
+ assert.deepEqual(r.get('bd_operational_reports_v1'),reports);assert.deepEqual(r.get('bd_finance_revenue'),cash);
+ const repeated=await diagnosticHealth(r);assert.equal(repeated.recovery.reason,'CURRENT');assert.deepEqual(repeated.data,result.data);assert.equal(repeated.generatedAt,result.generatedAt);assert.deepEqual(Object.keys(repeated.recovery),['reason']);
+});
+test('early closure is not sufficient: earlier OPEN guard and incomplete finance remain distinct',async t=>{
+ const r=await prematurelyClosed24();t.after(r.close);const reports=r.get('bd_operational_reports_v1');r.put('bd_operational_reports_v1',[...reports,{id:'open',venueId:r.venue,date:'2026-10-24',workdayStatus:'OPEN'}]);
+ assert.equal((await diagnosticHealth(r)).recovery.reason,'OPEN_WORKDAY');assert.deepEqual(r.get(r.key),r.previous);
+ r.put('bd_operational_reports_v1',reports);r.put('bd_finance_expenses',[{id:'unknown',venueId:r.venue,date:'2026-10-24',amount:null,category:'other',currency:'MDL'}]);assert.equal((await diagnosticHealth(r)).recovery.reason,'FINANCE_INCOMPLETE');assert.deepEqual(r.get(r.key),r.previous);
+});
+test('future business date and invalid opening/closing order cannot become recovery candidates',async t=>{
+ const r=await prematurelyClosed24();t.after(r.close);r.setNow('2026-10-23T18:00:00Z');assert.equal((await diagnosticHealth(r)).recovery.reason,'CURRENT');assert.deepEqual(r.get(r.key),r.previous);
+ r.setNow('2026-10-24T18:00:00Z');const reports=r.get('bd_operational_reports_v1');
+ for(const opened of [undefined,'bad','2026-10-23T18:00:00Z']){r.put('bd_operational_reports_v1',reports.map((row:any)=>row.date==='2026-10-24'?{...row,workdayOpenedAt:opened}:row));assert.deepEqual((await diagnosticHealth(r)).data,JSON.parse(r.previous.payload).data);assert.deepEqual(r.get(r.key),r.previous);}
+});
