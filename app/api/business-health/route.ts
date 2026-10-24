@@ -1,4 +1,4 @@
-import {readClosedHealth} from '../../../lib/bardoctor/closed-health';
+import {refreshClosedHealth} from '../../../lib/bardoctor/closed-health';
 import {FinancialReadPending} from '../../../lib/bardoctor/financial-read-progress';
 import { canReadDiagnosisSources, restrictedVenueContext } from "../../../lib/bardoctor/venue-context-access";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
@@ -28,6 +28,6 @@ async function readHealth(request: Request): Promise<Response> {
 
   if (!canReadDiagnosisSources(account)) return restrictedVenueContext();
 
-  const saved=await readClosedHealth(account);
+  const saved=await refreshClosedHealth(account);
   return noStore(Response.json(saved??{success:false,code:'HEALTH_NO_SNAPSHOT'}));
 }

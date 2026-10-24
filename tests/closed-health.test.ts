@@ -158,3 +158,57 @@ test('future zero cash with posted sales is not proven empty',async t=>{
  r.sqlite.prepare('INSERT INTO sales_event_records(account_id,event_id,position,external_id,source,business_date,revenue_row_id,fingerprint,payload_hash,chunk_count) VALUES(?,?,?,?,?,?,?,?,?,1)').run(r.owner.userId,event.id,1,event.id,'POS_API',event.businessDate,event.revenueRowId,event.id,createHash('sha256').update(payload).digest('hex'));r.sqlite.prepare('INSERT INTO sales_event_chunks(account_id,event_id,version,ordinal,payload) VALUES(?,?,0,0,?)').run(r.owner.userId,event.id,payload);
  assert.equal((await r.post(r.closeCommand)).status,201);assert.equal((await r.read()).code,'HEALTH_NO_SNAPSHOT');
 });
+async function missedCapture(){
+ const r=await setup();assert.equal((await r.post(r.closeCommand)).status,201);const key='__bd_closed_health_v1__:'+r.venue,previous=r.get(key);
+ r.setNow('2026-10-24T17:00:00Z');assert.equal((await r.post({action:'open',date:'2026-10-24',operationId:'recovery-open24',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),...[24,25,26].map(day=>({id:'cash'+day,venueId:r.venue,date:'2026-10-'+day,revenueSource:'sales_events_v1',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL'}))]);
+ assert.equal((await r.post({...r.closeCommand,date:'2026-10-24',operationId:'recovery-close24',expectedRevision:1})).status,201);
+ r.put(key,previous);r.setNow('2026-10-24T18:00:00Z');return {...r,key,previous};
+}
+test('missed capture recovers on GET with current calculation time, without business writes; reload stable',async t=>{
+ const r=await missedCapture();t.after(r.close);
+ const before=r.sqlite.prepare('SELECT store_key,data_json,updated_at FROM domain_data WHERE account_id=? AND store_key<>? ORDER BY store_key').all(r.owner.userId,r.key);
+ const audit=r.sqlite.prepare('SELECT * FROM audit_log').all();
+ const result=await r.read();assert.equal(result.generatedAt,'2026-10-24T18:00:00.000Z');
+ const snapshot=result.data.businessHealthSnapshot;assert.equal(snapshot.captureMode,'RECALCULATED_CLOSED_PERIOD');assert.equal(snapshot.closedWorkdayDate,'2026-10-24');assert.equal(snapshot.closedWorkdayClosedAt,'2026-10-24T17:00:00.000Z');
+ assert.deepEqual(r.sqlite.prepare('SELECT store_key,data_json,updated_at FROM domain_data WHERE account_id=? AND store_key<>? ORDER BY store_key').all(r.owner.userId,r.key),before);assert.deepEqual(r.sqlite.prepare('SELECT * FROM audit_log').all(),audit);
+ const stored=r.get(r.key);r.setNow('2026-10-24T19:00:00Z');assert.deepEqual(await r.read(),result);assert.deepEqual(r.get(r.key),stored);
+});
+test('missed capture does not incorporate a new open shift, even on the same business date',async t=>{
+ const r=await missedCapture();t.after(r.close);const report=r.get('bd_operational_reports_v1').find((x:any)=>x.date==='2026-10-24');
+ assert.equal((await r.post({action:'open_next',date:report.date,workdayId:report.id,operationId:'recovery-next',expectedRevision:report.workdayRevision,staffing:[{employeeId:'e'}]})).status,201);
+ assert.deepEqual(await r.read(),JSON.parse(r.previous.payload));assert.deepEqual(r.get(r.key),r.previous);
+});
+test('recovery preserves prior assessment when sources incomplete or the derived write fails',async t=>{
+ const r=await missedCapture();t.after(r.close);r.put('bd_finance_expenses',[{id:'unknown',venueId:r.venue,date:'2026-10-24',amount:null,category:'other',currency:'MDL'}]);
+ assert.deepEqual(await r.read(),JSON.parse(r.previous.payload));assert.deepEqual(r.get(r.key),r.previous);
+ r.put('bd_finance_expenses',[]);r.failDatabase();assert.deepEqual(await r.read(),JSON.parse(r.previous.payload));assert.deepEqual(r.get(r.key),r.previous);
+ assert.equal((await r.read()).data.businessHealthSnapshot.captureMode,'RECALCULATED_CLOSED_PERIOD');
+});
+test('recovery CAS rejects an intervening new open workday and retries only on later read',async t=>{
+ const r=await missedCapture();t.after(r.close);
+ r.beforeNextBatch(()=>{r.put('bd_operational_reports_v1',[...r.get('bd_operational_reports_v1'),{id:'new-open',venueId:r.venue,date:'2026-10-24',workdayStatus:'OPEN',workdayRevision:1}]);});
+ assert.deepEqual(await r.read(),JSON.parse(r.previous.payload));assert.deepEqual(r.get(r.key),r.previous);
+});
+test('concurrent recovery reads converge on one persisted generation',async t=>{
+ const r=await missedCapture();t.after(r.close);const results=await Promise.all([r.read(),r.read()]);assert.deepEqual(results[0],results[1]);assert.equal(results[0].generatedAt,'2026-10-24T18:00:00.000Z');assert.equal(r.get(r.key).captureMode,'RECALCULATED_CLOSED_PERIOD');
+});
+
+test('recovery of yesterday uses venue date, and future closed workdays never win selection',async t=>{
+ const r=await missedCapture();t.after(r.close);
+ r.put('bd_operational_reports_v1',[...r.get('bd_operational_reports_v1'),...[25,26].map(day=>({id:'future'+day,venueId:r.venue,date:'2026-10-'+day,workdayStatus:'CLOSED',workdayClosedAt:'2026-10-24T17:00:00Z',workdayRevision:2,payrollBreakdown:{total:0}}))]);
+ r.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:'MDL',timezone:'Europe/Chisinau',name:'Local test'}),r.owner.userId);
+ r.setNow('2026-10-24T22:30:00Z');const result=await r.read();assert.equal(result.data.businessHealthSnapshot.closedWorkdayDate,'2026-10-24');assert.equal(result.generatedAt,'2026-10-24T22:30:00.000Z');
+});
+test('recovery selects exact last sequential shift, not the first shift of that date',async t=>{
+ const r=await missedCapture();t.after(r.close);const first=r.get('bd_operational_reports_v1').find((x:any)=>x.date==='2026-10-24');
+ const opened=await r.post({action:'open_next',date:first.date,workdayId:first.id,operationId:'recover-seq-open',expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]});assert.equal(opened.status,201);const second=(await opened.json() as any).workday;
+ assert.equal((await r.post({...r.closeCommand,date:first.date,workdayId:second.id,operationId:'recover-seq-close',expectedRevision:1})).status,201);r.put(r.key,r.previous);r.setNow('2026-10-24T19:00:00Z');
+ assert.equal((await r.read()).data.businessHealthSnapshot.closedWorkdayId,second.id);
+});
+test('future stock movements prevent recovery rather than silently using later balances',async t=>{
+ const r=await missedCapture();t.after(r.close);r.sqlite.prepare('INSERT INTO stock_journal_movements(account_id,position,movement_id,kind,effective_date,payload_json) VALUES(?,0,?,?,?,?)').run(r.owner.userId,'future-stock','receipt','2026-10-25',JSON.stringify({id:'future-stock',venueId:r.venue,date:'2026-10-25',businessDate:'2026-10-25',productKey:'p',quantity:1}));assert.deepEqual(await r.read(),JSON.parse(r.previous.payload));assert.deepEqual(r.get(r.key),r.previous);
+});
+test('recovery does not create another tenant capture',async t=>{
+ const r=await missedCapture();t.after(r.close);const other=await r.register('recovery-other@isolated.test');const response=await r.api.health.GET(r.request(undefined,other));assert.equal((await response.json() as any).code,'HEALTH_NO_SNAPSHOT');assert.deepEqual(r.get(r.key),r.previous);
+});
