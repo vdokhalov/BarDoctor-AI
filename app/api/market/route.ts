@@ -1,3 +1,4 @@
+import { marketResultAttempt, retainMarketResult } from "../../../lib/bardoctor/market-result-attempt";
 import { marketFailureDiagnostic, type MarketStage } from "../../../lib/bardoctor/market-diagnostics";
 import { filterMarketEvidence, linkedMarketSources, marketCandidateEligible } from "../../../lib/bardoctor/market-source-relevance";
 import { readStoreSnapshots, runStoreCasBatch, type StoreSnapshot } from "../../../lib/bardoctor/store-cas";
@@ -572,7 +573,14 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     };
 
     diagnosticStage = "save";
-    await saveAnalysis(account.id, payload, casSnapshots);
+    const attempt = marketResultAttempt(parsed, web.sources, relevant.result, payload, generatedAt);
+    const saved = retainMarketResult(previousAnalysis, payload, attempt);
+    await saveAnalysis(account.id, saved, casSnapshots);
+    const completedResponse = () => {
+      try { console.info(JSON.stringify({ event: "market.result", requestId: diagnosticRequestId, status: 200, reason: attempt.reason, counts: attempt.counts })); } catch { /* Logging cannot change persistence. */ }
+      return noStore(Response.json({ ok: true, data: saved, stale: marketAnalysisIsStale(saved) }, { headers: { "X-BD-Market-Request-Id": diagnosticRequestId } }));
+    };
+    if (attempt.reason !== "RESULT") return completedResponse();
 
     if (address || latitude !== null || longitude !== null) {
       const nextRestaurant = {
@@ -588,7 +596,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
         .where(eq(accounts.id, account.id));
     }
 
-    return noStore(Response.json({ ok: true, data: payload, stale: false }));
+    return completedResponse();
   } catch (error) {
     const response = aiErrorResponse(error);
     try {

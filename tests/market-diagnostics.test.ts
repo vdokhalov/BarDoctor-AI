@@ -16,13 +16,13 @@ test('diagnostics allow only fixed fields and codes, never error text or incomin
 });
 
 test('native market errors emit correlated safe metadata and retain old analysis without external calls',async()=>{
- const fixture={mode:'format',calls:0,fetch:async()=>{
+ const fixture={mode:'format',payload:'{}',calls:0,fetch:async()=>{
   fixture.calls++;
   if(fixture.mode==='network')throw Error('PRIVATE_TOKEN owner@example.test');
   if(fixture.mode==='timeout')throw new DOMException('PRIVATE_TOKEN','TimeoutError');
   if(fixture.mode.startsWith('provider'))return Response.json({error:{code:'PRIVATE_TOKEN',message:'owner@example.test'}},{status:fixture.mode==='provider422'?422:503});
   if(fixture.mode==='empty')return Response.json({output:[]});
-  return Response.json({output_text:fixture.mode==='valid'?'{}':'PRIVATE_TOKEN owner@example.test'});
+  return Response.json({output_text:fixture.mode==='valid'?fixture.payload:'PRIVATE_TOKEN owner@example.test'});
  }};
  const runtime=await lifecycleRuntime({market:'./app/api/market/route'},{modules:{'market-diag-fixture':fixture},plugins:[{name:'local-provider-only',setup(build){
   build.onLoad({filter:/\/lib\/bardoctor\/openai\.ts$/},args=>({contents:"const fetch=require('market-diag-fixture').fetch;\n"+readFileSync(args.path,'utf8'),loader:'ts',resolveDir:args.path.slice(0,args.path.lastIndexOf('/'))}));
@@ -30,6 +30,7 @@ test('native market errors emit correlated safe metadata and retain old analysis
   build.onResolve({filter:/^\.\/integration-secrets$/},args=>args.importer.endsWith('/openai.ts')?{path:'fixture-secret',namespace:'fixture-secret'}:null);
   build.onLoad({filter:/.*/,namespace:'fixture-secret'},()=>({contents:"export async function getIntegrationValue(_account,key){return key==='OPENAI_MODEL'?'local-fixture':'PRIVATE_TOKEN'}",loader:'js'}));
  }}]});
+ const results:string[]=[],info=console.info;console.info=(...args)=>results.push(args.join(' '));
  const logs:string[]=[],original=console.error;console.error=(...args)=>logs.push(args.join(' '));
  try{
   const owner=await runtime.register('market-diag@isolated.test');
@@ -53,6 +54,18 @@ test('native market errors emit correlated safe metadata and retain old analysis
   }
   fixture.mode='valid';const before=logs.length;
   assert.equal((await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).status,200);assert.equal(logs.length,before);
-  assert.equal(fixture.calls,7);assert.doesNotMatch(logs.join('\n'),/PRIVATE_|owner@|market-diag@|authorization|prompt|stack/i);
- }finally{console.error=original;runtime.close()}
+  const reloaded:any=await (await runtime.api.market.GET(runtime.request(owner,'/api/market','GET'))).json();
+  assert.equal(reloaded.analysis.generatedAt,'2026-10-24T16:26:00Z');assert.equal(reloaded.analysis.competitors[0].name,'Сохранённый кандидат');assert.equal(reloaded.analysis.lastAttempt.reason,'MODEL_EMPTY');
+  assert.equal(fixture.calls,7);
+  fixture.payload=JSON.stringify({competitors:[{name:'Foreign',city:'Бельцы',category:'Кафе'}]});
+  const filtered:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(filtered.data.lastAttempt.reason,'FILTER_EMPTY');assert.equal(filtered.data.generatedAt,reloaded.analysis.generatedAt);
+  fixture.payload=JSON.stringify({competitors:[{name:'Unknown local candidate',category:'Кафе'}]});
+  const useful:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(useful.data.lastAttempt.reason,'RESULT');assert.equal(useful.data.competitors.length,1);
+  const other=await runtime.register('other-market@isolated.test');
+  const isolated:any=await (await runtime.api.market.GET(runtime.request(other,'/api/market','GET'))).json();assert.equal(isolated.analysis,null);
+  runtime.sqlite.prepare("DELETE FROM domain_data WHERE account_id=? AND store_key='bd_market_analysis_v1'").run(owner.userId);fixture.payload='{}';
+  const absent:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(absent.data.generatedAt,undefined);assert.equal(absent.data.lastAttempt.reason,'MODEL_EMPTY');
+  assert.equal(results.length,4);for(const line of results){const result=JSON.parse(line);assert.deepEqual(Object.keys(result).sort(),['counts','event','reason','requestId','status']);assert.equal(result.event,'market.result');assert.equal(result.status,200);}assert.doesNotMatch(results.join('\n'),/PRIVATE_|owner@|Unknown|Foreign|isolated/i);
+  assert.doesNotMatch(logs.join('\n'),/PRIVATE_|owner@|market-diag@|authorization|prompt|stack/i);
+ }finally{console.error=original;console.info=info;runtime.close()}
 });
