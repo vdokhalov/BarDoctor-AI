@@ -118,3 +118,43 @@ test('sequential guards protect closed month, selected history and other tenant'
  // Closed history is never reopened through team/close or new-date open.
  assert.equal((await r.post({action:'team',operationId:'mutate-closed',workdayId:first.id,expectedRevision:first.workdayRevision,staffing:[{employeeId:'e'}]})).status>=400,true);assert.deepEqual(r.get('bd_operational_reports_v1')[0],first);
 });
+
+test('future closed zero cash shifts do not block current closed Health; records stay unchanged',async t=>{
+ const r=await setup();t.after(r.close);
+ const future=[25,26].map(day=>({id:'future-'+day,venueId:r.venue,date:'2026-10-'+day,revenueSource:'sales_events_v1',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL'}));
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),...future]);
+ const before=JSON.stringify(r.get('bd_finance_revenue'));
+ assert.equal((await r.post(r.closeCommand)).status,201);
+ const health=await r.read();assert.equal(health.success,true);assert.match(health.data.businessHealth.components.find((x:any)=>x.id==='finance').evidence.join(' '),/2026-10-22/);
+ assert.equal(JSON.stringify(r.get('bd_finance_revenue')),before);assert.deepEqual(await r.read(),health);
+});
+for(const [name,patch] of Object.entries({nonzero:{revenue:1},unknown:{revenue:null},receipts:{receipts:1},open:{closingStatus:'open'},invalidDate:{date:'unknown'},invalidCalendarDate:{date:'2026-10-99'}}))test('future cash '+name+' does not bypass completeness safeguards',async t=>{
+ const r=await setup();t.after(r.close);r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),{id:'future',venueId:r.venue,date:'2026-10-25',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL',...patch}]);
+ assert.equal((await r.post(r.closeCommand)).status,201);assert.equal((await r.read()).code,'HEALTH_NO_SNAPSHOT');
+});
+test('3393 date scenario: closed 24 October ignores empty 25/26, then open next shift keeps capture',async t=>{
+ const r=await setup();t.after(r.close);assert.equal((await r.post(r.closeCommand)).status,201);
+ r.setNow('2026-10-24T18:00:00Z');assert.equal((await r.post({action:'open',date:'2026-10-24',operationId:'open24',expectedRevision:0,staffing:[{employeeId:'e'}]})).status,201);
+ r.put('bd_operational_reports_v1',[...r.get('bd_operational_reports_v1'),...[25,26].map(day=>({id:'future-workday-'+day,venueId:r.venue,date:'2026-10-'+day,workdayStatus:'CLOSED',closingStatus:'closed',payrollBreakdown:{total:0}}))]);
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),...[24,25,26].map(day=>({id:'cash'+day,venueId:r.venue,date:'2026-10-'+day,revenueSource:'sales_events_v1',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL'}))]);
+ assert.equal((await r.post({...r.closeCommand,date:'2026-10-24',operationId:'close24',expectedRevision:1})).status,201);
+ const health=await r.read();assert.equal(health.generatedAt,'2026-10-24T18:00:00.000Z');assert.match(health.data.businessHealth.components.find((x:any)=>x.id==='finance').evidence.join(' '),/2026-10-24/);
+ const report=r.get('bd_operational_reports_v1').find((x:any)=>x.date==='2026-10-24');
+ assert.equal((await r.post({action:'open_next',date:report.date,workdayId:report.id,operationId:'next24',expectedRevision:report.workdayRevision,staffing:[{employeeId:'e'}]})).status,201);assert.deepEqual(await r.read(),health);
+});
+test('venue timezone: yesterday remains eligible and tomorrow cannot seed a snapshot',async t=>{
+ const overnight=await setup();t.after(overnight.close);
+ overnight.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:'MDL',timezone:'Europe/Chisinau',name:'Local test'}),overnight.owner.userId);
+ overnight.setNow('2026-10-22T22:30:00Z');assert.equal((await overnight.post(overnight.closeCommand)).status,201);assert.equal((await overnight.read()).success,true);
+ const future=await setup();t.after(future.close);
+ future.sqlite.prepare('UPDATE accounts SET restaurant_json=? WHERE id=?').run(JSON.stringify({currency:'MDL',timezone:'America/Los_Angeles',name:'Local test'}),future.owner.userId);
+ future.setNow('2026-10-22T01:00:00Z');assert.equal((await future.post(future.closeCommand)).status,201);assert.equal((await future.read()).code,'HEALTH_NO_SNAPSHOT');
+});
+
+test('future zero cash with posted sales is not proven empty',async t=>{
+ const r=await setup();t.after(r.close);
+ r.put('bd_finance_revenue',[...r.get('bd_finance_revenue'),{id:'future',venueId:r.venue,date:'2026-10-25',closingStatus:'closed',revenue:0,receipts:0,currency:'MDL'}]);
+ const event=JSON.parse(String(r.sqlite.prepare('SELECT payload FROM sales_event_chunks LIMIT 1').get()!.payload));event.id=event.externalId=event.fingerprint='future-sale';event.businessDate='2026-10-25';event.revenueRowId='future';event.batch.id='future-sale';event.batch.businessDate=event.businessDate;event.batch.lines[0].salesBatchId='future-sale';const payload=JSON.stringify(event);
+ r.sqlite.prepare('INSERT INTO sales_event_records(account_id,event_id,position,external_id,source,business_date,revenue_row_id,fingerprint,payload_hash,chunk_count) VALUES(?,?,?,?,?,?,?,?,?,1)').run(r.owner.userId,event.id,1,event.id,'POS_API',event.businessDate,event.revenueRowId,event.id,createHash('sha256').update(payload).digest('hex'));r.sqlite.prepare('INSERT INTO sales_event_chunks(account_id,event_id,version,ordinal,payload) VALUES(?,?,0,0,?)').run(r.owner.userId,event.id,payload);
+ assert.equal((await r.post(r.closeCommand)).status,201);assert.equal((await r.read()).code,'HEALTH_NO_SNAPSHOT');
+});

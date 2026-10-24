@@ -31,7 +31,18 @@ export async function prepareClosedHealth(account:AuthenticatedAccount,next:Row,
  const reports=candidate.sources.find(x=>x.key==='bd_operational_reports_v1')?.data;
  if(!Array.isArray(reports)||reports.some((r:Row)=>r.workdayStatus==='OPEN'))return null;
  const revenues=candidate.sources.find(x=>x.key==='bd_finance_revenue')?.data;
- if(!Array.isArray(revenues)||revenues.some((r:Row)=>r.closingStatus==='open'||String(r.date)>date))return null;
+ const sales=candidate.sources.find(x=>x.key==='bd_sales_events_v1');
+ if(!Array.isArray(revenues)||revenues.some((r:Row)=>{
+  // A future, explicitly closed empty cash shift has no sales to capture.
+  // Unknown/nonzero future activity must not be treated as a harmless test day:
+  // its stock effects may already be reflected in current balances.
+  if(String(r.date)>date){
+   const future=typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&Number.isFinite(Date.parse(r.date+'T00:00:00Z'))&&new Date(r.date+'T00:00:00Z').toISOString().slice(0,10)===r.date;
+   const emptySales=sales?.state==='AVAILABLE'&&Array.isArray(sales.data)&&!sales.data.some((event:Row)=>event.status==='POSTED'&&(event.revenueRowId===r.id||String(event.businessDate)>date));
+   return !(future&&emptySales&&r.closingStatus==='closed'&&r.revenue===0&&r.receipts===0);
+  }
+  return r.closingStatus==='open';
+ }))return null;
  const finance=candidate.intelligence.businessHealth.components.find(x=>x.id==='finance');
  if(finance?.score==null)return null;
  const key=closedHealthKey(account.venueId),saved=await readStoreSnapshots(db,account.id,[key]);
