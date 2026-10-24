@@ -1,3 +1,4 @@
+import { auditTextSearch } from "../../../lib/bardoctor/audit-search";
 import { getD1 } from "../../../db";
 import { hasPermission } from "../../../lib/bardoctor/access-control";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -99,10 +100,6 @@ function boundedInteger(value: string | null, fallback: number, min: number, max
   return Number.isInteger(parsed) ? Math.max(min, Math.min(max, parsed)) : fallback;
 }
 
-function likeValue(value: string): string {
-  return `%${value.replace(/[\\%_]/g, (symbol) => `\\${symbol}`)}%`;
-}
-
 function isoDay(value: string | null): string | null {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
@@ -156,9 +153,9 @@ function queryDefinition(accountId: number, url: URL): QueryDefinition {
     bindings.push(actor);
   }
   if (query) {
-    const value = likeValue(query);
-    clauses.push("(actor_name LIKE ? ESCAPE '\\' COLLATE NOCASE OR entity_label LIKE ? ESCAPE '\\' COLLATE NOCASE OR reason LIKE ? ESCAPE '\\' COLLATE NOCASE)");
-    bindings.push(value, value, value);
+    const search = auditTextSearch(query);
+    clauses.push(search.sql);
+    bindings.push(...search.bindings);
   }
   if (/^\d{4}-\d{2}$/.test(monthKey)) {
     clauses.push("(month_key = ? OR created_at LIKE ?)");
