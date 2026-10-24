@@ -53,7 +53,28 @@ try{
  failNext=true;await page.getByRole('button',{name:'Обновить анализ',exact:true}).first().click();
  await page.waitForTimeout(1000);assert.equal(calls,2);assert.equal(readTasks().length,0);
  await page.reload();await page.locator('[data-bd-ai-result]').waitFor();assert.equal(calls,2);assert.equal(readTasks().length,0);
- actions=[{title:'Проверить температуру холодильника',action:'Измерить температуру',steps:['Измерить температуру'],responsibleRole:'Управляющий',deadline:'2026-10-24',recommendationId:'cold',expectedResult:'Температура проверена',priority:'medium',evidence:[]}];await page.getByRole('button',{name:'Обновить анализ',exact:true}).first().click();await page.waitForTimeout(1000);assert.equal(readTasks().length,1);assert.equal(readTasks()[0].title,actions[0].title);
+ const saveFailure=process.env.BD_TASK_SAVE_FAILURE;
+ if(saveFailure)await page.route('**/api/store/bd_tasks',route=>{
+ if(route.request().method()!=='PUT')return route.continue();
+ if(saveFailure==='network')return route.abort('failed');
+ if(saveFailure==='timeout')return new Promise<void>(()=>{});
+ return route.fulfill({status:503,json:{ok:false,error:'Local fixture save unavailable'}});
+ });
+ actions=[{title:'Проверить температуру холодильника',action:'Измерить температуру',steps:['Измерить температуру'],responsibleRole:'Управляющий',deadline:'2026-10-24',recommendationId:'cold',expectedResult:'Температура проверена',priority:'medium',evidence:[]}];await page.getByRole('button',{name:'Обновить анализ',exact:true}).first().click();await page.waitForTimeout(1000);
+ if(saveFailure){
+  const retry=page.getByRole('button',{name:'Повторить сохранение',exact:true});
+  await retry.waitFor({timeout:15000});assert.equal(readTasks().length,0);
+  assert.ok(!(await page.locator('body').innerText()).includes('Все изменения сохранены'));
+  await page.locator('[data-doctor-save-status]').scrollIntoViewIfNeeded();await page.screenshot({path:out+'/save-failure-'+saveFailure+'-390.png'});
+  const callsBefore=calls;await page.reload();await retry.waitFor();assert.equal(calls,callsBefore);
+  await page.unroute('**/api/store/bd_tasks');
+  await retry.evaluate((button:HTMLButtonElement)=>{button.click();button.click()});
+  await page.locator('[data-doctor-save-status]').waitFor({state:'detached'});
+  assert.equal(calls,callsBefore,'retry never calls diagnosis');
+ }
+ assert.equal(readTasks().length,1);assert.equal(readTasks()[0].title,actions[0].title);
+ assert.deepEqual(readTasks()[0].steps,actions[0].steps);
+ assert.equal(readTasks()[0].responsible,'Управляющий');
  await page.getByRole('button',{name:'Обновить анализ',exact:true}).first().click();await page.waitForTimeout(700);assert.equal(readTasks().length,1);
  await page.goto(base+'/tasks?venue='+venueId);await page.getByText(actions[0].title,{exact:true}).first().waitFor();await page.reload();await page.getByText(actions[0].title,{exact:true}).first().waitFor();await page.goBack();assert.equal(readTasks().length,1);assert.deepEqual(errors,[]);console.log(JSON.stringify({pass:true,calls,checks:['empty response no writes','saved analysis reload no request','valid action persisted','same run no duplicate','failed response preserves empty history; retry creates exactly one','task navigation and reload'],out}));await context.close();
 }finally{await browser.close();server.closeAllConnections();await new Promise<void>(done=>server.close(()=>done()));await Promise.all([...pendingHandlers]);await runtime.close()}
