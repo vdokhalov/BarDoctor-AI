@@ -5,3 +5,14 @@ test('item detail closes within catalog before returning to nomenclature',()=>{a
 test('return cannot redirect externally or accept a forged venue',()=>{const c=contract();assert.equal(c.resolve('https://outside.invalid/catalog?returnTo=nomenclature'),null);const result=new URL(c.parent('/catalog?returnTo=nomenclature&returnItem=https://outside.invalid&venue=evil&returnView=evil'),'https://local.test');assert.equal(result.pathname,'/nomenclature');assert.equal(result.searchParams.has('venue'),false);assert.equal(result.searchParams.has('view'),false);assert.equal(c.parent('/catalog?returnTo=https://outside.invalid'),'/more')});
 test('legal owner and anonymous fallbacks are fixed internal destinations',()=>{for(const signed of [true,false]){const c=vm.createContext({location:{search:'?venue=3393&from=https://outside.invalid'},Ot:()=>signed?'fixture':null,gz:()=>signed?'token':null,URLSearchParams});vm.runInContext(readFileSync('scripts/fragments/legal-item-back.js','utf8'),c);assert.equal(c.bdTermsBackUrl(),signed?'/about?venue=3393':'/login')}});
 test('existing integration and notification subview parents remain unchanged',()=>{const c=contract();assert.equal(c.parent('/integrations?venue=2&flow=onec'),'/integrations?venue=2');assert.equal(c.parent('/notifications?venue=2&view=category&category=incident'),'/notifications?venue=2')});
+test('privacy retains only supported entry contexts and validated venue',()=>{
+ for(const signed of [true,false])for(const from of ['about','login','register','https://outside.invalid','//outside.invalid','']){
+  const c=vm.createContext({location:{search:'?venue=3393&from='+encodeURIComponent(from)},Ot:()=>signed?'fixture':null,gz:()=>signed?'token':null,URLSearchParams});vm.runInContext(readFileSync('scripts/fragments/legal-item-back.js','utf8'),c);
+  assert.equal(c.bdPrivacyBackUrl(),from==='login'?'/login':from==='register'?'/register':signed?'/about?venue=3393':'/login');
+ }
+});
+test('privacy About link preserves venue but cannot create arbitrary targets',()=>{
+ const c=vm.createContext({location:{search:'?venue=3393'},localStorage:{getItem:()=>null},URLSearchParams});vm.runInContext(readFileSync('scripts/fragments/legal-item-back.js','utf8'),c);
+ assert.equal(c.bdTermsEntryUrl('privacy'),'/privacy?from=about&venue=3393');assert.equal(c.bdTermsEntryUrl('https://outside.invalid'),'/terms?from=about&venue=3393');
+ c.location.search='?venue=evil';assert.equal(c.bdTermsEntryUrl('privacy'),'/privacy?from=about');
+});
