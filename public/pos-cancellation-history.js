@@ -1,18 +1,25 @@
 (function(root){
  'use strict';
  const validAmount=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0;
+ function uniqueSaved(values){const groups=new Map();for(const value of Array.isArray(values)?values:[]){if(!value?.id)continue;const previous=groups.get(value.id);if(previous===undefined)groups.set(value.id,value);else if(JSON.stringify(previous)!==JSON.stringify(value))groups.set(value.id,null);}return [...groups.values()].filter(Boolean);}
+ function chain(order,venue){
+ const tickets=uniqueSaved(order.preparationTickets).filter(t=>t.venueId===venue&&t.orderId===order.id),operations=uniqueSaved(order.operations),originals=new Map(tickets.filter(t=>t.kind!=='CANCELLATION').map(t=>[t.id,t]));
+ const events=tickets.map((t,index)=>({id:t.id,kind:t.kind==='CANCELLATION'?'item':'preparation',at:t.createdAt,actor:t.createdBy,sectionName:t.sectionName,lines:Array.isArray(t.lines)?t.lines:[],reason:t.reason||null,stockDecision:t.stockDecision||null,originalTicketId:t.originalTicketId||null,originalAvailable:t.kind!=='CANCELLATION'||originals.has(t.originalTicketId),index}));
+ if(order.status==='CANCELLED'&&!order.salesEventId&&!order.paidAt){const matches=operations.filter(op=>op.action==='cancel_order'),fact=matches.length===1?matches[0]:null;events.push({id:fact?.id||null,kind:'order',at:order.cancelledAt||fact?.at,actor:fact?.actor,lines:[],reason:fact?.details?.reason||null,index:events.length});}
+ return events.sort((a,b)=>{const left=Date.parse(a.at),right=Date.parse(b.at);return Number.isFinite(left)&&Number.isFinite(right)?left-right||a.index-b.index:a.index-b.index;});
+ }
  function rows(orders,venue){const out=[];
  for(const order of Array.isArray(orders)?orders:[]){if(order.venueId!==venue)continue;
- const operations=Array.isArray(order.operations)?order.operations:[],tickets=Array.isArray(order.preparationTickets)?order.preparationTickets:[],seen=new Set();
+ const operations=uniqueSaved(order.operations),tickets=uniqueSaved(order.preparationTickets),seen=new Set(),history=chain(order,venue);
  for(const ticket of tickets){if(ticket.kind!=='CANCELLATION'||ticket.venueId!==venue||ticket.orderId!==order.id||seen.has(ticket.id))continue;seen.add(ticket.id);
  const matches=operations.filter(op=>op.action==='cancel_item'&&op.id===ticket.batchId),op=matches.length===1?matches[0]:null,snapshot=op?.details?.cancelledLine;
  const lines=(ticket.lines||[]).map(line=>{const captured=snapshot&&snapshot.id===line.lineId&&snapshot.menuItemId===line.menuItemId&&snapshot.quantity===line.quantity&&!snapshot.pricingUnavailable;return {...line,total:captured&&validAmount(snapshot.total)?snapshot.total:null,currency:captured?snapshot.currency:null};});
  const currencies=new Set(lines.map(line=>line.currency));const known=lines.length>0&&lines.every(line=>validAmount(line.total)&&line.currency&&!line.pricingUnavailable)&&currencies.size===1;
- out.push({id:order.id+'::'+ticket.id,orderId:order.id,tableNumber:order.tableNumber,kind:'item',lines,amount:known?Math.round(lines.reduce((sum,line)=>sum+line.total,0)*100)/100:null,currency:known?lines[0].currency:null,cancelledAt:ticket.createdAt,fact:{details:{reason:ticket.reason},actor:ticket.createdBy},stockDecision:ticket.stockDecision||op?.details?.stockDecision||null});
+ out.push({id:order.id+'::'+ticket.id,orderId:order.id,tableNumber:order.tableNumber,kind:'item',history,lines,amount:known?Math.round(lines.reduce((sum,line)=>sum+line.total,0)*100)/100:null,currency:known?lines[0].currency:null,cancelledAt:ticket.createdAt,fact:{details:{reason:ticket.reason},actor:ticket.createdBy},stockDecision:ticket.stockDecision||op?.details?.stockDecision||null});
  }
- if(order.status==='CANCELLED'&&!order.salesEventId&&!order.paidAt&&((order.lines||[]).length||!seen.size)){
+ if(order.status==='CANCELLED'&&!order.salesEventId&&!order.paidAt){
  const lines=order.lines||[],ops=operations.filter(op=>op.action==='cancel_order'),currencies=new Set(lines.map(line=>line.currency)),known=lines.length>0&&lines.every(line=>validAmount(line.total)&&line.currency&&!line.pricingUnavailable)&&currencies.size===1;
- out.push({id:order.id,orderId:order.id,tableNumber:order.tableNumber,kind:'order',lines,amount:known?(validAmount(order.totals?.netAmount)?order.totals.netAmount:Math.round(lines.reduce((sum,line)=>sum+line.total,0)*100)/100):null,currency:known?lines[0].currency:null,cancelledAt:order.cancelledAt,fact:ops.length===1?ops[0]:null,stockDecision:null});
+ out.push({id:order.id,orderId:order.id,tableNumber:order.tableNumber,kind:'order',history,lines,amount:known?(validAmount(order.totals?.netAmount)?order.totals.netAmount:Math.round(lines.reduce((sum,line)=>sum+line.total,0)*100)/100):null,currency:known?lines[0].currency:null,cancelledAt:order.cancelledAt,fact:ops.length===1?ops[0]:null,stockDecision:null});
  }
  }
  return out.sort((a,b)=>(Date.parse(b.cancelledAt)||0)-(Date.parse(a.cancelledAt)||0)||a.id.localeCompare(b.id));
