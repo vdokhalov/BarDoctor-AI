@@ -1,3 +1,4 @@
+import { responseWebSources as marketWebSources } from './openai-web-sources';
 import { markWebSearchFailure } from './market-diagnostics';
 import { getIntegrationValue } from "./integration-secrets";
 import { runtimeEnv } from "./runtime-env";
@@ -278,6 +279,7 @@ function backgroundResult(
   throw new AIServiceError("OpenAI вернул неизвестный статус распознавания.", 502);
 }
 
+
 function normaliseWebSource(value: unknown): OpenAIWebSource | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -421,7 +423,7 @@ export async function openAIWebSearch(input: {
     const text = responseText(payload);
     if (!text) throw markWebSearchFailure(new AIServiceError("OpenAI вернул пустой ответ.", 502), "PROVIDER_EMPTY");
     await observeOpenAI({ accountId: input.accountId, context: input.observability, requestId, model: configuredModel, startedAt, status: "success", payload });
-    return { text, sources: responseWebSources(payload), model: configuredModel };
+    return { text, sources: input.observability?.feature === "market" ? marketWebSources(payload) : responseWebSources(payload), model: configuredModel };
   }
 
   const primaryCode = await providerErrorCode(response);
