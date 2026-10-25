@@ -69,3 +69,7 @@ test('native market POST persists only server evidence; GET/reload never refetch
   fixture.blocked=true;const blocked:any=await(await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(blocked.data.competitors[0].pageEvidence.reason,'BLOCKED');assert.equal(blocked.data.competitors[0].evidenceStatus,'city_unverified');assert.equal(fixture.pageCalls,2);assert.equal(fixture.providerCalls,2);
  }finally{runtime.close()}
 });
+test('QA observed FoodEstablishment DOM shape supports nested Country.name without treating other schemas as venues',()=>{
+ const blocks=[{'@context':'https://schema.org','@type':'Organization',name:'Tripadvisor'},{'@context':'https://schema.org','@type':'WebSite',name:'Tripadvisor'},{'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[]},{'@context':'https://schema.org','@type':'FoodEstablishment',name:'Street Food',address:{'@type':'PostalAddress',addressCountry:{'@type':'Country',name:'MD'},streetAddress:'Kalinina St., 23',addressLocality:'Bender'}}];
+ const parsed=parseMarketPage(blocks.map(html).join(''),'Street Food',loc);assert.equal(parsed.reason,'VERIFIED');assert.equal(parsed.address?.country,'MD');assert.equal(parsed.address?.city,'Bender');
+});
