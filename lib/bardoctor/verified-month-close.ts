@@ -1,3 +1,4 @@
+import {serviceAccruals} from './service-accruals';
 import {validExpenseDate,blockUnknownExpensePeriod} from "./expense-date";
 import {activeBusinessRow} from "./business-day-rows";
 import {financeDocumentScope} from './finance-documents';
@@ -52,10 +53,13 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const snapshots = monthlySnapshotRows(data.bd_inventory_snapshots, venueId);
   const settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
   const localDay = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone);
-  const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, validExpenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
+  const service=serviceAccruals({...scope,currency,startDate,endDate,purchases:data.bd_purchase_documents,expenses:validExpenses});
+  const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, service.expenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
+  if(base.cashResult!=null&&service.nonCashDelta!=null)base.cashResult=money(Number(base.cashResult)+service.nonCashDelta);
+  if(base.periodExpenses!=null&&service.nonCashDelta!=null)base.periodExpenses=money(Number(base.periodExpenses)-service.nonCashDelta);
   const report = reconcileMonthlyReport({ costProof:input.costProof, report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
   const history = periodCostProof(input.costProof,monthKey)??historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, reconciliations: data.bd_sales_reconciliations_v1 });
-  const reasons = [...finance.missing, ...history.reasons,...(expenseDateIssues.length?["EXPENSE_DATE_UNKNOWN"]:[])];
+  const reasons = [...service.issues,...finance.missing, ...history.reasons,...(expenseDateIssues.length?["EXPENSE_DATE_UNKNOWN"]:[])];
   for (const field of ["taxModel", "utilityModel"]) {
     const model = row(settings[field]);
     if (model.mode != null && !["manual", "fixed", "percent"].includes(String(model.mode)) || model.mode === "fixed" && finiteBusinessNumber(model.amount) == null || model.mode === "percent" && finiteBusinessNumber(model.percent) == null) reasons.push("RECURRING_INPUT_UNKNOWN");
@@ -68,6 +72,7 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   if (finance.days.some(day => day.revenue.status !== "FINAL")) reasons.push("REVENUE_NOT_FINAL");
   if (row(report.openingSnapshot).phase7SnapshotKnown !== true || row(report.closingSnapshot).phase7SnapshotKnown !== true) reasons.push("INVENTORY_BOUNDARY_UNKNOWN");
   const finalProfit = reasons.length || finance.revenue == null || finance.payroll == null ? null : money(finance.revenue - history.cost! + history.adjustment - Number(report.writeoffs) - finance.payroll - Number(report.otherExpenses) - Number(report.taxes) - Number(report.utilities));
+  if(service.issues.length){report.otherExpenses=null;report.resultBeforeCost=null;report.cashResult=null;report.operatingResult=null;}
   const payrollDelta = finance.payroll == null ? null : finance.payroll - Number(report.payroll);
   const adjust = (value: unknown) => value == null || payrollDelta == null ? null : money(Number(value) - payrollDelta);
   // Presentation evidence only: no arithmetic, eligibility or closing guards change.
@@ -156,7 +161,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
     const current = currentFinance({ payrollEstimateSources:estimateAvailable?{employees:stores.bd_employees,rules:stores.bd_payroll_rules,gaps:stores.bd_finance_gap_reasons??[]}:undefined, costProof, profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
       movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, reconciliations: stores.bd_sales_reconciliations_v1, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
-      expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
+      purchases:stores.bd_purchase_documents,purchasesAvailable:optionalCollectionAvailable('bd_purchase_documents'),expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
       expensesAvailable: optionalCollectionAvailable('bd_finance_expenses'), payrollEntriesAvailable: optionalCollectionAvailable('bd_payroll_entries') });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));
     const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf,costProof}).snapshot;
