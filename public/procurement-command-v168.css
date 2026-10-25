@@ -1520,8 +1520,6 @@
   .bd-proc-gateways-v168 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bd-proc-quick-grid-v168 .bd-proc-quick-v168:last-child { grid-column: 1 / -1; }
   .bd-proc-purchase-main-v168 { min-height: 92px; padding-right: 18px; padding-left: 18px; }
-  .bd-proc-supplier-row-v168 { grid-template-columns: 48px minmax(180px, 1fr) minmax(130px, auto) minmax(280px, 1.3fr) auto; padding: 15px 16px; }
-  .bd-proc-supplier-facts-v168 { grid-column: auto; padding-top: 0; border-top: 0; }
   .bd-proc-compare-head-v168 { display: grid; grid-template-columns: 1.4fr 1fr 1fr .7fr; gap: 12px; padding: 0 15px; color: var(--bd-proc-muted); font-size: 9.5px; font-weight: 850; }
   .bd-proc-compare-row-v168 { grid-template-columns: 1.4fr 1fr 1fr .7fr auto; align-items: center; }
   .bd-proc-compare-row-v168 .product { grid-column: auto; }
@@ -1552,4 +1550,15 @@
 
 @media (prefers-reduced-motion: reduce) {
   .bd-proc-loading-v168 > div > span { animation-duration: 1.8s; }
+}
+
+/* Supplier cards follow their available space, including the narrow tablet shell. */
+.bd-proc-supplier-list-v168 { container-type: inline-size; }
+.bd-proc-supplier-row-v168 > svg { display: none; }
+.bd-proc-supplier-spend-v168 { min-width: 0; }
+.bd-proc-supplier-spend-v168 b { white-space: normal; overflow-wrap: anywhere; }
+@container (min-width: 760px) {
+  .bd-proc-supplier-row-v168 { grid-template-columns: 48px minmax(180px, 1fr) minmax(130px, auto) minmax(280px, 1.3fr) auto; padding: 15px 16px; }
+  .bd-proc-supplier-facts-v168 { grid-column: auto; padding-top: 0; border-top: 0; }
+  .bd-proc-supplier-row-v168 > svg { display: block; }
 }
