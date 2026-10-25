@@ -1133,6 +1133,11 @@ const bdOwnerUATFixesV285="owner-uat-v285";
 
 
 
+
+
+
+
+
 function BdRecordedWorkdayPayroll() {
   const [, route] = $f("/finance/shift/:id/payroll"), [, navigate] = bt(), scope = Pt(Wm), params = new URLSearchParams(location.search), id = (() => {
     try {
@@ -3207,6 +3212,7 @@ function bdPayrollEmployeeRowV164({row:e,onOpen:t}){const n=e.summary,r=Math.abs
 
 
 
+
 /* payroll-loading:start */
 function bdPayrollLoadState(sync,operational){return sync==="error"||operational==="error"?"error":sync==="ready"&&operational==="ready"?"ready":"loading"}
 function bdPayrollLoadingPage({state,month,context,back}){return i.jsx(nt,{showBottomNav:true,className:"pb-32",children:i.jsx($e,{className:"pt-0",children:i.jsxs("div",{className:"bd-payroll-page-v164",children:[i.jsx(bdSalaryHeaderV164,{title:"Зарплаты",context,back}),i.jsx("main",{className:"bd-payroll-main-v164",children:i.jsxs("section",{className:"bd-payroll-summary-v164",style:{padding:16},"data-bd-payroll-load":state,role:state==="error"?"alert":"status",children:[i.jsx("strong",{children:bdMonthDisplay(month)}),i.jsx("p",{style:{marginTop:12},children:state==="error"?"Не удалось загрузить зарплаты.":"Загружаем зарплаты…"}),state==="error"&&i.jsx("button",{type:"button",onClick:()=>window.location.reload(),style:{marginTop:12,minHeight:44},children:"Повторить"})]})})]})})})}
@@ -4377,6 +4383,7 @@ function bdFinanceExpenseRecordsV160({records:e,equipment:t,documents:n,canManag
 
 
 
+
 /* expense-scope:start */
 function bdExpenseScope(row){
   if(!row||row.reversedAt||row.isDraft||["cancelled","canceled","void","voided","reversed","draft"].includes(String(row.status||"").toLowerCase()))return null;
@@ -4854,7 +4861,7 @@ function bdPurchaseReview({draft:e,suppliers:t,onChange:n,onCancel:r,onConfirm:a
         i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Номер документа",children:i.jsx("input",{value:e.documentNumber||"",onChange:g=>l("documentNumber",g.target.value),placeholder:"Необязательно"})}),i.jsx(bdVenueCurrencyLockedV326,{currency:bdAccountingCurrency})]}),
         bdFxNeeded&&i.jsxs("section",{"data-bd-accounting-fx":"v321",className:"bd-procurement-review-note",children:[i.jsxs("p",{children:["Сумма документа: ",Number(e.total||0).toFixed(2)," ",e.currency," · Учётная валюта: ",bdAccountingCurrency]}),i.jsxs("div",{className:"bd-procurement-form-grid",children:[i.jsx(bdProcField,{label:"Исторический курс (1 "+e.currency+" = … "+bdAccountingCurrency+")",children:i.jsx("input",{type:"number",step:"0.000001",inputMode:"decimal",value:e.fxRate||"",onChange:g=>l("fxRate",g.target.value)})}),i.jsx(bdProcField,{label:"Дата курса",children:i.jsx("input",{type:"date",value:e.fxEffectiveDate||e.date||"",onChange:g=>l("fxEffectiveDate",g.target.value)})})]}),i.jsx(bdProcField,{label:"Источник курса",children:i.jsx("input",{value:e.fxSource||"",onChange:g=>l("fxSource",g.target.value)})})]}),
         i.jsx(bdProcField,{label:"Категория закупки",children:i.jsx("select",{value:e.expenseCategory||"auto",onChange:g=>l("expenseCategory",g.target.value),children:[i.jsx("option",{value:"auto",children:"Определить автоматически"}),...bdProcUniqueCategoryOptionsV367(e.expenseCategory).map(([key,label])=>i.jsx("option",{value:key,children:label},key))]})}),
-        i.jsx("p",{className:"bd-receiving-accounting-note-v357",children:"После проведения товарные позиции увеличат остатки и обновят себестоимость. Долг поставщику появится по документу; оплату добавьте отдельной операцией."})
+        i.jsx("p",{className:"bd-receiving-accounting-note-v357",children:e.documentType==="price_list"?"Сохранятся цены поставщика. Прихода и долга не будет.":"После проведения товарные позиции увеличат остатки и обновят себестоимость. Долг поставщику появится по документу; оплату добавьте отдельной операцией."})
       ]})]}),
       i.jsxs("div",{className:"bd-receiving-lines-head-v357",children:[i.jsxs("div",{children:[i.jsx("h3",{children:"Позиции документа"}),i.jsx("span",{children:"Порядок строк сохранён как в документе"})]}),bdAttentionLinesV357.length>0&&i.jsx("button",{type:"button",onClick:bdNextAttentionV357,children:"Следующая проблема"})]}),
       e.source!=="manual"&&i.jsx(bdInvoiceReviewSummaryV4,{items:e.items,onChange:g=>l("items",g)}),
@@ -4866,7 +4873,7 @@ function bdPurchaseReview({draft:e,suppliers:t,onChange:n,onCancel:r,onConfirm:a
       i.jsx("button",{type:"button",className:"bd-procurement-secondary bd-receiving-add-line-v357",onClick:f,children:"+ Добавить позицию"}),
       e.documentType!=="price_list"&&i.jsx(BdPurchasePricePreview,{draft:e}),e.documentType!=="price_list"&&i.jsxs("section",{className:"bd-receiving-totals-v357",children:[i.jsxs("div",{children:[i.jsx("span",{children:"Сумма позиций"}),i.jsx("strong",{children:window.bdFormatAccountingMoney(d,e.currency)})]}),i.jsxs("div",{children:[i.jsx("span",{children:"Итог документа"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.total,onChange:event=>l("total",Number(event.target.value)||0),"aria-label":"Итог документа"})]}),i.jsxs("div",{children:[i.jsx("span",{children:"НДС / налог"}),i.jsx("input",{type:"number",step:"0.01",inputMode:"decimal",value:e.vat||"",onChange:event=>l("vat",Number(event.target.value)||0),placeholder:"0","aria-label":"НДС или налог"})]}),bdTotalMismatchV357&&i.jsx("button",{type:"button",onClick:m,children:"Принять сумму позиций как итог"})]})
     ]}),
-    i.jsxs("footer",{className:"bd-procurement-sheet-actions bd-receiving-actions-v357",children:[i.jsx("button",{type:"button",className:"bd-procurement-secondary",disabled:s,onClick:r,children:e.status==="confirmed"?"Закрыть":"Не сохранять"}),i.jsxs("div",{children:[i.jsx("small",{children:bdCanPostV357?e.status==="confirmed"?"Изменения будут пересчитаны":"Склад и себестоимость обновятся после проведения":bdBlockingTextV357}),i.jsx("button",{type:"button",className:"bd-procurement-primary",disabled:s||!bdCanPostV357,onClick:a,children:s?"Сохраняю…":e.status==="confirmed"?"Сохранить изменения":e.documentType==="price_list"?"Сохранить прайс":"Провести приход"})]})]})
+    i.jsxs("footer",{className:"bd-procurement-sheet-actions bd-receiving-actions-v357",children:[i.jsx("button",{type:"button",className:"bd-procurement-secondary",disabled:s,onClick:r,children:e.status==="confirmed"?"Закрыть":"Не сохранять"}),i.jsxs("div",{children:[i.jsx("small",{children:bdCanPostV357?e.documentType==="price_list"?"Цены будут сохранены":e.status==="confirmed"?"Изменения будут пересчитаны":"Склад и себестоимость обновятся после проведения":bdBlockingTextV357}),i.jsx("button",{type:"button",className:"bd-procurement-primary",disabled:s||!bdCanPostV357,onClick:a,children:s?"Сохраняю…":e.status==="confirmed"?"Сохранить изменения":e.documentType==="price_list"?"Сохранить прайс":"Провести приход"})]})]})
   ]})})
 }
 const bdImageUploadVersion="payload-safe-v37",bdDirectImageTypes=new Set(["image/jpeg","image/png","image/webp","image/gif"]),bdUploadPayloadBudgetBytes=7864320,bdUploadSingleSourceLimitBytes=33554432;
@@ -5813,6 +5820,14 @@ function cEe(){return i.jsx(uK,{client:sEe,children:i.jsx(Zoe,{children:i.jsx(Vs
 const bdPurchasePracticalQaV211="v211";
 
 const bdFinancePurchaseGroupsV212="v212";
+
+
+
+
+
+
+
+
 
 
 
