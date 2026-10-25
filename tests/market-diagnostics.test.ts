@@ -55,17 +55,21 @@ test('native market errors emit correlated safe metadata and retain old analysis
   fixture.mode='valid';const before=logs.length;
   assert.equal((await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).status,200);assert.equal(logs.length,before);
   const reloaded:any=await (await runtime.api.market.GET(runtime.request(owner,'/api/market','GET'))).json();
-  assert.equal(reloaded.analysis.generatedAt,'2026-10-24T16:26:00Z');assert.equal(reloaded.analysis.competitors[0].name,'Сохранённый кандидат');assert.equal(reloaded.analysis.lastAttempt.reason,'MODEL_EMPTY');
+  assert.equal(reloaded.analysis.generatedAt,'2026-10-24T16:26:00Z');assert.equal(reloaded.analysis.competitors[0].name,'Сохранённый кандидат');assert.equal(reloaded.analysis.lastAttempt.reason,'MODEL_EMPTY');assert.equal(reloaded.analysis.lastAttempt.filtering.version,1);assert.equal(reloaded.analysis.lastAttempt.filtering.candidates.KEPT_LOCAL,0);
   assert.equal(fixture.calls,7);
   fixture.payload=JSON.stringify({competitors:[{name:'Foreign',city:'Бельцы',category:'Кафе'}]});
-  const filtered:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(filtered.data.lastAttempt.reason,'FILTER_EMPTY');assert.equal(filtered.data.generatedAt,reloaded.analysis.generatedAt);
+  const filtered:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(filtered.data.lastAttempt.reason,'FILTER_EMPTY');assert.equal(filtered.data.lastAttempt.filtering.candidates.CLAIMED_CITY_CONFLICT,1);assert.equal(filtered.data.generatedAt,reloaded.analysis.generatedAt);
   fixture.payload=JSON.stringify({competitors:[{name:'Unknown local candidate',category:'Кафе'}]});
-  const useful:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(useful.data.lastAttempt.reason,'RESULT');assert.equal(useful.data.competitors.length,1);
+  const useful:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(useful.data.lastAttempt.reason,'RESULT');assert.equal(useful.data.competitors.length,1);assert.equal(useful.data.lastAttempt.filtering.projection.RETAINED_CANDIDATES,1);
+  runtime.sqlite.prepare("UPDATE domain_data SET data_json=? WHERE account_id=? AND store_key='bd_market_analysis_v1'").run(JSON.stringify({...useful.data,deletedCompetitorNames:['candidate0']}),owner.userId);
+  fixture.payload=JSON.stringify({competitors:Array.from({length:13},(_,i)=>({name:'Candidate'+i}))});
+  const projected:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();
+  assert.equal(projected.data.lastAttempt.counts.filteredCandidates,13);assert.deepEqual(projected.data.lastAttempt.filtering.projection,{NORMALIZATION_CANDIDATES_REMOVED:1,USER_EXCLUDED_CANDIDATES:1,RETAINED_CANDIDATES:11,SOURCE_LINKS_REMOVED:0,RETAINED_SOURCES:0});
   const other=await runtime.register('other-market@isolated.test');
   const isolated:any=await (await runtime.api.market.GET(runtime.request(other,'/api/market','GET'))).json();assert.equal(isolated.analysis,null);
   runtime.sqlite.prepare("DELETE FROM domain_data WHERE account_id=? AND store_key='bd_market_analysis_v1'").run(owner.userId);fixture.payload='{}';
   const absent:any=await (await runtime.api.market.POST(runtime.request(owner,'/api/market','POST',{}))).json();assert.equal(absent.data.generatedAt,undefined);assert.equal(absent.data.lastAttempt.reason,'MODEL_EMPTY');
-  assert.equal(results.length,4);for(const line of results){const result=JSON.parse(line);assert.deepEqual(Object.keys(result).sort(),['counts','event','reason','requestId','status']);assert.equal(result.event,'market.result');assert.equal(result.status,200);}assert.doesNotMatch(results.join('\n'),/PRIVATE_|owner@|Unknown|Foreign|isolated/i);
+  assert.equal(results.length,5);for(const line of results){const result=JSON.parse(line);assert.deepEqual(Object.keys(result).sort(),['counts','event','filtering','reason','requestId','status']);assert.equal(result.event,'market.result');assert.equal(result.status,200);}assert.doesNotMatch(results.join('\n'),/PRIVATE_|owner@|Unknown|Foreign|isolated/i);
   assert.doesNotMatch(logs.join('\n'),/PRIVATE_|owner@|market-diag@|authorization|prompt|stack/i);
  }finally{console.error=original;console.info=info;runtime.close()}
 });

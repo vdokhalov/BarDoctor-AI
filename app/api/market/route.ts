@@ -573,11 +573,21 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     };
 
     diagnosticStage = "save";
-    const attempt = marketResultAttempt(parsed, web.sources, relevant.result, payload, generatedAt);
+    const finalCandidateCount = Array.isArray(analysis.competitors) ? analysis.competitors.length : 0;
+    const attempt = { ...marketResultAttempt(parsed, web.sources, relevant.result, payload, generatedAt), filtering: {
+      ...relevant.diagnostics,
+      projection: {
+        NORMALIZATION_CANDIDATES_REMOVED: (Array.isArray(relevant.result.competitors) ? relevant.result.competitors.length : 0) - nextCompetitors.length,
+        USER_EXCLUDED_CANDIDATES: nextCompetitors.length - finalCandidateCount,
+        RETAINED_CANDIDATES: finalCandidateCount,
+        SOURCE_LINKS_REMOVED: relevant.sources.length - payload.sources.length,
+        RETAINED_SOURCES: payload.sources.length,
+      },
+    } };
     const saved = retainMarketResult(previousAnalysis, payload, attempt);
     await saveAnalysis(account.id, saved, casSnapshots);
     const completedResponse = () => {
-      try { console.info(JSON.stringify({ event: "market.result", requestId: diagnosticRequestId, status: 200, reason: attempt.reason, counts: attempt.counts })); } catch { /* Logging cannot change persistence. */ }
+      try { console.info(JSON.stringify({ event: "market.result", requestId: diagnosticRequestId, status: 200, reason: attempt.reason, counts: attempt.counts, filtering: attempt.filtering })); } catch { /* Logging cannot change persistence. */ }
       return noStore(Response.json({ ok: true, data: saved, stale: marketAnalysisIsStale(saved) }, { headers: { "X-BD-Market-Request-Id": diagnosticRequestId } }));
     };
     if (attempt.reason !== "RESULT") return completedResponse();
