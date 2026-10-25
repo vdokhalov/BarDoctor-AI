@@ -9,6 +9,62 @@
   var cityHelp = document.getElementById("venue-city-help");
   var regionInput = form && form.elements ? form.elements.region : null;
 
+  // This explicit-save editor owns its dirty state, including custom controls.
+  form.dataset.bdDirtyReady = "true";
+  var initialValues = null;
+  var dirtyStatus = document.createElement("span");
+  dirtyStatus.className = "bd-dirty-state";
+  dirtyStatus.setAttribute("role", "status");
+  dirtyStatus.textContent = "Есть несохранённые изменения";
+  submit.before(dirtyStatus);
+  function values() {
+    var data = payloadFromForm();
+    delete data.trackingStartDate; // Clock changes are not edits.
+    // Unselected and explicitly cleared days both mean no working days.
+    data.workingDays = Array.from({length:7}, function (_, index) {
+      return Boolean(data.workingDays && data.workingDays[String(index + 1)]);
+    });
+    return JSON.stringify(data);
+  }
+  function updateDirty() {
+    var dirty = initialValues !== null && values() !== initialValues;
+    form.dataset.bdDirty = String(dirty);
+    dirtyStatus.hidden = !dirty;
+    dirtyStatus.style.display = dirty ? "inline-flex" : "none";
+    return dirty;
+  }
+  function markClean() { initialValues = values(); updateDirty(); }
+  function confirmExit() {
+    if (!updateDirty()) return true;
+    if (!window.confirm("Изменения не сохранены. Выйти без сохранения?")) return false;
+    markClean();
+    return true;
+  }
+  ["input", "change", "schedulechange", "timezonechange"].forEach(function (type) {
+    form.addEventListener(type, updateDirty);
+  });
+  function guardClick(event) {
+    var control = event.target.closest && event.target.closest("a[href],button");
+    if (!control || event.defaultPrevented) return;
+    var ownDocument = control.ownerDocument === document;
+    if (ownDocument && !control.matches("[data-bd-back]")) return;
+    if (!confirmExit()) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }
+  document.addEventListener("click", guardClick, true);
+  function guardUnload(event) {
+    if (updateDirty()) { event.preventDefault(); event.returnValue = ""; }
+  }
+  window.addEventListener("beforeunload", guardUnload);
+  if (window.parent !== window) {
+    window.parent.document.addEventListener("click", guardClick, true);
+    window.parent.addEventListener("beforeunload", guardUnload);
+    window.addEventListener("pagehide", function () {
+      window.parent.document.removeEventListener("click", guardClick, true);
+      window.parent.removeEventListener("beforeunload", guardUnload);
+    });
+  }
+  updateDirty();
+
   function option(value, label, code) {
     var node = document.createElement("option");
     node.value = value;
@@ -82,6 +138,7 @@
     });
     if (restoredCountry) countrySelect.value = restoredCountry;
     renderCities(false);
+
     if (locationListenersBound) return true;
     locationListenersBound = true;
     countrySelect.addEventListener("change", function () {
@@ -190,6 +247,7 @@
       localStorage.setItem("bd_active_role", result.venue.role || "owner");
       localStorage.setItem("bd_active_permissions", JSON.stringify(result.venue.permissions || []));
       sessionStorage.setItem("bd_new_venue_notice", "Заведение создано. Данные других заведений сюда не перенесены.");
+      markClean();
       window.location.replace("/home?venue=" + encodeURIComponent(result.activeVenueId) + "&newVenue=1");
     } catch (error) {
       showNotice(error instanceof Error ? error.message : "Не удалось создать заведение", "error");
@@ -198,6 +256,7 @@
     }
   });
 
+  markClean();
   initialiseLocationFields();
   verifyOwner();
 })();
