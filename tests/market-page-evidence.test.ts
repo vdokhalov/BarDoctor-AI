@@ -73,3 +73,8 @@ test('QA observed FoodEstablishment DOM shape supports nested Country.name witho
  const blocks=[{'@context':'https://schema.org','@type':'Organization',name:'Tripadvisor'},{'@context':'https://schema.org','@type':'WebSite',name:'Tripadvisor'},{'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[]},{'@context':'https://schema.org','@type':'FoodEstablishment',name:'Street Food',address:{'@type':'PostalAddress',addressCountry:{'@type':'Country',name:'MD'},streetAddress:'Kalinina St., 23',addressLocality:'Bender'}}];
  const parsed=parseMarketPage(blocks.map(html).join(''),'Street Food',loc);assert.equal(parsed.reason,'VERIFIED');assert.equal(parsed.address?.country,'MD');assert.equal(parsed.address?.city,'Bender');
 });
+
+test('missing source URLs are distinct from unsupported hosts, with conserved counters and no fetch',async()=>{
+ let calls=0;const out=await verifyMarketPages({competitors:[{name:'A'},{name:'B',sourceUrls:[]},{name:'C',sourceUrls:['']},{name:'D',sourceUrls:[null]},{name:'San Marino',sourceUrls:['https://restaurantguru.com/San-Marino-Bender']}]},[{url:'https://restaurantguru.com/San-Marino-Bender',title:'San Marino'}],loc,async()=>{calls++;throw Error('must not fetch')});
+ assert.equal(out.counts.NO_SOURCE_URL,4);assert.equal(out.counts.UNSUPPORTED_URL,1);assert.equal(Object.values(out.counts).reduce((a,b)=>a+b,0),5);assert.equal(out.pagesRequested,0);assert.equal(calls,0);
+});

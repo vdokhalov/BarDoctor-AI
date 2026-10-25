@@ -5,7 +5,7 @@ const object=(v:unknown):Row|null=>v!==null&&typeof v==='object'&&!Array.isArray
 const str=(v:unknown,max=256)=>typeof v==='string'&&v.trim().length<=max?v.trim():'';
 const hosts=new Set(['www.tripadvisor.com','tripadvisor.com','www.tripadvisor.co.uk','tripadvisor.co.uk']);
 const MAX_BYTES=1_048_576, MAX_PAGES=4, PAGE_MS=2500;
-export type PageReason='VERIFIED'|'UNSUPPORTED_URL'|'BLOCKED'|'HTTP_ERROR'|'REDIRECT_REJECTED'|'TIMEOUT'|'NETWORK_ERROR'|'TOO_LARGE'|'UNSUPPORTED_CONTENT'|'MALFORMED'|'NO_STRUCTURED_ADDRESS'|'IDENTITY_MISMATCH'|'ADDRESS_CONFLICT'|'AMBIGUOUS'|'LIMIT';
+export type PageReason='VERIFIED'|'NO_SOURCE_URL'|'UNSUPPORTED_URL'|'BLOCKED'|'HTTP_ERROR'|'REDIRECT_REJECTED'|'TIMEOUT'|'NETWORK_ERROR'|'TOO_LARGE'|'UNSUPPORTED_CONTENT'|'MALFORMED'|'NO_STRUCTURED_ADDRESS'|'IDENTITY_MISMATCH'|'ADDRESS_CONFLICT'|'AMBIGUOUS'|'LIMIT';
 type Address={name:string;streetAddress:string;city:string;country:string;region:string};
 export type PageEvidence={status:'verified'|'unverified';reason:PageReason;sourceUrl?:string;checkedAt:string;kind?:'schema_org';address?:Address};
 /** Deliberately closed public-origin/path allowlist. No arbitrary DNS, IPs,
@@ -79,14 +79,14 @@ export async function verifyMarketPages(result:Row,sources:OpenAIWebSource[],loc
  const urls=[...new Set(candidates.flatMap(v=>Array.isArray(object(v)?.sourceUrls)?(object(v)!.sourceUrls as unknown[]).filter((u):u is string=>typeof u==='string'&&available.has(u)&&!!eligibleMarketPage(u)):[]))].slice(0,MAX_PAGES);
  const pages=new Map<string,Awaited<ReturnType<typeof readPage>>>();
  for(let start=0;start<urls.length;start+=2)await Promise.all(urls.slice(start,start+2).map(async url=>{pages.set(url,await readPage(eligibleMarketPage(url)!,fetcher))}));
- const counts:Record<PageReason,number>={VERIFIED:0,UNSUPPORTED_URL:0,BLOCKED:0,HTTP_ERROR:0,REDIRECT_REJECTED:0,TIMEOUT:0,NETWORK_ERROR:0,TOO_LARGE:0,UNSUPPORTED_CONTENT:0,MALFORMED:0,NO_STRUCTURED_ADDRESS:0,IDENTITY_MISMATCH:0,ADDRESS_CONFLICT:0,AMBIGUOUS:0,LIMIT:0};
+ const counts:Record<PageReason,number>={VERIFIED:0,NO_SOURCE_URL:0,UNSUPPORTED_URL:0,BLOCKED:0,HTTP_ERROR:0,REDIRECT_REJECTED:0,TIMEOUT:0,NETWORK_ERROR:0,TOO_LARGE:0,UNSUPPORTED_CONTENT:0,MALFORMED:0,NO_STRUCTURED_ADDRESS:0,IDENTITY_MISMATCH:0,ADDRESS_CONFLICT:0,AMBIGUOUS:0,LIMIT:0};
  const checkedAt=new Date().toISOString(),rejectedUrls=new Set<string>(),rejectedNames=new Set<string>();let inspections=0;
  const competitors=candidates.map(value=>{const candidate=object(value)??{},references=Array.isArray(candidate.sourceUrls)?candidate.sourceUrls:[];
   const checks=references.filter((u):u is string=>typeof u==='string'&&available.has(u)).map(sourceUrl=>{
    const page=pages.get(sourceUrl),parsed=page?.html!==undefined?(inspections++<12?parseMarketPage(page.html,str(candidate.name),location):{reason:'LIMIT' as const}):{reason:page?.reason??(eligibleMarketPage(sourceUrl)?'LIMIT':'UNSUPPORTED_URL') as PageReason};
    return {status:parsed.reason==='VERIFIED'?'verified':'unverified',reason:parsed.reason,sourceUrl,checkedAt,...(parsed.address?{kind:'schema_org',address:parsed.address}:{})} as PageEvidence;
   });
-  const evidence=checks.find(c=>['ADDRESS_CONFLICT','AMBIGUOUS','IDENTITY_MISMATCH'].includes(c.reason))??checks.find(c=>c.status==='verified')??checks[0]??{status:'unverified',reason:'UNSUPPORTED_URL',checkedAt} as PageEvidence;
+  const evidence=checks.find(c=>['ADDRESS_CONFLICT','AMBIGUOUS','IDENTITY_MISMATCH'].includes(c.reason))??checks.find(c=>c.status==='verified')??checks[0]??{status:'unverified',reason:references.some(u=>typeof u==='string'&&u.trim())?'UNSUPPORTED_URL':'NO_SOURCE_URL',checkedAt} as PageEvidence;
   counts[evidence.reason]++;const conflict=['ADDRESS_CONFLICT','AMBIGUOUS','IDENTITY_MISMATCH'].includes(evidence.reason);if(conflict){rejectedNames.add(marketEvidenceWords(str(candidate.name)));for(const check of checks)if(check.sourceUrl)rejectedUrls.add(check.sourceUrl);}
   // Never resurrect model statements/prices/ratings discarded by metadata filtering.
   return {...candidate,pageEvidence:evidence,...(conflict?{evidenceStatus:'venue_unverified',sourceUrls:[],evidence:'Адрес источника требует проверки.',distance:'',rating:'',strengths:[],gaps:[]}:{}),...(evidence.status==='verified'?{evidenceStatus:'local',evidence:'Название и адрес найдены на странице источника.',distance:'',rating:'',strengths:[],gaps:[]}:{})};
