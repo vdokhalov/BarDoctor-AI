@@ -1,3 +1,4 @@
+import { consumableNeeds } from './consumable-needs';
 import { derivedInputBelongs } from "./derived-input-scope";
 import { capturedBatchCost } from "./financial-reconciliation";
 import { itemSalesInputs } from "./item-sales-inputs";
@@ -237,6 +238,7 @@ function venueScopedAssortment(value: JsonRecord, venueId?: number): JsonRecord 
     "recipes",
     "nomenclature",
     "stockBalances",
+    "internalItems",
     "warehouses",
     "inventoryProductAliases",
     "canonicalProductAliases",
@@ -1317,6 +1319,8 @@ export function buildAssortmentAnalytics(input: {
     }
   }
 
+  const internalNeeds = consumableNeeds(array(assortment.internalItems).map(record).filter(item => !input.venueId || derivedInputBelongs(item, { venueId: input.venueId, workspaceId: input.workspaceId, dataAccountId: input.dataAccountId })));
+  needIssues.push(...internalNeeds.issues);
   const needs = [...required.values()].map((requirement) => {
     const balance = balances.get(requirement.productKey);
     const balanceUnit = text(balance?.unit, "", 20);
@@ -1360,6 +1364,7 @@ export function buildAssortmentAnalytics(input: {
       complete: currentStock !== null && (shortage === 0 || packageAmount > 0),
     };
   }).filter((need) => need.shortage === null || need.shortage > 0)
+    .concat(internalNeeds.rows)
     .sort((left, right) => (right.shortage ?? Number.MAX_SAFE_INTEGER) - (left.shortage ?? Number.MAX_SAFE_INTEGER));
 
   return {
@@ -1461,10 +1466,10 @@ export function buildAssortmentAnalytics(input: {
       rows: needs,
       issues: [...new Set(needIssues)].slice(0, 40),
       completeRows: needs.filter((need) => need.complete).length,
-      forecastStatus: needs.length && needs.every((need) => need.complete)
+      forecastStatus: (needs.length || internalNeeds.calculated) && !needIssues.length && needs.every((need) => need.complete)
         ? "ready"
         : "insufficient_data",
-      formula: "Остаток + уже заказано сопоставляются с потребностью по подтверждённым техкартам и фактическому плану/истории продаж",
+      formula: "Расходники — до минимального остатка с учётом уже заказанного. Блюда — по плану или продажам.",
     },
     sources: array(assortment.sources).map(record).slice(0, 30),
     valuation: {
