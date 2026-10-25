@@ -18,6 +18,20 @@ function countryInfo(country:string){
  if(code)for(const locale of ['en','ru','ro','de','fr'])try{names.push(new Intl.DisplayNames([locale],{type:'region'}).of(code)??'')}catch{/* Unknown country stays unverified. */}
  return {code,aliases:[...new Set(names.map(marketEvidenceWords).filter(x=>x.length>2))]};
 }
+// Reviewed city names, scoped to the country, never venue IDs or model-provided aliases.
+// Bender/Tighina: https://moldova.travel/en/transnistrian-region/
+// Chisinau/Kishinev: https://visit.chisinau.md/en/topics/legende/
+const cityNameGroups:Record<string,string[][]>={MD:[
+ ['Bender','Bendery','Бендер','Бендеры','Tighina','Тигина'],
+ ['Chișinău','Chisinau','Кишинёв','Кишинев','Кишинэу','Kishinev'],
+]};
+function cityForms(city:string,country:string){
+ const normalized=marketEvidenceWords(city),code=countryInfo(country).code;
+ const group=(code?cityNameGroups[code]:undefined)?.map(names=>names.map(marketEvidenceWords)).find(names=>names.includes(normalized));
+ return group?[...new Set(group)]:[normalized];
+}
+function sameCity(a:string,b:string,country:string){return cityForms(a,country).includes(marketEvidenceWords(b));}
+function containsCity(text:string,city:string,country:string){return cityForms(city,country).some(alias=>contains(text,alias));}
 const horeca=/\b(?:restaurant|restoran|restaurante|restaurantele|cafe|caffe|cafenea|cafeneaua|kafe|pub|bar|bistro|pizzeria|pizzeriya|hotel|otel|gostinitsa|nightclub|club|klub|coffee|coffeeshop|bakery|pekarnya|stolovaya)\b/;
 const irrelevant=/\b(?:dating app|dating application|dating service|tinder|software|download|prilozhenie|video game)\b/;
 const marketTopic=/\b(?:population|naselenie|tourism|turizm|tourist|travel|traffic|transport|economy|economic|ekonomika|income|dohod|statistics|statistika|municipality|municipal|primaria|council|events|festival|festivali)\b/;
@@ -42,9 +56,9 @@ function sourceAssessment(source:OpenAIWebSource,location:MarketLocation,name?:s
  const tailCountry=country.aliases.find(alias=>tail.endsWith(' '+alias));
  const addressCity=tailCountry?tail.slice(0,-tailCountry.length).trim():undefined;
  const statedCity=explicit?.[1]??located?.[1]??address?.[0]??addressCity;
- const conflictCity=Boolean(city&&statedCity&&!contains(marketEvidenceWords(statedCity),city));
+ const conflictCity=Boolean(city&&statedCity&&!containsCity(marketEvidenceWords(statedCity),city,location.country));
  if(conflictCountry||conflictCity)return {status:'conflict' as const,entity:named,named,reason:conflictCountry?'COUNTRY_CONFLICT' as const:'CITY_CONFLICT' as const};
- const geographic=Boolean(city&&location.country&&contains(geoText,city)&&(!region||region===city||contains(geoText,region))&&country.aliases.some(alias=>contains(geoText,alias)));
+ const geographic=Boolean(city&&location.country&&containsCity(geoText,city,location.country)&&(!region||sameCity(region,city,location.country)||contains(geoText,region))&&country.aliases.some(alias=>contains(geoText,alias)));
  const topical=name?venue:horeca.test(m.text)||marketTopic.test(m.text);
  return {status:geographic&&topical?'local' as const:'unknown' as const,entity:venue,named,reason:!geographic?'LOCATION_UNVERIFIED' as const:!topical?'TOPIC_UNVERIFIED' as const:'LOCAL_SOURCE' as const};
 }
@@ -66,7 +80,7 @@ export function filterMarketEvidence(raw:unknown,sources:OpenAIWebSource[],locat
  diagnostics.candidates.INVALID_CANDIDATE=(Array.isArray(input.competitors)?input.competitors.length:0)-candidates.length;
  const competitors=candidates.flatMap(v=>{
   const claimedCity=string(v.city),claimedCountry=string(v.country);
-  if(location.city&&claimedCity&&marketEvidenceWords(claimedCity)!==marketEvidenceWords(location.city)){diagnostics.candidates.CLAIMED_CITY_CONFLICT++;return [];}
+  if(location.city&&claimedCity&&!sameCity(claimedCity,location.city,location.country)){diagnostics.candidates.CLAIMED_CITY_CONFLICT++;return [];}
   if(location.country&&claimedCountry){const expected=countryInfo(location.country),claimed=countryInfo(claimedCountry);if(expected.code&&claimed.code?expected.code!==claimed.code:!expected.aliases.some(a=>claimed.aliases.includes(a))){diagnostics.candidates.CLAIMED_COUNTRY_CONFLICT++;return [];}}
   if(irrelevant.test(marketEvidenceWords(string(v.name)+' '+string(v.category)))){diagnostics.candidates.IRRELEVANT_TYPE++;return [];}
   const cited=[...new Set(strings(v.sourceUrls))].flatMap(url=>{const source=byUrl.get(url);return source&&metadata(source)?[{source,...sourceAssessment(source,location,string(v.name))}]:[]});
