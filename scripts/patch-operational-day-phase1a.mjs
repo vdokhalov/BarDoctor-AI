@@ -51,6 +51,8 @@ fn('bdShiftsPage',s=>{
  s=replace(s,'const saved=upsertDailyRevenue(values,editing?.id);','if(values?.operationalSaved){toast({variant:"success",title:"Операционные данные сохранены",description:"Команда, ФОТ, списания и происшествия сохранены."});closeSheet();return}const saved=upsertDailyRevenue(values,editing?.id);');
  s=replace(s,'setEditing(date?{date}:void 0);','setEditing(date?revenue.find(row=>row.date?.slice(0,10)===date)||{date}:void 0);');
  s=replace(s,'setEditing(todayState?.operatingDate?{date:todayState.operatingDate}:void 0);','setEditing(todayState?.operatingDate?revenue.find(row=>row.date?.slice(0,10)===todayState.operatingDate)||{date:todayState.operatingDate}:void 0);');
+ // Quick close belongs to the canonical workday flow, never the legacy operations editor.
+ s=s.replace('if(params.get("closeShift")==="1"&&profile){setEditing(todayState?.operatingDate?revenue.find(row=>row.date?.slice(0,10)===todayState.operatingDate)||{date:todayState.operatingDate}:void 0);setSheet("revenue")}','');
  s=replace(s,'timeline.find(item=>String(item.row?.id||"")===linkedShift)','timeline.find(item=>String(item.row?.id||"")===linkedShift||(item.row?._bdOperationalDay&&"operational-report:"+item.row._bdOperationalDay.venueId+":"+item.date===linkedShift))');
  s=replace(s,'payroll=row&&profile?Jle(row,profile):null','payroll=row?.workdayStatus==="OPEN"?null:row&&profile?Jle(row,profile):null');
  s=replace(s,'contextModel=bdShiftContextModelV156(todayState,nextWorking,schedule,canManage)','contextModel=bdShiftContextModelV156(todayState,nextWorking,schedule,canManage),activeOperationalDay=revenue.find(row=>row._bdOperationalDay?.status==="OPERATING")?._bdOperationalDay');
