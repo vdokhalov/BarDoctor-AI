@@ -296,6 +296,35 @@ export async function PATCH(request: Request): Promise<Response> {
     }
     const body = record(JSON.parse(rawBody)) ?? {};
     const action = text(body.action);
+    if (action === "check-source-page") {
+      // Diagnostic only: no model call, CAS write, arbitrary URL or profile input.
+      const keys = Object.keys(body);
+      if (keys.some(key => !["action", "competitorKey", "sourceIndex", "generatedAt"].includes(key)) ||
+          typeof body.competitorKey !== "string" || !body.competitorKey || body.competitorKey.length > 2200 ||
+          !Number.isInteger(body.sourceIndex) || Number(body.sourceIndex) < 0 || Number(body.sourceIndex) > 29 ||
+          typeof body.generatedAt !== "string") {
+        return noStore(Response.json({ ok: false, code: "INVALID_SELECTION" }, { status: 400 }));
+      }
+      const saved = record(await cachedAnalysis(account.id));
+      if (!saved || !saved.generatedAt || saved.generatedAt !== body.generatedAt) {
+        return noStore(Response.json({ ok: false, code: "ANALYSIS_CHANGED" }, { status: 409 }));
+      }
+      const candidate = (Array.isArray(saved.competitors) ? saved.competitors : [])
+        .map(record).find(item => item?.key === body.competitorKey);
+      const url = candidate && Array.isArray(candidate.sourceUrls) ? candidate.sourceUrls[Number(body.sourceIndex)] : null;
+      const source = (Array.isArray(saved.sources) ? saved.sources : []).map(record).find(item => item?.url === url);
+      if (!candidate || typeof url !== "string" || !source || !text(candidate.name)) {
+        return noStore(Response.json({ ok: false, code: "SOURCE_NOT_FOUND" }, { status: 404 }));
+      }
+      const restaurant = account.restaurantJson ? record(JSON.parse(account.restaurantJson)) ?? {} : {};
+      const started = Date.now();
+      const checked = await verifyMarketPages({ competitors: [{ name: candidate.name, sourceUrls: [url] }] },
+        [{ url, title: text(source.title) }],
+        { city: text(restaurant.city), country: text(restaurant.country), region: text(restaurant.region) });
+      const evidence = record(record((checked.result.competitors as unknown[])[0])?.pageEvidence);
+      return noStore(Response.json({ ok: true, reason: evidence?.reason, status: evidence?.status,
+        pagesRequested: checked.pagesRequested, durationMs: Date.now() - started }));
+    }
     if (action === "set-location") {
       const restaurant = account.restaurantJson
         ? record(JSON.parse(account.restaurantJson)) ?? {}
