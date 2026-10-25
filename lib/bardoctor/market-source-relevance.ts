@@ -44,7 +44,7 @@ function metadata(source:OpenAIWebSource){
  return {title:marketEvidenceWords(source.title),path:marketEvidenceWords(decodeURIComponent(u.pathname)),host:u.hostname.toLowerCase(),text:marketEvidenceWords(source.title+' '+decodeURIComponent(u.pathname))};}catch{return null;}
 }
 export type MarketEvidenceStatus='local'|'city_unverified'|'venue_unverified';
-export function marketCandidateEligible(value:unknown){const item=row(value);return !!item&&(!item.evidenceStatus||item.evidenceStatus==='local');}
+export function marketCandidateEligible(value:unknown){const item=row(value);return !!item&&strings(item.sourceUrls).some(url=>{try{const u=new URL(url);return /^https?:$/.test(u.protocol)&&!u.username&&!u.password;}catch{return false;}})&&(!item.evidenceStatus||item.evidenceStatus==='local');}
 function sourceAssessment(source:OpenAIWebSource,location:MarketLocation,name?:string){
  const m=metadata(source),city=marketEvidenceWords(location.city),region=marketEvidenceWords(location.region??''),country=countryInfo(location.country),entity=marketEvidenceWords(name??'');
  if(!m)return {status:'unknown' as const,entity:false,named:false,reason:'INVALID_SOURCE' as const};

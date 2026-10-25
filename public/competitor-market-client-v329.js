@@ -61,7 +61,7 @@
     var direct = Array.isArray(analysis && analysis.detectedChanges) ? analysis.detectedChanges.filter(Boolean) : [];
     if (direct.length) return direct.filter(function(change){return !competitors(analysis).some(function(item){return !eligible(item)&&(item.key===change.competitorKey||item.name===change.competitorName);});});
     var merged = [];
-    competitors(analysis).forEach(function (competitor) {
+    competitors(analysis).filter(eligible).forEach(function (competitor) {
       (Array.isArray(competitor.changes) ? competitor.changes : []).forEach(function (change) {
         merged.push(Object.assign({ competitorName: competitor.name, competitorKey: competitor.key }, change));
       });
@@ -69,7 +69,8 @@
     return merged;
   }
 
-  function eligible(item) { return !item.evidenceStatus || item.evidenceStatus === "local"; }
+  function hasSource(item) { return (Array.isArray(item.sourceUrls)?item.sourceUrls:[]).some(function(url){try{var u=new URL(url);return /^https?:$/.test(u.protocol)&&!u.username&&!u.password}catch{return false}}); }
+  function eligible(item) { return hasSource(item) && (!item.evidenceStatus || item.evidenceStatus === "local"); }
 
   function summary(analysis) {
     var rows = competitors(analysis);
@@ -90,6 +91,7 @@
 
   window.bdCompetitorMarketClientV329 = {
     eligible: eligible,
+    hasSource: hasSource,
     acquireRefreshLease: acquireRefreshLease,
     changes: changes,
     competitors: competitors,

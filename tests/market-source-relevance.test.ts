@@ -72,15 +72,15 @@ test('same names in different cities cannot merge geography or borrowing sources
  assert.deepEqual(filterMarketEvidence({competitors:[{name:'Luna',sourceUrls:[a.url,b.url]}]},[a,b],target).result.competitors,[]);
 });
 test('unverified entries remain in candidate count but never count as confirmed, including forged flags',async()=>{
- const {readFileSync}=await import('node:fs'),{runInNewContext}=await import('node:vm');const sandbox:any={window:{},localStorage:{getItem:()=>null},Date,Set};
+ const {readFileSync}=await import('node:fs'),{runInNewContext}=await import('node:vm');const sandbox:any={window:{},localStorage:{getItem:()=>null},Date,Set,URL};
  runInNewContext(readFileSync('public/competitor-market-client-v329.js','utf8'),sandbox);
- const result=sandbox.window.bdCompetitorMarketClientV329.summary({competitors:[{key:'a',confirmed:true,evidenceStatus:'local'},{key:'b',confirmed:true,evidenceStatus:'city_unverified'},{key:'c',confirmed:false,evidenceStatus:'venue_unverified'}]});
+ const result=sandbox.window.bdCompetitorMarketClientV329.summary({competitors:[{key:'a',confirmed:true,evidenceStatus:'local',sourceUrls:['https://local.test']},{key:'b',confirmed:true,evidenceStatus:'city_unverified'},{key:'c',confirmed:false,evidenceStatus:'venue_unverified'}]});
  assert.equal(result.foundCount,3);assert.equal(result.confirmedCount,1);assert.equal(result.candidateCount,2);
 });
 test('a dating event at a restaurant is not confused with a dating application',()=>{assert.ok(marketSourceRelevant(source('Rosa restaurant: speed dating, Бендеры Moldova','https://rosa.example/event'),target,'Rosa'));});
 test('unverified candidates cannot enter downstream confirmed market context',async()=>{
  const {buildVenueAIContextFromSources}=await import('../lib/bardoctor/venue-ai-context');
- const unknown={name:'Unknown',confirmed:true,evidenceStatus:'city_unverified'},known={name:'Local',confirmed:true,evidenceStatus:'local'};
+ const unknown={name:'Unknown',confirmed:true,evidenceStatus:'city_unverified'},known={name:'Local',confirmed:true,evidenceStatus:'local',sourceUrls:['https://local.test']};
  const build=(external?:any)=>buildVenueAIContextFromSources('diagnosis',{accountProfile:{name:'Local fixture'},stores:new Map([['bd_market_analysis_v1',{data:{competitors:[unknown,known]},updatedAt:'2026-10-24'}]]),external,now:new Date('2026-10-24T12:00:00Z')});
  const stored=build();assert.deepEqual((stored.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
  const supplied=build({confirmedCompetitors:[unknown,known]});assert.deepEqual((supplied.promptData.market as any).confirmedCompetitors.map((x:any)=>x.name),['Local']);
