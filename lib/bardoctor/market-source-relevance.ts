@@ -32,6 +32,10 @@ function cityForms(city:string,country:string){
 }
 function sameCity(a:string,b:string,country:string){return cityForms(a,country).includes(marketEvidenceWords(b));}
 function containsCity(text:string,city:string,country:string){return cityForms(city,country).some(alias=>contains(text,alias));}
+export function marketAddressMatches(city:string,country:string,location:MarketLocation,region=''){
+ const expected=countryInfo(location.country),actual=countryInfo(country);
+ return Boolean(expected.code&&actual.code&&expected.code===actual.code&&sameCity(city,location.city,location.country)&&(!location.region||sameCity(location.region,location.city,location.country)||marketEvidenceWords(region)===marketEvidenceWords(location.region)));
+}
 const horeca=/\b(?:restaurant|restoran|restaurante|restaurantele|cafe|caffe|cafenea|cafeneaua|kafe|pub|bar|bistro|pizzeria|pizzeriya|hotel|otel|gostinitsa|nightclub|club|klub|coffee|coffeeshop|bakery|pekarnya|stolovaya)\b/;
 const irrelevant=/\b(?:dating app|dating application|dating service|tinder|software|download|prilozhenie|video game)\b/;
 const marketTopic=/\b(?:population|naselenie|tourism|turizm|tourist|travel|traffic|transport|economy|economic|ekonomika|income|dohod|statistics|statistika|municipality|municipal|primaria|council|events|festival|festivali)\b/;

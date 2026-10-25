@@ -1,3 +1,4 @@
+import { verifyMarketPages } from '../../../lib/bardoctor/market-page-evidence';
 import { marketResultAttempt, retainMarketResult } from "../../../lib/bardoctor/market-result-attempt";
 import { marketFailureDiagnostic, type MarketStage } from "../../../lib/bardoctor/market-diagnostics";
 import { filterMarketEvidence, linkedMarketSources, marketCandidateEligible } from "../../../lib/bardoctor/market-source-relevance";
@@ -171,6 +172,7 @@ function normaliseMarketResult(
       gaps: textList(item.gaps, 5),
       sourceUrls: sourced(item.sourceUrls),
       evidenceStatus: item.evidenceStatus,
+      pageEvidence: item.pageEvidence,
       confirmed: false,
     }));
 
@@ -524,7 +526,8 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     const parsed = parseAIJson<unknown>(web.text);
     diagnosticStage = "evidence";
     const relevant = filterMarketEvidence(parsed, web.sources, {city,country,region});
-    const analysis = normaliseMarketResult(relevant.result, relevant.sources);
+    const pages = await verifyMarketPages(relevant.result, relevant.sources, {city,country,region});
+    const analysis = normaliseMarketResult(pages.result, relevant.sources);
     const nextCompetitors = Array.isArray(analysis.competitors) ? analysis.competitors : [];
     analysis.competitors = nextCompetitors.filter((value) => {
       const item = record(value) ?? {};
@@ -576,6 +579,7 @@ ${JSON.stringify(venueAIContextForPrompt(venueContext))}
     const finalCandidateCount = Array.isArray(analysis.competitors) ? analysis.competitors.length : 0;
     const attempt = { ...marketResultAttempt(parsed, web.sources, relevant.result, payload, generatedAt), filtering: {
       ...relevant.diagnostics,
+      pages: { requested: pages.pagesRequested, outcomes: pages.counts },
       projection: {
         NORMALIZATION_CANDIDATES_REMOVED: (Array.isArray(relevant.result.competitors) ? relevant.result.competitors.length : 0) - nextCompetitors.length,
         USER_EXCLUDED_CANDIDATES: nextCompetitors.length - finalCandidateCount,
