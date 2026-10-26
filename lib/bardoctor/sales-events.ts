@@ -139,7 +139,10 @@ export async function planSalesEvent(c: SalesEventContext, command: SalesEventCo
     discountAmount: allocation?.lines[index].discountAmount ?? 0, total: allocation?.lines[index].netAmount ?? price.total }));
   if (isPos && Math.round(command.payments![0].amount*100) !== Math.round(revenue*100)) fail("POS_PAYMENT_MISMATCH");
   const common = { assortment:c.assortment, mappings:c.mappings, warehouseRoutes:c.warehouseRoutes, warehouses:c.warehouses,
-    stockMovements:c.movements, venueId:c.venueId, actor:c.actor, now:c.now, costAsOf:c.now };
+    // Receipt dates are venue-local calendar dates, not the UTC date prefix.
+    // An overnight cash shift still owns revenue's business date above; pricing
+    // uses today's venue date, when this new sale is actually accepted.
+    stockMovements:c.movements, venueId:c.venueId, actor:c.actor, now:c.now, costAsOf:venueDate(c.now, timezone) };
   const draft = createOrUpdateSalesBatch({ ...common, batches:[], batchId:eventId, draft:{ source:command.source, businessDate:date, shiftId:command.shiftId,
     lines:command.lines.map((l,i) => ({ ...l, rawName:prices[i].name })), warnings:[] } });
   if (!draft.ok || draft.batch.lines.some(l => l.processingStatus !== "READY")) fail("CONSUMPTION_NEEDS_REVIEW");

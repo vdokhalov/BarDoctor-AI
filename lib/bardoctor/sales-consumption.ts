@@ -1301,7 +1301,7 @@ export function postSalesBatch(input: {
         venueId: input.venueId,
         warehouseId: ingredient.warehouseId,
         nomenclatureItem: { productKey: ingredient.productKey, unit: ingredient.baseUnit },
-        asOf: now,
+        asOf: input.costAsOf ?? now,
         receipts: currentMovements,
         accountingCurrency: balance.accountingCurrency ?? balance.currency,
       });
