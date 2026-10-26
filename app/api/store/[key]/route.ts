@@ -1,3 +1,4 @@
+import { employeePositionView } from "../../../../lib/bardoctor/employee-import-position";
 import { changedInvalidEquipmentPlans } from "../../../../lib/bardoctor/equipment-plan-validation";
 import { SALES_ACCOUNTING_KEY, parseSalesAccounting, managedRevenueMutation } from "../../../../lib/bardoctor/sales-accounting";
 import {getD1} from "../../../../db";
@@ -112,7 +113,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   const data = row ? key===STOCK_MOVEMENT_STORE_KEY ? await readStockHistory(getD1(),account.id,row.dataJson) : JSON.parse(row.dataJson) : null;
   return Response.json({
     ok: true,
-    data: key === "bd_finance_revenue" ? workdayPersonnelView(data,canReadManagementWorkday(account)) : data,
+    data: key === "bd_employees" ? employeePositionView(data, account.venueId) : key === "bd_finance_revenue" ? workdayPersonnelView(data,canReadManagementWorkday(account)) : data,
     updatedAt: row?.updatedAt ?? null,
     source: row ? "server_d1" : "missing",
     authoritative: Boolean(row),

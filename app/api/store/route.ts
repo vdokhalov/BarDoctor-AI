@@ -1,3 +1,4 @@
+import { employeePositionView } from "../../../lib/bardoctor/employee-import-position";
 import {readStockHistory} from "../../../lib/bardoctor/stock-storage";
 import { canReadManagementWorkday, workdayPersonnelView } from "../../../lib/bardoctor/management-workday";
 import { canReadSavedDiagnosis } from "../../../lib/bardoctor/venue-context-access";
@@ -29,7 +30,7 @@ export async function GET(request: Request): Promise<Response> {
     if (!canReadStore(account, row.store_key)) continue;
     if (/^bd_ai_diagnosis_v[3-9]$/.test(row.store_key) && !canReadSavedDiagnosis(account)) continue;
     entries[row.store_key] = {
-      data: row.store_key === "bd_stock_movements" ? await readStockHistory(getD1(),account.id,row.data_json) : row.store_key === "bd_finance_revenue" ? workdayPersonnelView(JSON.parse(row.data_json),canReadManagementWorkday(account)) : JSON.parse(row.data_json),
+      data: row.store_key === "bd_employees" ? employeePositionView(JSON.parse(row.data_json), account.venueId) : row.store_key === "bd_stock_movements" ? await readStockHistory(getD1(),account.id,row.data_json) : row.store_key === "bd_finance_revenue" ? workdayPersonnelView(JSON.parse(row.data_json),canReadManagementWorkday(account)) : JSON.parse(row.data_json),
       updatedAt: row.updated_at,
       source: "server_d1",
     };

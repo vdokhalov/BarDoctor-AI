@@ -1,3 +1,4 @@
+import { importedEmployeePosition } from "../employee-import-position";
 import {readStockHistory,stockStoreStatements} from "../stock-storage";
 import { captureAcceptedWrite, type AcceptedRecord } from "./accepted-write";
 import { canonicalInputScope } from "../canonical-input-evidence";
@@ -1022,10 +1023,19 @@ function applySimpleListMutation(input: WriterInput & {
   if (before && number(before.sourcePriority) > inputPriority(input.envelope)) {
     return { result: { ok: true, internalId: targetId, duplicate: true } };
   }
+  let profile = source;
+  if (input.entityType === "employee") {
+    const position = importedEmployeePosition(source.role, before);
+    if (!position) return { result: { ok: false, code: "EMPLOYEE_POSITION_REQUIRED",
+      error: "Укажите должность сотрудника; для «Другое» нужно название должности." } };
+    // Canonical import calls the job title `role`; never copy it as an access role.
+    const { role: _jobTitle, ...fields } = source;
+    profile = { ...fields, ...position };
+  }
   const status = source.active === false ? "inactive" : "active";
   const next = {
     ...before,
-    ...source,
+    ...profile,
     id: targetId,
     status,
     active: source.active !== false,
