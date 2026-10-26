@@ -1002,7 +1002,7 @@ export function buildAssortmentAnalytics(input: {
       hasPendingDraft: consumptionMode === "RECIPE" && Boolean(pendingDraft && pendingDraft.id !== recipe?.id),
       pendingDraftId: consumptionMode === "RECIPE" && pendingDraft ? text(pendingDraft.id, "", 120) || null : null,
       pendingDraftStatus: consumptionMode === "RECIPE" && pendingDraft ? text(pendingDraft.reviewStatus, "requires_review", 40) : null,
-      status: itemStatus({ item, mode: consumptionMode, consumptionOk: consumption.ok, recipe, costComplete }),
+      status: itemStatus({ item, mode: consumptionMode, consumptionOk: consumption.ok, recipe, costComplete: recipeCost !== null }),
       ingredientCount: ingredients.length,
       mappedIngredientCount: ingredients.filter((ingredient) =>
         Boolean(text(ingredient.purchaseProductKey ?? ingredient.productKey))
@@ -1016,7 +1016,7 @@ export function buildAssortmentAnalytics(input: {
       missingPriceCount: ingredientRows.filter((ingredient) => ingredient.reason === "price").length,
       ingredientRows,
       recipeCost,
-      recipeCostStatus: consumption.ok && consumption.mode === "NONE" ? "KNOWN_ZERO" : costComplete ? "KNOWN" : "UNKNOWN",
+      recipeCostStatus: consumption.ok && consumption.mode === "NONE" ? "KNOWN_ZERO" : recipeCost !== null ? "KNOWN" : "UNKNOWN",
       costCurrency,
       costPercent,
       unitGrossProfit,
@@ -1057,7 +1057,7 @@ export function buildAssortmentAnalytics(input: {
     }
     requiredChecks.push({ id: `${item.id}:units`, complete: item.ingredientCount > 0 && item.invalidUnitCount === 0 });
     requiredChecks.push({ id: `${item.id}:mapping`, complete: item.ingredientCount > 0 && item.unmappedIngredientCount === 0 });
-    requiredChecks.push({ id: `${item.id}:prices`, complete: item.ingredientCount > 0 && item.missingPriceCount === 0 });
+    requiredChecks.push({ id: `${item.id}:prices`, complete: item.recipeCost !== null });
   }
   const completedChecks = requiredChecks.filter((check) => check.complete).length;
   const readinessPercent = requiredChecks.length
@@ -1074,7 +1074,7 @@ export function buildAssortmentAnalytics(input: {
   const visibleReviewCards = activeReviewCards.filter((recipe) => recipeModeIds.has(text(recipe.menuItemId ?? recipe.ownerId, "", 120)));
   const unmappedItems = itemAnalytics.filter((item) => item.unmappedIngredientCount > 0);
   const invalidUnitItems = itemAnalytics.filter((item) => item.invalidUnitCount > 0);
-  const missingPriceItems = itemAnalytics.filter((item) => item.missingPriceCount > 0);
+  const missingPriceItems = itemAnalytics.filter((item) => item.recipeCost === null);
   const unpricedItems = itemAnalytics.filter((item) => item.salePrice === null);
   const costChanges = itemAnalytics
     .filter((item) => item.costChangePercent !== null)
@@ -1157,10 +1157,10 @@ export function buildAssortmentAnalytics(input: {
     id: "ingredient-prices",
     type: "price_missing",
     tone: "orange",
-    title: `${missingPriceItems.reduce((sum, item) => sum + item.missingPriceCount, 0)} ингредиентов без подтверждённой цены`,
-    detail: "Себестоимость зависимых позиций пока неполна",
-    tab: "recipes",
-    filter: "review",
+    title: `Неполная себестоимость: ${missingPriceItems.length} ${plural(missingPriceItems.length, "позиция", "позиции", "позиций")}`,
+    detail: "Проверьте цены, единицы и валюту ингредиентов",
+    tab: "menu",
+    filter: "attention",
     itemId: missingPriceItems[0].id,
   });
   if (unpricedItems.length) signals.push({
@@ -1391,7 +1391,7 @@ export function buildAssortmentAnalytics(input: {
         { id: "recipe", label: "Подтверждённая техкарта", complete: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE" && item.techCardStatus === "approved").length, total: itemAnalytics.filter((item) => item.consumptionMode === "RECIPE").length },
         { id: "units", label: "Нормализованные единицы", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.invalidUnitCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
         { id: "mapping", label: "Связь расхода с номенклатурой", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.unmappedIngredientCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
-        { id: "purchase_price", label: "Подтверждённая стоимость расхода", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.ingredientCount > 0 && item.missingPriceCount === 0).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
+        { id: "purchase_price", label: "Подтверждённая стоимость расхода", complete: itemAnalytics.filter((item) => item.consumptionMode !== "NONE" && item.consumptionStatus === "CONFIGURED" && item.recipeCost !== null).length, total: itemAnalytics.filter((item) => item.consumptionMode !== "NONE").length },
       ],
       desirable: [
         {
