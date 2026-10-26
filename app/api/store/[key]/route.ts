@@ -416,6 +416,7 @@ export async function PUT(request: Request, context: RouteContext): Promise<Resp
     { status: monthKey ? 423 : 409 });
   }
   const mutations = compareStoreData(auditBefore, auditAfter);
+  if (["bd_events", "bd_equipment_work_orders"].includes(key) && mutations.some(mutation => [mutation.before, mutation.after].some(value => {const item = record(value); return Boolean(item.equipmentWorkOrderId || item.flow === "breakdown_v2");}))) return Response.json({ok:false,code:"USE_EQUIPMENT_WORK_ORDER_API",error:"Измените ремонт в карточке поломки"},{status:409});
   if(key==="bd_finance_revenue"&&!canReadManagementWorkday(account)&&mutations.some(m=>workdayPersonnelChanged(m.before,m.after)))return Response.json({ok:false,code:"WORKDAY_PERSONNEL_PROTECTED",error:"Нет доступа к изменению команды или ФОТ. Кадровые данные сохранены без изменений."},{status:403});
   if (/^bd_ai_diagnosis_v[3-9]$/.test(key) && !canReadSavedDiagnosis(account)) return restrictedVenueContext();
   if ((key === EXPENSE_STORE_KEY || key === "bd_equipment_work_orders") && mutations.some(mutation =>

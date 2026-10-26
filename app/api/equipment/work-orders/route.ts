@@ -1,3 +1,4 @@
+import { saveEquipmentBreakdown } from "../../../../lib/bardoctor/equipment-breakdown";
 import { readStoreSnapshots, runStoreCasBatch, withStoreCasRetries } from "../../../../lib/bardoctor/store-cas";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -114,6 +115,7 @@ async function postOnce(request: Request): Promise<Response> {
   } catch {
     return Response.json({ ok: false, error: "Некорректная запись обслуживания" }, { status: 400 });
   }
+  if (body.breakdownAction) return saveEquipmentBreakdown(account, body);
   const requested = record(body.workOrder);
   if (!requested) {
     return Response.json({ ok: false, error: "Не передана запись обслуживания" }, { status: 400 });
@@ -147,6 +149,7 @@ async function postOnce(request: Request): Promise<Response> {
     return Response.json({ ok: false, error: "Нельзя перенести запись к другому оборудованию" }, { status: 409 });
   }
 
+  if (existing?.flow === "breakdown_v2") return Response.json({ok:false,error:"Откройте ремонт из события поломки"},{status:409});
   const kind = text(requested.kind, 30);
   const priority = text(requested.priority, 20) || "medium";
   const title = text(requested.title ?? requested.problem, 240);

@@ -1,30 +1,29 @@
-// Small deterministic prototype. Department/zone is not evidence of contents or severity.
-function bdEquipmentBusinessRisk(equipment){
- if(!equipment||typeof equipment.id!=='string')return null;
- const name=String(equipment.name||'').normalize('NFKC').toLocaleLowerCase('ru').replace(/ё/g,'е');
- const has=pattern=>new RegExp('(?:^|[^\\p{L}\\p{N}])(?:'+pattern+')(?:$|[^\\p{L}\\p{N}])','u').test(name);
- const found=[];
- if(has('холодильник|холодильная витрина|холодильная камера|холодильный шкаф|морозильник|морозильная камера|refrigerator|freezer'))found.push('refrigeration');
- if(has('кондиционер|система кондиционирования|air conditioner'))found.push('comfort');
- if(has('светильник|светильники|люстра|освещение|lighting|light fixture'))found.push('lighting');
- const contradicted=has('не|без')||has('кондиционер для волос');
- const kind=!contradicted&&found.length===1?found[0]:'unknown';
- let contents='unspecified',risk='',action='';
- if(kind==='refrigeration'){
-  const food=has('продуктов|продуктовый|мяса|рыбы|молочных продуктов|food'),drinks=has('напитков|пивной|пива|вина|drinks|beverage');
-  if(food&&!drinks)contents='food';if(drinks&&!food)contents='drinks';
-  risk=contents==='food'?'При нарушении условий хранения возможны порча продуктов, списания и сокращение доступного меню.':contents==='drinks'?'Возможны нарушение температуры подачи, сокращение доступных напитков и снижение продаж.':'Если оборудование используется для хранения, нарушение охлаждения может повлиять на качество и доступность позиций. Содержимое не указано.';
-  action='Организуйте проверку условий хранения ответственным сотрудником и согласуйте с сервисом срок обслуживания.';
- }else if(kind==='comfort'){
-  risk='Возможно ухудшение комфорта гостей и команды, что может повлиять на обслуживание.';
-  action='Согласуйте использование доступных комфортных зон и передайте заявку обслуживающей организации.';
- }else if(kind==='lighting'){
-  risk='Возможно ухудшение видимости и условий обслуживания в затронутой зоне.';
-  action='Согласуйте использование зоны с ответственным за безопасность и передайте заявку обслуживающей организации.';
- }else{
-  risk=found.length>1?'Название указывает на несколько назначений. Конкретные последствия не определены.':'По названию и категории назначение оборудования не определено.';
-  action='Передайте в сервис название, место установки и описание неисправности.';
- }
- return {version:1,kind,contents,basis:'equipment_name',source:{equipmentId:equipment.id,name:String(equipment.name||''),category:String(equipment.category||''),zone:String(equipment.zone||equipment.area||'')},risk,action};
+// Generated from lib/bardoctor/equipment-breakdown-risk.ts.
+function equipmentBreakdownRisk(equipment) {
+  const name = String(equipment.name || "").normalize("NFKC").toLocaleLowerCase("ru").replace(/ё/g, "\u0435");
+  const has = (pattern) => new RegExp("(?:^|[^\\p{L}\\p{N}])(?:" + pattern + ")(?:$|[^\\p{L}\\p{N}])", "u").test(name);
+  const rules = [
+    ["refrigeration", "\u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0438\u043A|\u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0430\u044F \u0432\u0438\u0442\u0440\u0438\u043D\u0430|\u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u0430\u044F \u043A\u0430\u043C\u0435\u0440\u0430|\u0445\u043E\u043B\u043E\u0434\u0438\u043B\u044C\u043D\u044B\u0439 \u0448\u043A\u0430\u0444|\u043C\u043E\u0440\u043E\u0437\u0438\u043B\u044C\u043D\u0438\u043A|\u043C\u043E\u0440\u043E\u0437\u0438\u043B\u044C\u043D\u0430\u044F \u043A\u0430\u043C\u0435\u0440\u0430|refrigerator|freezer", "\u0420\u0438\u0441\u043A \u043F\u043E\u0440\u0447\u0438 \u0442\u043E\u0432\u0430\u0440\u0430, \u0434\u043E\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0445 \u0441\u043F\u0438\u0441\u0430\u043D\u0438\u0439 \u0438 \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u044F \u043F\u043E\u0437\u0438\u0446\u0438\u0439 \u0432 \u0441\u0442\u043E\u043F-\u043B\u0438\u0441\u0442\u0435"],
+    ["cooking", "\u043F\u043B\u0438\u0442\u0430|\u043F\u0435\u0447\u044C|\u0434\u0443\u0445\u043E\u0432\u043E\u0439 \u0448\u043A\u0430\u0444|\u043F\u0430\u0440\u043E\u043A\u043E\u043D\u0432\u0435\u043A\u0442\u043E\u043C\u0430\u0442|\u0444\u0440\u0438\u0442\u044E\u0440\u043D\u0438\u0446\u0430|\u0433\u0440\u0438\u043B\u044C|\u0438\u043D\u0434\u0443\u043A\u0446\u0438\u043E\u043D\u043D\u0430\u044F \u043F\u043B\u0438\u0442\u0430|cooking range|oven", "\u0417\u0430\u0434\u0435\u0440\u0436\u043A\u0438 \u043F\u0440\u0438\u0433\u043E\u0442\u043E\u0432\u043B\u0435\u043D\u0438\u044F \u0438 \u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E\u0435 \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u0431\u043B\u044E\u0434 \u0432 \u0441\u0442\u043E\u043F-\u043B\u0438\u0441\u0442\u0435"],
+    ["coffee", "\u043A\u043E\u0444\u0435\u043C\u0430\u0448\u0438\u043D\u0430|\u043A\u043E\u0444\u0435\u0432\u0430\u0440\u043A\u0430|\u043A\u043E\u0444\u0435\u043C\u043E\u043B\u043A\u0430|coffee machine|espresso machine", "\u0412\u043E\u0437\u043C\u043E\u0436\u043D\u043E\u0435 \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u043A\u043E\u0444\u0435\u0439\u043D\u044B\u0445 \u043D\u0430\u043F\u0438\u0442\u043A\u043E\u0432 \u0432 \u0441\u0442\u043E\u043F-\u043B\u0438\u0441\u0442\u0435"],
+    ["ice", "\u043B\u044C\u0434\u043E\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440|\u0433\u0435\u043D\u0435\u0440\u0430\u0442\u043E\u0440 \u043B\u044C\u0434\u0430|ice maker", "\u041D\u0435\u0445\u0432\u0430\u0442\u043A\u0430 \u043B\u044C\u0434\u0430 \u0438 \u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E\u0435 \u043F\u043E\u044F\u0432\u043B\u0435\u043D\u0438\u0435 \u043D\u0430\u043F\u0438\u0442\u043A\u043E\u0432 \u0441\u043E \u043B\u044C\u0434\u043E\u043C \u0432 \u0441\u0442\u043E\u043F-\u043B\u0438\u0441\u0442\u0435"],
+    ["dishwasher", "\u043F\u043E\u0441\u0443\u0434\u043E\u043C\u043E\u0435\u0447\u043D\u0430\u044F \u043C\u0430\u0448\u0438\u043D\u0430|\u043F\u043E\u0441\u0443\u0434\u043E\u043C\u043E\u0439\u043A\u0430|\u0441\u0442\u0430\u043A\u0430\u043D\u043E\u043C\u043E\u0435\u0447\u043D\u0430\u044F \u043C\u0430\u0448\u0438\u043D\u0430|dishwasher", "\u041D\u0435\u0445\u0432\u0430\u0442\u043A\u0430 \u0447\u0438\u0441\u0442\u043E\u0439 \u043F\u043E\u0441\u0443\u0434\u044B \u0438 \u0437\u0430\u0434\u0435\u0440\u0436\u043A\u0438 \u043E\u0431\u0441\u043B\u0443\u0436\u0438\u0432\u0430\u043D\u0438\u044F"],
+    ["extraction", "\u0432\u044B\u0442\u044F\u0436\u043A\u0430|\u0432\u044B\u0442\u044F\u0436\u043D\u043E\u0439 \u0437\u043E\u043D\u0442|\u0432\u044B\u0442\u044F\u0436\u043D\u0430\u044F \u0432\u0435\u043D\u0442\u0438\u043B\u044F\u0446\u0438\u044F|extractor hood", "\u0414\u044B\u043C, \u043F\u0430\u0440, \u0437\u0430\u043F\u0430\u0445\u0438 \u0438 \u0443\u0445\u0443\u0434\u0448\u0435\u043D\u0438\u0435 \u0443\u0441\u043B\u043E\u0432\u0438\u0439 \u0440\u0430\u0431\u043E\u0442\u044B"],
+    ["comfort", "\u043A\u043E\u043D\u0434\u0438\u0446\u0438\u043E\u043D\u0435\u0440|\u0441\u0438\u0441\u0442\u0435\u043C\u0430 \u043A\u043E\u043D\u0434\u0438\u0446\u0438\u043E\u043D\u0438\u0440\u043E\u0432\u0430\u043D\u0438\u044F|air conditioner", "\u041D\u0430\u0440\u0443\u0448\u0435\u043D\u0438\u0435 \u0442\u0435\u043C\u043F\u0435\u0440\u0430\u0442\u0443\u0440\u043D\u043E\u0433\u043E \u043A\u043E\u043C\u0444\u043E\u0440\u0442\u0430"],
+    ["lighting", "\u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0441\u0432\u0435\u0442|\u0440\u0430\u0431\u043E\u0447\u0435\u0435 \u043E\u0441\u0432\u0435\u0449\u0435\u043D\u0438\u0435|\u0441\u0432\u0435\u0442\u0438\u043B\u044C\u043D\u0438\u043A|\u0441\u0432\u0435\u0442\u0438\u043B\u044C\u043D\u0438\u043A\u0438|\u043E\u0441\u0432\u0435\u0449\u0435\u043D\u0438\u0435|work light", "\u0417\u0430\u0442\u0440\u0443\u0434\u043D\u0435\u043D\u0438\u0435 \u0440\u0430\u0431\u043E\u0442\u044B \u0432 \u0437\u043E\u043D\u0435 \u043E\u0441\u0432\u0435\u0449\u0435\u043D\u0438\u044F"],
+    ["pos", "\u043A\u0430\u0441\u0441\u0430|\u043A\u0430\u0441\u0441\u043E\u0432\u044B\u0439 \u0430\u043F\u043F\u0430\u0440\u0430\u0442|\u043A\u0430\u0441\u0441\u043E\u0432\u044B\u0439 \u0442\u0435\u0440\u043C\u0438\u043D\u0430\u043B|pos terminal", "\u0417\u0430\u0434\u0435\u0440\u0436\u043A\u0438 \u043F\u0440\u0438 \u043E\u0444\u043E\u0440\u043C\u043B\u0435\u043D\u0438\u0438 \u0437\u0430\u043A\u0430\u0437\u043E\u0432 \u0438 \u0440\u0430\u0441\u0447\u0451\u0442\u0435 \u0441 \u0433\u043E\u0441\u0442\u044F\u043C\u0438"],
+    ["plumbing", "\u0440\u0430\u043A\u043E\u0432\u0438\u043D\u0430|\u043C\u043E\u0439\u043A\u0430|\u0441\u043C\u0435\u0441\u0438\u0442\u0435\u043B\u044C|\u0443\u043D\u0438\u0442\u0430\u0437|\u0441\u0430\u043D\u0442\u0435\u0445\u043D\u0438\u043A\u0430|sink|toilet", "\u041E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u043D\u0438\u044F \u0437\u0430\u0442\u0440\u043E\u043D\u0443\u0442\u043E\u0439 \u0442\u043E\u0447\u043A\u0438"]
+  ];
+  const found = rules.filter(([, pattern]) => has(pattern));
+  const match = found.length === 1 && !has("\u043D\u0435|\u0431\u0435\u0437|\u043A\u043E\u043D\u0434\u0438\u0446\u0438\u043E\u043D\u0435\u0440 \u0434\u043B\u044F \u0432\u043E\u043B\u043E\u0441") ? found[0] : null;
+  return {
+    version: 2,
+    kind: match?.[0] || "unknown",
+    basis: "equipment_name",
+    source: { equipmentId: String(equipment.id || ""), name: String(equipment.name || ""), category: String(equipment.category || ""), zone: String(equipment.zone || equipment.area || "") },
+    risk: match?.[2] || null
+  };
 }
+
+function bdEquipmentBusinessRisk(equipment){return equipment?.id?equipmentBreakdownRisk(equipment):null}
 function bdEquipmentPriorityUnassessed(event){return event?.category==='equipment'&&event?.priorityBasis==='unassessed'&&!event?.aiAssessment}
