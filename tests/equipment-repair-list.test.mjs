@@ -1,0 +1,11 @@
+import test from'node:test';import assert from'node:assert/strict';import fs from'node:fs';import vm from'node:vm';
+const ctx=vm.createContext({});vm.runInContext(fs.readFileSync('scripts/fragments/equipment-repair-list.js','utf8'),ctx);const list=(e,w)=>ctx.bdEquipmentOpenRepairs(e,w,1);
+const equipment=[{id:'ok',name:'Исправное',status:'working',venueId:1},{id:'broken',name:'Холодильник',status:'broken',venueId:1},{id:'done',name:'Отремонтированное',status:'working',venueId:1},{id:'maintenance',name:'ТО',status:'needs_maintenance',venueId:1},{id:'legacy',name:'Без работы',status:'broken',venueId:1},{id:'foreign',status:'broken',venueId:2},{id:'archived',status:'broken',archived:true,venueId:1}];
+const work=[{id:'open',equipmentId:'broken',kind:'problem',status:'detected',venueId:1},{id:'done',equipmentId:'done',kind:'repair',status:'verified',venueId:1},{id:'to',equipmentId:'maintenance',kind:'maintenance',status:'detected',venueId:1}];
+test('only open repairs and genuine legacy broken cards; no equipment/TO duplicates',()=>assert.deepEqual(Array.from(list(equipment,work),r=>r.id).sort(),['equipment:legacy','open']));
+test('restoration removes the repair and updates counter without erasing history',()=>{const e=equipment.map(e=>e.id==='broken'?{...e,status:'working'}:e),w=work.map(w=>w.id==='open'?{...w,status:'verified'}:w);assert.deepEqual(Array.from(list(e,w),r=>r.id),['equipment:legacy']);assert.equal(w.length,work.length)});
+for(const status of ['assigned','in_progress','fixed'])test(status+' stays open until verified',()=>assert.ok(list(equipment,[{...work[0],status}]).some(r=>r.id==='open')));
+test('multiple repairs on one item remain separate, unknown statuses are not invented',()=>{const rows=list([{id:'broken',status:'working'}],[work[0],{...work[0],id:'second'},{...work[0],id:'invalid',status:'mystery'}]);assert.equal(rows.length,2)});
+test('foreign work and archived equipment never appear',()=>assert.equal(list(equipment,[{...work[0],venueId:2},{...work[0],equipmentId:'archived'}]).filter(r=>r.workOrder).length,0));
+test('empty is genuinely empty',()=>assert.equal(list([],[]).length,0));
+test('no selected venue does not expose cached repairs',()=>assert.equal(ctx.bdEquipmentOpenRepairs(equipment,work,null).length,0));
