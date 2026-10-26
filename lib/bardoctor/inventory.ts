@@ -1079,8 +1079,12 @@ export function consolidateInventoryDuplicates(input: {
 
   const balanceByKey = new Map(balances.map((balance) => [text(balance.productKey ?? balance.key, "", 300), balance]));
   const nomenclatureGroups = new Map<string, JsonRecord[]>();
+  const services: JsonRecord[] = [];
   for (const raw of array(parts.root.nomenclature)) {
     const item = cloneRecord(raw);
+    // Stock repair has no evidence that similarly named services are one entity.
+    // Preserve their IDs (including legacy duplicates) until an explicit remediation.
+    if (item.kind === "service") { services.push(item); continue; }
     const originalKey = text(item.productKey ?? item.key, "", 300);
     const candidateKey = inventoryAliasProductKey(item)
       || remappedProductKey(item, aliases)
@@ -1098,7 +1102,7 @@ export function consolidateInventoryDuplicates(input: {
   }
 
   let mergedNomenclature = 0;
-  const nomenclature: JsonRecord[] = [];
+  const nomenclature: JsonRecord[] = services;
   for (const [canonicalKey, values] of nomenclatureGroups) {
     const latest = latestRecord(values);
     const classification = classificationRecord(values);
@@ -2792,6 +2796,27 @@ function purchaseStockTarget(assortment: unknown, item: JsonRecord, venueId: unk
   return { key, unit, name: text(linked[0].name, text(item.name), 240) };
 }
 
+/** Explicit non-stock links must never be regenerated from invoice units/names. */
+function purchaseServiceTarget(assortment: unknown, item: JsonRecord, venueId: unknown):
+  { key: string; id: string } | { error: string } | null {
+  const references = [...new Set([item.purchaseProductKey, item.productKey, item.canonicalProductKey,
+    item.nomenclatureId, item.nomenclatureItemId].map(value => text(value, "", 300)).filter(Boolean))];
+  if (!references.length) return null;
+  const products = array(record(assortment).nomenclature).map(record).filter(product =>
+    product.venueId == null || number(product.venueId) === number(venueId));
+  const matches = references.map(reference => products.filter(product =>
+    [product.id, product.key, product.productKey].includes(reference)));
+  const keys = new Set(matches.flat().map(product => text(product.productKey ?? product.key, "", 300)));
+  if (matches.some(values => values.length !== 1) || keys.size !== 1 || keys.has("")
+    || products.filter(product => keys.has(text(product.productKey ?? product.key, "", 300))).length !== 1
+    || matches.flat().some(product => product.key && product.productKey && product.key !== product.productKey)
+    || matches.flat().some(product => product.kind !== "service" || product.active === false
+      || product.archived === true || product.status === "archived")) {
+    return { error: "Не удалось подтвердить выбранную услугу. Сопоставьте строку заново." };
+  }
+  return { key: [...keys][0], id: text(matches[0][0].id, [...keys][0], 300) };
+}
+
 export function applyPurchaseToInventory(input: {
   assortment: unknown;
   document: unknown;
@@ -2801,6 +2826,7 @@ export function applyPurchaseToInventory(input: {
 }): {
   assortment: JsonRecord;
   movements: StockMovement[];
+  serviceLinks?: Record<string, { key: string; id: string }>;
   summary: InventoryUpdateSummary;
 } {
   const now = input.now ?? new Date().toISOString();
@@ -2834,10 +2860,16 @@ export function applyPurchaseToInventory(input: {
     assortment: structuredClone(record(input.assortment)), movements: [],
     summary: { postedLines: 0, movementCount: 0, linkedIngredients: 0, currencyConflicts: 0, unresolvedLines: kindConflicts },
   };
+  const serviceTargets = new Map<number, { key: string; id: string }>();
   const explicitTargets = new Map<number, Exclude<ReturnType<typeof purchaseStockTarget>, { error: string } | null>>();
   const identityConflicts = array(document.items).flatMap((value, index) => {
     const item = record(value);
-    if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) return [];
+    if (!PURCHASE_STOCK_CATEGORIES.has(text(item.category, "products", 80))) {
+      const target = purchaseServiceTarget(input.assortment, item, document.venueId);
+      if (target && "error" in target) return [{ id: sourceLineId(item, index), name: text(item.name), reason: target.error }];
+      if (target) serviceTargets.set(index, target);
+      return [];
+    }
     const target = purchaseStockTarget(input.assortment, item, document.venueId);
     if (target && "error" in target) return [{ id: sourceLineId(item, index), name: text(item.name), reason: target.error }];
     if (target) explicitTargets.set(index, target);
@@ -2878,11 +2910,26 @@ export function applyPurchaseToInventory(input: {
   let canonicalItemsReused = 0;
   let sourceMappingsNeedingReview = 0;
   let identityValidationFailed = false;
+  const serviceLinks: Record<string, { key: string; id: string }> = {};
 
   array(document.items).forEach((value, index) => {
     const item = record(value);
     const itemId = sourceLineId(item, index);
     const sourceName = text(item.name, `Позиция ${index + 1}`);
+    const serviceTarget = serviceTargets.get(index);
+    if (serviceTarget) {
+      const existing = nomenclatureByKey.get(serviceTarget.key)!;
+      const resolution = resolveCanonicalPurchaseItem({ assortment: { ...parts.root, supplierProductMappings },
+        document, item: { ...item, purchaseProductKey: serviceTarget.key }, canonicalItems: nomenclature, now });
+      supplierProductMappings = upsertSupplierProductMapping(supplierProductMappings,
+        { ...resolution.sourceMapping, canonicalProductKey: serviceTarget.key });
+      sourceMappingsUpserted += 1;
+      canonicalItemsReused += 1;
+      // Keep the service's identity, classification and unit; the invoice has its own label/unit.
+      Object.assign(existing, { lastPurchaseAt: date, updatedAt: now });
+      serviceLinks[itemId] = serviceTarget;
+      return;
+    }
     let received = purchaseLineBaseAmount(item);
     let explicitTarget = explicitTargets.get(index);
     const canonicalResolution = resolveCanonicalPurchaseItem({
@@ -3243,6 +3290,7 @@ export function applyPurchaseToInventory(input: {
   return {
     assortment: parts.root,
     movements,
+    serviceLinks,
     summary: {
       postedLines: movements.length,
       movementCount: movements.length,

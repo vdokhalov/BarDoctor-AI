@@ -525,6 +525,8 @@ async function postOnce(request: Request): Promise<Response> {
     confirmedDocument = {
       ...confirmedDocument,
       items: confirmedDocument.items.map((item) => {
+        const service = inventory.serviceLinks?.[String(item.id)];
+        if (service) return { ...item, purchaseProductKey: service.key, canonicalProductKey: service.key, nomenclatureId: service.id };
         const productKey = resolvedProductByLine.get(String(item.id));
         return productKey
           ? { ...item, purchaseProductKey: productKey, canonicalProductKey: productKey }
