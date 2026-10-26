@@ -47,8 +47,9 @@ const captureFields = [
 
 export function monthlyHelperBlock(domainSource) {
   // Browser calculations cannot consume server-local verification capabilities.
-  // Strip only this named adapter; all other imports remain a build error.
+  // Strip only the named server adapters; all other imports remain a build error.
   const normalized = domainSource.replace(/\r\n/g, "\n")
+    .replace("import {enrichmentForBatch} from './cost-enrichment';", "function enrichmentForBatch(){return null;}")
     .replace("import {periodCostProof} from './financial-period-proof';", "function periodCostProof(){return undefined;}");
   if (/^\s*import\b/m.test(normalized)) throw new Error("Phase 7: browser financial model must be import-free");
   let domain = stripTypeScriptTypes(normalized).replace(/\bexport\s+/g, "")

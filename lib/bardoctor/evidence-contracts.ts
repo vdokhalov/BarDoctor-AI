@@ -67,6 +67,7 @@ type FactBase = EvidenceScope & {
 };
 export type CapturedCostStatus = "KNOWN" | "UNKNOWN" | "PARTIAL" | "NONE";
 export type CapturedSaleCost = {
+  supplementalCost?: {cost:number;enrichmentId:string;calculatedAt:string;method:"receipt_before_sale"}|null;
   saleId: string; saleLineId: string | null; menuItemId: string | null;
   quantity: number | null; capturedUnitCost: number | null; capturedTotalCost: number | null;
   costStatus: CapturedCostStatus; canonicalBatchCostStatus: "FULL" | "PARTIAL" | "UNVALUED" | null;

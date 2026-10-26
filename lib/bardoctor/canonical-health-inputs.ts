@@ -1,3 +1,4 @@
+import {readCostEnrichmentState} from './cost-enrichment-storage';
 import {continueFinancialRead,financialReadExists,FinancialReadPending,financialReadAccessGuard} from './financial-read-progress';
 import {accountingCurrencyFromProfile} from './currency';
 import { journalMonth } from './journal-period';
@@ -130,6 +131,13 @@ export async function loadCanonicalHealthInputs(account: AuthenticatedAccount, a
     financeCostProof=undefined;
     for(const key of ['bd_sales_events_v1','bd_stock_movements'])financeStores.set(key,{data:null,sourceState:'PARTIAL',updatedAt:stores.get(key)?.updatedAt??''});
    }
+  }
+  if(!financeCostProof && canReadVenueSource(sourceAccess,'bd_sales_cost_enrichments_v1')) {
+    const eventData=financeStores.get('bd_sales_events_v1')?.data ?? stores.get('bd_sales_events_v1')?.data;
+    if(Array.isArray(eventData)){
+      const data=await readCostEnrichmentState(database,scope,eventData,{ledger:snapshots.find(s=>s.key==='bd_sales_cost_enrichments_v1')?.dataJson??null,documents:snapshots.find(s=>s.key==='bd_purchase_documents')?.dataJson??null,stock:snapshots.find(s=>s.key==='bd_stock_movements')?.dataJson??null});
+      financeStores.set('bd_sales_cost_enrichments_v1',{data,sourceState:'AVAILABLE',updatedAt:stores.get('bd_sales_cost_enrichments_v1')?.updatedAt??''});
+    }
   }
   // Server-only projection used before atomic workday close. Persisted source
   // snapshots remain unchanged and are CAS-checked together with the close.

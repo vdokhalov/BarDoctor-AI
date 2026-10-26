@@ -1,3 +1,6 @@
+import { authenticatedEvidenceContext } from "../../../lib/bardoctor/evidence-resolver";
+import { readCostEnrichmentState } from "../../../lib/bardoctor/cost-enrichment-storage";
+import { enrichmentForBatch } from "../../../lib/bardoctor/cost-enrichment";
 import { SALES_ACCOUNTING_KEY, parseSalesAccounting, salesModeForDate } from "../../../lib/bardoctor/sales-accounting";
 import {readSalesEvents} from '../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory,readSaleStock,stockStoreStatements,stockMovementResponse} from "../../../lib/bardoctor/stock-storage";
@@ -245,20 +248,24 @@ function responsePayload(stores: Awaited<ReturnType<typeof readStores>>, venueId
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const account = await authenticateRequest(request);
+  const context = await authenticatedEvidenceContext(request);
+  const account = context?.account;
   if (!account) return unauthorized();
   if (account.role === "cashier") return Response.json({ok:false,code:"ACCESS_DENIED",error:"Используйте кассу для продаж и своих чеков."},{status:403});
   if (!hasPermission(account, "sales.view")) {
     return Response.json({ ok: false, code: "ACCESS_DENIED", error: "Нет права просматривать продажи" }, { status: 403 });
   }
   const stores = await readStores(getD1(), account.id);
+  const overlays = await readCostEnrichmentState(getD1(),{venueId:account.venueId,workspaceId:context!.workspaceId,dataAccountId:account.id},stores.events);
+  const present = (batch:any) => ({...batch,costEnrichment:enrichmentForBatch(batch,overlays,account.venueId,String(batch.currency??accountingCurrencyFromRestaurantJson(account.restaurantJson))) });
   const id = text(new URL(request.url).searchParams.get("id"), "", 160);
   if (id) {
     const batch = salesEventDocuments(stores.events, account.venueId).find(item => item.id === id) ?? salesBatches(stores.batches, account.venueId).find((item) => item.id === id);
     if (!batch) return Response.json({ ok: false, code: "SALES_BATCH_NOT_FOUND", error: "Документ не найден или относится к другому заведению" }, { status: 404 });
-    return Response.json({ ok: true, serverNow:new Date().toISOString(), ...venueTimeFromJson(account.restaurantJson), batch, venueId: account.venueId }, { headers: { "Cache-Control": "private, no-store" } });
+    return Response.json({ ok: true, serverNow:new Date().toISOString(), ...venueTimeFromJson(account.restaurantJson), batch:present(batch), venueId: account.venueId }, { headers: { "Cache-Control": "private, no-store" } });
   }
-  return Response.json({serverNow:new Date().toISOString(),...venueTimeFromJson(account.restaurantJson),...responsePayload(stores, account.venueId, account.permissions),currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)}, { headers: { "Cache-Control": "private, no-store" } });
+  const payload=responsePayload(stores, account.venueId, account.permissions);
+  return Response.json({serverNow:new Date().toISOString(),...venueTimeFromJson(account.restaurantJson),...payload,batches:payload.batches.map(present),capabilities:{...payload.capabilities,enrichCost:["owner","manager"].includes(account.role)&&["finance.manage","sales.view","shifts.view","inventory.view"].every(p=>hasPermission(account,p as any))},currency:accountingCurrencyFromRestaurantJson(account.restaurantJson)}, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 async function postOnce(request: Request): Promise<Response> {

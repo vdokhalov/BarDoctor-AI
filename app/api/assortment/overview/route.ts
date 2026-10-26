@@ -1,3 +1,4 @@
+import {readCostEnrichmentState} from '../../../../lib/bardoctor/cost-enrichment-storage';
 import {readSalesEvents} from '../../../../lib/bardoctor/sales-event-storage';
 import {readStockHistory} from "../../../../lib/bardoctor/stock-storage";
 import { authenticatedEvidenceContext } from "../../../../lib/bardoctor/evidence-resolver";
@@ -69,11 +70,14 @@ export async function GET(request: Request): Promise<Response> {
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
     venueId: account.venueId,
   });
+  const salesEvents = await readSalesEvents(getD1(),account.id,stores.get("bd_sales_events_v1"));
+  const costEnrichments=await readCostEnrichmentState(getD1(),{venueId:account.venueId,workspaceId:context!.workspaceId,dataAccountId:account.id},salesEvents);
   const analytics = buildAssortmentAnalytics({
+    costEnrichments,
     assortment: reconciliation.assortment,
     purchaseDocuments: values(stores.get("bd_purchase_documents")),
     stockMovements: await readStockHistory(getD1(),account.id,stores.get("bd_stock_movements")),
-    salesEvents: await readSalesEvents(getD1(),account.id,stores.get("bd_sales_events_v1")),
+    salesEvents,
     salesDocuments: values(stores.get("bd_sales_documents")),
     salesBatches: values(stores.get("bd_sales_batches")),
     financeRevenue: values(stores.get("bd_finance_revenue")),

@@ -1,3 +1,4 @@
+import {enrichmentForBatch} from './cost-enrichment';
 import { consumableNeeds } from './consumable-needs';
 import { derivedInputBelongs } from "./derived-input-scope";
 import { capturedBatchCost } from "./financial-reconciliation";
@@ -628,6 +629,7 @@ export function buildAssortmentAnalytics(input: {
   purchaseDocuments?: unknown[];
   stockMovements?: unknown[];
   salesEvents?: unknown[];
+  costEnrichments?: unknown[];
   salesDocuments?: unknown[];
   salesBatches?: unknown[];
   financeRevenue?: unknown[];
@@ -777,7 +779,8 @@ export function buildAssortmentAnalytics(input: {
       if (grossSales === null) metric.revenueComplete = false;
       else metric.revenue += grossSales;
       const postedLine = batchLinesById.get(text(line.id));
-      const captured = postedLine && batch?.salesEventId ? capturedBatchCost({ ...batch, lines: [postedLine], costStatus: "FULL", totalTheoreticalCost: postedLine.theoreticalCost }, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null;
+      const enriched = batch?.salesEventId ? enrichmentForBatch(batch,input.costEnrichments??[],Number(batch.venueId),String(batch.currency),String(postedLine?.id)) : null;
+      const captured = enriched ?? (postedLine && batch?.salesEventId ? capturedBatchCost({ ...batch, lines: [postedLine], costStatus: "FULL", totalTheoreticalCost: postedLine.theoreticalCost }, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null);
       const historicalCost = captured ? captured.known ? captured.cost : null : postedLine ? nonNegative(postedLine.theoreticalCost) : null;
       if (!postedLine || !["POSTED", "REVERSED"].includes(text(postedLine.processingStatus)) || historicalCost === null) {
         metric.historicalCostComplete = false;
@@ -1231,7 +1234,7 @@ export function buildAssortmentAnalytics(input: {
   let unresolvedSalesLines = 0;
   for (const document of currentSales) {
     const batch = salesBatches.get(text(document.salesBatchId));
-    const captured = batch?.salesEventId ? capturedBatchCost(batch, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null;
+    const captured = batch?.salesEventId ? enrichmentForBatch(batch,input.costEnrichments??[],Number(batch.venueId),String(batch.currency)) ?? capturedBatchCost(batch, Number(batch.venueId), String(batch.businessDate), String(batch.currency)) : null;
     const batchCost = captured ? captured.known ? captured.cost : null : batch ? nonNegative(batch.totalTheoreticalCost) : null;
     if (!batch || batchCost === null || text(batch.costStatus) !== "FULL") {
       salesCostComplete = false;

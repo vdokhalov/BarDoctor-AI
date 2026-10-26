@@ -3441,7 +3441,8 @@ function bdSalaryEmployeePage(){const[,e]=bt(),[,t]=$f("/salaries/:id"),bdSalary
 const bdBuildMonthlyReportBeforePayroll=bdBuildMonthlyReport;
 bdBuildMonthlyReport=function(e,t,n,r,a,s,l=[]){const u=bdBuildMonthlyReportBeforePayroll(e,t,n,r,a,s,l),d=bdPayrollEntriesForVenue(e,bdPayrollArrayStore()).filter(M=>M.date.slice(0,7)===t),f=bdPayrollEntryTotals(d),m=n.filter(M=>M.date.slice(0,7)===t).reduce((M,D)=>M+(Number(D.payrollBreakdown?.total??D.payrollBreakdown?.totalPayroll)||0),0),h=r.filter(M=>M.date.slice(0,7)===t&&M.category==="payroll").reduce((M,D)=>M+(Number(D.amount)||0),0),g=m>0?m:h,y=g+f.bonus,j=y-f.deductions,v=j-f.paid,b=y-u.payroll,N=u.operatingResult===null?null:u.operatingResult-b,E=u.resultBeforeCost==null?null:u.resultBeforeCost-b,G=u.cashResult==null?null:u.cashResult-b,_=u.shiftEstimates.map(M=>{const D=n.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)),L=d.filter(z=>z.date.slice(0,10)===M.date.slice(0,10)&&z.type==="bonus").reduce((z,q)=>z+(Number(q.amount)||0),0),q=m>0?D.reduce((z,q)=>z+(Number(q.payrollBreakdown?.total??q.payrollBreakdown?.totalPayroll)||0),0)+L:M.payroll+L,B=q-M.payroll;return{...M,payroll:q,resultBeforeCost:M.resultBeforeCost==null?null:M.resultBeforeCost-B,estimatedResult:M.estimatedResult==null?null:M.estimatedResult-B}});return{...u,payroll:y,payrollBase:g,payrollBonuses:f.bonus,payrollDeductions:f.deductions,payrollNet:j,payrollPaid:f.paid,payrollBalance:v,payrollSource:(m>0?"По составу смен":"По внесённым расходам")+(f.bonus>0?" + премии":""),operatingResult:N,resultBeforeCost:E,cashResult:G,shiftEstimates:_}};
 /* phase7-monthly-financial-model:start */
-const bdMonthlyFinancialModelPhase7=(()=>{function periodCostProof(){return undefined;}
+const bdMonthlyFinancialModelPhase7=(()=>{function enrichmentForBatch(){return null;}
+function periodCostProof(){return undefined;}
 // Pure readers of captured financial data. Never consult today's catalogue/prices.
 
 const row = (value         )      => value && typeof value === "object" && !Array.isArray(value) ? value        : {};
@@ -3677,7 +3678,7 @@ function historicalPeriodCost(input
   if (new Set(events.map(item => item.id)).size !== events.length
     || new Set(revenues.map(item => item.id)).size !== revenues.length
     || new Set(movements.map(item => item.id)).size !== movements.length) reasons.push("DUPLICATE_FINANCIAL_HISTORY");
-  let cost = 0, adjustment = 0;
+  let cost = 0, adjustment = 0, supplementCount = 0;
   const usedBatches = new Set        ();
   const referencedBatches = new Set        ();
   const addCost = (resolved            , date        ) => {
@@ -3726,7 +3727,9 @@ function historicalPeriodCost(input
     for (const event of active) {
       if (text(row(event.batch).id)) referencedBatches.add(text(row(event.batch).id));
       if (currency(event.currency) !== expectedCurrency) { reasons.push("HISTORICAL_SALES_COST_UNKNOWN"); continue; }
-      addCost(capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
+      const supplement=enrichmentForBatch(event.batch,input.costEnrichments??[],venueId,expectedCurrency);
+      if(supplement)supplementCount++;
+      addCost(supplement ?? capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
     }
   }
   if (events.some(event => !revenues.some(revenue => revenue.id === event.revenueRowId && revenue.revenueSource === "sales_events_v1"))) {
@@ -3760,7 +3763,7 @@ function historicalPeriodCost(input
   }
   return { known: reasons.length === 0, salesCostKnown: reasons.every(reason => reason === "INVENTORY_ADJUSTMENT_COST_UNKNOWN"),
     adjustmentsKnown: !reasons.some(reason => ["INVENTORY_ADJUSTMENT_COST_UNKNOWN", "DUPLICATE_FINANCIAL_HISTORY", "ACCOUNTING_CURRENCY_UNKNOWN"].includes(reason)),
-    cost: money(cost), adjustment: money(adjustment), daily,
+    cost: money(cost), adjustment: money(adjustment), daily, supplementCount,
     reasons: [...new Set(reasons)], eventCount: events.length };
 }
 
@@ -3794,7 +3797,7 @@ function reconcileMonthlyReport(input
     + Number(report.taxes ?? 0) + Number(report.utilities ?? 0);
   const reasons = [...history.reasons, ...(!snapshotsKnown ? ["INVENTORY_BOUNDARY_COST_UNKNOWN"] : []),
     ...(Number(report.unconvertedForeignCurrencyCount ?? 0) > 0 ? ["FINANCIAL_CURRENCY_UNCONVERTED"] : [])];
-  return { ...report, openingInventory: openingValue, closingInventory: closingValue,
+  return { ...report, costSupplementCount:history.supplementCount, costSupplementNotice:history.supplementCount?"Включён дорасчёт по приходам до продажи":null, openingInventory: openingValue, closingInventory: closingValue,
     costOfGoods: known ? history.cost : null, rawCostOfGoods: known ? history.cost : null,
     grossProfit: known ? money(Number(report.revenue) - history.cost) : null,
     inventoryAdjustmentNet: history.known ? history.adjustment : null,

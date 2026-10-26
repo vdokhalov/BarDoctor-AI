@@ -34,7 +34,7 @@
     syncJournalParent();
   }
   function clearJournalContext(){
-    ++journalGeneration;state.payload=null;state.batch=null;state.pos=null;setDirty(false);if(editor.open)editor.close();if(sourceDialog.open)sourceDialog.close();editorBody.replaceChildren();document.getElementById('batch-list').replaceChildren();['journal-metrics','journal-metric-note','import-quality','import-metrics','pos-drafts'].forEach(function(id){document.getElementById(id).hidden=true;});
+    ++journalGeneration;document.getElementById('cost-enrichment')?.remove();state.payload=null;state.batch=null;state.pos=null;setDirty(false);if(editor.open)editor.close();if(sourceDialog.open)sourceDialog.close();editorBody.replaceChildren();document.getElementById('batch-list').replaceChildren();['journal-metrics','journal-metric-note','import-quality','import-metrics','pos-drafts'].forEach(function(id){document.getElementById(id).hidden=true;});
     notice('Заведение или аккаунт изменились. Обновите журнал.','error');
   }
   window.addEventListener('storage',function(e){if(['bd_active_venue_id','bd_session','bd_session_token'].includes(e.key))clearJournalContext();});
@@ -360,7 +360,8 @@
     editorBody.innerHTML = '<section class="preview-summary pos-event-summary"><div><span>Сумма продажи</span><strong>' + h(money(batch.revenue,batch.currency)) + '</strong><p class="document-payment">'+h(journal.payment(batch))+' · '+h(journal.sourceLabel(batch))+'</p></div></section>'
       + journal.metadata(batch,state.payload.shifts || [],money)
       + '<section class="sale-document-lines"><h3>Позиции</h3>'+(batch.prices || []).map(function(line){return '<article><b>' + h(line.name) + '</b><span>'+h(line.quantity)+' × '+h(money(line.unitPrice,batch.currency))+'</span><strong>'+h(money(line.total,batch.currency))+'</strong></article>';}).join('')+'</section>'
-      + '<section class="document-cost"><span>Себестоимость</span><strong>' + h(window.bdFormatSalesCost(batch,batch.currency)) + '</strong></section>'
+      + '<section class="document-cost"><span>Себестоимость</span><strong>' + h(batch.costEnrichment ? money(batch.costEnrichment.cost,batch.currency) : window.bdFormatSalesCost(batch,batch.currency)) + '</strong></section>'
+      + (batch.costEnrichment ? '<p class="journal-help">Дорасчитано по приходам до продажи · '+h(journal.date(batch.costEnrichment.calculatedAt))+'</p>' : '')
       + '<p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>' + journal.movements(batch)
       + '<details class="journal-technical"><summary>Технические реквизиты</summary><p>Продажа: '+h(batch.salesEventId || batch.id)+'</p><p>Смена: '+h(batch.shiftId || 'Без смены')+'</p></details>';
     editorFooter.innerHTML = '<span>Документ из единого журнала продаж</span>'+(batch.source!=='POS_API' && batch.status==='POSTED' && state.payload.capabilities.reverse ? '<a href="/sales-entry?event='+encodeURIComponent(batch.salesEventId)+'">Открыть действия продажи</a>' : '');
@@ -386,7 +387,7 @@
     var mappingCount = batch.lines.filter(function (line) { return line.errorCode === "NEEDS_MAPPING"; }).length;
     var noRecipeCount = batch.lines.filter(function (line) { return line.errorCode === "NO_RECIPE"; }).length;
     var readyCount = batch.readyLineCount + batch.postedLineCount;
-    editorBody.innerHTML = journal.metadata(batch,state.payload.shifts || [],money)+'<p>Себестоимость: '+h(window.bdFormatSalesCost(batch,batch.currency))+'</p><p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>'+journal.movements(batch)+'<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.slice().sort(function(a,b){return Number(b.processingStatus==='BLOCKED')-Number(a.processingStatus==='BLOCKED');}).map(function (line) {
+    editorBody.innerHTML = journal.metadata(batch,state.payload.shifts || [],money)+'<p>Себестоимость: '+h(batch.costEnrichment ? money(batch.costEnrichment.cost,batch.currency) : window.bdFormatSalesCost(batch,batch.currency))+'</p><p>Комментарий: '+h(batch.comment || 'Не указан')+'</p>'+journal.movements(batch)+'<section class="preview-summary"><div><strong>' + batch.lines.length + '</strong><span>распознано</span></div><div class="positive"><strong>' + readyCount + '</strong><span>готовы</span></div><div class="warning"><strong>' + mappingCount + '</strong><span>требуют сопоставления</span></div><div class="danger"><strong>' + noRecipeCount + '</strong><span>без техкарты</span></div></section>' + (batch.blockedLineCount ? '<div class="partial-warning"><b>' + readyCount + ' из ' + batch.lines.length + ' позиций готовы к отражению.</b><span>' + batch.blockedLineCount + ' требуют исправления — документ не будет показан как полностью проведённый.</span></div>' : "") + '<div class="preview-table"><div class="preview-head"><span>Позиция</span><span>Кол-во</span><span>Статус</span></div>' + batch.lines.slice().sort(function(a,b){return Number(b.processingStatus==='BLOCKED')-Number(a.processingStatus==='BLOCKED');}).map(function (line) {
       var lineStatus = lineState(line); var selected = line.menuItemId || line.suggestedMenuItemId || "";
       var mapping = line.processingStatus === "BLOCKED" && line.errorCode === "NEEDS_MAPPING" && canMap ? '<label class="mapping-select">Сопоставить<select data-map-line="' + h(line.id) + '" data-raw-name="' + h(line.rawName) + '"><option value="">Выберите позицию</option>' + menu.map(function (item) { return '<option value="' + h(item.id) + '"' + (item.id === selected ? " selected" : "") + '>' + h(item.name) + '</option>'; }).join("") + '</select></label>' : '<b>' + h((line.recipeSnapshot && line.recipeSnapshot.menuItem.name) || (menu.find(function (item) { return item.id === line.menuItemId; }) || {}).name || "Не сопоставлено") + '</b>';
       var details = line.recipeSnapshot ? line.recipeSnapshot.ingredients.map(function (item) { return h(item.name + " · " + item.baseQuantityTotal + " " + unitLabel(item.baseUnit)); }).join(" · ") : "";
@@ -523,6 +524,22 @@
     document.getElementById('journal-average').textContent=k.average===null?'—':money(k.average,state.payload?.currency).replace(/\u00a0/g,' ');
     document.getElementById('journal-metric-note').textContent=(filters.from || filters.to ? 'Период: '+(filters.from?journal.businessDate({businessDate:filters.from}):'с начала учёта')+' — '+(filters.to?journal.businessDate({businessDate:filters.to}):'по сегодня') : 'За всё время')+' · POS и ручной ввод. Импорт без выручки не включён: '+k.imports+'.';
     renderBatches(batches);
+    var panel=document.getElementById('cost-enrichment');
+    if(!panel){panel=document.createElement('div');panel.id='cost-enrichment';panel.className='journal-help cost-enrichment';document.getElementById('batch-list').before(panel);}
+    var months=[...new Set(batches.filter(function(b){return b.readOnly&&b.status==='POSTED'&&b.costStatus!=='FULL'&&!b.costEnrichment;}).map(function(b){return b.businessDate.slice(0,7);} ))].sort().reverse();
+    panel.hidden=!state.payload?.capabilities?.enrichCost||!months.length;
+    panel.innerHTML='<label>Неизвестная себестоимость · <select id="cost-month" aria-label="Месяц дорасчёта">'+months.map(function(m){return '<option>'+h(m)+'</option>';}).join('')+'</select></label> <button type="button" class="primary" id="enrich-cost">Дорасчитать за месяц</button><p>По приходам, подтверждённым до продажи. Чеки и списания не изменятся.</p>';
+    document.getElementById('enrich-cost').onclick=function(){
+      if(state.busy||journalIdentity()!==initialJournalIdentity)return;
+      var month=document.getElementById('cost-month').value;
+      if(!confirm('Дорасчитать неизвестную себестоимость за '+month+' по сохранённым приходам?'))return;
+      setBusy(true,'Дорасчитываем себестоимость…');
+      request('/api/sales-cost-enrichment',{method:'POST',body:JSON.stringify({action:'enrich_unknown',venueId:Number(state.payload.venueId),month:month})}).then(function(result){
+        if(journalIdentity()!==initialJournalIdentity)return;
+        return load().then(function(){notice(result.updated?'Дорасчитано чеков: '+result.updated+'. Остальные без изменений.':'Новых подтверждённых сумм нет. Неизвестные суммы оставлены без изменений.','info');});
+      }).catch(function(error){if(journalIdentity()===initialJournalIdentity)notice(error.message,'error');}).finally(function(){setBusy(false);});
+    };
+
   }
   function renderJournalOptions() {
     var batches=state.payload.batches || [], shifts=state.payload.shifts || [];

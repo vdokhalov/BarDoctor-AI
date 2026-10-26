@@ -39,3 +39,6 @@ body.sales-entry-shell{padding-top:var(--bd-safe-top,0px)!important}.sales-entry
 
 /* Draft restoration and issue status keep the same command/header geometry. */
 @media(max-width:767px){.journal-primary{min-height:calc(2 * 13px * 1.5 + 16px);overflow-anchor:none}.journal-primary #pos-drafts .journal-resume{line-height:1.5;padding:8px 16px;min-height:calc(2 * 13px * 1.5 + 16px)}.journal-resume-label{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#import-quality.has-issues .section-heading{padding-bottom:15px}}
+
+/* Explicit supplemental costing; existing journal, no new editor. */
+.cost-enrichment{margin:12px;padding:14px;background:var(--sales-soft,#f5f6fb);border-radius:14px;display:grid;gap:10px}.cost-enrichment[hidden]{display:none}.cost-enrichment label{display:grid;gap:6px}.cost-enrichment select{width:100%;min-width:0}.cost-enrichment p{margin:0;line-height:1.5}.cost-enrichment .primary{width:100%;white-space:normal}

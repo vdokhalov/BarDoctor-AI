@@ -12,7 +12,7 @@ import { venueDate, venueTimeFromJson } from './venue-time';
 export type CurrentCostSourceStates = Partial<Record<"bd_sales_events_v1" | "bd_stock_movements" | "bd_sales_documents" | "bd_sales_batches" | "bd_sales_reconciliations_v1", "AVAILABLE" | "ABSENT" | "UNAVAILABLE">>;
 
 /** Recorded current-period result, never purchases-as-COGS or a closed-month profit. */
-export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; purchases?: unknown[]; purchasesAvailable?: boolean; payrollEstimateSources?: {employees: unknown[]; rules: unknown[]; gaps: unknown[]}; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
+export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; purchases?: unknown[]; purchasesAvailable?: boolean; payrollEstimateSources?: {employees: unknown[]; rules: unknown[]; gaps: unknown[]}; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costEnrichments?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
  const endDate = venueDate(input.asOf, venueTimeFromJson(JSON.stringify(input.profile)).timezone);
  const startDate = endDate.slice(0,7)+'-01';
  const purchasePayment = (x:Record<string,unknown>) => x.category==='inventory' || x.source==='purchase_payment' || x.source==='purchase_document' || x.paymentKind==='supplier_payment';
@@ -31,7 +31,7 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const throughDate = (values:unknown[] = []) => scopedBusinessRows(values,{venueId:input.venueId,workspaceId:input.workspaceId,dataAccountId:input.dataAccountId}).filter(x=>{
   const date=String(x.businessDate??x.date??'').slice(0,10);return date>=startDate&&date<=endDate;
  });
- const history=periodCostProof(input.costProof,endDate.slice(0,7))??historicalPeriodCost({venueId:input.venueId,monthKey:endDate.slice(0,7),accountingCurrency:input.currency??'',revenues:value.revenueRows,events:throughDate(input.events),documents:throughDate(input.documents),movements:throughDate(input.movements),batches:throughDate(input.batches),reconciliations:throughDate(input.reconciliations)});
+ const history=periodCostProof(input.costProof,endDate.slice(0,7))??historicalPeriodCost({venueId:input.venueId,monthKey:endDate.slice(0,7),accountingCurrency:input.currency??'',revenues:value.revenueRows,events:throughDate(input.events),documents:throughDate(input.documents),movements:throughDate(input.movements),batches:throughDate(input.batches),reconciliations:throughDate(input.reconciliations),costEnrichments:input.costEnrichments});
  // A confirmed absent unused channel is empty, not a failed/truncated read.
  // Stock history remains required to establish whether adjustments exist.
  const required = new Set<string>(["bd_stock_movements"]);
@@ -96,9 +96,9 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  return {...value,startDate,endDate,missing,missingPayrollDates,knownPayrollSubtotal,resultBeforeCost,
   provisionalPayroll,estimatedPayrollSubtotal,estimatedPayrollDays,provisionalResultBeforeCost,provisionalResultAfterCost,provisionalExplanation,
   result:resultBeforeCost,preliminaryResult:resultBeforeCost,financeInputsKnown:missing.length===0,
-  currentFinance:true,asOfDate:endDate,operatingResult:null,isClosed:false,
+  costSupplementCount:history.supplementCount,currentFinance:true,asOfDate:endDate,operatingResult:null,isClosed:false,
   resultAfterCost,costBasis:value.revenueRows.some(x=>[1,2].includes(Number(x.manualTotalsVersion)))?value.revenueRows.every(x=>[1,2].includes(Number(x.manualTotalsVersion)))?"OWNER_DECLARED":"MIXED":"CAPTURED",costOfGoods:costKnown?history.cost:null,inventoryAdjustmentNet:adjustmentsKnown?history.adjustment:null,financeAssessmentMissing,costReasons:[...history.reasons,...(!sourcesKnown?["COST_SOURCE_UNAVAILABLE"]:[])],
-  financeAssessmentInformation:[...missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
+  financeAssessmentInformation:[...(history.supplementCount?["Включён дорасчёт по приходам до продажи."]:[]),...missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
   serviceAccruals:accrual.accruals, serviceAccrualIssues:accrual.issues, purchasePayments,cashResult:resultBeforeCost!=null&&purchasePayments!=null&&accrual.nonCashDelta!=null?Math.round((resultBeforeCost+accrual.nonCashDelta-purchasePayments)*100)/100:null,
   missingInformation:missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),
   resultExplanation:'Выручка − учтённые расходы − начисленный ФОТ. Без себестоимости товара и ещё не внесённых начислений; это не чистая прибыль.',

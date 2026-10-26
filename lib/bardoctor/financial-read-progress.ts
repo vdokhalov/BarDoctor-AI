@@ -1,3 +1,5 @@
+import {readCostEnrichmentState} from './cost-enrichment-storage';
+import {enrichmentForBatch} from './cost-enrichment';
 import {resolveAccountingMoney} from './accounting-money';
 /** Resumable verification of captured journals, not an accounting ledger.
  * Each call verifies at most one bounded journal page. Intermediate rows never
@@ -28,7 +30,7 @@ function boundary(db:D1Database,input:FinancialReadInput){const s=input.scope;re
 function guard(db:D1Database,job:Job){return db.prepare(`INSERT INTO domain_data(account_id,store_key,data_json) SELECT 0,'__financial_read_progress_guard__',NULL WHERE NOT EXISTS(SELECT 1 FROM financial_read_jobs WHERE id=? AND revision=? AND phase=? AND cursor IS ?)`).bind(job.id,job.revision,job.phase,job.cursor);}
 function selected(input:FinancialReadInput,values:Row[]){return values.filter(value=>belongsToJournalPeriod(value.businessDate??value.date,input.period));}
 
-const SOURCE_KEYS=['bd_finance_revenue','bd_operational_reports_v1','bd_sales_events_v1','bd_sales_documents','bd_sales_batches','bd_sales_reconciliations_v1','bd_stock_movements','bd_inventory_snapshots','bd_finance_expenses','bd_payroll_entries','bd_purchase_documents','bd_finance_settings','bd_finance_gap_reasons','bd_inventory_writeoffs','bd_opening_stock_v1'];
+const SOURCE_KEYS=['bd_sales_cost_enrichments_v1','bd_finance_revenue','bd_operational_reports_v1','bd_sales_events_v1','bd_sales_documents','bd_sales_batches','bd_sales_reconciliations_v1','bd_stock_movements','bd_inventory_snapshots','bd_finance_expenses','bd_payroll_entries','bd_purchase_documents','bd_finance_settings','bd_finance_gap_reasons','bd_inventory_writeoffs','bd_opening_stock_v1'];
 function normalizedInput(input:FinancialReadInput):FinancialReadInput{return {...input,snapshots:SOURCE_KEYS.map(key=>input.snapshots.find(s=>s.key===key)??{key,dataJson:null,updatedAt:null})};}
 async function sourceId(input:FinancialReadInput){return hash(stableSalesValue({scope:input.scope,period:input.period,currency:input.currency,profile:input.profileJson,snapshots:input.snapshots}));}
 export async function financialReadExists(db:D1Database,input:FinancialReadInput){return Boolean(await db.prepare('SELECT id FROM financial_read_jobs WHERE id=? AND account_id=? AND venue_id=?').bind(await sourceId(normalizedInput(input)),input.scope.dataAccountId,input.scope.venueId).first());}
@@ -92,16 +94,17 @@ async function advanceFinancialReadOnce(db:D1Database,input:FinancialReadInput){
   const revenues=selected(input,records(input.stores.bd_finance_revenue));
   const existing=(await db.prepare("SELECT DISTINCT batch_id FROM financial_read_events WHERE job_id=? AND linked=1 AND status='POSTED' AND cost IS NOT NULL AND batch_id IN (SELECT value FROM json_each(?))").bind(id,JSON.stringify(page.items.map(e=>e.batch.id))).all<{batch_id:string}>()).results;
   const seen=new Set(existing.map(e=>e.batch_id));
+  const enrichments=await readCostEnrichmentState(db,scope,page.items,{ledger:raw('bd_sales_cost_enrichments_v1')??null,documents:raw('bd_purchase_documents')??null,stock:raw('bd_stock_movements')??null});
   for(const event of page.items){
    const e=event as unknown as Row;required(derivedInputBelongs(e,scope));
-   const cost=e.status==='POSTED'?currency(e.currency)!==currency(input.currency)?{known:false,cost:null,reason:'HISTORICAL_SALES_COST_UNKNOWN'}:capturedBatchCost(e.batch,scope.venueId,e.businessDate,input.currency):{known:true,cost:0};
+   const cost=e.status==='POSTED'?currency(e.currency)!==currency(input.currency)?{known:false,cost:null,reason:'HISTORICAL_SALES_COST_UNKNOWN'}:(enrichmentForBatch(e.batch,enrichments,scope.venueId,input.currency)??capturedBatchCost(e.batch,scope.venueId,e.businessDate,input.currency)):{known:true,cost:0};
    const linked=revenues.some(r=>r.id===e.revenueRowId&&r.revenueSource==='sales_events_v1');
    accumulateEvent(aggregate,e,input.currency);
    if(!linked)note('SALES_REVENUE_HISTORY_MISMATCH');
    if(linked&&e.status==='POSTED'){
     if(!cost.known)note('reason' in cost?String(cost.reason):'HISTORICAL_SALES_COST_UNKNOWN');
     else if(seen.has(String(e.batch.id))||legacy.used.has(String(e.batch.id)))note('SALES_BATCH_REFERENCED_TWICE');
-    else {aggregate.costRows[e.businessDate]=(aggregate.costRows[e.businessDate]??0)+Number(cost.cost);seen.add(String(e.batch.id));}
+    else {if('enrichmentId' in cost)aggregate.supplementCount=(aggregate.supplementCount??0)+1;aggregate.costRows[e.businessDate]=(aggregate.costRows[e.businessDate]??0)+Number(cost.cost);seen.add(String(e.batch.id));}
    }
    writes.push(db.prepare(`INSERT INTO financial_read_events(job_id,event_id,batch_id,revenue_id,business_date,status,currency,source,revenue,accounting_revenue,cost,cost_reason,linked,accepted_at,payments_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(id,e.id,String(row(e.batch).id??''),e.revenueRowId,e.businessDate,e.status,e.currency??null,e.source??null,finite(e.revenue),resolveAccountingMoney({value:e,originalAmount:e.revenue,originalCurrency:e.currency??input.currency,accountingCurrency:input.currency})?.accountingAmount??null,cost.known?cost.cost:null,'reason' in cost?cost.reason:null,linked?1:0,e.acceptedAt??null,JSON.stringify(records(e.payments))));
   }
@@ -165,7 +168,7 @@ async function finishFinancialRead(db:D1Database,input:FinancialReadInput,job:Jo
  for(const r of costRows){cost+=Number(r.cost??0);(daily[r.business_date]??={cost:0,adjustment:0}).cost+=Number(r.cost??0);}
  for(const r of adjustments){if(!r.known)reasons.add('INVENTORY_ADJUSTMENT_COST_UNKNOWN');adjustment+=r.amount;(daily[r.business_date]??={cost:0,adjustment:0}).adjustment+=r.amount;}
  const list=[...reasons];
- const history={known:!list.length,salesCostKnown:list.every(r=>r==='INVENTORY_ADJUSTMENT_COST_UNKNOWN'),adjustmentsKnown:!list.some(r=>['INVENTORY_ADJUSTMENT_COST_UNKNOWN','DUPLICATE_FINANCIAL_HISTORY','ACCOUNTING_CURRENCY_UNKNOWN'].includes(r)),cost:round(cost),adjustment:round(adjustment),daily,reasons:list,eventCount:summaries.reduce((n,s)=>n+s.count,0)};
+ const history={supplementCount:aggregate.supplementCount??0,known:!list.length,salesCostKnown:list.every(r=>r==='INVENTORY_ADJUSTMENT_COST_UNKNOWN'),adjustmentsKnown:!list.some(r=>['INVENTORY_ADJUSTMENT_COST_UNKNOWN','DUPLICATE_FINANCIAL_HISTORY','ACCOUNTING_CURRENCY_UNKNOWN'].includes(r)),cost:round(cost),adjustment:round(adjustment),daily,reasons:list,eventCount:summaries.reduce((n,s)=>n+s.count,0)};
  // Recheck the original source revision immediately before returning trusted
  // server-local facts. A changed marker/profile never yields stale-as-current.
  const result={summaries,history,venueId:scope.venueId,currency:cur},json=JSON.stringify(result);
@@ -200,7 +203,7 @@ function legacyReferences(input:FinancialReadInput){
  }
  return {referenced,used,reversed};
 }
-type Aggregate={day?:string;summaries:Row[];costRows:Record<string,number>;adjustments:Record<string,number>;reasons:string[]};
+type Aggregate={supplementCount?:number;day?:string;summaries:Row[];costRows:Record<string,number>;adjustments:Record<string,number>;reasons:string[]};
 function accumulateEvent(aggregate:Aggregate,e:Row,accountingCurrency:string){
  const key={revenue_id:e.revenueRowId,business_date:e.businessDate,status:e.status,currency:e.currency??null,source:e.source??null};
  let summary=aggregate.summaries.find(s=>Object.entries(key).every(([k,v])=>s[k]===v));

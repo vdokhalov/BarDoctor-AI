@@ -1,3 +1,5 @@
+import {readCostEnrichmentState} from './cost-enrichment-storage';
+import {enrichmentForBatch} from './cost-enrichment';
 import {readSalesEvents} from './sales-event-storage';
 import {stockJournalMarker} from "./stock-storage";
 import {journalSelect,journalState} from "./stock-journal";
@@ -154,6 +156,7 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
     const ids = [...originalIds, ...(Array.isArray(b.reversalMovementIds) ? b.reversalMovementIds : []), ...reversals.map(m => m.id)];
     return [...new Set(ids)].map(id => ({ id, movement: movementById(id) })).filter(x => x.movement?.row.type !== "sale_reversal" || x.movement.row.salesBatchLineId === line.id);
   };
+  const enriched=event?await readCostEnrichmentState(getD1(),{venueId:context.venueId,workspaceId:context.workspaceId,dataAccountId:context.account.id},[event]):[];
   // Bind only the selected sale's inputs, not unrelated new receipts or other sales.
   const revisionInput = (target: EvidenceReference): unknown => {
     if (target.kind === "NOMENCLATURE") return unique(nomenclature, target.id, context);
@@ -164,7 +167,7 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
     const e = unique(events, target.id, context, true);
     if (!e) return null;
     const ls = target.partId ? sourceLines(e).filter(l => l.id === target.partId && scoped(l, context)) : sourceLines(e);
-    return { event: e, inventoryVisible: inventory, ...(inventory ? {
+    return { event: e, ...(target.kind==='CAPTURED_COST'?{supplementalCost:enrichmentForBatch(obj(e.batch),enriched,context.venueId,String(e.currency),target.partId??undefined)}:{}), inventoryVisible: inventory, ...(inventory ? {
       movements: ls.flatMap(l => relatedMovements(l, e).map(x => ({ id: x.id, record: x.movement?.row ?? null, recordBasis: x.movement?.basis ?? null }))),
       currentMenu: ls.map(l => unique(menu, l.menuItemId, context)),
       currentNomenclature: ls.flatMap(l => list(obj(l.recipeSnapshot)?.ingredients).map(i => unique(nomenclature, i.nomenclatureItemId, context))),
@@ -218,6 +221,7 @@ export async function resolveCostEvidence(context: Context, reference: EvidenceR
   let projection: EvidenceProjection;
   if (reference.kind === "CAPTURED_COST") {
     projection = costProjection(event!, lines, selected);
+    projection.supplementalCost=enrichmentForBatch(obj(event!.batch),enriched,context.venueId,String(event!.currency),selected?String(selected.id):undefined);
     if (["UNKNOWN", "PARTIAL"].includes(projection.costStatus)) missing(projection.costStatus === "UNKNOWN" ? "COST_UNKNOWN" : "COST_PARTIAL");
     if (projection.costMethod === null) missing("SOURCE_METADATA_MISSING");
     for (const l of lines) {

@@ -1,3 +1,4 @@
+import {enrichmentForBatch} from './cost-enrichment';
 import {periodCostProof} from './financial-period-proof';
 // Pure readers of captured financial data. Never consult today's catalogue/prices.
 type Row = Record<string, unknown>;
@@ -217,7 +218,7 @@ export function reconciledLegacyRowCost(input: { revenue: Row; reconciliation: R
 export function historicalPeriodCost(input: {
   venueId: number; monthKey: string; accountingCurrency: string;
   revenues: unknown; events: unknown; movements: unknown;
-  documents?: unknown; batches?: unknown; reconciliations?: unknown;
+  documents?: unknown; batches?: unknown; reconciliations?: unknown; costEnrichments?: unknown[];
 }) {
   const { venueId, monthKey } = input;
   const expectedCurrency = currency(input.accountingCurrency);
@@ -234,7 +235,7 @@ export function historicalPeriodCost(input: {
   if (new Set(events.map(item => item.id)).size !== events.length
     || new Set(revenues.map(item => item.id)).size !== revenues.length
     || new Set(movements.map(item => item.id)).size !== movements.length) reasons.push("DUPLICATE_FINANCIAL_HISTORY");
-  let cost = 0, adjustment = 0;
+  let cost = 0, adjustment = 0, supplementCount = 0;
   const usedBatches = new Set<string>();
   const referencedBatches = new Set<string>();
   const addCost = (resolved: CostResult, date: string) => {
@@ -283,7 +284,9 @@ export function historicalPeriodCost(input: {
     for (const event of active) {
       if (text(row(event.batch).id)) referencedBatches.add(text(row(event.batch).id));
       if (currency(event.currency) !== expectedCurrency) { reasons.push("HISTORICAL_SALES_COST_UNKNOWN"); continue; }
-      addCost(capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
+      const supplement=enrichmentForBatch(event.batch,input.costEnrichments??[],venueId,expectedCurrency);
+      if(supplement)supplementCount++;
+      addCost(supplement ?? capturedBatchCost(event.batch, venueId, String(event.businessDate), expectedCurrency), String(event.businessDate));
     }
   }
   if (events.some(event => !revenues.some(revenue => revenue.id === event.revenueRowId && revenue.revenueSource === "sales_events_v1"))) {
@@ -317,14 +320,14 @@ export function historicalPeriodCost(input: {
   }
   return { known: reasons.length === 0, salesCostKnown: reasons.every(reason => reason === "INVENTORY_ADJUSTMENT_COST_UNKNOWN"),
     adjustmentsKnown: !reasons.some(reason => ["INVENTORY_ADJUSTMENT_COST_UNKNOWN", "DUPLICATE_FINANCIAL_HISTORY", "ACCOUNTING_CURRENCY_UNKNOWN"].includes(reason)),
-    cost: money(cost), adjustment: money(adjustment), daily,
+    cost: money(cost), adjustment: money(adjustment), daily, supplementCount,
     reasons: [...new Set(reasons)], eventCount: events.length };
 }
 
 export function reconcileMonthlyReport(input: {
   costProof?:object; report: Row; venueId: number; monthKey: string; snapshots: unknown;
   revenues: unknown; events: unknown; movements: unknown;
-  documents?: unknown; batches?: unknown; reconciliations?: unknown;
+  documents?: unknown; batches?: unknown; reconciliations?: unknown; costEnrichments?: unknown[];
 }): Row {
   const report = input.report;
   const opening = row(report.openingSnapshot), closing = row(report.closingSnapshot);
@@ -351,7 +354,7 @@ export function reconcileMonthlyReport(input: {
     + Number(report.taxes ?? 0) + Number(report.utilities ?? 0);
   const reasons = [...history.reasons, ...(!snapshotsKnown ? ["INVENTORY_BOUNDARY_COST_UNKNOWN"] : []),
     ...(Number(report.unconvertedForeignCurrencyCount ?? 0) > 0 ? ["FINANCIAL_CURRENCY_UNCONVERTED"] : [])];
-  return { ...report, openingInventory: openingValue, closingInventory: closingValue,
+  return { ...report, costSupplementCount:history.supplementCount, costSupplementNotice:history.supplementCount?"Включён дорасчёт по приходам до продажи":null, openingInventory: openingValue, closingInventory: closingValue,
     costOfGoods: known ? history.cost : null, rawCostOfGoods: known ? history.cost : null,
     grossProfit: known ? money(Number(report.revenue) - history.cost) : null,
     inventoryAdjustmentNet: history.known ? history.adjustment : null,
