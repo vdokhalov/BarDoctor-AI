@@ -5,7 +5,7 @@ Scope: local isolated fixtures only. No production writes, migration, AI, push o
 
 ## Evidence and cause
 
-The audit (Library libfile_4d5373e73cb08191a053bc4a58ab587f, pp. 4–5, 19) reports two cards after mapping a 15 MDL purchase to an existing service. The historical live IDs have not yet been independently inspected in this task.
+The audit (Library libfile_4d5373e73cb08191a053bc4a58ab587f, pp. 4–5, 19) reports two cards after mapping a 15 MDL purchase to an existing service. The parent subsequently confirmed the historical IDs using authorized native read-only navigation in venue 3394 (see exact-case verification below).
 
 A real POST /api/purchases/confirm fixture reproduces the defect: service:учебная уборка тест was explicitly selected (both nomenclatureId and purchaseProductKey), but a manual invoice retains unit/package `шт.`/`1 шт.`. applyPurchaseToInventory regenerated this selected key as stock:учебная уборка тест|pcs, created a second kind=service card, and kept the original. No stock movement and only one purchase were produced. The regression test failed with two cards before the fix.
 
@@ -40,3 +40,9 @@ Build: scripts/build-verified.sh. Build-only blank-line drift in the prepared le
 - Additional adjacent test `purchase-identity-phase7-hotfix.test.ts` has one pre-existing harness failure: `Identifier 'belongsToVenue' has already been declared` in its legacy receipt repair test. Reproduced independently in a clean a3b0c546 worktree; its other 20 tests pass. No helper fix included.
 - Existing tablet nomenclature toolbar wraps some labels at 820px; no layout changes in this task.
 - Legacy duplicate cleanup requires actual IDs and dependent links to be reviewed separately. Names alone are insufficient. No live PASS claimed.
+
+## Exact historical case (read-only evidence received after the fix)
+
+Parent confirmed original `service:учебная уборка тест 26 10` (manual, created 2026-10-25T22:21:03.023Z), duplicate `stock:учебная уборка тест 26 10|pcs` (kind=service, purchase-created 22:21:43.093Z), document `f456ec77-55ce-477d-ad18-fa0dfa98afc1`, line `42926360-21cd-4e73-bfb3-a49c1156e11f`, number УЧЕБНЫЙ-РАСХОД-15-2610. The line unit is **усл.**, not шт.; the contradictory package is **1 шт.**. Both explicit links point to the original service, while the supplier mapping points to the duplicate.
+
+Added an isolated exact-value regression through the actual confirmation route. Existing fix 72ef6e already handles this: one original card, canonical supplier mapping references the original key and exact document/line IDs, invoice unit/package preserved, service unit/package unchanged, no stock, debt 15, retry unchanged. All 14 service-identity tests passed. Production code and compiled assets were unchanged, so no repeat build was needed. This prevents recurrence; it does not repair the already-saved historical duplicate.

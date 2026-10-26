@@ -36,3 +36,42 @@ test('CAS race with another committed confirmation returns existing document',as
 test('cancel retains service ID and removes accrual without stock movement; confirm retry cannot resurrect',async()=>{const r=fixture();try{await r.send();const api=r.loadRoute(new URL('../app/api/purchases/cancel/route.ts',import.meta.url),{...purchases,...conversion,...scope,...matching,INVENTORY_SNAPSHOT_STORE_KEY:'bd_inventory_snapshots'});const response=await api.POST(new Request('http://localhost/api/purchases/cancel',{method:'POST',headers:{'Content-Type':'application/json','X-Venue-Id':'1'},body:JSON.stringify({purchaseId:r.document.id,reason:'Локальная проверка'})}));assert.equal(response.status,200,await response.text());const {serviceAccruals}=await import('../lib/bardoctor/service-accruals');assert.equal(serviceAccruals({venueId:1,currency:'MDL',startDate:'2026-10-01',endDate:'2026-10-26',purchases:r.get('bd_purchase_documents') as any[],expenses:[]}).accruals.length,0);assert.equal((await r.send()).status,200);assert.equal((r.get('bd_assortment_v1') as any).nomenclature[0].id,service.id);assert.equal((r.get('bd_stock_movements') as any[]|null)?.length??0,0);}finally{r.close()}});
 
 test('inconsistent stored service key fails closed instead of remapping or crashing',async()=>{const r=fixture();try{r.put('bd_assortment_v1',{nomenclature:[{...service,key:'conflicting-key'}],stockBalances:[]});assert.equal((await r.send()).status,422);assert.equal(r.get('bd_purchase_documents'),null);}finally{r.close()}});
+
+test('audit 3394: explicit service ID with unit усл. and contradictory package 1 шт. stays one service', async () => {
+  // Historical values copied into isolated SQLite; no access to the real venue.
+  const r = fixture();
+  try {
+    const key = 'service:учебная уборка тест 26 10';
+    const original = {...service, id:key, key, productKey:key, name:'Учебная уборка — тест 26.10',
+      source:'manual', createdAt:'2026-10-25T22:21:03.023Z'};
+    r.put('bd_assortment_v1', {nomenclature:[original], stockBalances:[]});
+    const document = {...r.document, id:'f456ec77-55ce-477d-ad18-fa0dfa98afc1',
+      documentNumber:'УЧЕБНЫЙ-РАСХОД-15-2610', items:[{...r.document.items[0],
+        id:'42926360-21cd-4e73-bfb3-a49c1156e11f', name:original.name, rawName:original.name,
+        nomenclatureId:key, purchaseProductKey:key, unit:'усл.', packageSize:'1 шт.'}]};
+    const result = await r.send(document);
+    assert.equal(result.status, 201, JSON.stringify(result.body));
+    const saved = result.body.document.items[0];
+    assert.equal(saved.unit, 'усл.');
+    assert.equal(saved.packageSize, '1 шт.', 'Keep the invoice representation; do not rewrite history');
+    assert.equal(saved.nomenclatureId, key);
+    assert.equal(saved.purchaseProductKey, key);
+    assert.equal(saved.canonicalProductKey, key);
+    const root = r.get('bd_assortment_v1') as any;
+    assert.equal(root.nomenclature.length, 1);
+    assert.equal(root.nomenclature[0].id, key);
+    assert.equal(root.nomenclature[0].unit, 'unknown');
+    assert.equal(root.nomenclature[0].packageSize, '1 усл.');
+    assert.equal(root.nomenclature[0].createdAt, original.createdAt);
+    assert.equal(root.supplierProductMappings.length, 1);
+    assert.equal(root.supplierProductMappings[0].canonicalProductKey, key);
+    assert.deepEqual(root.supplierProductMappings[0].purchaseDocumentIds, [document.id]);
+    assert.deepEqual(root.supplierProductMappings[0].purchaseLineIds, [document.items[0].id]);
+    assert.equal(root.stockBalances.length, 0);
+    assert.equal(result.body.stockMovements.length, 0);
+    assert.equal(result.body.document.balanceDue, 15);
+    assert.equal((await r.send(document)).status, 200);
+    assert.equal((r.get('bd_purchase_documents') as any[]).length, 1);
+    assert.deepEqual(r.get('bd_assortment_v1'), root, 'Retry/reload does not change IDs or supplier mapping');
+  } finally { r.close(); }
+});
