@@ -1,0 +1,16 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';import {parse} from 'acorn';
+const source=fs.readFileSync('public/assets/index-BQGspy0I.js','utf8'),ast=parse(source,{ecmaVersion:'latest',sourceType:'module'});
+const fn=name=>{const n=ast.body.find(n=>n.id?.name===name);assert.ok(n,name);return source.slice(n.start,n.end)};
+const ctx=vm.createContext({window:{},Intl,roe:new Set(),LS:d=>typeof d==='string'?d:d.toISOString().slice(0,10),bdCurrentAccountingCurrencyV243:()=> 'MDL'});
+const names=['Ym','wn','BS','ql','Gm','bdIsLinkedPurchasePaymentV188'];
+vm.runInContext(ast.body.filter(n=>n.type==='FunctionDeclaration'&&(names.includes(n.id.name)||n.id.name.startsWith('bdMonthly'))).map(n=>source.slice(n.start,n.end)).join('\n'),ctx);
+vm.runInContext(fs.readFileSync('public/accounting-currency.js','utf8'),ctx);
+const row=(revenue,receipts,date='2026-10-26',currency='MDL')=>({revenue,receipts,date,currency});
+const period=rows=>ctx.wn(rows,[],'2026-10-01','2026-10-31','MDL');
+for(const [revenue,receipts,label] of [[125,2,'62,50'],[145,3,'48,33'],[115,2,'57,50'],[0,2,'0,00'],[-15,2,'-7,50']])test(`${revenue}/${receipts} retains money precision`,()=>{const value=ctx.Ym(row(revenue,receipts));assert.equal(value,revenue/receipts);assert.equal(period([row(revenue,receipts)]).avgReceipt,value);assert.ok(ctx.window.bdFormatAccountingMoney(value,'MDL').includes(label));});
+test('period weighted by receipts, including multiple shifts on same date',()=>{const result=period([row(115,2),row(30,1)]);assert.equal(result.revenue,145);assert.equal(result.receipts,3);assert.equal(result.avgReceipt,145/3);assert.notEqual(result.avgReceipt,(57.5+30)/2);});
+test('no receipts is unavailable, not zero or infinity',()=>{for(const count of [0,undefined,null,-1])assert.equal(ctx.Ym(row(125,count)),null);assert.equal(period([]).avgReceipt,null);assert.equal(period([row(30,0)]).avgReceipt,null);});
+test('net return value retained without changing counts or source data',()=>{const rows=[row(115,2),row(-10,0)],before=JSON.stringify(rows);const p=period(rows);assert.equal(p.revenue,105);assert.equal(p.receipts,2);assert.equal(p.avgReceipt,52.5);assert.equal(JSON.stringify(rows),before);});
+test('period and currency exclusion preserved',()=>{const p=period([row(125,2),row(900,1,'2026-09-30'),row(500,1,'2026-10-26','EUR')]);assert.equal(p.revenue,125);assert.equal(p.receipts,2);assert.equal(p.avgReceipt,62.5);assert.equal(p.unconvertedForeignCurrencyCount,1);});
+test('all affected display branches no longer round to whole money',()=>{assert.ok(fn('bdFinanceKpisV160').includes('t&&e.receipts>0?e.revenue/e.receipts:null'));assert.ok(fn('bdDocumentDetailSheet').includes('Mn((Number(t.revenue)||0)/t.receipts)'));for(const code of ['MDL','PMR_RUB','RUB','EUR','USD','UAH','RON'])assert.match(ctx.window.bdFormatAccountingMoney(145/3,code),/48,33/);});
+test('rounding occurs at money presentation, not before aggregation',()=>{const p=period([row(1.01,1),row(1,1)]);assert.equal(p.avgReceipt,1.005);assert.match(ctx.window.bdFormatAccountingMoney(p.avgReceipt,'MDL'),/1,01/);});
