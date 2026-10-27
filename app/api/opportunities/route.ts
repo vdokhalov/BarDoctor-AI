@@ -187,7 +187,7 @@ async function requestRecord(request: Request, maximumBytes: number): Promise<Js
 }
 
 function publicCalendar(calendar: OpportunityCalendar | null) {
-  return calendar;
+  return calendar ? { ...calendar, events: calendar.events.map(event => ({ ...event, notificationPlan: { ...event.notificationPlan, messages: event.notificationPlan.messages.map(({ recipientAccountId: _recipient, ...message }) => message) } })) } : null;
 }
 
 function opportunityCalendarIsStale(

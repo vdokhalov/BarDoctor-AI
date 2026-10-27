@@ -147,6 +147,7 @@
     if (settings.serverConfigured === false) return "Отправка уведомлений пока не настроена";
     if (plan.status === "scheduled") return "Передано на отправку: " + Number(plan.count || 0) + ". Доставка на устройство не подтверждена.";
     if (plan.status === "queued") return "Напоминания ожидают отправки";
+    if (plan.status === "unavailable") return "Нет получателей с настроенными уведомлениями календаря";
     if (plan.status === "error") return "Не удалось запланировать напоминания";
     if (plan.status === "disabled") return "Для события напоминания не запланированы";
     if (event.decision === "dismissed") return "Для отклонённого события напоминания не нужны";

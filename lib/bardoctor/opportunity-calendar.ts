@@ -1,3 +1,4 @@
+import { calendarNotificationRecipients, calendarNotificationSource } from "./calendar-notification-recipients";
 import { runStoreCasBatch, type StoreSnapshot } from "./store-cas";
 import { and, eq } from "drizzle-orm";
 import { getDb, getD1 } from "../../db";
@@ -37,6 +38,7 @@ export type ScheduledOpportunityMessage = {
   sendAt: string;
   dedupeKey: string;
   providerMessageId: string;
+  recipientAccountId?: number;
 };
 
 export type OpportunityEvent = {
@@ -89,7 +91,7 @@ export type OpportunityEvent = {
   decision: "watching" | "planned" | "dismissed";
   decisionUpdatedAt: string | null;
   notificationPlan: {
-    status: "scheduled" | "queued" | "disabled" | "not_needed" | "error";
+    status: "scheduled" | "queued" | "disabled" | "not_needed" | "unavailable" | "error";
     count: number;
     queuedCount?: number;
     nextAt: string | null;
@@ -471,7 +473,7 @@ async function cancelEventMessages(accountId: number, event: OpportunityEvent): 
   }
 }
 
-export async function reconcileOpportunityNotifications(input: {
+async function reconcileRecipientOpportunityNotifications(input: {
   accountId: number;
   venueId?: number | null;
   origin: string;
@@ -488,14 +490,14 @@ export async function reconcileOpportunityNotifications(input: {
     const canReuse = Boolean(enabled && nextEvent && sameSignature(previousEvent, nextEvent));
     if (!canReuse) {
       await cancelEventMessages(input.accountId, previousEvent);
-      await cancelNotificationJobsForSource(input.accountId, "opportunity", previousEvent.id);
+      await cancelNotificationJobsForSource(input.accountId, "opportunity", calendarNotificationSource(input.venueId!, previousEvent.id));
     }
   }
 
   for (const event of input.next.events) {
     const signature = scheduleSignature(event);
     if (!enabled) {
-      await cancelNotificationJobsForSource(input.accountId, "opportunity", event.id, "Календарные уведомления отключены");
+      await cancelNotificationJobsForSource(input.accountId, "opportunity", calendarNotificationSource(input.venueId!, event.id), "Календарные уведомления отключены");
       event.notificationPlan = {
         status: "disabled",
         count: 0,
@@ -520,32 +522,32 @@ export async function reconcileOpportunityNotifications(input: {
       .slice(0, 3);
 
     if (!candidates.length) {
-      await cancelNotificationJobsForSource(input.accountId, "opportunity", event.id, "Для события больше не требуется напоминание");
+      await cancelNotificationJobsForSource(input.accountId, "opportunity", calendarNotificationSource(input.venueId!, event.id), "Для события больше не требуется напоминание");
       event.notificationPlan = emptyNotificationPlan(signature);
       continue;
     }
 
     const candidateRows = candidates.map((candidate) => ({
       ...candidate,
-      dedupeKey: `opportunity:${event.id}:${candidate.kind}:${candidate.sendAt.slice(0, 10)}`,
+      dedupeKey: `opportunity:venue:${input.venueId}:${event.id}:${candidate.kind}:${candidate.sendAt.slice(0, 10)}`,
     }));
     for (const candidate of candidateRows) {
       await enqueueNotificationJob({
         accountId: input.accountId,
         venueId: input.venueId,
         sourceType: "opportunity",
-        sourceId: event.id,
+        sourceId: calendarNotificationSource(input.venueId!, event.id),
         category: "calendar",
         dedupeKey: candidate.dedupeKey,
         title: notificationTitle(candidate.kind),
         message: notificationMessage(event, candidate.kind),
-        targetUrl: `/opportunities#${encodeURIComponent(event.id)}`,
+        targetUrl: `/opportunities?venue=${input.venueId}#${encodeURIComponent(event.id)}`,
         targetAt: candidate.sendAt,
         timezone: preferences.timezone,
       });
     }
-    await dispatchNotificationJobs({ origin: input.origin, accountId: input.accountId, sourceId: event.id, now: new Date(now) });
-    const jobs = await notificationJobsForSource(input.accountId, "opportunity", event.id);
+    await dispatchNotificationJobs({ origin: input.origin, accountId: input.accountId, sourceId: calendarNotificationSource(input.venueId!, event.id), now: new Date(now) });
+    const jobs = await notificationJobsForSource(input.accountId, "opportunity", calendarNotificationSource(input.venueId!, event.id));
     const candidateByKey = new Map(candidateRows.map((candidate) => [candidate.dedupeKey, candidate]));
     const activeJobs = jobs.filter((job) => candidateByKey.has(job.dedupe_key) && job.status !== "cancelled");
     const messages: ScheduledOpportunityMessage[] = activeJobs
@@ -555,6 +557,7 @@ export async function reconcileOpportunityNotifications(input: {
         sendAt: job.target_at,
         dedupeKey: job.dedupe_key,
         providerMessageId: job.provider_message_id as string,
+        recipientAccountId: input.accountId,
       }));
     const queuedJobs = activeJobs.filter((job) => ["queued", "dispatching", "failed"].includes(job.status));
     const lastError = queuedJobs.find((job) => job.last_error)?.last_error ?? "";
@@ -607,5 +610,49 @@ export async function reconcileOpportunityNotifications(input: {
     .filter((value): value is string => Boolean(value))
     .sort()[0] ?? null;
   input.next.notificationSummary = { scheduled, queued, nextAt, enabled };
+  return input.next;
+}
+
+
+/** Fan out the shared venue calendar using each member's identity and preferences. */
+export async function reconcileOpportunityNotifications(input: {
+  accountId:number; venueId?:number|null; origin:string;
+  previous:OpportunityCalendar|null; next:OpportunityCalendar;
+}):Promise<OpportunityCalendar> {
+  if (!input.venueId) throw new Error("CALENDAR_NOTIFICATION_VENUE_REQUIRED");
+  const recipients = await calendarNotificationRecipients(input.venueId);
+  // Retire obsolete recipients and legacy venue-account jobs only for this venue.
+  const existing = await getD1().prepare("SELECT account_id, source_id, provider_message_id, dedupe_key FROM notification_jobs WHERE venue_id=? AND source_type='opportunity' AND status NOT IN ('cancelled','expired')")
+    .bind(input.venueId).all<{account_id:number;source_id:string;provider_message_id:string|null;dedupe_key:string}>();
+  const sourceIds = new Set(input.next.events.map(event=>calendarNotificationSource(input.venueId!,event.id)));
+  for (const job of existing.results ?? []) {
+    if (recipients.includes(job.account_id) && sourceIds.has(job.source_id)) continue;
+    if (job.provider_message_id && !await cancelScheduledPush(job.account_id,job.provider_message_id,job.dedupe_key)) {
+      throw new Error("Не удалось отменить прежнее напоминание. Повторите позже.");
+    }
+    await cancelNotificationJobsForSource(job.account_id,"opportunity",job.source_id);
+  }
+  const calendars:OpportunityCalendar[]=[];
+  for (const accountId of recipients) {
+    const previous = input.previous ? structuredClone(input.previous) : null;
+    for (const event of previous?.events ?? []) event.notificationPlan.messages = event.notificationPlan.messages.filter(message=>message.recipientAccountId===accountId);
+    calendars.push(await reconcileRecipientOpportunityNotifications({...input,accountId,previous,next:structuredClone(input.next)}));
+  }
+  for (let i=0;i<input.next.events.length;i++) {
+    const plans=calendars.map(calendar=>calendar.events[i].notificationPlan);
+    const messages=plans.flatMap(plan=>plan.messages);
+    const queuedCount=plans.reduce((n,plan)=>n+(plan.queuedCount??0),0);
+    const nextAt=plans.map(plan=>plan.nextAt).filter((date):date is string=>Boolean(date)).sort()[0]??null;
+    input.next.events[i].notificationPlan={
+      status:messages.length?'scheduled':plans.some(p=>p.status==='error')?'error':queuedCount?'queued':plans.some(p=>p.status==='not_needed')?'not_needed':'unavailable',
+      count:messages.length,queuedCount,nextAt,messages,signature:scheduleSignature(input.next.events[i]),
+    };
+  }
+  input.next.notificationSummary={
+    scheduled:input.next.events.reduce((n,event)=>n+event.notificationPlan.count,0),
+    queued:input.next.events.reduce((n,event)=>n+(event.notificationPlan.queuedCount??0),0),
+    nextAt:input.next.events.map(event=>event.notificationPlan.nextAt).filter((date):date is string=>Boolean(date)).sort()[0]??null,
+    enabled:recipients.length>0,
+  };
   return input.next;
 }

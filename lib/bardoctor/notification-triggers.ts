@@ -105,7 +105,7 @@ async function runForMembership(
   const preferences = preferencePayload(subscription.preferences);
 
   const storedOpportunityCalendar = record(stores.get(OPPORTUNITY_CALENDAR_KEY));
-  if (storedOpportunityCalendar && membershipContext.role === "owner") {
+  if (storedOpportunityCalendar && ["owner", "manager", "shift_manager"].includes(membershipContext.role) && membershipContext.permissions.includes("calendar.view")) {
     try {
       const previous = storedOpportunityCalendar as OpportunityCalendar;
       const next = JSON.parse(JSON.stringify(previous)) as OpportunityCalendar;
@@ -129,7 +129,7 @@ async function runForMembership(
     restaurant,
     stores,
     preferences,
-  }).filter((message) => hasPermission(
+  }).filter((message) => message.category !== "calendar" && hasPermission(
     { role: membershipContext.role, permissions: membershipContext.permissions },
     CATEGORY_PERMISSION[message.category as Exclude<NotificationCategory, "test">],
   ));

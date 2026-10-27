@@ -1,3 +1,4 @@
+import { calendarNotificationRecipients } from "./calendar-notification-recipients";
 import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
 import { notificationJobEvents, notificationJobs } from "../../db/schema";
@@ -112,6 +113,10 @@ export async function dispatchNotificationJobs(input: {
   const summary = { checked: 0, scheduled: 0, duplicates: 0, failed: 0, expired: 0 };
   for (const job of rows.results ?? []) {
     if (!oneSignalCanScheduleAt(job.target_at, nowMs)) continue;
+    if (job.source_type === "opportunity" && (!job.venue_id || !(await calendarNotificationRecipients(job.venue_id)).includes(job.account_id))) {
+      await cancelNotificationJobsForSource(job.account_id,job.source_type,job.source_id ?? "", "Получатель отключил уведомления или больше не имеет доступа");
+      continue;
+    }
     const claim = await getD1().prepare(`
       UPDATE notification_jobs SET status='dispatching', leased_at=?, attempt_count=attempt_count+1, updated_at=?
       WHERE id=? AND (status IN ('queued','failed') OR (status='dispatching' AND leased_at < ?))
