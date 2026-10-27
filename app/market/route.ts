@@ -15,7 +15,7 @@ ${canonicalUserShellAssets()}
 <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
 <script src="/competitor-market-qa-v329.js?v=20260828-competitors-v329" defer></script>
 <script src="/competitor-market-client-v329.js?v=20260828-competitors-v329" defer></script>
-<script src="/market.js?v=20260828-competitors-v329" defer></script>
+<script src="/market.js?v=20261027-focus-bd13" defer></script>
 <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
 </head><body data-bd-parent-route="/home">
 <header class="market-topbar"><a class="icon-button" href="/home" aria-label="Вернуться на главную" data-bd-back>‹</a><div class="topbar-title"><p>МОДУЛЬ BARDOCTOR</p><strong>Конкуренты</strong></div><div class="bd-standalone-venue-host" data-bd-venue-host></div></header>

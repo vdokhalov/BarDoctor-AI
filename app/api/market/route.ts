@@ -331,9 +331,11 @@ export async function PATCH(request: Request): Promise<Response> {
         : {};
       const current = record(await cachedAnalysis(account.id));
       const address = text(body.address, text(restaurant.address), 240);
-      const latitude = number(body.latitude) ?? number(restaurant.lat);
-      const longitude = number(body.longitude) ?? number(restaurant.lng);
-      const focus = text(body.focus, text(current?.focus), 500);
+      const coordinate = (value: unknown) => value == null || value === "" ? null : number(value);
+      const latitude = coordinate(body.latitude) ?? coordinate(restaurant.lat);
+      const longitude = coordinate(body.longitude) ?? coordinate(restaurant.lng);
+      const savedFocus = typeof restaurant.marketFocus === "string" ? restaurant.marketFocus : text(current?.focus);
+      const focus = typeof body.focus === "string" ? body.focus.trim().slice(0, 500) : savedFocus;
       if (!address && (latitude === null || longitude === null)) {
         throw new AIServiceError("Укажите адрес или используйте геолокацию.", 400);
       }
@@ -342,9 +344,9 @@ export async function PATCH(request: Request): Promise<Response> {
         city: restaurant.city,
         region: restaurant.region,
         country: restaurant.country,
-        latitude: restaurant.lat,
-        longitude: restaurant.lng,
-        focus: current?.focus,
+        latitude: coordinate(restaurant.lat),
+        longitude: coordinate(restaurant.lng),
+        focus: savedFocus,
       });
       const nextSignature = marketLocationSignature({
         address,
@@ -360,22 +362,25 @@ export async function PATCH(request: Request): Promise<Response> {
         ? {
             ...restaurant,
             address,
+            marketFocus: focus,
             ...(latitude !== null ? { lat: latitude } : {}),
             ...(longitude !== null ? { lng: longitude } : {}),
           }
         : restaurant;
       if (changed) {
         const updatedAt = new Date().toISOString();
-        await getDb().update(accounts).set({
-          restaurantJson: JSON.stringify(nextRestaurant),
-          updatedAt,
-        }).where(eq(accounts.id, account.id));
+        const database = getD1();
+        const statements = [database.prepare("UPDATE accounts SET restaurant_json=?, updated_at=? WHERE id=?")
+          .bind(JSON.stringify(nextRestaurant), updatedAt, account.id)];
         if (current) {
           current.focus = focus;
           current.locationChangePending = true;
           current.pendingLocation = { address, latitude, longitude, focus, updatedAt };
-          await saveAnalysis(account.id, current, casSnapshots);
+          statements.push(database.prepare(`INSERT INTO domain_data (account_id, store_key, data_json, updated_at)
+            VALUES (?, ?, ?, ?) ON CONFLICT(account_id, store_key) DO UPDATE SET data_json=excluded.data_json, updated_at=excluded.updated_at`)
+            .bind(account.id, MARKET_KEY, JSON.stringify(current), updatedAt));
         }
+        await runStoreCasBatch(database, account.id, casSnapshots, statements, updatedAt);
       }
       return noStore(Response.json({ ok: true, changed, restaurant: nextRestaurant, focus, analysis: current }));
     }
