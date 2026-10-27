@@ -863,6 +863,7 @@
   }
 
   async function importFile() {
+    var importVenue = currentVenueId(), importEmail = localStorage.getItem("bd_session"), importType = hubForm.querySelector('[name="entityType"]').value;
     var submit = hubForm.querySelector('button[type="submit"]');
     var resultBox = document.getElementById("hub-import-result");
     submit.disabled = true; submit.textContent = "Импортирую…"; resultBox.classList.add("hidden");
@@ -877,6 +878,10 @@
       }
       var result = await api("/api/integration-hub/import", { method: "POST", body: new FormData(hubForm) });
       var run = result.run;
+      if (importType === "employee" && (run.created > 0 || run.updated > 0) && importVenue === currentVenueId() && importEmail === localStorage.getItem("bd_session")) {
+        var host = window.parent === window ? window : window.parent;
+        try { host.dispatchEvent(new CustomEvent("bd:employees-imported", { detail: { venueId: importVenue, email: importEmail } })); } catch {}
+      }
       resultBox.textContent = "Получено: " + number(run.received) + ". Создано: " + number(run.created) + ". Обновлено: " + number(run.updated) + ". Пропущено: " + number(run.skipped) + (run.errors.length ? ". Ошибок: " + number(run.errors.length) : "") + ".";
       resultBox.classList.remove("hidden", "error");
       if (run.status === "failed") resultBox.classList.add("error");
