@@ -1,3 +1,5 @@
+import {parseInventoryCsv} from '../../../../lib/bardoctor/inventory-csv';
+import {derivedInputBelongs} from '../../../../lib/bardoctor/derived-input-scope';
 import * as XLSX from "xlsx";
 import { getD1 } from "../../../../db";
 import { hasPermission } from "../../../../lib/bardoctor/access-control";
@@ -150,7 +152,7 @@ export async function POST(request: Request): Promise<Response> {
   }
   const balances = (Array.isArray(assortment.stockBalances) ? assortment.stockBalances : [])
     .map(record)
-    .filter((balance) => text(balance.productKey ?? balance.key, "", 300));
+    .filter((balance) => text(balance.productKey ?? balance.key, "", 300) && derivedInputBelongs(balance, {venueId: account.venueId}));
   if (!balances.length) {
     return Response.json({
       ok: false,
@@ -168,8 +170,12 @@ export async function POST(request: Request): Promise<Response> {
   const prompt = `Распознай фактические остатки из ведомости. Список складских позиций BarDoctor дан только для сопоставления; не добавляй его строки, если их нет в документе.\n\nНоменклатура:\n${names.join("\n")}`;
 
   try {
-    let raw: string;
-    if (IMAGE_TYPES.has(mimeType)) {
+    let raw: string = "";
+    let table: JsonRecord | null = null;
+    if (/\.(csv|tsv)$/i.test(filename) || mimeType === "text/csv" || mimeType === "text/tab-separated-values") {
+      try { table = parseInventoryCsv(new TextDecoder("utf-8", {fatal:true}).decode(bytes)); }
+      catch { throw new AIServiceError("Проверьте CSV: столбцы наименование, количество, единица; до 500 строк. Разделитель — запятая, точка с запятой или табуляция. Дробь с запятой заключите в кавычки, если разделитель тоже запятая.",422); }
+    } else if (IMAGE_TYPES.has(mimeType)) {
       raw = await aiText({
         accountId: account.id,
         observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "ocr_inventory" },
@@ -207,7 +213,7 @@ export async function POST(request: Request): Promise<Response> {
       throw new AIServiceError("Поддерживаются фото, PDF, Excel и CSV.", 415);
     }
 
-    const parsed = record(parseAIJson<unknown>(raw));
+    const parsed = table ?? record(parseAIJson<unknown>(raw));
     const extracted = (Array.isArray(parsed.items) ? parsed.items : []).map(record).slice(0, 2_000);
     const candidates = balances.map((balance) => ({
       balance,
@@ -220,6 +226,11 @@ export async function POST(request: Request): Promise<Response> {
 
     extracted.forEach((item, index) => {
       const name = text(item.name, `Позиция ${index + 1}`);
+      const quantityText = String(item.quantity ?? "").trim().replace(/\s/g, "");
+      const quantity = /^(?:\d+(?:[.,]\d+)?|[.,]\d+)$/.test(quantityText) ? Number(quantityText.replace(",", ".")) : NaN;
+      if (!Number.isFinite(quantity) || !text(item.name)) {
+        unresolved.push({id:`scan-${index+1}`,name,quantity:null,unit:text(item.unit),reason:!text(item.name)?"Не указано наименование":"Укажите неотрицательное число в количестве",candidates:[]}); return;
+      }
       const normalized = normalizeInventoryText(name);
       const ranked = candidates.map((candidate) => ({
         ...candidate,
@@ -227,11 +238,11 @@ export async function POST(request: Request): Promise<Response> {
       })).sort((left, right) => right.score - left.score);
       const best = ranked[0];
       const second = ranked[1];
-      if (!best || best.score < 0.58 || (second && best.score < 0.86 && best.score - second.score < 0.12)) {
+      if (!best || best.score < 0.58 || (second && (best.score === second.score || (best.score < 0.86 && best.score - second.score < 0.12)))) {
         unresolved.push({
           id: `scan-${index + 1}`,
           name,
-          quantity: Math.max(0, number(item.quantity)),
+          quantity,
           unit: text(item.unit, ""),
           reason: "Не удалось однозначно сопоставить со складом",
           candidates: ranked.slice(0, 3).filter((candidate) => candidate.score >= 0.4).map((candidate) => ({
@@ -242,21 +253,21 @@ export async function POST(request: Request): Promise<Response> {
         });
         return;
       }
-      const quantity = Math.max(0, number(item.quantity));
       const requestedUnit = normalizeInventoryText(item.unit);
       const balanceUnit = text(best.balance.unit, "unknown", 20);
       const packageAmount = Math.max(0, number(best.balance.packageAmount));
-      const packageLike = !requestedUnit || /^(шт|уп|бут|бан|пач|короб|ед|pcs)/.test(requestedUnit);
+      const packageLike = /^(уп|бут|бан|пач|короб)/.test(requestedUnit);
       const converted = packageLike && packageAmount > 0
         ? { amount: quantity * packageAmount, unit: balanceUnit }
-        : toInventoryBaseAmount(quantity, requestedUnit);
-      if (converted.unit !== balanceUnit || converted.amount < 0) {
+        : toInventoryBaseAmount(quantity, requestedUnit, balanceUnit);
+      const belowPrecision = converted.amount > 0 && Math.round(converted.amount * 1_000) === 0;
+      if (converted.unit === "unknown" || converted.unit !== balanceUnit || !Number.isFinite(converted.amount) || converted.amount < 0 || belowPrecision) {
         unresolved.push({
           id: `scan-${index + 1}`,
           name,
           quantity,
           unit: text(item.unit, ""),
-          reason: "Единица в ведомости не совпадает со складской единицей",
+          reason: belowPrecision ? "Количество меньше точности складского учёта" : "Единица в ведомости не совпадает со складской единицей",
           candidates: [{
             productKey: best.key,
             name: text(best.balance.name, "Товар"),
@@ -275,6 +286,10 @@ export async function POST(request: Request): Promise<Response> {
       });
     });
 
+    const repeated = new Set(mapped.filter((item,index)=>mapped.some((other,j)=>j!==index&&other.productKey===item.productKey)).map(item=>item.productKey));
+    for (let index=mapped.length-1;index>=0;index--) if(repeated.has(mapped[index].productKey)) {
+      const item=mapped.splice(index,1)[0];unresolved.push({id:item.id,name:item.scannedName,quantity:item.actual,unit:"",reason:"Товар повторяется в файле. Оставьте одну строку с итоговым количеством.",candidates:[]});
+    }
     return Response.json({
       ok: true,
       draft: {

@@ -348,7 +348,8 @@ function hierarchyFor(balance: JsonRecord, assortment: unknown) {
 function entryDefinition(balance: JsonRecord): { entryUnit: string; entryFactor: number } {
   const unit = text(balance.unit, "", 20);
   const packageAmount = Math.max(0, numeric(balance.displayPackageAmount ?? balance.packageAmount, 0));
-  const hasSinglePackage = balance.multiplePackageSizes !== true
+  const hasSinglePackage = !/^(?:kg|кг|g|г|l|л|ml|мл|pcs|шт\.?)$/i.test(text(balance.packageSize))
+    && balance.multiplePackageSizes !== true
     && text(balance.packageSize, "") !== "Несколько фасовок"
     && packageAmount > 0;
   if (hasSinglePackage) {

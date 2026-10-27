@@ -1,9 +1,9 @@
 /** Bounded RFC4180-style CSV reader. No formulas or spreadsheet evaluation. */
-export function parseOnboardingCsv(source: string) {
+export function parseOnboardingCsv(source: string, delimiter?: "," | ";" | "\t") {
   if (typeof source !== "string" || new TextEncoder().encode(source).length > 512_000) throw new Error("OPENING_CSV_SIZE");
   const raw = source.replace(/^\uFEFF/, "");
   const header = raw.split(/\r?\n/, 1)[0];
-  const separator = header.includes(";") ? ";" : ",";
+  const separator = delimiter ?? (header.includes(";") ? ";" : ",");
   const records: string[][] = [];
   let row: string[] = [], value = "", quoted = false, closed = false;
   function cell() {
