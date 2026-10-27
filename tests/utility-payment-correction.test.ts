@@ -1,0 +1,23 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {emptyMonthFixture} from './helpers/empty-month-fixture';
+async function fixture(){const r=await emptyMonthFixture({utilities:'./app/api/utilities/route'}),url='/api/utilities?venue='+r.venueId+'&month=2026-10';let serial=0;
+ const get=async():Promise<any>=>(await r.api.utilities.GET(r.request(r.user,url)) as Response).json();
+ const post=async(body:object)=>r.api.utilities.POST(r.request(r.user,url,'POST',body)) as Promise<Response>;
+ const prepare=async(command:object)=>{const state=await get(),body={command,operationId:'op'+(++serial),venueId:r.venueId,revision:state.revision};const p=await post({...body,preview:true});return {body,p}};
+ const save=async(command:object)=>{const {body,p}=await prepare(command);assert.equal(p.status,200,await p.clone().text());const preview:any=await p.json(),payload={...body,previewToken:preview.previewToken};const reply=await post(payload);assert.equal(reply.status,200,await reply.clone().text());return payload};
+ await save({action:'create',meterId:'water',kind:'water',included:true,startMonth:'2026-10'});await save({action:'tariff',meterId:'water',tariffId:'t',date:'2026-10-01',amount:2});await save({action:'reading',meterId:'water',readingId:'a',date:'2026-10-01',value:100});await save({action:'reading',meterId:'water',readingId:'b',date:'2026-10-20',value:108});
+ const pay=async(id:string,amount:number)=>save({action:'payment',meterId:'water',readingId:'b',paymentId:id,date:'2026-10-21',amount});
+ const report=async():Promise<any>=>{const data:any=await(await r.api.closing.GET(r.request(r.user,'/api/month-close?monthKey=current&view=current')) as Response).json();return data.report};
+ return {...r,get,post,prepare,save,pay,report};}
+const edit={action:'reading',meterId:'water',readingId:'b',date:'2026-10-20',value:109};
+test('cancel erroneous payments, retain history, correct reading, repay once; actual financial readers',async t=>{const r=await fixture();t.after(r.close);await r.pay('p1',5);await r.pay('p2',3);assert.equal((await r.prepare(edit)).p.status,422);
+ const payload=await r.save({action:'cancel-payment',meterId:'water',paymentId:'p1',reason:'Внесено ошибочно'});const revision=(await r.get()).revision;assert.equal((await r.post(payload)).status,200);assert.equal((await r.get()).revision,revision);assert.equal((await r.prepare(edit)).p.status,422);
+ await r.save({action:'cancel-payment',meterId:'water',paymentId:'p2'});let f=await r.report();assert.equal(f.resultBeforeCost,74);assert.equal(f.cashResult,90);
+ await r.save(edit);const s=await r.get();assert.equal(s.total.amount,18);assert.equal(s.payments.length,2);assert.deepEqual(s.payments.map((p:any)=>p.amount),[5,3]);assert.ok(s.payments.every((p:any)=>p.cancelledAt&&Number.isInteger(p.cancelledBy)));assert.equal(s.meters[0].readingHistory[0].before.value,108);assert.equal(s.meters[0].readingHistory[0].after.value,109);
+ await r.pay('p3',18);f=await r.report();assert.equal(f.resultBeforeCost,72);assert.equal(f.cashResult,72);assert.equal((await r.get()).payments.length,3);
+ assert.equal((await r.prepare({action:'cancel-payment',meterId:'water',paymentId:'p1'})).p.status,422);
+});
+test('cancel preview cannot cross closing or permission changes; no partial update',async t=>{const r=await fixture();t.after(r.close);await r.pay('p',5);const {body,p}=await r.prepare({action:'cancel-payment',meterId:'water',paymentId:'p'});const preview:any=await p.json();
+ r.seed('bd_month_closings',[{id:'closed',venueId:r.venueId,monthKey:'2026-10',status:'closed',snapshot:{resultBeforeCost:777}}]);assert.equal((await r.post({...body,previewToken:preview.previewToken})).status,422);assert.equal((await r.get()).payments[0].cancelledAt,undefined);
+ r.seed('bd_month_closings',[]);r.sqlite.prepare("UPDATE venue_memberships SET role='manager',permissions_json='{\"deny\":[\"finance.manage\"]}' WHERE venue_id=?").run(r.venueId);assert.equal((await r.post({...body,previewToken:preview.previewToken})).status,403);
+ const raw:any=JSON.parse(String(r.sqlite.prepare("SELECT data_json FROM domain_data WHERE account_id=? AND store_key='bd_utility_meters_v1'").get(r.account)!.data_json));assert.equal(raw[0].payments[0].cancelledAt,undefined);
+});

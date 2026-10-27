@@ -1,4 +1,4 @@
-import {parseUtilities,utilityView,type UtilityState} from './utility-state';
+import {parseUtilities,utilityView,isActiveUtilityPayment} from './utility-state';
 type Row=Record<string,unknown>;
 /** Read-only accrual projection; never write this projection back into the expense store. */
 export function utilityFinance(input:{state?:unknown[];venueId:number;dataAccountId?:number;currency:string|null;month:string;throughDate?:string;expenses:Row[]}){
@@ -13,7 +13,7 @@ export function utilityFinance(input:{state?:unknown[];venueId:number;dataAccoun
   if(input.expenses.some(e=>e.category==='utilities'&&String(e.accountingMonth??String(e.date).slice(0,7))===input.month&&!['cancelled','voided'].includes(String(e.status))))result.issues.push('UTILITY_UNLINKED_EXPENSE');
   const generated:Row[]=[];
   for(const m of state.meters.filter(m=>m.included))for(const i of view.intervals[m.id])if(i.month===input.month&&(!input.throughDate||i.to<=input.throughDate)&&i.amount!==null)generated.push({id:'utility:'+m.id+':'+i.toReadingId,venueId:input.venueId,dataAccountId:input.dataAccountId,date:i.to,accountingMonth:i.month,amount:i.amount,currency:i.currency,category:'utilities',source:'utility_accrual',status:'posted'});
-  result.paid=state.payments.filter(p=>p.date.slice(0,7)===input.month&&(!input.throughDate||p.date<=input.throughDate)).reduce((n,p)=>n+p.amount,0);
+  result.paid=state.payments.filter(p=>isActiveUtilityPayment(p)&&p.date.slice(0,7)===input.month&&(!input.throughDate||p.date<=input.throughDate)).reduce((n,p)=>n+p.amount,0);
   result.expenses=[...input.expenses,...generated];return result;
  }catch{result.active=true;result.amount=null;result.issues.push('UTILITY_SOURCE_INVALID');return result}
 }

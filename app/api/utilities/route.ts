@@ -27,7 +27,7 @@ async function handle(request:Request){
  if(duplicate)return duplicate.hash===fingerprint?json({ok:true,duplicate:true,...utilityView(state,month,currency),today,canManage:true}):json({error:'Идентификатор операции уже использован'},409);
  if(body.revision!==state.revision)return json({error:'Данные изменились. Обновите страницу.',code:'REVISION_CONFLICT'},409);
  if(state.operations.length>=5000)return json({error:'Достигнут предел журнала. Сохранение остановлено.'},422);
- const next=changeUtilities(state,command,currency,closed,today),previewToken=await hash([next,closed,body.operationId]);
+ const next=changeUtilities(state,command,currency,closed,today,account.actorAccountId),previewToken=await hash([next,closed,body.operationId]);
  if(body.preview===true)return json({ok:true,previewToken,before:utilityView(state,month,currency),after:utilityView(next,month,currency)});
  if(body.previewToken!==previewToken)return json({error:'Сначала проверьте результат изменения',code:'PREVIEW_REQUIRED'},409);
  next.operations.push({id:body.operationId,hash:fingerprint});const now=new Date().toISOString();
