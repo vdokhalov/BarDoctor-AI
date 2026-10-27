@@ -58,6 +58,10 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, service.expenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
   if(base.cashResult!=null&&service.nonCashDelta!=null)base.cashResult=money(Number(base.cashResult)+service.nonCashDelta);
   if(base.periodExpenses!=null&&service.nonCashDelta!=null)base.periodExpenses=money(Number(base.periodExpenses)-service.nonCashDelta);
+  // The payment chart must use the same cash ledger as periodExpenses.
+  // Service accruals belong to P&L, not to this cash-category breakdown.
+  const cashCategories = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, validExpenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
+  base.expenseBreakdown = cashCategories.expenseBreakdown;
   const report = reconcileMonthlyReport({ costProof:input.costProof, report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, costEnrichments:data.bd_sales_cost_enrichments_v1,reconciliations: data.bd_sales_reconciliations_v1 });
   const history = periodCostProof(input.costProof,monthKey)??historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, costEnrichments:data.bd_sales_cost_enrichments_v1,reconciliations: data.bd_sales_reconciliations_v1 });
   const reasons = [...service.issues,...finance.missing, ...history.reasons,...(expenseDateIssues.length?["EXPENSE_DATE_UNKNOWN"]:[])];
