@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import {parse} from 'acorn';
+import {transformSync} from 'esbuild';
+const path='public/assets/index-BQGspy0I.js';let source=fs.readFileSync(path,'utf8');
+const node=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='bdAssortmentAmountV170');
+if(!node)throw Error('Missing assortment amount formatter');
+const helper=transformSync(fs.readFileSync('lib/bardoctor/assortment-amount-label.ts','utf8').replace('export function','function'),{loader:'ts'}).code.trim();
+source=source.slice(0,node.start)+helper+source.slice(node.end);
+const card=parse(source,{ecmaVersion:'latest',sourceType:'module'}).body.find(n=>n.type==='FunctionDeclaration'&&n.id.name==='bdAssortmentNeedsV170');
+if(!card)throw Error('Missing assortment needs view');
+let view=source.slice(card.start,card.end);
+if(!view.includes('bd-needs-unit-layout'))view=view.replace('className:"bd-assortment-needs-v170",children:[','className:"bd-assortment-needs-v170",children:[i.jsx("style",{"data-bd-needs-unit-layout":true,children:".bd-assortment-needs-v170{container-type:inline-size}@container(max-width:600px){.bd-assortment-needs-list-v170{grid-template-columns:minmax(0,1fr)!important}}"}),');
+source=source.slice(0,card.start)+view+source.slice(card.end);
+parse(source,{ecmaVersion:'latest',sourceType:'module'});fs.writeFileSync(path,source);
+console.log('Assortment needs: explicit mass, volume and piece labels');
