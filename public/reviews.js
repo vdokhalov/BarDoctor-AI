@@ -10,6 +10,10 @@
     filter: "all",
     source: "all",
     importInspection: null,
+    importSequence: 0,
+    importBusy: false,
+    importFile: null,
+    importTimer: 0,
     analysisAttempted: false,
     aiRunning: false,
     doctorAttempted: false,
@@ -635,9 +639,27 @@
     manualDialog.showModal();
   }
 
+  function resetImport(resetFile) {
+    state.importSequence += 1;
+    window.clearTimeout(state.importTimer);
+    state.importInspection = null; state.importFile = null; state.importBusy = false;
+    var form = document.getElementById("review-import-form");
+    if (resetFile) form.reset();
+    form.elements.fieldMapping.value = "";
+    document.getElementById("review-import-fields").textContent = "";
+    document.getElementById("review-import-summary").textContent = "";
+    document.getElementById("review-import-mapping").classList.add("hidden");
+    var result = document.getElementById("review-import-result");
+    result.textContent = ""; result.classList.add("hidden");
+    document.getElementById("review-import-submit").disabled = true;
+    document.getElementById("review-import-preview").disabled = false;
+  }
+
   function openImport() {
+    resetImport(true);
     importDialog.showModal();
   }
+  importDialog.addEventListener("close", function () { resetImport(true); });
 
   async function analyzePending() {
     if (state.analysisAttempted || !canManageReviews()) return;
@@ -832,12 +854,18 @@
     var form = document.getElementById("review-import-form");
     var file = form.querySelector('input[name="file"]').files[0];
     if (!file) return showMessage("Сначала выберите файл.", true);
-    event.currentTarget.disabled = true;
+    if (state.importBusy) return;
+    var button = event.currentTarget, previousMapping = state.importFile === file ? form.elements.fieldMapping.value : "";
+    resetImport(false);
+    var sequence = state.importSequence, venue = currentVenueId();
+    state.importBusy = true; button.disabled = true;
     var payload = new FormData();
     payload.append("file", file);
     try {
       var result = await api("/api/review-layer/import/preview", { method: "POST", body: payload });
-      state.importInspection = result;
+      if (sequence !== state.importSequence || venue !== currentVenueId() || form.elements.file.files[0] !== file) return;
+      state.importInspection = result; state.importFile = file;
+      var savedMapping = previousMapping ? JSON.parse(previousMapping) : {};
       var root = document.getElementById("review-import-fields");
       root.textContent = "";
       result.fields.forEach(function (field) {
@@ -850,7 +878,7 @@
         result.inspection.headers.forEach(function (header) {
           var option = node("option", "", header);
           option.value = header;
-          option.selected = result.inspection.suggestedMapping[field.target] === header;
+          option.selected = (Object.prototype.hasOwnProperty.call(savedMapping, field.target) ? savedMapping[field.target] : result.inspection.suggestedMapping[field.target]) === header;
           select.appendChild(option);
         });
         select.addEventListener("change", updateImportMapping);
@@ -859,51 +887,58 @@
       });
       document.getElementById("review-import-summary").textContent = reviewCount(result.inspection.recordCount) + " · " + number(result.inspection.headers.length) + " столбцов";
       document.getElementById("review-import-mapping").classList.remove("hidden");
-      updateImportMapping();
+      state.importBusy = false; updateImportMapping();
     } catch (problem) {
-      showMessage(problem.message || "Не удалось проверить файл.", true);
+      if (sequence === state.importSequence && venue === currentVenueId()) showMessage(problem.message || "Не удалось проверить файл.", true);
     } finally {
-      event.currentTarget.disabled = false;
+      if (sequence === state.importSequence && venue === currentVenueId()) { state.importBusy = false; button.disabled = false; }
     }
   });
 
   function updateImportMapping() {
     var mapping = {};
     document.querySelectorAll("#review-import-fields select[data-target]").forEach(function (select) {
-      if (select.value) mapping[select.dataset.target] = select.value;
+      mapping[select.dataset.target] = select.value;
     });
     document.querySelector('#review-import-form input[name="fieldMapping"]').value = JSON.stringify(mapping);
-    document.getElementById("review-import-submit").disabled = !mapping.text;
+    document.getElementById("review-import-submit").disabled = state.importBusy || !mapping.text;
   }
 
   document.querySelector('#review-import-form input[name="file"]').addEventListener("change", function () {
-    state.importInspection = null;
-    document.getElementById("review-import-mapping").classList.add("hidden");
-    document.getElementById("review-import-submit").disabled = true;
+    resetImport(false);
   });
 
   document.getElementById("review-import-form").addEventListener("submit", async function (event) {
     event.preventDefault();
     var form = event.currentTarget;
     var file = form.querySelector('input[name="file"]').files[0];
-    if (!file || !state.importInspection) return showMessage("Сначала проверьте структуру файла.", true);
+    if (state.importBusy) return;
+    if (!file || !state.importInspection || state.importFile !== file) return showMessage("Сначала проверьте структуру файла.", true);
     var submit = document.getElementById("review-import-submit");
-    submit.disabled = true;
+    var sequence = state.importSequence, venue = currentVenueId();
+    state.importBusy = true; submit.disabled = true;
+    document.getElementById("review-import-preview").disabled = true;
+    var resultBox = document.getElementById("review-import-result");
+    resultBox.textContent = ""; resultBox.classList.add("hidden");
     var payload = new FormData();
     payload.append("file", file);
     payload.append("source", form.elements.source.value);
     payload.append("fieldMapping", form.elements.fieldMapping.value);
     try {
       var result = await api("/api/review-layer/import", { method: "POST", body: payload });
+      if (sequence !== state.importSequence || venue !== currentVenueId()) return;
       var stats = result.result || {};
       var resultBox = document.getElementById("review-import-result");
       resultBox.classList.remove("hidden", "error");
       resultBox.textContent = "Создано: " + number(stats.created || 0) + " · обновлено: " + number(stats.updated || 0) + " · пропущено: " + number(stats.skipped || 0) + " · ошибки: " + number(stats.invalid || 0);
       showMessage("Импорт завершён. Дубли не создаются.");
-      window.setTimeout(function () { importDialog.close(); form.reset(); loadData(); }, 900);
+      state.importTimer = window.setTimeout(function () { if (sequence !== state.importSequence || venue !== currentVenueId()) return; importDialog.close(); loadData(); }, 900);
     } catch (problem) {
+      if (sequence !== state.importSequence || venue !== currentVenueId()) return;
+      state.importBusy = false;
       showMessage(problem.message || "Импорт не выполнен.", true);
-      submit.disabled = false;
+      document.getElementById("review-import-preview").disabled = false;
+      updateImportMapping();
     }
   });
 
@@ -917,6 +952,8 @@
   });
 
   window.addEventListener("bd:venue-will-change", function () {
+    resetImport(true);
+    if (importDialog.open) importDialog.close();
     state.sequence += 1;
     if (state.controller) state.controller.abort();
     state.layer = null;
