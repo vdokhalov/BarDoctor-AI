@@ -3,7 +3,7 @@ export type UtilityKind = 'water' | 'gas' | 'electricity';
 export type UtilityScope = { venueId: number; dataAccountId: number };
 export type UtilityMeter = UtilityScope & { id: string; name: string; kind: UtilityKind; unit: 'm3' | 'kWh'; included: boolean; parentId?: string; revision: number };
 export type UtilityReading = { id: string; meterId: string; date: string; value: number };
-export type UtilityTariff = { id: string; effectiveDate: string; amount: number; currency: string };
+export type UtilityTariff = { id: string; effectiveDate: string; amount: number; currency: string; startsAfterReadingId?: string };
 export type UtilityInterval = { fromReadingId: string; toReadingId: string; from: string; to: string; month: string; consumption: number; amount: number | null; currency: string | null; tariffId: string | null; issue: string | null };
 export class UtilityInputError extends Error {}
 const fail = (code: string): never => { throw new UtilityInputError(code); };
@@ -34,6 +34,7 @@ export function utilityIntervals(meter: UtilityMeter, scope: UtilityScope, readi
  const tariffIds = new Set<string>(), tariffDates = new Set<string>();
  for (const t of tariffs) {
   if (!t.id || tariffIds.has(t.id) || !date(t.effectiveDate) || tariffDates.has(t.effectiveDate) || !finite(t.amount) || !/^(?:[A-Z]{3}|PMR_RUB)$/.test(t.currency)) fail('INVALID_TARIFF');
+  if(t.startsAfterReadingId&&!readings.some(r=>r.id===t.startsAfterReadingId&&r.date===t.effectiveDate))fail('TARIFF_BOUNDARY_MISSING');
   tariffIds.add(t.id);tariffDates.add(t.effectiveDate);
  }
  const ordered = [...readings].sort((a,b)=>a.date.localeCompare(b.date)), rates = [...tariffs].sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate));
@@ -43,7 +44,7 @@ export function utilityIntervals(meter: UtilityMeter, scope: UtilityScope, readi
   // A rate effective at the ending boundary may have applied during that day.
   // Without a boundary reading/time we cannot price that interval exactly.
   const rate = rates.filter(t=>t.effectiveDate <= previous.date).at(-1);
-  const changed = rates.some(t=>t.effectiveDate > previous.date && t.effectiveDate <= current.date);
+  const changed = rates.some(t=>t.effectiveDate > previous.date && (t.effectiveDate < current.date || t.effectiveDate === current.date && t.startsAfterReadingId !== current.id));
   const issue = !rate ? 'TARIFF_MISSING' : changed ? 'TARIFF_CHANGED_WITHIN_INTERVAL' : null;
   return {fromReadingId:previous.id,toReadingId:current.id,from:previous.date,to:current.date,month:current.date.slice(0,7),consumption,amount:issue?null:round(consumption*rate!.amount,2),currency:issue?null:rate!.currency,tariffId:issue?null:rate!.id,issue};
  });

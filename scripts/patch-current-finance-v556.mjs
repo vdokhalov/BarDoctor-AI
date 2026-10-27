@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 const file=new URL('../public/assets/index-BQGspy0I.js',import.meta.url);
 let s=fs.readFileSync(file,'utf8');
+
 const before='i.jsx(bdHomeMoneyCard,{report:j,previousReport:v,onNavigate:g})';
 const after='i.jsx(bdHomeCurrentFinanceV556,{profile:e,settings:u,onNavigate:g,revision:JSON.stringify([t,n,d,u,r])})';
 const start='/* finance-current-result-v573:start */',end='/* finance-current-result-v573:end */';
@@ -21,6 +22,7 @@ const documentLinks=[
 ];
 for(const [original,linked] of documentLinks)s=s.replaceAll(linked,original);
 if(process.argv.includes('--restore')){
+ s=s.replace('action:()=>window.location.assign("/finance/utilities?venue="+encodeURIComponent(localStorage.getItem("bd_active_venue_id")||"")+"&month="+encodeURIComponent(monthKey||""))','action:()=>e("/finance/settings?section=utilities")');
  s=s.replace('children:[i.jsx(BdFinanceDocumentReturn,{}),bdManagementStockContextPhase4b.banner','children:[bdManagementStockContextPhase4b.banner');
  s=s.replace('function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey,currentFinance=false}){','function bdFinanceQuickActionsV160({navigate:e,onCloseMonth:t,monthKey}){');
  s=s.replace('children:n.filter(row=>!currentFinance||row.key!=="close").map(r=>','children:n.map(r=>');
@@ -32,6 +34,7 @@ if(process.argv.includes('--restore')){
  for(const name of ['bdFinanceKpisV160','bdFinanceSummaryV160'])s=s.replace(new RegExp('(function '+name+'\\(\\{report:([a-zA-Z]+)[^]*?\\)\\{)if\\(\\2\\?\\.currentFinance\\)return null;'),'$1');
  fs.writeFileSync(file,s.replace(after,before));process.exit(0);
 }
+s=s.replace('action:()=>e("/finance/settings?section=utilities")','action:()=>window.location.assign("/finance/utilities?venue="+encodeURIComponent(localStorage.getItem("bd_active_venue_id")||"")+"&month="+encodeURIComponent(monthKey||""))');
 for(const [original,linked] of documentLinks)s=s.replaceAll(original,linked.replace('const back=bdFinanceDocumentReturnUrl();if(back)','const back=(typeof bdWarehouseDocumentModule!=="undefined"&&bdWarehouseDocumentModule.stockReturnUrl(window.location.search,window.location.origin,Number(localStorage.getItem("bd_active_venue_id"))))||bdFinanceDocumentReturnUrl();if(back)'));
 s=s.replace('children:[bdManagementStockContextPhase4b.banner','children:[i.jsx(BdFinanceDocumentReturn,{}),bdManagementStockContextPhase4b.banner');
 if(s.split(anchor).length!==2)throw Error('Unique Finance current result anchor required');

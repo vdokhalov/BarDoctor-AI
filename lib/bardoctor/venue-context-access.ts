@@ -17,6 +17,7 @@ export const VENUE_CONTEXT_SOURCES: Record<string, string[]> = {
 };
 
 export function canReadVenueSource(account: AuthenticatedAccount, key: string): boolean {
+  if(key === "bd_utility_meters_v1")return hasPermission(account,"finance.view");
   if (key === "bd_sales_reconciliations_v1" || key === "bd_sales_cost_enrichments_v1") return ["finance.view", "sales.view", "inventory.view", "shifts.view"].every(p=>hasPermission(account,p as any));
   if (key === "bd_sales_events_v1" || key === "bd_operational_reports_v1") return hasPermission(account, "shifts.view");
   if (key === "bd_market_analysis_v1") return hasPermission(account, "analysis.view");

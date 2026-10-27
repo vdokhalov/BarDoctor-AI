@@ -1,3 +1,4 @@
+import {utilityFinance} from './utility-finance';
 import {readCostEnrichmentState} from './cost-enrichment-storage';
 import {serviceAccruals} from './service-accruals';
 import {validExpenseDate,blockUnknownExpensePeriod} from "./expense-date";
@@ -27,7 +28,7 @@ import { stableSalesValue } from "./sales-events";
 
 type Row = Record<string, unknown>;
 export const MONTH_CLOSE_VERSION = "verified-month-close-v1";
-export const MONTH_CLOSE_INPUT_KEYS = ["bd_sales_cost_enrichments_v1","bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_sales_batches", "bd_sales_reconciliations_v1", "bd_stock_movements", "bd_inventory_snapshots", "bd_finance_expenses", "bd_payroll_entries", "bd_purchase_documents", "bd_finance_settings", "bd_finance_gap_reasons", "bd_inventory_writeoffs", "bd_opening_stock_v1"];
+export const MONTH_CLOSE_INPUT_KEYS = ["bd_utility_meters_v1","bd_sales_cost_enrichments_v1","bd_finance_revenue", "bd_operational_reports_v1", "bd_sales_events_v1", "bd_sales_documents", "bd_sales_batches", "bd_sales_reconciliations_v1", "bd_stock_movements", "bd_inventory_snapshots", "bd_finance_expenses", "bd_payroll_entries", "bd_purchase_documents", "bd_finance_settings", "bd_finance_gap_reasons", "bd_inventory_writeoffs", "bd_opening_stock_v1"];
 const ESTIMATE_KEYS=["bd_employees","bd_payroll_rules"];
 const KEYS = [...MONTH_CLOSE_INPUT_KEYS, "bd_month_closings"];
 const array = (value: unknown): Row[] => Array.isArray(value) ? value.map(row) : [];
@@ -52,9 +53,11 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   const expenseDateIssues=(data.bd_finance_expenses??[]).filter(value=>activeBusinessRow(value)&&!validExpenseDate(value.date)).map(value=>({recordId:value.id==null?null:String(value.id).slice(0,180)}));
   const validExpenses=(data.bd_finance_expenses??[]).filter(value=>validExpenseDate(value.date));
   const snapshots = monthlySnapshotRows(data.bd_inventory_snapshots, venueId);
-  const settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
+  let settings = data.bd_finance_settings?.find(value => value.id === "primary" || Number(value.id) === venueId) ?? data.bd_finance_settings?.[0] ?? {};
   const localDay = venueDate(asOf, venueTimeFromJson(JSON.stringify(profile)).timezone);
-  const service=serviceAccruals({...scope,currency,startDate,endDate,purchases:data.bd_purchase_documents,expenses:validExpenses});
+  const utility=utilityFinance({state:data.bd_utility_meters_v1,venueId,dataAccountId,currency,month:monthKey,expenses:validExpenses});
+  if(utility.active)settings={...settings,utilityModel:{mode:'manual'}};
+  const service=serviceAccruals({...scope,currency,startDate,endDate,purchases:data.bd_purchase_documents,expenses:utility.expenses});
   const base = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, service.expenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
   if(base.cashResult!=null&&service.nonCashDelta!=null)base.cashResult=money(Number(base.cashResult)+service.nonCashDelta);
   if(base.periodExpenses!=null&&service.nonCashDelta!=null)base.periodExpenses=money(Number(base.periodExpenses)-service.nonCashDelta);
@@ -62,9 +65,18 @@ export function calculateVerifiedMonth(input: { profile: Row; stores: Record<str
   // Service accruals belong to P&L, not to this cash-category breakdown.
   const cashCategories = existingMonthlyCalculation(profile, monthKey, finance.revenueRows, validExpenses, snapshots, settings, data.bd_finance_gap_reasons ?? [], data, `${localDay}T12:00:00Z`, currency) as Row;
   base.expenseBreakdown = cashCategories.expenseBreakdown;
+  if(utility.active){
+    const allocated=base.periodPast?Number(base.utilities)||0:Number(base.allocatedUtilities)||0;
+    if(base.resultBeforeCost!=null)base.resultBeforeCost=money(Number(base.resultBeforeCost)+allocated-(utility.amount??0));
+    if(base.cashResult!=null)base.cashResult=money(Number(base.cashResult)+allocated-utility.paid);
+    base.utilities=utility.amount;base.utilityPaid=utility.paid;base.utilityMode='По показаниям';base.allocatedUtilities=utility.amount;
+    // Readings identify an interval, not consumption of an individual shift.
+    base.shiftEstimates=array(base.shiftEstimates).map(x=>({...x,utilityAllocation:null,recurringAllocation:null,resultBeforeCost:null,estimatedResult:null}));
+    if(utility.issues.length){base.resultBeforeCost=null;base.cashResult=null;base.operatingResult=null;}
+  }
   const report = reconcileMonthlyReport({ costProof:input.costProof, report: base, venueId, monthKey, snapshots, revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, costEnrichments:data.bd_sales_cost_enrichments_v1,reconciliations: data.bd_sales_reconciliations_v1 });
   const history = periodCostProof(input.costProof,monthKey)??historicalPeriodCost({ venueId, monthKey, accountingCurrency: currency ?? "", revenues: finance.revenueRows, events: data.bd_sales_events_v1, movements: data.bd_stock_movements, documents: data.bd_sales_documents, batches: data.bd_sales_batches, costEnrichments:data.bd_sales_cost_enrichments_v1,reconciliations: data.bd_sales_reconciliations_v1 });
-  const reasons = [...service.issues,...finance.missing, ...history.reasons,...(expenseDateIssues.length?["EXPENSE_DATE_UNKNOWN"]:[])];
+  const reasons = [...utility.issues,...service.issues,...finance.missing, ...history.reasons,...(expenseDateIssues.length?["EXPENSE_DATE_UNKNOWN"]:[])];
   for (const field of ["taxModel", "utilityModel"]) {
     const model = row(settings[field]);
     if (model.mode != null && !["manual", "fixed", "percent"].includes(String(model.mode)) || model.mode === "fixed" && finiteBusinessNumber(model.amount) == null || model.mode === "percent" && finiteBusinessNumber(model.percent) == null) reasons.push("RECURRING_INPUT_UNKNOWN");
@@ -167,7 +179,7 @@ export async function verifiedMonthCloseRequest(request: Request): Promise<Respo
     const current = currentFinance({ payrollEstimateSources:estimateAvailable?{employees:stores.bd_employees,rules:stores.bd_payroll_rules,gaps:stores.bd_finance_gap_reasons??[]}:undefined, costProof, profile, venueId, workspaceId, dataAccountId: account.id, currency: calculation.currency, asOf, startDate: calculation.startDate, endDate: calculation.endDate,
       revenues: stores.bd_finance_revenue, reports: stores.bd_operational_reports_v1, events: stores.bd_sales_events_v1, documents: stores.bd_sales_documents,
       movements: stores.bd_stock_movements, batches: stores.bd_sales_batches, costEnrichments:stores.bd_sales_cost_enrichments_v1,reconciliations: stores.bd_sales_reconciliations_v1, costSourceStates: Object.fromEntries(["bd_sales_events_v1","bd_stock_movements","bd_sales_documents","bd_sales_batches","bd_sales_reconciliations_v1"].map(key=>[key,snapshots.some(x=>x.key===key&&x.dataJson!=null)?"AVAILABLE":"ABSENT"])),
-      purchases:stores.bd_purchase_documents,purchasesAvailable:optionalCollectionAvailable('bd_purchase_documents'),expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
+      utilities:stores.bd_utility_meters_v1,purchases:stores.bd_purchase_documents,purchasesAvailable:optionalCollectionAvailable('bd_purchase_documents'),expenses: stores.bd_finance_expenses, payrollEntries: normalizeLegacyPayrollEntries(stores.bd_payroll_entries, profile, {venueId,workspaceId,dataAccountId:account.id}),
       expensesAvailable: optionalCollectionAvailable('bd_finance_expenses'), payrollEntriesAvailable: optionalCollectionAvailable('bd_payroll_entries') });
     const dated = Object.fromEntries(Object.entries(stores).map(([key,values])=>[key,values.filter(x=>!(x.businessDate??x.date)||String(x.businessDate??x.date).slice(0,10)<=current.endDate)]));
     const display = calculateVerifiedMonth({profile,stores:dated,venueId,workspaceId,dataAccountId:account.id,monthKey,asOf,costProof}).snapshot;

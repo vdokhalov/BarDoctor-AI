@@ -254,15 +254,15 @@ function bdMonthlyPayrollRecurringV165({ report, period, navigate }) {
     i.jsxs("section", { className: "bd-monthly-card-v165 bd-monthly-recurring-v165", children: [
       i.jsx(bdMonthlySectionHeaderV165, { title: "Налоги и коммунальные", caption: "Месячные суммы выбранного периода" }),
       i.jsx(bdReportLine, { label: "Налоги", value: bdMoney2(report.taxes), strong: true }),
-      i.jsx(bdReportLine, { label: "Коммунальные услуги", value: bdMoney2(report.utilities), strong: true }),
-      i.jsx(bdReportLine, { label: "Общий финансовый эффект", value: bdMoney2(Number(report.taxes || 0) + Number(report.utilities || 0)), strong: true }),
+      i.jsx(bdReportLine, { label: "Коммунальные услуги", value: report.utilities==null?"Неизвестно":bdMoney2(report.utilities), strong: true }),
+      i.jsx(bdReportLine, { label: "Общий финансовый эффект", value: report.utilities==null?"Неизвестно":bdMoney2(Number(report.taxes || 0) + Number(report.utilities || 0)), strong: true }),
       i.jsxs("details", { className: "bd-monthly-details-v165", children: [
-        i.jsx("summary", { children: "Как распределяется по сменам" }),
+        i.jsx("summary", { children: report.utilityMode==="По показаниям"?"Как учтены коммунальные":"Как распределяется по сменам" }),
         i.jsxs("div", { children: [
-          i.jsx(bdReportLine, { label: "На плановую смену", value: bdMoney2(report.recurringPerShift) }),
+          report.utilityMode!=="По показаниям"&&i.jsx(bdReportLine, { label: "На плановую смену", value: bdMoney2(report.recurringPerShift) }),
           i.jsx(bdReportLine, { label: "Налоги / смену", value: bdMoney2(report.taxPerShift) }),
-          i.jsx(bdReportLine, { label: "Коммунальные / смену", value: bdMoney2(report.utilityPerShift) }),
-          i.jsx("p", { children: "Плановых смен по графику: " + report.plannedShifts + ". Алгоритм распределения фиксированных месячных сумм не изменён." }),
+          report.utilityMode!=="По показаниям"&&i.jsx(bdReportLine, { label: "Коммунальные / смену", value: bdMoney2(report.utilityPerShift) }),
+          i.jsx("p", { children: report.utilityMode==="По показаниям"?"Коммунальные начислены в месяце последнего показания. По отдельным сменам расход не распределяется. Оплаты не начисляют его повторно.":"Плановых смен по графику: " + report.plannedShifts + ". Алгоритм распределения фиксированных месячных сумм не изменён." }),
         ] }),
       ] }),
     ] }),

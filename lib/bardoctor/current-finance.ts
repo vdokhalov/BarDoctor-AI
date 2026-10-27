@@ -1,3 +1,4 @@
+import {utilityFinance} from './utility-finance';
 import {serviceAccruals} from './service-accruals';
 import {shiftRevenues} from "./work-shifts";
 import { calculateWorkdayPayroll, workdayPayrollRequirements } from './workday-payroll';
@@ -12,14 +13,15 @@ import { venueDate, venueTimeFromJson } from './venue-time';
 export type CurrentCostSourceStates = Partial<Record<"bd_sales_events_v1" | "bd_stock_movements" | "bd_sales_documents" | "bd_sales_batches" | "bd_sales_reconciliations_v1", "AVAILABLE" | "ABSENT" | "UNAVAILABLE">>;
 
 /** Recorded current-period result, never purchases-as-COGS or a closed-month profit. */
-export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; purchases?: unknown[]; purchasesAvailable?: boolean; payrollEstimateSources?: {employees: unknown[]; rules: unknown[]; gaps: unknown[]}; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costEnrichments?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
+export function currentFinance(input: FinanceReadInput & { profile: Record<string, unknown>; utilities?: unknown[]; purchases?: unknown[]; purchasesAvailable?: boolean; payrollEstimateSources?: {employees: unknown[]; rules: unknown[]; gaps: unknown[]}; movements?: unknown[]; batches?: unknown[]; reconciliations?: unknown[]; costEnrichments?: unknown[]; costProof?: object; costInputsAvailable?: boolean; costSourceStates?: CurrentCostSourceStates }) {
  const endDate = venueDate(input.asOf, venueTimeFromJson(JSON.stringify(input.profile)).timezone);
  const startDate = endDate.slice(0,7)+'-01';
  const purchasePayment = (x:Record<string,unknown>) => x.category==='inventory' || x.source==='purchase_payment' || x.source==='purchase_document' || x.paymentKind==='supplier_payment';
  const expenses=(input.expenses??[]).map(row);
- const accrual=serviceAccruals({...input,startDate,endDate});
+ const utility=utilityFinance({state:input.utilities,venueId:input.venueId,dataAccountId:input.dataAccountId,currency:input.currency,month:endDate.slice(0,7),throughDate:endDate,expenses});
+ const accrual=serviceAccruals({...input,startDate,endDate,expenses:utility.expenses});
  const value=readFinanceInputs({...input,startDate,endDate,expenses:accrual.expenses.filter(x=>!purchasePayment(x))});
- const missing=[...value.missing,...accrual.issues,...(input.purchasesAvailable===false?['SERVICE_SOURCE_UNAVAILABLE']:[])];
+ const missing=[...value.missing,...accrual.issues,...utility.issues,...(input.purchasesAvailable===false?['SERVICE_SOURCE_UNAVAILABLE']:[])];
  if(!value.days.length)missing.push('NO_CURRENT_ACTIVITY');
  const missingPayrollDates=value.payrollByDay.filter(x=>x.amount==null).map(x=>x.businessDate);
  const knownDays=value.payrollByDay.filter(x=>x.recordedAmount!=null);
@@ -92,14 +94,14 @@ export function currentFinance(input: FinanceReadInput & { profile: Record<strin
  const provisionalResultAfterCost=provisionalResultBeforeCost!=null&&assessmentKnown?Math.round((provisionalResultBeforeCost-history.cost+history.adjustment)*100)/100:null;
  const provisionalExplanation=provisionalPayroll!=null?'Предварительно: зарплата открытых смен рассчитана по текущим ставкам, внесённым часам и доступным данным о продажах. Она ещё не подтверждена и может измениться.':null;
  const financeAssessmentMissing=[...missing,...(!assessmentKnown?['CAPTURED_COST_INCOMPLETE']:[])];
- const labels:Record<string,string>={SERVICE_SCOPE_UNKNOWN:'Проверьте принадлежность документа услуги',SERVICE_ID_UNKNOWN:'Не удалось определить документ услуги',SERVICE_DATE_UNKNOWN:'Проверьте дату услуги',SERVICE_AMOUNT_UNKNOWN:'Проверьте сумму и валюту услуги',SERVICE_ALLOCATION_UNKNOWN:'Проверьте состав документа услуги',SERVICE_SOURCE_UNAVAILABLE:'Не удалось загрузить документы услуг',REVENUE_OR_CURRENCY:'Не подтверждена выручка или её валюта',PAYROLL:'Нет полного актуального расчёта ФОТ: проверьте ставки, часы и данные продаж открытых смен',EXPENSES_OR_CURRENCY:'Не полностью известны расходы или их валюта',NO_CURRENT_ACTIVITY:'Нет учтённых рабочих дней за текущий период'};
+ const labels:Record<string,string>={UTILITY_READINGS_INCOMPLETE:'Не все коммунальные расходы рассчитаны по показаниям',UTILITY_UNLINKED_EXPENSE:'Есть отдельные коммунальные расходы: проверьте, не относятся ли они к тем же показаниям',UTILITY_SOURCE_INVALID:'Не удалось проверить данные счётчиков',SERVICE_SCOPE_UNKNOWN:'Проверьте принадлежность документа услуги',SERVICE_ID_UNKNOWN:'Не удалось определить документ услуги',SERVICE_DATE_UNKNOWN:'Проверьте дату услуги',SERVICE_AMOUNT_UNKNOWN:'Проверьте сумму и валюту услуги',SERVICE_ALLOCATION_UNKNOWN:'Проверьте состав документа услуги',SERVICE_SOURCE_UNAVAILABLE:'Не удалось загрузить документы услуг',REVENUE_OR_CURRENCY:'Не подтверждена выручка или её валюта',PAYROLL:'Нет полного актуального расчёта ФОТ: проверьте ставки, часы и данные продаж открытых смен',EXPENSES_OR_CURRENCY:'Не полностью известны расходы или их валюта',NO_CURRENT_ACTIVITY:'Нет учтённых рабочих дней за текущий период'};
  return {...value,startDate,endDate,missing,missingPayrollDates,knownPayrollSubtotal,resultBeforeCost,
   provisionalPayroll,estimatedPayrollSubtotal,estimatedPayrollDays,provisionalResultBeforeCost,provisionalResultAfterCost,provisionalExplanation,
   result:resultBeforeCost,preliminaryResult:resultBeforeCost,financeInputsKnown:missing.length===0,
   costSupplementCount:history.supplementCount,currentFinance:true,asOfDate:endDate,operatingResult:null,isClosed:false,
   resultAfterCost,costBasis:value.revenueRows.some(x=>[1,2].includes(Number(x.manualTotalsVersion)))?value.revenueRows.every(x=>[1,2].includes(Number(x.manualTotalsVersion)))?"OWNER_DECLARED":"MIXED":"CAPTURED",costOfGoods:costKnown?history.cost:null,inventoryAdjustmentNet:adjustmentsKnown?history.adjustment:null,financeAssessmentMissing,costReasons:[...history.reasons,...(!sourcesKnown?["COST_SOURCE_UNAVAILABLE"]:[])],
   financeAssessmentInformation:[...(history.supplementCount?["Включён дорасчёт по приходам до продажи."]:[]),...missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),...(!assessmentKnown?["Не подтверждена себестоимость всех продаж и складских корректировок; текущая рентабельность не оценена."]:[])],
-  serviceAccruals:accrual.accruals, serviceAccrualIssues:accrual.issues, purchasePayments,cashResult:resultBeforeCost!=null&&purchasePayments!=null&&accrual.nonCashDelta!=null?Math.round((resultBeforeCost+accrual.nonCashDelta-purchasePayments)*100)/100:null,
+  utilityAccrued:utility.active?utility.amount:undefined,utilityPaid:utility.active?utility.paid:undefined,serviceAccruals:accrual.accruals, serviceAccrualIssues:accrual.issues, purchasePayments,cashResult:resultBeforeCost!=null&&purchasePayments!=null&&accrual.nonCashDelta!=null?Math.round((resultBeforeCost+accrual.nonCashDelta+(utility.active?(utility.amount??0)-utility.paid:0)-purchasePayments)*100)/100:null,
   missingInformation:missing.map(code=>code==='PAYROLL'&&provisionalExplanation?provisionalExplanation:labels[code]??code),
   resultExplanation:'Выручка − учтённые расходы − начисленный ФОТ. Без себестоимости товара и ещё не внесённых начислений; это не чистая прибыль.',
  };
