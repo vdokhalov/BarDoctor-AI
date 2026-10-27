@@ -25,7 +25,7 @@ const OPPORTUNITIES_HTML = `<!doctype html>
     <script src="/opportunity-calendar-qa-v327.js?v=20260828-opportunity-calendar-v328" defer></script>
     <script src="/opportunity-calendar-client-v327.js?v=20260828-opportunity-calendar-v327" defer></script>
     <script src="/opportunity-timing.js" defer></script>
-    <script src="/opportunities.js?v=20260828-opportunity-calendar-v328" defer></script>
+    <script src="/opportunities.js?v=20261027-notification-status" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
   </head>
   <body data-bd-parent-route="/home">

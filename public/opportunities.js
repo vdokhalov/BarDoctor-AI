@@ -141,11 +141,17 @@
   }
   function notificationCopy(event) {
     var plan = event.notificationPlan || {};
-    if (plan.status === "scheduled") return "Уведомления запланированы: " + Number(plan.count || 0);
-    if (plan.status === "queued") return "Уведомления сохранены и ожидают окна отправки";
-    if (plan.status === "disabled") return "Уведомления календаря выключены в настройках";
-    if (plan.status === "error") return plan.error || "Не удалось запланировать уведомления";
-    return "Уведомления появятся после планирования события";
+    var settings = state.notificationStatus || {};
+    if (state.offline) return "Статус уведомлений не обновлён. Проверьте подключение.";
+    if (settings.enabled === false || settings.calendarAlerts === false) return "Уведомления календаря выключены в настройках";
+    if (settings.serverConfigured === false) return "Отправка уведомлений пока не настроена";
+    if (plan.status === "scheduled") return "Передано на отправку: " + Number(plan.count || 0) + ". Доставка на устройство не подтверждена.";
+    if (plan.status === "queued") return "Напоминания ожидают отправки";
+    if (plan.status === "error") return "Не удалось запланировать напоминания";
+    if (plan.status === "disabled") return "Для события напоминания не запланированы";
+    if (event.decision === "dismissed") return "Для отклонённого события напоминания не нужны";
+    if (event.decision === "planned") return "Будущие напоминания для события не запланированы";
+    return "Напоминания для события не запланированы";
   }
   function sourceBlock(event) {
     var row = element("div", "source-row");
