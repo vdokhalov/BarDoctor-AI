@@ -1,0 +1,47 @@
+name: Signed holiday source QA
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  sample:
+    if: github.actor_id == '300073239' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Create synthetic test data
+        run: |
+          python3 - <<'PY'
+          import json,hashlib,datetime
+          if datetime.datetime.now(datetime.timezone.utc) >= datetime.datetime.fromisoformat('2026-10-28T14:00:00+00:00'):
+              raise SystemExit('QA window expired')
+          countries={}
+          for code in ['AM','AZ','BY','KG','KZ','MD','RU','TJ','TM','UZ']:
+              date='2027-01-01'
+              name='ТЕСТ — не праздник, не применять к заведению'
+              identity='|'.join([code,date,'public',name])
+              countries[code]={'events':[{'id':hashlib.sha256(identity.encode()).hexdigest(),'date':date,'category':'public','sourceName':name,'needsReview':True}]}
+          payload={'schemaVersion':1,'provider':'python-holidays','version':'0.107','license':'MIT','years':[2026,2027],'countries':countries,'testOnly':True}
+          with open('holiday-source-qa.json','w') as f:json.dump(payload,f,ensure_ascii=False,sort_keys=True)
+          PY
+      - name: Attest test payload
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: holiday-source-qa.json
+      - name: Prepare QA bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" holiday-source-qa.sigstore.json
+      - name: Retain test files for verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: holiday-source-signed-qa
+          path: |
+            holiday-source-qa.json
+            holiday-source-qa.sigstore.json
+          retention-days: 1
+          if-no-files-found: error
