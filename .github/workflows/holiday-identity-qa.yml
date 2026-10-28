@@ -1,0 +1,49 @@
+name: Temporary holiday identity QA
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  identity:
+    if: github.actor_id == '300073239' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      id-token: write
+    steps:
+      - name: Verify the fixed temporary QA endpoint
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import datetime,sys
+          if datetime.datetime.now(datetime.timezone.utc) >= datetime.datetime.fromisoformat('2026-10-28T13:11:15Z'.replace('Z','+00:00')):
+              raise SystemExit('Temporary identity QA has expired')
+          sys.argv=['check','--endpoint','https://bardoctor-holiday-identity-qa.v-dokhalov.chatgpt.site/api/holiday-identity-qa','--audience','https://bardoctor-holiday-identity-qa.v-dokhalov.chatgpt.site/holiday-identity-qa']
+          """Identity-only QA. No catalogue input, storage credentials, files or JWT logging."""
+          import argparse,hashlib,json,os,secrets,urllib.parse,urllib.request
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self,*args,**kwargs):raise RuntimeError('Redirect rejected')
+          
+          def main():
+              p=argparse.ArgumentParser();p.add_argument('--endpoint',required=True);p.add_argument('--audience',required=True);args=p.parse_args()
+              endpoint=urllib.parse.urlparse(args.endpoint)
+              if endpoint.scheme!='https' or not endpoint.hostname or endpoint.username or endpoint.password or endpoint.query or endpoint.fragment or endpoint.path!='/api/holiday-identity-qa':raise RuntimeError('Invalid QA endpoint')
+              if args.audience!=urllib.parse.urlunparse(endpoint._replace(path='/holiday-identity-qa')):raise RuntimeError('Invalid QA audience')
+              body=json.dumps({'purpose':'identity-only','nonce':secrets.token_urlsafe(24)},separators=(',',':')).encode();digest=hashlib.sha256(body).hexdigest()
+              parts=urllib.parse.urlparse(os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'])
+              if parts.scheme!='https' or parts.username or parts.password or parts.fragment or not (parts.hostname or '').endswith('.actions.githubusercontent.com'):raise RuntimeError('Invalid issuer endpoint')
+              query=[(k,v) for k,v in urllib.parse.parse_qsl(parts.query) if k!='audience'];query.append(('audience',args.audience+':sha256:'+digest))
+              opener=urllib.request.build_opener(NoRedirect)
+              request=urllib.request.Request(urllib.parse.urlunparse(parts._replace(query=urllib.parse.urlencode(query))),headers={'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+              with opener.open(request,timeout=20) as response:token=json.loads(response.read(20000))['value']
+              request=urllib.request.Request(args.endpoint,data=body,method='POST',headers={'Content-Type':'application/json','Authorization':'Bearer '+token})
+              with opener.open(request,timeout=20) as response:result=json.loads(response.read(16000))
+              if result.get('status')!='identity-verified' or result.get('sha256')!=digest or result.get('writesAllowed') is not False:raise RuntimeError('Invalid QA receipt')
+              identity=result.get('identity',{})
+              # Deliberately do not dump the response or JWT claims. Only explicit non-secret identity fields.
+              safe={k:identity.get(k) for k in ('repository','repositoryId','ownerId','ref','workflowRef','workflowSha','subject','runNumber','attempt','expiresAt')}
+              print(json.dumps({'status':'identity-verified','identity':safe,'writesAllowed':False}))
+          if __name__=='__main__':
+              try:main()
+              except Exception as error:
+                  print(json.dumps({'status':'failed','error':type(error).__name__}));raise SystemExit(1)
+          PY
