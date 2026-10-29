@@ -45,20 +45,27 @@ jobs:
                       if not isinstance(token,str) or not token or len(token)>16000: raise ValueError('token')
                   stage = 'qa-post'
                   req = urllib.request.Request(ENDPOINT, method='POST', headers={'Authorization':'Bearer '+token})
-                  with opener.open(req, timeout=75) as response:
-                      raw=response.read(4097)
-                      if len(raw)>4096: raise ValueError('size')
-                      body=json.loads(raw)
-                      result={'stage':stage,'http':response.status}
-                      for key in ('processed','updated','failed','qaCalendars','qaApplied'):
-                          value=body.get(key)
-                          if type(value) is int and 0<=value<=17: result[key]=value
-                      for key in ('mayHaveMore','qaMarks','qaHidden','qaUnchanged','qaReplayRejected','qaReplayNoMutation'):
-                          if type(body.get(key)) is bool: result[key]=body[key]
-                      if body.get('upstreamStatus') != 200: raise ValueError('upstream')
-                      if any(body.get(key) is not True for key in ('qaMarks','qaHidden','qaReplayRejected','qaReplayNoMutation')): raise ValueError('qa_assertion')
-                      if body.get('qaCalendars') != 17 or body.get('failed') != 0: raise ValueError('qa_counts')
-                      print(json.dumps(result)); return 0 if response.status==200 else 1
+                  try:
+                      response = opener.open(req, timeout=30)
+                  except urllib.error.HTTPError as error:
+                      response = error
+                  with response:
+                      status = response.status
+                      ctype = response.headers.get('Content-Type','').split(';',1)[0].strip().lower()
+                      result = {'stage':stage,'http':status,'content_type':ctype if ctype in ('application/json','text/html','text/plain') else 'other'}
+                      if ctype == 'application/json':
+                          raw = response.read(1025)
+                          if len(raw)<=1024:
+                              try:
+                                  body=json.loads(raw)
+                                  if body.get('marker')=='holiday-identity-only-v1':
+                                      result['marker']='holiday-identity-only-v1'
+                                      if body.get('code') in ('identity_verified','identity_rejected','internal_error','disabled','invalid_request'):
+                                          result['code']=body['code']
+                              except Exception:
+                                  pass
+                      print(json.dumps(result))
+                      return 0 if status==200 and result.get('code')=='identity_verified' else 1
               except urllib.error.HTTPError as error:
                   print(json.dumps({'stage':stage,'http':error.code})); return 1
               except Exception:
