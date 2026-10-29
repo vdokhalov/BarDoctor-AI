@@ -1,4 +1,3 @@
-# Approved signed holiday source workflow; publication remains gated by repository variables.
 name: Signed holiday source
 on:
   schedule:
@@ -9,77 +8,10 @@ concurrency:
   group: holiday-signed-release
   cancel-in-progress: false
 jobs:
-  generate:
-    if: github.repository == 'vdokhalov/BarDoctor-AI' && github.ref == 'refs/heads/main' && vars.HOLIDAY_APPROVED_SOURCE_SHA == github.sha
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
-        with:
-          python-version: '3.12'
-      - run: |
-          python scripts/holiday-feed/test_update.py
-          python scripts/holiday-feed/update.py --output generated-holiday-feed
-          python scripts/holiday-feed/stage_candidate.py generated-holiday-feed signed-feed
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: holiday-generated
-          path: signed-feed/holiday-source.json
-          retention-days: 2
-          if-no-files-found: error
-  sign:
-    needs: generate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: holiday-generated
-          path: signed-feed
-      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
-        id: attest
-        with:
-          subject-path: signed-feed/holiday-source.json
-      - env:
-          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-        run: cp "$BUNDLE_PATH" signed-feed/holiday-source.sigstore.json
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: holiday-signed
-          path: signed-feed/
-          retention-days: 2
-          if-no-files-found: error
-  publish:
-    needs: sign
-    if: vars.HOLIDAY_FEED_PUBLISH_ENABLED == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
+  approved-producer:
+    if: github.repository == 'vdokhalov/BarDoctor-AI' && github.ref == 'refs/heads/main'
+    uses: vdokhalov/BarDoctor-AI/.github/workflows/holiday-signed-producer.yml@14727f8a7a12d653fdf634f36dcb8d9fb8a77eac
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: holiday-signed
-          path: signed-feed
-      - name: Verify before publication
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: vdokhalov/BarDoctor-AI
-        run: |
-          gh attestation verify signed-feed/holiday-source.json --bundle signed-feed/holiday-source.sigstore.json --repo "$GH_REPO" --signer-workflow "$GH_REPO/.github/workflows/holiday-signed-release.yml" --source-digest "$GITHUB_SHA" --source-ref refs/heads/main --deny-self-hosted-runners
-      - name: Publish immutable release files
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/holiday-feed/publish_release.py signed-feed
+      id-token: write
+      attestations: write
