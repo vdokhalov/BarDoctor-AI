@@ -7,4 +7,4 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: vdokhalov/BarDoctor-AI/.github/workflows/holiday-background-updater.yml@916694fee3bd010d8aaabe468c25e24a516aa677
+    uses: vdokhalov/BarDoctor-AI/.github/workflows/holiday-background-updater.yml@04a47c2dfb7734d859b0c444af86affc28bff560
