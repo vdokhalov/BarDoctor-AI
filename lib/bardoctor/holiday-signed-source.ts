@@ -1,11 +1,11 @@
+import {parseSignedSourceConfig} from './holiday-signed-config';
 import {holidayAutoSyncPaused} from './holiday-sync-control';
 import {env}from'cloudflare:workers';
 import {readCurrent,updateFromSource}from'./signed-feed/runtime.mjs';
 import {validateHolidayFeed}from'./holiday-feed';
 const KEY='calendar-sources/signed-holidays-v2/refresh.json',HOUR=3600000;
 type State={lastAttempt?:number;lastSuccess?:number;leaseUntil?:number;error?:boolean};
-type Config={source:{payloadUrl?:string;bundleUrl?:string;releaseFeed?:boolean};policy:Record<string,unknown>;root:Record<string,unknown>};
-export function signedSourceConfig():Config|null{try{const raw=(env as unknown as {HOLIDAY_SIGNED_SOURCE?:string}).HOLIDAY_SIGNED_SOURCE;if(!raw)return null;const c=JSON.parse(raw);return (c?.source?.releaseFeed===true||(c?.source?.payloadUrl&&c?.source?.bundleUrl))&&c.policy&&c.root?c:null}catch{return null}}
+export function signedSourceConfig(){return parseSignedSourceConfig((env as unknown as {HOLIDAY_SIGNED_SOURCE?:string}).HOLIDAY_SIGNED_SOURCE)}
 function bucket(){const b=(env as unknown as {BUCKET?:R2Bucket}).BUCKET;if(!b)throw Error('SOURCE_STORAGE');return b}
 export function signedSourceEnabled(){return Boolean(signedSourceConfig())}
 async function policyId(){const bytes=new TextEncoder().encode(JSON.stringify(signedSourceConfig()?.policy));return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(b=>b.toString(16).padStart(2,'0')).join('')}
