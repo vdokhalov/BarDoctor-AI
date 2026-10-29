@@ -1,4 +1,3 @@
-import { assertCanonicalBoundaryInvariants } from './canonical-boundary-invariants.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 const file = new URL('../public/assets/index-BQGspy0I.js', import.meta.url);
 let source = readFileSync(file, 'utf8');
@@ -62,6 +61,8 @@ for (const [before, after] of [[originalStoreRead, guardedStoreRead], [originalF
     source = source.replace(before, after);
   }
 }
-assertCanonicalBoundaryInvariants(source);
 writeFileSync(file, source);
+for (const invariant of ['bdRestrictAnalysisContextPhase3a5(t);if(!r.ok', 'bdRestrictedAnalysisContextsPhase3a5.delete(t);bdBusinessHealthCommitEnvelopeV284', 'bdRestrictAnalysisContextPhase3a5();E(null)', 'function WS(){if(bdAnalysisContextRestrictedPhase3a5())return null;']) {
+  if (!source.includes(invariant)) throw new Error('Phase3a5 client permission invariant missing');
+}
 console.info('Phase3a5 client cache: authorization denial clears current analysis; transient failures preserve authorized cache.');

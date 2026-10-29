@@ -1,4 +1,3 @@
-import { assertCanonicalBoundaryInvariants } from '../scripts/canonical-boundary-invariants.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -25,7 +24,7 @@ test('authorization denial invalidates only the originating tenant context; stal
 
 test('actual client hooks clear denied Health/Doctor results, preserve transient-error cache, and unblock only after successful server authorization', () => {
   assert.match(bundle, /function WS\(\)\{if\(bdAnalysisContextRestrictedPhase3a5\(\)\)return null;/);
-  assertCanonicalBoundaryInvariants(bundle);
+  assert.match(bundle, /if\(r\.status===403\|\|r\.status===401\)bdRestrictAnalysisContextPhase3a5\(t\);if\(!r\.ok\|\|!a\?\.success\)throw/);
   assert.match(bundle, /bdRestrictedAnalysisContextsPhase3a5\.delete\(t\);bdBusinessHealthCommitEnvelopeV284\(a,!0\)/);
   assert.match(bundle, /if\(L\.status===403\|\|L\.status===401\)\{bdRestrictAnalysisContextPhase3a5\(\);E\(null\)\}/);
 });
