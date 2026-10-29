@@ -1,0 +1,17 @@
+name: Signed holiday source
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: holiday-signed-release
+  cancel-in-progress: false
+jobs:
+  approved-producer:
+    if: github.repository == 'vdokhalov/BarDoctor-AI' && github.ref == 'refs/heads/main'
+    uses: vdokhalov/BarDoctor-AI/.github/workflows/holiday-signed-producer.yml@14727f8a7a12d653fdf634f36dcb8d9fb8a77eac
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write

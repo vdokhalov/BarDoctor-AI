@@ -1,0 +1,76 @@
+name: Isolated holiday background updater
+on:
+  workflow_call:
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: One isolated QA request
+        shell: bash
+        run: |
+          python3 - <<'PYCODE'
+          """One bounded relay QA POST. No redirects/retries; never prints credentials."""
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          
+          ENDPOINT = 'https://bardoctor-background-relay-qa.v-dokhalov.chatgpt.site/api/holiday-background-sync'
+          AUDIENCE = 'https://bardoctor-holiday-scheduled-qa.v-dokhalov.chatgpt.site/api/holiday-background-sync'
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, headers, newurl):
+                  return None
+          
+          def main():
+              oidc_url = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_URL', '')
+              request_token = os.environ.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN', '')
+              if not request_token or not oidc_url.startswith('https://'):
+                  print('stage=config status=missing'); return 1
+              opener = urllib.request.build_opener(NoRedirect)
+              separator = '&' if '?' in oidc_url else '?'
+              req = urllib.request.Request(oidc_url + separator + urllib.parse.urlencode({'audience':AUDIENCE}), headers={'Authorization':'Bearer '+request_token})
+              stage = 'identity'
+              try:
+                  with opener.open(req, timeout=20) as response:
+                      raw = response.read(20001)
+                      if len(raw)>20000: raise ValueError('size')
+                      token = json.loads(raw).get('value')
+                      if not isinstance(token,str) or not token or len(token)>16000: raise ValueError('token')
+                  stage = 'qa-post'
+                  req = urllib.request.Request(ENDPOINT, method='POST', headers={'Authorization':'Bearer '+token})
+                  try:
+                      response = opener.open(req, timeout=30)
+                  except urllib.error.HTTPError as error:
+                      response = error
+                  with response:
+                      status = response.status
+                      ctype = response.headers.get('Content-Type','').split(';',1)[0].strip().lower()
+                      result = {'stage':stage,'http':status,'content_type':ctype if ctype in ('application/json','text/html','text/plain') else 'other'}
+                      if ctype == 'application/json':
+                          raw = response.read(1025)
+                          if len(raw)<=1024:
+                              try:
+                                  body=json.loads(raw)
+                                  if body.get('marker')=='holiday-identity-only-v1':
+                                      result['marker']='holiday-identity-only-v1'
+                                      if body.get('code') in ('identity_verified','identity_rejected','internal_error','disabled','invalid_request'):
+                                          result['code']=body['code']
+                              except Exception:
+                                  pass
+                      print(json.dumps(result))
+                      return 0 if status==200 and result.get('code')=='identity_verified' else 1
+              except urllib.error.HTTPError as error:
+                  print(json.dumps({'stage':stage,'http':error.code})); return 1
+              except Exception:
+                  print(json.dumps({'stage':stage,'status':'failed'})); return 1
+          
+          if __name__=='__main__':
+              sys.exit(main())
+          PYCODE
