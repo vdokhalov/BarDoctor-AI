@@ -341,7 +341,7 @@ const BAR_DOCTOR_HTML = `<!doctype html>
     <script src="/nomenclature-qa-v238.js?v=20260821-accounting-currency-v243" defer></script>
     <script src="/health-score-experience.js?v=20260828-health-startup-v332" defer></script>
     <script src="/opportunity-calendar-qa-v327.js?v=20260828-opportunity-calendar-v328" defer></script>
-    <script src="/opportunity-calendar-client-v327.js?v=20260828-opportunity-calendar-v327" defer></script>
+    <script src="/opportunity-calendar-client-v327.js?v=20261029-calendar-startup-c7c483d1" defer></script>
     <script src="/competitor-market-qa-v329.js?v=20260828-competitors-v329" defer></script>
     <script src="/competitor-market-client-v329.js?v=20260828-competitors-v329" defer></script>
     <script src="/server-migration-discovery-v262.js?v=20260824-controlled-migration-v262" defer></script>

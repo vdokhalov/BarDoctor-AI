@@ -23,7 +23,7 @@ const OPPORTUNITIES_HTML = `<!doctype html>
     <script src="/bd-route-context.js?v=20260822-navigation-v247" defer></script>
     <script src="/venue-switcher.js?v=20260826-venue-identity-v297" defer></script>
     <script src="/opportunity-calendar-qa-v327.js?v=20260828-opportunity-calendar-v328" defer></script>
-    <script src="/opportunity-calendar-client-v327.js?v=20260828-opportunity-calendar-v327" defer></script>
+    <script src="/opportunity-calendar-client-v327.js?v=20261029-calendar-startup-c7c483d1" defer></script>
     <script src="/opportunity-timing.js" defer></script>
     <script src="/opportunities.js?v=20261028-free-holidays" defer></script>
     <script src="/modern-polish.js?v=20260811-modern-v87" defer></script>
