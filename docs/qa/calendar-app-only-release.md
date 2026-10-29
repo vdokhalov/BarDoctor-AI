@@ -14,23 +14,25 @@ Three runtime seams differ from c7c483d1:
 - holiday-auto-sync.ts retains only scoped status/syncHolidayAccount with per-venue CAS/profile guard and notification safeguards. No BackgroundGuard, batch cache, runHolidaySync or drainHolidayBackground. Each authenticated venue owns its source request, global signed source lease still coalesces shared downloads.
 
 ## Dependencies / activation (NOT installed)
-Existing DB domain_data and BUCKET bindings. No new D1 schema. Existing nodejs_compat. Vendored verifier uses pinned @sigstore/verify4.1.2, core4.0.1, bundle5.0.0, protobuf-specs0.5.0; lockfile/source and Apache2 notices included. Root package changes only remove duplicated legacy prebuild (verified build script already owns patch pipeline).
+Existing DB domain_data and BUCKET bindings. No new D1 schema. Existing nodejs_compat. Vendored verifier uses pinned @sigstore/verify4.1.2, core4.0.1, bundle5.0.0, protobuf-specs0.5.0; lockfile/source and Apache2 notices included. Root package.json and the complete production build-verified.sh pipeline are unchanged. The temporary Phase3a5 invariant adaptation and its associated tests are excluded.
 
 HOLIDAY_SIGNED_SOURCE: exact nonsecret docs/examples/holiday-signed-source-pinned.json, releaseFeed:true, repository vdokhalov/BarDoctor-AI, repositoryId1289866712, ownerId300073239, caller signed-release.yml/main, immutable signed-producer.yml@14727f8a7a12d653fdf634f36dcb8d9fb8a77eac, public Sigstore root,14day candidate freshness. No GitHub or Sites token. HOLIDAY_AUTO_SYNC_DISABLED=true pauses admission; false/absent enables normal flow. No HOLIDAY_FEED_TRUST or background variables.
 
 Production metadata read for readiness: v666/deployment appgdep_6ae18376c19081918c3c4d4fb5160297 succeeded, public, settings revision15, no HOLIDAY_* entries. No settings changed. Publication/activation remain separate decisions.
 
 ## Local verification
-66 focused app tests +5 release-discovery tests PASS before final build; startup13 tests included. App-only tests enforce schema rejection, no legacy endpoint/DDL/activation and shared signed reader requiring no D1. Runner-specific tests replaced with per-venue isolation assertions; all decision/deletion, source failure, CAS, date and reminder tests retained.
+67 focused app tests +5 release-discovery tests PASS; startup13 tests included. App-only tests enforce schema rejection, no legacy endpoint/DDL/activation and shared signed reader requiring no D1. Runner-specific tests replaced with per-venue isolation assertions; all decision/deletion, source failure, CAS, date and reminder tests retained.
 
 Commands:
 ```
 node_modules/.bin/tsx --test tests/free-holiday-calendar.test.ts tests/cis-holidays.test.ts tests/opportunity-evidence.test.ts tests/holiday-auto-sync.test.ts tests/holiday-notification-guard.test.ts tests/holiday-pinned-release.test.ts tests/holiday-published-release.test.ts tests/holiday-signed-open.test.ts tests/holiday-sync-control.test.ts tests/holiday-startup-client.test.ts tests/holiday-synthetic-delta.test.ts tests/holiday-app-only.test.ts
 node --test tests/holiday-release-source.test.mjs
-npm run build
+bash scripts/build-verified.sh
 node_modules/.bin/tsc --noEmit
 node_modules/.bin/tsx scripts/holiday-synthetic-open-browser.ts
 ```
+The npm lifecycle retains its known baseline failure: its older prebuild restore sequence omits later presentation layers. This release uses the existing canonical command above, documented in production docs/qa/utility-meters-2026-10-27.md; no invariant is disabled or patched.
+
 Typecheck baseline only: business-health-snapshot.ts372 TS2322 and health-partial-operations-v539.test.ts10 TS2352. Final build/UI outcome recorded with the exact commit in task report; this document is not hosted approval.
 
 Country coverage remains partial; see published-feed-coverage-20261028.md. Static professional supplements do not become automatically renewed by the signed feed. MD uses separately translated OpenHolidays. No invented religious/local dates or scores. Real signed releases prove signature/discovery, not a changed payload; synthetic revisions prove changed-data behavior separately. Startup1–2seconds is not achieved consistently; previous local mock timings are not production/iPhone measurements. No closed-app calendar sync claimed. Already successful page contexts stay deduped through bfcache; no continuous polling.
