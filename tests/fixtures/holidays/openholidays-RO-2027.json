@@ -1,0 +1,370 @@
+[
+  {
+    "id": "ba8f1a1d-8ad8-4777-a2dc-2b35044fc15c",
+    "startDate": "2027-01-01",
+    "endDate": "2027-01-02",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Anul Nou"
+      },
+      {
+        "language": "DE",
+        "text": "Neujahr"
+      },
+      {
+        "language": "EN",
+        "text": "New Year"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "18886b52-0328-40a6-b442-e552c4546982",
+    "startDate": "2027-01-06",
+    "endDate": "2027-01-06",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Bobotează"
+      },
+      {
+        "language": "DE",
+        "text": "Dreikönigstag"
+      },
+      {
+        "language": "EN",
+        "text": "Epiphany"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "7672d292-44e3-41ed-b3ac-534184b2341e",
+    "startDate": "2027-01-07",
+    "endDate": "2027-01-07",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Sfântul Ion"
+      },
+      {
+        "language": "DE",
+        "text": "Tag des Heiligen Johannes des Täufers"
+      },
+      {
+        "language": "EN",
+        "text": "Saint John the Baptist Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "c0c48d63-330c-454d-8284-80664e4b6f08",
+    "startDate": "2027-01-24",
+    "endDate": "2027-01-24",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Unirii Principatelor Române"
+      },
+      {
+        "language": "DE",
+        "text": "Tag der Vereinigung der rumänischen Fürstentümer"
+      },
+      {
+        "language": "EN",
+        "text": "Day of the Unification of the Romanian Principalities"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "e800b84a-9bff-4859-92ea-b78c68e0056b",
+    "startDate": "2027-04-30",
+    "endDate": "2027-04-30",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Vinerea Mare"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Karfreitag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Good Friday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "f80dac02-942d-49c3-b242-1631b1ce20c5",
+    "startDate": "2027-05-01",
+    "endDate": "2027-05-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Muncii"
+      },
+      {
+        "language": "DE",
+        "text": "Tag der Arbeit"
+      },
+      {
+        "language": "EN",
+        "text": "Labour Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "4379d891-8868-4db7-a48b-2d236d04d148",
+    "startDate": "2027-05-02",
+    "endDate": "2027-05-02",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Prima zi de Paşte"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Ostersonntag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Easter Sunday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "5e893651-3ded-47be-be40-987de5147ed3",
+    "startDate": "2027-05-03",
+    "endDate": "2027-05-03",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "A doua zi de Paște"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Ostermontag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Easter Monday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "9cd64ce4-1486-4f59-93d3-1e735aae22c9",
+    "startDate": "2027-06-01",
+    "endDate": "2027-06-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Copilului"
+      },
+      {
+        "language": "DE",
+        "text": "Weltkindertag"
+      },
+      {
+        "language": "EN",
+        "text": "Children's Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "8ba6b90f-0306-4a59-8abc-99e79a990fad",
+    "startDate": "2027-06-07",
+    "endDate": "2027-06-07",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Prima zi de Rusalii"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Pfingstsonntag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Pentecost Sunday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "259296cb-3c86-4174-b41b-1f4622a65897",
+    "startDate": "2027-06-20",
+    "endDate": "2027-06-20",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "A doua zi de Rusalii"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Pfingstmontag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Pentecost Monday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "f995e297-0d77-430e-9866-0ead7fca2969",
+    "startDate": "2027-08-21",
+    "endDate": "2027-08-21",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Adormirea Maicii Domnului"
+      },
+      {
+        "language": "DE",
+        "text": "Mariä Himmelfahrt"
+      },
+      {
+        "language": "EN",
+        "text": "Assumption Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "9f3b3948-c28f-425d-ab74-789d236dc676",
+    "startDate": "2027-11-30",
+    "endDate": "2027-11-30",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Sfântul Apostol Andrei"
+      },
+      {
+        "language": "DE",
+        "text": "Tag des Heiligen Andreas"
+      },
+      {
+        "language": "EN",
+        "text": "Saint Andrew's Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "cb107743-f5de-4108-b720-eb61d8af5326",
+    "startDate": "2027-12-01",
+    "endDate": "2027-12-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Națională a României"
+      },
+      {
+        "language": "DE",
+        "text": "Nationalfeiertag von Rumänien"
+      },
+      {
+        "language": "EN",
+        "text": "National Day of Romania"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "86c752a6-efd8-4f15-a7ac-6a5a064e513c",
+    "startDate": "2027-12-25",
+    "endDate": "2027-12-25",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Prima zi de Crăciun"
+      },
+      {
+        "language": "DE",
+        "text": "Erster Weihnachtstag"
+      },
+      {
+        "language": "EN",
+        "text": "First Christmas Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "27ddcb10-50fc-45bd-8f72-ac2296163159",
+    "startDate": "2027-12-26",
+    "endDate": "2027-12-26",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "A doua zi de Crăciun"
+      },
+      {
+        "language": "DE",
+        "text": "Zweiter Weihnachtstag"
+      },
+      {
+        "language": "EN",
+        "text": "Second Christmas Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  }
+]

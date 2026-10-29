@@ -1,3 +1,9 @@
+import {holidaySyncStatus,syncHolidayAccount} from '../../../lib/bardoctor/holiday-auto-sync';
+import {opportunityEvidence} from '../../../lib/bardoctor/opportunity-evidence';
+import {loadOpportunityEvidenceDays} from '../../../lib/bardoctor/opportunity-evidence-storage';
+import type {AuthenticatedAccount} from '../../../lib/bardoctor/auth';
+import {accountingCurrencyFromRestaurantJson} from '../../../lib/bardoctor/currency';
+import { holidayCountry, loadFreeHolidays, freeHolidayRaw } from "../../../lib/bardoctor/free-holiday-calendar";
 import { getD1 } from "../../../db";
 import { readStoreSnapshots, withStoreCasRetries } from "../../../lib/bardoctor/store-cas";
 import { authenticateRequest, unauthorized } from "../../../lib/bardoctor/auth";
@@ -5,7 +11,6 @@ import { hasPermission } from "../../../lib/bardoctor/access-control";
 import {
   AIServiceError,
   aiErrorResponse,
-  parseAIJson,
 } from "../../../lib/bardoctor/ai-provider";
 import {
   loadOpportunityCalendar,
@@ -21,7 +26,6 @@ import {
   OPPORTUNITY_HORIZON_DAYS,
   OPPORTUNITY_SEARCH_RADIUS_KM,
   buildOpportunityBaseline,
-  opportunityBaselineHasCountryCalendar,
   opportunityVenueProfileSignature,
   type OpportunityVenueContext,
 } from "../../../lib/bardoctor/opportunity-baseline";
@@ -29,11 +33,6 @@ import {
   getNotificationPreferences,
   oneSignalAccountConfig,
 } from "../../../lib/bardoctor/notifications";
-import { openAIWebSearch } from "../../../lib/bardoctor/openai";
-import {
-  loadVenueAIContext,
-  venueAIContextForPrompt,
-} from "../../../lib/bardoctor/venue-ai-context";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -92,34 +91,6 @@ function uniqueSources(sources: OpportunitySource[]): OpportunitySource[] {
   }).slice(0, 40);
 }
 
-function mergedRawCalendar(baseline: ReturnType<typeof buildOpportunityBaseline>, discovered: unknown): JsonRecord {
-  const raw = record(discovered) ?? {};
-  const webEvents = (Array.isArray(raw.events) ? raw.events : [])
-    .map(record)
-    .filter((event): event is JsonRecord => Boolean(event))
-    .map((event) => {
-      const requestedType = text(event.calendarType);
-      const locality = text(event.locality);
-      const category = text(event.category);
-      const calendarType = ["official", "local", "discovered"].includes(requestedType)
-        ? requestedType
-        : category === "holiday" && locality === "national"
-          ? "official"
-          : (category === "holiday" || category === "city") && ["local", "regional"].includes(locality)
-            ? "local"
-            : "discovered";
-      return { ...event, origin: "web", calendarType };
-    });
-  return {
-    summary: text(
-      raw.summary,
-      baseline.raw.summary,
-      1_000,
-    ),
-    events: [...baseline.raw.events, ...webEvents],
-  };
-}
-
 function baselineCalendar(input: {
   context: OpportunityVenueContext;
   label: string;
@@ -134,7 +105,7 @@ function baselineCalendar(input: {
     windowEnd: input.windowEnd,
   });
   return normaliseOpportunityCalendar({
-    raw: baseline.raw,
+    raw: { ...baseline.raw, events: baseline.raw.events.filter(event => event.calendarType !== "local" && event.category !== "city") },
     sources: baseline.sources,
     previous: input.previous,
     venueName: input.context.venueName,
@@ -145,29 +116,6 @@ function baselineCalendar(input: {
     model: "calendar-core-v3",
     venueContext: input.context,
   });
-}
-
-function countryCode(country: string): string | undefined {
-  const normalised = country.trim().toLocaleLowerCase("ru");
-  const map: Record<string, string> = {
-    md: "MD",
-    moldova: "MD",
-    молдова: "MD",
-    молдавия: "MD",
-    ro: "RO",
-    romania: "RO",
-    румыния: "RO",
-    ua: "UA",
-    ukraine: "UA",
-    украина: "UA",
-    de: "DE",
-    germany: "DE",
-    германия: "DE",
-    ru: "RU",
-    russia: "RU",
-    россия: "RU",
-  };
-  return /^[a-z]{2}$/i.test(country.trim()) ? country.trim().toUpperCase() : map[normalised];
 }
 
 function noStore(response: Response): Response {
@@ -186,8 +134,12 @@ async function requestRecord(request: Request, maximumBytes: number): Promise<Js
   return body;
 }
 
-function publicCalendar(calendar: OpportunityCalendar | null) {
-  return calendar ? { ...calendar, events: calendar.events.map(event => ({ ...event, notificationPlan: { ...event.notificationPlan, messages: event.notificationPlan.messages.map(({ recipientAccountId: _recipient, ...message }) => message) } })) } : null;
+async function publicCalendar(calendar: OpportunityCalendar | null, account:AuthenticatedAccount, context:OpportunityVenueContext) {
+  const missing=calendar?.events.some(event=>event.assessmentAvailable===false);
+  const days=missing?await loadOpportunityEvidenceDays(account):null;
+  let profile:JsonRecord={};try{profile=JSON.parse(account.restaurantJson||'{}')}catch{}
+  const withEvidence=calendar?{...calendar,events:calendar.events.map(event=>event.assessmentAvailable===false?{...event,evidenceAssessment:opportunityEvidence({date:event.startDate,context,timezone:typeof profile.timezone==='string'?profile.timezone:undefined,currency:accountingCurrencyFromRestaurantJson(account.restaurantJson),venueId:account.venueId,asOf:new Date().toISOString(),days})}:event)}:null;
+  return withEvidence ? { ...withEvidence, events: withEvidence.events.map(event => ({ ...event, notificationPlan: { ...event.notificationPlan, messages: event.notificationPlan.messages.map(({ recipientAccountId: _recipient, ...message }) => message) } })) } : null;
 }
 
 function opportunityCalendarIsStale(
@@ -253,8 +205,9 @@ async function getOnce(request: Request): Promise<Response> {
   return noStore(Response.json({
     ok: true,
     restaurant,
-    calendar: publicCalendar(calendar),
+    calendar: await publicCalendar(calendar,account,context),
     stale,
+    sync: {...await holidaySyncStatus(account.id,context.country),allowed:hasPermission(account,"calendar.manage")},
     refreshIntervalDays: 7,
     horizonDays: OPPORTUNITY_HORIZON_DAYS,
     searchRadiusKm: OPPORTUNITY_SEARCH_RADIUS_KM,
@@ -299,7 +252,10 @@ export async function POST(request: Request): Promise<Response> {
       && previous.profileSignature === expectedSignature,
     );
     const automatic = body.automatic === true;
-    if (automatic) throw new AIServiceError("Запустите платный поиск явно кнопкой обновления.", 400);
+    if (automatic) {
+      const outcome=await syncHolidayAccount(account.id);
+      return noStore(Response.json({ok:true,calendar:await publicCalendar(await loadOpportunityCalendar(account.id),account,context),sync:{...await holidaySyncStatus(account.id,context.country),allowed:true},syncOutcome:outcome.status,partial:outcome.status==='failed',warning:outcome.status==='failed'?'Источник недоступен. Показан сохранённый календарь.':undefined}));
+    }
     const knownGeneratedAt = text(body.knownGeneratedAt, "", 80);
     const today = new Date().toISOString().slice(0, 10);
     if (automatic && previous && (
@@ -308,148 +264,28 @@ export async function POST(request: Request): Promise<Response> {
     )) {
       return noStore(Response.json({
         ok: true,
-        calendar: publicCalendar(previous),
+        calendar: await publicCalendar(previous,account,context),
         skipped: true,
         message: "Календарь уже актуален.",
       }));
     }
 
     const windowEnd = addDays(today, OPPORTUNITY_HORIZON_DAYS);
-    const baseline = buildOpportunityBaseline({ context, windowStart: today, windowEnd });
-    const hasCountryCalendar = opportunityBaselineHasCountryCalendar(context);
-    const unifiedContext = await loadVenueAIContext(account, "opportunities", body);
-    const internal = venueAIContextForPrompt(unifiedContext);
-    const system = `Ты — BarDoctor Opportunity Intelligence, аналитик возможностей для баров, ресторанов, клубов и караоке. Используй веб-поиск и только актуальные публичные источники. Пиши по-русски, конкретно и без рекламных фраз.
-
-Задача — собрать полноценный календарь подтверждённых возможностей на ближайшие ${OPPORTUNITY_HORIZON_DAYS} дней для конкретного заведения. Код BarDoctor передаёт ниже только базовые даты. Не считай этот список полным и не повторяй лишь точные совпадения по названию и дате.
-
-Обязательные уровни проверки для любого указанного региона:
-1. официальный календарь страны: государственные праздники и фактические длинные выходные;
-2. календарь субъекта/области/республики: региональные праздники и дополнительные выходные;
-3. точный город: День города, официальная муниципальная афиша и крупные городские события;
-4. актуальная локальная афиша: концерты, фестивали, домашние спортивные матчи и иные события с уже подтверждённой датой.
-Если регион в профиле не заполнен, сначала установи его по городу через официальный источник. Для каждого найденного календарного уровня добавь подтверждённые даты из заданного периода, даже если их коммерческий потенциал низкий. Не выдумывай даты ради заполнения.
-
-Жёсткий географический фильтр:
-- local_demand допустим только в точном городе заведения или не дальше ${OPPORTUNITY_SEARCH_RADIUS_KM} км; укажи distanceKm, а если расстояние не подтверждено — null;
-- события в других городах и районах не считать источником гостей без прямого доказательства перемещения аудитории;
-- regional_interest — информационный шум, такие события не возвращай;
-- venue_activation допустим для официального национального/регионального праздника, национальной трансляции, спортивного финала или сезонной даты, которые реально можно учесть либо активировать внутри заведения;
-- фестиваль, концерт или городской марафон далеко от заведения нельзя превращать в «after-party» только ради заполнения списка;
-- любая удалённая точка не относится автоматически к заведению в городе «${context.city || "не указан"}».
-
-Жёсткий фильтр формата:
-- используй только реально указанные в профиле свойства заведения;
-- не выдумывай террасу, винную карту, кухню, экран, сцену или тематическую специализацию;
-- винный фестиваль не подходит ночному клубу/караоке автоматически;
-- учитывай точные рабочие дни и часы; если событие приходится на закрытый день, предложи activationDate ближайшей реальной смены либо снизь scheduleFit;
-- рекомендация должна называть конкретное заведение и объяснять, почему повод подходит именно ему.
-
-Правила достоверности:
-- не выдумывай события, даты, артистов, команды, площадки, расстояния или прогнозы;
-- каждое событие должно иметь минимум один URL из веб-поиска, который подтверждает название и дату;
-- не включай событие, если дата не подтверждена;
-- отделяй факт от гипотезы для заведения;
-- не обещай рост выручки без внутренних данных или подтверждённого основания;
-- если точный процент нельзя обосновать, поле impact.range должно прямо говорить, что диапазон пока не рассчитан;
-- учитывай формат, график, город, район и доступные показатели самого заведения;
-- рекомендации должны говорить, что именно делать: формат, предложение, продвижение, операционная подготовка и крайняя дата решения;
-- учитывай права на публичную трансляцию, безопасность, логистику и конкуренцию как риски, когда это уместно;
-- не дублируй одно и то же событие под разными названиями;
-- для официальных дат полнота важнее высокой оценки; для афиш лучше вернуть 0–8 сильных локальных событий, чем заполнить список нерелевантными фестивалями.
-
-Оценка potentialScore — сумма пяти факторов строго от 0 до 100:
-audienceFit 0–30, scheduleFit 0–20, proximity 0–20, commercialPotential 0–20, readiness 0–10.
-75–100 = высокий потенциал, 55–74 = средний, ниже 55 = низкий.
-
-Верни ТОЛЬКО валидный JSON без markdown по схеме:
-{"summary":"...","events":[{"title":"...","category":"holiday|sport|concert|festival|city|seasonal|other","calendarType":"official|local|discovered","startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD или null","activationDate":"YYYY-MM-DD — рекомендуемая смена заведения","startTime":"HH:MM или null","location":"точная площадка и город","locality":"local|regional|national|online","relation":{"mode":"local_demand|venue_activation|regional_interest","distanceKm":12.5,"reason":"почему это относится именно к указанному заведению"},"audience":"...","summary":"подтверждённый факт о событии","confidence":"high|medium|low","scoreReason":"почему такая оценка именно для этого заведения и графика","scoreBreakdown":{"audienceFit":25,"scheduleFit":18,"proximity":18,"commercialPotential":15,"readiness":6},"whyUseful":["..."],"impact":{"score":82,"level":"high|medium|low","metric":"что может измениться","range":"обоснованный диапазон или честно без диапазона","basis":"на чём основана оценка"},"recommendation":{"format":"...","offer":"...","promotion":"...","operations":"...","decisionDeadline":"YYYY-MM-DD","leadDays":14},"risks":["..."],"sourceUrls":["https://..."]}]}`;
-
-    const prompt = `Сегодня ${today}. Найди и оцени возможности на период ${today}–${windowEnd}.
-
-Профиль заведения:
-${JSON.stringify({
-  name: venueName,
-  businessType: context.businessType,
-  venueFormat: context.venueFormat,
-  seats: numeric(restaurant.seats),
-  employees: numeric(restaurant.employees),
-  openTime: context.openTime,
-  closeTime: context.closeTime,
-  workingDays: context.workingDays,
-  city: context.city,
-  region: context.region,
-  country: context.country,
-  location: label,
-  latitude: numeric(restaurant.lat),
-  longitude: numeric(restaurant.lng),
-})}
-
-Внутренний контекст BarDoctor:
-${JSON.stringify(internal)}
-
-Базовые даты, которые уже добавлены BarDoctor. Не повторяй только эти точные пары названия и даты:
-${JSON.stringify(baseline.raw.events.map((event) => ({
-  title: event.title,
-  date: event.startDate,
-  recommendedShift: event.activationDate,
-})))}
-
-Приоритетные локальные источники и рамки поиска:
-${baseline.searchHints.map((hint) => `- ${hint}`).join("\n")}
-
-Наличие полного встроенного календаря страны: ${hasCountryCalendar ? "да" : "нет — обязательно найди официальный календарь страны через веб-поиск"}.
-
-Верни все недостающие подтверждённые официальные и региональные даты из периода и от 0 до 8 сильных локальных событий. Общий максимум — 16 событий. Сначала точный город, затем ближайшая зона до ${OPPORTUNITY_SEARCH_RADIUS_KM} км, затем только действительно активируемые внутри заведения национальные поводы.`;
-
+    const country = holidayCountry(context.country);
+    if (!country) throw new AIServiceError("Для этой страны бесплатный справочник пока не подключён. Сохранённый календарь не изменён.", 400);
+    const data = await loadFreeHolidays(country,today,windowEnd);
+    const seed = freeHolidayRaw(context,today,windowEnd,data,country);
     const generatedAt = new Date().toISOString();
-    let discovered: unknown = { summary: baseline.raw.summary, events: [] };
-    let webSources: OpportunitySource[] = [];
-    let model = "calendar-core-v2";
-    let searchWarning = "";
-    try {
-      const web = await openAIWebSearch({
-        accountId: account.id,
-        observability: { actorAccountId: account.actorAccountId, venueId: account.venueId, feature: "calendar" },
-        system,
-        prompt,
-        maxTokens: 7_000,
-        location: {
-          country: countryCode(context.country),
-          city: context.city || undefined,
-          region: context.region || undefined,
-          timezone: text(body.timezone, "Europe/Chisinau", 80),
-        },
+    let calendar = normaliseOpportunityCalendar({raw:seed.raw,sources:seed.sources,previous,venueName,locationLabel:label,windowStart:today,windowEnd,generatedAt,model:data.model,venueContext:context});
+    // Keep saved event decisions and assessments; do not re-date old local listings.
+    if (previousMatchesProfile && previous) {
+      calendar.sources = uniqueSources([...calendar.sources,...previous.sources]);
+      calendar.events = calendar.events.map(event => {
+        const old=previous.events.find(item=>item.id===event.id);
+        return old ? {...event,potentialScore:old.potentialScore,potentialLabel:old.potentialLabel,scoreBreakdown:old.scoreBreakdown,scoreReason:old.scoreReason,impact:old.impact,assessmentAvailable:old.assessmentAvailable,decision:old.decision,decisionUpdatedAt:old.decisionUpdatedAt} : event;
       });
-      discovered = parseAIJson<unknown>(web.text);
-      webSources = web.sources.map((source) => ({ url: source.url, title: source.title }));
-      const discoveredRecord = record(discovered);
-      const discoveredEvents = Array.isArray(discoveredRecord?.events) ? discoveredRecord.events : [];
-      if (discoveredEvents.length > 0 && webSources.length === 0) {
-        throw new AIServiceError(
-          "Веб-поиск нашёл события, но не вернул подтверждающие источники. BarDoctor сохранил базовый календарь и повторит поиск позже.",
-          502,
-        );
-      }
-      model = web.model;
-    } catch (error) {
-      searchWarning = error instanceof Error
-        ? error.message
-        : "Локальные афиши временно не удалось проверить.";
+      for(const old of previous.events) if(!calendar.events.some(event=>event.id===old.id)) calendar.events.push(old);
     }
-    const sources = uniqueSources([...baseline.sources, ...webSources]);
-    let calendar = normaliseOpportunityCalendar({
-      raw: mergedRawCalendar(baseline, discovered),
-      sources,
-      previous,
-      venueName,
-      locationLabel: label,
-      windowStart: today,
-      windowEnd,
-      generatedAt,
-      model,
-      venueContext: context,
-    });
     calendar = await reconcileOpportunityNotifications({
       accountId: account.id,
       venueId: account.venueId,
@@ -458,17 +294,8 @@ ${baseline.searchHints.map((hint) => `- ${hint}`).join("\n")}
       next: calendar,
     });
     await saveOpportunityCalendar(account.id, calendar, casSnapshots);
-    const baselineCount = calendar.events.filter((event) => event.origin === "baseline").length;
-    const localCount = calendar.events.filter((event) => event.origin === "web").length;
-    return noStore(Response.json({
-      ok: true,
-      calendar: publicCalendar(calendar),
-      partial: Boolean(searchWarning),
-      warning: searchWarning || null,
-      message: searchWarning
-        ? `Календарные даты обновлены: ${baselineCount}. Локальные афиши временно не удалось проверить.`
-        : `Календарь обновлён: ${baselineCount} обязательных дат и ${localCount} подтверждённых локальных событий.`,
-    }));
+    return noStore(Response.json({ok:true,calendar:await publicCalendar(calendar,account,context),partial:Boolean(data.warning),warning:data.warning,
+      message:data.warning?data.warning:"Даты обновлены из бесплатного справочника. Местная афиша не обновлялась."}));
   } catch (error) {
     return noStore(aiErrorResponse(error));
   }
@@ -530,7 +357,7 @@ export async function PATCH(request: Request): Promise<Response> {
       await saveOpportunityCalendar(account.id, calendar, casSnapshots);
       return noStore(Response.json({
         ok: true,
-        calendar: publicCalendar(calendar),
+        calendar: await publicCalendar(calendar,account,context),
         message: "Событие удалено из календаря, связанные напоминания отменены.",
       }));
     }
@@ -546,7 +373,7 @@ export async function PATCH(request: Request): Promise<Response> {
     await saveOpportunityCalendar(account.id, calendar, casSnapshots);
     return noStore(Response.json({
       ok: true,
-      calendar: publicCalendar(calendar),
+      calendar: await publicCalendar(calendar,account,context),
       message: decision === "planned"
         ? "Событие взято в работу. BarDoctor сохранил план напоминаний."
         : decision === "dismissed"

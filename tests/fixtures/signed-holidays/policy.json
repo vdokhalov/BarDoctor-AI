@@ -1,0 +1,12 @@
+{
+  "repository": "vdokhalov/BarDoctor-AI",
+  "repositoryId": "1289866712",
+  "ownerId": "300073239",
+  "workflow": ".github/workflows/holiday-source-attestation-qa.yml",
+  "ref": "refs/heads/main",
+  "allowedSourceSHAs": [
+    "99d310cc57c584af7e74b5fb755fc0479a7d86e6"
+  ],
+  "notBefore": 1793145600000,
+  "maxAgeMs": 1209600000
+}

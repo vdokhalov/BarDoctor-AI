@@ -1,3 +1,4 @@
+import {cancelPendingOpportunityJobs} from './notification-jobs';
 import { calendarNotificationRecipients, calendarNotificationSource } from "./calendar-notification-recipients";
 import { runStoreCasBatch, type StoreSnapshot } from "./store-cas";
 import { and, eq } from "drizzle-orm";
@@ -43,6 +44,10 @@ export type ScheduledOpportunityMessage = {
 
 export type OpportunityEvent = {
   id: string;
+  sourceMissing?: boolean;
+  sourceIdentity?: string;
+  sourceScheduleChanged?: boolean;
+  sourceRevision?: number;
   title: string;
   category: string;
   calendarType: "official" | "local" | "commercial" | "discovered";
@@ -61,6 +66,7 @@ export type OpportunityEvent = {
   audience: string;
   summary: string;
   potentialScore: number;
+  assessmentAvailable?: boolean;
   potentialLabel: "high" | "medium" | "low";
   confidence: "high" | "medium" | "low";
   scoreReason: string;
@@ -210,6 +216,7 @@ function scheduleSignature(event: Pick<OpportunityEvent,
   return [
     event.id,
     event.startDate,
+    Boolean((event as OpportunityEvent).sourceMissing),
     event.activationDate,
     event.decision,
     event.potentialScore,
@@ -263,7 +270,8 @@ export function normaliseOpportunityCalendar(input: {
       const title = text(event.title, "", 180);
       const startDate = validDate(event.startDate);
       if (!title || !startDate || startDate < input.windowStart || startDate > input.windowEnd) return null;
-      const id = eventId(startDate, title);
+      const sourceIdentity = input.model === 'openholidays' && typeof event.sourceIdentity === 'string' && /^openholidays:(MD|DE):[0-9a-f-]{36}(?::\d{4}-\d{2}-\d{2})?$/.test(event.sourceIdentity) ? event.sourceIdentity : undefined;
+      const id = sourceIdentity ? `opp_source_${sourceIdentity}` : eventId(startDate, title);
       if (deletedEventIds.has(id)) return null;
       if (seen.has(id)) return null;
       seen.add(id);
@@ -311,7 +319,7 @@ export function normaliseOpportunityCalendar(input: {
         ? requestedActivation
         : startDate;
       const previous = previousById.get(id)
-        ?? previousByDateTitle.get(`${startDate}|${title.toLocaleLowerCase("ru")}`);
+        ?? (sourceIdentity ? undefined : previousByDateTitle.get(`${startDate}|${title.toLocaleLowerCase("ru")}`));
       const decision = previous?.decision ?? "watching";
       const recommendation = {
         format: text(recommendationRaw.format, "Определить формат после проверки спроса.", 700),
@@ -324,6 +332,7 @@ export function normaliseOpportunityCalendar(input: {
 
       const normalised: OpportunityEvent = {
         id,
+        ...(sourceIdentity ? {sourceIdentity,sourceRevision:(previous?.sourceRevision??0)+(previous&&(previous.startDate!==startDate||previous.activationDate!==activationDate)?1:0),sourceScheduleChanged:Boolean(previous && (previous.sourceScheduleChanged || previous.startDate!==startDate || previous.activationDate!==activationDate))} : {}),
         title,
         category,
         calendarType: calendarTypes.has(text(event.calendarType))
@@ -350,6 +359,7 @@ export function normaliseOpportunityCalendar(input: {
         audience: text(event.audience, "Потенциальная аудитория требует проверки.", 500),
         summary: text(event.summary, "Подтверждённое событие в зоне интереса заведения.", 900),
         potentialScore: score,
+        assessmentAvailable: event.assessmentAvailable !== false,
         potentialLabel: potentialLabel(score),
         confidence: confidence(event.confidence),
         scoreReason: text(event.scoreReason, "Оценка основана на соответствии формату, дате и локации.", 900),
@@ -373,7 +383,7 @@ export function normaliseOpportunityCalendar(input: {
     })
     .filter((event): event is OpportunityEvent => Boolean(event))
     .sort((left, right) => left.startDate.localeCompare(right.startDate) || right.potentialScore - left.potentialScore)
-    .slice(0, 24);
+    .slice(0, ['verified-cis-2026-2027','openholidays','holidays-0.107-reserve'].includes(input.model) ? 512 : 24);
 
   return {
     version: OPPORTUNITY_CALENDAR_VERSION,
@@ -430,7 +440,7 @@ function notificationCandidates(event: OpportunityEvent): Array<{
   kind: ScheduledOpportunityMessage["kind"];
   date: string;
 }> {
-  if (event.decision === "dismissed") return [];
+  if (event.sourceMissing || event.decision === "dismissed") return [];
   const deadline = event.recommendation.decisionDeadline
     ?? addDays(event.activationDate, -event.recommendation.leadDays);
   if (event.decision === "planned") {
@@ -469,7 +479,7 @@ function sameSignature(left: OpportunityEvent, right: OpportunityEvent): boolean
 
 async function cancelEventMessages(accountId: number, event: OpportunityEvent): Promise<void> {
   for (const message of event.notificationPlan?.messages ?? []) {
-    await cancelScheduledPush(accountId, message.providerMessageId, message.dedupeKey);
+    if (Date.parse(message.sendAt)>Date.now() && !await cancelScheduledPush(accountId, message.providerMessageId, message.dedupeKey)) throw new Error("Отмена прежнего напоминания не подтверждена. Повторите позже.");
   }
 }
 
@@ -486,6 +496,7 @@ async function reconcileRecipientOpportunityNotifications(input: {
   const now = Date.now();
 
   for (const previousEvent of input.previous?.events ?? []) {
+    if (input.next.events.find(event=>event.id===previousEvent.id)?.sourceMissing || input.next.events.find(event=>event.id===previousEvent.id)?.sourceScheduleChanged) continue;
     const nextEvent = input.next.events.find((event) => event.id === previousEvent.id);
     const canReuse = Boolean(enabled && nextEvent && sameSignature(previousEvent, nextEvent));
     if (!canReuse) {
@@ -496,6 +507,13 @@ async function reconcileRecipientOpportunityNotifications(input: {
 
   for (const event of input.next.events) {
     const signature = scheduleSignature(event);
+    if(event.sourceMissing || event.sourceScheduleChanged){
+      await cancelPendingOpportunityJobs(input.accountId,input.venueId!,calendarNotificationSource(input.venueId!,event.id));
+      event.notificationPlan=emptyNotificationPlan(signature);
+      // Persist the acknowledged cancellation before a later reconciliation creates replacements.
+      if(event.sourceScheduleChanged) event.sourceScheduleChanged=false;
+      continue;
+    }
     if (!enabled) {
       await cancelNotificationJobsForSource(input.accountId, "opportunity", calendarNotificationSource(input.venueId!, event.id), "Календарные уведомления отключены");
       event.notificationPlan = {
@@ -529,7 +547,7 @@ async function reconcileRecipientOpportunityNotifications(input: {
 
     const candidateRows = candidates.map((candidate) => ({
       ...candidate,
-      dedupeKey: `opportunity:venue:${input.venueId}:${event.id}:${candidate.kind}:${candidate.sendAt.slice(0, 10)}`,
+      dedupeKey: `opportunity:venue:${input.venueId}:${event.id}:${candidate.kind}:${candidate.sendAt.slice(0, 10)}${event.sourceRevision ? `:r${event.sourceRevision}` : ""}`,
     }));
     for (const candidate of candidateRows) {
       await enqueueNotificationJob({
@@ -639,6 +657,7 @@ export async function reconcileOpportunityNotifications(input: {
     calendars.push(await reconcileRecipientOpportunityNotifications({...input,accountId,previous,next:structuredClone(input.next)}));
   }
   for (let i=0;i<input.next.events.length;i++) {
+    if(input.next.events[i].sourceScheduleChanged && calendars.every(calendar=>!calendar.events[i].sourceScheduleChanged)) input.next.events[i].sourceScheduleChanged=false;
     const plans=calendars.map(calendar=>calendar.events[i].notificationPlan);
     const messages=plans.flatMap(plan=>plan.messages);
     const queuedCount=plans.reduce((n,plan)=>n+(plan.queuedCount??0),0);

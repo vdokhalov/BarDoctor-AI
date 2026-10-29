@@ -1,0 +1,301 @@
+[
+  {
+    "id": "091f8ddb-fe35-496a-b9ed-abf9c36688cd",
+    "startDate": "2027-01-01",
+    "endDate": "2027-01-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Anul Nou"
+      },
+      {
+        "language": "DE",
+        "text": "Neujahr"
+      },
+      {
+        "language": "EN",
+        "text": "New Year"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "e4d5bc45-641c-4772-9b9f-20c275674943",
+    "startDate": "2027-01-07",
+    "endDate": "2027-01-08",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Naşterea lui Iisus Hristos (Crăciunul pe stil vechi)"
+      },
+      {
+        "language": "DE",
+        "text": "Geburt Jesu Christi (Weihnachten im alten Stil)"
+      },
+      {
+        "language": "EN",
+        "text": "Birth of Jesus Christ (Christmas in the old style)"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "4d387f8d-2467-43c9-b8ad-dea18746d73f",
+    "startDate": "2027-03-08",
+    "endDate": "2027-03-08",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua internaţională a femeii"
+      },
+      {
+        "language": "DE",
+        "text": "Internationaler Frauentag"
+      },
+      {
+        "language": "EN",
+        "text": "International Women's Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "0a652ec9-1524-49cb-af53-379c3f3f81cd",
+    "startDate": "2027-05-01",
+    "endDate": "2027-05-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua internaţională a solidarităţii oamenilor muncii"
+      },
+      {
+        "language": "DE",
+        "text": "Tag der Arbeit"
+      },
+      {
+        "language": "EN",
+        "text": "Labour Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "3b2abf5c-88b9-46b7-8f13-d4326f5ba65a",
+    "startDate": "2027-05-02",
+    "endDate": "2027-05-02",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Prima zi de Paşti conform calendarului bisericesc"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Ostersonntag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Easter Sunday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "78ed9159-bb6a-413e-b1e0-bb2c8d8e15ec",
+    "startDate": "2027-05-03",
+    "endDate": "2027-05-03",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "A doua zi de Paște conform calendarului bisericesc"
+      },
+      {
+        "language": "DE",
+        "text": "Orthodoxer Ostermontag"
+      },
+      {
+        "language": "EN",
+        "text": "Orthodox Easter Monday"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "43ab8527-069f-4226-a6c5-5bfac575f00b",
+    "startDate": "2027-05-09",
+    "endDate": "2027-05-09",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Victoriei şi a comemorării eroilor căzuţi pentru Independenţa Patriei"
+      },
+      {
+        "language": "DE",
+        "text": "Tag des Sieges"
+      },
+      {
+        "language": "EN",
+        "text": "Victory Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "5a3721ae-b032-4e0f-b3d1-fa618d62b57b",
+    "startDate": "2027-05-09",
+    "endDate": "2027-05-09",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Europei"
+      },
+      {
+        "language": "DE",
+        "text": "Europatag"
+      },
+      {
+        "language": "EN",
+        "text": "Europe Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "54b2df4c-04b0-43a0-a989-ccb6555e01ca",
+    "startDate": "2027-05-10",
+    "endDate": "2027-05-10",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua Comemorarii (Pastele Blajinilor)"
+      },
+      {
+        "language": "DE",
+        "text": "Gedenktag (Raduniza)"
+      },
+      {
+        "language": "EN",
+        "text": "Commemoration Day (Radonitsa)"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "321f53c6-0da9-4d41-b008-4db2fd3ed1af",
+    "startDate": "2027-06-01",
+    "endDate": "2027-06-01",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua ocrotirii copilului"
+      },
+      {
+        "language": "DE",
+        "text": "Weltkindertag"
+      },
+      {
+        "language": "EN",
+        "text": "Children's Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "42afcb4b-1536-40a2-b82b-7f8bce62b2f8",
+    "startDate": "2027-08-27",
+    "endDate": "2027-08-27",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Ziua independenţei Republicii Moldova"
+      },
+      {
+        "language": "DE",
+        "text": "Unabhängigkeitstag der Republik Moldau"
+      },
+      {
+        "language": "EN",
+        "text": "Independence Day of the Republic of Moldova"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "87d0ea21-2c14-45bb-80bc-2bd70d967a41",
+    "startDate": "2027-08-31",
+    "endDate": "2027-08-31",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Sărbătoarea \"Limba noastră\""
+      },
+      {
+        "language": "DE",
+        "text": "Nationaler Tag der Sprache"
+      },
+      {
+        "language": "EN",
+        "text": "National Language Day"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  },
+  {
+    "id": "54f3b54e-ba56-4144-9ddd-471c46391563",
+    "startDate": "2027-12-25",
+    "endDate": "2027-12-25",
+    "type": "Public",
+    "name": [
+      {
+        "language": "RO",
+        "text": "Naşterea lui Iisus Hristos (Crăciunul pe stil nou)"
+      },
+      {
+        "language": "DE",
+        "text": "Geburt Jesu Christi (Weihnachten im neuen Stil)"
+      },
+      {
+        "language": "EN",
+        "text": "Birth of Jesus Christ (Christmas in a new style)"
+      }
+    ],
+    "regionalScope": "National",
+    "temporalScope": "FullDay",
+    "nationwide": true
+  }
+]

@@ -1,0 +1,13 @@
+OpenHolidays API data
+Source: https://www.openholidaysapi.org/
+License: Open Database License (ODbL) 1.0
+https://opendatacommons.org/licenses/odbl/1-0/
+Sources and terms: https://www.openholidaysapi.org/en/faq/
+The OpenHolidays-derived dates in BarDoctor are attributed in each event's sources.
+Captured API test fixtures retain this attribution and the ODbL license.
+
+Fallback date data generated with holidays 0.107 (Vacanza), 2026-10-28.
+https://github.com/vacanza/holidays/tree/v0.107
+MIT license: /licenses/holidays-MIT.txt
+Fallback coverage: national holidays MD, DE; years 2026 and 2027.
+Not a source for local event listings or unpublished government decisions.

@@ -18,12 +18,15 @@
     return headers;
   }
 
+  function sessionContext() { return ["bd_session","bd_session_token","bd_active_venue_id"].map(function (key) { return localStorage.getItem(key) || ""; }).join(":"); }
   async function api(url, options, timeout) {
+    var capturedContext = sessionContext();
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, timeout || 35_000);
     try {
       var response = await fetch(url, Object.assign({}, options || {}, { headers: authHeaders(options && options.headers), signal: controller.signal }));
       var body = await response.json().catch(function () { return {}; });
+      if (capturedContext !== sessionContext()) { var stale = new Error("Контекст изменился"); stale.staleContext = true; throw stale; }
       if (!response.ok || body.ok === false) {
         var error = new Error(body.error || "Не удалось выполнить запрос");
         error.status = response.status;
@@ -128,6 +131,7 @@
   }
   function renderScore(event) {
     var score = element("div", "event-score");
+    if (event.assessmentAvailable === false) { score.append(element("span", "", event.evidenceAssessment ? "Без балла" : "Без оценки")); return score; }
     var number = element("p");
     number.append(element("strong", "", event.potentialScore), element("span", "", "/100"));
     var track = element("div", "score-segments");
@@ -143,6 +147,8 @@
     var plan = event.notificationPlan || {};
     var settings = state.notificationStatus || {};
     if (state.offline) return "Статус уведомлений не обновлён. Проверьте подключение.";
+    if (event.sourceScheduleChanged) return "Дата обновлена. Напоминания будут перенесены после отмены прежних.";
+    if (event.sourceMissing) return "Дата требует проверки. Новые напоминания приостановлены; ранее переданные могут прийти.";
     if (settings.enabled === false || settings.calendarAlerts === false) return "Уведомления календаря выключены в настройках";
     if (settings.serverConfigured === false) return "Отправка уведомлений пока не настроена";
     if (plan.status === "scheduled") return "Передано на отправку: " + Number(plan.count || 0) + ". Доставка на устройство не подтверждена.";
@@ -225,6 +231,7 @@
     tile.append(element("span", "", date(event.startDate, { month: "short" }).replace(".", "")), element("strong", "", date(event.startDate, { day: "2-digit" })), element("small", "", date(event.startDate, { weekday: "short" }).replace(".", "")));
     var copy = element("div", "event-copy");
     copy.append(element("h3", "", event.title), element("p", "event-reason", event.summary || event.scoreReason));
+    if (event.sourceMissing) copy.appendChild(element("strong", "source-review", "Дата требует проверки"));
     var category = element("span", "event-category " + event.category); category.append(element("i"), document.createTextNode(categoryLabel(event.category))); copy.appendChild(category);
     var timing=eventTiming(event);if(timing.past)copy.appendChild(element("small","timing-past","Событие прошло"));else if(timing.remaining===0)copy.appendChild(element("small","","Сегодня"));
     var score = renderScore(event);
@@ -234,7 +241,8 @@
 
     var details = element("details", "event-details"); details.appendChild(element("summary", "", "Подробнее"));
     var content = element("div", "details-content");
-    content.append(
+    if (event.evidenceAssessment) content.appendChild(detailBlock("Предварительная оценка", textList([event.evidenceAssessment.schedule, event.evidenceAssessment.history, event.evidenceAssessment.conclusion])));
+    if (event.assessmentAvailable !== false) content.append(
       detailBlock("Почему такая оценка", element("p", "", event.scoreReason || "—")),
       detailBlock("Факторы оценки", breakdownBlock(event)),
       detailBlock("Почему это полезно", textList(event.whyUseful)),
@@ -275,15 +283,22 @@
     $("#calendar-summary").classList.toggle("hidden", !state.calendar);
     $("#calendar-content").classList.toggle("hidden", !state.calendar);
     $("#empty-state").classList.toggle("hidden", Boolean(state.calendar) || state.bootstrapping || state.refreshing);
-    if (state.calendar) { renderSummary(); renderEvents(); }
+    if (state.calendar) { renderSummary(); renderEvents(); var coverage = $("#calendar-coverage"); if (coverage) {
+      var info = state.calendar.summary || "Покрытие дат не проверено. Местная афиша не обновляется.";
+      if (state.sync && state.sync.lastChecked && Number.isFinite(Date.parse(state.sync.lastChecked))) info += " Проверено: " + new Date(state.sync.lastChecked).toLocaleString("ru-RU", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) + ".";
+      if (state.sync && state.sync.error) info += " Источник недоступен; показаны сохранённые данные.";
+      coverage.textContent = info;
+    } }
     var button = $("#refresh-calendar"); button.disabled = state.refreshing; button.querySelector("b").textContent = state.refreshing ? "Обновляю…" : "Обновить";
   }
 
   async function refreshCalendar(automatic) {
-    if (state.refreshing || automatic) return;
-    if (!window.confirm("Платный AI-поиск календаря: один запрос, до 6 поисковых действий и 7000 выходных токенов. Данные заведения отправляются AI-провайдеру. Денежный потолок не установлен. Продолжить?")) return;
-    var lease = automatic && shared ? shared.acquireRefreshLease() : "manual";
+    if (state.refreshing || (automatic && (!state.sync || !state.sync.supported || !state.sync.allowed || !state.sync.due))) return;
+
+    var refreshContext = sessionContext();
+    var lease = automatic && shared ? await shared.acquireRefreshLease() : "manual";
     if (automatic && !lease) return;
+    if (refreshContext !== sessionContext()) { if (automatic && shared) shared.releaseRefreshLease(lease); return; }
     state.refreshing = true; state.refreshFailed = false; render();
     if (!automatic) showNotice("Проверяю новые события. Сохранённый календарь остаётся доступен.", "info");
     try {
@@ -291,9 +306,10 @@
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "refresh", automatic: Boolean(automatic), knownGeneratedAt: state.calendar && state.calendar.generatedAt, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Europe/Chisinau" }),
       }, 175_000);
-      state.calendar = result.calendar || state.calendar; state.offline = false; state.refreshFailed = false; cacheCurrent(result);
+      state.sync = result.sync || state.sync; state.calendar = result.calendar || state.calendar; state.offline = false; state.refreshFailed = false; cacheCurrent(result);
       if (!automatic || result.partial) showNotice(result.warning || result.message, result.partial ? "info" : "success");
     } catch (error) {
+      if (error.staleContext) return;
       state.refreshFailed = Boolean(state.calendar);
       showNotice(state.calendar ? "Не удалось завершить актуализацию. Показаны последние сохранённые данные." : (error.message || "Не удалось собрать календарь."), "warning");
     } finally {
@@ -318,8 +334,11 @@
     sheet.addEventListener("click", function (event) { var button = event.target.closest("button[data-route]"); if (button) location.href = button.dataset.route; });
   }
   function applyResponse(result, offline) {
-    state.restaurant = result.restaurant || state.restaurant || {}; state.calendar = result.calendar || null; state.notificationStatus = result.notificationStatus || {}; state.horizonDays = Number(result.horizonDays) || 365; state.offline = Boolean(offline); state.bootstrapping = false;
+    state.sync = result.sync || null; state.restaurant = result.restaurant || state.restaurant || {}; state.calendar = result.calendar || null; state.notificationStatus = result.notificationStatus || {}; state.horizonDays = Number(result.horizonDays) || 365; state.offline = Boolean(offline); state.bootstrapping = false;
   }
+  window.addEventListener("bd:bootstrap-start", function () { state.calendar = null; state.sync = null; state.bootstrapping = true; render(); });
+  window.addEventListener("bd:calendar-checked", function () { var result = shared && shared.readSnapshot(); if (result) { applyResponse(result, false); render(); } });
+  window.addEventListener("storage", function (event) { if (event.key && event.key.indexOf("bd_opportunity_server_snapshot_v327:") === 0) { var result = shared && shared.readSnapshot(); if (result) { applyResponse(result, false); render(); } } });
   async function initialise() {
     setupFilters(); setupQuickAdd();
     $("#refresh-calendar").addEventListener("click", function () { refreshCalendar(false); }); $("#empty-refresh").addEventListener("click", function () { refreshCalendar(false); }); render();
@@ -330,8 +349,11 @@
     }
     try {
       var result = await api("/api/opportunities", {}, 15_000); applyResponse(result, false); if (shared) shared.writeSnapshot(result); render();
-      if (result.stale) showNotice("Показан сохранённый календарь. Для платного AI-поиска нажмите «Обновить».", "info");
+      if (result.sync && result.sync.supported && result.sync.allowed && result.sync.due) await refreshCalendar(true);
+      else if (result.sync && result.sync.message) showNotice(result.sync.message, "info");
+      else if (result.stale) showNotice("Показан сохранённый календарь. Для обновления бесплатного справочника нажмите «Обновить».", "info");
     } catch (error) {
+      if (error.staleContext) return;
       if (error.status === 401) { showNotice("Сначала войдите в BarDoctor.", "warning"); setTimeout(function () { location.href = "/"; }, 900); return; }
       if (cached && cached.calendar) { applyResponse(cached, true); render(); }
       else { state.bootstrapping = false; render(); showNotice(error.message || "Не удалось открыть календарь.", "warning"); }

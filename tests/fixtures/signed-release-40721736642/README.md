@@ -1,0 +1,1 @@
+Public Release holiday-feed-40721736642-1, downloaded 2026-10-28. No user or business data. Payload SHA256 037b495c9c8fb19689ac980721f0f009dbb15ee05acfad00c262098589a483c2. Bundle verifies approved source dd0f2246390401989c86661a504c7284aa04721a. Tests fix the clock to publication time; this fixture must not be used as a perpetual freshness exception.

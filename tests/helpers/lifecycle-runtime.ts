@@ -67,7 +67,8 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
     construct(target, args) { return Reflect.construct(target, args.length ? args : [options.now]); },
     get(target, property) { return property === 'now' ? () => Date.parse(options.now!) : Reflect.get(target, property); },
   }) : Date;
-  new Function('require', 'module', 'exports', 'Date', compiled.outputFiles[0].text)((name: string) => name === 'cloudflare:workers' ? { env: { DB: db, BUCKET: bucket, ...options.bindings } } : options.modules?.[name] ?? require(name), loaded, loaded.exports, clock);
+  const runtimeEnv:Record<string,unknown>={DB:db,BUCKET:bucket,...options.bindings};
+  new Function('require', 'module', 'exports', 'Date', compiled.outputFiles[0].text)((name: string) => name === 'cloudflare:workers' ? { env: runtimeEnv } : options.modules?.[name] ?? require(name), loaded, loaded.exports, clock);
   const api = loaded.exports as Api & Record<string, Route>;
   async function register(email: string) {
     const response = await api.register.POST(new Request('https://isolated.test/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'Isolated-Test-Password-123!', firstName: 'Test' }) }));
@@ -77,5 +78,5 @@ export async function lifecycleRuntime(extraRoutes: Record<string, string> = {},
   function request(user: { email: string; token: string }, path: string, method = 'GET', data?: unknown) {
     return new Request(`https://isolated.test${path}`, { method, headers: { 'Content-Type': 'application/json', 'X-Session-Email': user.email, 'X-Session-Token': user.token }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) });
   }
-  return { api, sqlite, objects, register, request, setNow:(now:string)=>{options.now=now;}, onRead: (callback: ((sql: string) => void | Promise<void>) | null) => { beforeRead = callback; }, beforeNextBatch: (callback: () => void | Promise<void>) => { beforeBatch = callback; }, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failDatabaseRead: () => { failRead = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
+  return { api, sqlite, objects, register, request, setBinding:(key:string,value:unknown)=>{runtimeEnv[key]=value}, setNow:(now:string)=>{options.now=now;}, onRead: (callback: ((sql: string) => void | Promise<void>) | null) => { beforeRead = callback; }, beforeNextBatch: (callback: () => void | Promise<void>) => { beforeBatch = callback; }, beforeNextDomainWrite: (callback: () => void | Promise<void>) => { beforeDomainWrite = callback; }, failDatabase: () => { failBatch = true; }, failDatabaseRead: () => { failRead = true; }, failStorage: (value: boolean) => { failStorage = value; }, close: () => sqlite.close() };
 }

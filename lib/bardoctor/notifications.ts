@@ -555,7 +555,8 @@ export async function cancelScheduledPush(
     return false;
   }
 
-  const cancelled = response.ok;
+  const cancellation = await response.json().catch(() => null) as {success?:boolean}|null;
+  const cancelled = response.ok && cancellation?.success === true;
   const status = cancelled ? "cancelled" : response.status === 400 || response.status === 404
     ? "expired"
     : "scheduled";

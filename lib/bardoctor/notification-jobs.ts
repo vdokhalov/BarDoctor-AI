@@ -1,3 +1,4 @@
+import {holidaySourceHeld} from './holiday-notification-guard';
 import { calendarNotificationRecipients } from "./calendar-notification-recipients";
 import { and, eq } from "drizzle-orm";
 import { getD1, getDb } from "../../db";
@@ -8,7 +9,7 @@ import {
   ONESIGNAL_MIN_SCHEDULE_LEAD_MS,
   ONESIGNAL_SCHEDULE_SAFETY_MS,
 } from "./notification-schedule-window";
-import { sendPushToAccount } from "./notifications";
+import { sendPushToAccount, cancelScheduledPush } from "./notifications";
 import { notificationRetryAt } from "./notification-retry";
 import type { NotificationCategory } from "./notification-types";
 
@@ -123,6 +124,11 @@ export async function dispatchNotificationJobs(input: {
         AND (venue_id IS NULL OR EXISTS (SELECT 1 FROM venues WHERE venues.id=notification_jobs.venue_id AND venues.status='active'))
     `).bind(nowIso, nowIso, job.id, staleLease).run();
     if ((claim.meta.changes ?? 0) !== 1) continue;
+    if(job.source_type==='opportunity'&&job.venue_id&&await holidaySourceHeld(job.venue_id,job.source_id)){
+      const cancelled=await getD1().prepare("UPDATE notification_jobs SET status='cancelled',leased_at=NULL,updated_at=? WHERE id=? AND status='dispatching' AND provider_message_id IS NULL").bind(nowIso,job.id).run();
+      if(cancelled.meta.changes)await transition(job.id,'dispatching','cancelled','Дата больше не подтверждается источником');
+      continue;
+    }
     summary.checked += 1; await transition(job.id, job.status, "dispatching", `Попытка ${job.attempt_count + 1}`);
     try {
       const result = await sendPushToAccount(job.account_id, input.origin, {
@@ -154,4 +160,20 @@ export async function dispatchNotificationJobs(input: {
     if (changed.length) { await transition(row.id, row.status, "expired", "Целевое время прошло до передачи провайдеру"); summary.expired += 1; }
   }
   return summary;
+}
+
+/** Only future messages; provider cancellation must be acknowledged before changing local status. */
+export async function cancelPendingOpportunityJobs(accountId:number,venueId:number,sourceId:string):Promise<void>{
+ const now=new Date().toISOString();
+ const rows=await getD1().prepare("SELECT * FROM notification_jobs WHERE account_id=? AND venue_id=? AND source_type='opportunity' AND source_id=? AND target_at>? AND status NOT IN ('cancelled','expired')").bind(accountId,venueId,sourceId,now).all<NotificationJobRow>();
+ for(const job of rows.results??[]){
+  if(job.status==='dispatching')throw new Error('Отправка напоминания уже выполняется. Отмена пока не подтверждена.');
+  if(job.provider_message_id&&!await cancelScheduledPush(accountId,job.provider_message_id,job.dedupe_key))throw new Error('Отмена прежнего напоминания не подтверждена. Повторите позже.');
+  const result=await getD1().prepare("UPDATE notification_jobs SET status='cancelled',leased_at=NULL,updated_at=? WHERE id=? AND status=?").bind(now,job.id,job.status).run();
+  if(result.meta.changes)await transition(job.id,job.status,'cancelled','Дата больше не подтверждается источником');
+  else{
+   const current=await getD1().prepare('SELECT status FROM notification_jobs WHERE id=?').bind(job.id).first<{status:string}>();
+   if(current&& !['cancelled','expired'].includes(current.status))throw new Error('Состояние напоминания изменилось. Отмена пока не подтверждена.');
+  }
+ }
 }

@@ -1,0 +1,8 @@
+{
+  "payloadUrl": "https://raw.githubusercontent.com/vdokhalov/BarDoctor-AI/fadc66513f26eb8612ab9e3858ae7d936c996e32/qa/holiday-source-20261028.json",
+  "bundleUrl": "https://raw.githubusercontent.com/vdokhalov/BarDoctor-AI/fadc66513f26eb8612ab9e3858ae7d936c996e32/qa/holiday-source-20261028.sigstore.json",
+  "payloadSha256": "e8a7e79faf62cb533602094c6dbb97bcf28ab7ebf82634569d8b78f6a3709134",
+  "bundleSha256": "cee91ce89d00263067799a8dfada28fa64cc48314240dbf4a196aba4d1a140f1",
+  "runId": "40691897933",
+  "verifiedWorkflowSha": "99d310cc57c584af7e74b5fb755fc0479a7d86e6"
+}

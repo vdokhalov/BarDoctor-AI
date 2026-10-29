@@ -1,0 +1,2265 @@
+{
+  "checkedAt": "2026-10-28",
+  "years": [
+    2026,
+    2027
+  ],
+  "countries": {
+    "RU": {
+      "source": "https://xn--80akibcicpdbetz7e2g.xn--p1ai/questions/view/249110",
+      "dates": {
+        "01-01": "Новый год",
+        "01-02": "Новогодние каникулы",
+        "01-03": "Новогодние каникулы",
+        "01-04": "Новогодние каникулы",
+        "01-05": "Новогодние каникулы",
+        "01-06": "Новогодние каникулы",
+        "01-07": "Православное Рождество",
+        "01-08": "Новогодние каникулы",
+        "02-23": "День защитника Отечества",
+        "03-08": "Международный женский день",
+        "05-01": "Праздник Весны и Труда",
+        "05-09": "День Победы",
+        "06-12": "День России",
+        "11-04": "День народного единства"
+      },
+      "coverageNote": "Включена часть профессиональных праздников; полный перечень ещё сверяется. Региональные праздники не включены."
+    },
+    "BY": {
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "dates": {
+        "01-01": "Новый год",
+        "01-02": "Новый год",
+        "01-07": "Православное Рождество",
+        "03-08": "Международный женский день",
+        "05-01": "Праздник труда",
+        "05-09": "День Победы",
+        "07-03": "День независимости Беларуси",
+        "11-07": "День Октябрьской революции",
+        "12-25": "Католическое Рождество"
+      },
+      "coverageNote": "Пасха по православному и католическому календарям ещё не сверена. Региональные события не включены."
+    },
+    "KZ": {
+      "source": "https://www.gov.kz/org/enbek/documents/details/1034069?lang=ru",
+      "dates": {
+        "01-01": "Новый год",
+        "01-02": "Новый год",
+        "01-07": "Православное Рождество",
+        "03-08": "Международный женский день",
+        "03-15": "День Конституции Казахстана",
+        "03-21": "Наурыз",
+        "03-22": "Наурыз",
+        "03-23": "Наурыз",
+        "05-01": "Праздник единства народа Казахстана",
+        "05-07": "День защитника Отечества",
+        "05-09": "День Победы",
+        "07-06": "День столицы",
+        "10-25": "День Республики",
+        "12-16": "День независимости Казахстана"
+      },
+      "coverageNote": "Курбан айт на 2027 год ожидает официального уточнения. Профессиональные праздники пока не включены."
+    },
+    "AM": {
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "dates": {
+        "01-01": "Новый год",
+        "01-02": "Новый год",
+        "01-06": "Рождество и Богоявление",
+        "01-27": "День памяти погибших при защите Родины",
+        "01-28": "День армии",
+        "03-08": "Международный женский день",
+        "04-24": "День памяти жертв геноцида армян",
+        "05-01": "Праздник труда",
+        "05-09": "День Победы и мира",
+        "05-28": "День Республики",
+        "07-05": "День Конституции Армении",
+        "09-21": "День независимости Армении",
+        "12-31": "Канун Нового года"
+      },
+      "coverageNote": "Часть церковных дат и региональные праздники пока не включены."
+    },
+    "AZ": {
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "dates": {
+        "01-01": "Новый год",
+        "01-02": "Новый год",
+        "03-08": "Международный женский день",
+        "05-09": "День Победы над фашизмом",
+        "05-28": "День независимости Азербайджана",
+        "06-15": "День национального спасения",
+        "06-26": "День Вооружённых сил",
+        "11-08": "День Победы",
+        "11-09": "День Государственного флага",
+        "12-31": "День солидарности азербайджанцев мира"
+      },
+      "coverageNote": "Новруз, Рамазан и Гурбан на 2027 год ожидают официального объявления."
+    },
+    "KG": {
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "dates": {
+        "01-01": "Новый год",
+        "01-07": "Православное Рождество",
+        "03-08": "Международный женский день",
+        "03-21": "Нооруз",
+        "05-01": "Праздник труда",
+        "05-05": "День Конституции Кыргызстана",
+        "05-09": "День Победы",
+        "08-31": "День независимости Кыргызстана"
+      },
+      "coverageNote": "Орозо айт и Курман айт на 2027 год ожидают официального уточнения."
+    },
+    "TJ": {
+      "source": "https://mfa.tj/ru/moscow/tadzhikistan/kultura/natsionalnye-prazdniki",
+      "dates": {
+        "01-01": "Новый год",
+        "03-08": "День матери",
+        "03-21": "Навруз",
+        "03-22": "Навруз",
+        "03-23": "Навруз",
+        "03-24": "Навруз",
+        "05-09": "День Победы",
+        "11-06": "День Конституции Таджикистана",
+        "06-27": "День национального единства",
+        "09-09": "День независимости Таджикистана"
+      },
+      "coverageNote": "Полный перечень профессиональных и памятных дат ещё сверяется. Иди Рамазон на 2026 год ещё не сверён; религиозные даты 2027 года ожидают официального уточнения."
+    },
+    "TM": {
+      "source": "https://www.mfa.gov.tm/ru/articles/2;116255",
+      "dates": {
+        "01-01": "Новый год",
+        "03-08": "Международный женский день",
+        "03-21": "Национальный праздник весны",
+        "03-22": "Национальный праздник весны",
+        "05-18": "День Конституции и Государственного флага",
+        "09-27": "День независимости Туркменистана",
+        "10-06": "День поминовения",
+        "12-12": "Международный день нейтралитета"
+      },
+      "coverageNote": "Включена часть профессиональных и памятных дат; полный перечень ещё сверяется. Религиозные даты 2027 года ожидают официального объявления."
+    },
+    "UZ": {
+      "source": "https://lex.uz/docs/-6257288",
+      "dates": {
+        "01-01": "Новый год",
+        "03-08": "Международный женский день",
+        "03-21": "Навруз",
+        "05-09": "День памяти и почестей",
+        "09-01": "День независимости Узбекистана",
+        "10-01": "День учителей и наставников",
+        "12-08": "День Конституции Узбекистана"
+      },
+      "coverageNote": "Религиозные даты 2027 года ожидают официального объявления."
+    }
+  },
+  "additionalDates": [
+    {
+      "country": "BY",
+      "date": "2026-02-23",
+      "name": "День защитников Отечества и Вооружённых Сил",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-02-23",
+      "name": "День защитников Отечества и Вооружённых Сил",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-15",
+      "name": "День Конституции Беларуси",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-15",
+      "name": "День Конституции Беларуси",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-02",
+      "name": "День единения народов Беларуси и России",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-04-02",
+      "name": "День единения народов Беларуси и России",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-17",
+      "name": "День народного единства",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-17",
+      "name": "День народного единства",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-11-02",
+      "name": "День памяти",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-11-02",
+      "name": "День памяти",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-15",
+      "name": "День семьи",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-15",
+      "name": "День семьи",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-14",
+      "name": "День матери",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-14",
+      "name": "День матери",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-21",
+      "name": "День отца",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-21",
+      "name": "День отца",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-01",
+      "name": "День знаний",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-01",
+      "name": "День знаний",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-10",
+      "name": "День Государственного флага, герба и гимна Беларуси",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-09",
+      "name": "День Государственного флага, герба и гимна Беларуси",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-21",
+      "name": "Радуница",
+      "source": "https://mintrud.gov.by/uploads/files/Proizvodstvennyj-kalendar-2026.pdf",
+      "kind": "religious"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-11",
+      "name": "Радуница",
+      "source": "https://www.mintrud.gov.by/printv/ru/news-ru/view/o-perenose-rabochego-dnja-v-2027-godu-11929-2026/",
+      "kind": "religious"
+    },
+    {
+      "country": "AM",
+      "date": "2027-02-17",
+      "name": "День Месропа Маштоца",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-02-21",
+      "name": "День родного языка",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-02-28",
+      "name": "День памяти жертв погромов и защиты прав депортированных армян",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-04-07",
+      "name": "День материнства и красоты",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-04-16",
+      "name": "День армянского кино",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-04-19",
+      "name": "День налогоплательщика",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-05-08",
+      "name": "День защитника Отечества",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-05-15",
+      "name": "День семьи",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-05-16",
+      "name": "День студентов и молодёжи",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-06-01",
+      "name": "День защиты прав детей",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-06-14",
+      "name": "День памяти репрессированных",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-06-17",
+      "name": "День отца",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-08-03",
+      "name": "День памяти жертв геноцида езидов Синджара",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-08-03",
+      "name": "День памяти жертв геноцида езидов Синджара",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-08-11",
+      "name": "Навасард — день национальных традиций и культуры",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-08-11",
+      "name": "Навасард — день национальных традиций и культуры",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-08-23",
+      "name": "День государственных символов",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-08-23",
+      "name": "День государственных символов",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-09-01",
+      "name": "День знаний и письменности",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-09-01",
+      "name": "День знаний и письменности",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-10-05",
+      "name": "День учителя",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-10-05",
+      "name": "День учителя",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-11-10",
+      "name": "День местного самоуправления",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-11-10",
+      "name": "День местного самоуправления",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-12-07",
+      "name": "День памяти жертв землетрясения",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-12-07",
+      "name": "День памяти жертв землетрясения",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-12-09",
+      "name": "День осуждения и предотвращения геноцидов",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-12-09",
+      "name": "День осуждения и предотвращения геноцидов",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-10-04",
+      "name": "День национальных меньшинств Армении",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2026-10-10",
+      "name": "День переводчиков",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-10-03",
+      "name": "День национальных меньшинств Армении",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-10-09",
+      "name": "День переводчиков",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AM",
+      "date": "2027-04-25",
+      "name": "День гражданина Армении",
+      "source": "https://www.arlis.am/hy/acts/228539",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-10-18",
+      "name": "День восстановления независимости",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2027-10-18",
+      "name": "День восстановления независимости",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-11-12",
+      "name": "День Конституции Азербайджана",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2027-11-12",
+      "name": "День Конституции Азербайджана",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-11-17",
+      "name": "День национального возрождения",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2027-11-17",
+      "name": "День национального возрождения",
+      "source": "https://genprosecutor.gov.az/ru/page/azerbaycan/bayramlar",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-09-27",
+      "name": "День памяти",
+      "source": "https://president.az/ru/articles/view/48356",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2027-09-27",
+      "name": "День памяти",
+      "source": "https://president.az/ru/articles/view/48356",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-01-20",
+      "name": "День всенародной скорби",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2027-01-20",
+      "name": "День всенародной скорби",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "observance"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-20",
+      "name": "Новруз",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "holiday"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-21",
+      "name": "Новруз",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "holiday"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-22",
+      "name": "Новруз",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "holiday"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-23",
+      "name": "Новруз",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "holiday"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-24",
+      "name": "Новруз",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "holiday"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-20",
+      "name": "Рамазан",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "religious"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-03-21",
+      "name": "Рамазан",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "religious"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-05-27",
+      "name": "Гурбан",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "religious"
+    },
+    {
+      "country": "AZ",
+      "date": "2026-05-28",
+      "name": "Гурбан",
+      "source": "https://sosial.gov.az/az/faydali/istehsalat-teqvimi/2026-ci-ilin-istehsalat-teqvimi",
+      "kind": "religious"
+    },
+    {
+      "country": "KG",
+      "date": "2026-02-23",
+      "name": "День защитника Отечества",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2027-02-23",
+      "name": "День защитника Отечества",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2026-04-07",
+      "name": "День Апрельской народной революции",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2027-04-07",
+      "name": "День Апрельской народной революции",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2026-11-07",
+      "name": "День истории и памяти предков",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2027-11-07",
+      "name": "День истории и памяти предков",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2026-11-08",
+      "name": "День истории и памяти предков",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2027-11-08",
+      "name": "День истории и памяти предков",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "observance"
+    },
+    {
+      "country": "KG",
+      "date": "2026-01-02",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-01-02",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-01-03",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-01-03",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-01-04",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-01-04",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-01-05",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-01-05",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-01-06",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-01-06",
+      "name": "Новогодние каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-02",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-02",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-03",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-03",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-04",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-04",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-06",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-06",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-07",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-07",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-08",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2027-05-08",
+      "name": "Майские каникулы",
+      "source": "https://mlsp.gov.kg/ru/2025/01/27/sadyr-zhaparov-podpisal-novyj-trudovoj-kodeks/",
+      "kind": "holiday"
+    },
+    {
+      "country": "KG",
+      "date": "2026-03-20",
+      "name": "Орозо айт",
+      "source": "https://mlsp.gov.kg/ru/2026/03/11/v-mintruda-napomnili-o-vyhodnyh-dnyah-v-svyazi-s-prazdnikami-orozo-ajt-i-nooruz/",
+      "kind": "religious"
+    },
+    {
+      "country": "KZ",
+      "date": "2026-05-27",
+      "name": "Курбан айт",
+      "source": "https://www.muftyat.kz/ru/news/qmdb/2026-05-18/48344-27-maya---pervyij-den-prazdnika-kurban-ajt/",
+      "kind": "religious"
+    },
+    {
+      "country": "UZ",
+      "date": "2026-03-20",
+      "name": "Рамазан хайит",
+      "source": "https://president.uz/ru/lists/view/9019",
+      "kind": "religious"
+    },
+    {
+      "country": "UZ",
+      "date": "2026-05-27",
+      "name": "Курбан хайит",
+      "source": "https://president.uz/ru/lists/view/9233",
+      "kind": "religious"
+    },
+    {
+      "country": "TM",
+      "date": "2026-03-20",
+      "name": "Ораза байрамы",
+      "source": "https://www.turkmenistan.gov.tm/ru/post/104235/ukaz-prezidenta-turkmenistana-o-prazdnovanii-oraza-bajramy-i-perenose-vyhodnogo-dnya-po-sluchayu-nacionalnogo-prazdnika-vesny",
+      "kind": "religious"
+    },
+    {
+      "country": "TM",
+      "date": "2026-05-27",
+      "name": "Курбан байрамы",
+      "source": "https://www.turkmenistan.gov.tm/ru/post/106527/ukaz-prezidenta-turkmenistana-o-prazdnovanii-kurban-bajramy-5",
+      "kind": "religious"
+    },
+    {
+      "country": "TM",
+      "date": "2026-05-28",
+      "name": "Курбан байрамы",
+      "source": "https://www.turkmenistan.gov.tm/ru/post/106527/ukaz-prezidenta-turkmenistana-o-prazdnovanii-kurban-bajramy-5",
+      "kind": "religious"
+    },
+    {
+      "country": "TM",
+      "date": "2026-05-29",
+      "name": "Курбан байрамы",
+      "source": "https://www.turkmenistan.gov.tm/ru/post/106527/ukaz-prezidenta-turkmenistana-o-prazdnovanii-kurban-bajramy-5",
+      "kind": "religious"
+    },
+    {
+      "country": "TJ",
+      "date": "2026-05-27",
+      "name": "Иди Курбон",
+      "source": "https://shuroiulamo.tj/en/news/ids/1873",
+      "kind": "religious"
+    },
+    {
+      "country": "KG",
+      "date": "2026-05-27",
+      "name": "Курман айт",
+      "source": "https://ru.kabar.kg/news/v-kyrgyzstane-kurman-ajt-budet-prazdnovatsya-27-maya/",
+      "kind": "religious"
+    },
+    {
+      "country": "RU",
+      "date": "2026-01-09",
+      "name": "Перенесённый выходной",
+      "source": "https://static.government.ru/media/files/4jeB8hNKm69ggOa9yDiYOli6YoAyM21i.pdf",
+      "kind": "transfer"
+    },
+    {
+      "country": "RU",
+      "date": "2026-12-31",
+      "name": "Перенесённый выходной",
+      "source": "https://static.government.ru/media/files/4jeB8hNKm69ggOa9yDiYOli6YoAyM21i.pdf",
+      "kind": "transfer"
+    },
+    {
+      "country": "RU",
+      "date": "2027-02-22",
+      "name": "Перенесённый выходной",
+      "source": "https://www.mintrans.gov.ru/eye/press-center/branch-news/9491",
+      "kind": "transfer"
+    },
+    {
+      "country": "RU",
+      "date": "2027-11-05",
+      "name": "Перенесённый выходной",
+      "source": "https://www.mintrans.gov.ru/eye/press-center/branch-news/9491",
+      "kind": "transfer"
+    },
+    {
+      "country": "RU",
+      "date": "2027-12-31",
+      "name": "Перенесённый выходной",
+      "source": "https://www.mintrans.gov.ru/eye/press-center/branch-news/9491",
+      "kind": "transfer"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-20",
+      "name": "Перенесённый выходной",
+      "source": "https://pravo.by/novosti/novosti-pravo-by/2025/july/89567/",
+      "kind": "transfer"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-10",
+      "name": "Перенесённый выходной",
+      "source": "https://pravo.by/novosti/novosti-pravo-by/2026/october/95281/",
+      "kind": "transfer"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-05",
+      "name": "День работников социальной защиты",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-19",
+      "name": "День спасателя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-22",
+      "name": "День дипломатического работника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-02-21",
+      "name": "День работников землеустроительной и картографо-геодезической службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-04",
+      "name": "День милиции",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-18",
+      "name": "День внутренних войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-23",
+      "name": "День работников гидрометеорологической службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-22",
+      "name": "День судебного эксперта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-05",
+      "name": "День печати",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-07",
+      "name": "День работников радио, телевидения и связи",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-28",
+      "name": "День пограничника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-26",
+      "name": "День работников прокуратуры",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-30",
+      "name": "День экономиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-25",
+      "name": "День пожарной службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-02",
+      "name": "День работников органов государственного контроля",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-23",
+      "name": "День работников государственной статистики",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-12",
+      "name": "День сотрудника органов предварительного следствия",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-15",
+      "name": "День библиотек",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-20",
+      "name": "День таможенника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-06",
+      "name": "День архивиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-14",
+      "name": "День стандартизации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-15",
+      "name": "День работников фармацевтической и микробиологической промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-20",
+      "name": "День сотрудника органов государственной безопасности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-22",
+      "name": "День энергетика",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-21",
+      "name": "День инженерных войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-02",
+      "name": "День десантников и сил специальных операций",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-06",
+      "name": "День железнодорожных войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-11-19",
+      "name": "День ракетных войск и артиллерии",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-15",
+      "name": "День потребителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-05",
+      "name": "День охраны окружающей среды",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-21",
+      "name": "День мира",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-01",
+      "name": "День пожилых людей",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-03",
+      "name": "День инвалидов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-10",
+      "name": "День прав человека",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-17",
+      "name": "День белорусского кино",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-02-15",
+      "name": "День памяти воинов-интернационалистов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-26",
+      "name": "День чернобыльской трагедии",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-22",
+      "name": "День всенародной памяти жертв Великой Отечественной войны и геноцида белорусского народа",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-04",
+      "name": "День банковских и финансовых работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-01-25",
+      "name": "День белорусской науки",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-03-22",
+      "name": "День работников бытового обслуживания населения и жилищно-коммунального хозяйства",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-05",
+      "name": "День геолога",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-16",
+      "name": "День работников физической культуры и спорта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-05-31",
+      "name": "День химика",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-07",
+      "name": "День мелиоратора",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-14",
+      "name": "День работников лёгкой промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-21",
+      "name": "День медицинских работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-27",
+      "name": "День изобретателя и рационализатора",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-04",
+      "name": "День кооперации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-05",
+      "name": "День работников водного транспорта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-12",
+      "name": "День работников налоговых органов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-19",
+      "name": "День металлурга",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-07-26",
+      "name": "День работников торговли",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-02",
+      "name": "День железнодорожника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-09",
+      "name": "День строителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-30",
+      "name": "День шахтёра",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-06",
+      "name": "День работников нефтяной, газовой и топливной промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-20",
+      "name": "День работников леса",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-27",
+      "name": "День машиностроителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-04",
+      "name": "День учителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-11",
+      "name": "День работников культуры",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-10-25",
+      "name": "День автомобилиста и дорожника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-11-01",
+      "name": "День работников гражданской авиации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-11-15",
+      "name": "День работников сельского хозяйства и перерабатывающей промышленности агропромышленного комплекса",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-05",
+      "name": "День страховых работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-12-06",
+      "name": "День юриста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-04-12",
+      "name": "День войск противовоздушной обороны",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-08-16",
+      "name": "День военно-воздушных сил",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-13",
+      "name": "День танкиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-06-28",
+      "name": "День молодёжи и студенчества",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2026-09-06",
+      "name": "День белорусской письменности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-05",
+      "name": "День работников социальной защиты",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-19",
+      "name": "День спасателя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-22",
+      "name": "День дипломатического работника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-02-21",
+      "name": "День работников землеустроительной и картографо-геодезической службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-04",
+      "name": "День милиции",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-18",
+      "name": "День внутренних войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-23",
+      "name": "День работников гидрометеорологической службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-04-22",
+      "name": "День судебного эксперта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-05",
+      "name": "День печати",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-07",
+      "name": "День работников радио, телевидения и связи",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-28",
+      "name": "День пограничника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-26",
+      "name": "День работников прокуратуры",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-30",
+      "name": "День экономиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-25",
+      "name": "День пожарной службы",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-02",
+      "name": "День работников органов государственного контроля",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-23",
+      "name": "День работников государственной статистики",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-12",
+      "name": "День сотрудника органов предварительного следствия",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-15",
+      "name": "День библиотек",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-20",
+      "name": "День таможенника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-06",
+      "name": "День архивиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-14",
+      "name": "День стандартизации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-15",
+      "name": "День работников фармацевтической и микробиологической промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-20",
+      "name": "День сотрудника органов государственной безопасности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-22",
+      "name": "День энергетика",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-21",
+      "name": "День инженерных войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-02",
+      "name": "День десантников и сил специальных операций",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-06",
+      "name": "День железнодорожных войск",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-11-19",
+      "name": "День ракетных войск и артиллерии",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-15",
+      "name": "День потребителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-05",
+      "name": "День охраны окружающей среды",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-21",
+      "name": "День мира",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-01",
+      "name": "День пожилых людей",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-03",
+      "name": "День инвалидов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-10",
+      "name": "День прав человека",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-17",
+      "name": "День белорусского кино",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-02-15",
+      "name": "День памяти воинов-интернационалистов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-04-26",
+      "name": "День чернобыльской трагедии",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-22",
+      "name": "День всенародной памяти жертв Великой Отечественной войны и геноцида белорусского народа",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-03",
+      "name": "День банковских и финансовых работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-01-31",
+      "name": "День белорусской науки",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-03-28",
+      "name": "День работников бытового обслуживания населения и жилищно-коммунального хозяйства",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-04-04",
+      "name": "День геолога",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-15",
+      "name": "День работников физической культуры и спорта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-05-30",
+      "name": "День химика",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-06",
+      "name": "День мелиоратора",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-13",
+      "name": "День работников лёгкой промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-20",
+      "name": "День медицинских работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-26",
+      "name": "День изобретателя и рационализатора",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-03",
+      "name": "День кооперации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-04",
+      "name": "День работников водного транспорта",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-11",
+      "name": "День работников налоговых органов",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-18",
+      "name": "День металлурга",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-07-25",
+      "name": "День работников торговли",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-01",
+      "name": "День железнодорожника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-08",
+      "name": "День строителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-29",
+      "name": "День шахтёра",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-05",
+      "name": "День работников нефтяной, газовой и топливной промышленности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-19",
+      "name": "День работников леса",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-26",
+      "name": "День машиностроителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-03",
+      "name": "День учителя",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-10",
+      "name": "День работников культуры",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-10-31",
+      "name": "День автомобилиста и дорожника",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-11-07",
+      "name": "День работников гражданской авиации",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-11-21",
+      "name": "День работников сельского хозяйства и перерабатывающей промышленности агропромышленного комплекса",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-04",
+      "name": "День страховых работников",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-12-05",
+      "name": "День юриста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-04-11",
+      "name": "День войск противовоздушной обороны",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-08-15",
+      "name": "День военно-воздушных сил",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-12",
+      "name": "День танкиста",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-06-27",
+      "name": "День молодёжи и студенчества",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "BY",
+      "date": "2027-09-05",
+      "name": "День белорусской письменности",
+      "source": "https://president.gov.by/ru/gosudarstvo/prazdniki",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-01-27",
+      "name": "День защитника Отечества",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-02-18",
+      "name": "День дипломатических работников",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-04-07",
+      "name": "Всемирный день здоровья",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-05-09",
+      "name": "День Победы",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-06-12",
+      "name": "День науки",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-06-27",
+      "name": "День работников культуры, искусства и поэзии Махтумкули",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-09-01",
+      "name": "День знаний и студенческой молодёжи",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-10-01",
+      "name": "Международный день пожилых людей",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-10-10",
+      "name": "День работников здравоохранения и медицинской промышленности",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-08-06",
+      "name": "День работников строительного и промышленного комплекса",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-12-14",
+      "name": "День работников нефтегазовой промышленности и геологии",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-12-21",
+      "name": "День памяти первого президента Туркменистана",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-04-26",
+      "name": "Национальный праздник туркменского скакуна",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-10-25",
+      "name": "Праздник туркменского алабая",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2026-11-08",
+      "name": "Праздник урожая",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "RU",
+      "date": "2026-06-21",
+      "name": "День медицинского работника",
+      "source": "https://minzdrav.gov.ru/news/2022/06/18/18895-vladimir-putin-i-mihail-murashko-otkryli-19-ob-ektov-zdravoohraneniya-v-regionah-rossii",
+      "kind": "observance"
+    },
+    {
+      "country": "RU",
+      "date": "2026-10-04",
+      "name": "День работника электронной промышленности",
+      "source": "https://government.ru/news/51269/",
+      "kind": "observance"
+    },
+    {
+      "country": "TJ",
+      "date": "2026-08-18",
+      "name": "День работников сферы здравоохранения",
+      "source": "https://mfa.tj/ru/main/view/18781/kommentarii-k-ukazu-prezidenta-respubliki-tadzhikistan-o-mezhdunarodnoi-premii-abuali-ibn-sino-avitsenny-v-oblasti-meditsiny",
+      "kind": "observance"
+    },
+    {
+      "country": "TJ",
+      "date": "2026-10-05",
+      "name": "День государственного языка",
+      "source": "https://mfa.tj/ru/ashgabat/view/17763/prazdnovanie-dnya-gosudarstvennogo-yazyka-respubliki-tadzhikistan-v-turkmenistane",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-01-27",
+      "name": "День защитника Отечества",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-02-18",
+      "name": "День дипломатических работников",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-04-07",
+      "name": "Всемирный день здоровья",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-05-09",
+      "name": "День Победы",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-06-12",
+      "name": "День науки",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-06-27",
+      "name": "День работников культуры, искусства и поэзии Махтумкули",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-09-01",
+      "name": "День знаний и студенческой молодёжи",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-10-01",
+      "name": "Международный день пожилых людей",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-10-10",
+      "name": "День работников здравоохранения и медицинской промышленности",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-08-06",
+      "name": "День работников строительного и промышленного комплекса",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-12-14",
+      "name": "День работников нефтегазовой промышленности и геологии",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-12-21",
+      "name": "День памяти первого президента Туркменистана",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-04-25",
+      "name": "Национальный праздник туркменского скакуна",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-10-31",
+      "name": "Праздник туркменского алабая",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "TM",
+      "date": "2027-11-14",
+      "name": "Праздник урожая",
+      "source": "https://mejlis.gov.tm/turkmenistan/general-information?lang=ru",
+      "kind": "observance"
+    },
+    {
+      "country": "RU",
+      "date": "2027-06-20",
+      "name": "День медицинского работника",
+      "source": "https://minzdrav.gov.ru/news/2022/06/18/18895-vladimir-putin-i-mihail-murashko-otkryli-19-ob-ektov-zdravoohraneniya-v-regionah-rossii",
+      "kind": "observance"
+    },
+    {
+      "country": "RU",
+      "date": "2027-10-03",
+      "name": "День работника электронной промышленности",
+      "source": "https://government.ru/news/51269/",
+      "kind": "observance"
+    },
+    {
+      "country": "TJ",
+      "date": "2027-08-18",
+      "name": "День работников сферы здравоохранения",
+      "source": "https://mfa.tj/ru/main/view/18781/kommentarii-k-ukazu-prezidenta-respubliki-tadzhikistan-o-mezhdunarodnoi-premii-abuali-ibn-sino-avitsenny-v-oblasti-meditsiny",
+      "kind": "observance"
+    },
+    {
+      "country": "TJ",
+      "date": "2027-10-05",
+      "name": "День государственного языка",
+      "source": "https://mfa.tj/ru/ashgabat/view/17763/prazdnovanie-dnya-gosudarstvennogo-yazyka-respubliki-tadzhikistan-v-turkmenistane",
+      "kind": "observance"
+    }
+  ]
+}

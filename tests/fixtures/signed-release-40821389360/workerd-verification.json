@@ -1,0 +1,21 @@
+{
+  "runtime": "workerd",
+  "status": "PASS",
+  "results": [
+    "real pinned identity accepted with different caller SHA",
+    "idempotent replay",
+    "wrong producer",
+    "wrong caller path",
+    "wrong caller ref",
+    "rollback",
+    "payload tamper"
+  ],
+  "checkpoint": {
+    "digest": "037b495c9c8fb19689ac980721f0f009dbb15ee05acfad00c262098589a483c2",
+    "sourceSHA": "1cbed1e617beb85c3ecc2b3b1420b72e6a648141",
+    "invocation": "https://github.com/vdokhalov/BarDoctor-AI/actions/runs/40821389360/attempts/1",
+    "signedAt": 1793250364000,
+    "policyId": "49581b2c39fac2d048ed0a98eb23815304b8ae9892d758fe3494e0b85b55c44b",
+    "status": "verified"
+  }
+}

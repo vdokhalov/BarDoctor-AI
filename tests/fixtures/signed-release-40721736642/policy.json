@@ -1,0 +1,12 @@
+{
+  "repository": "vdokhalov/BarDoctor-AI",
+  "repositoryId": "1289866712",
+  "ownerId": "300073239",
+  "workflow": ".github/workflows/holiday-signed-release.yml",
+  "ref": "refs/heads/main",
+  "allowedSourceSHAs": [
+    "dd0f2246390401989c86661a504c7284aa04721a"
+  ],
+  "notBefore": 1793145600000,
+  "maxAgeMs": 1209600000
+}
